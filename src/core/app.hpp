@@ -34,6 +34,7 @@
 #include <deque>
 #include <future>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -876,6 +877,15 @@ private:
         recipe_registry        registry; ///< The worker's banded copy; play's registry after Begin.
         finish_campaign_result finish;   ///< The search's winner score (the seat reads it), the charter report.
         bool                   ready = false; ///< Set by the worker as its last write.
+        /// BL-1246 (STARTUP.md § Handoff, Ben 2026-10-10): the ground master's
+        /// IN-ROUND snapshot -- the home body's bake source, built by round 6's
+        /// worker from its OWN world right after the campaign road network is
+        /// laid (the generation tail; before the search and the settle), and
+        /// handed to the main thread here. Guarded by ground_mx; the main
+        /// thread takes it (moves it out) the frame it sees it.
+        std::mutex                                       ground_mx;
+        std::shared_ptr<const ui::ground::bake_source>   ground_roads;
+        entity_id                                        ground_roads_body = null_entity;
     };
     std::shared_ptr<wizard_world_cache> m_wiz_world_pending;
     std::shared_ptr<wizard_world_cache> m_wiz_world;
@@ -1113,12 +1123,18 @@ private:
     /// wizard pre-bake's source from @p w, or start it if none runs. @p what
     /// names the boundary in the log.
     void ground_round_boundary(const world& w, const char* what);
+    /// Round 6's in-round snapshot (the roads laid): when its worker has
+    /// handed one over in @p c, re-take the wizard pre-bake's source from it.
+    /// Main thread; once per run.
+    void ground_take_roads_snapshot(wizard_world_cache& c);
     /// Leaving the wizard's homeworld (a new gate world is coming, or the
     /// menu): stop the wizard pre-bake. No-op when none runs.
     void drop_wizard_ground(const char* why);
     /// BL-1246: the "Painting the ground" wait's sink (its bar is the master's
     /// chunks landed over its total).
     generation_progress m_paint_wait;
+    /// When the "Painting the ground" wait began (its length is said as play opens).
+    std::chrono::steady_clock::time_point m_paint_t0{};
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.

@@ -1086,6 +1086,30 @@ void app::ground_round_boundary(const world& w, const char* what)
     }
 }
 
+void app::ground_take_roads_snapshot(wizard_world_cache& c)
+{
+    std::shared_ptr<const ui::ground::bake_source> src;
+    entity_id body = null_entity;
+    {
+        std::lock_guard lk(c.ground_mx);
+        if (!c.ground_roads)
+            return;
+        src  = std::move(c.ground_roads);
+        body = c.ground_roads_body;
+    }
+    if (!m_ground_prebake_on || m_ground_bake_all || !m_ground_prebake_wizard)
+        return; // no wizard pre-bake to move: round 6's landing starts one
+    std::printf("[ground] in-round boundary: round 6's roads are laid (the search and settle run on)\n");
+    std::fflush(stdout);
+    if (!m_ground.resnapshot(body, std::move(src), /*assume_surveyed=*/true))
+    {
+        // Not the pre-bake's homeworld: round 6's landing boundary decides
+        // (it restarts the master if the identity really moved).
+        std::printf("[ground] the in-round snapshot is not the pre-bake's homeworld: skipped\n");
+        std::fflush(stdout);
+    }
+}
+
 void app::drop_wizard_ground(const char* why)
 {
     if (!m_ground_prebake_wizard)
@@ -1596,6 +1620,7 @@ void app::finish_new_game()
         {
             m_paint_wait.begin_wait();
             m_paint_wait.stage_count.store(1, std::memory_order_relaxed);
+            m_paint_t0 = std::chrono::steady_clock::now();
             m_screen = app_screen::painting_ground;
             std::printf("[begin] painting the ground: waiting on the home master (%d of %d chunks landed)\n",
                         paint_ready, paint_total);
@@ -1608,11 +1633,15 @@ void app::finish_new_game()
         // The pre-bake's whole cost, said once as play opens: master chunk
         // bakes, and how many of them were re-bakes a round boundary forced.
         const ground_layer::bake_stats& bs = m_ground.bake_counters();
+        char waited[64] = "no wait at the seat";
+        if (m_screen == app_screen::painting_ground)
+            std::snprintf(waited, sizeof waited, "after a %.1f s wait",
+                          std::chrono::duration<double>(std::chrono::steady_clock::now()
+                                                        - m_paint_t0).count());
         std::printf("[begin] the ground is painted: %s; %llu master chunk bakes for %d chunks "
                     "(%llu re-bakes, %llu of them as %llu windows: %.1f Mpx re-baked whole + "
                     "%.1f Mpx in windows)\n",
-                    m_screen == app_screen::painting_ground ? "after the wait above"
-                                                            : "no wait at the seat",
+                    waited,
                     static_cast<unsigned long long>(bs.chunk_bakes), paint_total,
                     static_cast<unsigned long long>(bs.chunk_rebakes),
                     static_cast<unsigned long long>(bs.chunk_patches),

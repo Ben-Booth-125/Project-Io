@@ -7,7 +7,7 @@
 -- (counted separately) its terrain — and a chunk whose own hashes held still
 -- on a day the body's installation digest moved elsewhere must not re-bake.
 -- verify.ground_chunk_probe() lists each ready MASTER chunk under the view
--- (tier 0 — BL-1246: one 96 px/hex master per body; a re-bake re-derives only
+-- (tier 0 — BL-1246: one 128 px/hex master per body; a re-bake re-derives only
 -- that chunk's mip pieces) plus the far page (tier -1) as
 -- { tier, key, bakes, installations, region }.
 --

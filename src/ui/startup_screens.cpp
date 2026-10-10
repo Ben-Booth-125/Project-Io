@@ -758,8 +758,11 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
     const auto cancel = std::make_shared<std::atomic<bool>>(false);
     m_wiz_run_cancel[lapse_index] = cancel;
 
+    // BL-1246: round 6 hands the ground an in-round snapshot only when a
+    // pre-bake can take it (the live app; never --verify).
+    const bool want_ground_roads = cache && m_ground_prebake_on && !m_ground_bake_all;
     auto run = [this, lapse_index, stage, start, cfg, cache, round6_record, cancel,
-                params = m_pending_world_params]() -> wizard_landing {
+                want_ground_roads, params = m_pending_world_params]() -> wizard_landing {
         generation_progress* const prog = &m_wiz_history_progress[lapse_index];
         // A stopped run hands back nothing: its round went stale, so the
         // landing drops it anyway. Round 6's record channel is always answered,
@@ -828,6 +831,39 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         if (stopped()) return wizard_landing{};
         run_generation_to(c, generation_stage::tail);
         if (stopped()) return wizard_landing{};
+        // BL-1246 (STARTUP.md § Handoff, Ben 2026-10-10): THE GROUND'S
+        // IN-ROUND SNAPSHOT. The tail has just laid the campaign road network
+        // (`generate_roads`, then the old roads stamped from the history) and
+        // the companies, so this worker builds the home body's bake source
+        // from ITS OWN world -- no other thread reads or writes it -- and
+        // hands it to the main thread through the cache
+        // (`ground_take_roads_snapshot`): the roads bake while the search and
+        // the settle run, rather than landing with the settle's buildings at
+        // the end. Unmasked, as every wizard boundary is. A read of a world
+        // nothing else touches: the build is unchanged by it.
+        //
+        // Why HERE and not after the search's apply (measured 2026-10-10,
+        // Release, seed 0, 45 s dwell per round): the painting wait was 10.4 s
+        // with the snapshot after the apply, 7.2 s with both, 6.5 s with this
+        // one alone -- the search's few seconds are worth more to the roads'
+        // re-bake than the apply's road-tier and firm deltas are to theirs.
+        if (want_ground_roads)
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            auto src = std::make_shared<const ui::ground::bake_source>(
+                ui::ground::prepare_source(c.w, c.w.home_body, /*reveal_all=*/true,
+                                           &cache->registry));
+            {
+                std::lock_guard lk(cache->ground_mx);
+                cache->ground_roads      = std::move(src);
+                cache->ground_roads_body = c.w.home_body;
+            }
+            std::printf("[ground] round 6 worker: roads laid, ground source snapshot built "
+                        "(%.0f ms on the worker)\n",
+                        std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - t0).count());
+            std::fflush(stdout);
+        }
         // THE SAME CALL BEGIN'S COLD WORKER MAKES, in the same order
         // (STARTUP.md § Handoff), so an adopted world and a cold build open
         // the campaign on one state hash.
@@ -1113,6 +1149,10 @@ void app::poll_wizard_history()
             land_wizard_record(i, std::move(rec));
         };
         take_round6_record();
+        // BL-1246: round 6's in-round ground snapshot (its roads laid), the
+        // moment its worker hands one over -- never a stale run's.
+        if (round6 && m_wiz_world_pending && !m_wiz_history_stale[i])
+            ground_take_roads_snapshot(*m_wiz_world_pending);
 
         if (!m_wiz_history_future[i].valid())
             continue;

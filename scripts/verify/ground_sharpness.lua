@@ -7,8 +7,9 @@
 -- prints the frame HUD's ground line as data (verify.ground_stats): the drawn
 -- hex radius (hex_size * zoom — the ground quad's own scale; F34), the LEVEL
 -- of the one master it drew from, texel/px (level px per hex / drawn px per
--- hex — >= 1.0 minified, < 1.0 magnified: only the top rung, reading the
--- 96 px master ~1.15x at the reference window, as accepted), the camera
+-- hex — >= 1.0 minified, < 1.0 magnified: no rung at the reference window
+-- (its top rung draws ~110 px from the 128 px master); the 4K-height top rung
+-- reads the master ~1.7x, as accepted), the camera
 -- squash (the one angle, every rung), the master's progress, and the RAM and
 -- GPU bytes per level. One capture per rung, frame HUD on, border band off
 -- so the ground is judged bare. Detail must not change between rungs — only
@@ -36,15 +37,20 @@ local function walk(tag, w, h)
             "GROUND %s %dx%d rung %d  draw_r %.2f  level %.0f  texel/px %.3f  sy %.4f  chunks %d  master %d/%d",
             tag, s.window_w, s.window_h, k, s.draw_r, s.level_ppr, s.texel_per_px, s.sy, s.chunks,
             s.master_ready, s.master_total))
-        if s.draw_r <= 96.0 then
+        if s.draw_r <= 128.0 then
             verify.expect(s.texel_per_px >= 1.0 - 1e-3, string.format(
-                "%s rung %d: at or under 96 px a level is never magnified (texel/px %.3f)",
+                "%s rung %d: at or under 128 px a level is never magnified (texel/px %.3f)",
                 tag, k, s.texel_per_px))
         else
-            -- Past the master's 96 px the master itself magnifies (accepted:
-            -- ~1.15x at the reference window, ~2.3x at 4K height).
-            verify.expect(s.level_ppr == 96.0, string.format(
-                "%s rung %d: past 96 px the master is drawn (level %.0f)", tag, k, s.level_ppr))
+            -- Past the master's 128 px the master itself magnifies (accepted:
+            -- ~1.7x at 4K height; no rung at the reference window).
+            verify.expect(s.level_ppr == 128.0, string.format(
+                "%s rung %d: past 128 px the master is drawn (level %.0f)", tag, k, s.level_ppr))
+        end
+        if tag == "ref" then
+            verify.expect(s.texel_per_px >= 1.0 - 1e-3, string.format(
+                "ref rung %d: no rung magnifies at the reference window (texel/px %.3f)",
+                k, s.texel_per_px))
         end
         verify.expect(s.texel_per_px <= 2.0 + 1e-3, string.format(
             "%s rung %d: the level is minified by at most 2:1 (texel/px %.3f)", tag, k, s.texel_per_px))

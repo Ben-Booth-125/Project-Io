@@ -19,9 +19,9 @@
 //
 // ONE MASTER PER BODY (docs/ui/RENDERING.md § Level of detail, Ben 2026-10-09:
 // "zooming doesn't add more detail"). Each body's ground is baked ONCE, whole
-// body, at 96 px per hex at the one camera angle (22.5 deg), in 512 px chunks
+// body, at 128 px per hex at the one camera angle (22.5 deg), in 512 px chunks
 // held in SYSTEM RAM. As each master chunk lands, the worker that baked it
-// box-downsamples it into its pieces of the 48 / 24 / 12 / 6 px levels — the
+// box-downsamples it into its pieces of the 64 / 32 / 16 / 8 px levels — the
 // mip chain — so every level is a chunked RAM image too. Each frame the
 // Planetary canvas draws ONE level, the coarsest at or above its drawn hex
 // radius (minified <= 2:1), and this layer uploads that level's visible
@@ -106,6 +106,16 @@ public:
     /// pre-bake target or @p w no longer holds it at the same grid (the
     /// homeworld changed identity): the caller starts again.
     bool resnapshot(const world& w, bool assume_surveyed);
+    /// AN IN-ROUND SNAPSHOT (STARTUP.md § Handoff, Ben 2026-10-10): the same
+    /// as resnapshot, with a source a round worker built from its OWN world at
+    /// a point inside the round (round 6, right after the campaign road
+    /// network is laid) and handed across — the main thread never reads a
+    /// world a worker is writing. @p src must be prepare_source of @p body with
+    /// reveal_all == @p assume_surveyed and the registry play runs on, so its
+    /// hashes agree with the boundary that follows. False when the pre-bake
+    /// target is not @p body at the same grid.
+    bool resnapshot(entity_id body, std::shared_ptr<const ui::ground::bake_source> src,
+                    bool assume_surveyed);
     /// The master is complete AND current: every chunk landed against the
     /// latest source snapshot, and that snapshot's sweep has run (a chunk
     /// a boundary moved is not counted whole until it has re-baked).
@@ -210,8 +220,8 @@ public:
     /// GPU texture LRU cap (textures of the active body; each <= 1 MB).
     static constexpr std::size_t k_gpu_cap = 320;
     /// RAM budget across bodies (TECH_FOUNDATIONS.md § Target hardware: 16 GB
-    /// minimum): the home body's master + chain is ~3.8 GB.
-    static constexpr long long   k_ram_budget = 6LL * 1024 * 1024 * 1024;
+    /// minimum): the home body's master + chain is ~6.7 GB at 128 px per hex.
+    static constexpr long long   k_ram_budget = 8LL * 1024 * 1024 * 1024;
     /// Master supersampling: 1x (measured 2026-10-09: the 2x whole-home bake
     /// does not fit the 15 s pre-bake budget — RENDERING.md § Level of detail).
     static constexpr int         k_master_ss = 1;
@@ -337,6 +347,11 @@ private:
     void alloc_master(body_state& b);
     void drop_master(body_state& b);
     void refresh_source(body_state& b, const world& w);
+    void set_source(body_state& b, std::shared_ptr<const ui::ground::bake_source> src);
+    /// A boundary's new source (either resnapshot): log what moved, set it,
+    /// and feed the pool so its sweep runs.
+    void land_boundary(body_state& b, std::shared_ptr<const ui::ground::bake_source> src,
+                       const char* what);
     void make_room(long long need, entity_id keep_a, entity_id keep_b);
     static long long master_bytes(const body_state& b);
 

@@ -9,37 +9,37 @@
 -- zoom change settles with verify.frames(2) before its capture.
 --
 -- BL-1246 (one master): every capture reads one level of the body's ONE
--- 96 px/hex master, at the one camera angle (22.5 degrees, every rung, every
+-- 128 px/hex master, at the one camera angle (22.5 degrees, every rung, every
 -- lens). Zooms below sit on (or near) the stepped x2 ladder's rungs —
--- kMinZoom * 2^k, k = 0..4 — so each capture reads one level: 12, 24, 48 and
--- 96 px/hex, the top rung reading the master ~1.15x magnified.
+-- kMinZoom * 2^k, k = 0..4 — so each capture reads one level: 8, 16, 32, 64
+-- and 128 px/hex, every rung minified (the top one ~1.16:1).
 
 verify.goto_surface("home")
 verify.set_overlay("none")
 
--- Rung 0, whole grid: the 12 px level. The wrap seam falls inside this frame;
+-- Rung 0, whole grid: the 8 px level. The wrap seam falls inside this frame;
 -- nothing may mark it. Border band now the muted single-tile ring.
 verify.set_zoom(1.26)
 verify.frames(2)
 verify.capture("ground_bake_wide")
 
--- Rung 1 (~13 px hexes): the 24 px level.
+-- Rung 1 (~13 px hexes): the 16 px level.
 verify.set_zoom(2.5)
 verify.frames(2)
 verify.capture("ground_bake_mid")
 
--- Rung 2 (~27 px hexes): the 48 px level — the working play view.
+-- Rung 2 (~27 px hexes): the 32 px level — the working play view.
 verify.set_zoom(5)
 verify.frames(2)
 verify.capture("ground_bake_play")
 
--- Rung 3 (~51 px hexes): the 96 px master, minified. The bake's own grain
+-- Rung 3 (~51 px hexes): the 64 px level, minified. The bake's own grain
 -- carries the ground; the vector texture pass must NOT be drawing.
 verify.set_zoom(10)
 verify.frames(2)
 verify.capture("ground_bake_close")
 
--- Rung 4 (~102 px hexes): the 96 px master, the top of the ladder:
+-- Rung 4 (~102 px hexes): the 128 px master, minified, the top of the ladder:
 -- height-displaced hills, standing trees, squashed chrome — at the same
 -- 22.5 degrees as every other rung.
 verify.set_zoom(20)
@@ -86,7 +86,7 @@ verify.set_overlay("none")
 -- every recipe group, every other placeable type, a construction site, a rival
 -- plant, a four-stack tile — and steps the six nearest population centres to a
 -- settlement ladder (scale 1-5) plus a ruin. C++ picks the ground; the script
--- learns only where it staged. Captured at EVERY rung, the 12 px level included, with
+-- learns only where it staged. Captured at EVERY rung, the 8 px level included, with
 -- the border band off so the structures are judged on bare ground.
 verify.set_overlay("none")
 verify.set_border_band(false)

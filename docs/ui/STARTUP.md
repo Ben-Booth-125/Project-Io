@@ -627,7 +627,7 @@ worker pool as soon as **the Life round has built the homeworld's terrain**, and
 rest of the wizard, which the player spends minutes watching. Each later round changes the
 world on its own worker, so the ground layer takes a **fresh source snapshot only at a round
 boundary** — and one more **inside round 6, right after the campaign road network is laid**
-(Ben, 2026-10-10), so the roads bake while the settle runs instead of landing with its
+(Ben, 2026-10-10), so the roads bake while the landscape search and the settle run instead of landing with its
 buildings at the end — never from a world a round worker is still mutating; whatever a round changed —
 history's urban growth, settlements, roads, the settle's buildings — moves only the content
 hashes of its own chunks, and only those chunks re-bake. Play does not open on a half-painted

@@ -515,8 +515,8 @@ been a fresh, expensive bake, and that bake was the lag.
   the one camera angle (§ One angle), whole-body, in 512 px chunks. Everything the
   player sees at any rung is this image: the close-tier features (trees, crags, strata,
   structures) are always in it and simply grow small with distance.
-- **Every other zoom is a downsample.** A **mip chain** — 48, 24, 12 and the 6 px far
-  page — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
+- **Every other zoom is a downsample.** A **mip chain** — 64, 32, 16 and 8 px per hex
+  — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
   draws the level at or above its drawn radius, minified by at most 2:1, so no step
   shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
   with zoom; only scale does.
@@ -531,7 +531,7 @@ been a fresh, expensive bake, and that bake was the lag.
   rest behind it. A RAM budget drops the masters of the least-recently-visited bodies,
   keeping their far pages.
 - **The bake is pooled.** All baking runs on the worker pool (§ Chunks, cache and
-  invalidation); the home body's master is about 3,000 chunks (2,975 at 261×121), work
+  invalidation); the home body's master is about 5,200 chunks (5,244 at 261×121), work
   only a pool can carry. Its cost is a measurement, not an estimate:
   `ground_bake_check --master` times the whole master, surveyed and masked, at 1× and 2×,
   and with each pass switched off in turn.
