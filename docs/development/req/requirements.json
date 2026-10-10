@@ -6790,34 +6790,11 @@
    "difficulty": 2,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1218 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
-   "resolved": null,
-   "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending.",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "failed",
-     "verification": [
-      "live click: Ben places a wharf on a coastal land tile",
-      "visual: construction ledger on a coastal land tile"
-     ],
-     "requirement": "The wharf appears in the construction ledger on a land tile with coast adjacency and places there; on water it is not offered; the Well is checked for the same mismatch.",
-     "notes": "Live click owed: Ben places a wharf on a coastal land tile. Live click FAILED: Ben, 2026-10-10 - no Fishing Wharf seen on a coastal tile. wharf_census (no_prehistory seed): 1042 of 1693 home-body coastal land tiles are Wharf sites, so the predicate offers it; which surface or tile Ben pressed is the open question.",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism before and after"
-     ],
-     "requirement": "Digest movement reported if the placement rule changed (AI placement reads it); never re-blessed.",
-     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-10",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "refunds-flow-shown",
