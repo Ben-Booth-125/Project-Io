@@ -92,6 +92,11 @@ struct bake_params
     // a fractal detail field whose amplitude grows with the landform bias — a
     // plains stays calm, a range reads craggy.
     float relief_gain     = 9.0f;   ///< Hillshade strength on the combined gradient.
+    /// The base hillshade's sign. +1 is the shading as baked, which lights the
+    /// SE-facing slopes — the opposite of the landform pass and the tree and
+    /// structure shadows (NR-1006 (e)); -1 lights the NW-facing slopes, as the
+    /// NW light every other pass uses. Flipping moves every golden: Ben's call.
+    float hillshade_sign  = 1.0f;
     float altitude_gain   = 0.30f;  ///< Luminance lift with normalised height.
     float landform_accent = 2.2f;   ///< Detail amplitude multiplier from |relief bias|.
     float detail_amp      = 0.30f;  ///< Fractal height-detail base amplitude.
@@ -158,6 +163,16 @@ struct bake_params
     float border_strength   = 1.0f;
     // Family patterns and grain (furrows, tussocks, scree, ripples). 0 = none.
     float pattern_strength  = 1.0f;
+    // Crisper texture inside a tile (BL-1254, RENDERING.md § Tiles hold their
+    // own ground; Ben 2026-10-09: the ground read softer than the buildings).
+    // Moves the base ground's energy from soft blotches to crisp marks: the
+    // broad grain octave hands over to a firmer fine grain and a fleck grain,
+    // patch edges firm, the relief gradient resolves its folds as creases
+    // (a plain's soft swells ease), and relief creases and the family
+    // patterns carry a light contact ink.
+    // Nominal-keyed: full at the 96 px master, nothing at the far page. The
+    // per-tile tone (the honeycomb) is untouched. 0 = the pre-BL-1254 look.
+    float crisp             = 1.0f;
     // Near-future grade (the separable pass).
     bool  grade_enabled   = true;
     float grade_desat     = 0.34f;  ///< Toward luma.

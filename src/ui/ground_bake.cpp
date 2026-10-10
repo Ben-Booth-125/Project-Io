@@ -33,6 +33,21 @@ float hash01(int x, int y, std::uint32_t salt)
     return static_cast<float>(h & 0x00FFFFFFu) / 16777216.0f;
 }
 
+/// floor() to int without the library call (BL-1254: the noise runs a dozen
+/// times a pixel). The same integer as static_cast<int>(std::floor(v)) for
+/// every v in int range, so every field is byte-identical.
+inline int ifloor(double v)
+{
+    const int i = static_cast<int>(v);
+    return v < static_cast<double>(i) ? i - 1 : i;
+}
+
+/// ceil() to int, likewise (ceil(v) = -floor(-v) exactly).
+inline int iceil(double v)
+{
+    return -ifloor(-v);
+}
+
 /// One octave of value noise on a lattice of @p cell canonical units, bilinear,
 /// wrap-periodic in x with period @p period_cells lattice cells. Smoothstep on
 /// the fractions keeps it C1 — a hard lattice reads as a grid, which is the one
@@ -40,20 +55,58 @@ float hash01(int x, int y, std::uint32_t salt)
 float value_noise(double x, double y, double cell, int period_cells, std::uint32_t salt)
 {
     const double fx = x / cell, fy = y / cell;
-    int ix = static_cast<int>(std::floor(fx));
-    int iy = static_cast<int>(std::floor(fy));
+    int ix = ifloor(fx);
+    int iy = ifloor(fy);
     float tx = static_cast<float>(fx - ix);
     float ty = static_cast<float>(fy - iy);
     tx = tx * tx * (3.0f - 2.0f * tx);
     ty = ty * ty * (3.0f - 2.0f * ty);
-    auto wrap = [&](int v) { return ((v % period_cells) + period_cells) % period_cells; };
-    const float v00 = hash01(wrap(ix),     iy,     salt);
-    const float v10 = hash01(wrap(ix + 1), iy,     salt);
-    const float v01 = hash01(wrap(ix),     iy + 1, salt);
-    const float v11 = hash01(wrap(ix + 1), iy + 1, salt);
+    // The wrapped column and its east neighbour, with one integer division
+    // (BL-1254: the bake calls this a dozen times a pixel, and four
+    // double-modulo wraps were most of its cost). The same integers as
+    // ((v % p) + p) % p, so the field is byte-identical.
+    int x0w = ix % period_cells;
+    if (x0w < 0)
+        x0w += period_cells;
+    const int x1w = x0w + 1 == period_cells ? 0 : x0w + 1;
+    const float v00 = hash01(x0w, iy,     salt);
+    const float v10 = hash01(x1w, iy,     salt);
+    const float v01 = hash01(x0w, iy + 1, salt);
+    const float v11 = hash01(x1w, iy + 1, salt);
     const float a = v00 + (v10 - v00) * tx;
     const float b = v01 + (v11 - v01) * tx;
     return a + (b - a) * ty; // [0, 1)
+}
+
+/// Two octaves of value_noise at one point and one lattice, different salts —
+/// the lattice position, fractions and wrap computed once. Byte-identical to
+/// two value_noise calls (BL-1254: the domain warp asks for pairs, per pixel).
+inline void value_noise2(double x, double y, double cell, int period_cells,
+                         std::uint32_t salt_a, std::uint32_t salt_b, float& a_out, float& b_out)
+{
+    const double fx = x / cell, fy = y / cell;
+    const int ix = ifloor(fx);
+    const int iy = ifloor(fy);
+    float tx = static_cast<float>(fx - ix);
+    float ty = static_cast<float>(fy - iy);
+    tx = tx * tx * (3.0f - 2.0f * tx);
+    ty = ty * ty * (3.0f - 2.0f * ty);
+    int x0w = ix % period_cells;
+    if (x0w < 0)
+        x0w += period_cells;
+    const int x1w = x0w + 1 == period_cells ? 0 : x0w + 1;
+    const auto lerp2 = [&](std::uint32_t salt) -> float
+    {
+        const float v00 = hash01(x0w, iy,     salt);
+        const float v10 = hash01(x1w, iy,     salt);
+        const float v01 = hash01(x0w, iy + 1, salt);
+        const float v11 = hash01(x1w, iy + 1, salt);
+        const float a = v00 + (v10 - v00) * tx;
+        const float b = v01 + (v11 - v01) * tx;
+        return a + (b - a) * ty;
+    };
+    a_out = lerp2(salt_a);
+    b_out = lerp2(salt_b);
 }
 
 inline double sq(double v) { return v * v; }
@@ -200,17 +253,20 @@ float value_noise_aniso(double u, double v, double cu, int period_cells, double 
                         std::uint32_t salt)
 {
     const double fu = u / cu, fv = v / cv;
-    const int iu = static_cast<int>(std::floor(fu));
-    const int iv = static_cast<int>(std::floor(fv));
+    const int iu = ifloor(fu);
+    const int iv = ifloor(fv);
     float tu = static_cast<float>(fu - iu);
     float tv = static_cast<float>(fv - iv);
     tu = tu * tu * (3.0f - 2.0f * tu);
     tv = tv * tv * (3.0f - 2.0f * tv);
-    auto wrap = [&](int q) { return ((q % period_cells) + period_cells) % period_cells; };
-    const float v00 = hash01(wrap(iu),     iv,     salt);
-    const float v10 = hash01(wrap(iu + 1), iv,     salt);
-    const float v01 = hash01(wrap(iu),     iv + 1, salt);
-    const float v11 = hash01(wrap(iu + 1), iv + 1, salt);
+    int u0w = iu % period_cells; // one division, as value_noise (byte-identical)
+    if (u0w < 0)
+        u0w += period_cells;
+    const int u1w = u0w + 1 == period_cells ? 0 : u0w + 1;
+    const float v00 = hash01(u0w, iv,     salt);
+    const float v10 = hash01(u1w, iv,     salt);
+    const float v01 = hash01(u0w, iv + 1, salt);
+    const float v11 = hash01(u1w, iv + 1, salt);
     const float a = v00 + (v10 - v00) * tu;
     const float b = v01 + (v11 - v01) * tu;
     return a + (b - a) * tv;
@@ -920,6 +976,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                  std::uint8_t* tag, std::uint8_t* cover_out, feature_px* fpx)
 {
     const double period   = g.gw * kSqrt3;
+    const bool   narrow_grid = src.gw < 5; // the gather's wrap round can be non-zero (see there)
     // Resolution-adaptive character (wave 2). The interpolation radius and the
     // detail amplitudes are CANONICAL-scale, so the same numbers that read as
     // painterly at the 24 px tier read as plain blur at 48/96 — a colour field
@@ -961,6 +1018,25 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     int fine_cells = 1;
     const double fine_cell = periodic_cell(0.155, fine_cells);
     const bool   fine_on   = nominal_s(g) >= 40.0;
+    // BL-1254 (ground crisper): the crisp key, nominal-keyed — 0 below 40 px
+    // per hex (the far page bakes as before), full at the 96 px master. A
+    // fleck lattice of ~4 px at the master: sub-tile marks, close only.
+    const float  ck = p.crisp * static_cast<float>(std::clamp((nominal_s(g) - 40.0) / 40.0, 0.0, 1.0));
+    int fleck_cells = 1;
+    const double fleck_cell = periodic_cell(0.045, fleck_cells);
+    // A cubic soft clip on [-1, 1]: S(+-1) = +-1, slope 1.5 at 0 — a field
+    // passed through it keeps its range but firms its transitions. Cheap on
+    // purpose: it runs per pixel.
+    const auto firm = [](float x) -> float
+    {
+        x = std::clamp(x, -1.0f, 1.0f);
+        return x * (1.5f - 0.5f * x * x);
+    };
+    const auto sstf = [](float e0, float e1, float v) -> float
+    {
+        const float t = std::clamp((v - e0) / (e1 - e0), 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    };
 
     // Terrain variant families (BL-1243) and tiles holding their own ground
     // (BL-1251). A land pixel's MATERIAL — colour, per-tile tone, landform
@@ -1215,12 +1291,12 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     lattice L_tuss2 { tuss2_cell, tuss2_cells, 0x5F21u, 0, 0.70f, 0.28, 0.45 };
     lattice L_scree { scree_cell, scree_n,     0x5C01u, 0, 0.45f, 0.22, 0.38 };
     const auto dots = [&](lattice& L, double qx, double qy, bool angular,
-                          float base, float lit, float shade) -> float
+                          float base, float lit, float shade, float ink) -> float
     {
-        const int ix0 = static_cast<int>(std::floor(qx / L.cell));
-        const int iy0 = static_cast<int>(std::floor(qy / L.cell));
+        const int ix0 = ifloor(qx / L.cell);
+        const int iy0 = ifloor(qy / L.cell);
         const double bound = L.rhi * L.cell * 1.5 + pxw_; // the dot, its shadow and its rim
-        float val = 0.0f, cov = 0.0f, shadow = 0.0f;
+        float val = 0.0f, cov = 0.0f, shadow = 0.0f, rim = 0.0f;
         double front = -1e30;
         // A neighbour cell's dot sits in its middle 70%: skip the cells whose
         // dot cannot reach this point before fetching them.
@@ -1260,10 +1336,16 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     front = pt.y;
                     cov = c;
                     val = base + lit * static_cast<float>(std::clamp(-(ddx + ddy) / (2.0 * rr), -1.0, 1.0));
+                    // BL-1254: contact ink — a ~1 px line on the dot's rim,
+                    // full on its lower (SE, shadowed) half where it meets
+                    // the ground, a trace on the lit half.
+                    if (ink > 0.0f)
+                        rim = static_cast<float>(std::clamp(1.0 - std::fabs(rr - d) / (1.2 * pxw_), 0.0, 1.0))
+                            * (ddx + ddy > 0.0 ? 1.0f : 0.3f);
                 }
             }
         }
-        return cov * val - (1.0f - cov) * shadow * shade;
+        return cov * val - (1.0f - cov) * shadow * shade - rim * ink;
     };
     const auto family_pattern = [&](std::size_t t, double rx, double ry, double qx, double qy, double wob) -> float
     {
@@ -1276,16 +1358,21 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 const double sv  = rx * src.furrow_cs[2 * t] + ry * src.furrow_cs[2 * t + 1];
                 const double ph  = sv / 0.075 + 0.5 * wob; // a ploughed line wanders a little
                 const double tri = std::fabs((ph - std::floor(ph)) - 0.5) * 2.0; // 0 furrow, 1 ridge
-                return static_cast<float>(0.075 * (sst(0.15, 0.85, tri) - 0.5));
+                // BL-1254: a firmer ridge profile, and a light contact ink
+                // in the furrow's bottom (tri runs 0 -> 1 over ~3.6 px at the
+                // master, so 0.28 is about a pixel).
+                const double lo = 0.15 + 0.12 * ck, hi = 0.85 - 0.12 * ck;
+                const double ink = ck * 0.05 * (1.0 - sst(0.0, 0.28, tri));
+                return static_cast<float>(0.075 * (1.0 + 0.25 * ck) * (sst(lo, hi, tri) - 0.5) - ink);
             }
             // Grassland: tussocks.
-            return dots(L_tuss, qx, qy, false, -0.02f, 0.08f, 0.05f);
+            return dots(L_tuss, qx, qy, false, -0.02f, 0.08f, 0.05f, 0.07f * ck);
         case vf_scrub:
-            return dots(L_tuss2, qx, qy, false, -0.04f, 0.09f, 0.06f);
+            return dots(L_tuss2, qx, qy, false, -0.04f, 0.09f, 0.06f, 0.08f * ck);
         case vf_bare:
         case vf_volcanic:
             // Scree: loose angular stones.
-            return dots(L_scree, qx, qy, true, 0.04f, 0.07f, 0.05f);
+            return dots(L_scree, qx, qy, true, 0.04f, 0.07f, 0.05f, 0.09f * ck);
         case vf_sand:
         {
             // Ripples: a gentle windward slope and a steep lee, the crests
@@ -1294,7 +1381,9 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             const double ph = u_ / ripple_l;
             const double fr = ph - std::floor(ph);
             const double prof = fr < 0.72 ? fr / 0.72 : (1.0 - fr) / 0.28;
-            return static_cast<float>(0.09 * (prof - 0.5));
+            // BL-1254: a light ink just over each crest, on the lee.
+            const double ink = fr < 0.72 ? 0.0 : ck * 0.045 * (1.0 - sst(0.0, 0.22, fr - 0.72));
+            return static_cast<float>(0.09 * (prof - 0.5) - ink);
         }
         default:
             return 0.0f;
@@ -1427,8 +1516,8 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 continue;
             lattice& L = L_scat[kk];
             const bool stone = K.set == bs_scree;
-            const int ix0 = static_cast<int>(std::floor(qx / K.cell));
-            const int iy0 = static_cast<int>(std::floor(qy / K.cell));
+            const int ix0 = ifloor(qx / K.cell);
+            const int iy0 = ifloor(qy / K.cell);
             float  a_top = 0.0f, shadow = 0.0f, cr = 0.0f, cg = 0.0f, cb = 0.0f;
             double front = -1e30;
             // Scatter points sit in a cell's middle 80%; an item reaches at
@@ -1525,12 +1614,13 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             // coordinates, so a strong warp cannot swirl the brushwork.
             const double uy = y0_ - g.y_min;
             // The small octave alone (+-1) is also the material's fray (BL-1251).
-            const double fray_x = (value_noise(x0_, uy, warp_cell2, warp_cells2, 0xA21Cu) - 0.5) * 2.0;
-            const double fray_y = (value_noise(x0_, uy, warp_cell2, warp_cells2, 0xB32Du) - 0.5) * 2.0;
-            const double wax =
-                (value_noise(x0_, uy, warp_cell,  warp_cells,  0xA11Cu) - 0.5) * 2.0 + fray_x * 0.45;
-            const double way =
-                (value_noise(x0_, uy, warp_cell,  warp_cells,  0xB22Du) - 0.5) * 2.0 + fray_y * 0.45;
+            float nfx, nfy, nwx, nwy; // each pair shares its lattice (BL-1254: cost)
+            value_noise2(x0_, uy, warp_cell2, warp_cells2, 0xA21Cu, 0xB32Du, nfx, nfy);
+            value_noise2(x0_, uy, warp_cell,  warp_cells,  0xA11Cu, 0xB22Du, nwx, nwy);
+            const double fray_x = (nfx - 0.5) * 2.0;
+            const double fray_y = (nfy - 0.5) * 2.0;
+            const double wax = (nwx - 0.5) * 2.0 + fray_x * 0.45;
+            const double way = (nwy - 0.5) * 2.0 + fray_y * 0.45;
             const double x = x0_ + wax * p.warp_amp;
             const double y = y0_ + way * p.warp_amp;
 
@@ -1555,25 +1645,34 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 best_d2 = 1e30;
                 owner   = -1;
                 ncand   = 0;
-                const int r_lo = std::max(0, static_cast<int>(std::ceil((sy_ - Rg) / 1.5)));
+                const int r_lo = std::max(0, iceil((sy_ - Rg) / 1.5));
                 const int r_hi = std::min(src.gh - 1,
-                                          static_cast<int>(std::floor((sy_ + Rg) / 1.5)));
+                                          ifloor((sy_ + Rg) / 1.5));
                 for (int r = r_lo; r <= r_hi; ++r)
                 {
                     const double cy   = 1.5 * r;
                     const double dy   = sy_ - cy;
                     const double odd  = (r & 1) ? 0.5 : 0.0;
-                    const int    c0   = static_cast<int>(std::floor(sx / kSqrt3 - odd));
-                    for (int dc = -1; dc <= 2; ++dc)
+                    const int    c0   = ifloor(sx / kSqrt3 - odd);
+                    // The wrapped column runs alongside c (one division a row,
+                    // not two a candidate — BL-1254, cost; the same integers).
+                    int cw_run = (c0 - 1) % src.gw;
+                    if (cw_run < 0)
+                        cw_run += src.gw;
+                    for (int dc = -1; dc <= 2; ++dc, cw_run = cw_run + 1 == src.gw ? 0 : cw_run + 1)
                     {
                         const int c  = c0 + dc;
                         const double cx = kSqrt3 * (c + odd);
                         double dx = sx - cx;
-                        dx -= period * std::round(dx / period); // cylinder wrap
+                        // Cylinder wrap. c lies within two columns of sx, so
+                        // |dx| <= 2 sqrt3 and the round is 0 on any grid of 5+
+                        // columns: skipped there (byte-identical, BL-1254 cost).
+                        if (narrow_grid)
+                            dx -= period * std::round(dx / period);
                         const double d2 = dx * dx + dy * dy;
                         if (d2 >= Rg2)
                             continue;
-                        const int cw = ((c % src.gw) + src.gw) % src.gw;
+                        const int cw = cw_run;
                         const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
                         if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::void_))
                             continue;
@@ -1723,13 +1822,13 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // owner, and only its six neighbours can lie within the band —
                 // the distance to the shared edge is the bisector distance.
                 {
-                    const int r0 = std::clamp(static_cast<int>(std::floor(mpy / 1.5)), 0, src.gh - 1);
+                    const int r0 = std::clamp(ifloor(mpy / 1.5), 0, src.gh - 1);
                     int    br = -1, bc = 0;
                     double bd2 = 1e30, bdx = 0.0, bdy = 0.0;
                     for (int r = r0; r <= std::min(r0 + 1, src.gh - 1); ++r)
                     {
                         const double odd = (r & 1) ? 0.5 : 0.0;
-                        const int    c   = static_cast<int>(std::floor(mpx / kSqrt3 - odd + 0.5));
+                        const int    c   = ifloor(mpx / kSqrt3 - odd + 0.5);
                         const double dx  = mpx - kSqrt3 * (c + odd), dy = mpy - 1.5 * r;
                         const double d2  = dx * dx + dy * dy;
                         if (d2 < bd2) { bd2 = d2; br = r; bc = c; bdx = dx; bdy = dy; }
@@ -1760,15 +1859,15 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     }
                 }
                 constexpr double MR = 1.55, MR2 = MR * MR; // past the farthest centre a band can reach (sqrt(1.07^2 + 2 sqrt3 * 0.13 + fray))
-                const int r_lo = std::max(0, static_cast<int>(std::ceil((mpy - MR) / 1.5)));
-                const int r_hi = std::min(src.gh - 1, static_cast<int>(std::floor((mpy + MR) / 1.5)));
+                const int r_lo = std::max(0, iceil((mpy - MR) / 1.5));
+                const int r_hi = std::min(src.gh - 1, ifloor((mpy + MR) / 1.5));
                 double dmin2 = 1e30;
                 const bool slow = nmc == 0; // the class warp carried land into a non-land hex
                 for (int r = r_lo; slow && r <= r_hi; ++r)
                 {
                     const double odd = (r & 1) ? 0.5 : 0.0;
                     const double dy  = mpy - 1.5 * r;
-                    const int    c0  = static_cast<int>(std::floor(mpx / kSqrt3 - odd));
+                    const int    c0  = ifloor(mpx / kSqrt3 - odd);
                     for (int dc = -1; dc <= 2 && nmc < 16; ++dc)
                     {
                         const int c = c0 + dc; // unwrapped beside mpx: dx needs no wrap
@@ -1929,21 +2028,32 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // crease at every crest — a range then shades as ridge lines
                 // instead of soft blobs. The finite differences pick the
                 // crease up for free.
-                const float ridge_w = std::min(1.0f, std::fabs(bias) * p.landform_accent)
-                                    * p.ridge_strength;
-                const auto detail_lo = [&](double sx, double sy) -> float
+                const float ridge_w0 = std::min(1.0f, std::fabs(bias) * p.landform_accent)
+                                     * p.ridge_strength;
+                // BL-1254: every ground folds a little at the master (a plain
+                // gently, a range as before), so the relief has creases to
+                // shade and ink rather than soft swells only.
+                const float ridge_w = ridge_w0 + (1.0f - ridge_w0) * 0.15f * ck;
+                const auto fold = [&](float n) -> float
                 {
-                    const float n = value_noise(sx, sy, detail_cell, detail_cells, 0xD371u);
                     const float smooth = n - 0.5f;
                     const float ridged = (0.25f - std::fabs(n - 0.5f)) * 2.0f;
                     return smooth + (ridged - smooth) * ridge_w;
                 };
-                const double eps = detail_cell * 0.5;
+                const auto detail_lo = [&](double sx, double sy) -> float
+                {
+                    return fold(value_noise(sx, sy, detail_cell, detail_cells, 0xD371u));
+                };
+                // BL-1254: the gradient's span narrows at the master (half a
+                // cell -> a fifth), so a fold resolves as a crease a few
+                // pixels wide instead of a swell twenty wide.
+                const double eps = detail_cell * (0.5 - 0.3 * ck);
                 const float ddx = (detail_lo(x0_ + eps, uy) - detail_lo(x0_ - eps, uy))
                                   / static_cast<float>(2.0 * eps);
                 const float ddy = (detail_lo(x0_, uy + eps) - detail_lo(x0_, uy - eps))
                                   / static_cast<float>(2.0 * eps);
-                const float d0 = detail_lo(x0_, uy) * 0.7f
+                const float n_c = value_noise(x0_, uy, detail_cell, detail_cells, 0xD371u);
+                const float d0 = fold(n_c) * 0.7f
                     + (value_noise(x0_, uy, detail_cell2, detail_cells2, 0xD372u) - 0.5f) * 0.3f;
 
                 // Two shade terms with their own scales: tile slopes are tiny
@@ -1951,11 +2061,34 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // gain; the detail slope is order-1 and takes amp alone. The
                 // clamp widens with resolution — a close tier is allowed
                 // deeper shadow.
-                const float tgx = gxx + ddx * amp;
-                const float tgy = gyy + ddy * amp;
-                const float shade = (gxx * Lx + gyy * Ly) * p.relief_gain
-                                  + (ddx * Lx + ddy * Ly) * amp * 0.75f;
+                // (BL-1254: the narrower gradient span reads a fold's slope
+                // whole where the half-cell span averaged it across the crease;
+                // the rock exposure keeps to the swell-scale slope it was
+                // tuned on, or every fold on a grassy slope sheds to rock.)
+                const float rock_k = 1.0f - 0.40f * ck;
+                const float tgx = gxx + ddx * amp * rock_k;
+                const float tgy = gyy + ddy * amp * rock_k;
+                // BL-1254: at the master a plain's soft swells — the largest
+                // soft blotches on the ground — ease, so its definition comes
+                // from the creases, grain and patterns instead; a range keeps
+                // its full shading (the narrower gradient span already
+                // steepens its folds).
+                const float soft_ease = 1.0f - 0.40f * ck * (1.0f - ridge_w0);
+                const float dshade = (ddx * Lx + ddy * Ly) * amp * 0.75f * soft_ease;
+                const float shade = p.hillshade_sign * ((gxx * Lx + gyy * Ly) * p.relief_gain + dshade);
                 lum += std::clamp(shade, -(0.60f + 0.15f * res_t), 0.60f + 0.15f * res_t);
+                if (ck > 0.0f)
+                {
+                    // BL-1254: contact ink on the relief's creases — the fold
+                    // line (n = 0.5, where the ridged mix kinks) inked ~1.5 px
+                    // wide, full on the side turned from the light, a trace on
+                    // the lit side; light on a plain, firmer on a range.
+                    const float crease = 1.0f - std::fabs(2.0f * n_c - 1.0f);
+                    const float line   = sstf(0.93f, 0.985f, crease);
+                    if (line > 0.0f)
+                        lum -= ck * line * (0.035f + 0.16f * ridge_w0)
+                             * (p.hillshade_sign * dshade < 0.0f ? 1.0f : 0.45f);
+                }
 
                 // Slope rock exposure: steep ground sheds its cover colour
                 // toward bare rock, which is what makes a hillside read as a
@@ -1972,17 +2105,36 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 }
                 // Altitude lift, the landform's own signed bias, and the detail
                 // field's own value (a crag's top is lit even side-on).
-                lum += (h - 0.45f) * p.altitude_gain + bias * 0.30f + d0 * amp * 0.8f;
+                lum += (h - 0.45f) * p.altitude_gain + bias * 0.30f + d0 * amp * 0.8f * soft_ease;
                 // Painterly patchiness: a WHISPER of per-tile jitter (this is
                 // the hex-mosaic dial — the detail field carries the texture
                 // now), then fine grain.
                 lum += jtt * p.jitter;
-                const float n2 = value_noise(x0_, uy, noise_cell_b, noise_cells_b, 0xFAB1u);
-                lum += (n2 - 0.5f) * 2.0f * p.noise_strength * noise_mul * grain_mul;
+                // BL-1254: the broad octave (~35 px blobs at the master) is
+                // the softest thing on the ground; it hands over to the crisp
+                // grain below as the crisp key rises, and is not sampled at
+                // all at the master (its cost pays for the flecks').
+                if (ck < 1.0f)
+                {
+                    const float n2 = value_noise(x0_, uy, noise_cell_b, noise_cells_b, 0xFAB1u);
+                    lum += (n2 - 0.5f) * 2.0f * p.noise_strength * noise_mul * grain_mul * (1.0f - ck);
+                }
                 if (fine_on)
                 {
                     const float n3 = value_noise(x0_, uy, fine_cell, fine_cells, 0x51D3u);
-                    lum += (n3 - 0.5f) * (1.2f + 2.2f * res_t) * p.noise_strength * grain_mul;
+                    float g3 = (n3 - 0.5f) * 2.0f;
+                    if (ck > 0.0f)
+                        g3 += (firm(g3) - g3) * ck; // firmer grain edges
+                    lum += g3 * 0.5f * (1.2f + 2.2f * res_t) * p.noise_strength * grain_mul * (1.0f + 0.25f * ck);
+                    if (ck > 0.0f)
+                    {
+                        // Flecks: the tails of a ~4 px lattice, cut with a
+                        // firm edge — pale and dark marks, sparse, scaled by
+                        // the family's grain.
+                        const float n4 = value_noise(x0_, uy, fleck_cell, fleck_cells, 0x51E4u);
+                        const float fl = sstf(0.66f, 0.72f, n4) - sstf(0.66f, 0.72f, 1.0f - n4);
+                        lum += ck * 0.045f * grain_mul * fl;
+                    }
                 }
                 lum += pat; // BL-1251: furrows, tussocks, scree, ripples
                 if (vland)
@@ -1994,6 +2146,10 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     lum += vv[vp_tone];
                     vpatch = (value_noise(x0_, uy, patch_cell,  patch_cells,  0x7B01u) - 0.5f) * 1.6f
                            + (value_noise(x0_, uy, patch_cell2, patch_cells2, 0x7B02u) - 0.5f) * 0.6f;
+                    // BL-1254: patches with a firmer edge (a brush's, not a
+                    // blur's), the same range.
+                    if (ck > 0.0f)
+                        vpatch += (1.1f * firm(vpatch / 1.1f) - vpatch) * 0.5f * ck;
                     lum += vv[vp_patch] * vpatch;
                     // Streaks: a soft band plus a darker crease along each
                     // band's centre line — strata, gullies, ripples, combing.
@@ -2015,15 +2171,15 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     if (sb > 1e-4f)
                         lum += sb * streak(value_noise_aniso(x0_ + kStreakK * uy, uy, streak_short,
                                                              streak_cells_s, streak_long, 0x7B05u));
-                    const float ck = vv[vp_crack] * crack_gate;
-                    if (ck > 1e-4f)
+                    const float crk = vv[vp_crack] * crack_gate;
+                    if (crk > 1e-4f)
                     {
                         // Crack lines: the n = 0.5 level set of a mid octave,
                         // a thin dark line wandering across the ground.
                         const float n  = value_noise(x0_, uy, crack_cell, crack_cells, 0x7B06u);
                         const float c  = 1.0f - std::fabs(2.0f * n - 1.0f);
                         const float c2 = c * c, c4 = c2 * c2, c8 = c4 * c4;
-                        lum -= ck * (2.2f * c8 * c2 - 0.2f);
+                        lum -= crk * (2.2f * c8 * c2 - 0.2f);
                     }
                     if (fine_on && vv[vp_stipple] > 1e-4f)
                     {
