@@ -6,6 +6,7 @@
 #include "construction.hpp"
 #include "corporation_generation.hpp" // BL-1154: move_seat_force (take_seat)
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
+#include "nation_tech.hpp" // BL-1276: the research-queue verbs
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set); intra_body_path (BL-470)
 // BL-470 included placement_rules.hpp here for is_water_tile, march_unit's old
 // destination check. BL-511 retargeted the verb to a province, and while the
@@ -1985,6 +1986,41 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // rule as the draw (`seat_release_dial_idled`).
             seat_release_dial_idled(w, cmd.corp);
             return corp_command_result::applied;
+        }
+
+        case corp_verb::queue_research:
+        case corp_verb::unqueue_research:
+        case corp_verb::clear_research:
+        {
+            // BL-1276 (the research panel). The seat only: the player reaches
+            // its nation's queue as the nation's operating champion; a rival
+            // corporation does not plan its nation's research. Validated in
+            // full before any mutation, so a refusal touches nothing.
+            if (cmd.corp != w.player_entity)
+                return corp_command_result::rejected_state;
+            const entity_id nation = w.corporations.at(cmd.corp).home_nation;
+            if (w.nations.find(nation) == w.nations.end())
+                return corp_command_result::rejected_state;
+
+            if (cmd.verb == corp_verb::queue_research)
+            {
+                if (cmd.order >= static_cast<uint32_t>(io::dg::node_count))
+                    return corp_command_result::rejected_invalid;
+                switch (enqueue_node(w, nation, static_cast<int>(cmd.order)))
+                {
+                    case enqueue_result::queued:         return corp_command_result::applied;
+                    case enqueue_result::already_held:
+                    case enqueue_result::already_queued:
+                    case enqueue_result::refused_pair:   return corp_command_result::rejected_state;
+                    case enqueue_result::invalid:        return corp_command_result::rejected_invalid;
+                }
+                return corp_command_result::rejected_invalid;
+            }
+            if (cmd.verb == corp_verb::unqueue_research)
+                return remove_last_queued(w, nation) ? corp_command_result::applied
+                                                     : corp_command_result::rejected_state;
+            return clear_research_queue(w, nation) ? corp_command_result::applied
+                                                   : corp_command_result::rejected_state;
         }
     }
     return corp_command_result::rejected_invalid;

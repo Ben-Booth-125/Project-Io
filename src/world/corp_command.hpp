@@ -141,6 +141,19 @@ enum class corp_verb : uint8_t
     // exists and is a specialist. DELIBERATELY NOT in corp_ai.cpp's candidate
     // list — no rival picks anyone's seat.
     take_seat,         ///< `corp` becomes the player's corporation: `is_player` / `world::player_entity` re-point onto it. `corp` must be a SPECIALIST (not a background firm). Pre-play only — the in-play hosts refuse it.
+    // --- BL-1276: the research queue joins the seam (2026-10-10) ---
+    // Appended AFTER take_seat, same append-only rule. The NATION holds
+    // technology (RESEARCH.md § Who holds technology); the player reaches its
+    // nation's queue as the seat — the nation's operating champion — so these
+    // three act on the home nation of `corp`, and only when `corp` IS the seat
+    // (`world::player_entity`): a rival corporation does not plan its nation's
+    // research (that is the nation scorer's, AI_OPPONENT.md § 11), and a wire
+    // agent acting as one must not either. `order` names the node: an index
+    // into `io::dg::nodes`, range-checked before any use. DELIBERATELY NOT in
+    // corp_ai.cpp's candidate list.
+    queue_research,    ///< The seat's nation queues node `order` with its unheld requirements ahead of it (`enqueue_node`). rejected_state when already held/queued or a pick-one pair refuses it; rejected_invalid for an unknown node.
+    unqueue_research,  ///< The seat's nation drops the LAST entry of its research queue. rejected_state when the queue is empty.
+    clear_research,    ///< The seat's nation empties its research queue (the pool stays). rejected_state when the queue is empty.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -150,7 +163,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::take_seat) + 1;
+    static_cast<uint8_t>(corp_verb::clear_research) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this

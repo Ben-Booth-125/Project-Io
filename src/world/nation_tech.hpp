@@ -201,6 +201,42 @@ void advance_research(world& w, const research_params& p = {},
 /// @return Nodes completed.
 int flow_research_queue(world& w, entity_id nation, const research_params& p = {});
 
+// ---------------------------------------------------------------------------
+// The research panel's reads and the queue edits (BL-1276)
+// ---------------------------------------------------------------------------
+
+/// What `enqueue_node` WOULD do for @p nation and @p node, mutating nothing.
+/// On `queued`, @p plan (optional) receives the entries it would append, in
+/// queue order — the node's unheld requirements, then the node. The same
+/// planner `enqueue_node` runs, so the preview cannot disagree with the press.
+enqueue_result preview_enqueue(const world& w, entity_id nation, int node,
+                               std::vector<std::uint16_t>* plan = nullptr);
+
+/// The milli-RP @p nation accrues in a quarter while its queue owes more than
+/// that quarter brings: the base, its buildings and the research line at its
+/// whole share of the current treasury, times the multiplier. Read-only — the
+/// same arithmetic `advance_research` applies, not a second formula.
+std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
+                                           const research_params& p = {});
+
+/// For each entry of @p nation's queue (in queue order), the quarter it is
+/// projected to complete in — 1 = the next quarterly pass — or -1 when it does
+/// not complete within @p horizon_quarters (a quest waits on its deed, and an
+/// entry needing it waits with it). Runs the quarterly pass's own accrual and
+/// queue flow on a COPY of the state, holding the treasury where it stands.
+std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
+                                        const research_params& p = {},
+                                        int horizon_quarters = 480);
+
+/// Drop the LAST entry of @p nation's queue. False (nothing touched) when the
+/// queue is empty. The pool is untouched: it is the head's progress.
+bool remove_last_queued(world& w, entity_id nation);
+
+/// Empty @p nation's queue. False (nothing touched) when it is already empty.
+/// The pool stays, so nothing researched is stranded (RESEARCH.md § The research
+/// queue: the pool IS the head's progress).
+bool clear_research_queue(world& w, entity_id nation);
+
 /// THE HANDOVER (RESEARCH.md § Who holds technology: no nation opens ahead in
 /// technology). Empties every nation's tech state — pool, queue and held set —
 /// so play opens with `world::nation_tech` empty. Called at the end of the

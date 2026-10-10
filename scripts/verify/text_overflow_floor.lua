@@ -24,7 +24,7 @@ local panels = {
     { name = "balance",      views = nil },
     { name = "corporation",  views = nil },
     { name = "build",        views = nil },
-    { name = "tech_tree",    views = { "tech_tree", 0, 2 } },
+    { name = "tech_tree",    views = { "tech_tree", 0, 1 } }, -- Inspect, Plan (BL-1276)
 }
 for _, p in ipairs(panels) do
     verify.show_panel(p.name, true)

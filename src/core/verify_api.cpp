@@ -36,6 +36,7 @@
 #include "ui/market_ledger.hpp"
 #include "ui/presentation.hpp"
 #include "ui/selection.hpp"
+#include "ui/tech_tree_panel.hpp" // BL-1276: research_player_nation, the queue readout
 #include "ui/text_fit.hpp"
 #include "world/era_timelapse.hpp" // BL-829: round 4's replay, for the history_* readouts
 #include "ui/view_nav.hpp"
@@ -2298,7 +2299,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 m_ui.construction.panel_view = 0; // Construction — the queue + the build bar
         }
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
-        else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
+        else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // the research panel (BL-1276), F9 / slot 4
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
         else if (name == "acquisitions") m_ui.show_acquisitions_ledger = open; // Acquisitions ledger, nav slot 5
@@ -2467,8 +2468,39 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // the one frame where no history has happened yet (BL-277).
         else if (name == "ages_year")     m_ui.ages_year = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
-        else if (name == "tech_tree")     m_ui.tech_tree_view = view;
+        else if (name == "tech_tree")     m_ui.tech_tree_view = view;   // 0 = Inspect, 1 = Plan (BL-1276)
     });
+
+    // The research panel (BL-1276). `tech_tree_node(id)` answers the screen
+    // centre of a Digitisation node as the ring LAST DREW it (x, y), or
+    // (-1, -1) for an unknown id or a ring not on screen — so a script aims
+    // verify.hover / verify.click at a node by its store id rather than
+    // re-deriving the ring's layout in Lua. Render a frame after opening the
+    // panel before asking. `tech_tree_queue()` lists the seat's nation's queue
+    // as store ids, head first; `research_message()` the panel's last press
+    // outcome (a refusal's reason).
+    v.set_function("tech_tree_node", [this](const std::string& id) -> std::tuple<float, float> {
+        const int i = io::dg::find_node(id);
+        const std::size_t need = static_cast<std::size_t>(io::dg::node_count) * 2;
+        if (i < 0 || m_ui.tech_tree_node_screen.size() < need)
+            return {-1.0f, -1.0f};
+        return {m_ui.tech_tree_node_screen[static_cast<std::size_t>(i) * 2],
+                m_ui.tech_tree_node_screen[static_cast<std::size_t>(i) * 2 + 1]};
+    });
+    v.set_function("tech_tree_queue", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        const entity_id nation = ui::research_player_nation(m_world);
+        const auto it = m_world.nation_tech.find(nation);
+        if (it == m_world.nation_tech.end())
+            return out;
+        int k = 1;
+        for (const std::uint16_t n : it->second.queue)
+            if (n < io::dg::node_count)
+                out[k++] = std::string(io::dg::nodes[n].id);
+        return out;
+    });
+    v.set_function("research_message", [this]() -> std::string { return m_ui.research_message; });
 
     // Park a COLLAPSING SECTION open or closed.
     //

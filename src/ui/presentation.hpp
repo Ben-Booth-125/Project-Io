@@ -351,6 +351,20 @@ ImU32 realm_colour(int polity, bool* found = nullptr);
 /// @return     That kind's ring-segment colour.
 ImU32 building_kind_colour(building_type type);
 
+// --- the research ring (BL-1276, the research panel) ---
+// The tree's grammar carried by colour: an AND link and a major in the accent, a
+// quest in the warning amber, a pick-one pair outlined in the danger red, a
+// placeholder muted. Held / available / locked are carried by fill and alpha
+// over these, so the grammar colours keep one meaning each.
+inline constexpr ImU32 research_accent  = IM_COL32( 96, 196, 232, 255); ///< Majors, AND links, joint/mastery rims.
+inline constexpr ImU32 research_warning = IM_COL32(236, 186,  72, 255); ///< Quest diamonds.
+inline constexpr ImU32 research_danger  = IM_COL32(226,  92,  86, 255); ///< Pick-one pair outline.
+inline constexpr ImU32 research_node    = IM_COL32(206, 210, 218, 255); ///< Travel / minor nodes.
+inline constexpr ImU32 research_link    = IM_COL32(150, 156, 168, 150); ///< An ordinary (one-group) link.
+inline constexpr ImU32 research_muted   = IM_COL32(128, 132, 142, 170); ///< Placeholders and locked nodes.
+inline constexpr ImU32 research_held    = IM_COL32(118, 206, 128, 255); ///< A held node's fill/ring.
+inline constexpr ImU32 research_queued  = IM_COL32(255, 255, 255, 255); ///< The queue-position ring.
+
 } // namespace palette
 
 /// Semantic colour for a value's direction: positive/negative/neutral.

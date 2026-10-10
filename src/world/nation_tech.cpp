@@ -272,13 +272,13 @@ bool recipe_unlocked(const world& /*w*/, const recipe_registry& /*reg*/, entity_
     return true;
 }
 
-int flow_research_queue(world& w, entity_id nation, const research_params& p)
-{
-    const auto it = w.nation_tech.find(nation);
-    if (it == w.nation_tech.end())
-        return 0;
-    nation_tech_state& st = it->second;
+namespace {
 
+// The queue half of the quarterly pass over one nation's state. Shared by
+// `flow_research_queue` (the live state) and `project_queue_arrivals` (a copy):
+// one loop, so the projection cannot disagree with what the pass will do.
+int flow_state(const world& w, entity_id nation, nation_tech_state& st, const research_params& p)
+{
     int completed = 0;
     bool moved = true;
     while (moved)
@@ -316,19 +316,18 @@ int flow_research_queue(world& w, entity_id nation, const research_params& p)
     return completed;
 }
 
-void clear_research_at_handover(world& w)
+// Universities by the nation whose territory they stand in; research
+// institutes by their owner corp's home nation. Counted in integers, so the
+// unordered corporation walk cannot reorder a sum.
+struct research_buildings
 {
-    w.nation_tech.clear();
-}
-
-void advance_research(world& w, const research_params& p, std::vector<research_accrual>* out)
-{
-    if (w.nations.empty())
-        return;
-
-    // Counted in integers, so the unordered corporation walk cannot reorder a sum.
     std::map<entity_id, int> universities;
     std::map<entity_id, int> institutes;
+};
+
+research_buildings count_research_buildings(const world& w)
+{
+    research_buildings rb;
     for (const auto& [corp, cc] : w.corporations)
     {
         for (const entity_id bid : cc.assets)
@@ -344,15 +343,115 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
             if (b.type == building_type::university)
             {
                 if (const auto tn = w.tile_to_nation.find(b.tile); tn != w.tile_to_nation.end())
-                    ++universities[tn->second];
+                    ++rb.universities[tn->second];
             }
             else if (b.type == building_type::research_institute)
             {
                 if (cc.home_nation != null_entity)
-                    ++institutes[cc.home_nation];
+                    ++rb.institutes[cc.home_nation];
             }
         }
     }
+    return rb;
+}
+
+// One nation's accrual for a quarter, COMPUTED and not applied: the RP it
+// would add and what the line would spend of @p treasury. @p st is the state
+// the queue's bill is read from (null = holds nothing, owes nothing). The
+// quarterly pass applies it; the research panel's projection reads it.
+research_accrual compute_accrual(const world& w, entity_id nid, const research_buildings& rb,
+                                 const nation_tech_state* st, float treasury,
+                                 const research_params& p)
+{
+    const std::size_t ai = static_cast<std::size_t>(budget_priority::academic_research);
+    research_accrual row;
+    row.nation = nid;
+
+    if (const auto u = rb.universities.find(nid); u != rb.universities.end())
+        row.universities = u->second;
+    if (const auto r = rb.institutes.find(nid); r != rb.institutes.end())
+        row.institutes = r->second;
+    row.multiplier = research_multiplier(w, nid);
+    const double mult = std::isfinite(row.multiplier) && row.multiplier > 0.0f
+                            ? static_cast<double>(row.multiplier) : 0.0;
+
+    // The RP that cost no treasury: the base and the buildings.
+    const std::int64_t free_milli = static_cast<std::int64_t>(std::llround(
+        static_cast<double>(to_milli(static_cast<double>(p.base_rp_per_nation)
+                                     + static_cast<double>(row.universities) * p.rp_per_university
+                                     + static_cast<double>(row.institutes) * p.rp_per_institute))
+        * mult));
+
+    // What the queue still owes: every queued node's cost, less the pool
+    // and less what the free RP will bring this quarter.
+    std::int64_t owed = 0;
+    if (st != nullptr)
+    {
+        for (const std::uint16_t n : st->queue)
+            owed += node_cost_milli(n, p);
+        owed -= st->pool_milli;
+    }
+    row.owed_milli = std::max<std::int64_t>(0, owed);
+    const std::int64_t line_need = std::max<std::int64_t>(0, owed - free_milli);
+
+    // The line's share: run_national_budget's own formula, recomputed on
+    // the run_nation_garrison_upkeep precedent (a line with no corp
+    // claimant never reaches that pass's report). It pays min(share, what
+    // the queue owes) — the garrison's min(share, bill) — as a direct
+    // expenditure, credited to nobody. An empty queue owes nothing and
+    // spends nothing.
+    if (treasury > 0.0f)
+    {
+        const auto bit = w.nation_budgets.find(nid);
+        if (bit != w.nation_budgets.end())
+        {
+            const nation_budget& bud = bit->second;
+            const float reserve   = std::clamp(bud.reserve_fraction, 0.0f, 1.0f);
+            const float spendable = treasury * (1.0f - reserve);
+            float weight_total = 0.0f;
+            for (std::size_t i = 0; i < priority_count; ++i)
+                if (std::isfinite(bud.weights[i]) && bud.weights[i] > 0.0f)
+                    weight_total += bud.weights[i];
+            if (spendable > 0.0f && weight_total > 0.0f
+                && std::isfinite(bud.weights[ai]) && bud.weights[ai] > 0.0f)
+                row.line_share = std::min(treasury,
+                                          spendable * (bud.weights[ai] / weight_total));
+        }
+    }
+    if (row.line_share > 0.0f && line_need > 0 && mult > 0.0)
+    {
+        const double bill = line_credits_for(static_cast<std::int64_t>(
+                                                 std::ceil(static_cast<double>(line_need) / mult)), p);
+        row.line_spend = static_cast<float>(std::min(static_cast<double>(row.line_share), bill));
+    }
+
+    const std::int64_t line_milli = static_cast<std::int64_t>(
+        std::llround(static_cast<double>(line_rp_milli(row.line_spend, p)) * mult));
+    row.rp_milli = free_milli + line_milli;
+    return row;
+}
+
+} // namespace
+
+int flow_research_queue(world& w, entity_id nation, const research_params& p)
+{
+    const auto it = w.nation_tech.find(nation);
+    if (it == w.nation_tech.end())
+        return 0;
+    return flow_state(w, nation, it->second, p);
+}
+
+void clear_research_at_handover(world& w)
+{
+    w.nation_tech.clear();
+}
+
+void advance_research(world& w, const research_params& p, std::vector<research_accrual>* out)
+{
+    if (w.nations.empty())
+        return;
+
+    const research_buildings rb = count_research_buildings(w);
 
     std::vector<entity_id> ids;
     ids.reserve(w.nations.size());
@@ -360,77 +459,14 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
 
-    const std::size_t ai = static_cast<std::size_t>(budget_priority::academic_research);
     for (const entity_id nid : ids)
     {
         nation_component& nc = w.nations.at(nid);
-        research_accrual row;
-        row.nation = nid;
-
-        if (const auto u = universities.find(nid); u != universities.end())
-            row.universities = u->second;
-        if (const auto r = institutes.find(nid); r != institutes.end())
-            row.institutes = r->second;
-        row.multiplier = research_multiplier(w, nid);
-        const double mult = std::isfinite(row.multiplier) && row.multiplier > 0.0f
-                                ? static_cast<double>(row.multiplier) : 0.0;
-
-        // The RP that cost no treasury: the base and the buildings.
-        const std::int64_t free_milli = static_cast<std::int64_t>(std::llround(
-            static_cast<double>(to_milli(static_cast<double>(p.base_rp_per_nation)
-                                         + static_cast<double>(row.universities) * p.rp_per_university
-                                         + static_cast<double>(row.institutes) * p.rp_per_institute))
-            * mult));
-
-        // What the queue still owes: every queued node's cost, less the pool
-        // and less what the free RP will bring this quarter.
         const auto sit = w.nation_tech.find(nid);
-        std::int64_t owed = 0;
-        if (sit != w.nation_tech.end())
-        {
-            for (const std::uint16_t n : sit->second.queue)
-                owed += node_cost_milli(n, p);
-            owed -= sit->second.pool_milli;
-        }
-        row.owed_milli = std::max<std::int64_t>(0, owed);
-        const std::int64_t line_need = std::max<std::int64_t>(0, owed - free_milli);
-
-        // The line's share: run_national_budget's own formula, recomputed on
-        // the run_nation_garrison_upkeep precedent (a line with no corp
-        // claimant never reaches that pass's report). It pays min(share, what
-        // the queue owes) — the garrison's min(share, bill) — as a direct
-        // expenditure, credited to nobody. An empty queue owes nothing and
-        // spends nothing.
-        if (nc.treasury > 0.0f)
-        {
-            const auto bit = w.nation_budgets.find(nid);
-            if (bit != w.nation_budgets.end())
-            {
-                const nation_budget& bud = bit->second;
-                const float reserve   = std::clamp(bud.reserve_fraction, 0.0f, 1.0f);
-                const float spendable = nc.treasury * (1.0f - reserve);
-                float weight_total = 0.0f;
-                for (std::size_t i = 0; i < priority_count; ++i)
-                    if (std::isfinite(bud.weights[i]) && bud.weights[i] > 0.0f)
-                        weight_total += bud.weights[i];
-                if (spendable > 0.0f && weight_total > 0.0f
-                    && std::isfinite(bud.weights[ai]) && bud.weights[ai] > 0.0f)
-                    row.line_share = std::min(nc.treasury,
-                                              spendable * (bud.weights[ai] / weight_total));
-            }
-        }
-        if (row.line_share > 0.0f && line_need > 0 && mult > 0.0)
-        {
-            const double bill = line_credits_for(static_cast<std::int64_t>(
-                                                     std::ceil(static_cast<double>(line_need) / mult)), p);
-            row.line_spend = static_cast<float>(std::min(static_cast<double>(row.line_share), bill));
-        }
+        research_accrual row = compute_accrual(
+            w, nid, rb, sit != w.nation_tech.end() ? &sit->second : nullptr, nc.treasury, p);
         if (row.line_spend > 0.0f)
             nc.treasury -= row.line_spend;
-
-        const std::int64_t line_milli = static_cast<std::int64_t>(
-            std::llround(static_cast<double>(line_rp_milli(row.line_spend, p)) * mult));
-        row.rp_milli = free_milli + line_milli;
 
         // An entry is created only when there is something to hold, so a world
         // where nothing researches keeps an empty map (and its state_hash).
@@ -444,4 +480,106 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         if (out != nullptr)
             out->push_back(row);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Read-only views and the queue edits (BL-1276, the research panel)
+// ---------------------------------------------------------------------------
+
+enqueue_result preview_enqueue(const world& w, entity_id nation, int node,
+                               std::vector<std::uint16_t>* plan)
+{
+    if (plan != nullptr)
+        plan->clear();
+    if (!valid_node(node) || w.nations.find(nation) == w.nations.end())
+        return enqueue_result::invalid;
+
+    const nation_tech_state* existing = state_of(w, nation);
+    static const nation_tech_state empty{};
+    const nation_tech_state& st = existing != nullptr ? *existing : empty;
+
+    if (st.held.test(static_cast<std::size_t>(node)))
+        return enqueue_result::already_held;
+    if (in_list(st.queue, node))
+        return enqueue_result::already_queued;
+
+    planner pl{st.held, st.queue, {}, research_params{}};
+    if (!pl.expand(node, 0))
+        return enqueue_result::refused_pair;
+    if (plan != nullptr)
+        *plan = std::move(pl.plan);
+    return enqueue_result::queued;
+}
+
+std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
+                                           const research_params& p)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return 0;
+    // A bill no quarter can meet, so the line reports its whole share: the
+    // rate a nation researches at while its queue owes more than a quarter.
+    nation_tech_state owing;
+    owing.queue.assign(1, 0);
+    owing.pool_milli = -(std::numeric_limits<std::int64_t>::max() / 4);
+    return compute_accrual(w, nation, count_research_buildings(w), &owing,
+                           nit->second.treasury, p).rp_milli;
+}
+
+std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
+                                        const research_params& p, int horizon_quarters)
+{
+    const nation_tech_state* existing = state_of(w, nation);
+    if (existing == nullptr || existing->queue.empty())
+        return {};
+    std::vector<int> arrival(existing->queue.size(), -1);
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return arrival;
+
+    nation_tech_state sim = *existing;
+    const research_buildings rb = count_research_buildings(w);
+    const float treasury = nit->second.treasury; // held: the rate as it stands now
+    for (int q = 1; q <= horizon_quarters && !sim.queue.empty(); ++q)
+    {
+        const research_accrual row = compute_accrual(w, nation, rb, &sim, treasury, p);
+        if (row.rp_milli <= 0)
+            break;
+        sim.pool_milli += row.rp_milli;
+        flow_state(w, nation, sim, p);
+        for (std::size_t i = 0; i < existing->queue.size(); ++i)
+            if (arrival[i] < 0 && sim.held.test(existing->queue[i]))
+                arrival[i] = q;
+
+        // Every remaining entry passed over (a quest waiting on its deed, or an
+        // entry behind one): no later quarter moves the queue either.
+        bool any_open = false;
+        for (const std::uint16_t n : sim.queue)
+            if (groups_met(sim.held, n) && deed_met(w, nation, n))
+            {
+                any_open = true;
+                break;
+            }
+        if (!any_open)
+            break;
+    }
+    return arrival;
+}
+
+bool remove_last_queued(world& w, entity_id nation)
+{
+    const auto it = w.nation_tech.find(nation);
+    if (it == w.nation_tech.end() || it->second.queue.empty())
+        return false;
+    it->second.queue.pop_back();
+    return true;
+}
+
+bool clear_research_queue(world& w, entity_id nation)
+{
+    const auto it = w.nation_tech.find(nation);
+    if (it == w.nation_tech.end() || it->second.queue.empty())
+        return false;
+    it->second.queue.clear();
+    return true;
 }

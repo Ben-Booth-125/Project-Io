@@ -86,6 +86,7 @@ const VERBS = [
   'raze_centre',                                       // BL-616
   'buy_corporation',                                   // BL-628
   'take_seat',                                         // BL-1076 -- pre-play only: --serve refuses it (rejected_state)
+  'queue_research', 'unqueue_research', 'clear_research', // BL-1276 -- the seat's nation's research queue; order = node index
 ];
 
 // ---------------------------------------------------------------------------

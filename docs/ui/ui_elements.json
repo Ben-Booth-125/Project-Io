@@ -1752,17 +1752,19 @@
   },
   {
    "id": "UI-108",
-   "name": "Research panel (tech-tree design mock)",
+   "name": "Research panel",
    "kind": "ledger",
    "parent": null,
    "source": [
     "docs/economy/RESEARCH.md",
+    "docs/economy/tech/DIGITISATION_TREE.md",
     "src/ui/tech_tree_panel.cpp",
-    "src/ui/nav_pane.cpp"
+    "src/ui/nav_pane.cpp",
+    "src/world/nation_tech.cpp"
    ],
-   "summary": "Rail slot 4: an era-selector fold-out, one row per era with a real thumbnail of that era's node graph. The slot's own tooltip says design mock, not gameplay.",
-   "interesting_question": "A mock on a live rail slot is indistinguishable from a feature until the player clicks it. Is the tooltip enough?",
-   "resolution": "Judged enough for now - the slot tooltip reads \"Technology unlocks and the route to space (design mock)\", which is the same honesty idiom slot 8 uses for its stand-in. RESEARCH.md is itself a stub, so the mock is ahead of its own authority.",
+   "summary": "Rail slot 4 / F9: the Digitisation tree as three trees in a ring on the canvas — every node in its tier's glyph (travel dot, minor ring, major disc, quest diamond, pair outlined red, placeholder dashed, joint/mastery accent ring), AND links in the accent, held / open / locked / queued states, rim majors and branches labelled — with the shared hover card on a node. The column holds the Inspect / Plan strip, the seat's nation with its RP a quarter, and the queue with each entry's arrival quarter, Remove last and Clear. In Plan mode a press queues the node with its requirements through the queue_research verb.",
+   "interesting_question": "The arrival quarter is a projection at today's treasury and today's buildings, and quests never complete until their deeds have readers. Is a date that will move a promise the panel cannot keep?",
+   "resolution": "It is labelled as what it is: the projection runs the quarterly pass's own accrual and queue flow on a copy of the state, holding the treasury where it stands, so it is the date AT THE CURRENT RATE (RESEARCH.md § The research queue: 'every entry shows its arrival date at the current research rate'). An entry that cannot complete says so ('on its deed', 'after a deed') instead of printing a date.",
    "checks": [
     "tech_tree_panel"
    ]

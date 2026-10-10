@@ -618,16 +618,16 @@
    "status": "drafted"
   },
   "tech_tree_panel": {
-   "surface": "Tech tree viewer (F9)",
-   "answers": "What can I unlock, and what stands between me and it?",
-   "because": "A constellation of gates is only a decision if the player can see which are reachable. BL-344 made that second half real: each node now reports EARNED, LOCKED with its unmet conditions itemised, or -- honestly -- \"no gate authored\", instead of showing an unevaluable string condition that could never resolve.",
+   "surface": "Research panel (nav slot 4 / F9): the Digitisation ring on the canvas, the Inspect / Plan strip and the queue in the column",
+   "answers": "Which technologies can my nation reach, what does each give, and when will my plan arrive?",
+   "because": "The nation holds technology (RESEARCH.md § Who holds technology), and the queue is how it is spent: anything may be queued however far out, with its requirements ahead of it, and every entry shows its arrival date. A queue nobody can see the tree behind is a list of names; a tree nobody can plan on is a poster. The ring earns the whole canvas because the tree's grammar is spatial — three trees, nine branches, four cost rings inside out, AND links where a node needs two paths, pick-one pairs that close each other for good, quests that key the next age — and each of those is drawn in its own way so a glance reads where the power surges are and which choices are traps. The hover card carries the exact advantage, the RP cost and the requirements in the shared card rather than a second tooltip idiom. The column carries the answer to 'when': each queued entry's arrival quarter, projected by the quarterly pass's own accrual and flow on a copy of the state, so the panel and the sim cannot disagree. Plan mode is a separate, visible mode so a stray hover-and-click in Inspect never spends the treasury; a refused press says which pair closed it. Replaces the retired mock constellation (BL-087/BL-310) and its era tabs.",
    "backlog_item": [
-    "BL-087",
-    "BL-126",
-    "BL-344"
+    "BL-1276",
+    "BL-1273"
    ],
    "files": [
-    "src/ui/tech_tree_panel.cpp"
+    "src/ui/tech_tree_panel.cpp",
+    "src/world/nation_tech.cpp"
    ],
    "status": "drafted"
   },

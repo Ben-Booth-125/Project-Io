@@ -130,7 +130,7 @@ static const std::array<key_binding, 24> s_bindings = {{
     {SDL_SCANCODE_F5,           false, ui::canvas_command::quick_save,   "Quick save",        "F5"},
     {SDL_SCANCODE_F6,           false, ui::canvas_command::quick_load,   "Quick load",        "F6"},
     {SDL_SCANCODE_F1,           false, ui::canvas_command::help_toggle,  "Key bindings",      "F1"},
-    {SDL_SCANCODE_F9,           false, ui::canvas_command::tech_tree_toggle, "Tech tree (mock)", "F9"},
+    {SDL_SCANCODE_F9,           false, ui::canvas_command::tech_tree_toggle, "Research",         "F9"},
     {SDL_SCANCODE_F10,          false, ui::canvas_command::options_toggle, "Options",         "F10"},
 }};
 
@@ -1999,8 +1999,14 @@ void app::dispatch_action(ui::canvas_command cmd)
             m_show_options = !m_show_options;
             return;
         case ui::canvas_command::tech_tree_toggle:
-            m_ui.show_tech_tree = !m_ui.show_tech_tree;
+        {
+            // The same press as the rail's Research slot (BL-1276): it yields
+            // the column like every other ledger, and closes what it opened.
+            const bool was_open = m_ui.show_tech_tree;
+            ui::close_all_panels(m_ui);
+            m_ui.show_tech_tree = !was_open;
             return;
+        }
 
         // Everything else is a canvas navigation command.
         default:
@@ -2504,11 +2510,10 @@ void app::render()
     // deleted, since intent is not recoverable from a diff.
     ui::draw_corporation_panel(m_world, m_last_corp_standings, m_ui, m_ui.show_corporations_table);
 
-    // Tech tree era-selector menu (BL-310 round 4) — nav slot 4 (Research), a
-    // real fold-out ledger like every other menu now, not chrome bolted onto
-    // the canvas takeover. draw_tech_tree_panel (below, F11 HUD's neighbour)
-    // is the canvas itself; this is where the era is actually chosen.
-    ui::draw_tech_tree_menu(m_ui);
+    // Research ledger (BL-1276) — nav slot 4 / F9: the mode strip, the seat's
+    // nation and its queue with each entry's arrival. draw_tech_tree_panel
+    // (below, F11 HUD's neighbour) is the ring itself, a canvas takeover.
+    ui::draw_tech_tree_menu(m_world, m_registry.research(), m_ui);
 
     // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
     // rect at the bottom of the screen, sandwiched between the shell column and
@@ -2835,6 +2840,18 @@ void app::render()
     }
     m_ui.pending_order_commands.clear(); // consume the requests
 
+    // Research-queue presses (BL-1276) — the research panel queues them; they
+    // apply through the same seam an agent's queue_research takes. The panel
+    // already previewed the press and wrote its reason; a rejection HERE is a
+    // race (the world moved between the draw and the apply), so say so.
+    for (corp_command& cmd : m_ui.pending_research_commands)
+    {
+        cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+        if (apply_corp_command(m_world, m_registry, cmd) != corp_command_result::applied)
+            m_ui.research_message = "The research queue refused that press.";
+    }
+    m_ui.pending_research_commands.clear(); // consume the requests
+
     // F1 key-binding cheat-sheet — generated from s_bindings so it never drifts.
     if (m_show_help)
     {
@@ -2956,10 +2973,9 @@ void app::render()
         ImGui::End();
     }
 
-    // F9 research canvas, also reachable from nav rail slot 4 (BL-310). The
-    // mock Lua tree it drew retired with BL-1273; the Digitisation tree panel
-    // is BL-1276's, and until it lands this draws a pending state.
-    ui::draw_tech_tree_panel(m_world, m_ui.show_tech_tree);
+    // F9 research canvas, also reachable from nav rail slot 4: the Digitisation
+    // tree's ring (BL-1276) — inspect, and plan the seat's nation's queue.
+    ui::draw_tech_tree_panel(m_world, m_registry.research(), m_ui);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
     // measures a full frame's worth of panels, and anchored (first use only; it is
