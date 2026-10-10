@@ -45,6 +45,7 @@
 #include "world/era_band.hpp"
 #include "world/landscape_search.hpp"  // landscape_search_result, landscape_search_params
 #include "world/stockpile_budget.hpp"  // stockpile_budget
+#include "world/corporation_generation.hpp" // marketplace_retrofit_report (BL-1268)
 
 #include <cstdint>
 #include <vector>
@@ -98,6 +99,8 @@ struct finish_campaign_result
     charter_spend_params    spend{};
     /// The winner's spend report (untouched when the budget was empty).
     charter_spend_report    charter;
+    /// BL-1268: what the retrofit placed from the history's trade record.
+    marketplace_retrofit_report retrofit;
     /// Wall clock of the search and of the settle, milliseconds -- REPORTED
     /// ONLY, on the BL-754 footing; the loading bar's weights are re-measured
     /// from these, never read from them at run time.

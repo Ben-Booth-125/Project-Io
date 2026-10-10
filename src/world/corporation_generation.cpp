@@ -11,6 +11,8 @@
 #include "world/placement_rules.hpp"
 #include "world/planetology.hpp"    // checkpoint_rng — charter_web_from_budget's keyed streams
 #include "world/settlement.hpp"
+#include "world/history_sim.hpp"      // trade_record_cell — the retrofit's record (BL-1268)
+#include "world/world_gen_config.hpp" // trade_retrofit_params (BL-1268)
 #include "world/input_reach.hpp"   // the one reach rule (BL-1185 / BL-1187)
 #include "world/spawn_seat.hpp"    // repoint_player — enforce_chain_feasible_roster's seat
 
@@ -23,6 +25,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <random>
@@ -6864,4 +6867,258 @@ void date_chartered_firms(world& w, charter_spend_report& report,
         c.founded_year = year;
         r.founded_year = year;
     }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1268 — THE RETROFIT (TRADE.md § Trade in generation)
+// ---------------------------------------------------------------------------
+
+gen_trade_record gen_trade_record_from_history(const std::vector<trade_record_cell>& record,
+                                               const trade_retrofit_params&          rates)
+{
+    gen_trade_record out;
+    out.points_per_marketplace = rates.points_per_marketplace;
+    out.max_per_market         = rates.max_per_market;
+    out.cells.reserve(record.size());
+    for (const trade_record_cell& c : record) // already sorted by (polity, region)
+    {
+        const std::int64_t pts = c.flow_volume * rates.flow_points_per_1000 / 1000
+                               + c.relation_years * rates.relation_points_per_year;
+        if (pts <= 0)
+            continue;
+        out.cells.push_back(gen_trade_cell{c.polity, c.region, pts, c.flow_volume, c.relation_years});
+    }
+    return out;
+}
+
+marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registry& reg)
+{
+    marketplace_retrofit_report rep;
+    const gen_trade_record& rec = w.gen_trade_record;
+    const settlement_state* ss  = w.gen_settlement.get();
+    for (const gen_trade_cell& c : rec.cells)
+        rep.points_total += c.points;
+    if (ss == nullptr || rec.cells.empty())
+        return rep;
+
+    const auto b = w.bodies.find(w.home_body);
+    if (b == w.bodies.end())
+    {
+        rep.points_no_market = rep.points_total;
+        return rep;
+    }
+    const int gw = b->second.grid_width, gh = b->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+    {
+        rep.points_no_market = rep.points_total;
+        return rep;
+    }
+
+    // The home body's raster by grid position (stockpile_region_reach's idiom):
+    // no iteration order of the tile map reaches the answer.
+    const std::size_t cells = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    std::vector<entity_id> tile_at(cells, null_entity);
+    for (const auto& [tid, t] : w.tiles)
+    {
+        if (t.body != w.home_body || t.grid_x < 0 || t.grid_y < 0 || t.grid_x >= gw || t.grid_y >= gh)
+            continue;
+        tile_at[static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(gw)
+                + static_cast<std::size_t>(t.grid_x)] = tid;
+    }
+
+    // 1. Points per market, by each cell's seat region's anchor tile.
+    std::map<entity_id, std::int64_t> market_points;
+    std::map<entity_id, std::pair<std::int64_t, std::int64_t>> market_raw; // (flow, relation)
+    for (const gen_trade_cell& c : rec.cells)
+    {
+        entity_id m = null_entity;
+        if (c.region >= 0 && static_cast<std::size_t>(c.region) < ss->regions.size())
+        {
+            const region& rg = ss->regions[static_cast<std::size_t>(c.region)];
+            if (rg.col >= 0 && rg.row >= 0 && rg.col < gw && rg.row < gh)
+            {
+                const entity_id tid = tile_at[static_cast<std::size_t>(rg.row) * static_cast<std::size_t>(gw)
+                                              + static_cast<std::size_t>(rg.col)];
+                if (tid != null_entity)
+                    m = market_for_tile(w, tid);
+            }
+        }
+        if (m == null_entity)
+            rep.points_no_market += c.points;
+        else
+        {
+            market_points[m] += c.points;
+            market_raw[m].first  += c.flow_volume;
+            market_raw[m].second += c.relation_years;
+        }
+    }
+    rep.markets_with_record = static_cast<int>(market_points.size());
+
+    // 2. What each market's record buys.
+    const std::int64_t price = rec.points_per_marketplace;
+    const int          cap   = std::max(0, rec.max_per_market);
+    std::map<entity_id, int> wanted; // market -> Marketplaces bought
+    for (const auto& [m, pts] : market_points)
+    {
+        marketplace_retrofit_row row;
+        row.market = m;
+        row.points = pts;
+        row.flow_volume    = market_raw[m].first;
+        row.relation_years = market_raw[m].second;
+        if (price > 0)
+        {
+            const std::int64_t whole = pts / price;
+            row.bought = static_cast<int>(std::min<std::int64_t>(whole, cap));
+            rep.points_below_one += pts - whole * price;
+            rep.points_over_cap  += (whole - row.bought) * price;
+        }
+        else
+            rep.points_below_one += pts;
+        rep.bought += row.bought;
+        if (row.bought > 0)
+            wanted[m] = row.bought;
+        rep.rows.push_back(row);
+    }
+    const auto row_of = [&](entity_id m) -> marketplace_retrofit_row& {
+        return *std::lower_bound(rep.rows.begin(), rep.rows.end(), m,
+                                 [](const marketplace_retrofit_row& r, entity_id k) { return r.market < k; });
+    };
+    // 3. The owner of each market's Marketplaces: the corporation with the
+    //    most buildings in its catchment, every building by the market its
+    //    tile clears against; corporations in ascending id, so a tie stays with
+    //    the lower. Found for EVERY market with a record (bought or not), so a
+    //    reading can say who the record would reach at another rate.
+    std::vector<entity_id> corp_ids;
+    corp_ids.reserve(w.corporations.size());
+    for (const auto& kv : w.corporations)
+        corp_ids.push_back(kv.first);
+    std::sort(corp_ids.begin(), corp_ids.end());
+    std::map<entity_id, std::map<entity_id, int>> holdings; // market -> corp -> buildings
+    for (const entity_id cid : corp_ids)
+    {
+        if (cid == w.player_entity)
+            continue; // never added for the seat (TRADE.md § Trade in generation)
+        for (const entity_id bid : w.corporations.at(cid).assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const entity_id m = market_for_tile(w, bit->second.tile);
+            if (market_points.count(m) != 0)
+                ++holdings[m][cid];
+        }
+    }
+    for (marketplace_retrofit_row& row : rep.rows)
+    {
+        int best = 0;
+        if (const auto hit = holdings.find(row.market); hit != holdings.end())
+            for (const auto& [cid, cnt] : hit->second)
+                if (cnt > best)
+                {
+                    best      = cnt;
+                    row.owner = cid;
+                }
+        row.owner_holdings = best;
+    }
+
+    if (wanted.empty() || !reg.building_available(building_type::planetary_marketplace))
+    {
+        for (const auto& [m, n] : wanted)
+            rep.no_site += n;
+        return rep;
+    }
+
+    // 4. The catchment tiles of every market that bought, nearest its centre
+    //    first. One raster walk; a tile holding any building is passed over.
+    std::unordered_set<entity_id> occupied;
+    for (const auto& [bid, bc] : w.buildings)
+        occupied.insert(bc.tile);
+    struct site { long long d2; entity_id tile; };
+    std::map<entity_id, std::vector<site>> sites;
+    std::map<entity_id, std::pair<int, int>> centre_xy;
+    for (const auto& [m, n] : wanted)
+    {
+        const auto mit = w.markets.find(m);
+        int cx = -1, cy = -1;
+        if (mit != w.markets.end() && mit->second.centre_tile != null_entity)
+            if (const auto ct = w.tiles.find(mit->second.centre_tile); ct != w.tiles.end())
+            {
+                cx = ct->second.grid_x;
+                cy = ct->second.grid_y;
+            }
+        centre_xy[m] = {cx, cy};
+    }
+    for (std::size_t i = 0; i < cells; ++i)
+    {
+        const entity_id tid = tile_at[i];
+        if (tid == null_entity || occupied.count(tid) != 0)
+            continue;
+        const entity_id m = market_for_tile(w, tid);
+        const auto cit = centre_xy.find(m);
+        if (cit == centre_xy.end())
+            continue;
+        const long long x = static_cast<long long>(i % static_cast<std::size_t>(gw));
+        const long long y = static_cast<long long>(i / static_cast<std::size_t>(gw));
+        long long d2 = 0;
+        if (cit->second.first >= 0)
+        {
+            long long dx = std::llabs(x - cit->second.first);
+            dx = std::min<long long>(dx, gw - dx); // columns wrap
+            const long long dy = y - cit->second.second;
+            d2 = dx * dx + dy * dy;
+        }
+        sites[m].push_back(site{d2, tid});
+    }
+
+    // 5. Author.
+    const placement_gate gate = reg.placement_gate_for(building_type::planetary_marketplace, no_recipe);
+    bool any = false;
+    for (const auto& [m, n] : wanted)
+    {
+        marketplace_retrofit_row& row = row_of(m);
+        const entity_id owner = row.owner;
+        if (owner == null_entity)
+        {
+            rep.no_owner += n;
+            continue;
+        }
+        std::vector<site>& cand = sites[m];
+        std::sort(cand.begin(), cand.end(), [](const site& a, const site& b2) {
+            if (a.d2 != b2.d2) return a.d2 < b2.d2;
+            return a.tile < b2.tile;
+        });
+        int placed = 0;
+        for (const site& s : cand)
+        {
+            if (placed >= n)
+                break;
+            if (occupied.count(s.tile) != 0)
+                continue;
+            if (!placement_rules::can_place_in_world(w, s.tile, building_type::planetary_marketplace,
+                                                     resource_type::iron_ore, /*max_reach=*/-1.0f,
+                                                     owner, gate))
+                continue;
+            const entity_id bid = author_building(w, s.tile, building_type::planetary_marketplace, occupied);
+            w.corporations.at(owner).assets.push_back(bid);
+            ++placed;
+            any = true;
+        }
+        row.placed = placed;
+        rep.placed  += placed;
+        rep.no_site += n - placed;
+    }
+    if (any)
+        invalidate_logistics_caches(w);
+    return rep;
+}
+
+void print_marketplace_retrofit(const marketplace_retrofit_report& r)
+{
+    std::printf("[trade_retrofit] %lld points: %d markets with record, %d Marketplaces bought, "
+                "%d placed (no owner %d, no site %d); unspent: no market %lld, below one %lld, "
+                "over cap %lld\n",
+                static_cast<long long>(r.points_total), r.markets_with_record, r.bought, r.placed,
+                r.no_owner, r.no_site, static_cast<long long>(r.points_no_market),
+                static_cast<long long>(r.points_below_one), static_cast<long long>(r.points_over_cap));
+    std::fflush(stdout);
 }

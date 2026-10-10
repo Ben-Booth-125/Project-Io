@@ -189,6 +189,8 @@ struct shipped_landscape
     /// reports it charged is read from here, never restated. Default (empty)
     /// off the stockpile path.
     charter_spend_params    stockpile_spend{};
+    /// BL-1268: the retrofit the mirror ran after the winner's apply.
+    marketplace_retrofit_report retrofit;
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -279,6 +281,9 @@ inline shipped_landscape apply_shipped_landscape(
     // 4-argument call inside world/* before anything else is read.
     apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
                               budget, spend, charter.report);
+    // BL-1268: finish_campaign_world's retrofit, verbatim, at the same point.
+    out.retrofit = retrofit_marketplaces(w, reg);
+    print_marketplace_retrofit(out.retrofit);
 
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
