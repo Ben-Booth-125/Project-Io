@@ -1266,6 +1266,35 @@
    ],
    "title": "Sprint 52's one re-bless: the world without generation research, on the industrial band, described by shape and authorised by Ben",
    "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech effects form: deed state in sprint 52); filed by Claude",
+   "id": "BL-1278",
+   "short_name": "QUEST_DEED_STATE",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "requires": [
+    "BL-1274"
+   ],
+   "files": [
+    "src/world/nation_tech.cpp",
+    "src/world/nation_tech.hpp",
+    "src/world/condition_set.cpp",
+    "src/world/condition_set.hpp",
+    "src/world/world_save.cpp",
+    "docs/economy/tech/digitisation_tree.json",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "A nation keeps the deed history its quests read, so a quest completes when its deed is met",
+   "design": "DESIGNED: RESEARCH.md § Quests key the next age (a deed is read from state the game carries). Add the per-nation deed state the nine deeds need where the game already carries the quantity: streak counters over quarters, first-time latches, the national stock-and-demand cover, trade partners by nation; saved. Wire deed_met for every deed whose quantity exists; the rest (Alarm, unrest, war outcomes) stay declared unread with the system they wait on. Never a counter kept only to unlock a node: each reads an in-world quantity."
   }
  ]
 }
