@@ -193,6 +193,10 @@ struct bake_params
     /// How far a plain's soft swells ease at the master (BL-1254 eased them
     /// by 0.40; 0 = plains roll at full shading).
     float plain_ease      = 0.0f;
+    /// Flat land renders flat (Ben, 2026-10-10): the share of the tile
+    /// height field's slope shading (relief_gain) that flat ground — plains
+    /// and valleys, roll 0 — keeps. Rolling ground keeps all of it.
+    float flat_tilt       = 0.0f;
     /// Value range: the hillshade's clamp below and above flat ground, before
     /// the grade (pre-BL-1256 +-0.75 at the master).
     float shade_lo        = 0.65f;
@@ -267,6 +271,11 @@ struct bake_source
     std::vector<float> height;          ///< BL-517 normalised height.
     std::vector<float> grad_x, grad_y;  ///< Height gradient (neighbour differences).
     std::vector<float> relief_bias;     ///< palette::relief_amount, landform accent input.
+    /// Flat land renders flat (Ben, 2026-10-10): how far the tile's ground
+    /// ROLLS — 0 on plains and valleys, 1 on highland and the dramatic forms
+    /// (landform_roll). Interpolated as the relief bias is, it weights the
+    /// fold field, the hills and the tile tilt, so relief eases out smoothly.
+    std::vector<float> roll;
     std::vector<float> jitter;          ///< Per-tile hash jitter in [-1, 1].
     std::vector<std::uint8_t> cover;    ///< terrain_cover per tile — feeds the close-tier feature stamps.
     std::vector<std::uint8_t> density;  ///< cover_density per tile.
@@ -360,13 +369,25 @@ void rederive_border_sets(bake_source& s);
 float hill_field(const bake_source& s, double x, double y, float& gx, float& gy);
 
 /// BL-1261: the sub-tile relief's slope at ground point (x, y) as the base
-/// hillshade reads it — the fold field (its amplitude from @p shape_bias and
-/// @p h, the interpolated relief bias and height there) plus the hills — in
-/// shading units (a slope of 1 is a full stop of light). The tile gradient
-/// (relief_gain x grad) is the caller's to add. The route pass cuts a road
-/// into the slope the eye sees with it.
+/// hillshade reads it — the fold field (its amplitude from @p shape_bias,
+/// @p h and @p roll, the interpolated rolling relief bias, height and roll
+/// weight there) plus the hills (times @p roll) — in shading units (a slope
+/// of 1 is a full stop of light). The tile gradient (relief_gain x grad,
+/// times tilt_weight) is the caller's to add. The route pass cuts a road
+/// into the slope the eye sees with it; on flat ground there is none.
 void relief_slope(const bake_source& s, const geometry& g, const bake_params& p, double x, double y,
-                  float shape_bias, float h, float& gx, float& gy);
+                  float shape_bias, float h, float roll, float& gx, float& gy);
+
+/// Flat land renders flat: the share of the tile height field's slope
+/// shading kept at interpolated roll weight @p roll (flat_tilt on flat
+/// ground, 1 on rolling ground, linear between).
+inline float tilt_weight(const bake_params& p, float roll)
+{
+    return p.flat_tilt + (1.0f - p.flat_tilt) * roll;
+}
+
+/// The roll weight of a terrain_landform value (bake_source::roll).
+float landform_roll(std::uint8_t landform);
 
 struct pixel_rect;
 /// BL-1261: the partial re-bake's tree bound for a road change. Appends the

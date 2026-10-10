@@ -6,16 +6,19 @@
 --
 --   palette and value  it1's khaki, olive and green, white peaks; lit slopes near a warm off-white,
 --                      shadows near black; no broad dark mottle of its own
---   relief everywhere  plains roll in folds a third to a half of a hex apart,
---                      ranges above them, continuous across tiles
---   cast shadows       the low NW sun throws shadow behind ridges and hills
+--   flat land flat     plains and valleys lie flat (grain and patterns only);
+--                      highland rolls in folds a third to a half of a hex
+--                      apart, ranges above it, the change smooth across tiles
+--   cast shadows       the low NW sun throws shadow behind ridges and hills,
+--                      none on flat ground
 --   water              blue-green, glinting; white where a river falls; rocky banks
 --   forests            as before (their form is unchanged)
 --
 -- Subjects are ground_bake_check `--look`'s aims on the home body (that reading
 -- prints them, with the luminance percentiles the palette is tuned against): a
 -- plain, rolling hills, the best-linked mountain run, the river reach with the
--- steepest fall, a forest edge, the busiest town and a coast. Rungs 0 to 4 of
+-- steepest fall, a forest edge, the busiest town, a coast, a plain meeting a
+-- mountain run and a road across a plain (Ben, 2026-10-10). Rungs 0 to 4 of
 -- the stepped ladder: rungs 0-2 are judged for COLOUR against it1's top-down
 -- panel (docs/ui/design/renders/map/it1), rungs 3-4 for detail against it3 C-F.
 --
@@ -37,6 +40,8 @@ local aims = {
     { "forest_edge",  26, 25 },
     { "town",         43, 24 },
     { "coast",         9, 25 },
+    { "plain_mountain", 108, 53 },
+    { "road_plain",     84, 51 },
 }
 
 -- The player's own ground, inside its vision: everywhere else the vision fog

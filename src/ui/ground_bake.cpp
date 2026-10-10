@@ -688,6 +688,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
     s.grad_x.assign(n, 0.0f);
     s.grad_y.assign(n, 0.0f);
     s.relief_bias.assign(n, 0.0f);
+    s.roll.assign(n, 0.0f);
     s.jitter.assign(n, 0.0f);
     s.cover.assign(n, static_cast<std::uint8_t>(terrain_cover::none));
     s.density.assign(n, 0);
@@ -752,6 +753,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
         s.colour[i] = palette::ground_tile_colour(t.substrate, t.cover, t.cover_density);
         s.height[i] = t.height;
         s.relief_bias[i] = palette::relief_amount(t.landform);
+        s.roll[i] = landform_roll(static_cast<std::uint8_t>(t.landform)); // flat land renders flat
         s.jitter[i] = hash01(t.grid_x, t.grid_y, 0xB732u) * 2.0f - 1.0f;
         s.cover[i]   = static_cast<std::uint8_t>(t.cover);
         s.density[i] = t.cover_density;
@@ -1063,13 +1065,17 @@ inline float sst01(float e0, float e1, float v)
     return t * t * (3.0f - 2.0f * t);
 }
 
-/// The fold field's amplitude (relief everywhere): roll_floor on every land
-/// pixel, more with the landform bias and the altitude. One formula for the
-/// base hillshade and the cast-shadow height field, so the two agree.
-inline float relief_amp(const bake_params& p, float detail_mul, float shape_bias, float h, float swell)
+/// The fold field's amplitude: roll_floor and the altitude's share on
+/// ROLLING ground (flat land renders flat, Ben 2026-10-10: @p roll, the
+/// interpolated roll weight, is 0 on plains and valleys, 1 on highland and
+/// the dramatic forms), plus the landform accent from @p shape_bias — the
+/// interpolated bias of the rolling tiles only, so a valley adds none. One
+/// formula for the base hillshade, the cast-shadow height field and the
+/// route pass's slope, so the three agree.
+inline float relief_amp(const bake_params& p, float detail_mul, float shape_bias, float h, float swell, float roll)
 {
     return p.detail_amp * detail_mul
-         * (p.roll_floor * swell + p.landform_accent * std::fabs(shape_bias) + 0.35f * h);
+         * (roll * (p.roll_floor * swell + 0.35f * h) + p.landform_accent * std::fabs(shape_bias));
 }
 
 /// The roll's own swell: a low-frequency field (~2.4 canonical, a hex and a
@@ -1995,7 +2001,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 f.lift  = static_cast<float>(hlift);
             }
             double wsum = 0.0, cr = 0.0, cg = 0.0, cb = 0.0;
-            double hsum = 0.0, gx = 0.0, gy = 0.0, rb = 0.0, jt = 0.0;
+            double hsum = 0.0, gx = 0.0, gy = 0.0, rb = 0.0, jt = 0.0, rl = 0.0, rsb = 0.0;
 
             for (int k = 0; k < ncand; ++k)
             {
@@ -2013,6 +2019,8 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 gy   += wgt * src.grad_y[i];
                 rb   += wgt * src.relief_bias[i];
                 jt   += wgt * src.jitter[i];
+                rl   += wgt * src.roll[i];
+                rsb  += wgt * src.roll[i] * src.relief_bias[i];
             }
             if (wsum <= 0.0)
             {
@@ -2034,7 +2042,12 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             // interpolation, never the material's edge band — drives the
             // relief's amplitude and folding, so relief is continuous across
             // tiles (no hex-shaped relief) and matches the cast-shadow field.
-            const float shape_bias = bias;
+            // Flat land renders flat (Ben, 2026-10-10): the shape reads the
+            // ROLLING tiles' bias only (a valley is flat), and the roll
+            // weight eases every rolling term out across the same wide
+            // interpolation — never a step at a hex.
+            const float shape_bias = static_cast<float>(rsb * inv);
+            const float roll       = static_cast<float>(rl * inv);
 
             const bool land = owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::land);
 
@@ -2253,12 +2266,13 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // finite-difference gradient of the detail field), which is
                 // what gives the ground painterly terrain texture at sub-tile
                 // scale instead of a per-hex mosaic.
-                // BL-1256 (relief everywhere): the amplitude's floor is
-                // roll_floor, so a plain rolls; it reads the SHAPE bias, and a
-                // variant's roughness moves it only a third as far as it did,
-                // so no tile's relief stops at its hex.
+                // BL-1256: the amplitude's floor is roll_floor — on ROLLING
+                // ground only (flat land renders flat, Ben 2026-10-10: the
+                // roll weight is 0 on plains and valleys); it reads the SHAPE
+                // bias, and a variant's roughness moves it only a third as
+                // far as it did, so no tile's relief stops at its hex.
                 const float amp = relief_amp(p, detail_mul, shape_bias, h,
-                                             roll_swell(x0_, uy + hlift, swell_cell, swell_cells))
+                                             roll_swell(x0_, uy + hlift, swell_cell, swell_cells), roll)
                                 * (vland ? 1.0f + (vv[vp_detail] - 1.0f) * 0.35f : 1.0f);
                 // The GRADIENT reads the low octave only, central-differenced
                 // at half a cell: a fine octave in the slope is per-pixel
@@ -2293,14 +2307,21 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // BL-1254: the gradient's span narrows at the master (half a
                 // cell -> a fifth), so a fold resolves as a crease a few
                 // pixels wide instead of a swell twenty wide.
-                const double eps = detail_cell * (0.5 - 0.3 * ck);
-                const float ddx = (detail_lo(x0_ + eps, gry) - detail_lo(x0_ - eps, gry))
-                                  / static_cast<float>(2.0 * eps);
-                const float ddy = (detail_lo(x0_, gry + eps) - detail_lo(x0_, gry - eps))
-                                  / static_cast<float>(2.0 * eps);
-                const float n_c = fold_noise(x0_, gry, detail_cell, detail_cells, detail_cell_b, detail_cells_b);
-                const float d0 = fold(n_c) * 0.7f
-                    + (value_noise(x0_, gry, detail_cell2, detail_cells2, 0xD372u) - 0.5f) * 0.3f;
+                // Flat land renders flat: on wholly flat ground (roll 0, no
+                // rolling bias) the fold field's amplitude and its crease
+                // ink both weigh 0, so it is not sampled at all.
+                float ddx = 0.0f, ddy = 0.0f, n_c = 0.0f, d0 = 0.0f;
+                if (roll > 0.0f || shape_bias != 0.0f)
+                {
+                    const double eps = detail_cell * (0.5 - 0.3 * ck);
+                    ddx = (detail_lo(x0_ + eps, gry) - detail_lo(x0_ - eps, gry))
+                        / static_cast<float>(2.0 * eps);
+                    ddy = (detail_lo(x0_, gry + eps) - detail_lo(x0_, gry - eps))
+                        / static_cast<float>(2.0 * eps);
+                    n_c = fold_noise(x0_, gry, detail_cell, detail_cells, detail_cell_b, detail_cells_b);
+                    d0  = fold(n_c) * 0.7f
+                        + (value_noise(x0_, gry, detail_cell2, detail_cells2, 0xD372u) - 0.5f) * 0.3f;
+                }
 
                 // Two shade terms with their own scales: tile slopes are tiny
                 // (heights are 0-1 across a whole continent) and take the big
@@ -2324,13 +2345,14 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 const float dshade = (ddx * Lx + ddy * Ly) * amp * 0.75f * soft_ease;
                 // BL-1256: the hills' long faces, under the folds.
                 float hshade = 0.0f;
-                if (p.hill_amp > 0.0f)
+                if (p.hill_amp > 0.0f && roll > 0.0f)
                 {
                     float hx, hy;
                     hill_noise(x0_, gry, hill_cell_a, hill_cells_a, hill_cell_b, hill_cells_b, hx, hy);
-                    hshade = (hx * Lx + hy * Ly) * p.hill_amp;
+                    hshade = (hx * Lx + hy * Ly) * p.hill_amp * roll; // flat land: no hills
                 }
-                const float shade = p.hillshade_sign * ((gxx * Lx + gyy * Ly) * p.relief_gain + dshade + hshade);
+                const float shade = p.hillshade_sign * ((gxx * Lx + gyy * Ly) * p.relief_gain * tilt_weight(p, roll)
+                                                        + dshade + hshade);
                 // BL-1256: a wide value range — lit slopes toward a warm
                 // off-white, slopes turned from the light toward black (the
                 // grade's S-curve then holds it). The clamp still widens with
@@ -2346,7 +2368,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     const float crease = 1.0f - std::fabs(2.0f * n_c - 1.0f);
                     const float line   = sstf(0.93f, 0.985f, crease);
                     if (line > 0.0f)
-                        lum -= ck * line * (0.012f + 0.16f * ridge_w0) // BL-1256: a plain's crest is a fold, not a contour line
+                        lum -= ck * line * (0.012f * roll + 0.16f * ridge_w0) // BL-1256: a fold, not a contour line; flat land has none
                              * (p.hillshade_sign * dshade < 0.0f ? 1.0f : 0.45f);
                 }
 
@@ -3376,11 +3398,12 @@ struct shadow_field
     }
 
     /// The same-class Wendland gather the base bake runs, at (x, y): the
-    /// interpolated height and landform bias of the owner's class, and the
+    /// interpolated height, the rolling tiles' landform bias (the base
+    /// bake's shape_bias) and the roll weight of the owner's class, and the
     /// owner (-1: no ground; a masked owner reads as height 0, no bias).
-    void gather(double x, double y, double& h, double& bias, int& owner) const
+    void gather(double x, double y, double& h, double& bias, double& roll, int& owner) const
     {
-        h = 0.0; bias = 0.0; owner = -1;
+        h = 0.0; bias = 0.0; roll = 0.0; owner = -1;
         struct c_ { std::size_t i; double w; };
         c_ cs[24];
         int nc = 0;
@@ -3418,18 +3441,20 @@ struct shadow_field
         const std::uint8_t oc = src.cls[static_cast<std::size_t>(owner)];
         if (oc == static_cast<std::uint8_t>(bake_source::tile_class::masked))
             return;
-        double ws = 0.0, hs = 0.0, bs = 0.0;
+        double ws = 0.0, hs = 0.0, bs = 0.0, rs = 0.0;
         for (int k = 0; k < nc; ++k)
             if (src.cls[cs[k].i] == oc)
             {
                 ws += cs[k].w;
                 hs += cs[k].w * src.height[cs[k].i];
-                bs += cs[k].w * src.relief_bias[cs[k].i];
+                bs += cs[k].w * src.roll[cs[k].i] * src.relief_bias[cs[k].i];
+                rs += cs[k].w * src.roll[cs[k].i];
             }
         if (ws > 0.0)
         {
             h = hs / ws;
             bias = bs / ws;
+            roll = rs / ws;
         }
     }
 
@@ -3515,9 +3540,9 @@ struct shadow_field
     {
         // The base bake warps at the PIXEL (the ground point less its oblique
         // lift), so the lift is estimated first from the unwarped gather.
-        double h0, b0;
+        double h0, b0, r0;
         int o0;
-        gather(gx, gy, h0, b0, o0);
+        gather(gx, gy, h0, b0, r0, o0);
         const double uy = gy - g.y_min - h0 * g.lift;
         float nfx, nfy, nwx, nwy;
         value_noise2(gx, uy, warp_c2, warp_n2, 0xA21Cu, 0xB32Du, nfx, nfy);
@@ -3525,22 +3550,22 @@ struct shadow_field
         const double wax = (nwx - 0.5) * 2.0 + (nfx - 0.5) * 2.0 * 0.45;
         const double way = (nwy - 0.5) * 2.0 + (nfy - 0.5) * 2.0 * 0.45;
         const double wx = gx + wax * p.warp_amp, wy = gy + way * p.warp_amp;
-        double h, bias;
+        double h, bias, roll;
         int o;
-        gather(wx, wy, h, bias, o);
+        gather(wx, wy, h, bias, roll, o);
         if (o < 0 || src.cls[static_cast<std::size_t>(o)] != static_cast<std::uint8_t>(bake_source::tile_class::land))
             return p.shadow_tile * p.relief_gain * h; // water, the mask, the margin: no relief of their own
         const float amp = relief_amp(p, detail_mul, static_cast<float>(bias), static_cast<float>(h),
-                                     roll_swell(gx, gy - g.y_min, swell_c, swell_n));
+                                     roll_swell(gx, gy - g.y_min, swell_c, swell_n), static_cast<float>(roll));
         const float rw0 = ridge_weight0(p, static_cast<float>(bias));
         const float rw  = fold_ridge(p, rw0, ck);
         const float n   = fold_noise(gx, gy - g.y_min, detail_c, detail_n, detail_cb, detail_nb);
         const float fold = (n - 0.5f) + (((0.25f - std::fabs(n - 0.5f)) * 2.0f) - (n - 0.5f)) * rw;
         double H = p.shadow_tile * p.relief_gain * h + p.shadow_fold * 0.75 * amp * fold;
-        if (p.hill_amp > 0.0f)
+        if (p.hill_amp > 0.0f && roll > 0.0)
         {
             float hgx, hgy;
-            H += p.hill_amp * (hill_noise(gx, gy - g.y_min, hill_ca, hill_na, hill_cb, hill_nb, hgx, hgy) - 0.5f);
+            H += p.hill_amp * roll * (hill_noise(gx, gy - g.y_min, hill_ca, hill_na, hill_cb, hill_nb, hgx, hgy) - 0.5f);
         }
         if (p.landform_strength > 0.0f && (src.near_feature[static_cast<std::size_t>(o)] & k_near_landform))
             H += 0.5 * p.landform_strength * landform_h(o, wx, wy);
@@ -4251,8 +4276,26 @@ float hill_field(const bake_source& s, double x, double y, float& gx, float& gy)
     return hill_noise(x, y, ca, na, cb, nb, gx, gy);
 }
 
+float landform_roll(std::uint8_t landform)
+{
+    // Flat land renders flat (Ben, 2026-10-10; RENDERING.md § Art direction
+    // and palette): plains and valleys lie flat, highland rolls, the dramatic
+    // forms keep their folds under their own forms.
+    switch (static_cast<terrain_landform>(landform))
+    {
+        case terrain_landform::plains:
+        case terrain_landform::valley:   return 0.0f;
+        case terrain_landform::highland:
+        case terrain_landform::mountain:
+        case terrain_landform::canyon:
+        case terrain_landform::crater:
+        case terrain_landform::rift:     return 1.0f;
+    }
+    return 0.0f;
+}
+
 void relief_slope(const bake_source& s, const geometry& g, const bake_params& p, double x, double y,
-                  float shape_bias, float h, float& gx, float& gy)
+                  float shape_bias, float h, float roll, float& gx, float& gy)
 {
     // bake_window's own fold and hill terms, as its hillshade reads them
     // (the variant's detail multiplier aside): the same lattices, the same
@@ -4270,7 +4313,10 @@ void relief_slope(const bake_source& s, const geometry& g, const bake_params& p,
     const double detail_cell   = cell(p.detail_cell, dc);
     const double detail_cell_b = cell(p.detail_cell * 0.62, dcb);
     const double swell_cell    = cell(2.4, swc);
-    const float amp = relief_amp(p, detail_mul, shape_bias, h, roll_swell(x, y, swell_cell, swc));
+    gx = gy = 0.0f;
+    if (roll <= 0.0f && shape_bias == 0.0f)
+        return; // flat land: no folds, no hills
+    const float amp = relief_amp(p, detail_mul, shape_bias, h, roll_swell(x, y, swell_cell, swc), roll);
     const float rw0 = ridge_weight0(p, shape_bias);
     const float ridge_w = fold_ridge(p, rw0, ck);
     const auto fold = [&](float n) -> float {
@@ -4291,8 +4337,8 @@ void relief_slope(const bake_source& s, const geometry& g, const bake_params& p,
     {
         float hx, hy;
         hill_field(s, x, y, hx, hy);
-        gx += hx * p.hill_amp;
-        gy += hy * p.hill_amp;
+        gx += hx * p.hill_amp * roll;
+        gy += hy * p.hill_amp * roll;
     }
 }
 
