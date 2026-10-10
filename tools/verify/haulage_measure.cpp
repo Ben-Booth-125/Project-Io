@@ -40,7 +40,8 @@
 // authored data and the assertions on it live in price_band_harness.cpp. Its one
 // assertion is a vacuity guard: that it measured a world with markets in it.
 //
-// Run: .\build\haulage_measure.exe [seeds] [ticks] [--per-tick]
+// Run: .\build\haulage_measure.exe [seeds] [ticks] [--per-tick] [--no-snap]
+// (--no-snap, either mode: roads laid with BL-1252's snap off, an isolated reading)
 //
 // --per-tick (BL-978) prints the dispatch count of EVERY tick, pooled over the
 // seeds, after the totals. It is the instrument that sized the winner's
@@ -115,6 +116,7 @@
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp"
 #include "world/resource_names.hpp"
+#include "world/road_generation.hpp" // g_road_probe_no_snap (--no-snap, BL-1119 R6)
 #include "world/supply_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/tech_gate.hpp"
@@ -898,6 +900,20 @@ int run_far_trade(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    // --no-snap (BL-1119 R6, a measurement switch): lay roads with BL-1252's snap
+    // off (g_road_probe_no_snap, road_generation.hpp), so a reading can isolate
+    // the snap. Verify-only; stripped here so both modes accept it anywhere.
+    {
+        int out = 1;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::strcmp(argv[i], "--no-snap") == 0) { g_road_probe_no_snap = true; continue; }
+            argv[out++] = argv[i];
+        }
+        argc = out;
+        if (g_road_probe_no_snap)
+            std::printf("[haulage_measure] --no-snap: BL-1252's road snap is OFF (measurement)\n");
+    }
     for (int i = 1; i < argc; ++i)
         if (std::strcmp(argv[i], "--far-trade") == 0)
             return run_far_trade(argc, argv);
