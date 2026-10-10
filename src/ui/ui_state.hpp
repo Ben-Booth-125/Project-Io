@@ -307,6 +307,15 @@ struct construction_controls
     /// harness's clipping check is vacuous on this class of surface (NR-663), so a
     /// green picture proves nothing on its own.
     entity_id levers_for = null_entity;
+
+    /// The Build door's processing rows as the door LISTED them this frame: the
+    /// ABSOLUTE recipe ids that survived its filters (era, tech, the body's air),
+    /// and the tile they were listed for (`null_entity` when the door did not
+    /// draw). The door folds rows by building group, so a capture cannot show
+    /// which recipe sits behind a folded row; this is the surface reporting its
+    /// own list, read by the `air_gate.lua` check. VIEW state, not serialised.
+    std::vector<std::uint16_t> door_recipes;
+    entity_id                  door_tile = null_entity;
 };
 
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
