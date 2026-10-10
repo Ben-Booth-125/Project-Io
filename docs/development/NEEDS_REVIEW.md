@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*96 entries — 16 open, 80 resolved.*
+*103 entries — 23 open, 80 resolved.*
 
 ---
 
@@ -170,6 +170,106 @@ To verify the air gate and the sea-route lane headlessly, the verify API gained 
 *novel-work · raised 2026-10-09 · from Ben, sprint 50 close, the market stock form*
 
 Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT.
+
+### NR-1011 — Opening stock placed on the shelves unpaid, split by where the corporation's buildings stand
+*decision taken on your behalf · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+CORPORATION_GENERATION.md § Pass 4b says the opening stock goes on the shelves of the markets each corporation sits in, its share split over its own markets, and "is the market's from then on". Built: the split weights each market by how many of the corporation's buildings its catchment holds (the HQ market alone if none); no money moves at placement. Before, the corporation was paid when the held stock sold at a clear.
+
+**Why it matters.** Corporations open with less income than before (they no longer sell their opening stock); G2's settle mean is the denominator that moves.
+
+- Keep: unpaid, split by building count (built)
+- Pay the corporation the stock at base price on placement
+- Split evenly over its markets instead of by building count
+
+> **Recommendation:** Keep. The doc says the stock is the market's; paying at placement would re-create the windfall the held-stock rule existed to tame.
+
+*Files: `src/world/market_clearing.cpp (place_opening_stock)`*
+
+### NR-1012 — Trade points: a Marketplace makes them at its staffed rate, a Port flat
+*decision taken on your behalf · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+TRADE.md: a Marketplace makes points "at its staffed rate, as a processor makes goods"; Ports make points "at a lower rate the data sets". Built: Marketplace points = trade.points.planetary_marketplace x workforce_assigned x labour contention x workforce-target scalar (staffed 0.5 at placement, so 20 x 0.5 = 10 points); a Port, which staffs at zero, makes trade.points.port (4) flat. A building whose goods upkeep went unmet that tick makes none.
+
+**Why it matters.** Port points make every existing Port a small trade source; staffing makes Marketplace points move with labour like any producer.
+
+- Keep (built)
+- Ports also staffed (a world-mover: every Port starts drawing labour and wages)
+
+> **Recommendation:** Keep.
+
+*Files: `src/world/trade.cpp (building_trade_points)`, `scripts/economy.lua (economy.trade)`*
+
+### NR-1013 — May a rival BUILD a Planetary Marketplace? (an AI_OPPONENT.md § 11 widening)
+*question · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+The 2026-10-10 grant lets a rival set its own trades with the points "its own Planetary Marketplaces make". It does not say a rival may build one, and the scorer's build candidates today are producers, a bootstrap port/hub and the muster base. Without a build grant, a rival's trade capacity is what generation retrofits plus its Ports, for the whole campaign. Not built; raised per the standing rule (a new widening is raised, never assumed).
+
+**Why it matters.** Trade is the only way goods move between markets. If rivals cannot add capacity, inter-market flow is fixed at the 1960 retrofit and the player alone can grow trade.
+
+- Grant: a rival may build a Marketplace, scored on the trade margin its points would earn (public prices, network haul)
+- No grant: capacity comes only from generation's retrofit and Ports
+- Defer to after the gate reads
+
+> **Recommendation:** Grant, scored like the bootstrap port: a flat, modest score that never outbids an economic build, gated on the corporation having routes with margin.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md § 11`*
+
+### NR-1014 — Procurement under the shelf economy: the supplier buys its stock off the shelf; the delivery lands on the buyer's market
+*decision taken on your behalf · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+MARKETS.md: procurement contracts "deliver from and to shelves". Built: at fulfilment the supplier BUYS what its home market's shelf on the fulfilment body holds (posted price, under the ceiling) and builds the rest to order, as before; the delivery LANDS on the buyer's home market on the delivery body, so — landing being selling — the buyer is paid it at that tick's clearing price and the goods stand on the shelf for whoever buys next (the buyer included).
+
+**Why it matters.** A procurement buyer now holds money, not goods, after delivery; a buyer that needs the goods buys them back off the shelf.
+
+- Keep (built)
+- Deliver unpaid onto the buyer's shelf (the buyer paid the contract already)
+
+> **Recommendation:** Keep — "landing is selling" is the one rule; an unpaid landing would be a second kind.
+
+*Files: `src/world/economy_system.cpp (procurement completion)`*
+
+### NR-1015 — Readings of "what a corporation holds" now read the shelves of the markets it sits in
+*decision taken on your behalf · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+Three readers asked what a corporation holds: the condition subject `stockpile` (the E1-EC-01 Converter Practice tech gate reads "holds machinery"), the hire gate and hire debit (hire_axis_cost of an axis good). Built: all three read the stock on the shelves of the markets the corporation sits in (`corp_shelf_stock`); a hire BUYS its kit there at the posted price (ceiling off, since the gate counted the whole shelf).
+
+**Why it matters.** Converter Practice is now satisfied by machinery on the corporation's shelves — anyone's machinery, not its own production. A tighter reading would be "the corporation has produced machinery" (corporation_component::produced_ever).
+
+- Keep: shelf stock where it sits (built)
+- Converter Practice reads produced_ever instead (its stated intent: the machine-tool chain is running)
+
+> **Recommendation:** Switch the Converter Practice gate to produced_ever; keep the hire on the shelves.
+
+*Files: `src/world/condition_set.cpp`, `src/world/unit_roster.cpp`, `src/world/corp_command.cpp (debit_from_corp)`*
+
+### NR-1016 — Auto trade: reach, margin floor, and a trade's purchase bids
+*decision taken on your behalf · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+Built (TRADE.md § Auto and reserved trade leaves these open): (1) an owner's auto trade reaches every market on a body where it holds a completed trade building (Marketplace or Port); between bodies it also needs a Launchpad and propellant on the source shelf; (2) a route earns only above the network's dispatch_margin (5%) of the source price, so rounding-error routes do not churn; (3) each route is sized to what the destination absorbs above its landed cost (the old dispatcher's room rule) and what the source shelf holds; (4) a trade's purchase posts as want on the source market, so trading reads to the price like any bid.
+
+**Why it matters.** Reach is the biggest lever on how much trade moves; a Port anywhere on a body makes every market on it reachable.
+
+- Keep (built)
+- Reach limited to the markets within logistic reach of the trade building
+
+> **Recommendation:** Keep; measure first.
+
+*Files: `src/world/trade.cpp`*
+
+### NR-1017 — Production lands at the tick's clear; a producer with no market under it makes nothing
+*decision taken on your behalf · raised 2026-10-10 · from BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10*
+
+Built: output goes into a per-tick landing register and onto the shelf at that tick's clear, paid at the clearing price there (so it is listed as this tick's supply and the price law reads it once). A processor therefore cannot draw a sibling's output made the same tick; before, a corporation's own processors could draw its own same-tick output from its pool. A site or plant with no market under it has no shelf, so it makes nothing (completing a building spawns the body's first market, so this is an edge). A grid good made at a market off the grid is not made (BL-708's store-ceiling rule, read at the shelf).
+
+**Why it matters.** A one-tick lag on own-corporation chains at start; steady-state throughput is unchanged.
+
+- Keep (built)
+- Land on the shelf at production time and subtract same-tick landings from the price law's shelf share
+
+> **Recommendation:** Keep.
+
+*Files: `src/world/economy_system.cpp`, `src/world/market_clearing.cpp`*
 
 ---
 

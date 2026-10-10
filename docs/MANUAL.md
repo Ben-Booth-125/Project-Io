@@ -209,9 +209,8 @@ cycling: **Scarcity, Industry, Reach, Supply-routes**.
 | Action | Control |
 |---|---|
 | Open the Market Ledger | The market glyph on the icon rail |
-| Switch view | The **Prices** / **Sell Orders** tabs |
-| Place a sell order | Sell Orders tab → pick a resource → set price and quantity |
-| Remove a sell order | **Remove** beside the listed order |
+| Switch view | The **Prices** / **Trades** tabs |
+| Set, change or clear a trade; reserve trade points from auto | The **Trades** tab (`docs/ai/ACTIONS.md` names each press) |
 
 ### 3.7 Ledgers
 
@@ -294,8 +293,8 @@ a supply anchor, and build time depends on where you build, not only what.
 **You may build any building and run any method your research permits.** Two locks govern the
 Build door, and both remove a row rather than showing it greyed — the door does not offer what it
 would refuse: an **era lock** (a building or recipe belongs to a later technological era and never
-appears in this campaign at all) and a **tech lock** (a specific research condition — holding a
-stockpile, running a processing facility, a cash surplus — that unlocks one recipe by name once
+appears in this campaign at all) and a **tech lock** (a specific research condition — a good
+standing on the shelves of your markets, running a processing facility, a cash surplus — that unlocks one recipe by name once
 met). Nothing is locked behind what you have produced before.
 
 So what stops you is not permission. A method you can place may still be a bad idea, or simply
@@ -311,10 +310,16 @@ straight upgrade, so the better choice depends on which market the output is goi
 ### 4.5 Markets and prices
 
 Each market is independent. Base prices come from global rarity; local prices respond to local
-supply and demand, smoothed rather than jumping. A matched price-time **order book** sits on top,
-so the player and the AI place standing orders through the same mechanism.
+supply and demand, smoothed rather than jumping. You hold no stock: everything you make lands on
+your market's shelf and is sold there at that quarter's price, and everything your buildings use
+they buy off a shelf at the posted price — your own output included.
 
-*Authority: `docs/economy/MARKETS.md`.*
+Goods move between markets only by **trade**. Your Planetary Marketplaces and Ports make **trade
+points**; a trade spends them to buy a good on one market, haul it, and sell it on landing at
+another, and you keep the margin less the haul. Points you do not reserve for your own routes are
+spent automatically on the best-paying routes; the AI trades the same way.
+
+*Authority: `docs/economy/MARKETS.md`, `docs/economy/TRADE.md`.*
 
 ### 4.6 Money
 
@@ -327,7 +332,7 @@ differently.
 ### 4.7 Logistics
 
 Roads come in three tiers and are generated as a per-nation lattice; cities are free logistics hubs.
-Convoys route goods between markets at a cost weighted by terrain, and distance costs both money
+A trade's convoys carry goods between markets at a cost weighted by terrain, and distance costs both money
 and **time**.
 
 A tile is about **128 km across** — derived from the planet's generated mass, not authored. A laden
@@ -344,7 +349,7 @@ Two independent fogs. The **geographic fog** hides the tile map and deposits unt
 survey. The **activity fog** is lit by your own trade routes and presence, tiering each body from
 Unknown through Known, Stale and Visible. A place can be Known but unsurveyed.
 
-Rival buildings are visible; their production and stockpiles are private. Markets are the public
+Rival buildings are visible; their production and finances are private. Markets are the public
 intelligence channel.
 
 *Authority: `docs/ui/DISCOVERY.md`.*
@@ -384,7 +389,7 @@ be legislated for.
 ### 4.12 The opponent
 
 Rival companies run a deterministic scored-utility layer over the same command seam you use: they
-build, demolish, survey, road, hire, trade and place sell orders. Nations act in the same shape,
+build, demolish, survey, road, hire and trade. Nations act in the same shape,
 allocating a budget over priority lines. There are no hidden AI exceptions — they play by your
 rules or a defined subset of them.
 

@@ -353,7 +353,9 @@ checks, in order:
 The two payment legs. A **credit cost** of
 `hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 40 + 0.5 × power,
 so Levy Spear costs 40 and Rifle Regiment 230). Plus a **flat resource draw** of 5.0 per *gated*
-axis, from the corp's `(corp, body)` pools, drained in ascending body-id order.
+axis, **bought** off the shelves of the markets the corp sits in, lowest market id first, at each
+shelf's posted price — a hire buys its kit like any buyer (`../economy/MARKETS.md` § The shelf
+economy).
 
 `port_q` is exempt from the resource leg — it is a building check, so there is nothing to debit.
 The other three axes draw from the same preference order the gate reads, so a hire never spends a
@@ -376,8 +378,8 @@ the press (BL-405, hire price on screen).
 rules § Determinism & data model). `src/world/corp_ai.cpp` scores hiring alongside build, demolish,
 survey and road; a corp with no completed base has no muster tile and must build one first, priced
 by the ordinary build-candidate machinery. A soft cap of three units per corp keeps hiring from
-becoming an unconditional extra action every evaluation. Availability is decided by stockpile and
-market access alone; the credit cost is subject to the solvency gate like every other spend
+becoming an unconditional extra action every evaluation. Availability is decided by the stock on
+the shelves of the markets the corp sits in alone; the credit cost is subject to the solvency gate like every other spend
 (Ben, 2026-08-13, NR-218).
 
 ### The roster
@@ -403,7 +405,8 @@ separately and *resolves into* combat's types.
 
 **Two gate paths, one table.** `available_rows(const region&, band)` is the Era −1 path, gated on
 authored region endowment. `available_rows(const world&, corp, band)` is the campaign path, gated
-on the corp's own stockpile and market access.
+on the stock standing on the shelves of the markets the corp sits in — the `stockpile` subject's
+reading, since a corporation holds no goods of its own.
 
 The campaign gate is **binary by design** — each axis is 1000 or 0, the table's own max threshold.
 "You may field rifles because you can buy steel" is a yes/no supply-chain question here, not a
@@ -486,7 +489,7 @@ order is written down and changes nothing observable.
 **The blackboard export shows a corp its own force.** `export_corp_blackboard`
 (`src/world/corp_ai.cpp`) emits `unit_tile`, `unit_type`, `unit_count`, `unit_strength` and
 `unit_order_state`/`unit_order_dest` facts for the corp's OWN units — no BL-068 visibility
-question, exactly like cash/buildings/pools. Rival units carry no unit-subject facts in the
+question, exactly like cash and buildings. Rival units carry no unit-subject facts in the
 export. The rival scorer can legally issue `march_unit`; scoring march *quality* is BL-450's
 (rivals score stance) conflict-AI arc.
 
@@ -656,8 +659,9 @@ it a regiment is debited once and free forever while every building beside it pa
 and wages every tick.
 
 **Upkeep is credits AND military goods** (Ben, 2026-08-17), so the cost is a **vector**: a credit
-wage plus a set of `{resource, qty}` draws against the corp's pool on the unit's own body. When the
-goods do not arrive the unit **weakens** rather than vanishing.
+wage plus a set of `{resource, qty}` draws bought off the shelf of the market the unit stands in,
+at the posted price under the fair-price ceiling. When the goods do not arrive the unit **weakens**
+rather than vanishing.
 
 The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 
@@ -672,7 +676,7 @@ The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 | `out_of_supply_reach` | `0.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
 
 **Every rate is authored at zero, deliberately**, so the pricing is tuned by playtest against a
-measured baseline rather than guessed. At zero nothing is charged, no pool is drawn, no draw can go
+measured baseline rather than guessed. At zero nothing is charged, no shelf is drawn, no draw can go
 unmet, and no supply factor moves; turning upkeep on is editing this table, not a code change.
 The numbers are anchored by BL-543 (value anchor) — a unit's annual equipment costs twice its
 annual salary (Ben, 2026-08-22, [`NATIONS.md`](../politics/NATIONS.md)) — and the ordnance rate
@@ -681,9 +685,9 @@ is the measurement: it sweeps candidate rate sets and prints the wage bill again
 goods draw against production, and the supply curve.
 
 **Two halves, two homes.** The credit half is its own term in `apply_budget`
-(`src/world/budget_system.cpp`, surfacing as `corp_budget::upkeep`). The goods half is a pool
-debit in `run_unit_upkeep` (`src/world/economy_system.cpp`), drawn from the unit's `(owner, body)`
-stockpile.
+(`src/world/budget_system.cpp`, surfacing as `corp_budget::upkeep`). The goods half is a shelf
+draw in `run_unit_upkeep` (`src/world/economy_system.cpp`, `draw_goods_or_bid`), bought off the
+market under the unit and billed by the clear as expenditure.
 
 **Ordnance is the good, and it is authored as data.** `resource_type::ordnance` is the roster's
 first terminal military good (BL-457, ordnance), added so this draw has something to consume.
@@ -710,7 +714,7 @@ Dijkstra behind it, so a zero table costs no time as well as no credits. The tes
 `!(rc <= limit)` rather than `rc > limit`, so infinity and NaN both read as out of supply.
 
 **Determinism.** The pass visits units in **ascending entity id**, sorted out of the unordered
-`w.units`, because two units of one corp on one body draw from a shared pool — the visit order
+`w.units`, because two units drawing on one shelf draw the same stock — the visit order
 decides which one goes short. That is load-bearing, not cosmetic.
 
 **Orphan cleanup.** `demolish_building` erases the building, the corp asset and the stockpile but

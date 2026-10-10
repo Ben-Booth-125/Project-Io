@@ -43,7 +43,7 @@ and the distinction is load-bearing:
 
 | | Corporation | Nation |
 |---|---|---|
-| Owns | buildings, stockpiles, orders | **tiles** |
+| Owns | buildings and trades — never goods: what it makes is sold onto a market's shelf | **tiles** |
 | Money | `balance`, spent on the market every tick | `treasury`, spent **only by direct transfer** |
 | Acts through | `corp_command`'s verbs | the **national budget** — a weight vector over priority lines |
 | Decides | `corp_ai`, every tick | `nation_ai`, on the same staggered cadence |
@@ -171,17 +171,18 @@ bills stone and timber at authored rates ([`LOGISTICS.md`](../economy/LOGISTICS.
 channel). The same state-purchase shape as the space programme below, with one deliberate
 difference: the claim is **unearmarked**, so rule 3's pro-rata fill applies — upkeep is continuous,
 and half the repair budget meaningfully buys half the materials, where rule 3a's lump exists for
-purchases a fraction of which buys nothing. The goods are consumed; the player's corp is never a
-supplier.
+purchases a fraction of which buys nothing. The materials are bought off a market's shelf at its
+posted price, under the fair-price ceiling, and consumed; the supplier is always a market, never a
+corporation (`../economy/MARKETS.md` § The shelf economy).
 
 `space_programme`'s consumer is `derive_space_programme_claims` / `settle_space_purchases`
-(`src/world/space_programme.{hpp,cpp}`): the state picks the supplier pool holding the most stock
-that covers a whole lump, prices it at the supplier market's own resolved price (procurement's
-basis — never an order on the market), pays through the budget pass's ordinary transfer, and the
-goods leave the pool **without landing anywhere** — state demand is terminal. The lump sizes are
-data (`economy.space_programme`, scripts/economy.lua). The player's corp is never a supplier: a
-state purchase drains the supplier's pool unasked, which on a rival is the standing trading grant's
-reach and on the player's corp would be a forced sale.
+(`src/world/space_programme.{hpp,cpp}`): the state buys its lump **off a market's shelf** — the
+lowest-id market whose shelf holds the most of the good, at least a whole lump, at a posted price
+the fair-price ceiling admits — pays the posted price as a direct, whole-or-nothing treasury debit,
+and the goods leave the shelf **without landing anywhere** — state demand is terminal. The supplier
+is always a market: a corporation holds no stock (`../economy/MARKETS.md` § The shelf economy), and
+whoever stocked the shelf was paid when the goods landed. The lump sizes are data
+(`economy.space_programme`, scripts/economy.lua).
 
 ### 4. Law authorship
 
@@ -424,7 +425,7 @@ credits another in the same float and the same tick, never bidding and never cle
 sides accumulate**: a nation does not spend to zero, a reserve is held back, and an underspent line
 carries forward.
 
-The market is untouched. `clear_markets` remains a buyer of last resort that pays sellers with
+The market is untouched. `clear_markets` is the buyer of every landing and pays its owner with
 nobody's money, and total corporate cash rises and falls every tick by design. The two standards
 are explicitly different things, which is what BL-392's silent value destruction came from
 conflating.

@@ -1,16 +1,16 @@
 # Project Io — Markets
 
-> **Settles:** where a market centre is and what it covers · how an order book clears · how a
-> price resolves and what bounds it · where a demand want comes from · who may place an order
-> and on what terms · what a market does when it cannot clear.
-> **Not here:** the money loop the proceeds land in (FINANCE) · what physically moves the goods
-> (SUPPLY) · what the road costs (LOGISTICS) · a priced promise between named parties
-> (CONTRACTS).
-> **Confused with:** FINANCE.md, CONTRACTS.md, SUPPLY.md.
+> **Settles:** where a market centre is and what it covers · the shelf: who stocks it, who draws
+> on it, and at what price · how a market clears · how a price resolves and what bounds it · where
+> a demand want comes from · what a market does when it cannot clear.
+> **Not here:** how goods move from one market to another (TRADE) · the money loop the proceeds
+> land in (FINANCE) · the shipment in transit (SUPPLY) · what the road costs (LOGISTICS) · a priced
+> promise between named parties (CONTRACTS).
+> **Confused with:** TRADE.md, FINANCE.md, CONTRACTS.md, SUPPLY.md.
 
-The market model: `src/world/market_clearing.cpp`, the market/order components in
+The market model: `src/world/market_clearing.cpp`, the market component in
 `src/world/components.hpp`, and the seeding in `src/world/hard_coded_world.cpp`. Production's side
-of the exchange is `docs/economy/PRODUCTION.md` § Stockpile and output flow; which resources trade
+of the exchange is `docs/economy/PRODUCTION.md` § Output and the shelf; which resources trade
 at all is `docs/economy/RESOURCES.md` § What trades. Contracts — the alternative to the market,
 priced and paced between named parties — are `docs/economy/CONTRACTS.md`.
 
@@ -42,11 +42,10 @@ production used to land in, list from, and draw on — and with it everything th
   share on its own markets (`../generation/CORPORATION_GENERATION.md` § Pass 4b).
 
 **What retires with the pool.** Auto-surplus and the processor reservation; the order book (standing buy
-and sell orders, and the sell order's floor, step 4 below); the pad's propellant reserve; opening stock held until a bid; the
-corporation convoy and the market export (`TRADE.md` § What trades replaces); the workforce
+and sell orders, and the sell order's floor); the pad's propellant reserve; opening stock held until a bid; the
+corporation convoy and the market export (`TRADE.md` § What trade replaces); the workforce
 dial's stock-fed draws (`../ai/AI_OPPONENT.md` § 11 — with no pool, a plant's whole want is
-posted demand). Where a section below speaks of pools, auto-surplus, sell orders or the export,
-this section holds.
+posted demand).
 
 ---
 
@@ -120,7 +119,7 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
    conquered market is destroyed to consolidate the conqueror's strength (Ben, 2026-09-25). The
    history's markets are the survivors' markets, not a monument to every realm that ever stood.
 
-A folded market's catchment, inventory and pools pass to the market that absorbs it. The junction
+A folded market's catchment and inventory pass to the market that absorbs it. The junction
 rule above still only lowers the gate; the folds run after it, on the whole set.
 
 **On a world whose firms come from the charter budget, the competitors the carve counts are the
@@ -132,12 +131,10 @@ search, which scores the carve's markets, still runs after the carve.
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
 (`market_for_tile`), measured on the cylinder (the column distance wraps). A folded market's
 centre still counts: a tile nearest to it clears against the market that absorbed it, so a
-catchment passes to its absorber whole, never to a third market that happens to stand nearer. **A corporation clears in every market it holds a pool in** (Ben, 2026-09-15):
-goods pools are per `(corp, market)` (`PRODUCTION.md` § Stockpile and output flow), so a building
-sells into and buys from its own tile's catchment, and goods a convoy delivers sell at the market
-they were delivered to. The earlier body-aggregate rule — every sale routed through the corp's
-lowest-id building — is retired with the per-body pool; it is what made a same-body haul sell back
-at home.
+catchment passes to its absorber whole, never to a third market that happens to stand nearer. **A building clears in its own tile's market** (Ben, 2026-09-15; Ben, 2026-10-10): its
+output lands on that market's shelf and its inputs and upkeep are bought there
+(`PRODUCTION.md` § Output and the shelf), and goods a trade delivers land and sell at the market
+they were delivered to (`TRADE.md` § A trade).
 
 ## Spontaneous market emergence
 
@@ -167,7 +164,7 @@ instant it started producing. Instead, `inject_interbody_demand` pulls a distanc
 (`pull_fraction`, 0.50) of a **home-body counterparty's unmet demand** onto every outpost market's
 demand each tick, additive after `inject_population_demand` and `inject_background_demand` —
 "nobody builds a mine on a moon to sell to the moon." This only shapes the outpost's local
-*price*; it moves no goods. Physical movement is `dispatch_convoys`' independent job.
+*price*; it moves no goods. Goods move only by trade (`TRADE.md`).
 
 **Whose demand — the counterpart market.** Per resource, the outpost reads its **counterpart**:
 the home-body market carrying the **greatest demand for that resource**, with the lowest market id
@@ -190,8 +187,8 @@ captured by `snapshot_market_supply` before the reset in step 1 below.
 The one-tick lag is deliberate. The reset zeroes every market's supply immediately before this
 injection and the supply writes land after it, so a live read would be identically zero and every
 outpost would be pulled by **gross** home demand. Moving the injection after the supply writes is
-rejected because those writes are themselves demand-sensitive (auto-surplus yields to standing
-orders), which would turn a pass whose ordering is already load-bearing into a two-pass
+rejected because it would make the counterpart's netting read the supply this same pass is
+writing, which would turn a pass whose ordering is already load-bearing into a two-pass
 dependency. The snapshot is local to `clear_markets`; nothing is persisted.
 
 **Ordering is a requirement, not a convenience.** The injection must run *after* the population
@@ -209,27 +206,33 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 
 ## The clearing tick
 
-`clear_markets` runs once per economy tick, after production (`run_economy_step`). In order:
+`clear_markets` runs once per economy tick, after production, upkeep and the trade pass
+(`run_economy_step`, then `run_trades`). Everything a consumer bought off a shelf this tick was
+drawn in those phases, capped by what the shelf held; everything that landed this tick — a
+building's output, a trade's arriving cargo, a captured cargo, a procurement delivery — waits in
+the tick's landing register (`world::landed_this_tick`). The clear lists the one, bills the other,
+and sells the landings. In order:
 
 1. **Reset** — every market's `supply` and `demand` arrays zero. Both are per-tick flows. A
    snapshot of every market's supply is taken *immediately before* the zeroing
    (`snapshot_market_supply`), because the inter-body pull needs a supply that this pass has not
    yet computed — see § Spontaneous market emergence.
-2. **Background-firm production** — real corporations (`corporation_component.is_background =
-   true`), generated at world-gen and running the same corp_ai scored-utility layer as rivals,
-   produce, sell, and buy through the ORDINARY steps of this tick (auto-surplus, standing orders,
-   auto-demand — steps 4, 5, 6 below) exactly like any other corp. There is no separate injection
-   step for background supply: saturation and the live opportunity margin are **emergent** from
-   real generated firms, not asserted by a function. See § Background corporations below.
-3. **Demand injection** — two pure demand-side pulls, both after the reset so they are not
-   erased the tick they land:
+2. **Background firms** — real corporations (`corporation_component.is_background = true`),
+   generated at world-gen and running the same corp_ai scored-utility layer as rivals, land, sell
+   and buy through the ORDINARY steps of this tick exactly like any other corp. There is no
+   separate injection step for background supply: saturation and the live opportunity margin are
+   **emergent** from real generated firms, not asserted by a function. See § Background
+   corporations below.
+3. **Demand injection** — the pure demand-side pulls, after the reset so they are not erased the
+   tick they land. The endemic pull (§ Demand channels) and the inter-body pull (§ Spontaneous
+   market emergence) ride here too; the two that shape every market are:
    - `inject_population_demand` — each population centre pulls a price-elastic, multi-resource
      DEMAND from its catchment market, over the cumulative rungs its stratum reaches:
      `heads / heads_per_demand_unit × basket[r] × elasticity(price)`, with rungs 4–5 scaled by the
      nation's qualification and every rung weighted by the catchment's culture
      (`POPULATION.md` § The stratum ladder). Population is a pure **consumer** — no supply term.
      The bid is also kept on the market's own household register (`household_bid`), because
-     the households draw it in step 12. Tunables in `scripts/economy.lua` § `population_demand`.
+     the households draw it in step 9. Tunables in `scripts/economy.lua` § `population_demand`.
    - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
      mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys, electronics
      — **not** `spacecraft_components`, which stays procurement-only so the militia's contracts
@@ -243,10 +246,10 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      channel's own attribution), never granted whole to each — a body carved into nine markets does
      not want nine times as much. Per-market scale is gathered in a `std::map` in ascending centre
      id, so accumulation order is deterministic. **The pull consumes what it buys (Ben, 2026-10-07; BL-1217, inputs reach
-     processors):** after the households' draw in step 12, the background basket draws from the
+     processors):** after the households' draw, the background basket draws from the
      market's shelf what it bid, or the whole shelf if it holds less, markets and resources
-     ascending. No money moves, on the households' rule: the market paid the maker when it bought
-     the stock. A bid that never took goods held a stocked shelf over the fair-price ceiling while
+     ascending (step 10). No money moves, on the households' rule: the market paid the maker when the
+     stock landed. A bid that never took goods held a stocked shelf over the fair-price ceiling while
      the processors beside it were silenced. Measured on the sixteen curated seeds with the pull
      split by catchment: input-starved processors per reading fell 47.0 → 35.0 and the share starved
      beside a stocked shelf priced over the ceiling 51% → 25%; processors running at handoff moved
@@ -263,100 +266,62 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      on the markets where 63 processors starved beside it, and turning the pull off whole moved the
      input-starved share 11.5% → 9.6%. Tunables in `scripts/economy.lua` § `background_demand`
      (`consumes`).
-4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
-   reservation** (the inputs its own processors need for a full run next tick) for sale. A
-   resource under a standing sell order is exempted — the order governs, and by default the order
-   covers the same surplus (step 5), so nothing is stranded.
-
-   **A pad's pool keeps its propellant (Ben, 2026-10-09; BL-1217, inputs reach processors).** Where the corporation holds
-   a Launchpad on the pool's body (the body its launches burn from), its propellant is part of the reservation: auto-surplus
-   lists none of it, because launches burn from that pool and a fuelled pad is the gate to space
-   (`PRODUCTION.md` § Launchpad). The corporation may still sell it by a standing sell order. A
-   pool with no pad lists its propellant like any other surplus.
-
-   **A standing sell order is a price floor over the whole surplus (Ben, 2026-10-05).** Most goods
-   need no order: auto-surplus sells them. An order is the decision *not to sell below a price*, so
-   by default it covers **everything** auto-surplus would have listed — the surplus above the
-   processor reservation, tick by tick as it grows — at the order's floor. A **quantity cap is
-   optional**: given one, the order lists at most that much per tick and the rest of the surplus
-   waits (the player chose to hold it). **An order closes itself once its pool has stood empty**
-   for a short run of ticks, and the good returns to auto-surplus. The rule is the same for the
-   player and for rival corps, so a rival's order can never strand the goods it was placed to
-   sell. **An order is a floor, not a hold (Ben, 2026-10-07; BL-1229, steel stays home):** the
-   good under an order still travels. The dispatcher may haul from an ordered pool whenever the
-   haul nets the seller more than the order's floor, exactly as it would haul unordered surplus
-   (`SUPPLY.md` § Dispatch trigger); the order only refuses a sale below its price. Holding goods
-   back from every convoy is not what a price floor means, and measured it stranded 30% of all
-   steel surplus while the processors that wanted it starved.
-5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
-   the player and by rival corps through the same `place_sell_order` verb). Each lists the pool's
-   surplus above the processor reservation — all of it when `quantity` is 0 (no cap), at most
-   `quantity` otherwise — entered into both market supply and the explicit sell book with its
-   `floor_price`. An order whose pool has held **no surplus** above the processor reservation —
-   read before any order's claim, so it is the pool that is empty, not the order — for
-   `sell_order_empty_close_ticks` (4) consecutive ticks is removed at the end of the clearing
-   pass, with a line in the world history log; a second order whose surplus an earlier one
-   claimed is therefore not closed while the pool still holds goods.
-   Multiple orders against one `(corp, market, resource)` share a **running remainder**: total
-   listed quantity never exceeds the pool, each order's matched/auto-cleared quantity is tracked
-   per order, and pool debits clamp at zero.
-6. **Auto-demand** — two registers, read separately (§ Want and fill below). `report.wants` —
-   what processors and construction sites set out to buy this tick, whether or not they got it —
-   enters **market demand**, and is the only thing that does. `report.purchases` — what was
-   actually drawn — enters the **billing** pass instead. That billing is not a fresh grant: the
-   real transaction already happened, capped by real inventory, in the PRIOR phase of the same
-   tick (production and construction both run before `clear_markets`; see § Real market
-   inventory).
-7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
-   explicit buy book (`max_price`, optional `preferred_seller`).
-8. **Reference prices** — computed once from the accumulated demand and the supply the price law
+4. **Landings listed** — every landing in the register enters its market's `supply` as this tick's
+   listings (§ The shelf economy). It is listed *before* the prices resolve, so a landing moves the
+   price it is then paid at: a glut floors its own sale, and the maker feels it.
+5. **Wants → demand** — two registers, read separately (§ Want and fill below). `report.wants` —
+   what processors, construction sites, upkeep and trades set out to buy this tick, whether or not
+   they got it — enters **market demand**, and is the only thing that does. `report.purchases` —
+   what was actually drawn — enters the **billing** pass instead (step 8). That billing is not a
+   fresh grant: the real transaction already happened, capped by real inventory, in the phases
+   before `clear_markets` (§ Real market inventory).
+6. **Reference prices** — computed once from the accumulated demand and the supply the price law
    reads — this tick's listings plus the shelf's share, at most k ticks of demand off the stock
    standing after the tick's draws (k is `price_band.shelf_supply_ticks`; § Price resolution,
    below) — so every sale this tick uses the same price.
-9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
-   sell side is unconditional — see § Real market inventory); auto-demand is billed at the
-   **posted price** — the price standing on the shelf when it was drawn in step 6, the one the
-   draw checked against its reservation ceiling — never the reference price its own want helped
-   resolve ([FINANCE.md](FINANCE.md) § Standing-force upkeep, Ben 2026-10-03).
-10. **Order-book matching** (BL-037, preferential purchasing) — explicit sells vs explicit buys
-    by price-time priority: cheapest ask first, highest bid first, corp id as the deterministic
-    tiebreak. A buyer's `preferred_seller` is served first, tolerated up to **1.10×** the cheapest
-    compatible ask. Trades clear at the **seller's ask**.
-11. **Buyer of last resort** — unmatched standing-order quantity auto-clears at the
-    **reference price**, and only if the order's floor allows it: an order whose `floor_price`
-    exceeds the reference price clears **nothing** and its stock stays in the pool. The floor is
-    a reservation price — "hold rather than sell below this" — never a price the market is made
-    to pay. A rule that let a seller name the price a perfect counterparty pays would be
-    unbounded income, not a simplification of a market but the absence of one (BL-386, floor is a
-    reservation price). The auto-surplus path (step 9) clears at the market's own resolved price,
-    which is the defensible prototype simplification.
-12. **Household draw** — the households clearing at each market take their pooled bid off its
-    shelf: `household_fill[r] = min(household_bid[r], inventory[r])`, and that much leaves
-    `inventory` for good. It runs after every sale this tick has credited the shelf, so a unit
-    made this tick can feed a household this tick. **Households come before the nation (Ben,
-    2026-10-05):** processors and construction drew before the clear, households draw here, and
-    the nation's own claims on the shelf — network upkeep and the space programme — draw later in
-    the tick from what households left. People eat before the roads are mended. **No money moves** — the
-    market paid the maker when it bought the stock (step 9 or 11), so the draw moves goods, not
-    credits. **The fair-price ceiling does not apply**: it is a processor's reservation price,
-    and a household's reservation is already in its elastic bid. Several centres on one market
-    bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
-    ascending, resources ascending. The fill is what the growth gate reads
-    (`POPULATION.md` § Growth, decline and razing). **The background pull draws next**, on the
-    same terms, from what households left, less one tick of the market's processor want:
+7. **Landings sold** — each landing's owner is paid its quantity at the reference price, and the
+   goods move onto the shelf in the same statement, so the shelf gains exactly what was paid for.
+   The market is the counterparty, **bid or no bid** (Ben, 2026-10-10): the sell side is
+   unconditional, with no floor and no hold. A landing whose owner is not a corporation shelves
+   unpaid. A landing on a market that no longer stands has no shelf to land on and is dropped. The
+   register then empties.
+8. **Shelf draws billed** — every draw taken off a shelf this tick is billed at the **posted
+   price** — the price standing on the shelf when it was drawn, the one the draw checked against
+   its reservation ceiling — never the reference price its own want helped resolve
+   ([FINANCE.md](FINANCE.md) § Standing-force upkeep, Ben 2026-10-03). The market is the seller:
+   whoever stocked the shelf was paid when the goods landed.
+9. **Household draw** — the households clearing at each market take their pooled bid off its
+   shelf: `household_fill[r] = min(household_bid[r], inventory[r])`, and that much leaves
+   `inventory` for good. It runs after every landing this tick has stocked the shelf, so a unit
+   made this tick can feed a household this tick. **Households come before the nation (Ben,
+   2026-10-05):** processors and construction drew before the clear, households draw here, and
+   the nation's own claims on the shelf — network upkeep and the space programme — draw later in
+   the tick from what households left. People eat before the roads are mended. **No money moves** — the
+   market paid the maker when the stock landed (step 7), so the draw moves goods, not
+   credits. **The fair-price ceiling does not apply**: it is a processor's reservation price,
+   and a household's reservation is already in its elastic bid. Several centres on one market
+   bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
+   ascending, resources ascending. The fill is what the growth gate reads
+   (`POPULATION.md` § Growth, decline and razing).
+10. **Background draw** — the background pull draws next, on the households' terms, from what
+    households left, less one tick of the market's processor want:
     `min(background bid, max(0, inventory − processor want))` (step 3, *the pull draws after the
     processors*).
-13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
+11. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
     `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
     households' draw, so the households' draw is not taxed by its own spoilage (the nation's later
     claims take what spoilage left); before the next
     tick's draws and reference prices read the shelf. No money moves. Markets ascending,
     resources ascending.
-14. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
-    otherwise it takes the reference price.
+12. **Price update** — the reference price stands. Every exchange is with the market, at the price
+    the supply and demand state set, so there is no second signal for the price to ease toward.
 
 Cash flows accrue per corp and are applied to balances by `apply_budget`
 (`src/world/budget_system.cpp`).
+
+**Production lands at the clear, not when it is made.** A processor cannot draw a sibling's output
+from the same tick: the output is still in the landing register while the processors draw, and
+reaches the shelf at step 7, for the next tick's draws.
 
 ## Demand channels — where a want comes from
 
@@ -367,7 +332,7 @@ satisfy the admission rule by naming a consumer nobody ever built.
 
 **The rule, and it is the whole section in one line: a consumer is a MECHANISM, not a noun.**
 "Sold to the market" is not a consumer. "Mercantile demand" is not a consumer. A good is wanted
-when some pass adds to a market's `demand` for it, or draws it from a pool — and where no pass
+when some pass adds to a market's `demand` for it, or draws it from a shelf — and where no pass
 does, the good is dead however plausible its name reads. Design: BL-648 (the admission rule names
 an injector).
 
@@ -407,14 +372,14 @@ reasoned: BL-641 turned building upkeep on and operating firms collapsed **227 �
 magnitude problem — the goods it drew (tools, planks) are *produced 0.0* in that band, so every
 draw went unmet, the supply factor decayed, output followed, and the reflex tier idled the firm.
 Halving the rate only delays it. And the loop cannot close from the other end either, because a
-**pool draw never reaches a market's `demand`**: wanting tools never raises their price, so no
-rival ever scores a Toolmaker and the supply is never induced.
+**draw that does not bid never reaches a market's `demand`**: wanting tools never raises their
+price, so no rival ever scores a Toolmaker and the supply is never induced.
 
-So a channel has to do one of two things — bid on the market so its want becomes a price signal,
-or draw from a pool for a good the world already makes. `run_construction` and `run_processing`
-bid; `run_unit_upkeep` does not, and it has the same latent defect. **A sink that cannot call forth
-its own supply is a slow way to shut the economy down**, and the cost of learning that is one
-harness run rather than a shipped world nobody can play.
+So a channel bids on the market, and its want becomes a price signal. With every good on a shelf
+(§ The shelf economy) there is no second road — no corporation's own store to draw on instead — so
+a draw that takes goods without posting its want is the defect this property names, wherever it
+sits. **A sink that cannot call forth its own supply is a slow way to shut the economy down**, and
+the cost of learning that is one harness run rather than a shipped world nobody can play.
 
 **4. Every resource must have a path to a TERMINAL sink** (Ben, 2026-08-31). A terminal sink
 consumes a good and produces nothing that must itself be sold: a household basket, an upkeep draw,
@@ -445,7 +410,7 @@ The rule is not "every resource needs its own channel". It is that **intermediat
 demand through the chain** — a market with people wants cloth, and should never need to want fibre
 directly; fibre's demand is the cloth-maker bidding for it. That is why property 3 above is
 load-bearing rather than fastidious: derived demand only propagates backwards through links that
-**bid**. Sever the chain at one pool draw and everything upstream of it becomes an orphan, however
+**bid**. Sever the chain at one draw that does not bid and everything upstream of it becomes an orphan, however
 carefully its recipe was authored.
 
 This gives the admission rule its shape. A resource is legitimate in a band when a path exists from
@@ -497,7 +462,7 @@ rate owns it.
 each other, and background companies can produce power with a profit"*).
 
 Every building that needs power bids for it, so **both links of the fuel chain bid**: the generator
-buys fuel as a processing input, and every building buys power as upkeep. Neither is a pool draw, so
+buys fuel as a processing input, and every building buys power as upkeep. Both bid, so
 neither severs the chain — property 3 satisfied twice, and property 4's derived demand propagating
 through links that bid, working as designed. `coal` and `petroleum` gain their endpoint and power
 gains its own.
@@ -508,33 +473,33 @@ profitable, which is why turning Industry on for power is a different propositio
 for tools, and the order to do it in.
 
 Power is also the first good whose **movement and market are separate questions**: it has a price but
-no convoy, and a buyer can only match a seller its road network reaches, which keeps the price
+no trade, and a buyer can only match a seller its road network reaches, which keeps the price
 regional. `docs/economy/PRODUCTION.md` § Power and `docs/economy/LOGISTICS.md` § 3a own it.
 
-### Settled: a short pool BUYS, up to a reservation ceiling
+### Settled: every draw BUYS, up to a reservation ceiling
 
 Ben's ruling, 2026-08-26 (BL-654): *"Buy on the market, but at a threshold, buying is not allowed.
 This goes hand in hand with maximum and minimum prices for goods."* And **one rule for every goods
 draw** — unit upkeep takes the same shape, not a second one.
 
-- **Short pool → buy the shortfall on the market**, spending credits. The draw becomes a real
-  participant, so the want lands in `demand`, the price moves, and a rival scoring the building
-  that supplies it finally has a reason to. That is the half BL-641 was missing.
+- **A draw buys on the market**, spending credits. The draw is a real participant, so the want
+  lands in `demand`, the price moves, and a rival scoring the building that supplies it finally
+  has a reason to. That is the half BL-641 was missing. With no corporation stock (§ The shelf
+  economy), the whole need is bought, never only a shortfall.
 - **Above a reservation ceiling, it does not buy.** The draw goes unmet and the shortfall rule
   applies — the building weakens, exactly as an unsupplied unit does. Going without is an outcome
   the design already knows how to express.
 - **It pays the posted price, and so does every other goods draw (Ben, 2026-10-03).** The ceiling
   is read against the price standing on the shelf, and that price is what the draw is billed.
-  Processor inputs and construction materials obey the same ceiling: a processor runs on its own
-  pool, and a site pauses, rather than buy above it. [FINANCE.md](FINANCE.md) § Standing-force
-  upkeep owns the rule.
+  Processor inputs, construction materials and a trade's purchase obey the same ceiling: a
+  processor idles, a site pauses and a trade ships less, rather than buy above it.
+  [FINANCE.md](FINANCE.md) § Standing-force upkeep owns the rule.
 
-**This is the exact mirror of a rule the market already has.** Step 11's `floor_price` is a
-seller's reservation — *"hold rather than sell below this"*, never a price the market is made to
-pay (BL-386). The ceiling is the buyer's — **"go without rather than buy above this"**, never a
-price the market is made to accept. Both sides may now decline a trade, and neither may dictate
-one, which is what stops a starving building bidding a good to its cap or spending itself to death
-chasing a shortfall it cannot fix.
+**The ceiling is the buyer's reservation** — **"go without rather than buy above this"**, never a
+price the market is made to accept. It is what stops a starving building bidding a good to its cap
+or spending itself to death chasing a shortfall it cannot fix. **The seller has no mirror of it:**
+a landing is sold at the clearing price, bid or no bid (§ The shelf economy), and the glut that
+floors that price is the signal a maker answers, not a price it may refuse.
 
 The ceiling belongs to the **price band's** authored family (`floor_mult` / `ceil_mult`,
 § Price resolution) rather than to upkeep, because it is a statement about what a good is worth
@@ -563,7 +528,7 @@ gameplay that good produces.
   **credits only**, while a unit pays credits **and a goods vector** (`run_unit_upkeep`). Giving
   buildings the same shape turns every firm in the world into a consumer, and it is the single
   largest structural sink available: tools and planks keep an ancient workshop running, machinery
-  and electronics an industrial one. The precedent, the shortfall rule and the pool-draw ordering
+  and electronics an industrial one. The precedent, the shortfall rule and the shelf-draw ordering
   all already exist — this is the unit-upkeep vector applied to the other kind of asset.
 - **Construction** (BL-642, construction actually draws). Materials are authored per building
   (`resource_costs`) and charged at the build press — but generation *places* buildings rather than
@@ -625,7 +590,7 @@ tuning pass will quote it and harness-local jargon three passes deep is unreadab
 
 | Term | Means |
 |---|---|
-| **Structural sink** | A good *has* an authored consumer — a recipe input, a basket weight, a pool draw. A property of the design. |
+| **Structural sink** | A good *has* an authored consumer — a recipe input, a basket weight, an upkeep draw. A property of the design. |
 | **Observed demand** | What was actually bid for this tick. A property of the run. |
 | **`REC` / `DEP`** | Producibility: made by a recipe in this band, or dug from a deposit. A good can be neither, which is the most interesting row in the report. |
 | **`px`** | Priced on some market. **An unpriced good is invisible to both basket injectors, which skip it silently** — so this column is where a missing script shows up (BL-652). |
@@ -639,7 +604,7 @@ economy actually had.
 
 **The market saturates because real firms produce and consume, not because a substrate pass
 injects supply and demand.** Nothing in the engine injects fictional supply; the only injected
-quantities are the two pure demand pulls in step 3. The design is BL-365 (real background
+quantities are the demand pulls in step 3. The design is BL-365 (real background
 corporations).
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
@@ -668,8 +633,8 @@ Background firms are not a cheaper stand-in for the player's rivals. They run th
 scored-utility layer** — build, demolish, survey, road, hire, and trade decisions, identical to
 the handful of named rival corps (Ben, 2026-08-11, overriding a reduced-model recommendation) —
 against the same `corp_command` seam and the same market this section documents. A background
-firm's sell orders, auto-surplus, and auto-demand are ordinary rows in steps 4–7 above; there is
-no separate code path for them.
+firm's landings, shelf draws and trades are ordinary rows in steps 4–8 above; there is no separate
+code path for them.
 
 **Data-model hook, not a UI change.** `is_background` exists on `corporation_component` so
 generation and `export_corp_blackboard` (BL-206) can distinguish "background noise" from a named
@@ -701,16 +666,19 @@ both `std::map` keyed by `(corp, market)`:
 - **`wants`** — the full-run input need, computed **before** any coverage decision, so it is the
   same number whether the draw then succeeds, runs short, or fails outright. Registered by
   `run_processing` before its starved early return, and by `run_construction` **before** its
-  `rate <= 0` pause check, so a build stalled for want of steel says so. This is the sole input
-  to `mc.demand`.
-- **`purchases`** — what was actually delivered. Feeds `auto_buys`, the VWAP accumulator, and
+  `rate <= 0` pause check, so a build stalled for want of steel says so; upkeep and a trade's
+  purchase register theirs the same way. This is the sole input to `mc.demand`.
+- **`purchases`** — what was actually delivered off the shelf. Feeds the billing pass (step 8) and
   the expenditure a corp is charged. **Never pay against `wants`**: that would credit deliveries
   nobody made.
 
-**The want is net of the corp's own pool** — the full-run need less what it already holds — because
-`mc.demand` is compared against `mc.supply`, an *offer to the market*, so demand must be the *bid to
-the market* for the ratio to mean anything. A corp feeding its smelter from its own mine is not
-bidding for the input and must not push its price. (Delegated call: NR-281.)
+**The want is the whole need (Ben, 2026-10-10).** A corporation holds no stock of its own
+(§ The shelf economy), so nothing covers any part of a processor's input but the shelf, and its
+full-run need is its bid to the market. A corporation feeding its smelter from its own mine bids
+for the ore like anyone else, and pushes its price like anyone else: the mine's output was sold to
+the market when it landed. A need the fair-price ceiling silences does not bid; it goes to the
+silenced-want register instead (§ Price resolution, *The shelf's share reads the want the ceiling
+silenced*).
 
 **Determinism.** Both registers are `std::map`, so accumulation runs over a **sorted** key set —
 the same seam where an `unordered_map` float accumulation is a latent nondeterminism.
@@ -718,161 +686,95 @@ the same seam where an `unordered_map` float accumulation is a latent nondetermi
 **The household channel keeps the same pair, on the market.** `household_bid` is the population
 channel's want — its share of `demand`, summed over the centres clearing there. `household_fill`
 is its receipt — what those households drew off the shelf at the end of the clear (§ The clearing
-tick, step 12). A centre's met ratio is `fill / bid`, never `supply / demand`: a shelf standing
+tick, step 9). A centre's met ratio is `fill / bid`, never `supply / demand`: a shelf standing
 full beside a tick with no listings still feeds the people. Both arrays are saved with the market,
 because the growth pass reads them before the next clear rewrites them.
 
 ## Real market inventory
 
-`market_component.inventory` is **real, persistent stock** — not reset each tick, unlike
-`supply`/`demand`, which are per-tick FLOW figures for pricing and reporting. It is the substrate
-outpost markets need (a market clearing against remote demand has stock in transit and stock on
-hand, which a derived-from-recent-supply figure cannot represent), and it is what makes the
-market a finite counterparty on the **buy** side. The design is BL-130 (real market inventory).
+`market_component.inventory` is **real, persistent stock** — the shelf — not reset each tick,
+unlike `supply`/`demand`, which are per-tick FLOW figures for pricing and reporting. It is the
+substrate outpost markets need (a market clearing against remote demand has stock in transit and
+stock on hand, which a derived-from-recent-supply figure cannot represent), and it is what makes
+the market a finite counterparty on the **buy** side. The design is BL-130 (real market
+inventory).
 
-**Fills from real corp sales only** — auto-surplus and standing sell orders, tallied separately
-from `mc.supply[r]`. Every seller filling `mc.inventory` is a real corp, background or not.
+**Fills from landings only.** A building's output, a trade's arriving cargo, a captured cargo and
+a procurement delivery each land on a market and are sold to it (§ The clearing tick, step 7); the
+opening stock generation places is the one other inflow (§ The shelf economy). Nothing else puts a
+unit on a shelf.
 
-**Credited where stock leaves a pool, not where it is listed (BL-422, inventory conservation).**
-An order whose floor exceeds the resolved price **holds**, and its stock never leaves the seller;
-crediting it at listing time would put goods on the shelf that no seller had parted with — and
-`inventory` is not a display figure, so a processor would buy that phantom stock, decrement it,
-and no counterparty would be paid. The credit sits in the same statement as each of the three
-pool debits — auto-surplus clearing, matched explicit trades, and the auto-clear pass — so
-**inventory gains exactly what pools lose**, and the two cannot drift apart in a later edit. It
-is a conservation law, not a tally. All three sites iterate ordered containers (`std::map`
-pools; sorted market and resource keys), so the credit is deterministic as well as correct.
+**Credited in the statement that pays for it (BL-422, inventory conservation).** The shelf gains a
+landing in the same statement that pays its owner, so **inventory gains exactly what the landing
+register held**, and the two cannot drift apart in a later edit. It is a conservation law, not a
+tally. The walk is over an ordered container (`std::map`, sorted market and resource keys), so the
+credit is deterministic as well as correct.
 
-**Drains during production and construction — both of which run BEFORE `clear_markets` in the
-same tick** — against whatever stock survived from **prior ticks'** sales:
+**Drains before `clear_markets`, in the same tick** — against whatever stock stood on the shelf
+from **prior ticks'** landings:
 
-- **`run_processing`** computes coverage as `(pool + market inventory) / need`, per input,
-  exactly as the no-market two-threshold model does — full batch at/above `t_full`, scaled
-  between `t_idle` and `t_full`, idle below `t_idle`. A market's stock is real and finite, so it
-  earns its place in the same coverage calculation rather than bypassing it. Draws pool-first,
-  then the market's real inventory for the remainder, decrementing it directly.
 - **`run_construction`** (the pacing rate of BL-095, construction pacing) reads
   `market_component.inventory` directly and **drains** it as the build draws.
+- **`run_processing`** computes coverage as `market inventory / need`, per input, on the
+  two-threshold model — full batch at/above `t_full`, scaled between `t_idle` and `t_full`, idle
+  below `t_idle` — and draws the shelf for what it runs, decrementing it directly. A short shelf is
+  shared pro-rata (§ Price resolution).
+- **Upkeep** — building and unit upkeep in goods, bought off the shelf at the posted price under
+  the ceiling (`FINANCE.md` § Standing-force upkeep).
+- **Trade** — a trade buys its cargo off its source market's shelf, and on a space leg the
+  launch's propellant with it (`TRADE.md` § A trade). It is the only way stock leaves for another
+  market.
 
-Because both consumers draw from the SAME live inventory value in a fixed, deterministic order
-(construction first, then production — the tick order), and a processor's `run` fraction is
-bounded by the coverage-min across every input, the total drawn from a market in one tick can
-never exceed what was actually on hand — no double-spend, no negative inventory, no ordering
-dependence beyond the tick's own fixed pass order.
+Because every consumer draws from the SAME live inventory value in a fixed, deterministic order
+(the tick order), and a processor's `run` fraction is bounded by the coverage-min across every
+input, the total drawn from a market in one tick can never exceed what was actually on hand — no
+double-spend, no negative inventory, no ordering dependence beyond the tick's own fixed pass
+order.
 
-**The shelf's third drain is the market's own export (Ben, 2026-09-24).** Shelf stock that
-another market prices above its landed cost by more than the margin leaves by convoy, in the
-dispatch step, after the corporations' own dispatch has claimed what room it wanted
-(`docs/economy/SUPPLY.md` § Dispatch trigger). **A market export moves no money:** the shelf
-belongs to no corporation, so there is nobody to charge for the haul and nobody to pay for the
-goods — the haul is the margin given up, taken off what the cargo realises where it lands.
+**After the clear, three more drains.** The households take their bid off the shelf (§ The
+clearing tick, step 9): the Household channel's terminal sink, consumed and never returned. The
+background pull takes what it bid above one tick of processor want (step 10). Then every good left
+on the shelf spoils by its authored rate (step 11; § Price resolution, *The shelf spoils*). None of
+the three moves money: the market paid the maker when the goods landed. The nation's own claims —
+network upkeep and the space programme — draw later in the tick from what is left, buying off the
+shelf (`../politics/NATIONS.md`).
 
-**The shelf's fourth drain is the households.** At the end of every clear the people take their
-bid off the shelf (§ The clearing tick, step 12). It is the Household channel's terminal sink:
-what they draw is consumed and never returns. Like the export, it moves no money.
+**The sell side has no volume cap and no condition.** `market_component.supply` is a derived
+per-tick flow for pricing, and the market absorbs any quantity that lands, at the clearing price.
+There is no floor a seller can hold behind and no stock held back from the price signal: whatever
+landed is listed, sold and shelved in the one tick.
 
-**The shelf's fifth drain is spoilage.** After the households' draw, every good left on the shelf
-loses its authored rate (§ The clearing tick, step 13; § Price resolution, *The shelf spoils*).
-Only the shelf: a corporation's pool never spoils. It moves no money.
+Verified by `tools/verify/market_inventory_harness.cpp`.
 
-**The sell side has no volume cap.** `market_component.supply` is a derived per-tick flow for
-pricing, and the market absorbs any quantity a seller is willing to release at the resolved price.
-What is conditional is the *price*: an order whose floor exceeds the resolved price holds rather
-than selling, so a listed quantity is a ceiling on what may clear, not a guarantee that it will.
-
-**Held stock stays visible to the price signal — deliberately, and for a mechanical reason.**
-Hiding held quantity from `mc.supply[r]` on the argument that stock explicitly not for sale below
-its floor is not supply is not implementable as stated: whether an order holds is decided by
-comparing its floor to the *resolved* price, and the resolved price is computed **from** `supply`.
-Removing held stock raises the price, which can un-hold the order that was removed — a fixed
-point, reached only by iterating, at a cost in complexity and determinism risk that a pricing
-nicety does not repay. So the two arrays are deliberately asymmetric: `supply` is the **offer**
-(listed stock is a real offer at a price, and the market may price against knowing it exists),
-`inventory` is the **delivery** (only what actually changed hands). Revisit only if a real defect
-is measured, not on the argument alone.
-
-Verified by `tools/verify/market_inventory_harness.cpp` and `order_book_harness` § R7 (the
-conservation rows).
-
-## Where the order book lives
-
-`world::sell_orders` and `world::buy_orders` — **world state**, not UI state (BL-293, order book
-as world state). Ben's ruling, 2026-08-07: *"Order book needs to be a background process, the AI
-must be able to trade as a player does."*
-
-A book held on `ui_state` and handed to `clear_markets` as an argument would cost three things at
-once: clearing would be something the **UI drove** rather than something the simulation does, so
-a headless tick would sell nothing standing; a `corp_command` mutates `world&`, so there would be
-**nothing for a trade verb to mutate** and no text-driven player could trade; and nothing on the
-serialisation seam would reference an order, so a player's standing orders would not **survive a
-save**. One misplacement, three symptoms.
-
-What follows from the book being world state:
-
-- **One implementation of what a press means.** `place_sell_order` / `remove_sell_order` are
-  `corp_verb`s (`corp_command.hpp`). The Market Ledger's buttons queue commands that
-  `app::render` applies through `apply_corp_command` — the same call the rival-corp scorer
-  makes. A player and an AI cannot diverge, because there is nothing to diverge.
-- **Rival corps trade.** The scored-utility layer reaches the verb like any other
-  (`io-standing-rules.md` § rival-corp exception). Its rule is deliberately conservative —
-  surplus past a hold threshold, floored at the rarity price — and lives in `corp_ai_params`.
-- **Orders carry a stable `id`.** Removal names the id, never an index, so withdrawing one order
-  cannot renumber another.
-- **Insertion order is semantic.** Matching is price-**time** priority, so the book's sequence is
-  state: it is never re-sorted, it is serialised in place, and `world::state_hash` folds it as
-  stored rather than sorted. `order_book_harness` asserts that two books holding the same orders
-  in a different sequence hash differently — the tripwire for a determinism leak.
-- **Persistence.** `order_book.{hpp,cpp}`, a flat-binary stream: magic `IOOB` + version, and a
-  bad stream is refused rather than reinterpreted.
-
-**The buy side is engine-only.** `clear_markets` implements it and the harnesses exercise it, but
-no press and no `corp_verb` submits a buy order, so preferred-seller routing is dormant in play:
-the book is one-sided, and the AI can release stock but cannot bid for it. The intended emitter is
-BL-160 (auto-exchange policy), whose buy band is the player buy surface and whose
-`derive_exchange_orders` is the first live writer — there is no interim manual buy tab (decided
-2026-07-31). Whether the dormant side should instead be removed is BL-383 (remove dormant buy
-side).
-
-## Trades — the standing order read as a position
+## Trades on the ledger — positions and history
 
 Ben, 2026-08-29, redesigning the Market ledger: *"Sell orders are complicated, and we should
-rework this into persistent trades. A sell order can be made automatically by companies and rival
-corps, but we get to see both our orders and all orders in markets where we operate. What we
-really want to see is a list of trades, and their profits. We also want to see potential trades
-and their profits."*
+rework this into persistent trades."* What he asked to see was a list of trades and their profits,
+and potential trades and theirs.
 
-A **trade** is a standing position in a market: a good, a direction, a quantity, a floor or
-ceiling, and an owner. It is not a new mechanism — it is the order book (§ Where the order book
-lives) read as something a player holds rather than something they submit. `world::sell_orders`
-and `world::buy_orders` are already world state and already written by rivals and background
-firms through the same verbs the player presses, so the population this surface reads exists.
+A **trade** is `TRADE.md`'s standing route — a good, a source market, a destination market, the
+trade points behind it, and an owner — and `TRADE.md` owns what it is and who may set it. This
+section owns the two things a market reading needs from it.
 
 **Three reads, and they are not equally cheap. Say which is which rather than presenting them as
 one table.**
 
-1. **My standing trades.** Every order the player's corp holds, per market. Exists today; this is
-   the existing Sell Orders view under a better name and with the buy side admitted.
-2. **The market's standing trades.** Every order in a market the player **operates in**, whoever
-   owns it. The book is world state and orders are the deliberate public signal (§ Real market
-   inventory), so this is a reading question rather than a disclosure one — but *operates in* is
-   the gate, and it must be a real predicate rather than "every market": a player reads the books
-   of markets they trade at, not of the whole system.
+1. **My trades.** Every trade the player's corporation holds, manual and auto, with its route.
+   Trades are world state (`world::trades`), written by the player and by rivals through the same
+   verbs, so the population this reads exists.
+2. **The market's trades.** Every trade touching a market the player **operates in**, whoever owns
+   it. *Operates in* is the gate, and it must be a real predicate rather than "every market": a
+   player reads the trades of markets they trade at, not of the whole system.
 3. **Potential trades.** Not a record at all — a **derivation**: for each good the player can
-   reach, buy price here against sell price there, less the haulage the route would cost
-   (`LOGISTICS.md` traversal cost, `SUPPLY.md` convoy pricing). This is the read that makes the
-   surface worth opening, and it is the one with no existing store behind it.
+   reach, the destination's price less the source's, less the haul the route would cost
+   (`LOGISTICS.md` traversal cost), times the good's trade capacity — exactly the ranking auto
+   trade runs (`TRADE.md` § Auto and reserved trade).
 
-**What does NOT exist, and must not be faked.** A **realised** trade — a buy matched to a sell at
-a price, with a profit — is not recorded anywhere. Clearing is an aggregate over supply and demand
-(§ The clearing tick); it resolves a price and moves quantity, and it does not pair a seller with
-a buyer or retain what any single exchange earned. So "a list of trades and their profits" is
-answerable for **positions** (what I am offering, at what floor, against what the market pays) and
-not yet for **history** (what I sold, to whom, for what margin). Reporting a realised profit that
-the clearing loop never computed would be inventing a number, and the honest-placeholder idiom
-(NR-249) is not licence to do it on a figure a player would act on.
-
-Making history real means the clearing loop retaining a per-exchange record, which is a change to
-the money loop and not to a ledger. **Ben, 2026-08-29: add it.**
+**What a trade realised is recorded, exchange by exchange.** A trade's purchase is a shelf draw at
+the source and its cargo is a landing at the destination, and both are rows of the exchange record
+below. Reporting a realised profit the clearing loop never computed would be inventing a number,
+and the honest-placeholder idiom (NR-249) is not licence to do it on a figure a player would act
+on; the record is what makes the history real.
 
 ### The exchange record
 
@@ -884,37 +786,34 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 | `market` | Which board. The surface is per-market. |
 | `resource` | What moved. |
 | `quantity` | How much. |
-| `unit_price` | The price the exchange was made at, not the floor or cap an order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. A sale to the market is made at the resolved price; a draw off the shelf at the **posted** price it was decided and billed at ([FINANCE.md](FINANCE.md) § Standing-force upkeep); a matched trade at the price its match executed on. |
-| `seller`, `buyer` | The two corps. Either may be a background firm — and either may be **absent**, which means the market itself and not an unknown party (see below). |
+| `unit_price` | The price the exchange was made at. A landing is sold to the market at the **clearing** price of its tick; a draw off the shelf is bought at the **posted** price it was decided and billed at ([FINANCE.md](FINANCE.md) § Standing-force upkeep). |
+| `seller`, `buyer` | The corporation on one side. The other side is **absent**, which means the market itself and not an unknown party (see below). |
 
-**One side is often the MARKET, and a reader must say so rather than blank the row.** Only the
-matched order-book path (§ Where the order book lives) has a real corp on both sides, and that path
-is dormant in play while the buy side has no emitter. The three paths that carry the volume trade
-against the market as counterparty of last resort: a corp's auto-surplus is *sold to the market*, a
-consumer's shelf draw (a processor's input, a site's material, an upkeep draw) is *bought from the
-market* at the posted price, and an unmatched standing sell auto-clears *to the market* at the
-resolved price. Those exchanges are real — goods moved, cash moved — so they are
-recorded, with the absent side left empty. A surface renders that side as the market; treating it as
-missing data would hide most of the history the record exists to keep.
+**There are two kinds of exchange, and the market is on one side of every one.** A **landing** —
+a building's output, a trade's cargo, a captured cargo, a procurement delivery — is *sold to the
+market*: the owner is the seller and the buyer is empty. A **shelf draw** — a processor's input, a
+site's material, an upkeep draw, a trade's purchase — is *bought from the market*: the seller is
+empty and the buyer is the corporation. Both are real — goods moved, cash moved — so both are
+recorded. A surface renders the empty side as the market; treating it as missing data would hide
+the whole history the record exists to keep. The households', the background's and spoilage's
+takes move no money and are not exchanges.
 
-**It records REVENUE, not profit, and that limit is structural rather than an omission.**
-`stockpile_component` is `quantities[]` and nothing else — **there is no cost basis anywhere in
-the model**. A unit of iron ore in a pool does not know what it cost to extract or to buy, so the
-margin on selling it cannot be derived from the sale. `quantity * unit_price` is honest;
-`profit` is not available at this grain and must not be printed as though it were.
+**It records REVENUE, not profit, and that limit is structural rather than an omission.** There
+is **no cost basis anywhere in the model**: a unit on a shelf does not know what it cost to extract
+or to carry there, so the margin on selling it cannot be derived from the sale.
+`quantity * unit_price` is honest; `profit` is not available at this grain and must not be printed
+as though it were.
 
-Two routes to a real margin, both larger than this record and neither taken here:
+Margin is answered where it is defined instead:
 
-- **Carry a cost basis on the pool** — a weighted average acquisition cost per resource per corp,
-  updated on every inflow. That is inventory accounting, and it makes every producer and every
-  buyer write a second number on every tick.
-- **Answer margin at the building instead**, where `building_profit.hpp` already nets revenue
-  against input cost, maintenance and wages. This is where margin currently lives and it is a
-  *per-building* answer, not a per-trade one.
+- **At the building**, where `building_profit.hpp` nets revenue against input cost, maintenance
+  and wages — a *per-building* answer.
+- **At the trade**, whose margin is defined by `TRADE.md` § A trade: the destination's price on
+  landing, less the source's price, less the haul — each a figure the record and the shipment
+  carry.
 
-So the surface reads: **what moved, at what price, between whom** — and the Trades tab must
-label that column **revenue**. The cost-basis question is the follow-on, and it is an economy
-decision rather than a UI one.
+So the surface reads: **what moved, at what price, between whom** — and a column built from the
+record alone must be labelled **revenue**.
 
 **Serialisation.** The record is world state, so it is in the save envelope and
 `save_game_version` moves. NR-708 records that **no envelope field has round-trip coverage** and
@@ -944,18 +843,23 @@ toward the market whose catchment holds its headquarters, once.
 **It is derived, never stored**, and it is seeded at the epoch only in the sense that the firms it
 sums are (`docs/generation/INDUSTRIALISATION.md` § 5. Wealth inequality, market cap and GDP).
 
-## Procurement is not the order book
+## Procurement is not the market
 
-A procurement contract is a **named counterparty** with a lead time and a refusal. The order
-book is price-time priority over anonymous asks, and it has no representation for either of
-those. The form itself — its verbs, its terms, its pricing and its reputation axis — is
-[`CONTRACTS.md`](CONTRACTS.md).
+A procurement contract is a **named counterparty** with a lead time and a refusal. The market is
+anonymous, instant and price-only, and it has no representation for any of those. The form itself
+— its verbs, its terms, its pricing and its reputation axis — is [`CONTRACTS.md`](CONTRACTS.md).
+
+**A contract still delivers from and to shelves.** At fulfilment the supplier buys what its home
+market's shelf holds of the good, at the posted price under the ceiling, and makes the rest to
+order; the delivery then lands on the buyer's home market on the delivery body and is sold there
+like any landing (§ The clearing tick, step 7). The contract moves money between the two parties;
+the goods meet the market at both ends.
 
 ## Tariffs — the first flow that pays a nation
 
 > **The nation half of this lives in [`docs/politics/NATIONS.md`](../politics/NATIONS.md)** — what a
 > treasury is, who may author a law, and how the treasury is spent. This section owns the
-> **clearing-tick half**: how the duty is charged when a trade matches.
+> **arrival half**: how the duty is charged when a shipment crosses a border.
 
 A market resolves to a jurisdiction: `market_component::centre_tile` through
 `world::tile_to_nation`. Goods that arrive in one jurisdiction from another have crossed a border,
@@ -965,13 +869,11 @@ and that is what a tariff reads.
 from its source market's nation pays the destination nation's enacted import duty on the cargo, at
 the destination's price, charged to the convoy's owner and credited to that nation's treasury.
 
-**Why the border and not the sale.** An import duty taxes goods coming in, and the convoy is the
-only object that carries goods across a line — so it is the only place the duty has a real payer
-without inventing one. The earlier rule charged a *matched order-book trade* whose buyer was
-domiciled abroad; that path is the only clearing path with a counterparty on both sides, and it is
-dormant in play, so no tariff ever fired and a nation's protection shaped nothing. Charging the
-shipper at arrival reaches every import, auto-dispatched or directed, and it is **the one** point
-of charge — the matched-trade charge is retired with it, so no good pays twice.
+**Why the border and not the sale.** An import duty taxes goods coming in, and a trade's shipment
+is the only object that carries goods across a line — so it is the only place the duty has a real
+payer without inventing one. A sale has no foreign party to charge: every exchange is with the
+market (§ The exchange record). Charging the shipper at arrival reaches every import, auto or
+manual, and it is **the one** point of charge, so no good pays twice.
 
 - **The base is the cargo's value at the destination** — quantity × the destination market's last
   resolved price at the arrival tick. The goods are priced where they will be sold.
@@ -998,9 +900,8 @@ of charge — the matched-trade charge is retired with it, so no good pays twice
   (`docs/politics/NATIONS.md`, BL-537).
 - **A same-nation haul is charged nothing.** A tariff that taxed domestic trade would be a sales
   tax wearing the wrong name.
-- **The payer is the shipper, and the shipper is always real.** The objection that retired a
-  charge on auto-surplus — *taxing an import from nobody* — does not reach a convoy: every convoy
-  has an owner who paid to move it.
+- **The payer is the shipper, and the shipper is always real.** A landing sold to the market has
+  no importer to tax; a shipment does: every convoy has an owner who paid to move it.
 - **It is a transfer.** The shipper's expenditure rises by exactly what the treasury rises by, in
   the same statement. `apply_budget` charges expenditure unconditionally (a balance may go
   negative), so the two sides cannot drift apart on a solvency edge.
@@ -1032,7 +933,7 @@ nothing to sell, so at k > 0 its own buyers cannot drive its price to the ceilin
 shelf.
 **The shelf counts only as far as it can sell (Ben, 2026-10-03):** the shelf's share of `supply` is
 at most what the market's demand would take off it within k ticks, `min(inventory, k × demand)`.
-Counted whole, a market that buys every surplus as the buyer of last resort grows a glut that
+Counted whole, a market that buys every landing grows a glut that
 floors its own prices; measured on seeds 0/10/28 the field fell to 1/1/11 firms. **k is 0 until
 the shelf spoils (Ben, 2026-10-03):** measured at k = 1 to 16, every k above 0 left fewer firms
 than listings-only supply (seeds 0/10/28: 43/48/32 at 0, 16/5/21 at 1, 5/2/19 at 4), because a
@@ -1051,7 +952,7 @@ demand, so a full shelf priced over the ceiling counts as no supply and stays pr
 cycle that starved about 65% of the processors starved at handoff (BL-1207, handoff starvation).
 So the share is `min(inventory, k × (demand + suppressed want))`, the suppressed want being the
 processor inputs and construction materials that went unbought over the ceiling (the same register
-the hauler reads, `SUPPLY.md` § Dispatch trigger). The want **still never bids** — it only lets a
+auto trade reads to size a shipment, `TRADE.md` § Auto and reserved trade). The want **still never bids** — it only lets a
 stocked shelf count as what it is, so the price can fall to where the silenced buyers return. The
 ceiling ruling stands unchanged. **Under this rule k = 1 (Ben, 2026-10-07):** re-swept at
 k = 0/1/2/4 on seeds 0/43/10/28/38, k = 1 is the smallest k that takes a consuming market's price
@@ -1069,17 +970,17 @@ uncontended shelf is drawn as it always was. On a contended shelf:
 - every other draw has the same share of its want reserved, `floor = want × shelf / total want`;
 - in visit order, each draw may take its **full** need from what the shelf holds beyond the floors
   still reserved for the draws after it. A draw that takes less than its floor — short on another
-  good, covered by its own pool, running part of a batch — releases the rest down the order, so an
+  good, or running part of a batch — releases the rest down the order, so an
   equal share too small to run anybody passes on until it runs someone;
 - the phase then **tops up**: a draw left short takes, in visit order, what the shelves still hold,
   sweeping again while a sweep moves.
 
 The invariant this keeps: **no contended shelf ends a phase holding stock while an admitted draw
 left short could have used it.** An uncontended shelf is drawn first-come as it always was, with no
-top-up; there every draw found enough at its turn, and the one way a draw there can end short
-beside stock is its own pool growing later in the phase. **It is shared within each phase, not across the tick (NR-977):** the
+top-up; there every draw found enough at its turn. **It is shared within each phase, not across the tick (NR-977):** the
 construction phase rations its sites first, then the production phase rations its processors
-from what construction left; upkeep draws, later in the tick, stay first-come after both.
+from what construction left; upkeep draws and the trade pass, later in the tick, stay first-come
+after both.
 Pooling every draw of the tick would need the tick reordered — construction runs before labour is
 solved, and a processor's need depends on its labour.
 
@@ -1091,9 +992,9 @@ fastest, **consumable** (consumer goods, fuels, chemicals, power-adjacent stocks
 like food, NR-972) slowest but never zero. The rates are
 first cuts, then measured. Three rules hold whatever the numbers:
 
-- **Only the shelf spoils.** A corporation's own pool is stock it holds and answers for; the shelf
-  is the market's, bought as the buyer of last resort, and nobody tends it.
-- **Nobody is charged.** The market already paid the maker when it bought the stock, so a spoiled
+- **Only the shelf spoils.** Cargo in transit does not: it is a trader's, and answered for. The
+  shelf is the market's, bought from every maker on landing, and nobody tends it.
+- **Nobody is charged.** The market already paid the maker when the stock landed, so a spoiled
   unit simply leaves — goods leave, no credits move, exactly as when a household eats it.
 - **Spoilage is a drain, not a price.** It takes stock off the shelf after the tick's draws and
   before the shelf's share of supply is read; it never sets a price by itself.
@@ -1153,8 +1054,8 @@ ceil_mult               >  1 + haulage_per_unit / base_price
 
 **The haulage is measured, not assumed.** `tools/verify/haulage_measure.cpp` walks every market
 in the real generated world, finds its nearest market neighbour by the terrain-weighted A* cost,
-and reports `logistics_cost(mode) × path.cost` — *exactly* the per-unit figure `dispatch_convoys`
-debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
+and reports `logistics_cost(mode) × path.cost` — *exactly* the per-unit haul a trade's shipment
+pays (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
 
 | Market → nearest market neighbour | credits per unit |
 |---|---|
@@ -1187,7 +1088,7 @@ at 280), which would delete the tier model; that reading is rejected and recorde
 it would widen the arbitrage margin only by cutting what an abundant producer receives (NR-290).
 
 **The nearest-neighbour reading is no longer the whole requirement (Ben, 2026-09-15).** Trade
-now chases price over distance (`SUPPLY.md` § Dispatch trigger), and a sea leg is the cheapest
+chases price over distance (`TRADE.md` § Auto and reserved trade), and a sea leg is the cheapest
 per distance (`SUPPLY.md` § Logistical cost), so the haul that matters is not only to the nearest
 neighbour but to wherever a gap is. The ceiling still covers every nearest pair; beside it sits a
 reading of the far pairs a seller actually reaches, taken after play has run, since a gap play
@@ -1198,46 +1099,40 @@ every convoy from dispatch to its first clear after arrival, on the world the ap
 windows of four quarterly dispatches — the first year of play, and the year after N years — and
 reads three things:
 
-- **(a)** volume delivered **and sold** at its destination, where that is not the market the source
-  pool clears at. A dispatch count is not this figure.
-- **(b)** the share of (a) whose destination is not the seller's **nearest** market — the market
-  other than home the dispatcher's own leg pricing reaches cheapest, so *nearest* means nearest
+- **(a)** volume delivered **and sold** at its destination, where that is not the source market.
+  A dispatch count is not this figure.
+- **(b)** the share of (a) whose destination is not the source's **nearest** market — the market
+  other than the source the trade's own leg pricing reaches cheapest, so *nearest* means nearest
   reachable.
-- **(c)** per good, the destination-minus-home price gap at dispatch and again at arrival, beside
+- **(c)** per good, the destination-minus-source price gap at dispatch and again at arrival, beside
   the haul paid per unit, so a gap that play closes shows as closing.
 
-A sale is read from the exchange record and attributed **cargo-first** — the cargo is taken to sell
-before the pool's other stock — which is an upper bound, since goods are fungible inside a pool.
-Per-market pools, sea legs and the net-price dispatch rule are each judged against this reading.
+A sale is read from the exchange record: a cargo is sold on landing, so its sale is its own landing
+row. Sea legs and auto trade's ranking are each judged against this reading.
 
 **Re-derive rather than trust.** Re-run `haulage_measure` whenever the logistics cost table
 (`logistics.base_cost_per_unit_distance`), the map scale (`body_km_per_tile`), or the
 `base_price` table changes — all three move the number this ceiling is computed from.
 
-**The band does not create inter-market trade; the convoy does.** Measured over five seeds, 1,677
-of 2,146 dispatched convoys are intra-body market-to-market hauls. **Under per-body pools those
-hauls moved nothing** (found 2026-09-15): the cargo returned to the pool it left and sold at the
-corp's home market, so the count measured dispatch, never trade. Per-market pools
-(`PRODUCTION.md` § Stockpile and output flow) are what make the figure mean what it says, and it
-must be re-read as delivered volume sold at the destination. **Inter-body** trade is gated
-separately: the space lane is refused by the launchpad and propellant gates in `dispatch_convoys`
-before any price is consulted. `trade_routes` (BL-088, persistent trade routes) is a body-level
-record, so it is structurally blind to intra-body trade (NR-289).
+**The band does not create inter-market trade; a trade does** (`TRADE.md`). A dispatch count is
+not trade: the figure that means what it says is delivered volume sold at the destination.
+**Inter-body** trade is gated separately: a trade between bodies needs the trader's Launchpad on
+the source body and the launch's propellant on the source shelf before any price is consulted.
+`trade_routes` (BL-088, persistent trade routes) is a body-level record, so it is structurally
+blind to intra-body trade (NR-289).
 
 ## Inter-body linkage
 
-There is no abstract price coupling between bodies — **the convoy is the coupling**
-(`docs/economy/SUPPLY.md`). `dispatch_convoys` reads last tick's cleared shortfalls
-(demand − supply per market) and hauls from the cheapest reachable corp pool — distances and
-haul prices read **tick-pure orbital angles** (`orbital_angle_at_tick`, BL-354), so dispatch is
-identical at any frame rate; the smoothly-advancing render angles are display-only. An arriving
-convoy credits the destination pool **only** — the cargo reaches the market's supply through the
-ordinary auto-surplus path off that pool at the next clear. A direct supply write on arrival would
-be dead: `credit_arrived_convoys` runs *after* `clear_markets` in the tick, so the write would be
-zeroed before pricing read it, while the pre-clearing AI scorer *would* read it — a private signal
-nothing priced agrees with (BL-382, dead market writes). A marketless body's processors fall back
-to the two-threshold pool model (PRODUCTION.md § Processing), and goods extracted there enter the
-economy only by convoy to a market.
+There is no abstract price coupling between bodies — **trade is the coupling** (`TRADE.md`), and
+its shipment rides the space lane as a convoy (`docs/economy/SUPPLY.md`). Distances and haul prices
+read **tick-pure orbital angles** (`orbital_angle_at_tick`, BL-354), so a shipment is identical at
+any frame rate; the smoothly-advancing render angles are display-only. An arriving cargo **lands**
+on the destination market and is sold at that tick's clear (§ The clearing tick, steps 4 and 7).
+Arrivals are credited at the head of the tick, before production and before `clear_markets`, so
+the landing is this tick's supply and every reader of the market — the price law and the AI scorer
+alike — sees the same goods (BL-382, dead market writes, is why it is never a direct `supply`
+write). **A body with no market makes nothing:** a producer with no market under it has no shelf
+to land on (`PRODUCTION.md` § Output and the shelf).
 
 ## Adjacent design
 
@@ -1246,6 +1141,5 @@ economy only by convoy to a market.
   What a shortfall against that demand does to habitability, workforce efficiency and growth is
   the habitability feedback model in `docs/economy/POPULATION.md`; RESOURCES.md § Habitability
   goods names the intended effect per good.
-- **Exchange policy.** BL-160 (auto-exchange policy) is the player's standing buy/sell band and
-  the buy book's first live writer; BL-161 (counterparty allow/deny) is the per-counterparty gate
-  over it.
+- **Trade.** How goods move between markets — the Planetary Marketplace, trade points, capacity,
+  auto and reserved trade — is `TRADE.md`.

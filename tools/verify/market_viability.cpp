@@ -477,6 +477,12 @@ struct seed_reading
     double inc_close = 0.0, inc_t50 = 0.0;
     double inc_settle_mean = 0.0;      ///< mean over the 12 settle ticks (the reading's "settle close")
     double inc_t26_50_mean = 0.0;      ///< mean over play ticks 26..50 (firm_attrition_trace's window)
+    // T (BL-1266, reported, no target): the trade pass over play ticks 1..50 —
+    // points made, shipments, units moved, corporations that made points, and
+    // the trade buildings standing at tick 50.
+    double t_points = 0.0, t_spent = 0.0, t_units = 0.0;
+    long long t_ship_manual = 0, t_ship_auto = 0, t_refused_lp = 0;
+    int t_ticks = 0, t_corps_max = 0, t_marketplaces_t50 = 0, t_ports_t50 = 0;
     double secs_build = 0.0, secs_settle = 0.0, secs_play = 0.0;
     int    decom_at_build = 0, proc_at_build = 0; ///< processors when the world is handed to the settle
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
@@ -1153,6 +1159,24 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                                                  /*spectating=*/false, &hooks);
         if (lg.armed) lg_after_tick(w, res.report, reg, lg);
         for (const convoy_component& c : w.convoys) lg.max_id = std::max(lg.max_id, c.id);
+        if (k <= k_g1_g2_play_tick)
+        {
+            r.t_points      += res.trades.points_made;
+            r.t_spent       += res.trades.points_spent;
+            r.t_units       += res.trades.units_shipped;
+            r.t_ship_manual += res.trades.manual_shipments;
+            r.t_ship_auto   += res.trades.auto_shipments;
+            r.t_refused_lp  += res.trades.refused_no_lp;
+            r.t_corps_max    = std::max(r.t_corps_max, res.trades.corps_trading);
+            ++r.t_ticks;
+        }
+        if (k == k_g1_g2_play_tick)
+            for (const auto& [bid, b] : w.buildings)
+            {
+                if (b.ticks_remaining > 0 || b.decommissioned) continue;
+                if (b.type == building_type::planetary_marketplace) ++r.t_marketplaces_t50;
+                else if (b.type == building_type::port)             ++r.t_ports_t50;
+            }
         if (k == k_idle_market_ticks)
         {
             for (const auto& [mid, mc] : w.markets)
@@ -1328,6 +1352,14 @@ int main(int argc, char** argv)
                     r.firms_handoff, r.last_tick, r.firms_survived,
                     r.firms_handoff ? pct(static_cast<double>(r.firms_survived) / r.firms_handoff) : 0.0,
                     r.firms_end);
+        if (r.t_ticks > 0)
+            std::printf(" T trade (play 1-%d, per tick): points made %.1f spent %.1f | shipments auto %.1f manual %.1f"
+                        " | units %.1f | LP-refused %.1f | corps trading (max) %d | at t%d: %d Marketplaces, %d Ports\n",
+                        r.t_ticks, r.t_points / r.t_ticks, r.t_spent / r.t_ticks,
+                        static_cast<double>(r.t_ship_auto) / r.t_ticks,
+                        static_cast<double>(r.t_ship_manual) / r.t_ticks, r.t_units / r.t_ticks,
+                        static_cast<double>(r.t_refused_lp) / r.t_ticks, r.t_corps_max,
+                        k_g1_g2_play_tick, r.t_marketplaces_t50, r.t_ports_t50);
         std::printf(" G4 seat %llu \"%s\"  operating net, last %d settle quarters:",
                     static_cast<unsigned long long>(r.seat), r.seat_name.c_str(), k_seat_settle_window);
         double sm = 0;

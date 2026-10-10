@@ -276,7 +276,7 @@ An owner's capacity to move goods between markets, made by its Planetary Marketp
 The units of a resource one trade point moves per tick, authored per resource (`docs/economy/TRADE.md`).
 
 **Trade**
-A standing route an owner sets — buy a resource on one market's shelf, haul it, land it on another — run with trade points; the only way goods move between markets (`docs/economy/TRADE.md`). Not the order book's "trade" (`MARKETS.md` § Trades — the standing order read as a position), which names a position.
+A standing route an owner sets — buy a resource on one market's shelf, haul it, land it on another — run with trade points; the only way goods move between markets (`docs/economy/TRADE.md`). Not a ledger position (`MARKETS.md` § Trades on the ledger — positions and history).
 
 
 **Culture share**
