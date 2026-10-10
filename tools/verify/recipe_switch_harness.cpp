@@ -202,6 +202,42 @@ void run_mechanism_checks()
         check(b6.recipe == idA2, "S6e ...and the recipe did NOT change");
         check(cross_cost == 0.0f, "S6f ...and nothing was debited (a rejection mutates nothing)");
     }
+
+    // S7 — propellant routes follow the body's air (Ben, 2026-10-09;
+    // PRODUCTION.md § Chemical Plant). Two same-group routes, one `airless`, one
+    // `atmosphere`. On an airless body the retool onto the atmosphere route is
+    // refused at the seam (`wrong_air`) and the player's set_recipe carries the
+    // reason (`rejected_wrong_air`), mutating nothing; under air it applies.
+    {
+        recipe ra; ra.name = "air_route"; ra.group = "Air Test"; ra.air = recipe_air::atmosphere;
+        ra.outputs[static_cast<std::size_t>(resource_type::propellant)] = 1.0f;
+        recipe rv; rv.name = "vac_route"; rv.group = "Air Test"; rv.air = recipe_air::airless;
+        rv.outputs[static_cast<std::size_t>(resource_type::propellant)] = 1.0f;
+        const uint16_t idA = reg.add_recipe(ra);
+        const uint16_t idV = reg.add_recipe(rv);
+
+        w.bodies[body].atmosphere = atmosphere_class::thin; // airless (planetology's rule)
+        const entity_id bld7 = make_processor(w, body, idV);
+        w.corporations[corp].assets.push_back(bld7);
+        w.corporations[corp].balance = 1000.0f;
+        building_component& b7 = w.buildings.at(bld7);
+
+        const recipe_switch_result r7a = try_switch_recipe(w, reg, corp, b7, idA);
+        check(r7a == recipe_switch_result::wrong_air,
+              "S7a on an airless body the atmosphere route is refused at the retool seam (wrong_air)");
+        check(b7.recipe == idV && w.corporations[corp].balance == 1000.0f,
+              "S7b ...the recipe did not change and nothing was debited");
+
+        corp_command cmd;
+        cmd.corp = corp; cmd.verb = corp_verb::set_recipe; cmd.subject = bld7; cmd.recipe = idA;
+        check(apply_corp_command(w, reg, cmd) == corp_command_result::rejected_wrong_air,
+              "S7c the player's set_recipe is rejected with its reason (rejected_wrong_air)");
+
+        w.bodies[body].atmosphere = atmosphere_class::moderate; // the body has air
+        check(apply_corp_command(w, reg, cmd) == corp_command_result::applied
+                  && w.buildings.at(bld7).recipe == idA,
+              "S7d under air the same set_recipe applies");
+    }
 }
 
 } // namespace

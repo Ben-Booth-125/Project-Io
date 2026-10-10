@@ -14,6 +14,11 @@
 //   R3  rates are per type and ERA-BANDED, and every rate is authorable at 0.0 —
 //       a zero entry skipped exactly as an absent one, so the shape lands inert
 //       (the BL-454 precedent).
+//   R11 BL-1230 (power crosses markets): the province is the grid's cell — a
+//       wired province draws across markets, billed at its own market; a strait
+//       joins; a dark province strikes power; a short grid is shared pro rata;
+//       power's price pools per grid, capacity's does not; a road write
+//       invalidates the grid.
 //   R6  determinism with rates ON: two identical runs produce identical pools and
 //       identical supply factors, and no unordered container decides an outcome.
 //
@@ -28,7 +33,10 @@
 //   .\build_gen\verify\building_upkeep.exe
 
 #include "world/components.hpp"
+#include "world/construction.hpp"
+#include "world/corporation_generation.hpp" // BL-1232: body_power_grid_gap, power_grids_to_serve
 #include "world/economy_system.hpp"
+#include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -36,6 +44,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -919,6 +928,506 @@ void r10_a_shelf_draw_pays_the_posted_price()
     }
 }
 
+// ---------------------------------------------------------------------------
+// R11 — BL-1230 (power crosses markets): THE PROVINCE IS THE GRID'S CELL
+// ---------------------------------------------------------------------------
+// LOGISTICS.md § 3a (Ben, 2026-10-07). A one-row body of `n` tiles, two
+// provinces (tiles [0, split) and [split, n)), two markets with centres at the
+// two ends — so tiles left of the middle route to M1 and right of it to M2. A
+// road mask wires provinces; a water mask makes a strait. Buildings stand on
+// the tiles named, owned by one corp.
+struct grid_fixture
+{
+    world     w;
+    entity_id body = null_entity;
+    entity_id corp = null_entity;
+    entity_id m1 = null_entity, m2 = null_entity;
+    std::vector<entity_id> tiles;
+    std::vector<entity_id> buildings;
+
+    void build(int n, int split, const std::string& road, const std::string& water,
+               const std::vector<int>& at, float base = 1.0f, float p1 = 1.0f, float p2 = 1.5f)
+    {
+        body = w.create_entity();
+        w.bodies[body] = body_component{};
+        w.bodies[body].name        = "Wire";
+        w.bodies[body].grid_width  = n;
+        w.bodies[body].grid_height = 1;
+        for (int x = 0; x < n; ++x)
+        {
+            const entity_id t = w.create_entity();
+            tile_component tc{};
+            tc.body       = body;
+            tc.grid_x     = x;
+            tc.grid_y     = 0;
+            tc.substrate  = (water[static_cast<std::size_t>(x)] == 'w') ? terrain_substrate::coast
+                                                                        : terrain_substrate::sedimentary;
+            tc.road_level = (road[static_cast<std::size_t>(x)] == 'r') ? 1 : 0;
+            w.tiles[t] = tc;
+            tiles.push_back(t);
+        }
+        // The partition: ascending ids, each id its lowest tile (province.hpp).
+        province a, b;
+        a.body = b.body = body;
+        for (int x = 0; x < n; ++x)
+            (x < split ? a : b).tiles.push_back(tiles[static_cast<std::size_t>(x)]);
+        a.id = static_cast<std::uint32_t>(a.tiles.front());
+        b.id = static_cast<std::uint32_t>(b.tiles.front());
+        w.provinces.provinces = { a, b };
+        for (const province& p : w.provinces.provinces)
+            for (const entity_id t : p.tiles)
+                w.provinces.tile_province[t] = p.id;
+
+        corp = w.create_entity();
+        corporation_component cc;
+        cc.name = "Wire Holdings";
+        cc.starting_capital = 1000.0f;
+        cc.balance = 1000.0f;
+        cc.is_player = true;
+        for (const int x : at)
+        {
+            const entity_id bid = w.create_entity();
+            building_component bc{};
+            bc.tile = tiles[static_cast<std::size_t>(x)];
+            bc.type = building_type::extraction_site;
+            bc.workforce_assigned = 0.5f;
+            w.buildings[bid] = bc;
+            buildings.push_back(bid);
+            cc.assets.push_back(bid);
+        }
+        w.corporations[corp] = cc;
+
+        auto market = [&](entity_id centre, float price) {
+            const entity_id mid = w.create_entity();
+            market_component mc{};
+            mc.body = body;
+            mc.centre_tile = centre;
+            mc.base_price[ri(resource_type::power)] = base;
+            mc.price[ri(resource_type::power)]      = price;
+            mc.base_price[ri(resource_type::construction_capacity)] = base;
+            mc.price[ri(resource_type::construction_capacity)]      = price;
+            w.markets[mid] = mc;
+            return mid;
+        };
+        m1 = market(tiles.front(), p1);
+        m2 = market(tiles.back(), p2);
+    }
+
+    std::uint32_t grid_at(int x) { return tile_power_grid(w, tiles[static_cast<std::size_t>(x)]); }
+    float& shelf(entity_id mid, resource_type r = resource_type::power) { return w.markets.at(mid).inventory[ri(r)]; }
+};
+
+recipe_registry power_registry(float need)
+{
+    recipe_registry reg = registry_with_reservation(resource_type::power, need, k_shipped_reservation);
+    grid_goods_params g;
+    g.is_grid[ri(resource_type::power)] = true;
+    g.is_grid[ri(resource_type::construction_capacity)] = true;
+    reg.set_grid_goods(g);
+    return reg;
+}
+
+void r11_the_province_is_the_grid_cell()
+{
+    std::printf("\n--- R11  BL-1230: a wired province draws power from any shelf on its grid ---\n");
+    constexpr float need = 0.4f;
+
+    // --- R11a: across markets, billed at the BUYER's market ------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrrrrr", "......", { 4 });
+        check(market_for_tile(f.w, f.tiles[4]) == f.m2, "R11a fixture: the building's tile routes to M2");
+        check(f.grid_at(0) != 0 && f.grid_at(0) == f.grid_at(5), "R11a two road-joined provinces are one grid");
+        f.shelf(f.m1) = 10.0f; // all the power is on M1's shelf; M2's is empty
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+        check(t.unmet == 0, "R11a a building in M2's catchment is met from M1's shelf");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000, "R11a ... and does not weaken");
+        check_near(f.shelf(f.m1), 10.0f - need, "R11a M1's shelf gave up exactly the draw");
+        const auto pit = rep.purchases.find({ f.corp, f.m2 });
+        check_near(pit == rep.purchases.end() ? 0.0f : pit->second[ri(resource_type::power)], need,
+                   "R11a the fill is booked to the buyer's OWN market (corp, M2)");
+        const auto flows = clear_markets(f.w, reg, rep);
+        const auto fit = flows.find(f.corp);
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * 1.5f,
+                   "R11a billed at M2's posted price (1.5), not M1's (1.0)");
+    }
+
+    // --- R11b: a strait joins; a wider water run does not ---------------------
+    {
+        grid_fixture f;
+        f.build(8, 3, "rr..rr..", "..ww....", {});
+        check(f.grid_at(1) != 0 && f.grid_at(1) == f.grid_at(4),
+              "R11b roads either side of a 2-tile strait (kMaxCrossingTiles) are one grid");
+        grid_fixture g;
+        g.build(9, 3, "rr...rr..", "..www....", {});
+        check(g.grid_at(1) != 0 && g.grid_at(5) != 0 && g.grid_at(1) != g.grid_at(5),
+              "R11b ... a 3-tile water run is open water: two grids");
+    }
+
+    // --- R11c: a dark province strikes power ---------------------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrr...", "......", { 4 });
+        check(f.grid_at(4) == 0, "R11c a province with no road is dark");
+        f.shelf(f.m1) = 10.0f;
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        for (int i = 0; i < 5; ++i)
+            run_building_upkeep(f.w, reg, rep);
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R11c a building in a dark province does not weaken for power it cannot receive (NR-782 b)");
+        check_near(f.shelf(f.m1), 10.0f, "R11c ... and draws nothing off the grid's shelf");
+    }
+
+    // --- R11c2: an ISOLATED road wires a province onto a grid with no shelf ----
+    // RULED (Ben, 2026-10-07): a wired grid with no generation keeps decaying as
+    // written — wired, it bids and goes short; dark, it would not. This row pins
+    // the ruled behaviour.
+    {
+        grid_fixture f;
+        f.build(6, 3, "rr..r.", "......", { 4 });
+        check(f.grid_at(4) != 0 && f.grid_at(4) != f.grid_at(0), "R11c2 an isolated road is a grid of its own");
+        f.shelf(f.m1) = 10.0f;
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 950,
+              "R11c2 ... with nothing on it, the wired building goes short (worse off than dark)");
+    }
+
+    // --- R11d: a short grid is shared PRO RATA --------------------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrrrrr", "......", { 4, 5 });
+        f.shelf(f.m1) = need; // enough for one of the two
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+        check(t.unmet == 2, "R11d both buildings on a half-covered grid are short (no id decides)");
+        check_near(rep.purchases[{ f.corp, f.m2 }][ri(resource_type::power)], need,
+                   "R11d the whole shelf is drawn (half each)");
+        check_near(f.shelf(f.m1), 0.0f, "R11d ... leaving the grid's shelf empty");
+    }
+
+    // --- R11e: the pooled price converges per market; capacity stays local ----
+    {
+        auto run = [&](resource_type good, float& p1, float& p2) {
+            grid_fixture f;
+            f.build(6, 3, "rrrrrr", "......", {}, 1.0f, 1.0f, 5.0f);
+            // A city at each centre anchors the reach field, so M1 may LIST
+            // power at all (the BL-708 listing gate, unchanged).
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.front();
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.back();
+            const entity_id seller = f.w.create_entity();
+            corporation_component sc;
+            sc.name = "Generator Co";
+            f.w.corporations[seller] = sc;
+            recipe_registry reg = power_registry(need);
+            for (int i = 0; i < 60; ++i)
+            {
+                f.w.pool_at(seller, f.m1).quantities[ri(good)] = 10.0f; // M1 lists 10
+                economy_report rep;
+                rep.wants[{ f.corp, f.m2 }][ri(good)] = 10.0f;         // M2 wants 10
+                clear_markets(f.w, reg, rep);
+            }
+            p1 = f.w.markets.at(f.m1).price[ri(good)];
+            p2 = f.w.markets.at(f.m2).price[ri(good)];
+        };
+        float p1 = 0, p2 = 0;
+        run(resource_type::power, p1, p2);
+        std::printf("      power: M1 %.3f  M2 %.3f\n", p1, p2);
+        check(std::fabs(p1 - p2) < 0.02f && p2 < 2.0f,
+              "R11e POWER: each market's price converges on the grid's (supply 10 / demand 10 across two markets)");
+        run(resource_type::construction_capacity, p1, p2);
+        std::printf("      capacity: M1 %.3f  M2 %.3f\n", p1, p2);
+        check(p1 < 0.5f && p2 > 5.0f,
+              "R11e CAPACITY (a grid good the ruling does not name) still prices on its own market");
+    }
+
+    // --- R11g: the shelf cap is taken ONCE, at the grid (review round 2) -------
+    // All the grid's power stands on M1's shelf; nothing is listed this tick;
+    // the only demand is M2's building. Summed market by market, M1's capped
+    // share (min(shelf, k x LOCAL demand) = 0) and M2's (empty shelf) would price
+    // the grid as empty and drive M2 over the ceiling; capped at the grid, the
+    // shelf answers the grid's demand and M2 stays under it.
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrrrrr", "......", { 4 }, 1.0f, 1.0f, 1.9f);
+        f.shelf(f.m1) = 100.0f;
+        recipe_registry reg = power_registry(need); // the SHIPPED k = 1
+        bool under = true, met = true;
+        float worst = 0.0f;
+        for (int i = 0; i < 20; ++i)
+        {
+            economy_report rep;
+            const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+            if (t.unmet != 0) met = false;
+            clear_markets(f.w, reg, rep);
+            const float p2 = f.w.markets.at(f.m2).price[ri(resource_type::power)];
+            worst = std::max(worst, p2);
+            if (p2 > 1.0f * k_shipped_reservation) under = false;
+        }
+        std::printf("      M2 highest resolved price over 20 ticks %.3f (ceiling %.3f)\n", worst, k_shipped_reservation);
+        check(under, "R11g shelf on M1, demand only at M2: the grid price stays under the ceiling");
+        check(met && f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R11g ... and M2's building is filled every tick from M1's shelf");
+        check_near(f.shelf(f.m1), 100.0f - 20.0f * need, "R11g M1's shelf gave up exactly 20 draws", 1e-2f);
+    }
+
+    // --- R11h: construction capacity's wire and draw stay LOCAL ----------------
+    // The ruling names power; capacity keeps the tile-reach wire (BL-708) and its
+    // own market's shelf.
+    {
+        auto cap_registry = [&]() {
+            recipe_registry reg = registry_with_reservation(resource_type::construction_capacity, need,
+                                                            k_shipped_reservation);
+            grid_goods_params g;
+            g.is_grid[ri(resource_type::power)] = true;
+            g.is_grid[ri(resource_type::construction_capacity)] = true;
+            reg.set_grid_goods(g);
+            return reg;
+        };
+        auto anchor = [](grid_fixture& f) {
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.front();
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.back();
+        };
+        // Reached by the tile wire, in a road-wired province, capacity only on M1:
+        // the grid does NOT carry it — the building goes short at its own M2.
+        {
+            grid_fixture f;
+            f.build(6, 3, "rrrrrr", "......", { 4 });
+            anchor(f);
+            f.shelf(f.m1, resource_type::construction_capacity) = 10.0f;
+            recipe_registry reg = cap_registry();
+            economy_report rep;
+            const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+            check(t.unmet == 1, "R11h capacity on M1's shelf does NOT reach a building at M2 (no grid draw)");
+            check_near(f.shelf(f.m1, resource_type::construction_capacity), 10.0f,
+                       "R11h ... M1's capacity shelf is untouched");
+        }
+        // A DARK province but a reached tile: capacity still draws at its own market.
+        {
+            grid_fixture f;
+            f.build(6, 3, "rrr...", "......", { 4 });
+            anchor(f);
+            f.shelf(f.m2, resource_type::construction_capacity) = 10.0f;
+            recipe_registry reg = cap_registry();
+            economy_report rep;
+            const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+            check(f.grid_at(4) == 0 && t.unmet == 0,
+                  "R11h a dark province does not strike capacity: its wire is the tile's reach");
+            check_near(f.shelf(f.m2, resource_type::construction_capacity), 10.0f - need,
+                       "R11h ... drawn from its OWN market's shelf");
+        }
+        // An unreached tile (no anchor) strikes capacity, as BL-708 always did.
+        {
+            grid_fixture f;
+            f.build(6, 3, "rrrrrr", "......", { 4 });
+            f.shelf(f.m2, resource_type::construction_capacity) = 10.0f;
+            recipe_registry reg = cap_registry();
+            economy_report rep;
+            for (int i = 0; i < 3; ++i)
+                run_building_upkeep(f.w, reg, rep);
+            check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000
+                      && f.shelf(f.m2, resource_type::construction_capacity) == 10.0f,
+                  "R11h an unreached tile strikes capacity (no draw, no decay) even in a wired province");
+        }
+    }
+
+    // --- R11f: a road write invalidates the grid ------------------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrr...", "......", {});
+        check(f.grid_at(4) == 0, "R11f before: the second province is dark");
+        recipe_registry reg;
+        const construction_result res = place_road(f.w, reg, f.corp, f.tiles[3], 1);
+        check(res == construction_result::placed, "R11f place_road placed a Track on the second province's edge");
+        check(f.grid_at(4) != 0 && f.grid_at(4) == f.grid_at(0),
+              "R11f after: the cached grid was invalidated and the province joined the first's grid");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// R12 — BL-1232 (power plants per grid): a generator serves its MARKET CENTRE's
+// grid, and unpowered short grids are served first
+// ---------------------------------------------------------------------------
+// Fixture: six tiles, provinces [0,2) and [2,6), roads "rr..r." — two grids
+// (A: tiles 0-1, B: tiles 2-5). M1's centre is tile 0 (grid A), M2's tile 5
+// (grid B). Tile 2 stands on grid B but routes to M1, so a plant there LISTS
+// on grid A's shelf; tile 3 routes to M2. Each extraction site draws 1.0 power;
+// one plant makes 3.0 (half a plant = 1.5, so a grid needing 2.0 is counted).
+
+namespace {
+struct power_plant_reg
+{
+    recipe_registry reg;
+    std::uint16_t   plant = 0;
+    float           plant_output = 0.0f;
+};
+
+power_plant_reg power_plant_registry(float need)
+{
+    power_plant_reg p;
+    p.reg = power_registry(need);
+    building_economics pe;
+    pe.base_rate = 2.0f;   // x the 0.5 default staffing = 1 batch a tick
+    p.reg.set_economics(building_type::processing_facility, pe);
+    recipe r;
+    r.name  = "test_power_plant";
+    r.group = "Power Generation";
+    r.inputs [ri(resource_type::petroleum)] = 1.0f;
+    r.outputs[ri(resource_type::power)]     = 3.0f;
+    p.plant        = p.reg.add_recipe(r);
+    p.plant_output = 3.0f;
+    return p;
+}
+
+entity_id add_plant(grid_fixture& f, int x, std::uint16_t recipe_id)
+{
+    const entity_id bid = f.w.create_entity();
+    building_component bc{};
+    bc.tile               = f.tiles[static_cast<std::size_t>(x)];
+    bc.type               = building_type::processing_facility;
+    bc.recipe             = recipe_id;
+    bc.workforce_assigned = 0.5f;
+    bc.workforce_target   = 100;
+    f.w.buildings[bid]    = bc;
+    f.w.corporations.at(f.corp).assets.push_back(bid);
+    return bid;
+}
+} // namespace
+
+void r12_a_plant_serves_its_market_centres_grid()
+{
+    std::printf("\n--- R12  BL-1232: generation is keyed by the grid its market centre is on ---\n");
+    const power_plant_reg P = power_plant_registry(1.0f);
+
+    // --- R12a/b: the gap is closed only by a plant whose market centre is on it
+    for (const int at : { 2, 3 })
+    {
+        grid_fixture f;
+        f.build(6, 2, "rr..r.", "......", { 0, 1, 4, 5 });
+        const std::uint32_t gA = f.grid_at(0), gB = f.grid_at(4);
+        add_plant(f, at, P.plant);
+        if (at == 2)
+        {
+            check(gA != 0 && gB != 0 && gA != gB, "R12 fixture: two separate grids");
+            check(f.grid_at(2) == gB && market_for_tile(f.w, f.tiles[2]) == f.m1,
+                  "R12 fixture: tile 2 stands on grid B but routes to M1 (centre on grid A)");
+            check(tile_feed_power_grid(f.w, f.tiles[2]) == gA, "R12a tile_feed_power_grid reads the market CENTRE's grid");
+        }
+        std::set<std::uint32_t> short_grids, unpowered;
+        const float gap = body_power_grid_gap(f.w, P.reg, f.body, P.plant_output, short_grids, &unpowered);
+        if (at == 2)
+        {
+            check(short_grids == std::set<std::uint32_t>{ gB } && unpowered == std::set<std::uint32_t>{ gB },
+                  "R12a a plant ON grid B whose market centre is on A leaves B short and unpowered");
+            check_near(gap, 2.0f, "R12a ... by B's whole need (the plant's output is credited to A)");
+        }
+        else
+        {
+            check(short_grids == std::set<std::uint32_t>{ gA },
+                  "R12b the same plant at tile 3 (M2, centre on B) closes B's gap and leaves A short");
+            check_near(gap, 2.0f, "R12b ... by A's whole need");
+        }
+    }
+
+    // --- R12c: two short grids, one firm — the UNPOWERED one is served ---------
+    {
+        grid_fixture f;
+        // Six drawers on A (need 6.0), two on B (need 2.0); a plant at tile 2
+        // feeds A (3.0): A short by 3 but powered, B short by only 2 and unpowered.
+        f.build(6, 2, "rr..r.", "......", { 0, 0, 0, 1, 1, 1, 4, 5 });
+        const std::uint32_t gA = f.grid_at(0), gB = f.grid_at(4);
+        std::set<std::uint32_t> serve;
+        float gap = power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve);
+        check(serve == std::set<std::uint32_t>{ gA, gB },
+              "R12c with no generation anywhere, both short grids may be served");
+        check_near(gap, 8.0f, "R12c ... and the gap is both grids' need");
+        add_plant(f, 2, P.plant);
+        gap = power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve);
+        check(serve == std::set<std::uint32_t>{ gB },
+              "R12c two short grids, one firm: the UNPOWERED grid (B) is the one served, not the already-powered grid A with the LARGER shortfall");
+        check_near(gap, 5.0f, "R12c ... while the gap still counts both shortfalls (3 + 2)");
+    }
+
+    // --- R12d: a grid is POWERED once a power firm is CHARTERED on it ----------
+    // "Every grid gets a plant before any gets a second" (Ben, 2026-10-08). No
+    // generator stands anywhere yet; the walk has chartered one power firm on
+    // the core grid A. A is then powered (live output or not) and the next firm
+    // may serve only B — the core grid cannot take every capped firm first.
+    {
+        grid_fixture f;
+        f.build(6, 2, "rr..r.", "......", { 0, 0, 0, 1, 1, 1, 4, 5 });
+        const std::uint32_t gA = f.grid_at(0), gB = f.grid_at(4);
+        std::set<std::uint32_t> serve;
+        const std::set<std::uint32_t> none, onA = { gA }, both = { gA, gB };
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &none);
+        check(serve == std::set<std::uint32_t>{ gA, gB }, "R12d nothing chartered: both short grids may be served");
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &onA);
+        check(serve == std::set<std::uint32_t>{ gB },
+              "R12d a firm chartered on A (no output yet): the second firm serves only B, though A's shortfall is larger");
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &both);
+        check(serve == std::set<std::uint32_t>{ gA, gB },
+              "R12d every short grid has a firm: a second firm may go to either");
+    }
+
+    // --- R12e: an UNREACHABLE unpowered grid never holds up the others ---------
+    // A is powered (a plant at tile 2 feeds it) but short; B is short, unpowered
+    // — and the deciding centre's windows feed only A. Unpowered-first must not
+    // narrow the firm to B, which it cannot reach: the core shortfall is served.
+    {
+        grid_fixture f;
+        f.build(6, 2, "rr..r.", "......", { 0, 0, 0, 1, 1, 1, 4, 5 });
+        const std::uint32_t gA = f.grid_at(0), gB = f.grid_at(4);
+        add_plant(f, 2, P.plant);
+        std::set<std::uint32_t> serve;
+        const std::set<std::uint32_t> none, only_A = { gA }, both = { gA, gB };
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &none, &both);
+        check(serve == std::set<std::uint32_t>{ gB }, "R12e B reachable: the unpowered grid B is served first");
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &none, &only_A);
+        check(serve == std::set<std::uint32_t>{ gA, gB },
+              "R12e B unreachable from the windows: it is dropped and every short grid is served (A's ground can take the plant)");
+        check(serve.count(gA) == 1, "R12e ... so the feedable core shortfall gets the plant");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// R13 — BL-1232: the workforce solver forecasts power on the plant's GRID
+// ---------------------------------------------------------------------------
+// One plant on tile 0 (M1). M1 holds a glut — 30 listed against 1 bid — while
+// M2, joined or not, bids 60. Petroleum costs the plant 2 a batch at M1's
+// posted price; the plant makes 3 power a batch. Read on M1 alone, power sits
+// at the floor (0.25 x 3 = 0.75 a batch) and the plant should not run; read on
+// a grid that includes M2's bid it earns well above 2 and should.
+void r13_the_solver_reads_power_on_its_grid()
+{
+    std::printf("\n--- R13  BL-1232: solve_workforce_target reads power's pooled grid figures ---\n");
+    const power_plant_reg P = power_plant_registry(1.0f);
+    for (const bool joined : { true, false })
+    {
+        grid_fixture f;
+        f.build(6, 3, joined ? "rrrrrr" : "rr..r.", "......", {});
+        const entity_id plant = add_plant(f, 0, P.plant);
+        market_component& m1 = f.w.markets.at(f.m1);
+        market_component& m2 = f.w.markets.at(f.m2);
+        const std::size_t pw = ri(resource_type::power), pe = ri(resource_type::petroleum);
+        m1.supply[pw] = 30.0f; m1.demand[pw] = 1.0f;
+        m2.supply[pw] = 0.0f;  m2.demand[pw] = 60.0f;
+        m1.base_price[pe] = 2.0f; m1.price[pe] = 2.0f;
+        const bool one_grid = f.grid_at(0) == f.grid_at(5);
+        check(one_grid == joined, joined ? "R13 fixture: the two markets share a grid"
+                                         : "R13 fixture: the two markets are on separate grids");
+        const int wt = solve_workforce_target(f.w, P.reg, f.w.buildings.at(plant), 1.0f);
+        if (joined)
+            check(wt > 0, "R13a on one grid the plant reads the GRID's bid (61 against 30) and runs");
+        else
+            check(wt == 0, "R13b on its own grid the same plant reads M1's glut and is zeroed (the pool is the grid's, no wider)");
+    }
+}
+
 int main()
 {
     std::printf("building_upkeep — BL-641, requirement group `building-upkeep-goods` R1-R3, R6;\n");
@@ -935,6 +1444,9 @@ int main()
     r8_the_floor();
     r9_no_wire_no_draw();
     r10_a_shelf_draw_pays_the_posted_price();
+    r11_the_province_is_the_grid_cell();
+    r12_a_plant_serves_its_market_centres_grid();
+    r13_the_solver_reads_power_on_its_grid();
 
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;

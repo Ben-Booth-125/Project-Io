@@ -64,6 +64,7 @@ enum class overlay_mode
     // `corporation` because the value is serialised in the save's view bindings —
     // inserting mid-enum would silently re-point a saved lens.
     company,       ///< Background-firm holdings, drawn exactly as the Corporation lens draws corporations. See LENSES.md § Company lens.
+    trade_flow,    ///< The player's dispatcher: market-to-market shipment arrows + a marker per short market coloured by why the surplus did not go. BL-1222. See LENSES.md § Trade-flow lens.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 
@@ -306,6 +307,15 @@ struct construction_controls
     /// harness's clipping check is vacuous on this class of surface (NR-663), so a
     /// green picture proves nothing on its own.
     entity_id levers_for = null_entity;
+
+    /// The Build door's processing rows as the door LISTED them this frame: the
+    /// ABSOLUTE recipe ids that survived its filters (era, tech, the body's air),
+    /// and the tile they were listed for (`null_entity` when the door did not
+    /// draw). The door folds rows by building group, so a capture cannot show
+    /// which recipe sits behind a folded row; this is the surface reporting its
+    /// own list, read by the `air_gate.lua` check. VIEW state, not serialised.
+    std::vector<std::uint16_t> door_recipes;
+    entity_id                  door_tile = null_entity;
 };
 
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
@@ -400,6 +410,14 @@ struct ui_state
     /// player opens it. One flag serves every legend: they are mutually
     /// exclusive by construction (a lens draws at most one).
     bool lens_key_open = false;
+    /// BL-1222: what the Trade-flow lens drew last frame — its arrows, its refusal
+    /// markers, and how many dispatcher passes of the HELD corporation it read.
+    /// Written by the Planetary canvas every frame (zero under any other lens);
+    /// read only by the verify API, so a script can assert a seat change shows
+    /// nothing of the corporation left behind.
+    int trade_flow_arrows  = 0;
+    int trade_flow_markers = 0;
+    int trade_flow_passes  = 0;
     /// Which section of the tile Selection accordion stands OPEN: 0 Buildings,
     /// 1 Deposits, 2 Resources, 3 Population, 4 Terrain — or -1 for none open
     /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed
@@ -1155,7 +1173,8 @@ struct ui_state
     /// the convoy's tile route in travel order (src→dst); progress/speed drive a head
     /// that interpolates smoothly along it between econ steps, with a tail that lags
     /// and dims one econ tick's travel behind the head.
-    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f; };
+    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f;
+                         std::vector<float> at; /* BL-1195: the lane's clock (convoy_route::at) */ };
     std::vector<convoy_beam> convoy_beams;
 
     // --- Throughput lens: this frame's active-LP anchor pools (BL-598) ---

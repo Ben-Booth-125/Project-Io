@@ -47,7 +47,7 @@
 //      G4's row. The share over ALL processors, build included, is printed
 //      beside it. (This denominator is the instrument's call, not the ruling's
 //      wording; it matches the 2026-10-04 reading's "~225 processors".)
-//      TARGET: pooled share running at the handoff >= 70%.
+//      TARGET: pooled share running at the handoff >= 85% (Ben, 2026-10-08); G1b: input-starved (now or decommissioned after starving) <= 5% of built.
 //   G2 field income per tick: the sum of `quarterly_return::income` over every
 //      corporation's return filed that tick, as WINDOW MEANS: play ticks 26-50
 //      over the 12 settle ticks. Pooled = sum / sum. TARGET: pooled >= 50%.
@@ -106,6 +106,54 @@
 //      tests: at k = 0 a stocked shelf does not lower its price, so the
 //      dispatcher's price gate (price_d > price_src x (1 + margin)) sees no
 //      gradient between a stocked market and a dry one.
+//   L  (BL-1223, the logistics row; reported, no target) read at SEVERAL play
+//      ticks -- 10, 25, 50 and the last (those <= --ticks) -- never one, after the
+//      run_economy_step lap (production, construction and dispatch have run; the
+//      clear has not), the instant water_pair_probe reads. The refusal classes
+//      are export_refusal.hpp's (the dispatcher's own rules, in its order), the
+//      reader water_pair_probe shares. Per probe tick:
+//        shipped  convoys dispatched this tick (ids above the previous tick's
+//                 highest), every good, corporations' and markets' own shelf
+//                 exports: units; the shelf-export units; and the share of units
+//                 bound for a market SHORT of the good (its shelf, at dispatch,
+//                 below its last-clear demand for it -- the one tick of want
+//                 market_shelf_surplus keeps home) and for a DRY one
+//        dry      dry (market, good) pairs, every non-grid good (export_refusal's
+//                 dry: the households bid it, the shelf holds < 1 unit), listed
+//                 by good; then each dry pair by its BEST class over every
+//                 surplus source of that good -- sources under the DISPATCHER's
+//                 own test (surplus > 0; water_pair_probe keeps >= 1 unit) --
+//                 plus noshelfsurplus (no surplus shelf of the good anywhere),
+//                 split on the PRE-STEP pools (last tick's leftover, not this
+//                 tick's output): `poolheld` (a corporation's pool on the body
+//                 holds >= 1 unit beyond processor_reservation and this tick's
+//                 deliveries, outside any standing sell order -- dispatch_convoys'
+//                 own surplus) / `ordered` (only under a sell order, and the
+//                 order's FLOOR is what refuses the haul to this market: an
+//                 order is a floor, not a hold, BL-1229; an ordered pool the
+//                 floor does not refuse reads `poolheld`) / `none`; and `grid`
+//                 (never cargo)
+//        input    every input-starved processor (G1's `input` state, this tick's
+//                 report), filed under its scarcest input (limiting_input) at
+//                 ITS market: `nomarket` (no tile market: a body pool), `grid`,
+//                 `unpriced` (base price 0 there), then -- on the shelf and pool
+//                 SNAPSHOTTED after the convoys lap, before the economy step, so
+//                 later draws and this tick's shelf export cannot hide stock --
+//                 stocked/ceiling (shelf >= 1 unit, price over the BL-1172
+//                 fair-price ceiling: shelf_admits false), stocked/thin (pool +
+//                 the WHOLE shelf < t_idle of a full run: run_processing's early
+//                 idle return even with no contention), stocked/contended (enough
+//                 stock, taken by earlier draws or the BL-1209 pro-rata share);
+//                 else the best dispatcher class read at dispatch, or
+//                 noshelfsurplus/poolheld|none. Per class, how many have the
+//                 input priced over the ceiling (a delivery would not unblock
+//                 them until the price falls); and how many had the input
+//                 shelf-exported off their own market this tick. Pooled by
+//                 class and listed by good: BL-1217 (inputs reach processors)'s
+//                 diagnosis.
+//      Pure: export_refusal.hpp's rule (router caches warmed through a
+//      const_cast; nothing the simulation reads is written). --no-logistics
+//      drops the row (the R3 check: G1-G4 read identically either way).
 //      OVERRIDES for a sweep (default: the shipped registry, untouched):
 //        --k X        price_band.shelf_supply_ticks = X
 //        --no-spoil   every shelf spoilage rate zero (the pre-BL-1179 shelf)
@@ -124,11 +172,14 @@
 
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
+#include "export_refusal.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp"
 #include "world/resource_names.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/road_generation.hpp" // BL-1252: --no-snap / --snap-run / --snap-bound (measurement)
 #include "world/spawn_seat.hpp"
 #include "world/world.hpp"
 
@@ -144,6 +195,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -151,8 +203,12 @@
 namespace {
 
 // --- THE TARGETS: Ben's ruling, the sprint 49 form, 2026-10-04 (BL-1184) ----
-// Pooled over the seeds read (the 16 curated seeds by default).
-constexpr double k_target_g1_running_at_handoff = 0.70; ///< processors running at handoff
+// Pooled over the seeds read (the 16 curated seeds by default). G1 raised 70% -> 85%
+// and G1b added by Ben, 2026-10-08 (sprint 50): running is not the whole question --
+// a plant idled for want of a buyer is the economy working; a STARVED plant is not.
+constexpr double k_target_g1_running_at_handoff = 0.85; ///< processors running at handoff
+constexpr double k_target_g1b_starved_max       = 0.05; ///< input-starved (now, or decommissioned after starving) / built, at handoff
+constexpr double k_target_g1_running_at_t50     = 0.85; ///< Ben 2026-10-08: the same 85% at play tick 50 — plants rescued at the handoff must still run
 constexpr double k_target_g2_income_ratio       = 0.50; ///< field income tick 50 / settle close
 constexpr double k_target_g3_firms_alive        = 0.70; ///< firms alive at tick 400 / at handoff
 constexpr int    k_g5_idle_window = 100; ///< G5: processors idled up to this play tick are followed
@@ -166,6 +222,8 @@ constexpr int k_w_late = 50;                ///< W: the late window, the last N 
 // --- sweep overrides (BL-1179): applied to the registry after the build ---
 float g_k_override = -1.0f;   ///< < 0: shipped k
 bool  g_no_spoil   = false;
+bool  g_logistics  = true;    ///< BL-1223: the L row (--no-logistics drops it)
+std::vector<int> g_lg_ticks;  ///< L: the probe play ticks (set in main)
 
 // --- seeds (market_census's minimal scan of the library) ---------------------
 
@@ -264,6 +322,10 @@ struct proc_tally
     int built() const { return total() - n[ps_build]; }
     double share_run() const { const int t = built(); return t ? static_cast<double>(n[ps_run]) / t : 0.0; }
     double share_run_incl_build() const { const int t = total(); return t ? static_cast<double>(n[ps_run]) / t : 0.0; }
+    /// G1b: input-starved now, plus decommissioned after starving (decom_after[1]) --
+    /// a plant mothballed because its inputs never came was starved, not idle by choice.
+    int starved() const { return n[ps_input] + decom_after[1]; }
+    double share_starved() const { const int t = built(); return t ? static_cast<double>(starved()) / t : 0.0; }
     void add(const proc_tally& o)
     {
         for (int i = 0; i < ps_count; ++i) n[i] += o.n[i];
@@ -347,6 +409,61 @@ void tap_after_lap(const world& w, int lap, void* ctx)
     t->last_total = total;
 }
 
+// --- L: the logistics row (BL-1223) -------------------------------------------
+// export_refusal's six dispatcher classes (0..5), then labels this row adds
+// OUTSIDE the dispatcher's order (they are not refusals by a rule):
+constexpr int x_poolheld  = export_refusal::c_count; ///< no shelf surplus; a corp pool on the body holds one (pre-step)
+constexpr int x_none      = x_poolheld + 1;          ///< no shelf surplus and no pool surplus on the body
+constexpr int x_ordered   = x_none + 1;              ///< pool surplus exists only under standing sell orders
+constexpr int x_grid      = x_ordered + 1;           ///< a grid good: never cargo
+constexpr int x_ceiling   = x_grid + 1;              ///< stocked, but priced over the fair-price ceiling
+constexpr int x_thin      = x_ceiling + 1;           ///< stocked, but pool + whole shelf < t_idle of a full run
+constexpr int x_contended = x_thin + 1;              ///< stocked and enough; other draws / pro-rata took it
+constexpr int x_unpriced  = x_contended + 1;         ///< the processor's market has no base price for it
+constexpr int x_nomarket  = x_unpriced + 1;          ///< the processor has no tile market (body pool)
+constexpr int x_count     = x_nomarket + 1;
+const char* const k_x_name[x_count] = {
+    "body", "noroute", "gate", "costly", "noroom", "room",
+    "noshelfsurplus/poolheld", "noshelfsurplus/none", "noshelfsurplus/ordered", "grid",
+    "stocked/ceiling", "stocked/thin", "stocked/contended", "unpriced", "nomarket"};
+/// Print orders: furthest from sending first.
+const int k_dry_order[]  = {x_none, x_ordered, x_poolheld, 0, 1, 2, 3, 4, 5, x_grid};
+const int k_proc_order[] = {x_nomarket, x_grid, x_unpriced, x_ceiling, x_thin, x_contended,
+                            x_none, x_ordered, x_poolheld, 0, 1, 2, 3, 4, 5};
+
+struct lg_reading
+{
+    int    reads = 0;
+    double ship_n = 0, ship_u = 0, ship_shelf_u = 0, ship_short_u = 0, ship_dry_u = 0;
+    long   consuming = 0, dry = 0;
+    std::array<long, resource_count> dry_good{};
+    long   dry_best[x_count] = {};
+    long   starved = 0, unread = 0;
+    long   export_away = 0;      ///< starved whose input the market shelf-exported this tick
+    double stocked_shelf = 0;    ///< pre-step shelf units summed over the stocked/* processors
+    long   starved_cls[x_count] = {};
+    long   starved_over_ceil[x_count] = {}; ///< of each class: the input priced over the ceiling
+    std::array<std::array<long, x_count>, resource_count> starved_good{};
+    void add(const lg_reading& o)
+    {
+        reads += o.reads; ship_n += o.ship_n; ship_u += o.ship_u; ship_shelf_u += o.ship_shelf_u;
+        ship_short_u += o.ship_short_u; ship_dry_u += o.ship_dry_u;
+        consuming += o.consuming; dry += o.dry; starved += o.starved; unread += o.unread;
+        export_away += o.export_away; stocked_shelf += o.stocked_shelf;
+        for (std::size_t g = 0; g < resource_count; ++g)
+        {
+            dry_good[g] += o.dry_good[g];
+            for (int c = 0; c < x_count; ++c) starved_good[g][c] += o.starved_good[g][c];
+        }
+        for (int c = 0; c < x_count; ++c)
+        {
+            dry_best[c] += o.dry_best[c];
+            starved_cls[c] += o.starved_cls[c];
+            starved_over_ceil[c] += o.starved_over_ceil[c];
+        }
+    }
+};
+
 // --- one seed ----------------------------------------------------------------------
 
 using shelf_snap_fwd = std::map<entity_id, std::array<float, resource_count>>;
@@ -399,7 +516,21 @@ struct seed_reading
     };
     water_win w_early, w_late;
     std::array<double, resource_count> late_bid{}, late_fill{};
+    // BG (BL-1217 lever D): the background basket's bid and shelf draw summed
+    // over every play tick and market; `bg_short` counts market-ticks where the
+    // shelf could not cover the bid. The draw is zero while the switch is off.
+    std::array<double, resource_count> bg_bid{}, bg_fill{};
+    std::array<long long, resource_count> bg_short{}, bg_mt{}; ///< bg_mt: market-ticks with a bid
+    int bg_ticks = 0;
+    // BG ship (BL-1226, the lever D cold review's finding 3): units of each
+    // background-basket good on convoys DISPATCHED this tick, and the share
+    // bound for a market whose background pull bid / DREW that good the same
+    // tick — goods hauled to a shelf the pull then destroys. Dispatch-tick
+    // proxy: the cargo lands later; a convoy that arrives inside its own
+    // dispatch tick is gone before the read and is not counted.
+    std::array<double, resource_count> bg_ship{}, bg_ship_bid{}, bg_ship_drawn{};
     double secs = 0.0;
+    std::vector<lg_reading> lg; ///< L (BL-1223): one per g_lg_ticks entry
 };
 
 /// W: one tick's water read. `max_convoy_id` is the highest convoy id seen
@@ -534,6 +665,354 @@ void read_shelf(const world& w, const recipe_registry& reg, const shelf_snap& sn
     }
 }
 
+/// One live processor as it stood BEFORE the economy step (after the convoys
+/// lap): its market, its owner's pool there and the market's shelf, and
+/// whether the fair-price ceiling admitted each good. Price is written only at
+/// the end of clear_markets, so the pre-step price is the price the draw saw.
+struct proc_snap
+{
+    entity_id m = null_entity;
+    std::array<float, resource_count> shelf{}, pool{};
+    std::array<bool, resource_count>  admits{};
+};
+
+struct lg_probe
+{
+    int                    lap_pre = -1; ///< the convoys lap: the pre-step snapshot
+    int                    lap = -1;     ///< the run_economy_step lap: the dispatch read
+    bool                   armed = false;
+    const recipe_registry* reg = nullptr;
+    std::uint32_t          max_id = 0;   ///< highest convoy id before this tick
+    lg_reading*            cur = nullptr;
+    std::map<entity_id, proc_snap> snap; ///< processor -> pre-step state
+    /// (processor's market, input good) -> best dispatcher class at the
+    /// dispatch read (x_poolheld / x_none where no shelf surplus exists).
+    std::map<std::pair<entity_id, std::size_t>, int> proc_best;
+    std::set<std::pair<entity_id, std::size_t>> exported; ///< (src market, good) shelf-exported this tick
+    /// (body, good) -> x_poolheld / x_ordered / absent (x_none), from the PRE-STEP
+    /// pools: last tick's post-clear leftover, not this tick's fresh output.
+    /// BL-1229 (an order is a floor, not a hold): an ordered-only entry carries
+    /// the lowest source price among its ordered pools (max(home, floor),
+    /// dispatch_source_price) and that pool's home price, so the read can tell a
+    /// destination only the FLOOR refuses (x_ordered) from one the dispatcher
+    /// would gate anyway, or haul (x_poolheld).
+    struct pool_stat { int st = x_ordered; float src = 0.0f, home = 0.0f; };
+    std::map<std::pair<entity_id, std::size_t>, pool_stat> pool_status;
+};
+
+std::vector<entity_id> sorted_processors(const world& w)
+{
+    std::vector<entity_id> ids;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::processing_facility) ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+bool live_processor(const building_component& b)
+{
+    return !b.decommissioned && b.ticks_remaining <= 0;
+}
+
+/// The pre-step snapshot (after the convoys lap).
+void lg_snapshot(const world& w, lg_probe& p)
+{
+    const recipe_registry& reg = *p.reg;
+    const float res_mult = reg.price_band().reservation_mult;
+    std::map<entity_id, entity_id> owner;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const entity_id a : cc.assets) owner.emplace(a, cid);
+    p.snap.clear();
+    for (const entity_id bid : sorted_processors(w))
+    {
+        const building_component& b = w.buildings.at(bid);
+        if (!live_processor(b)) continue;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (rc == nullptr) continue;
+        const entity_id m = market_for_tile(w, b.tile);
+        const auto mi = w.markets.find(m);
+        if (mi == w.markets.end()) continue; // nomarket: labelled after the tick
+        proc_snap s;
+        s.m = m;
+        const auto oi = owner.find(bid);
+        const stockpile_component* pool = oi != owner.end() ? w.find_pool(oi->second, m) : nullptr;
+        for (std::size_t g = 0; g < resource_count; ++g)
+        {
+            if (!(rc->inputs[g] > 0.0f)) continue;
+            s.shelf[g]  = mi->second.inventory[g];
+            s.pool[g]   = pool ? pool->quantities[g] : 0.0f;
+            s.admits[g] = shelf_admits(mi->second, g, res_mult, /*off_buys=*/true);
+        }
+        p.snap.emplace(bid, s);
+    }
+}
+
+/// noshelfsurplus split, read PRE-STEP (after the convoys lap): per (body, good),
+/// does some corporation's pool on the body hold >= 1 unit the corporations'
+/// dispatcher would treat as shippable -- pool less processor_reservation less
+/// this tick's deliveries (dispatch_arrived), dispatch_convoys' own surplus
+/// (supply_system.cpp) -- outside a standing sell order (`poolheld`), or only
+/// under one (`ordered`)? Absent = `none`. Since BL-1229 (an order is a floor,
+/// not a hold) dispatch hauls an ordered pool at max(home, floor), so an
+/// ordered-only entry is resolved per destination at read time (no_shelf_class).
+void snapshot_pool_status(const world& w, const recipe_registry& reg, lg_probe& p)
+{
+    p.pool_status.clear();
+    const order_floor_map ordered = collect_order_floors(w);
+    const grid_goods_params& grid = reg.grid_goods();
+    for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
+    {
+        if (!w.corporations.count(key.first)) continue;
+        const entity_id body = pool_key_body(w, key.second);
+        if (body == null_entity) continue;
+        bool any = false;
+        for (std::size_t g = 0; g < resource_count && !any; ++g) any = pool.quantities[g] >= 1.0f;
+        if (!any) continue;
+        const std::array<float, resource_count> res = processor_reservation(w, reg, key.first, key.second);
+        for (std::size_t g = 0; g < resource_count; ++g)
+        {
+            if (grid.grid(g) || !(pool.quantities[g] >= 1.0f)) continue;
+            const float surplus = pool.quantities[g] - res[g] - dispatch_arrived(w, key.first, key.second, g);
+            if (!(surplus >= 1.0f)) continue;
+            const auto [it, fresh] = p.pool_status.try_emplace(std::make_pair(body, g));
+            lg_probe::pool_stat& ps = it->second;
+            if (!ordered.count({key.first, body, g})) { ps.st = x_poolheld; continue; }
+            if (ps.st != x_ordered) continue;
+            const float src = dispatch_source_price(w, ordered, key.first, key.second, g);
+            if (fresh || src < ps.src) { ps.src = src; ps.home = dispatch_home_price(w, key.second, g); }
+        }
+    }
+}
+
+void lg_after_lap(const world& cw, int lap, void* vctx)
+{
+    using namespace export_refusal;
+    auto* p = static_cast<lg_probe*>(vctx);
+    if (!p->armed) return;
+    if (lap == p->lap_pre) { lg_snapshot(cw, *p); snapshot_pool_status(cw, *p->reg, *p); return; }
+    if (lap != p->lap) return;
+    world& w = const_cast<world&>(cw); // router path caches only (export_refusal.hpp)
+    const recipe_registry& reg = *p->reg;
+    lg_reading& r = *p->cur;
+    ++r.reads;
+    context x(w, reg);
+
+    // shipped this tick
+    std::uint32_t top = p->max_id;
+    p->exported.clear();
+    for (const convoy_component& c : w.convoys)
+    {
+        if (c.id <= p->max_id) continue;
+        top = std::max(top, c.id);
+        const std::size_t g = static_cast<std::size_t>(c.cargo_resource);
+        r.ship_n += 1; r.ship_u += c.cargo_qty;
+        if (c.corp == null_entity)
+        {
+            r.ship_shelf_u += c.cargo_qty;
+            p->exported.insert(std::make_pair(c.source_market, g));
+        }
+        const auto di = w.markets.find(c.dest_market);
+        if (di == w.markets.end() || g >= resource_count) continue;
+        const market_component& dm = di->second;
+        if (dm.demand[g] > 0.0f && dm.inventory[g] < dm.demand[g]) r.ship_short_u += c.cargo_qty;
+        if (dry(dm, g)) r.ship_dry_u += c.cargo_qty;
+    }
+    p->max_id = top;
+
+    // the dispatcher's own surplus test (> 0), not water_pair_probe's 1 unit
+    std::vector<good_markets> scans(resource_count);
+    // BL-1229: an ordered-only pool is `ordered` only where the FLOOR refuses —
+    // the gate at max(home, floor) fails at d but the home price alone passes.
+    const float lg_margin = reg.dispatch_margin();
+    const auto no_shelf_class = [&](entity_id d, std::size_t g) {
+        const auto it = p->pool_status.find(std::make_pair(w.markets.at(d).body, g));
+        if (it == p->pool_status.end()) return static_cast<int>(x_none);
+        const lg_probe::pool_stat& ps = it->second;
+        if (ps.st != x_ordered) return ps.st;
+        const float pd = dispatch_market_price(w.markets.at(d), g);
+        const bool floor_refuses = !(pd > ps.src * (1.0f + lg_margin)) &&
+                                   pd > ps.home * (1.0f + lg_margin);
+        return floor_refuses ? static_cast<int>(x_ordered) : static_cast<int>(x_poolheld);
+    };
+
+    // dry (market, good) pairs by best class
+    for (std::size_t g = 0; g < resource_count; ++g)
+    {
+        scans[g] = scan_good(x, g, surplus_rule::dispatcher);
+        const good_markets& gm = scans[g];
+        r.consuming += gm.consuming;
+        r.dry += static_cast<long>(gm.dry.size());
+        r.dry_good[g] += static_cast<long>(gm.dry.size());
+        const bool grid = reg.grid_goods().grid(g);
+        for (const entity_id d : gm.dry)
+        {
+            if (grid) { ++r.dry_best[x_grid]; continue; }
+            const int b = classify_destination(x, d, g, gm.sur).best;
+            ++r.dry_best[b < 0 ? no_shelf_class(d, g) : b];
+        }
+    }
+
+    // every snapped processor's every input: the best dispatcher class at its
+    // market (the stocked / grid / unpriced cuts are made after the tick)
+    p->proc_best.clear();
+    for (const auto& [bid, s] : p->snap)
+    {
+        const recipe* rc = reg.get_recipe(w.buildings.at(bid).recipe);
+        if (rc == nullptr) continue;
+        for (std::size_t g = 0; g < resource_count; ++g)
+        {
+            if (!(rc->inputs[g] > 0.0f) || reg.grid_goods().grid(g)) continue;
+            const auto key = std::make_pair(s.m, g);
+            if (p->proc_best.count(key)) continue;
+            const int b = classify_destination(x, s.m, g, scans[g].sur).best;
+            p->proc_best.emplace(key, b < 0 ? no_shelf_class(s.m, g) : b);
+        }
+    }
+}
+
+/// After the tick: each input-starved processor (G1's `input`) filed under its
+/// scarcest input's class at its market.
+void lg_after_tick(const world& w, const economy_report& rep, const recipe_registry& reg, lg_probe& p)
+{
+    lg_reading& r = *p.cur;
+    const float base_rate = reg.economics(building_type::processing_facility).base_rate;
+    for (const entity_id bid : sorted_processors(w))
+    {
+        const building_component& b = w.buildings.at(bid);
+        const building_report* row = row_of(rep, bid);
+        if (classify(b, row, reg) != ps_input) continue;
+        ++r.starved;
+        const std::size_t g = static_cast<std::size_t>(row->limiting_input);
+        if (g >= resource_count) { ++r.unread; continue; }
+        const entity_id m = market_for_tile(w, b.tile);
+        int c = -1;
+        bool over = false;
+        if (w.markets.find(m) == w.markets.end()) c = x_nomarket;
+        else
+        {
+            const auto si = p.snap.find(bid);
+            if (si == p.snap.end()) { ++r.unread; continue; }
+            const proc_snap& s = si->second;
+            const market_component& mc = w.markets.at(m);
+            over = mc.base_price[g] > 0.0f && !s.admits[g];
+            if (reg.grid_goods().grid(g)) c = x_grid;
+            else if (!(mc.base_price[g] > 0.0f)) c = x_unpriced;
+            else if (s.shelf[g] >= 1.0f)
+            {
+                r.stocked_shelf += s.shelf[g];
+                // run_processing's early idle return: coverage of a full run
+                // with the WHOLE shelf (no pro-rata) still under t_idle. Tested
+                // BEFORE the ceiling (cold check, 2026-10-07): a thin shelf idles
+                // the processor at any price, so counting it as a ceiling lock
+                // overstated what lowering the price would recover. `over` still
+                // reports the price beside it.
+                const recipe* rc = reg.get_recipe(b.recipe);
+                const float wt = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+                const float need = (rc ? rc->inputs[g] : 0.0f) * base_rate * row->effective_workforce
+                                 * wt * building_supply_scalar(b);
+                const bool thin = need > 0.0f && (s.pool[g] + s.shelf[g]) / need < reg.t_idle();
+                if (thin) c = x_thin;
+                else if (!s.admits[g]) c = x_ceiling;
+                else c = x_contended;
+            }
+            else
+            {
+                const auto it = p.proc_best.find(std::make_pair(m, g));
+                if (it == p.proc_best.end()) { ++r.unread; continue; }
+                c = it->second;
+            }
+            if (p.exported.count(std::make_pair(m, g))) ++r.export_away;
+        }
+        ++r.starved_cls[c];
+        if (over) ++r.starved_over_ceil[c];
+        ++r.starved_good[g][c];
+    }
+    p.snap.clear();
+    p.proc_best.clear();
+    p.exported.clear();
+    p.pool_status.clear();
+}
+
+/// Two after_lap readers on the one hook slot: the existing one first, untouched.
+struct hook_pair
+{
+    void (*a)(const world&, int, void*) = nullptr;
+    void* actx = nullptr;
+    lg_probe* lg = nullptr;
+};
+
+void pair_after_lap(const world& w, int lap, void* ctx)
+{
+    auto* h = static_cast<hook_pair*>(ctx);
+    if (h->a) h->a(w, lap, h->actx);
+    lg_after_lap(w, lap, h->lg);
+}
+
+std::string good_name(std::size_t g) { return resource_names::name_of(static_cast<resource_type>(g)); }
+
+void print_lg(const char* label, const lg_reading& r, int top_goods)
+{
+    const double n = r.reads > 0 ? r.reads : 1.0;
+    const double u = r.ship_u > 0 ? r.ship_u : 1.0;
+    std::printf("    L %-6s (%d read%s, per read): shipped %.1f convoys %.0f u (shelf export %.0f u)"
+                " -> to a SHORT mkt %.1f%%, to a DRY mkt %.1f%%\n",
+                label, r.reads, r.reads == 1 ? "" : "s", r.ship_n / n, r.ship_u / n, r.ship_shelf_u / n,
+                100.0 * r.ship_short_u / u, 100.0 * r.ship_dry_u / u);
+    std::printf("      dry (mkt, good) %.1f of %.1f consuming:", r.dry / n, r.consuming / n);
+    std::vector<std::pair<long, std::size_t>> dg;
+    for (std::size_t g = 0; g < resource_count; ++g)
+        if (r.dry_good[g] > 0) dg.push_back({-r.dry_good[g], g});
+    std::sort(dg.begin(), dg.end());
+    for (std::size_t i = 0; i < dg.size() && static_cast<int>(i) < top_goods; ++i)
+        std::printf(" %s %.1f", good_name(dg[i].second).c_str(), -dg[i].first / n);
+    if (static_cast<int>(dg.size()) > top_goods) std::printf(" (+%zu goods)", dg.size() - top_goods);
+    std::printf("\n      dry by BEST class:");
+    const double dd = r.dry > 0 ? r.dry : 1.0;
+    for (const int c : k_dry_order)
+        std::printf("  %s %.1f (%.0f%%)", k_x_name[c], r.dry_best[c] / n, 100.0 * r.dry_best[c] / dd);
+    const double sd = r.starved > 0 ? r.starved : 1.0;
+    std::printf("\n      INPUT-STARVED processors %.1f; scarcest input's class at its market:", r.starved / n);
+    long stocked = 0, over = 0;
+    for (const int c : k_proc_order)
+    {
+        over += r.starved_over_ceil[c];
+        if (r.starved_cls[c] == 0) continue; // nonzero classes only
+        std::printf("  %s %.1f (%.0f%%", k_x_name[c], r.starved_cls[c] / n, 100.0 * r.starved_cls[c] / sd);
+        if (r.starved_over_ceil[c] > 0) std::printf("; %.1f over ceiling", r.starved_over_ceil[c] / n);
+        std::printf(")");
+    }
+    stocked = r.starved_cls[x_ceiling] + r.starved_cls[x_thin] + r.starved_cls[x_contended];
+    std::printf("\n        stocked/* %.1f (pre-step shelf mean %.1f u) | input priced over the ceiling %.1f"
+                " | input shelf-exported from its market this tick %.1f",
+                stocked / n, stocked ? r.stocked_shelf / stocked : 0.0, over / n, r.export_away / n);
+    if (r.unread) std::printf("  UNREAD %ld", r.unread);
+    std::printf("\n      starved by input:");
+    std::vector<std::pair<long, std::size_t>> sg;
+    for (std::size_t g = 0; g < resource_count; ++g)
+    {
+        long s = 0;
+        for (int c = 0; c < x_count; ++c) s += r.starved_good[g][c];
+        if (s > 0) sg.push_back({-s, g});
+    }
+    std::sort(sg.begin(), sg.end());
+    if (sg.empty()) std::printf(" none");
+    for (std::size_t i = 0; i < sg.size() && static_cast<int>(i) < top_goods; ++i)
+    {
+        const std::size_t g = sg[i].second;
+        std::printf(" %s %.1f [", good_name(g).c_str(), -sg[i].first / n);
+        bool first = true;
+        for (const int c : k_proc_order)
+            if (r.starved_good[g][c] > 0)
+            {
+                std::printf("%s%s %.1f", first ? "" : ", ", k_x_name[c], r.starved_good[g][c] / n);
+                first = false;
+            }
+        std::printf("]");
+    }
+    if (static_cast<int>(sg.size()) > top_goods) std::printf(" (+%zu inputs)", sg.size() - top_goods);
+    std::printf("\n");
+}
+
 std::map<entity_id, int> centre_heads(const world& w)
 {
     std::map<entity_id, int> out;
@@ -661,6 +1140,16 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     constexpr int k_econ_tick_days = 90; // sim_loop::econ_tick_days (harness_params.hpp)
     std::uint32_t max_convoy_id = 0;
     for (const convoy_component& c : w.convoys) max_convoy_id = std::max(max_convoy_id, c.id);
+    // L (BL-1223): its own convoy-id watermark, so the W row's is untouched.
+    lg_probe lg;
+    lg.reg = &reg;
+    lg.lap = snap.lap; // the run_economy_step lap
+    for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+        if (std::strcmp(k_campaign_settle_lap_names[i], "convoys") == 0) lg.lap_pre = i;
+    lg.max_id = max_convoy_id;
+    std::uint32_t bg_max_id = max_convoy_id; // BG ship: its own watermark
+    const std::array<float, resource_count>& bg_basket = reg.background_demand_basket();
+    if (g_logistics) r.lg.assign(g_lg_ticks.size(), lg_reading{});
     for (int k = 1; k <= ticks; ++k)
     {
         const int day = k * k_econ_tick_days;
@@ -672,8 +1161,20 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         else if ((k >= k_g5_from && k <= k_g5_to) || k > ticks - k_w_late)
         { hooks.after_lap = snap_after_lap; hooks.ctx = &snap; }
         static_assert(k_idle_market_ticks < k_g5_from, "the G5 shelf hook and the exchange tap share one slot");
+        lg.armed = false;
+        hook_pair pair;
+        if (g_logistics)
+            for (std::size_t i = 0; i < g_lg_ticks.size(); ++i)
+                if (g_lg_ticks[i] == k) { lg.armed = true; lg.cur = &r.lg[i]; }
+        if (lg.armed)
+        {
+            pair.a = hooks.after_lap; pair.actx = hooks.ctx; pair.lg = &lg;
+            hooks.after_lap = pair_after_lap; hooks.ctx = &pair;
+        }
         settle_tick_result res = run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day,
                                                  /*spectating=*/false, &hooks);
+        if (lg.armed) lg_after_tick(w, res.report, reg, lg);
+        for (const convoy_component& c : w.convoys) lg.max_id = std::max(lg.max_id, c.id);
         if (k == k_idle_market_ticks)
         {
             for (const auto& [mid, mc] : w.markets)
@@ -686,6 +1187,32 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         if (k >= k_g5_from && k <= k_g5_to) read_water(w, snap.inv, r.w_early, max_convoy_id);
         else if (k > ticks - k_w_late && k > k_g5_to) read_water(w, snap.inv, r.w_late, max_convoy_id);
         else for (const convoy_component& c : w.convoys) max_convoy_id = std::max(max_convoy_id, c.id);
+        ++r.bg_ticks;
+        for (const auto& [mid, mc] : w.markets)
+            for (std::size_t g = 0; g < resource_count; ++g)
+                if (mc.background_bid[g] > 0.0f)
+                {
+                    r.bg_bid[g]  += mc.background_bid[g];
+                    r.bg_fill[g] += mc.background_fill[g];
+                    if (mc.background_fill[g] < mc.background_bid[g] * 0.999f) ++r.bg_short[g];
+                    ++r.bg_mt[g];
+                }
+        {
+            std::uint32_t top = bg_max_id;
+            for (const convoy_component& c : w.convoys)
+            {
+                if (c.id <= bg_max_id) continue;
+                top = std::max(top, c.id);
+                const std::size_t g = static_cast<std::size_t>(c.cargo_resource);
+                if (!(bg_basket[g] > 0.0f)) continue;
+                r.bg_ship[g] += c.cargo_qty;
+                const auto dit = w.markets.find(c.dest_market);
+                if (dit == w.markets.end()) continue;
+                if (dit->second.background_bid[g] > 0.0f)  r.bg_ship_bid[g]   += c.cargo_qty;
+                if (dit->second.background_fill[g] > 0.0f) r.bg_ship_drawn[g] += c.cargo_qty;
+            }
+            bg_max_id = top;
+        }
         if (k > ticks - k_w_late)
             for (const auto& [mid, mc] : w.markets)
                 for (std::size_t g = 0; g < resource_count; ++g)
@@ -764,8 +1291,17 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) { seeds = parse_seed_list(argv[++i]); from_args = true; }
         else if (!std::strcmp(argv[i], "--k") && i + 1 < argc) g_k_override = static_cast<float>(std::atof(argv[++i]));
         else if (!std::strcmp(argv[i], "--no-spoil")) g_no_spoil = true;
-        else { std::fprintf(stderr, "usage: market_viability [--seeds a,b] [--ticks N] [--k X] [--no-spoil]\n"); return 2; }
+        else if (!std::strcmp(argv[i], "--no-logistics")) g_logistics = false;
+        else if (!std::strcmp(argv[i], "--no-snap")) g_road_probe_no_snap = true; // BL-1252 measurement
+        else if (!std::strcmp(argv[i], "--snap-run") && i + 1 < argc) g_road_probe_snap_run = std::atoi(argv[++i]); // BL-1252
+        else if (!std::strcmp(argv[i], "--snap-bound") && i + 1 < argc) g_road_probe_snap_bound = static_cast<float>(std::atof(argv[++i])); // BL-1252
+        else { std::fprintf(stderr, "usage: market_viability [--seeds a,b] [--ticks N] [--k X] [--no-spoil] [--no-logistics] [--no-snap] [--snap-run N] [--snap-bound X]\n"); return 2; }
     }
+    // L (BL-1223): several play ticks, never one -- 10, 25, 50 and the last.
+    for (const int t : {10, 25, k_g1_g2_play_tick, ticks})
+        if (t >= 1 && t <= ticks && std::find(g_lg_ticks.begin(), g_lg_ticks.end(), t) == g_lg_ticks.end())
+            g_lg_ticks.push_back(t);
+    std::sort(g_lg_ticks.begin(), g_lg_ticks.end());
     if (!from_args)
     {
         seeds = library_seeds("docs/generation/seed_library.json");
@@ -778,9 +1314,9 @@ int main(int argc, char** argv)
     }
 
     std::printf("market_viability — BL-1184 (market viability gate)\n");
-    std::printf("targets (Ben, the sprint 49 form, 2026-10-04), pooled: G1 running at handoff >= %.0f%%,"
-                " G2 income t%d/settle-close >= %.0f%%, G3 firms alive t%d/handoff >= %.0f%%\n",
-                pct(k_target_g1_running_at_handoff), k_g1_g2_play_tick, pct(k_target_g2_income_ratio),
+    std::printf("targets (Ben, 2026-10-04; G1/G1b 2026-10-08), pooled: G1 running at handoff >= %.0f%%,"
+                " G1b starved <= %.0f%%, G2 income t%d/settle-close >= %.0f%%, G3 firms alive t%d/handoff >= %.0f%%\n",
+                pct(k_target_g1_running_at_handoff), pct(k_target_g1b_starved_max), k_g1_g2_play_tick, pct(k_target_g2_income_ratio),
                 ticks, pct(k_target_g3_firms_alive));
     std::printf("seeds (%s, %zu):", from_args ? "--seeds" : "docs/generation/seed_library.json", seeds.size());
     for (const std::uint32_t s : seeds) std::printf(" %u", s);
@@ -855,6 +1391,18 @@ int main(int argc, char** argv)
                 std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
                             pct(r.late_fill[g] / r.late_bid[g]));
         std::printf("\n");
+        if (g_logistics && !r.lg.empty())
+        {
+            std::printf(" L logistics (reported, no target):\n");
+            lg_reading all;
+            for (std::size_t i = 0; i < r.lg.size(); ++i)
+            {
+                const std::string lbl = "t" + std::to_string(g_lg_ticks[i]);
+                print_lg(lbl.c_str(), r.lg[i], 6);
+                all.add(r.lg[i]);
+            }
+            print_lg("all", all, 8);
+        }
         std::fflush(stdout);
     }
 
@@ -886,6 +1434,7 @@ int main(int argc, char** argv)
                     r.idle_markets, r.home_markets, r.b_live, r.b_build);
     }
     const double g1 = ph.share_run();
+    const double g1b = ph.share_starved();
     const double g2 = ic > 0 ? i50 / ic : 0.0;
     const double g3 = fh > 0 ? static_cast<double>(fs) / static_cast<double>(fh) : 0.0;
     std::printf("\n pooled over %zu seeds (%.0f s)\n", rs.size(), secs);
@@ -893,6 +1442,13 @@ int main(int argc, char** argv)
     print_tally("tick 50", p50);
     std::printf(" %s  G1 processors running at handoff  %5.1f%%  (target >= %.0f%%)\n",
                 g1 >= k_target_g1_running_at_handoff ? "PASS" : "FAIL", pct(g1), pct(k_target_g1_running_at_handoff));
+    std::printf(" %s  G1b processors input-starved at handoff  %5.1f%%  (%d / %d: %d starved now, %d decommissioned after starving; target <= %.0f%%)\n",
+                g1b <= k_target_g1b_starved_max ? "PASS" : "FAIL", pct(g1b), ph.starved(), ph.built(), ph.n[ps_input],
+                ph.decom_after[1], pct(k_target_g1b_starved_max));
+    const double g1_t50 = p50.share_run();
+    std::printf(" %s  G1 processors running at tick %d   %5.1f%%  (target >= %.0f%%)\n",
+                g1_t50 >= k_target_g1_running_at_t50 ? "PASS" : "FAIL", k_g1_g2_play_tick, pct(g1_t50),
+                pct(k_target_g1_running_at_t50));
     std::printf(" %s  G2 field income play 26-%d mean / settle mean  %5.1f%%  (%.0f / %.0f; target >= %.0f%%)\n",
                 g2 >= k_target_g2_income_ratio ? "PASS" : "FAIL", k_g1_g2_play_tick, pct(g2), i50, ic,
                 pct(k_target_g2_income_ratio));
@@ -941,6 +1497,109 @@ int main(int argc, char** argv)
                 std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(), pct(lf[g] / lb[g]));
         std::printf("\n");
     }
-    std::printf("market_viability: G1 %.1f/70 G2 %.1f/50 G3 %.1f/70\n", pct(g1), pct(g2), pct(g3));
+    {
+        std::array<double, resource_count> bb{}, bf{};
+        std::array<long long, resource_count> bs{}, bm{};
+        std::array<double, resource_count> sh{}, shb{}, shd{};
+        long long bt = 0;
+        for (const seed_reading& r : rs)
+        {
+            bt += r.bg_ticks;
+            for (std::size_t g = 0; g < resource_count; ++g)
+            {
+                bb[g] += r.bg_bid[g]; bf[g] += r.bg_fill[g]; bs[g] += r.bg_short[g]; bm[g] += r.bg_mt[g];
+                sh[g] += r.bg_ship[g]; shb[g] += r.bg_ship_bid[g]; shd[g] += r.bg_ship_drawn[g];
+            }
+        }
+        const double d = bt > 0 ? static_cast<double>(bt) : 1.0;
+        std::printf(" BG pooled background basket per seed-tick (bid / DRAWN off the shelf, short of bid market-ticks):");
+        double tb = 0, tf = 0;
+        long long ts = 0, tm = 0;
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (bb[g] > 0.0)
+            {
+                std::printf(" %s %.1f/%.1f (%lld of %lld)", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                            bb[g] / d, bf[g] / d, bs[g], bm[g]);
+                tb += bb[g]; tf += bf[g]; ts += bs[g]; tm += bm[g];
+            }
+        std::printf("  | all %.1f/%.1f (%lld of %lld)\n", tb / d, tf / d, ts, tm);
+        // BL-1226 finding 3: basket goods hauled to a market whose pull bid /
+        // drew that good in the dispatch tick (units per seed-tick).
+        std::printf(" BG ship basket goods dispatched per seed-tick (units -> to a market whose pull BID it / DREW it):");
+        double ta = 0, tbb = 0, tdd = 0;
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (bb[g] > 0.0 || sh[g] > 0.0)
+            {
+                std::printf(" %s %.1f -> %.1f / %.1f", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                            sh[g] / d, shb[g] / d, shd[g] / d);
+                ta += sh[g]; tbb += shb[g]; tdd += shd[g];
+            }
+        std::printf("  | all %.1f -> %.1f (%.0f%%) / %.1f (%.0f%%)\n", ta / d, tbb / d,
+                    ta > 0 ? 100.0 * tbb / ta : 0.0, tdd / d, ta > 0 ? 100.0 * tdd / ta : 0.0);
+    }
+    lg_reading lg_all;
+    if (g_logistics)
+    {
+        std::printf(" L pooled (sum / sum over seeds; per read = per seed-probe):\n");
+        for (std::size_t i = 0; i < g_lg_ticks.size(); ++i)
+        {
+            lg_reading t;
+            for (const seed_reading& r : rs)
+                if (i < r.lg.size()) t.add(r.lg[i]);
+            const std::string lbl = "t" + std::to_string(g_lg_ticks[i]);
+            print_lg(lbl.c_str(), t, 6);
+            lg_all.add(t);
+        }
+        print_lg("all", lg_all, 10);
+        // BL-1217 lever D: the background basket's goods, every one, so a good
+        // outside the top 10 still reads (per read, by class).
+        {
+            const double n = lg_all.reads > 0 ? lg_all.reads : 1.0;
+            std::printf("    L all background-basket goods starved by input (per read):");
+            for (std::size_t g = 0; g < resource_count; ++g)
+            {
+                bool in_basket = false;
+                for (const seed_reading& r : rs) if (r.bg_bid[g] > 0.0) in_basket = true;
+                if (!in_basket) continue;
+                long s = 0;
+                for (int c = 0; c < x_count; ++c) s += lg_all.starved_good[g][c];
+                std::printf(" %s %.1f [", good_name(g).c_str(), s / n);
+                bool first = true;
+                for (const int c : k_proc_order)
+                    if (lg_all.starved_good[g][c] > 0)
+                    {
+                        std::printf("%s%s %.1f", first ? "" : ", ", k_x_name[c], lg_all.starved_good[g][c] / n);
+                        first = false;
+                    }
+                std::printf("]");
+            }
+            std::printf("\n");
+        }
+    }
+    std::printf("market_viability: G1 %.1f/85 G1t50 %.1f/85 G1b %.1f/5 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(p50.share_run()), pct(g1b), pct(g2), pct(g3));
+    // BL-1217 D5/D6 review: the ABSOLUTE counts behind the shares, so a share
+    // that rises because the denominator fell reads as such. Running / built
+    // processors at the handoff and at tick 50 (pooled), and the play 26-50
+    // field income per tick per seed. Appended after the G fields, before L.
+    {
+        int ns = 0;
+        for (const seed_reading& r : rs) if (r.built) ++ns;
+        std::printf(" | abs run/built h %d/%d t50 %d/%d inc26-50 %.0f/seed-tick",
+                    ph.n[ps_run], ph.built(), p50.n[ps_run], p50.built(), ns ? i50 / ns : 0.0);
+    }
+    if (g_logistics)
+    {
+        // appended (BL-1223), never reordered: the L row's headline numbers
+        const double u = lg_all.ship_u > 0 ? lg_all.ship_u : 1.0;
+        const double sd = lg_all.starved > 0 ? static_cast<double>(lg_all.starved) : 1.0;
+        int top = k_proc_order[0];
+        for (const int c : k_proc_order)
+            if (lg_all.starved_cls[c] > lg_all.starved_cls[top]) top = c;
+        std::printf(" | L to-short %.1f%% dry/read %.1f starved/read %.1f top-class %s %.0f%%",
+                    pct(lg_all.ship_short_u / u), lg_all.reads ? static_cast<double>(lg_all.dry) / lg_all.reads : 0.0,
+                    lg_all.reads ? static_cast<double>(lg_all.starved) / lg_all.reads : 0.0, k_x_name[top],
+                    pct(lg_all.starved_cls[top] / sd));
+    }
+    std::printf("\n");
     return honesty_fail ? 1 : 0;
 }

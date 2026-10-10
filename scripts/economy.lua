@@ -1128,8 +1128,9 @@ economy = {
 
     -- BL-340/BL-365: background-industrial demand for the mid-chain processing
     -- goods real background firms alone would under-consume during the
-    -- pre-game warm start / early game, before enough of them exist. A
-    -- world-scale pull, not per-centre (unlike population_demand below).
+    -- pre-game warm start / early game, before enough of them exist. Each
+    -- market bids for the centres in its own catchment (BL-1226), so a body's
+    -- pull is split across its markets, never granted whole to each.
     -- Deliberately excludes spacecraft_components — the militia's procurement
     -- contracts are that good's only intended buyer (BL-340).
     --
@@ -1151,6 +1152,9 @@ economy = {
                 ree_alloy       = 0.15,
                 machinery       = 0.15,
                 alloys          = 0.15,
+                -- electronics STAYS (2026-10-07, NR-981): the metropolis
+                -- household rung that was to take it (BL-996) was cancelled
+                -- unmerged, so this stopgap is still its only final buyer.
                 electronics     = 0.15,
                 -- spacecraft_components intentionally absent — militia-only demand.
             } },
@@ -1159,6 +1163,10 @@ economy = {
         elasticity_min     = 0.30,
         elasticity_max     = 2.50,
         demand_scale       = 1.00,
+        -- BL-1217 lever D (Ben, 2026-10-07: adopted): the basket DRAWS its bid
+        -- off the market's shelf after the households' draw (no money moves,
+        -- no ceiling). MARKETS.md step 3 / step 12.
+        consumes           = true,
     },
 
     -- BL-368 (2026-08-11): the real per-centre population demand basket,

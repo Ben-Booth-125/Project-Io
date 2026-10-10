@@ -431,7 +431,8 @@
     "commercial_fog",
     "intrabody_fog",
     "visibility",
-    "proximity_glimpse"
+    "proximity_glimpse",
+    "sea_lane"
    ]
   },
   {
@@ -854,7 +855,8 @@
     "tile_build_ledger",
     "tile_build_ledger_survives",
     "drill_through_fold",
-    "construction_ledger_tabs"
+    "construction_ledger_tabs",
+    "air_gate"
    ]
   },
   {
@@ -1300,7 +1302,8 @@
     "tile_build_ledger",
     "roads",
     "build_door_wide_roster",
-    "fresh_start_build"
+    "fresh_start_build",
+    "air_gate"
    ]
   },
   {
@@ -1321,7 +1324,8 @@
     "recipe_workforce",
     "building_profit",
     "processing_management_ux",
-    "v009_batch"
+    "v009_batch",
+    "air_gate"
    ]
   },
   {

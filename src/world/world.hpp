@@ -11,6 +11,7 @@
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -36,6 +37,46 @@ struct asteroid_belt
     /// Whether the system has a belt to draw.
     /// @return True when the band has positive width.
     bool present() const { return outer_radius_au > inner_radius_au && outer_radius_au > 0.0f; }
+};
+
+/// BL-1222 (trade-flow lens) — why the player's surplus of a good did not go to a
+/// market short of it: the corporation dispatcher's own rules, worst first, so a
+/// larger value is CLOSER to sending (LENSES.md § Trade-flow lens). `sent` is not a
+/// refusal: some player source shipped the good there this pass.
+enum class trade_refusal : std::uint8_t
+{
+    no_lane = 0, ///< Another body, and no leg off this one is viable.
+    gate,        ///< The destination's price does not clear the margin over the source's.
+    no_route,    ///< Same body, and no viable leg reaches it.
+    costly,      ///< Routed, but the haul eats the margin.
+    no_propellant, ///< A space lane, but the pool cannot fuel the launch.
+    no_room,     ///< Clears the margin, but cannot absorb more at the landed cost.
+    no_funds,    ///< The rule would send, but the corporation cannot pay for the convoy.
+    room,        ///< The rule would send; held by one-destination-per-pass or the LP cap.
+    sent,        ///< Shipped this pass.
+};
+
+/// One player shipment, recorded by `dispatch_convoys` for the Trade-flow lens.
+struct trade_flow_shipment
+{
+    entity_id     source = null_entity; ///< The pool key the cargo left (a market, or a body-level pool).
+    entity_id     dest   = null_entity; ///< The destination market.
+    std::uint16_t good   = 0;           ///< resource_type index.
+    float         units  = 0.0f;        ///< What was actually sent (after any LP trim).
+    float         price_d = 0.0f;       ///< The destination price the dispatcher netted against its haul.
+};
+
+/// One dispatcher pass's player record: shipments, and the best class per
+/// (destination market, good) over the player's surplus sources, for markets short
+/// of the good (last clear's demand above its supply).
+struct trade_flow_pass
+{
+    /// The corporation this pass was taken for (the player at the time). The lens
+    /// draws only passes whose corp is the one the player holds NOW, so a seat
+    /// change never shows the corporation left behind (LENSES.md § Trade-flow lens).
+    entity_id corp = null_entity;
+    std::vector<trade_flow_shipment> shipments;
+    std::map<std::pair<entity_id, std::uint16_t>, trade_refusal> best;
 };
 
 /// Result of an intra-body pathfind (BL-077): the terrain-weighted path cost, whether the
@@ -424,6 +465,29 @@ struct world
     /// unused in L3.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_market_pools;
 
+    /// BL-1217 D5 — OPENING STOCK IS HELD, NOT LISTED, UNTIL SOMEONE BIDS FOR IT
+    /// (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 4b). Per
+    /// `corp_market_pools` key, how much of that pool is still the opening
+    /// stockpile generation seeded (`seed_opening_stock`) and no market has yet
+    /// bid for. `clear_markets` keeps it off the shelf: a pool lists only what
+    /// stands above the larger of its processor reservation and this. Each
+    /// clear, an entry is cut to its pool (what the corp drew down is gone) and
+    /// zeroed for a good its market bids for — permanently, so once a market
+    /// has bid, opening stock of that good lists by the ordinary sell rules.
+    /// Follows its pool wherever a pool moves (rehome, absorb, buyout) and goes
+    /// when the pool goes. A `std::map`, for the `corp_market_pools` reason.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> opening_stock_held;
+
+    /// BL-1217 D6 (Ben, 2026-10-09, the exceptions) — the PRE-AUTHORED
+    /// installation's processor, recorded when `make_hard_coded_world` authors
+    /// it: the one processor `assign_default_recipes` gives its default whatever
+    /// the want. A GENERATION-TIME MARKER, deliberately neither saved nor
+    /// hashed: the default pass runs only on a freshly generated world (a saved
+    /// world holds no recipe-less processor), so a loaded world's null here
+    /// exempts nothing it could ever meet. Copied with the world, like any
+    /// member, so a search candidate's copy carries it.
+    entity_id authored_processor = null_entity;
+
     /// Active convoys — goods in transit. Appended by dispatch_convoys, advanced by
     /// advance_convoys, and retired (erased) by credit_arrived_convoys in
     /// supply_system.hpp. A std::vector (not a map) because convoys have no persistent
@@ -449,6 +513,29 @@ struct world
     /// which clears it first — so a loaded world with an empty map behaves
     /// exactly as the saved one would have on its next tick.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> arrived_this_tick;
+
+    /// BL-1229 (an order is a floor, not a hold) — the (corp, body, good) triples
+    /// under a standing sell order that THIS tick's `dispatch_convoys` hauled
+    /// from. TRANSIENT: written by dispatch (cleared at its top), read by the
+    /// SAME tick's `clear_markets` — which counts a hauled pool as NOT empty for
+    /// the order's auto-close, so an order stays alive (and keeps its floor on
+    /// the haul) while its goods are travelling — and cleared again at the end
+    /// of that clear, so a clear run without a dispatch never reads a stale set.
+    /// Never saved, never in a state hash: saves are taken BETWEEN ticks, when
+    /// it is always empty (the same argument as `arrived_this_tick`).
+    std::set<std::tuple<entity_id, entity_id, std::size_t>> hauled_ordered_this_tick;
+
+    /// BL-1222 (trade-flow lens) — what the PLAYER corporation's dispatcher did
+    /// over its last few passes, for the Trade-flow lens (LENSES.md § Trade-flow
+    /// lens). WRITE-ONLY for the simulation: `dispatch_convoys` appends one pass
+    /// and nothing in `world/*` reads it. TRANSIENT: never saved, never folded
+    /// into a state hash, so a loaded game shows the lens from its first pass on.
+    /// Newest pass at the back; at most `trade_flow_window` passes are kept, the
+    /// trailing window the lens sizes its arrows over. Each pass carries the corp
+    /// it was taken for; nothing clears the window on a seat change, so the lens
+    /// filters on `trade_flow_pass::corp == player_entity`.
+    std::vector<trade_flow_pass> player_trade_flow;
+    static constexpr std::size_t trade_flow_window = 4;
 
     /// Next stable convoy handle. Monotonic and never reused, exactly like
     /// `next_order_id`: an arrived convoy's id does not come back, so a command
@@ -612,6 +699,29 @@ struct world
     /// asks this question for every tile under the cursor, and the armed-build tint asks it
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     faithful_unordered_map<entity_id, std::vector<float>> body_reach_cost;
+
+    /// BL-1230 (power crosses markets) — THE POWER GRID, province grain
+    /// (LOGISTICS.md § 3a, "The province is the grid's cell"). Wired province id
+    /// -> its grid id (the LOWEST wired province id in the grid). A province with
+    /// no road tile is dark and absent. A derived cache on the same footing as the
+    /// reach field: built lazily by `province_power_grid()`, cleared by
+    /// invalidate_logistics_caches (every road write calls it) and by
+    /// clear_derived_state, never serialised. `power_grid_built` distinguishes
+    /// "not built" from "built, every province dark"; `power_grid_stamp` is the
+    /// partition's province count at build, so a partition redrawn under the
+    /// cache rebuilds it rather than being read stale.
+    std::map<std::uint32_t, std::uint32_t> power_grid_of_province;
+    bool        power_grid_built = false;
+    std::size_t power_grid_stamp = 0;
+
+    /// BL-1195: the LOGISTICS CACHE GENERATION — a stamp that changes every time the
+    /// logistics caches above are dropped (invalidate_logistics_caches,
+    /// clear_derived_state). VIEW-ONLY: read by the UI's per-convoy lane cache to know
+    /// a re-route happened, and by nothing in the simulation. Never serialised, never
+    /// hashed, never compared across worlds. Drawn from one process-wide counter
+    /// (bump_logistics_cache_generation), so two worlds — a freshly loaded save and
+    /// the one it replaced — never share a value.
+    std::uint64_t logistics_cache_generation = 0;
 
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
     /// derived cache on the same footing as the three above: built lazily by
@@ -1024,6 +1134,16 @@ private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };
 
+/// BL-1195: stamp @p w with a fresh logistics cache generation (see
+/// world::logistics_cache_generation). The counter is process-wide and only ever
+/// grows, so no two invalidations — on any world — share a value. View-only: the
+/// simulation never reads it, so it cannot touch determinism.
+inline void bump_logistics_cache_generation(world& w)
+{
+    static std::atomic<std::uint64_t> s_next{1};
+    w.logistics_cache_generation = s_next.fetch_add(1, std::memory_order_relaxed);
+}
+
 // ---------------------------------------------------------------------------
 // Ownership accessors (BL-068 — competitor information asymmetry)
 // ---------------------------------------------------------------------------
@@ -1076,6 +1196,19 @@ entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body);
 /// markets stand, puts every unit where the HQ clears. Never call it once play
 /// has begun — it would move produced goods between catchments for free.
 void rehome_opening_pools(world& w);
+
+/// BL-1217 D5 — credit @p stock into (@p corp, @p key)'s pool AND record it as
+/// opening stock, held off the shelf until its market bids for it
+/// (`world::opening_stock_held`). Generation's one door for an opening
+/// stockpile; every generation site that seeds one calls it.
+void seed_opening_stock(world& w, entity_id corp, entity_id key,
+                        const std::array<float, resource_count>& stock);
+
+/// BL-1217 D5 — the held opening stock of pool @p from follows it to pool
+/// @p to (added to whatever @p to already holds); @p from's record goes. Call
+/// wherever a pool's goods move to another key, so the hold travels with them.
+void move_opening_stock_held(world& w, std::pair<entity_id, entity_id> from,
+                             std::pair<entity_id, entity_id> to);
 
 /// Resolve the corporation that owns @p building by scanning each corporation's
 /// `assets`. Siblings of `pool_at` / `workforce_supply`.

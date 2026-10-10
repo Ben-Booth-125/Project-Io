@@ -18,6 +18,36 @@ A market is **anonymous, instant and price-only**. Every seller meets the market
 trade clears in the tick it is listed; and the only term is the price. Everything else about an
 exchange — a counterparty, a lead time, a refusal — is a contract, not a market.
 
+## The shelf economy
+
+**Corporations hold no stockpiles; every good is on a market's shelf (Ben, 2026-10-10).** The
+market owns its shelf. This replaces the corporation pool — the per-(corporation, market) store
+production used to land in, list from, and draw on — and with it everything that read a pool.
+
+- **Production lands on the shelf, and landing is selling.** What a building makes goes onto the
+  shelf of its own market the tick it is made, and its owner is paid the quantity at that tick's
+  clearing price — the market is the counterparty, whether or not anyone bids (Ben, 2026-10-10).
+  A glut drives that price to the floor: that is the signal, and the maker feels it.
+- **The order book retires (Ben, 2026-10-10).** No standing buy or sell orders: everyone buys at
+  the posted price, under the fair-price ceiling. Procurement contracts are not the order book and
+  stay (`CONTRACTS.md`); they deliver from and to shelves.
+- **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
+  building upkeep, procurement, the space programme and a launch's propellant are all bought on
+  the shelf at the posted price, under the fair-price ceiling. A corporation buys even its own
+  output back: vertical integration is a location, not a free transfer.
+- **Goods leave a market only by trade** (`TRADE.md`), which buys on one shelf and lands on
+  another.
+- **The opening stock is on the shelves.** Generation's opening stockpile — the same total it
+  seeds — is placed on the shelves of the markets the corporations sit in, each corporation's
+  share on its own markets (`../generation/CORPORATION_GENERATION.md` § Pass 4b).
+
+**What retires with the pool.** Auto-surplus and the processor reservation; the order book (standing buy
+and sell orders, and the sell order's floor, step 4 below); the pad's propellant reserve; opening stock held until a bid; the
+corporation convoy and the market export (`TRADE.md` § What trades replaces); the workforce
+dial's stock-fed draws (`../ai/AI_OPPONENT.md` § 11 — with no pool, a plant's whole want is
+posted demand). Where a section below speaks of pools, auto-surplus, sell orders or the export,
+this section holds.
+
 ---
 
 ## Market centres and seeding
@@ -201,20 +231,48 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      The bid is also kept on the market's own household register (`household_bid`), because
      the households draw it in step 12. Tunables in `scripts/economy.lua` § `population_demand`.
    - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
-     mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys — **not**
-     `spacecraft_components`, which stays procurement-only so the militia's contracts remain its
-     only buyer), because real background firms alone would under-consume these before enough of
-     them exist. **It retires good by good as a real channel claims each one (Ben, 2026-09-15):**
-     electronics left it when the metropolis rung of the household ladder took it
-     (`POPULATION.md` § The stratum ladder); the intermediates stay until the Industry channel's
-     building upkeep buys them. **A body's pull is SPLIT across its markets in proportion to their
-     catchment population**, never granted whole to each — a body carved into nine markets does not
-     want nine times as much. Per-body population is gathered in a `std::map` so accumulation order
-     is deterministic. Tunables in `scripts/economy.lua` § `background_demand`.
+     mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys, electronics
+     — **not** `spacecraft_components`, which stays procurement-only so the militia's contracts
+     remain its only buyer), because real background firms alone would under-consume these before
+     enough of them exist. **It retires good by good as a real channel claims each one (Ben,
+     2026-09-15):** electronics leaves it when the metropolis rung of the household ladder takes it
+     (`POPULATION.md` § The stratum ladder), and not before — until then this pull is its only
+     final buyer; the intermediates stay until the Industry channel's building upkeep buys them.
+     **A body's pull is SPLIT across its markets in proportion to their catchment population**
+     (each centre's scale, credited to the market `market_for_tile` gives it, the household
+     channel's own attribution), never granted whole to each — a body carved into nine markets does
+     not want nine times as much. Per-market scale is gathered in a `std::map` in ascending centre
+     id, so accumulation order is deterministic. **The pull consumes what it buys (Ben, 2026-10-07; BL-1217, inputs reach
+     processors):** after the households' draw in step 12, the background basket draws from the
+     market's shelf what it bid, or the whole shelf if it holds less, markets and resources
+     ascending. No money moves, on the households' rule: the market paid the maker when it bought
+     the stock. A bid that never took goods held a stocked shelf over the fair-price ceiling while
+     the processors beside it were silenced. Measured on the sixteen curated seeds with the pull
+     split by catchment: input-starved processors per reading fell 47.0 → 35.0 and the share starved
+     beside a stocked shelf priced over the ceiling 51% → 25%; processors running at handoff moved
+     54.7% → 55.4%, run-rate income 54.4% → 52.3%, firm survival 88.9% → 88.7%. **The cost,
+     accepted:** a shelf the pull drains is a shelf a real processor cannot draw next tick.
+     **Re-ruled — the pull draws after the processors (Ben, 2026-10-09; BL-1217, G1b):** the
+     background basket leaves on the shelf one tick of the market's processor want for that good,
+     and draws only what is left above it. The pull still consumes; it no longer takes the input a
+     standing processor came for. **That includes want the fair-price ceiling silenced (Ben,
+     2026-10-09):** a processor priced out this tick still came for the input, so its silenced
+     want is left on the shelf too — the processors' part only, never construction's. The ceiling
+     still keeps that want out of the price (`FINANCE.md`); it only keeps the background off the
+     goods. Measured before the ruling: the pull took 871 of 943 units a tick
+     on the markets where 63 processors starved beside it, and turning the pull off whole moved the
+     input-starved share 11.5% → 9.6%. Tunables in `scripts/economy.lua` § `background_demand`
+     (`consumes`).
 4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the order governs, and by default the order
    covers the same surplus (step 5), so nothing is stranded.
+
+   **A pad's pool keeps its propellant (Ben, 2026-10-09; BL-1217, inputs reach processors).** Where the corporation holds
+   a Launchpad on the pool's body (the body its launches burn from), its propellant is part of the reservation: auto-surplus
+   lists none of it, because launches burn from that pool and a fuelled pad is the gate to space
+   (`PRODUCTION.md` § Launchpad). The corporation may still sell it by a standing sell order. A
+   pool with no pad lists its propellant like any other surplus.
 
    **A standing sell order is a price floor over the whole surplus (Ben, 2026-10-05).** Most goods
    need no order: auto-surplus sells them. An order is the decision *not to sell below a price*, so
@@ -224,7 +282,12 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    waits (the player chose to hold it). **An order closes itself once its pool has stood empty**
    for a short run of ticks, and the good returns to auto-surplus. The rule is the same for the
    player and for rival corps, so a rival's order can never strand the goods it was placed to
-   sell.
+   sell. **An order is a floor, not a hold (Ben, 2026-10-07; BL-1229, steel stays home):** the
+   good under an order still travels. The dispatcher may haul from an ordered pool whenever the
+   haul nets the seller more than the order's floor, exactly as it would haul unordered surplus
+   (`SUPPLY.md` § Dispatch trigger); the order only refuses a sale below its price. Holding goods
+   back from every convoy is not what a price floor means, and measured it stranded 30% of all
+   steel surplus while the processors that wanted it starved.
 5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
    the player and by rival corps through the same `place_sell_order` verb). Each lists the pool's
    surplus above the processor reservation — all of it when `quantity` is 0 (no cap), at most
@@ -279,7 +342,10 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     and a household's reservation is already in its elastic bid. Several centres on one market
     bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
     ascending, resources ascending. The fill is what the growth gate reads
-    (`POPULATION.md` § Growth, decline and razing).
+    (`POPULATION.md` § Growth, decline and razing). **The background pull draws next**, on the
+    same terms, from what households left, less one tick of the market's processor want:
+    `min(background bid, max(0, inventory − processor want))` (step 3, *the pull draws after the
+    processors*).
 13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
     `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
     households' draw, so the households' draw is not taxed by its own spoilage (the nation's later
@@ -979,7 +1045,7 @@ swept at k = 0/1/2/4/8 on seeds 0/43/10 with spoilage on and households eating, 
 took the share of consuming prices at the ceiling against a stocked shelf from 5.2% to 0.1%, every
 k above 0 left fewer firms alive (38% at 0, 21–23% above), and the ceiling that remains is empty
 shelves no k can reach. It is re-swept once water is supplied (BL-1198, the Well).
-**The shelf's share reads the want the ceiling silenced (Ben, 2026-10-07; BL-1209).** With the
+**The shelf's share reads the want the ceiling silenced (Ben, 2026-10-07; BL-1209, shelf sees silenced want).** With the
 share at `min(inventory, k × demand)`, a buyer silenced by the fair-price ceiling contributes no
 demand, so a full shelf priced over the ceiling counts as no supply and stays priced over it — a
 cycle that starved about 65% of the processors starved at handoff (BL-1207, handoff starvation).
@@ -992,7 +1058,7 @@ k = 0/1/2/4 on seeds 0/43/10/28/38, k = 1 is the smallest k that takes a consumi
 at the ceiling against a stocked shelf to 0% (2.5% at k = 0); it passes run-rate income (50.8%
 against 47.2% at k = 0) and firm survival (83.5%, against 88.9% at k = 0), and lifts medical
 supply at ticks 20-50 from 31% to 51% of the household bid.
-**A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209).** When a shelf cannot meet every
+**A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209, shelf sees silenced want).** When a shelf cannot meet every
 draw admitted against it in a tick, each draw receives the same share of its need, not first-come
 by building id: a dip under the ceiling no longer lets the lowest-numbered plants empty the shelf
 while the rest starve. **The sharing is a floor, then the remainder.** A shelf is *contended* when
@@ -1086,34 +1152,36 @@ ceil_mult               >  1 + haulage_per_unit / base_price
 ```
 
 **The haulage is measured, not assumed.** `tools/verify/haulage_measure.cpp` walks every market
-in the real generated world, finds its nearest market neighbour by the terrain-weighted A* cost,
-and reports `logistics_cost(mode) × path.cost` — *exactly* the per-unit figure `dispatch_convoys`
-debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
+in the real generated world, prices one unit to every other market on its body with
+`price_market_export_leg` — the router the dispatcher and placement both ask (`SUPPLY.md`
+§ Logistical cost): one land leg, or land → port → sea → port → land, node discount on each land
+leg, handling at each port — and keeps the cheapest as its nearest neighbour. A pair the router
+refuses is no neighbour. Over the default 5 seeds, 21 markets on 5 multi-market bodies, 17 of
+which have a neighbour the router reaches:
 
 | Market → nearest market neighbour | credits per unit |
 |---|---|
-| p10 | 0.08 |
-| median | 0.76 |
-| p90 | 5.65 |
-| max | 7.84 |
+| p10 | 0.23 |
+| median | 0.33 |
+| p90 | 0.62 |
+| max | 0.69 |
 
 The denominator is the **cheapest good carrying a base price: 1.00** (regolith, sitting at the
 stone/sand bulk floor — `RESOURCES.md` § What trades). The binding case is therefore the worst
 haul against the cheapest good:
 
 ```
-ceil > 1 + 7.84 / 1.00 = 8.84   ->   10.0
+ceil > 1 + 0.69 / 1.00 = 1.69
 ```
 
-**Why a smaller ceiling is not enough.** A ceiling of 4.0 clears the *median* neighbour pair
-(which needs 1.76) but not the p90 (6.65); the tail — the worst-connected market pair carrying
-the cheapest good — is permanently unservable at any scarcity. 10.0 covers **every**
-nearest-neighbour pair measured, for **every** priced good, with headroom below it.
+**The haulage bound does not bind the ceiling.** On the router's price the worst nearest pair
+needs 1.69, so 10.0 covers every nearest-neighbour pair with wide headroom. What demands more than
+4 is the second reading below, the spread within the ordinary raw tier (`ceil > 6`).
 
-**A second, independent reading agrees on the shape.** The requirement's other half is that a
+**The second, independent reading is the binding one.** The requirement's other half is that a
 scarce cheap good must be able to outprice an abundant dear one. Read *within a tier* — which is
 the only coherent reading, since RESOURCES.md promises margin widens *between* tiers — the
-ordinary raw tier spans 1.00 to 6.00 (`rare_earth_ore`), demanding `ceil > 6`, inside the
+ordinary raw tier spans 1.00 to 6.00 (`rare_earth_ore`), demanding `ceil > 6`, above the
 haulage bound. Read *across* tiers it would demand 280 (1.00 against `spacecraft_components`
 at 280), which would delete the tier model; that reading is rejected and recorded (NR-291).
 

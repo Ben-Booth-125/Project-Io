@@ -1,6 +1,7 @@
 #include "market_clearing.hpp"
 
 #include "law.hpp" // the D4 import tariff: any_import_tariff_enacted / nation_tariff_rate
+#include "supply_system.hpp" // launch_burns_from_pool, launch_draw_per_convoy (a pad's pool keeps its propellant)
 #include "logistics.hpp" // BL-708: body_reach_field / tile_reach_cost — the grid good's listing gate
 
 #include <algorithm>
@@ -256,6 +257,24 @@ std::array<float, resource_count> processor_reservation(
     return reserve;
 }
 
+std::array<float, resource_count> auto_surplus_reservation(
+    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key)
+{
+    std::array<float, resource_count> reserve = processor_reservation(w, reg, corp, pool_key);
+    if (!launch_burns_from_pool(w, corp, pool_key))
+        return reserve;
+    // A pad's pool keeps its propellant (MARKETS.md step 4, Ben 2026-10-09):
+    // every launch-drawn good is reserved whole, so auto-surplus lists none of it.
+    const stockpile_component* p = w.find_pool(corp, pool_key);
+    if (p == nullptr)
+        return reserve;
+    const auto& draw = launch_draw_per_convoy();
+    for (std::size_t r = 0; r < resource_count; ++r) // ascending: a fixed order
+        if (draw[r] > 0.0f)
+            reserve[r] = std::max(reserve[r], p->quantities[r]);
+    return reserve;
+}
+
 namespace {
 
 /// A corporation's representative tile on a body: the tile of its lowest-id
@@ -443,7 +462,35 @@ void absorb_body_pool_into_market(world& w, entity_id body, entity_id market)
         stockpile_component& dst = w.pool_at(corp, market);
         for (std::size_t r = 0; r < resource_count; ++r)
             dst.quantities[r] += moved.quantities[r];
+        move_opening_stock_held(w, {corp, body}, {corp, market}); // BL-1217 D5
     }
+}
+
+void seed_opening_stock(world& w, entity_id corp, entity_id key,
+                        const std::array<float, resource_count>& stock)
+{
+    stockpile_component& pool = w.pool_at(corp, key);
+    std::array<float, resource_count>& held = w.opening_stock_held[std::make_pair(corp, key)];
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        pool.quantities[r] += stock[r];
+        held[r]            += stock[r];
+    }
+}
+
+void move_opening_stock_held(world& w, std::pair<entity_id, entity_id> from,
+                             std::pair<entity_id, entity_id> to)
+{
+    if (from == to)
+        return;
+    const auto src = w.opening_stock_held.find(from);
+    if (src == w.opening_stock_held.end())
+        return;
+    const std::array<float, resource_count> moved = src->second;
+    w.opening_stock_held.erase(src);
+    std::array<float, resource_count>& dst = w.opening_stock_held[to];
+    for (std::size_t r = 0; r < resource_count; ++r)
+        dst[r] += moved[r];
 }
 
 entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body)
@@ -513,6 +560,7 @@ void rehome_opening_pools(world& w)
         stockpile_component& dst = w.pool_at(mv.from.first, dst_key);
         for (std::size_t r = 0; r < resource_count; ++r)
             dst.quantities[r] += moved.quantities[r];
+        move_opening_stock_held(w, mv.from, {mv.from.first, dst_key}); // BL-1217 D5
     }
 }
 
@@ -741,38 +789,39 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
 void inject_background_demand(world& w, const recipe_registry& reg)
 {
     // BL-340/BL-365: the offstage economy's own pull on the mid-chain
-    // processing goods, world-scale rather than per-centre (unlike
-    // inject_population_demand above) — real background firms alone would
-    // under-consume these during the early game before enough of them exist.
+    // processing goods, pooled per market catchment rather than bid per centre
+    // (unlike inject_population_demand above) — real background firms alone
+    // would under-consume these during the early game before enough of them
+    // exist.
     //
-    // BL-640: banded, NOT deleted. All six goods are industrial, so this pass
+    // BL-640: banded, NOT deleted. All five goods are industrial, so this pass
     // injects nothing in an ancient campaign — but it remains the stopgap
     // standing in for the Industry channel (BL-641) until that lands.
     const background_demand_params& bd = reg.background_demand();
     const std::array<float, resource_count>& basket = reg.background_demand_basket();
 
-    // Per-body population scale: sum of every centre's scale on that body,
-    // gathered once so every market on a multi-market body (BL-096) sees the
-    // same pull.
+    // Per-MARKET population scale (BL-1226, background pull per doc): each
+    // centre's scale goes to the ONE market whose catchment holds its tile —
+    // `market_for_tile`, the attribution inject_population_demand uses, so the
+    // household and background channels agree on which market a centre feeds.
+    // MARKETS.md step 3: "A body's pull is SPLIT across its markets in
+    // proportion to their catchment population, never granted whole to each".
+    // The old per-body sum was applied whole to EVERY market on the body, so a
+    // body carved into N markets bid N times its pull; the body total is now
+    // conserved across its markets.
     //
-    // ASCENDING CENTRE ID (BL-1050), and the reason that stood here was WRONG:
-    // it argued that a std::map keyed by entity_id makes the accumulation
-    // deterministic "regardless of population_centres' layout". An ordered KEY
-    // orders which bucket each addend lands in; it does not order the addends
-    // WITHIN a bucket, and `body_scale[body] +=` is a float accumulation whose
-    // order is `population_centres`' — which a save/load rebuilds (world_save.cpp
-    // re-inserts in id order) and another standard library lays out differently
-    // again. Today every scale is a small integer, so every partial sum is exact
-    // and no shipped world's number moves; the order is fixed anyway, because a
-    // sum that happens to be exact today is not a sum that is order-free.
-    //
-    // The membership test is order-free, so the filter runs unordered and only
-    // the accumulation is sorted.
+    // ASCENDING CENTRE ID (BL-1050): `market_scale[mid] +=` is a float
+    // accumulation. An ordered KEY orders the buckets, not the addends within
+    // one, so the addends are walked in id order — a save/load rebuilds
+    // `population_centres` in another layout. The membership filter is
+    // order-free and runs unordered; only the accumulation is sorted.
     std::vector<entity_id> scale_centre_ids;
     scale_centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
     {
-        (void)pcc;
+        if (pcc.razed)
+            continue; // BL-624: a razed centre has no heads — no pull, exactly
+                      // as inject_population_demand skips it.
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
@@ -782,17 +831,27 @@ void inject_background_demand(world& w, const recipe_registry& reg)
     }
     std::sort(scale_centre_ids.begin(), scale_centre_ids.end());
 
-    std::map<entity_id, float> body_scale;
+    // BL-1217 lever D: the per-market bid record restarts every clear, on
+    // every market (a market whose catchment holds no live centre bids nothing).
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.background_bid.fill(0.0f);
+    }
+
+    std::map<entity_id, float> market_scale;
     for (const entity_id cid : scale_centre_ids)
     {
-        const entity_id body = w.tiles.at(w.population_centre_tile.at(cid)).body;
-        body_scale[body] += static_cast<float>(w.population_centres.at(cid).scale);
+        const entity_id mid = market_for_tile(w, w.population_centre_tile.at(cid));
+        if (mid == null_entity)
+            continue;
+        market_scale[mid] += static_cast<float>(w.population_centres.at(cid).scale);
     }
 
     for (auto& [mid, mc] : w.markets)
     {
-        const auto sit = body_scale.find(mc.body);
-        if (sit == body_scale.end() || sit->second <= 0.0f)
+        const auto sit = market_scale.find(mid);
+        if (sit == market_scale.end() || sit->second <= 0.0f)
             continue;
         const float scale = sit->second * bd.demand_scale;
 
@@ -812,6 +871,52 @@ void inject_background_demand(world& w, const recipe_registry& reg)
             const float elastic = std::clamp(std::pow(base / price, bd.demand_elasticity),
                                              bd.elasticity_min, bd.elasticity_max);
             mc.demand[r] += weighted * elastic;
+            mc.background_bid[r] = weighted * elastic; // one write per (market, good)
+        }
+    }
+}
+
+void draw_background_basket(world& w, const recipe_registry& reg)
+{
+    // BL-1217 lever D (behind economy.background_demand.consumes: authored TRUE
+    // in scripts/economy.lua; the C++ struct default is false, so a hand-built
+    // registry does not draw). The background basket is not a pricing pull only:
+    // it TAKES what it bid off the market's shelf,
+    // exactly as draw_household_basket does and on the same terms -- NO MONEY
+    // MOVES (the market paid the maker when it bought the stock as buyer of
+    // last resort), and NO CEILING (the bid's elasticity is its reservation).
+    // One bid per (market, good), so a short shelf fills it pro rata trivially.
+    // Ascending market id, ascending resource.
+    //
+    // BL-1217 G1b R3 (MARKETS.md step 3, re-ruled Ben 2026-10-09): the pull
+    // draws AFTER the processors. It leaves one tick of the market's processor
+    // want (`processor_want`, written by clear_markets this clear: posted want
+    // plus the want the ceiling silenced, processors only) on the shelf and
+    // draws only what stands above it: min(bid, max(0, shelf - want)).
+    const bool consumes = reg.background_demand().consumes;
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        market_component& mc = w.markets.at(mid);
+        mc.background_fill.fill(0.0f);
+        if (!consumes)
+            continue; // switch off: the shelf is untouched (pre-lever behaviour)
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float bid   = std::max(0.0f, mc.background_bid[r]);
+            const float shelf = std::max(0.0f, mc.inventory[r]);
+            const float above = std::max(0.0f, shelf - std::max(0.0f, mc.processor_want[r]));
+            const float take  = std::min(bid, above);
+            mc.background_fill[r] = take;
+            if (take > 0.0f)
+                mc.inventory[r] = shelf - take;
         }
     }
 }
@@ -1206,6 +1311,54 @@ void inject_interbody_demand(world& w,
     }
 }
 
+std::uint32_t tile_feed_power_grid(world& w, entity_id tile)
+{
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid == null_entity)
+        return 0;
+    const auto mit = w.markets.find(mid);
+    if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
+        return 0;
+    return tile_power_grid(w, mit->second.centre_tile);
+}
+
+grid_good_pool pool_grid_good_figures(world& w, const recipe_registry& reg)
+{
+    grid_good_pool out;
+    const grid_goods_params& grid_rules = reg.grid_goods();
+    if (!grid_rules.any())
+        return out;
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        const market_component& mc = w.markets.at(mid);
+        if (mc.centre_tile == null_entity)
+            continue;
+        const std::uint32_t g = tile_power_grid(w, mc.centre_tile);
+        if (g == 0)
+            continue;
+        out.market_grid.emplace(mid, g);
+        auto& sd = out.grid_sd[g];
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!grid_rules.grid(r) || !grid_good_crosses_markets(r))
+                continue;
+            sd.listed[r] += std::max(0.0f, mc.supply[r]);
+            sd.shelf[r]  += std::max(0.0f, mc.inventory[r]);
+            sd.wants[r]  += std::max(0.0f, mc.demand[r]) + std::max(0.0f, mc.hauler_want[r]);
+            sd.demand[r] += mc.demand[r];
+        }
+    }
+    return out;
+}
+
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
@@ -1375,9 +1528,78 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         return ok;
     };
 
+    // BL-1217 D5 — OPENING STOCK IS HELD, NOT LISTED, UNTIL SOMEONE BIDS FOR IT
+    // (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 4b). A market BIDS for
+    // a good this clear when anything puts it in that market's demand register:
+    // the demand injections above, a draw's want (net of the drawer's own pool,
+    // so a corp living off its own stock does not bid), or a standing buy
+    // order. Read here, before either listing path, so the bid that releases a
+    // hold is this clear's. Each held record is first cut to its pool — what
+    // the corp drew down is no longer opening stock — then zeroed for every
+    // good its market bids for. Zeroing is permanent: once a market has bid,
+    // the opening stock of that good lists by the ordinary sell rules. A record
+    // whose pool is gone, or that holds nothing, is dropped. Sorted walks only.
+    if (!w.opening_stock_held.empty())
+    {
+        std::map<entity_id, std::array<bool, resource_count>> bids;
+        for (const auto& [mid, mc] : w.markets)
+        {
+            std::array<bool, resource_count>& row = bids[mid];
+            for (std::size_t r = 0; r < resource_count; ++r)
+                row[r] = mc.demand[r] > 0.0f;
+        }
+        for (const auto& [key, wanted] : report.wants)
+        {
+            const auto bit = bids.find(key.second);
+            if (bit == bids.end())
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (wanted[r] > 0.0f)
+                    bit->second[r] = true;
+        }
+        for (const buy_order& order : standing_buys)
+        {
+            if (order.quantity <= 0.0f)
+                continue;
+            const entity_id mid = buy_order_market(w, by_body, order.corp, order.body);
+            const auto bit = bids.find(mid);
+            const std::size_t r = static_cast<std::size_t>(order.resource);
+            if (bit != bids.end() && r < resource_count)
+                bit->second[r] = true;
+        }
+        for (auto it = w.opening_stock_held.begin(); it != w.opening_stock_held.end();)
+        {
+            const auto pkit = w.corp_market_pools.find(it->first);
+            if (pkit == w.corp_market_pools.end())
+            {
+                it = w.opening_stock_held.erase(it);
+                continue;
+            }
+            const auto bit = bids.find(it->first.second); // a body-level key has no market
+            bool any = false;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                float& h = it->second[r];
+                h = std::min(h, std::max(0.0f, pkit->second.quantities[r]));
+                if (bit != bids.end() && bit->second[r])
+                    h = 0.0f;
+                if (h > 0.0f)
+                    any = true;
+            }
+            it = any ? std::next(it) : w.opening_stock_held.erase(it);
+        }
+    }
+    // The held opening stock of (corp, market) in good r, after the pass above.
+    auto opening_held = [&w](entity_id corp, entity_id mid, std::size_t r) {
+        const auto hit = w.opening_stock_held.find(std::make_pair(corp, mid));
+        return hit == w.opening_stock_held.end() ? 0.0f : hit->second[r];
+    };
+
     // Auto-surplus: each corp's pool above its processor reservation, listed
     // into the pool's OWN market (BL-1003 — the pool key is the market). A
     // body-level pool (key = a market-less body) has nowhere to list and stays.
+    // BL-1217 D5: and above its held opening stock — the larger of the two
+    // stays, since a processor's reserved draw comes out of the held stock first.
     for (auto& [key, pool] : w.corp_market_pools)
     {
         const entity_id corp = key.first;
@@ -1391,7 +1613,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const entity_id body = mkit->second.body;
 
         const market_component& mc = mkit->second;
-        const auto reserve = processor_reservation(w, reg, corp, mid);
+        // A pad's pool keeps its propellant (MARKETS.md step 4): the auto-surplus
+        // reservation, not the bare processor one a standing sell order reads.
+        const auto reserve = auto_surplus_reservation(w, reg, corp, mid);
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -1406,7 +1630,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (any_grid && grid_rules.grid(r) && !market_connected(mid))
                 continue;
 
-            const float surplus = pool.quantities[r] - reserve[r];
+            const float surplus =
+                pool.quantities[r] - std::max(reserve[r], opening_held(corp, mid, r));
             if (surplus <= 0.0f)
                 continue;
 
@@ -1489,7 +1714,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 rit = order_reserve.emplace(std::make_pair(order.corp, mid),
                                             processor_reservation(w, reg, order.corp, mid)).first;
 
-            const float surplus = pkit->second.quantities[r] - rit->second[r];
+            // BL-1217 D5: an order lists what auto-surplus would, so held opening
+            // stock stays off the shelf here too until the market bids for it.
+            const float surplus = pkit->second.quantities[r]
+                                - std::max(rit->second[r], opening_held(order.corp, mid, r));
             if (surplus > 0.0f)
                 pool_has_surplus[oi] = 1; // before any claim: the pool, not this order
 
@@ -1547,6 +1775,37 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (wanted[r] > 0.0f)
                 mkit->second.demand[r] += wanted[r];
     }
+
+    // BL-1217 G1b R3 (MARKETS.md step 3, "the pull draws after the processors",
+    // Ben 2026-10-09): the PROCESSOR part of the demand just posted, per market —
+    // one tick of processor want, which draw_background_basket leaves on the
+    // shelf. Rewritten whole every clear, on every market; std::map: a sorted
+    // accumulation (ascending corp within a market).
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.processor_want.fill(0.0f);
+    }
+    for (const auto& [key, wanted] : report.processor_wants)
+    {
+        const auto mkit = w.markets.find(key.second);
+        if (mkit == w.markets.end())
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (wanted[r] > 0.0f)
+                mkit->second.processor_want[r] += wanted[r];
+    }
+
+    // BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): the
+    // dial's pool-draw record, written HERE and only here, beside the demand
+    // above — both describe this tick, so a consumer moving between its pool
+    // and the shelf is read once (economy_system.cpp, collect_dial_pool_draws).
+    for (const auto& [key, q] : report.dial_pool_sums)
+        if (const auto mkit = w.markets.find(key.first); mkit != w.markets.end())
+        {
+            mkit->second.dial_pool_draw[key.second]      = std::max(0.0f, q);
+            mkit->second.dial_pool_draw_tick[key.second] = w.current_econ_tick;
+        }
 
     // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
     // demand"): the HAULER-ONLY register — the want the fair-price ceiling
@@ -1615,15 +1874,49 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // tick's draws and this tick's demand phase, before the auto-surplus loop
     // below credits this clear's listings to the shelf. (The shipped k is 0 —
     // listings only — until shelf spoilage, BL-1179.)
+    //
+    // BL-1230 (power crosses markets; LOGISTICS.md § 3a, "The province is the
+    // grid's cell"): POWER's price clears against its GRID. A building
+    // draws a grid good from every shelf on its grid (run_building_upkeep), so
+    // the supply its own market's price answers is the grid's, not the shelf
+    // at its own centre. Each market on a grid (its centre tile's province's
+    // grid) therefore resolves the grid good against the grid's summed supply
+    // and demand — from its OWN prior price and its OWN base, so it keeps a
+    // market price that converges on the grid's rather than being replaced by
+    // one. A market off every grid resolves on its own figures, as before.
+    // Sums run over ascending market id, so no hash order reaches a float.
+    // Power only (grid_good_crosses_markets): construction capacity, the other
+    // grid good, still draws locally, so it still prices locally.
+    //
+    // THE SHELF CAP IS APPLIED ONCE, AT THE GRID (review round 2). pricing_supply's
+    // shelf share is min(shelf, k x (demand + silenced want)); summed market by
+    // market it would count a shelf with no LOCAL demand as no supply, though a
+    // building anywhere on the grid draws from it — so the grid would price as
+    // empty while one market held plenty. The three registers are pooled
+    // separately and the cap taken over the pooled figures: listed + min(sum
+    // shelf, k x sum(demand + silenced want)). At one market on a grid this is
+    // exactly pricing_supply. The pooling is `pool_grid_good_figures` (BL-1232:
+    // shared with the workforce solver's forecast, so the two cannot drift).
+    const grid_good_pool gpool = any_grid ? pool_grid_good_figures(w, reg) : grid_good_pool{};
+    const auto& market_grid = gpool.market_grid;
+    const auto& grid_sd     = gpool.grid_sd;
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {
         ref_price[mid] = {};
+        const auto mg = market_grid.find(mid);
+        const auto* sd = (mg != market_grid.end()) ? &grid_sd.at(mg->second) : nullptr;
         for (std::size_t r = 0; r < resource_count; ++r)
-            ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              pricing_supply(mc, r, reg.price_band().shelf_supply_ticks), mc.demand[r],
+        {
+            const bool  pooled = (sd != nullptr) && grid_rules.grid(r) && grid_good_crosses_markets(r);
+            const float k      = reg.price_band().shelf_supply_ticks;
+            const float supply = pooled ? grid_good_pricing_supply(*sd, r, k)
+                                        : pricing_supply(mc, r, k);
+            const float demand = pooled ? sd->demand[r] : mc.demand[r];
+            ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r], supply, demand,
                                               reg.price_band().floor_mult,
                                               reg.price_band().ceil_mult);
+        }
     }
 
     // --- Auto-surplus clearing: income at ref_price, pool debited immediately ---
@@ -1924,6 +2217,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // the nation — MARKETS.md step 12).
     draw_household_basket(w);
 
+    // BL-1217 lever D: the background basket draws what the households left,
+    // before spoilage and before the nation's later claims, leaving one tick of
+    // processor want (BL-1217 G1b R3). A no-op on the shelf while
+    // economy.background_demand.consumes is false (authored true in economy.lua).
+    draw_background_basket(w, reg);
+
     // BL-1179 (shelf spoilage): after the households' draw (the nation's later
     // claims take what spoilage leaves) and before the next tick's reference prices read the
     // shelf's share of supply (and before next tick's production, construction
@@ -1973,11 +2272,18 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // there and here appends to or erases from `w.sell_orders`, so index i still
     // names the same order.
     {
+        // BL-1229 review (an order is a floor, not a hold): a pool this tick's
+        // dispatch HAULED from is not empty — its goods left by convoy, above the
+        // order's floor, before this clear could list them. Counting it empty
+        // would close the order and drop the floor from the next haul, and the
+        // close notice below ("nothing to sell") would be false.
         const std::size_t n = std::min(pool_has_surplus.size(), w.sell_orders.size());
         for (std::size_t i = 0; i < n; ++i)
         {
             sell_order& o = w.sell_orders[i];
-            if (pool_has_surplus[i])
+            const bool hauled = w.hauled_ordered_this_tick.count(
+                                    {o.corp, o.body, static_cast<std::size_t>(o.resource)}) != 0;
+            if (pool_has_surplus[i] || hauled)
                 o.empty_ticks = 0;
             else if (o.empty_ticks < 255)
                 ++o.empty_ticks;
@@ -2019,6 +2325,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                                return o.empty_ticks >= sell_order_empty_close_ticks;
                            }),
             w.sell_orders.end());
+        // Consumed: a clear run without a dispatch must not read last tick's set.
+        w.hauled_ordered_this_tick.clear();
     }
 
     return flows;

@@ -228,7 +228,10 @@ its digests byte-identical to the tip's, and BL-1172 lives only in the tick.
   Road). Haulage +7.0% / +9.1%.
 - Digests: shipped all 16 from D_search; **legacy none** (the span is off there).
 
-**UNATTRIBUTED, or attributed without a traced mechanism.**
+**UNATTRIBUTED, or attributed without a traced mechanism.** Traced 2026-10-10 (BL-1165) in
+`sprint-48-rebless-traced.md`: the road flips are the landscape search's road-tier winner, not
+`edge_tier` (the inference below was wrong); BL-1168's haulage fall is specialists' hauling; seed
+0's treasury median is a median on a cliff.
 - **Road tiers flip whole networks.** Highway <-> Road moves wholesale on one seed at a time, at
   three of the five world-moving steps, and partly reverses: seed 31 and 37 go to Road at BL-1168
   and back at BL-1171; 13 and 41 go to Road at BL-1171 and back at BL-1169. The steps are

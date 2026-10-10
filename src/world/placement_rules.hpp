@@ -440,6 +440,21 @@ std::vector<entity_id> stack_members(const world& w, entity_id tile_id,
 /// @return            Its rank, or 0 if the building no longer exists.
 int stack_rank(const world& w, entity_id building_id);
 
+/// The rank a NEW site of @p type (and @p target) on @p tile_id would take — the
+/// sites already in its stack plus one, since a new building's id sorts last.
+/// This is the rank model `estimate_prospective_profit` prices a hypothetical at
+/// (BL-162 / BL-346); the corp scorer's extraction candidate reads it too, so a
+/// candidate on a stacked tile is priced at `stack_output_scalar` of its own
+/// rank, never the first site's output (BL-1227, AI_OPPONENT.md).
+///
+/// @param w       Read-only world state.
+/// @param tile_id Tile the candidate would stand on.
+/// @param type    Building type to match.
+/// @param target  Extraction target to match (ignored for non-extraction types).
+/// @return        `stack_members(...).size() + 1` (>= 1).
+int prospective_stack_rank(const world& w, entity_id tile_id,
+                           building_type type, resource_type target);
+
 /// Count buildings of @p type (and @p target, for extraction) already standing on
 /// @p tile_id. The current occupancy that `stack_capacity` is the ceiling for.
 ///

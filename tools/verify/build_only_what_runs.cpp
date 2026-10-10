@@ -30,6 +30,19 @@
 //      recipe; a third party's spare may. Shared test, the reflex rescue (one
 //      run_economy_step) and the scorer's within-group switch (12 evals); and an
 //      unstaffed plant is judged at a non-zero need (judged_batches).
+//   R7 THE GLUT GATE INSIDE THE ARGMAX (BL-1227): a group's net winner whose
+//      output market is dead yields to its runner-up, not to nothing.
+//   R8 THE CHAIN START (BL-1227, AI_OPPONENT.md § 11): a corp's own processor
+//      refused only for an unobtainable input lifts the dead-market veto on
+//      its OWN mine for that input, in that evaluation only; another corp's
+//      mine stays vetoed; the next evaluation without the refusal is vetoed.
+//   R4-R8 run IN PLAY (current_econ_tick > 0, a market that has cleared).
+//   R10 (BL-1217 G1b R1): the reflex rescue is refused onto a recipe whose
+//      input is only stock in the corp's pool; a producer in reach admits it.
+//   R11 (BL-1217 G1b R2, play form): after a real step and clear, the supply
+//      clause charges the households' and the background's FILLS (not bids).
+//   R12 (BL-1217 G1b R2): a final draw reached by two producer markets is
+//      charged once over the set.
 //
 // Exits non-zero on any FAIL.
 
@@ -399,9 +412,14 @@ int main()
         auto walk = [&](bool with_mine) {
             scene s = make_scene(); place_bound(s, reg);
             if (with_mine) add_mine(s, 6, 2);
+            // BL-1227: IN PLAY - a cleared market A that bids for the steel the
+            // plant would make (econ tick > 0; at 0 the glut forecast reads a
+            // never-cleared market and proves nothing about play).
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
             int first = -1;
             for (int t = 1; t <= 12; ++t)
             {
+                s.w.current_econ_tick = t;
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg, rep, t);
                 if (first < 0 && processors_of(s, s.ai) > 0) first = t;
@@ -424,6 +442,7 @@ int main()
             for (int t = 1; t <= 12; ++t)
             {
                 if (t == mine_at_tick) add_mine(s, mine_col, 2);
+                s.w.current_econ_tick = t; // BL-1227: in play
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg, rep, t);
                 if (resumed < 0 && !s.w.buildings.at(plant).decommissioned) resumed = t;
@@ -533,6 +552,7 @@ int main()
             int at = -1;
             for (int t = 1; t <= 12; ++t)
             {
+                s.w.current_econ_tick = t; // BL-1227: in play
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg, rep, t);
                 if (at < 0 && s.w.buildings.at(p).recipe == temper) at = t;
@@ -545,6 +565,486 @@ int main()
                     own_only, with_3p);
         check(own_only < 0, "R6 scorer: never switches onto its own leftover steel");
         check(with_3p > 0, "R6 scorer: switches when a third party's spare steel covers it");
+    }
+
+    // R7 (BL-1227 review round 1): THE GLUT GATE INSIDE THE ARGMAX, through
+    // the scorer, in play. A second coal recipe joins coal_steel's group
+    // (Foundry): coal -> machinery, whose net dwarfs steel's (machinery base
+    // 400), so it WINS the group's net argmax. When A bids for machinery it is
+    // built; when A has cleared but nobody bids for or lists machinery (a dead
+    // market), the veto must fall through to the runner-up — coal_steel, which
+    // A does bid for — rather than leave the group empty.
+    std::printf("R7 the dead-market veto inside the processor argmax (scorer, in play)\n");
+    {
+        recipe_registry reg7 = make_registry();
+        recipe coal_mach;
+        coal_mach.name  = "coal_mach";
+        coal_mach.group = "Foundry";
+        coal_mach.inputs [r_coal] = 1.0f;
+        coal_mach.outputs[r_mach] = 1.0f;
+        reg7.add_recipe(coal_mach);
+        auto built = [&](bool mach_bid) {
+            scene s = make_scene(); place_bound(s, reg7);
+            add_mine(s, 6, 2);
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
+            if (mach_bid)
+                s.w.markets.at(s.a).demand[r_mach] = 50.0f;
+            for (int t = 1; t <= 12; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg7, rep, t);
+                for (const entity_id b : s.w.corporations.at(s.ai).assets)
+                    if (const auto it = s.w.buildings.find(b);
+                        it != s.w.buildings.end() && it->second.type == building_type::processing_facility)
+                        return it->second.recipe;
+            }
+            return no_recipe;
+        };
+        const uint16_t with_bid = built(true);
+        const uint16_t dead     = built(false);
+        const auto nm = [&](uint16_t id) {
+            const recipe* r = reg7.get_recipe(id);
+            return r ? r->name.c_str() : "(none)";
+        };
+        std::printf("  first processor: machinery bid -> %s, machinery dead -> %s\n", nm(with_bid), nm(dead));
+        check(with_bid == reg7.recipe_id("coal_mach"),
+              "R7 not vacuous: with a machinery bid the fatter coal_mach wins the group and is built");
+        check(dead == reg7.recipe_id("coal_steel"),
+              "R7 machinery dead in a cleared market: the vetoed winner yields to coal_steel, not to nothing");
+    }
+
+    // R8 (BL-1227, the chain start; AI_OPPONENT.md § 11, Ben 2026-10-07/08). A
+    // coal deposit stands in A, A has cleared (it bids for steel) but nobody
+    // bids for or lists coal there — a dead market for coal, so a coal mine is
+    // vetoed. The AI corp's own coal_steel candidate on its ground in A is
+    // refused ONLY because coal is unobtainable (no producer anywhere). That
+    // refused draw is the corp's private bid on coal in A, for its own mine
+    // candidates, in that one evaluation.
+    std::printf("R8 the chain start: a corp's own refused processor bids for its own mine\n");
+    {
+        auto staged = [&]() {
+            scene s = make_scene(); place_bound(s, reg);
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
+            const entity_id ct = tile_at(s.w, s.body, 2, 2);
+            s.w.tiles.at(ct).resource_deposit[r_coal]   = 1.0f;
+            s.w.tiles.at(ct).resource_remaining[r_coal] = 1.0e6f;
+            return s;
+        };
+        auto coal_mines_of = [&](const scene& s, entity_id corp) {
+            int n = 0;
+            for (const entity_id b : s.w.corporations.at(corp).assets)
+                if (const auto it = s.w.buildings.find(b);
+                    it != s.w.buildings.end() && it->second.type == building_type::extraction_site
+                    && it->second.target_resource == resource_type::coal)
+                    ++n;
+            return n;
+        };
+        auto lifts_for = [&](const economy_report& rep, entity_id corp) {
+            int n = 0;
+            for (const auto& l : rep.chain_start_lifts)
+                if (l.corp == corp && l.target == resource_type::coal) ++n;
+            return n;
+        };
+        // The AI corp evaluates at tick % 4 == its index % 4; walk 4 ticks so
+        // it is due exactly once.
+        auto one_eval = [&](scene& s, int& lifts) {
+            lifts = 0;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                lifts += lifts_for(rep, s.ai);
+            }
+        };
+
+        // (a) the refusing corp: the veto is lifted and the mine is built on
+        // its ordinary score.
+        {
+            scene s = staged();
+            int lifts = 0;
+            one_eval(s, lifts);
+            std::printf("  (a) lifts %d, AI coal mines %d\n", lifts, coal_mines_of(s, s.ai));
+            check(lifts > 0, "R8 (a) a corp's own processor refused only for coal lifts its own coal-mine veto");
+            check(coal_mines_of(s, s.ai) > 0, "R8 (a) ... and the lifted mine, scored on the ordinary estimate, is built");
+        }
+        // (b) a DIFFERENT corp, with no processor candidate of its own, beside
+        // the refusing one: its mine in the same market stays vetoed.
+        {
+            scene s = staged();
+            // The other corp holds ground in A (an anchor) whose tile already
+            // carries a processor, so it offers no processor candidate of its
+            // own (one processor per tile) — and so refuses nothing.
+            auto add_other = [&](scene& sc) {
+                const entity_id id = sc.w.create_entity();
+                corporation_component c;
+                c.name = "Other"; c.balance = 1.0e6f; c.starting_capital = 1.0e6f;
+                c.focus = industrial_focus::extraction;
+                const entity_id t = tile_at(sc.w, sc.body, 3, 1);
+                const entity_id anchor = sc.w.create_entity();
+                building_component a{};
+                a.tile = t; a.type = building_type::extraction_site;
+                a.target_resource = resource_type::iron_ore; a.workforce_assigned = 0.5f;
+                sc.w.buildings[anchor] = a;
+                const entity_id plant = sc.w.create_entity();
+                building_component pb{};
+                pb.tile = t; pb.type = building_type::processing_facility;
+                pb.recipe = reg.recipe_id("steel_forge"); pb.target_resource = resource_type::machinery;
+                pb.workforce_assigned = 0.5f; pb.workforce_auto = false;
+                sc.w.buildings[plant] = pb;
+                c.assets = {anchor, plant};
+                sc.w.corporations[id] = c;
+                return id;
+            };
+            const entity_id other = add_other(s);
+            // The refusing AI corp still refuses (and would lift for itself) but
+            // cannot afford a mine, so the deposit's one slot stays open to Other.
+            s.w.corporations.at(s.ai).balance = 1.0f;
+            int other_lifts = 0;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                other_lifts += lifts_for(rep, other);
+            }
+            std::printf("  (b) other corp: lifts %d, coal mines %d\n", other_lifts, coal_mines_of(s, other));
+            check(other_lifts == 0 && coal_mines_of(s, other) == 0,
+                  "R8 (b) another corp's refused want is not a bid: its mine in the same dead market stays vetoed");
+            // Not vacuous: the same corp DOES build that mine once A bids for coal.
+            scene s2 = staged();
+            const entity_id other2 = add_other(s2);
+            s2.w.corporations.at(s2.ai).balance = 1.0f;
+            s2.w.markets.at(s2.a).demand[r_coal] = 50.0f;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s2.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s2.w, reg, rep, t);
+            }
+            check(coal_mines_of(s2, other2) > 0,
+                  "R8 (b) not vacuous: with a public coal bid in A the other corp builds that mine");
+        }
+        // (c) no memory: an evaluation that lifts but cannot afford the mine,
+        // then the next one with the processor candidate gone (the corp's
+        // ground sold) and the cash back — vetoed again.
+        {
+            scene s = staged();
+            corporation_component& ac = s.w.corporations.at(s.ai);
+            ac.balance = 1.0f;
+            int lifts1 = 0;
+            one_eval(s, lifts1);
+            const int built1 = coal_mines_of(s, s.ai);
+            ac.balance = 1.0e6f;
+            ac.assets.clear();
+            int lifts2 = 0;
+            for (int t = 5; t <= 8; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                lifts2 += lifts_for(rep, s.ai);
+            }
+            std::printf("  (c) eval 1 (poor): lifts %d built %d | eval 2 (no refused processor): lifts %d built %d\n",
+                        lifts1, built1, lifts2, coal_mines_of(s, s.ai));
+            check(lifts1 > 0 && built1 == 0, "R8 (c) not vacuous: the first evaluation lifts, but cannot afford the mine");
+            check(lifts2 == 0 && coal_mines_of(s, s.ai) == 0,
+                  "R8 (c) the next evaluation, without the refused candidate, is vetoed again (no memory)");
+        }
+        // (d) the PLAYER's corp is never a chain start, even when a spectated
+        // session evaluates it like a rival: the same staging as (a), with the
+        // AI corp made the seat and the scorer told it is spectating.
+        {
+            scene s = staged();
+            s.w.corporations.at(s.ai).is_player = true;
+            s.w.corporations.at(s.pl).is_player = false;
+            s.w.player_entity = s.ai;
+            corp_ai_params sp;
+            sp.spectating = true;
+            int lifts = 0;
+            bool evaluated = false;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t, sp);
+                lifts += lifts_for(rep, s.ai);
+                for (const entity_id c : rep.corps_evaluated)
+                    if (c == s.ai) evaluated = true;
+            }
+            std::printf("  (d) seat under spectate: evaluated %s, lifts %d, coal mines %d\n",
+                        evaluated ? "yes" : "no", lifts, coal_mines_of(s, s.ai));
+            check(evaluated, "R8 (d) not vacuous: under spectate the seat IS evaluated like a rival");
+            check(lifts == 0 && coal_mines_of(s, s.ai) == 0,
+                  "R8 (d) the player's corp is excluded from the chain start: no lift, no mine");
+        }
+    }
+
+    // R9 (BL-1227 review round 3; Ben 2026-10-07/08: "a buyer that takes goods
+    // without posting a bid is still a buyer"). Market A has cleared (it bids
+    // for steel) and nobody bids for or lists coal there. Its only coal
+    // consumer is the player's coal_steel plant, fed from the player's own
+    // pool — it posts no bid. Through run_economy_step (production, then the
+    // scorer), in play: while that plant RUNS, its draw is a bid and a third
+    // corp builds the coal mine; with the plant IDLED (decommissioned), it
+    // draws nothing, is no buyer, and the mine stays vetoed.
+    std::printf("R9 a running consumer fed from its own pool is a bid (run_economy_step, in play)\n");
+    {
+        auto mines_for = [&](bool plant_idled) {
+            scene s = make_scene(); place_bound(s, reg);
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
+            s.w.corporations.at(s.ai).balance = 1.0f; // the processing-focus AI stays out (no chain start)
+            const entity_id ct = tile_at(s.w, s.body, 2, 2);
+            s.w.tiles.at(ct).resource_deposit[r_coal]   = 1.0f;
+            s.w.tiles.at(ct).resource_remaining[r_coal] = 1.0e6f;
+            add_plant(s, reg, s.pl, 0, 3, 1.0f, plant_idled);
+            // The mine-builder: holds ground in A whose tile already carries a
+            // processor, so it offers no processor candidate (and refuses none).
+            const entity_id other = s.w.create_entity();
+            corporation_component oc;
+            oc.name = "Other"; oc.balance = 1.0e6f; oc.starting_capital = 1.0e6f;
+            oc.focus = industrial_focus::extraction;
+            const entity_id t = tile_at(s.w, s.body, 3, 1);
+            const entity_id anchor = s.w.create_entity();
+            building_component a{};
+            a.tile = t; a.type = building_type::extraction_site;
+            a.target_resource = resource_type::iron_ore; a.workforce_assigned = 0.5f;
+            s.w.buildings[anchor] = a;
+            const entity_id plant = s.w.create_entity();
+            building_component pb{};
+            pb.tile = t; pb.type = building_type::processing_facility;
+            pb.recipe = reg.recipe_id("steel_forge"); pb.target_resource = resource_type::machinery;
+            pb.workforce_assigned = 0.5f; pb.workforce_auto = false;
+            s.w.buildings[plant] = pb;
+            oc.assets = {anchor, plant};
+            s.w.corporations[other] = oc;
+            bool ran = false;
+            for (int t2 = 1; t2 <= 4; ++t2)
+            {
+                s.w.pool_at(s.pl, s.a).quantities[r_coal] = 1000.0f;
+                s.w.current_econ_tick = t2;
+                const economy_report rep = run_economy_step(s.w, reg);
+                for (const building_report& br : rep.buildings)
+                    if (br.corp == s.pl && br.type == building_type::processing_facility && br.active) ran = true;
+            }
+            int mines = 0;
+            for (const entity_id b : s.w.corporations.at(other).assets)
+                if (const auto it = s.w.buildings.find(b);
+                    it != s.w.buildings.end() && it->second.type == building_type::extraction_site
+                    && it->second.target_resource == resource_type::coal)
+                    ++mines;
+            return std::make_pair(ran, mines);
+        };
+        const auto [ran_on, mines_on]   = mines_for(false);
+        const auto [ran_off, mines_off] = mines_for(true);
+        std::printf("  plant running: ran %s, coal mines %d | plant idled: ran %s, coal mines %d\n",
+                    ran_on ? "yes" : "no", mines_on, ran_off ? "yes" : "no", mines_off);
+        check(ran_on, "R9 not vacuous: the player's plant runs on its own pool's coal");
+        check(mines_on > 0, "R9 a market whose only consumer is a running processor fed from its own pool does not veto a mine");
+        check(!ran_off && mines_off == 0, "R9 the same market with the processor idled: no buyer, the mine is vetoed");
+    }
+
+    // R10 (BL-1217 G1b R1, AI_OPPONENT.md "A recipe switch is judged on supply
+    // too", Ben 2026-10-09): THE REFLEX RESCUE IS JUDGED ON SUPPLY. P (coal_steel,
+    // steel floored) may be rescued onto iron_forge (iron ore -> machinery,
+    // dear). With 1,000 iron ore in the AI's own pool and no iron producer in
+    // reach, the rescue is REFUSED (stock no longer admits a switch); with a
+    // player-owned iron mine in A producing this tick, it switches (control).
+    std::printf("R10 the reflex rescue is judged on supply alone (one run_economy_step, in play)\n");
+    {
+        constexpr std::size_t r_iron = static_cast<std::size_t>(resource_type::iron_ore);
+        recipe_registry reg10 = make_registry();
+        recipe iron_forge;
+        iron_forge.name  = "iron_forge";
+        iron_forge.group = "Forge";
+        iron_forge.inputs [r_iron] = 1.0f;
+        iron_forge.outputs[r_mach] = 1.0f;
+        reg10.add_recipe(iron_forge);
+        auto rescue = [&](bool iron_mine) {
+            scene s = make_scene(); place_bound(s, reg10);
+            for (auto& [mid, m] : s.w.markets)
+            {
+                (void)mid;
+                m.base_price[r_iron] = 1.0f;
+                m.price[r_iron]      = 1.0f;
+                m.price[r_steel]     = 0.1f * m.base_price[r_steel];
+                m.price[r_mach]      = m.base_price[r_mach];
+            }
+            const entity_id p = add_plant(s, reg10, s.ai, 1, 2, 1.0f, /*idled=*/false);
+            s.w.buildings.at(p).ai_cooldown = 1000; // any switch is the reflex's
+            s.w.pool_at(s.ai, s.a).quantities[r_iron] = 1000.0f;
+            entity_id mine = null_entity;
+            if (iron_mine)
+            {
+                const entity_id t = tile_at(s.w, s.body, 2, 3);
+                s.w.tiles.at(t).resource_deposit[r_iron]   = 1.0f;
+                s.w.tiles.at(t).resource_remaining[r_iron] = 1.0e6f;
+                mine = s.w.create_entity();
+                building_component b{};
+                b.tile = t; b.type = building_type::extraction_site;
+                b.target_resource = resource_type::iron_ore; b.workforce_assigned = 0.5f;
+                s.w.buildings[mine] = b;
+                s.w.corporations.at(s.pl).assets.push_back(mine);
+            }
+            s.w.current_econ_tick = 1;
+            const economy_report rep = run_economy_step(s.w, reg10);
+            bool mine_ran = false;
+            for (const building_report& br : rep.buildings)
+                if (br.building == mine && br.active) mine_ran = true;
+            return std::make_pair(s.w.buildings.at(p).recipe, mine_ran);
+        };
+        const uint16_t cs = reg10.recipe_id("coal_steel");
+        const uint16_t fr = reg10.recipe_id("iron_forge");
+        const auto [rc_pool, ran_pool] = rescue(false);
+        const auto [rc_mine, ran_mine] = rescue(true);
+        (void)ran_pool;
+        std::printf("  pool only -> %s | iron mine in A (ran %s) -> %s\n",
+                    reg10.get_recipe(rc_pool) ? reg10.get_recipe(rc_pool)->name.c_str() : "?",
+                    ran_mine ? "yes" : "no",
+                    reg10.get_recipe(rc_mine) ? reg10.get_recipe(rc_mine)->name.c_str() : "?");
+        check(rc_pool == cs,
+              "R10 reflex: iron ore only in the corp's pool, no producer in reach -> the rescue is refused");
+        check(ran_mine && rc_mine == fr,
+              "R10 reflex: an iron mine in A producing this tick -> the rescue switches (control)");
+    }
+
+    // R11 (BL-1217 G1b R2, AI_OPPONENT.md § 11, "Spare supply counts what
+    // households and the background take", Ben 2026-10-09): THE PLAY FORM. One
+    // mine in A co-extracting coal and iron ore. Households live in N, which A's
+    // goods reach (N prices both dearer); N's shelf holds 1 unit of each, so at
+    // the clear the households' coal FILL (1) is below the mine's output, which
+    // is below their BID, and the background's iron fill (1) likewise. One real
+    // economy step and clear (run_settle_tick's order); then the supply clause,
+    // reading that step's report, must charge N exactly what those channels
+    // DREW: spare(coal) = coal out - household_fill, spare(iron) = iron out -
+    // background_fill. Reading the bid (charge capped at the output: spare 0)
+    // or dropping the background (spare = the whole output) fails it. The
+    // ceiling is off so the cleared price cannot drop the producer from the set.
+    std::printf("R11 the supply clause charges the last clear's household and background fills (play)\n");
+    {
+        constexpr std::size_t r_iron = static_cast<std::size_t>(resource_type::iron_ore);
+        recipe_registry reg11 = make_registry();
+        {
+            price_band_params pb = reg11.price_band();
+            pb.reservation_mult = 0.0f; // ceiling OFF: set membership is price-blind
+            reg11.set_price_band(pb);
+            population_demand_params pd = reg11.population_demand();
+            pd.demand_scale = 1.0f;
+            pd.demand_basket[r_coal] = 10.0f;
+            reg11.set_population_demand(pd);
+            background_demand_params bd = reg11.background_demand();
+            bd.demand_scale = 1.0f;
+            bd.demand_basket[r_iron] = 2.0f;
+            bd.consumes = true;
+            reg11.set_background_demand(bd);
+        }
+        scene s = make_scene();
+        for (auto& [mid, m] : s.w.markets)
+        {
+            const float p = (mid == s.n) ? 3.0f : 1.0f; // N dearer: A's goods reach it
+            m.base_price[r_coal] = p; m.price[r_coal] = p;
+            m.base_price[r_iron] = p; m.price[r_iron] = p;
+        }
+        const entity_id t = tile_at(s.w, s.body, 2, 3);
+        s.w.tiles.at(t).resource_deposit[r_coal]   = 1.0f;
+        s.w.tiles.at(t).resource_remaining[r_coal] = 1.0e6f;
+        s.w.tiles.at(t).resource_deposit[r_iron]   = 1.0f;
+        s.w.tiles.at(t).resource_remaining[r_iron] = 1.0e6f;
+        const entity_id mine = s.w.create_entity();
+        {
+            building_component b{};
+            b.tile = t; b.type = building_type::extraction_site;
+            b.target_resource = resource_type::coal; b.workforce_assigned = 0.5f;
+            s.w.buildings[mine] = b;
+            s.w.corporations.at(s.pl).assets.push_back(mine);
+        }
+        const entity_id centre = s.w.create_entity();
+        {
+            population_centre_component pc{};
+            pc.scale = 10;
+            s.w.population_centres[centre] = pc;
+            s.w.population_centre_tile[centre] = tile_at(s.w, s.body, 6, 1);
+        }
+        {
+            market_component& mn = s.w.markets.at(s.n);
+            mn.inventory[r_coal] = 1.0f;
+            mn.inventory[r_iron] = 1.0f;
+        }
+        // The processing AI stays out: a coal plant it started this step would
+        // be a committed processor draw on the same spare (BL-1234), not R2's.
+        s.w.corporations.at(s.ai).balance = 1.0f;
+        s.w.current_econ_tick = 1;
+        economy_report rep = run_economy_step(s.w, reg11);
+        (void)clear_markets(s.w, reg11, rep); // the clear, as run_settle_tick runs it
+        const market_component& m = s.w.markets.at(s.n);
+        input_reach ir = make_input_reach(s.w, reg11);
+        ir.report = &rep;
+        const building_component& mb = s.w.buildings.at(mine);
+        const float oc = building_output(s.w, reg11, mine, mb, r_coal, &rep);
+        const float oi = building_output(s.w, reg11, mine, mb, r_iron, &rep);
+        const float sc = reachable_supply(s.w, reg11, ir, s.a, r_coal, null_entity).spare;
+        const float si = reachable_supply(s.w, reg11, ir, s.a, r_iron, null_entity).spare;
+        const bool  a_n = market_within_reach(s.w, reg11, ir, s.a, s.n, r_coal)
+                       && market_within_reach(s.w, reg11, ir, s.a, s.n, r_iron)
+                       && market_for_tile(s.w, tile_at(s.w, s.body, 6, 1)) == s.n
+                       && market_for_tile(s.w, t) == s.a;
+        std::printf("  N: coal hh bid %.3f fill %.3f, iron bg bid %.3f fill %.3f | A's mine: coal %.3f -> "
+                    "spare %.3f, iron %.3f -> spare %.3f (A reaches N %d)\n",
+                    m.household_bid[r_coal], m.household_fill[r_coal], m.background_bid[r_iron],
+                    m.background_fill[r_iron], oc, sc, oi, si, a_n ? 1 : 0);
+        auto near = [](float a, float b) { return std::fabs(a - b) <= 1e-3f * std::max(1.0f, std::fabs(b)); };
+        check(a_n && oc > 0.0f && oi > 0.0f,
+              "R11 not vacuous: the mine produced coal and iron ore this tick, and A reaches N");
+        check(m.household_fill[r_coal] > 0.0f && m.household_fill[r_coal] < oc && oc < m.household_bid[r_coal],
+              "R11 not vacuous: households' coal fill < the mine's output < their bid (a bid reading differs)");
+        check(m.background_fill[r_iron] > 0.0f && m.background_fill[r_iron] < oi,
+              "R11 not vacuous: the background drew iron ore in N, less than the mine's output");
+        check(near(sc, oc - m.household_fill[r_coal] - m.background_fill[r_coal]),
+              "R11 coal spare = output - the households' FILL at the last clear (not their bid)");
+        check(near(si, oi - m.household_fill[r_iron] - m.background_fill[r_iron]),
+              "R11 iron spare = output - the background's FILL at the last clear");
+    }
+
+    // R12 (BL-1217 G1b R2): A FINAL DRAW REACHED BY SEVERAL PRODUCERS IS CHARGED
+    // ONCE, SHARED. Coal mines in A and N, households drawing coal in A only
+    // (generation form: no report, basket at base), A's coal priced so N
+    // reaches A. A's spare is both outputs less the households' draw ONCE.
+    std::printf("R12 a final buyer reached by two producer markets is charged once (generation form)\n");
+    {
+        recipe_registry reg12 = make_registry();
+        {
+            price_band_params pb = reg12.price_band();
+            pb.reservation_mult = 0.0f; // ceiling OFF: reach is the dispatch gate alone
+            reg12.set_price_band(pb);
+            population_demand_params pd = reg12.population_demand();
+            pd.demand_scale = 1.0f;
+            pd.demand_basket[r_coal] = 0.5f;
+            reg12.set_population_demand(pd);
+        }
+        scene s = make_scene(); place_bound(s, reg12);
+        const entity_id ma = add_mine(s, 2, 3);
+        const entity_id mn = add_mine(s, 6, 3);
+        const entity_id centre = s.w.create_entity();
+        population_centre_component pc{};
+        pc.scale = 10;
+        s.w.population_centres[centre] = pc;
+        s.w.population_centre_tile[centre] = tile_at(s.w, s.body, 0, 1);
+        input_reach ir = make_input_reach(s.w, reg12);
+        const bool n_reaches_a = market_within_reach(s.w, reg12, ir, s.n, s.a, r_coal);
+        const bool a_market    = market_for_tile(s.w, tile_at(s.w, s.body, 0, 1)) == s.a
+                              && market_for_tile(s.w, tile_at(s.w, s.body, 2, 3)) == s.a
+                              && market_for_tile(s.w, tile_at(s.w, s.body, 6, 3)) == s.n;
+        const float oa = building_output(s.w, reg12, ma, s.w.buildings.at(ma), r_coal, nullptr);
+        const float on = building_output(s.w, reg12, mn, s.w.buildings.at(mn), r_coal, nullptr);
+        const float hh = 10.0f * reg12.population_demand_basket()[r_coal];
+        const float sp = reachable_supply(s.w, reg12, ir, s.a, r_coal, null_entity).spare;
+        std::printf("  outputs A %.3f N %.3f, households in A draw %.3f -> spare at A %.3f (N reaches A %d)\n",
+                    oa, on, hh, sp, n_reaches_a ? 1 : 0);
+        check(n_reaches_a && a_market && oa > 0.0f && on > 0.0f && hh > 0.0f && hh < oa + on,
+              "R12 not vacuous: two producer markets in A's set, one household draw in A");
+        check(std::fabs(sp - (oa + on - hh)) < 1e-3f,
+              "R12 the households' draw is charged ONCE over the set (spare = A + N - draw, not A + N - 2 x draw)");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,

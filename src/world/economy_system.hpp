@@ -12,6 +12,7 @@
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono> // economy_step_phase_clock (BL-1117)
 #include <map>
@@ -244,6 +245,25 @@ struct shelf_phase_audit
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
+/// BL-1217 (AI_OPPONENT.md § 11, the dial reads posted demand plus pool-fed
+/// running processor draws, Ben 2026-10-09 as narrowed): one processor's dial
+/// record for a tick. `room[r]` is set where the want is posted
+/// (run_processing): the full-run need less what it posts as DEMAND, i.e. what
+/// its pool covered then (the whole need where the ceiling silenced the want,
+/// since a silenced want is not demand). Every pool draw, either turn, fills
+/// `drawn` only up to the room left — a top-up draw off a pool a sibling
+/// refilled is a unit this processor already put in demand, and counts once.
+struct proc_dial_draw
+{
+    std::array<float, resource_count> room  = {};
+    std::array<float, resource_count> drawn = {};
+    void take(std::size_t r, float from_pool)
+    {
+        const float c = std::min(from_pool, std::max(0.0f, room[r]));
+        if (c > 0.0f) { drawn[r] += c; room[r] -= c; }
+    }
+};
+
 struct economy_report
 {
     std::vector<building_report> buildings;
@@ -325,6 +345,16 @@ struct economy_report
     /// sorted-accumulation reason.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
 
+    /// BL-1217 G1b R3: PROCESSORS' want only (run_processing) — what each
+    /// wanted from the market for a full run, less its own pool: the part the
+    /// fair-price ceiling admitted (ALSO in `wants`) PLUS the part it silenced
+    /// (ALSO in `hauler_wants`; Ben 2026-10-09). Construction and upkeep never
+    /// write here. Never summed into `mc.demand` and never paid against: the
+    /// ceiling still keeps the silenced part out of the price. clear_markets copies it to
+    /// `market_component::processor_want`, the shelf the background pull
+    /// leaves (MARKETS.md step 3). Same key, same sorted std::map as `wants`.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> processor_wants;
+
     /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
     /// hauler sees as unmet demand", Ben 2026-10-05): the HAULER-ONLY want — a
     /// processor's input and a construction site's material that went unbid
@@ -334,6 +364,19 @@ struct economy_report
     /// to `market_component::hauler_want`, which only the dispatcher's room
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
+
+    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): per processor on
+    /// a market, its pool-fed draws this tick that it did NOT also post as
+    /// demand (`proc_dial_draw`), across both turns. Transient: read once, right
+    /// after the production pass, by `collect_dial_pool_draws`.
+    std::map<entity_id, proc_dial_draw> dial_pool_draws;
+
+    /// BL-1217: this tick's dial record per (market, good) — every input key a
+    /// processor that posted its want touched, the running ones' not-posted pool
+    /// draws summed (0 where none). clear_markets writes it to
+    /// `market_component::dial_pool_draw` (its only writer), beside this tick's
+    /// demand. Sorted std::map: fixed float order.
+    std::map<std::pair<entity_id, std::size_t>, float> dial_pool_sums;
 
     /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
     /// (`plan_short_shelves`), and each phase's own invariant audit
@@ -408,6 +451,20 @@ struct economy_report
     /// order is each producer's sorted walk, and the budget pass re-sorts into
     /// its own order anyway.
     std::vector<budget_claim> budget_claims;
+
+    /// BL-1227 (the chain start; AI_OPPONENT.md § 11, Ben 2026-10-07/08): every
+    /// mine candidate whose zero-bid veto was lifted this tick because the SAME
+    /// corporation, in the same evaluation, refused one of its own processor
+    /// candidates only for want of that input in that market. Reported only —
+    /// the lifted candidate then competes on its ordinary, unboosted score, so a
+    /// row here is not a build. Transient: a report is never saved.
+    struct chain_start_lift
+    {
+        entity_id     corp   = null_entity;
+        entity_id     tile   = null_entity;
+        resource_type target = resource_type::iron_ore;
+    };
+    std::vector<chain_start_lift> chain_start_lifts;
 
     /// What the national budget pass did this tick: per-nation / per-line
     /// detail, the total moved, and every transfer (who paid whom, for what).
@@ -789,6 +846,8 @@ enum class recipe_switch_result : uint8_t
     // retool, so the value became unreachable.
     tech_locked,          ///< BL-588: the corp has not earned the tech that unlocks the new recipe.
                           ///< The only method lock left at this door — see try_switch_recipe.
+    wrong_air,            ///< The new recipe cannot run on this building's body's air
+                          ///< (`recipe_runs_at_tile`; propellant routes, Ben 2026-10-09).
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
@@ -888,6 +947,33 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                 loss-maker only for cutting, so every dial the solver found in
 ///                 the other direction — the interior optimum it exists to find —
 ///                 scored negative and was silently discarded.
-int solve_workforce_target(const world& w, const recipe_registry& reg,
+/// @param bid_hold_ticks BL-1217 (AI_OPPONENT.md § 11, "the dial reads
+///                 stock-fed consumers", Ben 2026-10-09). -1 (the default; the
+///                 player's auto-solver) reads the plant's market's posted
+///                 demand alone. >= 0 (the background scorer passes its
+///                 cadence) reads posted demand plus the running processors'
+///                 not-posted pool draws held for that many ticks (`dial_bid`)
+///                 — never the build veto's composite bid — and forecasts an
+///                 output at its base price only on a market that lists none,
+///                 bids none and has never cleared ("The dial forecasts at base
+///                 where no fact exists yet"; `dial_forecasts_at_base`).
+int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank = 1, float* out_gain = nullptr);
+                           int stack_rank = 1, float* out_gain = nullptr,
+                           int bid_hold_ticks = -1);
+
+/// BL-1235 (dial hold outlasts reflex; AI_OPPONENT.md, "A plant the dial idled
+/// is not losing"): a background plant the workforce dial has set to zero. The
+/// dial is the only writer of a non-player building's `workforce_target`
+/// (set_workforce clears `workforce_auto`; the auto-solver runs on the player's
+/// corp only), so the stored pair is the whole record: no saved flag is needed.
+/// Its idle maintenance is the cost the dial chose to carry, so the loss reflex
+/// counts no streak against it; and the scorer's hold on it ends the moment its
+/// own forecast (`solve_workforce_target`) picks a target above zero again.
+inline bool dial_idled(const building_component& b)
+{
+    return !b.workforce_auto && b.workforce_target == 0 && !b.decommissioned
+        && b.ticks_remaining == 0
+        && (b.type == building_type::extraction_site
+            || b.type == building_type::processing_facility);
+}

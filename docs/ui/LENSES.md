@@ -50,6 +50,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
 | `throughput` | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
+| `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
 Identity colours live in `presentation.hpp`; the corporation-identity helper is
 `palette::corp_colour`.
@@ -268,10 +269,8 @@ its seat. The two lenses differ in exactly one thing — which population they
 admit — so a player who has learned to read one has learned to read the other,
 and the pair can be flipped between to compare.
 
-**Keyboard-cycle only for now.** It carries no distinct glyph yet and borrows the
-corporation mark, which is why it stays off the on-screen strip: an on-screen
-lens carries one distinct glyph, and Corp would be its immediate neighbour. It
-earns a strip slot when it earns a mark.
+**Glyph / access.** On the Planetary strip beside Corporation, with its own glyph
+distinct from the corporation mark (§ The strip rotates with the rung).
 
 ---
 
@@ -467,7 +466,7 @@ not a fixed set. Owned by BL-670 (rung-keyed lens strip).
 
 | Rung | On the strip |
 |---|---|
-| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput |
+| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow |
 | **Circumplanetary** | Market, Scarcity, Supply |
 | **Solar** | Supply, Reach, Supply-routes |
 
@@ -478,8 +477,10 @@ six of the twelve built lenses reachable only by the `L` / `Shift+L` cycle that 
 mentions. The keyboard cycle still reaches every lens from every rung; the strip is the discovery
 surface, not the only door.
 
-**Adding a lens means adding it to a rung row.** A lens named in no row is keyboard-only, which is
-a decision rather than an oversight only if it is written down.
+**Every lens has a glyph on the strip (Ben, 2026-10-07).** Each built lens sits in at least one
+rung row, and each carries its **own** glyph: no lens borrows another lens's mark, and no lens is
+keyboard-only. Adding a lens means adding it to a rung row and giving it a glyph in
+`src/ui/icons.*`, catalogued in ICONS.md.
 
 **Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
 (per-tile habitability), Industry (per-tile substrate throughput) and Throughput (the reach-cost
@@ -641,9 +642,8 @@ lens; nation borders are not what this lens asks.
 
 ## Scarcity lens
 
-**Off the on-screen bar.** The minimap bar holds eight glyphs; Scarcity is reached by
-**keyboard lens-cycle only**. The `overlay_mode::scarcity` render pass fires when selected by
-keyboard exactly as a bar lens would.
+**Glyph / access.** On the Planetary and Circumplanetary strips (§ The strip rotates with the
+rung), and in the keyboard lens-cycle.
 
 **Intent.** The inverse of the Resource lens: read the map as an *absence surface* — where a chosen
 good is **scarce or absent**, so the player sees gaps rather than concentrations. Answers "where is
@@ -679,8 +679,8 @@ so market supply/demand populate before capture. Verified by `scripts/verify/sca
 
 ## Industry lens
 
-**Off the on-screen bar.** Like Scarcity, Industry is reached by **keyboard lens-cycle only**;
-the `overlay_mode::industry` render pass is unaffected by its absence from the bar.
+**Glyph / access.** On the Planetary strip (§ The strip rotates with the rung), and in the
+keyboard lens-cycle.
 
 **Intent.** Read the map as a *rival-plant surface*: where the industry the player did **not**
 build already stands — distinct from where people live (the population-centre markers) and from
@@ -806,8 +806,8 @@ read `palette::activity_known` green; gone-cold routes grey
 (`activity_stale`) — the activity-fog convention. No tile re-skin. The
 body-marker glow belongs on the **Solar** canvas (rung table).
 
-**Glyph / access.** Reuses `icons::convoy` (a dedicated glyph is an open TODO in
-`ui::icons`); not on the strip — keyboard lens-cycle only.
+**Glyph / access.** On the Solar strip with its own glyph, distinct from the convoy
+chevron (§ The strip rotates with the rung).
 
 **Key.** The shared `draw_scroll_list_key` chrome, headed "Reach (your trade
 network)"; an unrouted body honestly says "no routes from this body".
@@ -826,8 +826,63 @@ row per lane touching the active body, a **log-scaled thickness bar** from
 saturates rather than dominating linearly), recency-tier colour shared with
 Reach. The Solar-canvas graph is the lens's inter-body representation (rung table).
 
-**Glyph / access.** Reuses `icons::supply`; off the strip, reached by the
-keyboard lens-cycle.
+**Glyph / access.** On the Solar strip with its own glyph, distinct from Supply's
+two lines, its strip neighbour (§ The strip rotates with the rung).
+
+## Trade-flow lens
+
+**Intent.** Where is my surplus going, and why is it not going where it is short? Supply
+shows convoys in flight and Supply-routes the lanes they carved; Trade-flow shows the
+**decision** behind them — what the player's dispatcher sent this pass, to where, at what
+landed price, and what it refused. Owned by BL-1222 (trade-flow lens). Ruled by Ben
+(2026-10-07, the lens form): a player lens over the player's own flows; the whole-world
+diagnosis stays headless (the market-viability skill's logistics row). **The player sees unmet
+want (Ben, 2026-10-08, the chain-start form):** the inputs a market's processors want and cannot
+get are shown to the player, on the market ledger or on this lens — which surface is open, and is
+asked of the player's question first. Owner: BL-1222 (trade-flow lens).
+
+**Visibility.** The player's own flows only (DISCOVERY.md § Competitor visibility). A market
+being short of a good is a public market signal; the refusal is a fact about the player's own
+surplus. No rival's shipments, shelves or refusals appear. A market's own shelf exports are
+no corporation's and do not appear either.
+
+**Surface (Planetary).**
+- **Flows** — one arrow per (source market, destination market, good) the player shipped,
+  width from units over a short trailing window, in the neutral logistics hue. Hover: good,
+  units, landed price (the destination price the dispatcher netted against its haul).
+- **Refusals** — a marker on each market of the active body that is short of a good the
+  player holds in surplus, coloured by the **best** class over the player's sources of
+  that good. Hover lists the classes by good.
+
+**The classes** name the corporation dispatcher's rule that refused, ranked by how far a
+destination got through those rules, best last:
+- **no lane** — another body, and no lane off this one.
+- **price gate** — the destination does not pay the margin over the source. The dispatcher
+  tests this before it prices a route.
+- **no route** — no road or sea leg reaches it.
+- **costly** — routed, but the haul eats the margin.
+- **no propellant** — a space lane, but the pool cannot fuel the launch.
+- **no room** — the destination cannot absorb more at the landed price.
+- **no funds** — the rule would send, but the player cannot pay for the convoy.
+- **room** — the rule would send, but the one-destination-per-pass rule or the LP cap held
+  it back.
+
+The market-viability skill's logistics row classifies **market shelf** exports, a
+different dispatcher with its own order; its labels are the tool's
+(`body / noroute / gate / costly / noroom / room`), not these.
+
+**Data.** The dispatcher records, for the player's corporation only, each pass's
+shipments and its best class per (good, destination market) as a transient output,
+tagged with the corporation it was taken for. The lens draws only passes taken for the
+corporation the player holds now, so a seat change shows nothing of the corporation
+left behind. The simulation never reads the record and it is not saved, so a loaded
+game shows the lens from its first pass on.
+
+**Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
+shared legend home.
+
+**Glyph / access.** On the Planetary strip with its own glyph (§ The strip rotates with the
+rung), and in the keyboard lens-cycle.
 
 ## Throughput lens
 
@@ -904,8 +959,7 @@ anchor ring follows the **marker** convention rather than the road-span one: the
 survey mask owns it, the vision fog does not dim it — an anchor is a city or a
 completed port, as public as the building glyph beside it.
 
-**Glyph / access.** Off the strip, keyboard lens-cycle only; reuses
-`icons::convoy` on the same terms Reach does, the lens it extends.
+**Glyph / access.** On the Planetary strip with its own glyph (`icons::throughput`).
 
 **Legend.** A fixed-height gradient key (§ Legend placement) on the **foreground**
 draw list with an opaque fill, so it is readable over the Selection band. It

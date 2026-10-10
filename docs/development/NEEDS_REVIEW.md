@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*84 entries — 7 open, 77 resolved.*
+*97 entries — 17 open, 80 resolved.*
 
 ---
 
@@ -121,7 +121,57 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 
 *Files: `docs/generation/seed_library.json`*
 
-### NR-980 — The player is a nation: six calls before the doc sweep
+### NR-980 — Trade-flow lens: may "no room" reflect rivals' cargo in flight to a market?
+*question · raised 2026-10-07 · from the BL-1222 (trade-flow lens) cold review, 2026-10-07*
+
+The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
+
+### NR-982 — Decisions taken on your behalf building "an order is a floor, not a hold" (BL-1229)
+*decision · raised 2026-10-07 · from the BL-1229 (steel stays home) build lane, 2026-10-07*
+
+Four readings of the ruling, taken as the lane built them (reversible): (1) the dispatch margin applies ON TOP of the floor - a haul from an ordered pool must beat the floor by the same margin it must beat home by (the floor acts as that pool's home price when it is higher); (2) several orders on one (corp, body, good): the HIGHEST floor binds; (3) a quantity cap limits only what is listed at home per tick, not what may be hauled; (4) REVERSED by the cold review (2026-10-07): a pool hauled empty must NOT close its order, or the haul then ships below the floor and the ruling breaks - a pool hauled from this tick counts as not empty. Floors almost never bind today (0.25-0.31x base, 3 of 782 surplus-ticks), so (1) and (2) rarely matter in play.
+
+### NR-983 — Decision taken on your behalf: spare supply stays a conservative estimate where several markets share one producer (BL-1233)
+*decision · raised 2026-10-08 · from the BL-1233 (processors to inputs) round 2 re-review, 2026-10-08*
+
+The sized test's spare (input_reach.cpp reachable_supply) charges each consumer market min(its draw, the output of the markets that reach it), split among those markets by output. Where one producer is reached by several hungry consumers it can still be charged past its output (P2 making 10, reached by C, Q1, Q2 each drawing 10 -> spare 0, true 10). This only ever REFUSES a plant that could stand, never admits one that cannot; the exact answer needs a small max-flow per input. TAKEN: accepted as a conservative estimate, with a code comment naming it. Reversible; say if you want the exact (max-flow) reading.
+
+### NR-984 — Decision taken on your behalf: a nation's want for a good nobody holds yet is recorded at its capital market
+*decision · raised 2026-10-08 · from the BL-1227 (idle mines) round 4 build and re-review*
+
+Your ruling: the space programme's / network upkeep's want counts as a bid "there", filled or not. When no pool or shelf anywhere holds the good, there is no "there" to read, so the build records the want at the nation's CAPITAL market. Effect: one such chain (propellant, spacecraft components) can start per nation, at its capital; once a plant exists the want follows the good. In play this took spacecraft-components plants from 0 to 22 on 5 seeds. TAKEN as built and written into AI_OPPONENT.md § 2B. Alternatives: every market of the nation (more starts, more idle risk), or the market nearest the nation's space infrastructure.
+
+### NR-985 — Decision taken on your behalf: an unpowered grid that no window can feed does not hold up the others (BL-1232)
+*decision · raised 2026-10-08 · from the BL-1232 (power plants per grid) re-review, 2026-10-08*
+
+Your ruling: unpowered grids first - every short grid gets a plant before any gets a second. The re-review found that a short grid NO chartering centre's window can feed (no market centre on it, or its feeding markets outside every window) would hold the rule forever: every power firm narrowed to it, found no ground, and the core stopped getting plants. TAKEN: such a grid is dropped from the unpowered set for that centre, so an unreachable grid never holds up the others; if nothing unpowered is reachable, every short grid is served. Reversible: the strict reading (the rule holds even for an unreachable grid) starves the body's core.
+
+### NR-987 — Decision taken on your behalf: 'never cleared' is read from the market's current state, not a stored first-clear tick (BL-1217 D3b)
+*decision · raised 2026-10-09 · from cold re-review of the BL-1217 D3 round 3 (a37f2099), sprint 50*
+
+Your ruling: the dial forecasts at base 'only on a market that has never cleared'; the build veto takes the same 'no clear yet: no signal' reading. Both now read market_has_cleared from fields only the clear writes (supply, demand, hauler_want) - fixing a real hole where a market spawned mid-step read as cleared. TAKEN: kept the state proxy. Gap: a market that HAS cleared but is wholly dead (no supply, demand or silenced want on any good) reads 'never cleared' again, so the veto gives no signal and the dial forecasts at base there - the old test had the same gap. Practically unreachable today (off-world markets get interbody demand; home markets carry people). Reversible: a set-once first-clear tick on the market would close it exactly, at the cost of a saved field (another save bump).
+
+### NR-988 — Decision taken on your behalf: a non-player roster corporation left with no holdings stays on legacy and no-budget worlds (BL-1217 D6)
+*decision · raised 2026-10-09 · from the BL-1217 D5/D6 harness audit, sprint 50*
+
+Your rulings bound every processor by want and unplace a recipe-less processor whose default output is unwanted. On the LEGACY landscape apply (no budget, refused budget or no specialists) that leaves 1 non-player roster corporation with no holdings (2 in two cases); the budget path - every shipped campaign - removes the roster right after, and the player is never left holdless. TAKEN: leave the holdless corporation as is (it holds cash and a seat in the roster, acts on nothing). Reversible: remove a non-player roster corporation that ends generation with no holdings.
+
+### NR-989 — Novel work: road generation SNAPS a new road onto an existing one beside it (BL-1252, no parallel roads)
+*novel-work · raised 2026-10-09 · from the BL-1252 lane, sprint 50*
+
+To remove the parallel roads the ruled stale-flood reuse leaves, the lane added a new mechanism rather than re-pricing: before stamp_edge lays a route, any stretch that would lay 2+ consecutive new land tiles within one cell of an existing road is re-walked over that road, kept only if it lays fewer new tiles. Pricing and flood reuse are unchanged. Long parallels 235 -> 47 at 1.04x the time; road tiles -4.4%. LOGISTICS.md section 4 owns it. Flagged because it reshapes what is laid after pricing - a new kind of rule in generation. An income cost on the 5 tuning seeds is being re-measured on the current tip before the merge call.
+
+### NR-990 — Novel work: verify fixtures that fabricate world state (sea_route_fixture lays Ports; air_gate inserts an unreachable airless works)
+*novel-work · raised 2026-10-09 · from the sprint 50 scripted visual checks lane*
+
+To verify the air gate and the sea-route lane headlessly, the verify API gained accessors that build world state no game path would: sea_route_fixture lays two Ports to make a sea pair with real land legs, and air_gate inserts an electrolysis works on an airless body the player cannot reach. Verify-only (bound behind --verify), deterministic, nothing in play changes. No doc owns the rule for when a verify fixture may fabricate state rather than find it; flagged so the precedent is chosen, not accreted. Also new: verify corp_command reads recipe_name/target_name/quantity, validated.
+
+### NR-992 — Novel work: retire corporation pools - all production lands on market shelves (Ben, 2026-10-10)
+*novel-work · raised 2026-10-09 · from Ben, sprint 50 close, the market stock form*
+
+Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT.
+
+### NR-1020 — The player is a nation: six calls before the doc sweep
 *question · raised 2026-10-08 · from Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)*
 
 Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.
@@ -1434,4 +1484,25 @@ BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their allo
 > **RESOLVED.** SUPERSEDED by Ben's ruling (the charter walk form, 2026-10-05): option A - the charter walk counts derived demand (a processor's input demand is demand it fills), so steel and every intermediate are chartered in their own right; written into CORPORATION_GENERATION.md sec Pass 6. The raw-input special case is replaced by it.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-981 — Decision taken on your behalf: electronics STAYS in the background stopgap (the household rung that was to take it was cancelled)
+*decision · raised 2026-10-07 · from the BL-1226 (background pull per doc) cold review, 2026-10-07*
+
+MARKETS.md said electronics "left" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to "leaves it when the metropolis rung takes it, and not before". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.
+
+> **RESOLVED.** Ben, 2026-10-07 (the path form): keep electronics in the stopgap, as now.
+
+### NR-986 — Question: should the player's seat get its dial-zeroed plants back on auto at the handoff? (BL-1235)
+*question · raised 2026-10-09 · from cold review of the BL-1235 (dial hold outlasts reflex) merge 3bca733a, sprint 50*
+
+With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothballed; it reaches the handoff with workforce_auto off and target 0. On the corp the player takes, the scorer and the reflex stop acting, and the player's auto-solver skips it (workforce_auto off), so nothing re-raises it until the player touches each plant. Before, the same plants arrived mothballed, which also needed a player action - not a regression in kind, but it bears on G1 (plants running at handoff) for the seat. CALL: hand the seat's dial-zeroed plants back to auto at the handoff (workforce_auto on), or leave them as the rival left them?
+
+> **RESOLVED.** Ben, 2026-10-09 (propellant form): yes - the seat's dial-idled plants return to auto at the handoff. Written into AI_OPPONENT.md beside BL-1235.
+
+### NR-991 — Question: the held AI power-plant gate is written as design but is not on the sprint branch and no open item owns it (BL-1232, power plants per grid)
+*question · raised 2026-10-10 · from sprint 50 close: the doc check*
+
+AI_OPPONENT.md § Candidate enumeration ('A power-plant candidate is priced against its grid's shortfall', Ben 2026-10-07) and PRODUCTION.md § Power ('The scorer's power-plant estimate reads the same per-grid gap, and counts plants already under construction') state the scorer's power gate as the design. The code does not do it: corp_ai.cpp scores power recipes like any other processor group (~1586-1796); the gate exists only on branch bl1232-gate-remeasure (14969c85), unmerged, HELD by Ben. BL-1232 (power plants per grid) is complete, so no open item owns the held part. CALL: (a) file a backlog item that re-measures and merges the gate, docs unchanged; or (b) withdraw the rule from both docs until it is re-ruled.
+
+> **RESOLVED.** Ben, 2026-10-10 (doc-check form): file an item to re-measure the gate on the current tip, then merge or drop -> BL-1263 (power gate remeasure). Also ruled: power inputs read the grid too -> BL-1264 (power input on grid).
 

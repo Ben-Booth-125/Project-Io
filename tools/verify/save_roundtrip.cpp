@@ -128,6 +128,23 @@ int main()
         // BL-1203: the hauler's room fields (world_save_version 36).
         w.markets.at(hh_market).household_weight[hh_food] = 3.375f;
         w.markets.at(hh_market).hauler_want[hh_food]      = 9.625f;
+        w.markets.at(hh_market).unposted_bid[hh_food]      = 4.875f; // BL-1227
+        w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
+        w.markets.at(hh_market).dial_pool_draw[hh_food]      = 1.625f; // BL-1217
+        w.markets.at(hh_market).dial_pool_draw_tick[hh_food] = 4321;   // BL-1217
+        w.markets.at(hh_market).background_fill[hh_food]     = 5.875f; // BL-1217 G1b R2
+    }
+
+    // BL-1217 D5 (world_save_version 39): the held opening stock. Generation
+    // seeds it, but pin a distinctive value on the lowest pool's food slot so
+    // the round trip is checked by VALUE. The pool is raised to cover it, as
+    // the clear would leave it; the reader rejects only a hold with no pool.
+    std::pair<entity_id, entity_id> held_key{null_entity, null_entity};
+    if (!w.corp_market_pools.empty())
+    {
+        held_key = w.corp_market_pools.begin()->first;
+        w.corp_market_pools.at(held_key).quantities[hh_food] += 5.0f;
+        w.opening_stock_held[held_key][hh_food] = 2.625f;
     }
 
     // BL-614: same treatment for the building record's newest field — the
@@ -231,6 +248,28 @@ int main()
         w.corporations.at(filing_corp).origin_region = 3;
     }
 
+    // world_save_version 41 (propellant routes follow the body's air, Ben
+    // 2026-10-09): `body_component::atmosphere`, copied from each body's
+    // generated profile. Census first: the generated world must carry BOTH an
+    // airless body and one with air, or the copy never ran (every body would
+    // sit at the `moderate` default) and P1's byte-equality would pass over a
+    // dropped byte on a uniform column.
+    int atmos_by_class[4] = {0, 0, 0, 0};
+    int airless_bodies = 0, aired_bodies = 0;
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        if (bc.type == body_type::star)
+            continue; // no surface, never generated
+        ++atmos_by_class[static_cast<int>(bc.atmosphere) & 3];
+        if (atmosphere_is_airless(bc.atmosphere)) ++airless_bodies; else ++aired_bodies;
+    }
+    std::printf("     bodies by atmosphere (star excluded): none %d  thin %d  moderate %d  thick %d"
+                "  -> airless %d, with air %d\n",
+                atmos_by_class[0], atmos_by_class[1], atmos_by_class[2], atmos_by_class[3],
+                airless_bodies, aired_bodies);
+    check(airless_bodies > 0 && aired_bodies > 0,
+          "P1 v41: the generated world copies each body's atmosphere (an airless body AND one with air)");
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------
@@ -244,6 +283,17 @@ int main()
     const std::string bytes_twice = read_ok ? to_bytes(loaded) : std::string();
     check(read_ok && bytes_once == bytes_twice,
           "P1 re-serialising the loaded world reproduces the snapshot byte for byte");
+
+    // v41: every body's atmosphere survives by VALUE.
+    {
+        bool same = read_ok && loaded.bodies.size() == w.bodies.size();
+        for (const auto& [bid, bc] : w.bodies)
+        {
+            const auto lit = loaded.bodies.find(bid);
+            same = same && lit != loaded.bodies.end() && lit->second.atmosphere == bc.atmosphere;
+        }
+        check(same, "P1 v41: body_component::atmosphere round-trips by value on every body");
+    }
 
     // BL-613: the qualification fraction survives by VALUE, not just by byte
     // agreement of the two writes.
@@ -276,6 +326,49 @@ int main()
                   && mit->second.household_weight[hh_food] == 3.375f
                   && mit->second.hauler_want[hh_food] == 9.625f,
               "P1 market household_weight / hauler_want (BL-1203) round-trip at their written values");
+    }
+    if (hh_market != null_entity)
+    {
+        const auto mit = loaded.markets.find(hh_market);
+        check(read_ok && mit != loaded.markets.end()
+                  && mit->second.unposted_bid[hh_food] == 4.875f
+                  && mit->second.unposted_bid_tick[hh_food] == 1234,
+              "P1 market unposted_bid / unposted_bid_tick (BL-1227, world_save_version 38) round-trip at their written values");
+    }
+    check(held_key.first != null_entity,
+          "P1 the fixture holds a corporation pool, so the opening_stock_held rows below are not vacuous (BL-1217 D5)");
+    if (held_key.first != null_entity)
+    {
+        const auto hit = loaded.opening_stock_held.find(held_key);
+        check(read_ok && hit != loaded.opening_stock_held.end()
+                  && hit->second[hh_food] == 2.625f
+                  && loaded.opening_stock_held.size() == w.opening_stock_held.size(),
+              "P1 opening_stock_held (BL-1217 D5, world_save_version 39) round-trips at its written value, every record kept");
+
+        // A hold whose pool is gone cannot have been written (the clear drops
+        // it): the reader refuses the stream whole.
+        world orphan = w;
+        orphan.opening_stock_held[std::make_pair(held_key.first, entity_id{0x7FFFFFF0u})][hh_food] = 1.0f;
+        world sink;
+        check(!from_bytes(to_bytes(orphan), sink),
+              "P1 a held opening-stock record with no pool behind it is rejected (BL-1217 D5)");
+    }
+    // BL-1217 (review): not guarded on a market existing -- a fixture with no
+    // market would make the row pass vacuously, so its absence FAILS it.
+    check(hh_market != null_entity,
+          "P1 the fixture carries a market for the v40 dial_pool_draw row (never vacuous)");
+    {
+        const auto mit = loaded.markets.find(hh_market);
+        check(read_ok && hh_market != null_entity && mit != loaded.markets.end()
+                  && mit->second.dial_pool_draw[hh_food] == 1.625f
+                  && mit->second.dial_pool_draw_tick[hh_food] == 4321,
+              "P1 market dial_pool_draw / dial_pool_draw_tick (BL-1217, world_save_version 40) round-trip at their written values");
+    }
+    {
+        const auto mit = loaded.markets.find(hh_market);
+        check(read_ok && hh_market != null_entity && mit != loaded.markets.end()
+                  && mit->second.background_fill[hh_food] == 5.875f,
+              "P1 market background_fill (BL-1217 G1b R2, world_save_version 43) round-trips at its written value");
     }
 
     // BL-614: likewise for the wage bid.
@@ -993,8 +1086,12 @@ int main()
         cv.cargo_resource = resource_type::ordnance; cv.cargo_qty = 12.5f;
         cv.progress = 0.375f; cv.speed = 2.25f; cv.corp = c1; cv.arrived = false;
         cv.id = 9; cv.held = true; cv.cost_paid = 44.5f;
+        cv.origin_tile = 301; cv.port_a = 302; cv.port_b = 303; // BL-1195 (v42)
         f.convoys.push_back(cv);
         cv.mode = convoy_mode::space; cv.id = 10; cv.held = false; cv.arrived = true;
+        // Distinct from convoy 0's, and port_a left null while port_b is set, so a
+        // reader that swapped or dropped a field breaks the by-hand check below.
+        cv.origin_tile = 401; cv.port_a = null_entity; cv.port_b = 403;
         f.convoys.push_back(cv);
 
         f.trade_routes.push_back({ b1, b2, c1, 1234, 7 });
@@ -1061,8 +1158,12 @@ int main()
             // on both sides.
             check(back.convoys.size() == 2 && back.convoys[0].mode == convoy_mode::sea
                       && back.convoys[0].held && back.convoys[0].cargo_qty == 12.5f
-                      && back.convoys[1].arrived && back.convoys[1].mode == convoy_mode::space,
-                  "P8 convoy fields land in the right members");
+                      && back.convoys[1].arrived && back.convoys[1].mode == convoy_mode::space
+                      && back.convoys[0].origin_tile == 301 && back.convoys[0].port_a == 302
+                      && back.convoys[0].port_b == 303 && back.convoys[1].port_a == null_entity
+                      && back.convoys[1].origin_tile == 401
+                      && back.convoys[1].port_b == 403,
+                  "P8 convoy fields land in the right members (BL-1195: the route's waypoints)");
             check(back.body_last_glimpse_tick.at(b2) == -3,
                   "P8 a negative glimpse tick survives (no unsigned round trip)");
             check(back.buy_orders.size() == 1 && back.buy_orders[0].preferred_seller == c1

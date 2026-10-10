@@ -7,7 +7,10 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <vector>
+
+struct input_reach;
 
 struct generation_progress; // hard_coded_world.hpp; the loading screen's write-only tap
 
@@ -204,6 +207,18 @@ void move_seat_force(world& w, entity_id previous, entity_id corp);
 /// still under construction is refunded rather than disarmed unpaid.
 /// Deterministic and draw-free. Returns the credits refunded.
 float seat_clean_slate(world& w, entity_id corp);
+
+/// NR-986 — AT THE HANDOFF THE SEAT'S DIAL-IDLED PLANTS RETURN TO AUTO (Ben,
+/// 2026-10-09; AI_OPPONENT.md). The scorer stops acting on the corporation the
+/// player takes, so a plant its workforce dial left at zero (`dial_idled`,
+/// economy_system.hpp) would otherwise stay at zero until the player touched
+/// it. Each such plant of @p corp gets `workforce_auto = true`, as every plant
+/// the player builds starts; nothing else is written (the auto-solver sets its
+/// target on the next economy step). Called by both ways a seat is taken at the
+/// handoff — the draw (`seat_player_corporation`) and the pick
+/// (`corp_verb::take_seat`) — and NOT by generation's provisional re-point.
+/// Deterministic and draw-free. Returns the number of plants released.
+int seat_release_dial_idled(world& w, entity_id corp);
 void arm_rivals(world& w);
 void arm_corporation(world& w, entity_id corp);
 void disarm_corporation(world& w, entity_id corp);
@@ -630,7 +645,21 @@ std::vector<entity_id> generate_background_firms(
 ///
 /// Call it after the registry is loaded and after every generation pass that can
 /// author a processor (`generate_corporations`, `generate_background_firms`).
-void assign_default_recipes(world& w, const recipe_registry& reg);
+///
+/// BL-1217 D6 (Ben, 2026-10-09: "a processor with no recipe whose default
+/// output isn't wanted is not placed"): the default is given only while its
+/// output is short by the shared want test (`output_want`, measured per body
+/// off the world with `body_demand`, each assignment booked in ascending
+/// building id); a recipe-less processor whose default output is NOT short is
+/// UNPLACED — the building, its stockpile, its place in its corporation's
+/// `assets`, with the HQ re-seated and the opening pools re-keyed
+/// (`unplace_and_reseat`). EXCEPT the pre-authored installation —
+/// `world::authored_processor` — which keeps its default whatever the want
+/// (Ben, 2026-10-09). WORLD BUILD ONLY: in play no processor lacks a
+/// recipe, so a call on a loaded or running world finds nothing to remove.
+/// @p site, when given, labels a log line printed whenever a processor is
+/// unplaced. @return the number unplaced.
+int assign_default_recipes(world& w, const recipe_registry& reg, const char* site = nullptr);
 
 /// BL-1185 (chain-feasible placement) — Pass 3's rule applied to a specialist
 /// roster laid BEFORE a recipe registry existed (world generation's own Pass 3,
@@ -704,3 +733,110 @@ std::array<float, resource_count> measure_body_production(const world& w,
                                                           entity_id body_id);
 float measure_production_ratio(const world& w, const recipe_registry& reg,
                                entity_id body_id);
+
+// ---------------------------------------------------------------------------
+// BL-1233 (Ben, 2026-10-07, ruling A; CORPORATION_GENERATION.md § Pass 6,
+// "Derived demand counts ... the prospective draw of a processor refused for
+// want of spare input"). Public so tools/verify/charter_refusal_probe can hold
+// the book to its rules row by row; the walk is its only other caller.
+// ---------------------------------------------------------------------------
+
+/// What a firm's processor WOULD have drawn of each input, had the sized rule
+/// not turned it away — in the units derived demand reads
+/// (`body_processor_input_demand`: nominal batches x recipe inputs) — and the
+/// market it would have stood in.
+struct refused_draw
+{
+    bool                              set    = false;
+    entity_id                         market = null_entity;
+    std::array<float, resource_count> draw{};
+};
+
+/// One refused good's prospective draw.
+struct prospective_entry
+{
+    entity_id                         market = null_entity;
+    std::array<float, resource_count> draw{};
+};
+
+/// THE BOOK: one entry per refused good, ordered by good. A refusal SETS its
+/// good's entry (`record_refused_draw`: a retry refused again counts it once,
+/// never twice); the walk erases it when a firm for the good lands.
+using prospective_draws = std::map<std::size_t, prospective_entry>;
+
+/// Set (never add) @p good's entry from @p refused; nothing when it is unset.
+void record_refused_draw(prospective_draws& book, std::size_t good, const refused_draw& refused);
+
+/// What the book adds to demand at a centre whose market is @p centre_market
+/// (null: no centre, the legacy Pass 6, which reads every entry).
+///
+/// TIED TO REACH (review round 2): an entry's want of input r is what its
+/// refused plant would draw less the SPARE r reachable at the plant's market —
+/// `reachable_supply`, the sized test's own reading, @p ir brought up to the
+/// standing buildings first — so only a producer within reach of that plant
+/// answers it; one landing elsewhere leaves it standing. And it is offered
+/// only at a centre whose market is the plant's or reaches it for r: the walk
+/// charters the extraction that would feed it, not a mine out of its reach.
+///
+/// First the entries whose good the walk has abandoned are withdrawn (erased):
+/// @p capped at its per-good cap, or no longer short — @p demand plus every
+/// entry's want, against @p production. Then the remaining wants, summed per
+/// input, are a SHORTAGE OF THEIR OWN: an input's demand is lifted to at least
+/// its body-wide @p production before its want is added, so a glut of it out of
+/// the plant's reach does not hide it. Ascending good, ascending r;
+/// deterministic.
+void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir,
+                           prospective_draws& book, entity_id centre_market,
+                           std::array<float, resource_count>& demand,
+                           const std::array<float, resource_count>& production,
+                           const std::array<bool, resource_count>& capped);
+
+/// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per grid,
+/// not per body"; LOGISTICS.md § 3a). Generation's per-grid power measure: the
+/// charter walk sizes power on it. Exported so harnesses read the walk's own
+/// figure. (A scorer half that would also read it is HELD, Ben 2026-10-08, and
+/// kept on branch bl1232-scorer-gate.)
+///
+/// `body_power_grid_gap`: @p body_id's power gap, the sum over its wired grids
+/// of max(0, need - output). Need is the operating buildings' power upkeep,
+/// keyed by each building's own tile grid (the draw side). Output is every
+/// non-decommissioned generator at the nominal rate, keyed by the grid its
+/// MARKET CENTRE is on (`tile_feed_power_grid`: where its listings land, the
+/// feed side) — plants UNDER CONSTRUCTION included, so a plant already started
+/// is counted as the supply it will be. A dark building neither draws nor
+/// feeds. A grid needing under half of @p plant_output is left to roads, not
+/// counted. @p short_grids receives every counted (short) grid;
+/// @p unpowered_short, when given, the short grids no generator feeds at all
+/// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). @p need_output,
+/// when given, receives every grid's (need, output) pair, counted or not
+/// (BL-1217 D6: the roster's keep sweep reads a sub-half grid's lone plant).
+/// Deterministic (ascending building id, std::map over grids).
+float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
+                          float plant_output, std::set<std::uint32_t>& short_grids,
+                          std::set<std::uint32_t>* unpowered_short = nullptr,
+                          std::map<std::uint32_t, std::pair<float, float>>* need_output = nullptr);
+
+/// The grids a power firm may SERVE on @p body_id (into @p serve), and the
+/// body's power gap (returned, every short grid's, as `body_power_grid_gap`).
+/// UNPOWERED GRIDS FIRST (PRODUCTION.md, Ben 2026-10-08: "every grid gets a
+/// plant before any gets a second"): while any short grid has no power firm
+/// chartered on it (@p chartered, the walk's own record) and no generator
+/// feeding it, only those; else every short grid. A grid is powered the moment
+/// a power firm is chartered on it, live output or not. An unpowered grid
+/// absent from @p reachable (the grids the deciding centre's windows can feed)
+/// never holds up the others: it is dropped, and with no unpowered grid left
+/// every short grid is served. The charter walk cuts a power firm's windows to
+/// ground FEEDING one of them.
+float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_id,
+                           float plant_output, std::set<std::uint32_t>& serve,
+                           const std::set<std::uint32_t>* chartered = nullptr,
+                           const std::set<std::uint32_t>* reachable = nullptr);
+
+/// The most power one plant makes: the largest power output of any in-band
+/// processing recipe at the nominal run. 0 where no recipe makes power.
+float one_power_plant_output(const recipe_registry& reg);
+
+/// True where power is sized per grid at all: some recipe makes power AND the
+/// band authors a power upkeep draw on some building type. Elsewhere the per-grid
+/// measure is not read and the charter walk behaves as before it existed.
+bool power_sized_per_grid(const recipe_registry& reg);

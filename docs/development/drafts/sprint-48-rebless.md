@@ -161,7 +161,10 @@ measured in its own worktree on the main of its day; they do not sum to the comb
   built); world_determinism unmoved.
 - BL-1136 (two-thread search): byte-identical by its proof; no world movement.
 
-**UNATTRIBUTED.**
+**UNATTRIBUTED.** Traced 2026-10-10 (BL-1165) in `sprint-48-rebless-traced.md`: population is
+BL-1132; the haulage fall is BL-1154 (-30%) and BL-1125 (-47%), after the density chain had
+doubled it; nation units are the
+province grain (garrison count) plus BL-1132 (garrison size).
 - The settlement record's population halves (12.19 B -> 6.27 B). The per-item records begin at
   6.08 B (BL-1141's base), so the halving lies upstream, in BL-1130/BL-1132's regions (42,695 ->
   15,436). No item recorded population; this is the likeliest cause, not a measured one.

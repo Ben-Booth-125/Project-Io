@@ -1,12 +1,14 @@
 #include "logistics.hpp"
 #include "river_generation.hpp"
 #include "hex_neighbors.hpp" // BL-1186: a port reaches its sea across any hex side
+#include "road_generation.hpp" // BL-1230: kMaxCrossingTiles, the strait a road crosses
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <queue>
+#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -846,6 +848,208 @@ float tile_reach_cost(const world& w, entity_id tile)
 }
 
 // ---------------------------------------------------------------------------
+// BL-1230 (power crosses markets) — the power grid at province grain
+// ---------------------------------------------------------------------------
+// LOGISTICS.md § 3a, "The province is the grid's cell (Ben, 2026-10-07)". A
+// union-find over the partition's provinces: every province holding a roaded
+// land tile is wired, and two wired provinces join wherever roads join — two
+// roaded tiles 4-cardinal adjacent (east-west wrapped), or two roaded tiles
+// either side of a strait (at most kMaxCrossingTiles of non-ocean water, the
+// crossing the road-only walk of road_generation.cpp admits). The grid id is
+// the lowest province id in the component, read only after every union, so no
+// visit order can reach the answer.
+namespace {
+
+struct province_dsu
+{
+    std::vector<std::size_t> parent;
+    explicit province_dsu(std::size_t n) : parent(n)
+    {
+        for (std::size_t i = 0; i < n; ++i)
+            parent[i] = i;
+    }
+    std::size_t find(std::size_t a)
+    {
+        while (parent[a] != a)
+        {
+            parent[a] = parent[parent[a]];
+            a = parent[a];
+        }
+        return a;
+    }
+    void unite(std::size_t a, std::size_t b)
+    {
+        a = find(a);
+        b = find(b);
+        if (a == b)
+            return;
+        if (b < a)
+            std::swap(a, b);
+        parent[b] = a; // cosmetic: the grid id is re-derived as a minimum below
+    }
+};
+
+} // namespace
+
+const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w)
+{
+    const std::vector<province>& provs = w.provinces.provinces;
+    if (w.power_grid_built && w.power_grid_stamp == provs.size())
+        return w.power_grid_of_province;
+
+    w.power_grid_of_province.clear();
+    w.power_grid_built = true;
+    w.power_grid_stamp = provs.size();
+    if (provs.empty())
+        return w.power_grid_of_province;
+
+    const std::size_t np = provs.size();
+    auto index_of = [&](std::uint32_t pid) -> std::size_t {
+        const auto it = std::lower_bound(provs.begin(), provs.end(), pid,
+                                         [](const province& p, std::uint32_t id) { return p.id < id; });
+        return (it != provs.end() && it->id == pid) ? static_cast<std::size_t>(it - provs.begin()) : np;
+    };
+
+    // Wired provinces, and the bodies they sit on (ascending: std::set).
+    std::vector<char> wired(np, 0);
+    std::set<entity_id> bodies;
+    for (std::size_t i = 0; i < np; ++i)
+    {
+        for (const entity_id t : provs[i].tiles)
+        {
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end() || is_water(tit->second.substrate))
+                continue;
+            if (tit->second.road_level > 0)
+            {
+                wired[i] = 1;
+                bodies.insert(provs[i].body);
+                break;
+            }
+        }
+    }
+
+    province_dsu dsu(np);
+    for (const entity_id body : bodies)
+    {
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end())
+            continue;
+        const int gw = bit->second.grid_width;
+        const int gh = bit->second.grid_height;
+        if (gw <= 0 || gh <= 0)
+            continue;
+        const std::vector<entity_id> raster = body_tile_grid(w, body); // a copy: owned here
+        const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+        if (raster.size() < n)
+            continue;
+
+        // Per cell: the province index of a ROADED land cell (np otherwise), and
+        // whether the cell is crossable water (non-ocean water).
+        std::vector<std::size_t> road_prov(n, np);
+        std::vector<char>        strait(n, 0);
+        for (std::size_t c = 0; c < n; ++c)
+        {
+            const auto tit = w.tiles.find(raster[c]);
+            if (tit == w.tiles.end())
+                continue;
+            const tile_component& tc = tit->second;
+            if (is_water(tc.substrate))
+            {
+                strait[c] = is_open_ocean(tc.substrate) ? 0 : 1;
+                continue;
+            }
+            if (tc.road_level > 0)
+                road_prov[c] = index_of(w.provinces.province_of(raster[c]));
+        }
+
+        auto cell_at = [&](int x, int y) -> int {
+            if (y < 0 || y >= gh)
+                return -1;
+            const int wx = ((x % gw) + gw) % gw; // the east-west wrap
+            return y * gw + wx;
+        };
+
+        std::vector<int> frontier, next;
+        std::vector<int> seen_stamp(n, -1);
+        for (int c = 0; c < static_cast<int>(n); ++c)
+        {
+            const std::size_t pc = road_prov[static_cast<std::size_t>(c)];
+            if (pc >= np)
+                continue;
+            const int cx = c % gw, cy = c / gw;
+
+            // Land: right and down suffice for an undirected adjacency.
+            const int right = cell_at(cx + 1, cy);
+            const int down  = cell_at(cx, cy + 1);
+            if (right >= 0 && road_prov[static_cast<std::size_t>(right)] < np)
+                dsu.unite(pc, road_prov[static_cast<std::size_t>(right)]);
+            if (down >= 0 && road_prov[static_cast<std::size_t>(down)] < np)
+                dsu.unite(pc, road_prov[static_cast<std::size_t>(down)]);
+
+            // A strait: a breadth-first run of at most kMaxCrossingTiles water
+            // cells from this road, joining any road on the far shore.
+            frontier.clear();
+            seen_stamp[static_cast<std::size_t>(c)] = c;
+            frontier.push_back(c);
+            for (int depth = 0; depth < kMaxCrossingTiles && !frontier.empty(); ++depth)
+            {
+                next.clear();
+                for (const int f : frontier)
+                {
+                    const int fx = f % gw, fy = f / gw;
+                    const int nb[4] = { cell_at(fx - 1, fy), cell_at(fx + 1, fy),
+                                        cell_at(fx, fy - 1), cell_at(fx, fy + 1) };
+                    for (const int v : nb)
+                    {
+                        if (v < 0 || seen_stamp[static_cast<std::size_t>(v)] == c)
+                            continue;
+                        seen_stamp[static_cast<std::size_t>(v)] = c;
+                        if (strait[static_cast<std::size_t>(v)])
+                            next.push_back(v);
+                    }
+                }
+                // The far shore: roads adjacent to this depth's water cells.
+                for (const int f : next)
+                {
+                    const int fx = f % gw, fy = f / gw;
+                    const int nb[4] = { cell_at(fx - 1, fy), cell_at(fx + 1, fy),
+                                        cell_at(fx, fy - 1), cell_at(fx, fy + 1) };
+                    for (const int v : nb)
+                        if (v >= 0 && road_prov[static_cast<std::size_t>(v)] < np)
+                            dsu.unite(pc, road_prov[static_cast<std::size_t>(v)]);
+                }
+                frontier.swap(next);
+            }
+        }
+    }
+
+    // Grid id = the lowest wired province id in the component. Ascending walk:
+    // the first member met of each root is its lowest id.
+    std::vector<std::uint32_t> grid_of_root(np, 0);
+    for (std::size_t i = 0; i < np; ++i)
+    {
+        if (!wired[i])
+            continue;
+        const std::size_t root = dsu.find(i);
+        if (grid_of_root[root] == 0)
+            grid_of_root[root] = provs[i].id;
+        w.power_grid_of_province.emplace(provs[i].id, grid_of_root[root]);
+    }
+    return w.power_grid_of_province;
+}
+
+std::uint32_t tile_power_grid(world& w, entity_id tile)
+{
+    const auto& grid = province_power_grid(w);
+    const std::uint32_t pid = w.provinces.province_of(tile);
+    if (pid == 0)
+        return 0;
+    const auto it = grid.find(pid);
+    return (it != grid.end()) ? it->second : 0;
+}
+
+// ---------------------------------------------------------------------------
 // Active Logistic Points (BL-596 — LOGISTICS.md § Logistic Points)
 // ---------------------------------------------------------------------------
 // LP is a per-tick RATE, never a stock (Ben, ruling on NR-343, 2026-08-20):
@@ -1160,55 +1364,252 @@ int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& pa
 // Convoy position (BL-458)
 // ---------------------------------------------------------------------------
 
+namespace {
+
+/// One leg of a convoy's lane while it is being laid: where its tiles start in the
+/// lane (the join tile it shares with the leg before) and the days it takes.
+struct lane_leg
+{
+    std::size_t first = 0;
+    float       days  = 0.0f;
+};
+
+/// Append one leg's tiles to @p out, oriented `from` -> `to`. The leg cache stores
+/// its sequence lo->hi like intra_body_path (the ORIENTATION RULE below), so the
+/// flip is owed here too. A tile shared with the previous leg's last (the port the
+/// two legs meet at) is written once. Records the leg's start and its travel days
+/// (leg_travel_days on the leg's own path cost, at @p mode's speed — the figure the
+/// haul was priced and timed on). False when the leg has no path.
+bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_domain domain,
+                convoy_mode mode, std::vector<entity_id>& out, std::vector<lane_leg>& legs)
+{
+    const logistics_path& lp = intra_body_leg_path(w, body, from, to, domain);
+    if (!lp.reachable || lp.tiles.empty())
+        return false;
+    std::vector<entity_id> seq = lp.tiles; // copied: the cache entry stays canonical lo->hi
+    if (from != std::min(from, to))
+        std::reverse(seq.begin(), seq.end());
+    std::size_t k = 0;
+    if (!out.empty() && out.back() == seq.front())
+        k = 1;
+    lane_leg leg;
+    leg.first = (k == 1) ? out.size() - 1 : out.size();
+    leg.days  = leg_travel_days(w, body, lp.cost, mode);
+    out.insert(out.end(), seq.begin() + static_cast<std::ptrdiff_t>(k), seq.end());
+    legs.push_back(leg);
+    return true;
+}
+
+/// THE CLOCK ALONG THE LANE (BL-1195). `at[i]` is the fraction of the whole journey's
+/// time spent when the cargo reaches tile i: 0 at the origin, 1 at the destination.
+/// Each leg takes its own days (caravan overland, coastal by sea — roughly five times
+/// faster), and within a leg the days split over its hops in proportion to each hop's
+/// PRICED edge cost — the node mean of the two tiles' traversal weights times the
+/// river discount of the side the hop leaves by, exactly what `flood_edge_cost`
+/// charges and the leg's path cost sums. So the clock reads the same cost the path
+/// was priced on, and a convoy's progress (the fraction of its travel ticks elapsed)
+/// maps to the tile the cargo is actually on, river stretches included. With no
+/// physical scale on the body (no days at all) the tiles are spaced evenly, which is
+/// what every reader did before.
+std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tiles,
+                              const std::vector<lane_leg>& legs)
+{
+    const std::size_t n = tiles.size();
+    std::vector<float> at(n, 0.0f);
+    if (n < 2)
+        return at;
+
+    // The cost of the hop a -> b as the flood prices it (flood_edge_cost, and the
+    // sea leg's diagonal port hop): node mean, times river_edge_discount on the side
+    // of `a` facing `b` (the tile being LEFT; downstream cheaper than upstream).
+    // The east-west wrap is undone so a hop across the seam finds its side.
+    const auto hop_cost = [&](entity_id ta, entity_id tb) {
+        const auto ia = w.tiles.find(ta);
+        const auto ib = w.tiles.find(tb);
+        if (ia == w.tiles.end() || ib == w.tiles.end())
+            return 1.0f;
+        const tile_component& a = ia->second;
+        const tile_component& b = ib->second;
+        float mult = 1.0f;
+        const auto bit = w.bodies.find(a.body);
+        const int gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
+        int dc = b.grid_x - a.grid_x;
+        if (gw > 2)
+        {
+            if (dc > 1)  dc -= gw;
+            if (dc < -1) dc += gw;
+        }
+        const int side = hex_side_for_offset(dc, b.grid_y - a.grid_y, (a.grid_y & 1) != 0);
+        if (side >= 0)
+            mult = river_edge_discount(a, side);
+        return 0.5f * (tile_traversal_cost(a) + tile_traversal_cost(b)) * mult;
+    };
+
+    std::vector<float> hop(n - 1, 0.0f); // days spent on hop i -> i+1
+    float total = 0.0f;
+    for (std::size_t l = 0; l < legs.size(); ++l)
+    {
+        const std::size_t a = legs[l].first;
+        const std::size_t b = (l + 1 < legs.size()) ? legs[l + 1].first : n - 1;
+        if (b <= a || !(legs[l].days > 0.0f) || !std::isfinite(legs[l].days))
+            continue;
+        float sum = 0.0f;
+        for (std::size_t i = a; i < b; ++i)
+        {
+            hop[i] = hop_cost(tiles[i], tiles[i + 1]);
+            sum += hop[i];
+        }
+        for (std::size_t i = a; i < b; ++i)
+        {
+            const float share = (sum > 0.0f) ? hop[i] / sum : 1.0f / static_cast<float>(b - a);
+            hop[i] = legs[l].days * share;
+        }
+        total += legs[l].days;
+    }
+
+    if (!(total > 0.0f) || !std::isfinite(total))
+    {
+        for (std::size_t i = 0; i < n; ++i)
+            at[i] = static_cast<float>(i) / static_cast<float>(n - 1);
+        return at;
+    }
+    float run = 0.0f;
+    for (std::size_t i = 1; i < n; ++i)
+    {
+        run += hop[i - 1];
+        at[i] = std::min(run / total, 1.0f);
+    }
+    at[n - 1] = 1.0f;
+    return at;
+}
+
+} // namespace
+
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
 {
     convoy_route route;
 
-    const auto sm = w.markets.find(cv.source_market);
     const auto dm = w.markets.find(cv.dest_market);
-    if (sm == w.markets.end() || dm == w.markets.end())
-        return route; // unresolved endpoint — no lane to stand on
-    if (sm->second.body == null_entity || sm->second.body != dm->second.body)
+    if (dm == w.markets.end())
+        return route; // unresolved destination — no lane to stand on
+
+    // The source's body. A market source carries its own; a convoy out of a
+    // BODY-LEVEL pool (BL-1003: commit_convoy stamps its `source_market` null, as
+    // no market sent it) takes it from the origin tile recorded at dispatch
+    // (BL-1195), so it has a lane like any other.
+    const auto sm = w.markets.find(cv.source_market);
+    entity_id src_body = null_entity;
+    if (sm != w.markets.end())
+        src_body = sm->second.body;
+    else if (cv.origin_tile != null_entity)
+    {
+        const auto ot = w.tiles.find(cv.origin_tile);
+        if (ot != w.tiles.end())
+            src_body = ot->second.body;
+    }
+    if (src_body == null_entity || src_body != dm->second.body)
         return route; // inter-body leg: in transit between bodies, on no tile
 
-    const entity_id body = sm->second.body;
-    const entity_id st   = sm->second.centre_tile;
-    const entity_id dt   = dm->second.centre_tile;
+    const entity_id body = src_body;
+    // BL-1195: the lane starts where the haul was priced from — the dispatch's
+    // origin tile — and falls back to the source centre for a convoy that never
+    // passed the dispatch seam (one built by hand, which records no route).
+    const entity_id st = (cv.origin_tile != null_entity)
+                             ? cv.origin_tile
+                             : (sm != w.markets.end() ? sm->second.centre_tile : null_entity);
+    const entity_id dt = dm->second.centre_tile;
     if (st == null_entity || dt == null_entity)
         return route; // an unanchored market has no centre to route from/to
 
-    const logistics_path& lp = intra_body_path(w, body, st, dt);
-    if (!lp.reachable || lp.tiles.empty())
-        return route;
+    std::vector<entity_id> tiles;
+    std::vector<lane_leg>  legs;
+
+    // BL-1195 (SUPPLY.md § Logistical cost): THE LANE IS THE LEGS. A route that
+    // crossed water was priced land -> port -> sea -> port -> land (BL-1186), so its
+    // lane is those three legs end to end, through the two Ports recorded at
+    // dispatch. Reading the direct centre-to-centre path instead put the head, the
+    // vision beam, interdiction and capture on ground the cargo never crosses. The
+    // Ports are fixed at dispatch; each leg's path is read from the network as it
+    // stands now.
+    if (cv.port_a != null_entity && cv.port_b != null_entity)
+    {
+        if (!append_leg(w, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs)
+            || !append_leg(w, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
+                           tiles, legs)
+            || !append_leg(w, body, cv.port_b, dt, leg_domain::land, convoy_mode::land, tiles,
+                           legs))
+            return route; // a leg the dispatch walked no longer exists: no lane
+    }
+    else
+    {
+        // One overland leg, chosen exactly as route_intra_body chose it: the
+        // unconfined cheapest path while it stays on land, else the cheapest
+        // LAND-ONLY path (a pair whose cheapest path crosses water but which has a
+        // road round).
+        const logistics_path& lp = intra_body_path(w, body, st, dt);
+        if (!lp.reachable || lp.tiles.empty())
+            return route;
+        bool laid = false;
+        if (lp.crosses_ocean)
+            laid = append_leg(w, body, st, dt, leg_domain::land, convoy_mode::land, tiles, legs);
+        // No overland road: only a convoy built outside the dispatch seam reaches
+        // here (the router refuses such a pair a land route). It keeps the direct
+        // path, the one lane it can be given.
+        if (!laid)
+        {
+            tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
+            // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence
+            // lo->hi under its ordered (src, dst) key (BL-1126), so the cached order
+            // is source->destination only when the source tile is the lower id. Flip
+            // it when it is not. Skipping this puts a convoy's head at the far end of
+            // its own lane about half the time, and the vision beam renders
+            // identically either way, so nothing on screen would report it.
+            if (st != std::min(st, dt))
+                std::reverse(tiles.begin(), tiles.end());
+            legs.clear();
+            legs.push_back({0, leg_travel_days(w, body, lp.cost, cv.mode == convoy_mode::sea
+                                                                     ? convoy_mode::sea
+                                                                     : convoy_mode::land)});
+        }
+    }
 
     route.body  = body;
-    route.tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
-
-    // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence lo->hi
-    // under its ordered (src, dst) key (BL-1126), so the cached order is
-    // source->destination only when the source tile is the lower id. Flip it
-    // when it is not. Skipping this puts a convoy's head at
-    // the far end of its own lane about half the time, and the vision beam
-    // renders identically either way, so nothing on screen would report it.
-    if (st != std::min(st, dt))
-        std::reverse(route.tiles.begin(), route.tiles.end());
-
+    route.at    = lane_clock(w, tiles, legs);
+    route.tiles = std::move(tiles);
     return route;
 }
 
-int convoy_head_index(std::size_t tile_count, float progress)
+int convoy_lane_index(const std::vector<float>& at, float progress)
 {
-    if (tile_count == 0)
+    if (at.empty())
         return -1;
-    const int n = static_cast<int>(tile_count);
     const float p = std::isfinite(progress) ? std::clamp(progress, 0.0f, 1.0f) : 0.0f;
-    return std::clamp(static_cast<int>(std::lround(p * static_cast<float>(n - 1))), 0, n - 1);
+    // An arrived convoy stands on the destination, always. The clock's tail can
+    // clamp to 1 a tile or more early (float rounding in lane_clock's running sum),
+    // and lower_bound would then answer the FIRST tile reading 1 — leaving the
+    // destination out of the last tick's sweep.
+    const int n = static_cast<int>(at.size());
+    if (p >= 1.0f)
+        return n - 1;
+    // The tile whose clock reading is nearest p. lower_bound finds i, the first
+    // tile reading >= p; p sits between at[i-1] and at[i], and an exact tie between
+    // those two goes to the later tile, i. Where several tiles share one reading (a
+    // hop of zero time), lower_bound lands on the first of them.
+    const auto it = std::lower_bound(at.begin(), at.end(), p);
+    if (it == at.end())
+        return n - 1;
+    const int i = static_cast<int>(it - at.begin());
+    if (i == 0)
+        return 0;
+    const float up   = at[static_cast<std::size_t>(i)] - p;
+    const float down = p - at[static_cast<std::size_t>(i - 1)];
+    return (up <= down) ? i : i - 1;
 }
 
 entity_id convoy_tile_at(world& w, const convoy_component& cv)
 {
     const convoy_route route = convoy_route_tiles(w, cv);
-    const int head = convoy_head_index(route.tiles.size(), cv.progress);
+    const int head = convoy_lane_index(route.at, cv.progress);
     if (head < 0)
         return null_entity;
     return route.tiles[static_cast<std::size_t>(head)];

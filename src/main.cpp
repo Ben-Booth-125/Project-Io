@@ -251,10 +251,10 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     world w = make_hard_coded_world();
 
     // Author default recipes onto generated processors (mirrors app::load_economy).
-    const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
+    // BL-429; the body's air (Ben, 2026-10-09): default_recipe_id_at, per tile.
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = default_recipe;
+            b.recipe = reg.default_recipe_id_at(w, b.tile);
 
     // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
     // 2026-09-21, NR-909). This path does not search. The Industrialisation span
