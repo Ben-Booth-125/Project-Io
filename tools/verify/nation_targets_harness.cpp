@@ -106,8 +106,12 @@ bool is_total_reconciliation(const lapse_event& e)
 }
 bool is_major_reconciliation(const lapse_event& e)
 {
-    (void)e;
-    return false;
+    // BL-1278 lane C (`reconcile_majors`): a champion chartered in the richest
+    // minor, the same where its treasury made up the price, and a cross-border
+    // buy-out. Each is one correction of one major.
+    const auto k = static_cast<lapse_event_kind>(e.kind);
+    return k == lapse_event_kind::champion_chartered || k == lapse_event_kind::state_charter
+        || k == lapse_event_kind::champion_bought_out;
 }
 
 struct reading

@@ -896,8 +896,20 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         {
             const ui::history_lapse late = lapse_from_report(out->report, lapse_index,
                                                              /*adopted=*/false);
+            // BL-1278 lane C: the finish appends the majors' corrections to the
+            // Industrialisation record, dated back into its closing round, AFTER
+            // the span's close this record was read at. They are the finish's
+            // by design, so the self-check counts the span's own events only.
+            std::size_t late_events = 0;
+            for (const lapse_event& e : late.lapse.events)
+            {
+                const auto k = static_cast<lapse_event_kind>(e.kind);
+                if (k != lapse_event_kind::champion_chartered && k != lapse_event_kind::state_charter
+                    && k != lapse_event_kind::champion_bought_out)
+                    ++late_events;
+            }
             const bool same = early.lapse.changes.size() == late.lapse.changes.size()
-                && early.lapse.events.size() == late.lapse.events.size()
+                && early.lapse.events.size() == late_events
                 && early.lapse.culture_changes.size() == late.lapse.culture_changes.size()
                 && early.lapse.samples.size() == late.lapse.samples.size()
                 && early.lapse.start_year == late.lapse.start_year

@@ -109,11 +109,13 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -1180,6 +1182,33 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
     const long long fp = spend.firm_price_points;
     std::map<entity_id, long long> firm_points_by_body;
     std::map<entity_id, long long> firm_charters_by_body;
+    // BL-1283 (one specialist per major), re-derived here rather than read from
+    // the walk: only each nation's RICHEST AFFORDING centre (points descending,
+    // ties to the lower centre id) sets the specialist price aside.
+    std::set<entity_id> champion_centres;
+    {
+        std::vector<std::tuple<std::int32_t, entity_id, entity_id>> cands;   // (pts, centre, nation)
+        for (const auto& [centre, pts] : budget.points())
+        {
+            const auto ct = w.population_centre_tile.find(centre);
+            if (ct == w.population_centre_tile.end() || w.tiles.count(ct->second) == 0)
+                continue;
+            const auto own = w.tile_to_nation.find(ct->second);
+            if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+                continue;
+            cands.emplace_back(pts, centre, own->second);
+        }
+        std::sort(cands.begin(), cands.end(), [](const auto& a, const auto& b) {
+            if (std::get<0>(a) != std::get<0>(b))
+                return std::get<0>(a) > std::get<0>(b);
+            return std::get<1>(a) < std::get<1>(b);
+        });
+        std::set<entity_id> nations_done;
+        for (const auto& [pts, centre, nation] : cands)
+            if (static_cast<long long>(pts) >= spend.specialist_price_of(centre)
+                && nations_done.insert(nation).second)
+                champion_centres.insert(centre);
+    }
     for (const auto& [centre, pts] : budget.points())
     {
         const auto ct = w.population_centre_tile.find(centre);
@@ -1192,7 +1221,7 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
         const long long cfp = spend.firm_price_of(centre);
         const long long csp = spend.specialist_price_of(centre);
         long long left = pts;
-        if (left >= csp)
+        if (left >= csp && champion_centres.count(centre) != 0)
             left -= csp;
         firm_points_by_body[t->second.body]   += cfp > 0 ? (left / cfp) * cfp : 0;
         firm_charters_by_body[t->second.body] += cfp > 0 ? left / cfp : 0;
