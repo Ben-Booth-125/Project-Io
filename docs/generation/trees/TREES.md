@@ -19,7 +19,7 @@ nothing reads them.
 
 | Piece of the history | Was | Is |
 |---|---|---|
-| A power's sea legs — whether it may arrive across water to subject a coast | The Exploration tree's *Oceanic Navigation* | **A date and naval capacity** (Ben, 2026-10-10): from a measured year, a polity that can field a navy — a harbour and the military band general ocean crossing already tests — holds sea legs, and it arrives across water to subject a coast only with a **fleet afloat** at or above a measured strength (Ben, 2026-10-10) |
+| A power's sea legs — whether it may arrive across water to subject a coast | The Exploration tree's *Oceanic Navigation* | **A date and naval capacity** (Ben, 2026-10-10): from a measured year, a polity that can field a navy — a harbour and the military band general ocean crossing already tests — holds sea legs, and it arrives across water to subject a coast only with a **fleet afloat** (Ben, 2026-10-10) at or above the **median navy of that year's naval-capable polities** — a relative floor, not a fixed hull count (Ben, 2026-10-11): no fixed floor restored Industrialisation's subjections without gutting Exploration's, and under the trees about half the polities held the node |
 | The treasury-bought third road rung | The Exploration tree's *Post Roads* | A date, by the same rule as sea legs |
 | Naval points from coastal sea technology | The Empire tree's coastal nodes | A date ramp for **coastal polities only**, its per-tech weight re-measured so naval points match the history as last blessed (Ben, 2026-10-10) |
 | Defence, cohesion, industrial and research modifiers | Held nodes' `modifier` effects | Nothing — every polity carries the same, zero |
