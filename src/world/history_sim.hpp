@@ -2682,15 +2682,20 @@ struct history_sim_params
     /// a total set, the total is reconciled by absorption or secession — each
     /// a recorded event (`lapse_event_kind::absorbed_at_close`,
     /// `seceded_at_close`). Planned by `plan_closing_rounds` against the carve
-    /// oracle the spec carries. A raw non-owning pointer like the resume
-    /// pointers; the fixture's copy nulls it (`without_resume_pointers`).
+    /// ground the spec carries. A raw non-owning pointer like the resume
+    /// pointers, but KEPT on the fixture's copy: the spec is a self-contained
+    /// value the fixture co-owns (`era_minus_one_fixture::
+    /// industrialisation_closing`), so a replay of the span from
+    /// `fixture.industrialisation_params` runs the same closing rounds.
     const closing_rounds_spec* closing_rounds = nullptr;
 
     /// THE TOTAL'S LEAN ON CONQUEST APPETITE, per mille on a campaign's value
     /// (+ more appetite, - less), applied beside the creed's appetite lean.
     /// 0 everywhere but an Industrialisation span whose world carries a total
     /// target fewer (+) or more (-) than the span opens on — the lean of
-    /// § The nation count is a target, stage 1. 0 is the identity.
+    /// § The nation count is a target, stage 1. 0 is the identity. Its
+    /// secession half is `secession_supply_floor_q`, which that span leaves
+    /// at 0 and the lean raises only when MORE nations are wanted.
     int campaign_appetite_q = 0;
 };
 
@@ -4661,6 +4666,8 @@ struct history_sim_state
     /// -1, on every run whose params carried no `closing_rounds`). The fold's
     /// predicted nation count after the rounds is what `run_tail` holds
     /// `generate_nations` to (the drift guard). Read by no decision.
+    int32_t closing_nations_before      = -1; ///< The fold's count before any closing step.
+    int32_t closing_nations_after_floor = -1; ///< ... after the floor's absorptions.
     int32_t closing_predicted          = -1;
     int32_t closing_floor_absorptions  = 0;
     int32_t closing_target_absorptions = 0;

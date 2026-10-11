@@ -23,6 +23,22 @@ struct fold_group
 
 } // namespace
 
+std::vector<int> closing_carve_cells(const closing_rounds_spec& spec, const std::vector<region>& regions)
+{
+    std::vector<int> anchors, region_of;
+    anchors.reserve(regions.size());
+    for (std::size_t ri = 0; ri < regions.size(); ++ri)
+        if (regions[ri].anchor >= 0)
+        {
+            anchors.push_back(regions[ri].anchor);
+            region_of.push_back(static_cast<int>(ri));
+        }
+    std::vector<int> cells = preview_nation_carve(spec.ground, anchors, spec.nation_seed);
+    for (int& k : cells)
+        k = (k >= 0 && k < static_cast<int>(region_of.size())) ? region_of[static_cast<std::size_t>(k)] : -1;
+    return cells;
+}
+
 std::vector<int64_t> closing_cell_tiles(const std::vector<int>& cell_region, std::size_t region_count)
 {
     std::vector<int64_t> tiles(region_count, 0);
@@ -101,6 +117,16 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
     std::vector<int> cap(static_cast<std::size_t>(max_p + 1), -1);
     for (std::size_t p = 0; p < polities.size(); ++p) cap[p] = polities[p].capital;
     int next_id = static_cast<int>(polities.size()); // the id the sim's next push takes
+    // A realm's CURRENT seat: its capital where it holds it, else the lowest
+    // region it holds -- never a stale capital another realm now owns.
+    const auto seat_of = [&](int p) -> int {
+        if (p < 0) return -1;
+        const int c = static_cast<std::size_t>(p) < cap.size() ? cap[static_cast<std::size_t>(p)] : -1;
+        if (c >= 0 && static_cast<std::size_t>(c) < R && cur_polity[static_cast<std::size_t>(c)] == p) return c;
+        for (std::size_t h = 0; h < R; ++h)
+            if (cur_polity[h] == p) return static_cast<int>(h);
+        return -1;
+    };
 
     // --- The groups the fold would make --------------------------------------
     std::vector<fold_group> groups;
@@ -220,14 +246,15 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         return {-1, -1};
     };
 
-    const auto absorb = [&](int x, int a, closing_step_kind kind) {
+    const auto absorb = [&](int x, int a, closing_step_kind kind, bool annex) {
         fold_group& X = groups[static_cast<std::size_t>(x)];
         fold_group& A = groups[static_cast<std::size_t>(a)];
         closing_step st;
         st.kind        = kind;
+        st.annex       = annex;
         st.from_polity = X.polity;
         st.into_polity = A.polity;
-        st.region      = X.polity >= 0 ? cap[static_cast<std::size_t>(X.polity)] : X.lone;
+        st.region      = X.polity >= 0 ? seat_of(X.polity) : X.lone;
         if (X.polity >= 0)
         {
             for (std::size_t h = 0; h < R; ++h)
@@ -239,7 +266,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         {
             cur_polity[static_cast<std::size_t>(h)] = A.polity;
             if (X.polity < 0 && !seat_flag[static_cast<std::size_t>(h)])
-                cur_seat[static_cast<std::size_t>(h)] = cap[static_cast<std::size_t>(A.polity)];
+                cur_seat[static_cast<std::size_t>(h)] = seat_of(A.polity);
         }
         if (st.region < 0 && !st.moved.empty()) st.region = st.moved.front();
         A.tiles += X.tiles;
@@ -273,7 +300,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             if (groups[static_cast<std::size_t>(s)].tiles >= min_tiles) break;
             const std::pair<int, int> xa = choose(s, false);
             if (xa.first < 0) break;
-            absorb(xa.first, xa.second, closing_step_kind::floor_absorb);
+            absorb(xa.first, xa.second, closing_step_kind::floor_absorb, xa.first != s);
         }
     }
     plan.nations_after_floor = N;
@@ -290,21 +317,28 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             std::pair<int, int> xa = choose(s, false);
             if (xa.first < 0) xa = choose(s, true);
             if (xa.first < 0) break;
-            absorb(xa.first, xa.second, closing_step_kind::target_absorb);
+            absorb(xa.first, xa.second, closing_step_kind::target_absorb, false);
         }
 
         // --- TOO FEW: a province secedes --------------------------------------
-        // A region with a cell, held by a realm that keeps another, never the
-        // realm's capital and never empty ground. Preferred: a secession that
-        // leaves both sides above the floor; then the ground furthest from its
-        // seat's reach (lowest `network_supply_q`, the sim's own secession
-        // reading); then the larger cell; then the lower index.
+        // The province is a region with a cell, held by a realm that keeps
+        // another, never the realm's seat and never empty ground -- and, where
+        // its own cell is under the floor, the neighbouring cells of the same
+        // realm it carries with it (adjacent across a cell border, lowest
+        // `network_supply_q` first, then the lower index) until the block
+        // clears the floor. NEVER UNDO THE FLOOR: the block and what the realm
+        // keeps must both clear it, or the start is no candidate; with none
+        // left the rounds stop short and the caller records the miss (never a
+        // silent ship off target). Preferred: the fewest regions; then the
+        // ground furthest from its seat's reach (the sim's own secession
+        // reading); then the larger block; then the lower index.
         while (N < total_target)
         {
             if (static_cast<std::size_t>(next_id) >= owner_index_limit) break;
-            int    best = -1;
-            int    best_tier = 0, best_supply = 0;
-            int64_t best_cell = 0;
+            int              best = -1;
+            std::vector<int> best_block;
+            int64_t          best_tiles = 0;
+            int              best_supply = 0;
             for (std::size_t r = 0; r < R; ++r)
             {
                 const int g = gid[r];
@@ -312,17 +346,47 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 const fold_group& G = groups[static_cast<std::size_t>(g)];
                 const int p = G.polity;
                 if (p < 0 || G.anchored.size() < 2) continue;
-                if (static_cast<int>(r) == cap[static_cast<std::size_t>(p)]) continue;
+                const int pseat = seat_of(p);
+                if (static_cast<int>(r) == pseat) continue;
                 if (regions[r].population <= 0) continue;
-                const int tier = (min_tiles <= 0 || (tiles[r] >= min_tiles && G.tiles - tiles[r] >= min_tiles))
-                                     ? 0 : 1;
                 const int supply = regions[r].network_supply_q;
+                // Grow the block (pure, bounded by the realm's own cells).
+                std::vector<int> block{static_cast<int>(r)};
+                int64_t bt = tiles[r];
+                while (min_tiles > 0 && bt < min_tiles)
+                {
+                    int pick = -1;
+                    for (const int m : block)
+                        for (const int n : adj[static_cast<std::size_t>(m)])
+                        {
+                            if (gid[static_cast<std::size_t>(n)] != g || n == pseat) continue;
+                            if (std::find(block.begin(), block.end(), n) != block.end()) continue;
+                            if (pick < 0
+                                || regions[static_cast<std::size_t>(n)].network_supply_q
+                                       < regions[static_cast<std::size_t>(pick)].network_supply_q
+                                || (regions[static_cast<std::size_t>(n)].network_supply_q
+                                        == regions[static_cast<std::size_t>(pick)].network_supply_q
+                                    && n < pick))
+                                pick = n;
+                        }
+                    if (pick < 0) break;
+                    block.push_back(pick);
+                    bt += tiles[static_cast<std::size_t>(pick)];
+                }
+                if (min_tiles > 0 && (bt < min_tiles || G.tiles - bt < min_tiles)) continue;
+                if (block.size() >= G.anchored.size()) continue; // the realm keeps a cell
                 const bool better =
                     best < 0
-                    || tier < best_tier
-                    || (tier == best_tier && (supply < best_supply
-                        || (supply == best_supply && tiles[r] > best_cell)));
-                if (better) { best = static_cast<int>(r); best_tier = tier; best_supply = supply; best_cell = tiles[r]; }
+                    || block.size() < best_block.size()
+                    || (block.size() == best_block.size()
+                        && (supply < best_supply || (supply == best_supply && bt > best_tiles)));
+                if (better)
+                {
+                    best = static_cast<int>(r);
+                    best_block = block;
+                    best_tiles = bt;
+                    best_supply = supply;
+                }
             }
             if (best < 0) break;
 
@@ -330,48 +394,56 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             const int g = gid[br];
             const int p = groups[static_cast<std::size_t>(g)].polity;
             const int nid = next_id++;
+            const int pseat = seat_of(p);
+            std::vector<int> in_block = best_block;
+            std::sort(in_block.begin(), in_block.end());
+            const auto blocked = [&](int h) { return std::binary_search(in_block.begin(), in_block.end(), h); };
             closing_step st;
             st.kind        = closing_step_kind::target_secede;
             st.from_polity = p;
             st.into_polity = nid;
             st.region      = best;
-            st.moved.push_back(best);
+            st.moved       = in_block;
+            // The unanchored hinterland of the block's cells leaves with them.
             for (std::size_t h = 0; h < R; ++h)
-                if (h != br && cur_polity[h] == p && cur_seat[h] == best && tiles[h] <= 0
-                    && static_cast<int>(h) != cap[static_cast<std::size_t>(p)])
+                if (!blocked(static_cast<int>(h)) && cur_polity[h] == p && tiles[h] <= 0
+                    && static_cast<int>(h) != pseat && cur_seat[h] >= 0 && blocked(cur_seat[h]))
                     st.moved.push_back(static_cast<int>(h));
             std::sort(st.moved.begin(), st.moved.end());
             for (const int h : st.moved)
             {
                 cur_polity[static_cast<std::size_t>(h)] = nid;
                 cur_seat[static_cast<std::size_t>(h)]   = best;
+                seat_flag[static_cast<std::size_t>(h)]  = (h == best) ? 1 : 0;
             }
-            seat_flag[br] = 1;
-            // Ground the realm keeps that pointed at the departing seat
-            // re-points at its own capital (the conquest rule for a region
-            // decoupled from its seat).
+            // Ground the realm keeps that pointed at a departing seat re-points
+            // at its own seat (the conquest rule for a region decoupled from
+            // its seat).
+            std::vector<int> moved_sorted = st.moved;
             for (std::size_t h = 0; h < R; ++h)
-                if (cur_polity[h] == p && cur_seat[h] == best)
-                    cur_seat[h] = cap[static_cast<std::size_t>(p)];
+                if (cur_polity[h] == p && cur_seat[h] >= 0
+                    && std::binary_search(moved_sorted.begin(), moved_sorted.end(), cur_seat[h]))
+                    cur_seat[h] = pseat;
             if (cap.size() <= static_cast<std::size_t>(nid)) cap.resize(static_cast<std::size_t>(nid) + 1, -1);
             if (polity_group.size() <= static_cast<std::size_t>(nid))
                 polity_group.resize(static_cast<std::size_t>(nid) + 1, -1);
             cap[static_cast<std::size_t>(nid)] = best;
 
             fold_group& G = groups[static_cast<std::size_t>(g)];
-            G.tiles -= tiles[br];
-            G.anchored.erase(std::remove(G.anchored.begin(), G.anchored.end(), best), G.anchored.end());
+            G.tiles -= best_tiles;
+            G.anchored.erase(std::remove_if(G.anchored.begin(), G.anchored.end(), blocked), G.anchored.end());
             G.lowest = INT_MAX;
             for (const int r : G.anchored) G.lowest = std::min(G.lowest, r);
 
             fold_group ng;
-            ng.polity = nid;
-            ng.alive  = true;
-            ng.tiles  = tiles[br];
-            ng.lowest = best;
-            ng.anchored.push_back(best);
-            gid[br] = static_cast<int>(groups.size());
-            polity_group[static_cast<std::size_t>(nid)] = static_cast<int>(groups.size());
+            ng.polity   = nid;
+            ng.alive    = true;
+            ng.tiles    = best_tiles;
+            ng.lowest   = in_block.front();
+            ng.anchored = in_block;
+            const int ngi = static_cast<int>(groups.size());
+            for (const int r : in_block) gid[static_cast<std::size_t>(r)] = ngi;
+            polity_group[static_cast<std::size_t>(nid)] = ngi;
             groups.push_back(std::move(ng));
             ++N;
             ++plan.target_secessions;

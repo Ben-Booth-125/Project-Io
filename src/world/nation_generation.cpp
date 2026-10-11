@@ -210,8 +210,7 @@ struct bfs_entry
 /// @return             Per-tile nation index (-1 = unclaimed/open ocean). Indexed as row*gw+col.
 std::vector<int> expand_territory(const std::vector<int>& seeds,
                                   const std::vector<bool>& unclaimable,
-                                  const world& w,
-                                  const std::vector<entity_id>& tile_ids,
+                                  const std::vector<float>& step_cost,
                                   int gw, int gh,
                                   const std::vector<float>& weight,
                                   std::mt19937& rng,
@@ -282,15 +281,9 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
              || unclaimable[static_cast<std::size_t>(nidx)])
                 continue;
 
-            // Look up the tile's landform for cost weighting.
-            const entity_id tid = tile_ids[static_cast<std::size_t>(nidx)];
-            float cost_step = 1.0f;
-            if (tid != null_entity)
-            {
-                const auto it = w.tiles.find(tid);
-                if (it != w.tiles.end())
-                    cost_step = expansion_cost(it->second.landform);
-            }
+            // The tile's landform cost (`nation_carve_ground::step_cost`,
+            // BL-1278: read once per tile up front, the same value).
+            const float cost_step = step_cost[static_cast<std::size_t>(nidx)];
 
             // BL-053: divide the step by the owning seed's growth weight, so
             // high-weight seeds accumulate cost slower, reach further, and claim
@@ -871,13 +864,12 @@ std::string make_nation_name(std::mt19937& rng, const tongue& t, const tongue_le
 /// weights are drawn.
 std::vector<int> carve_from_seeds(const std::vector<int>& seeds,
                                   const std::vector<bool>& unclaimable,
-                                  const std::vector<terrain_substrate>& sub,
-                                  const world& w,
-                                  const std::vector<entity_id>& tile_ids,
-                                  int gw, int gh,
+                                  const nation_carve_ground& ground,
                                   uint32_t seed,
                                   generation_progress* progress)
 {
+    const int gw = ground.gw, gh = ground.gh;
+    const std::vector<terrain_substrate>& sub = ground.sub;
     const uint32_t seed_expand = seed ^ 0x1F2E3D4Cu;
     const uint32_t seed_weight = seed ^ 0x6D2B79F5u;
     const int seed_count = static_cast<int>(seeds.size());
@@ -903,7 +895,7 @@ std::vector<int> carve_from_seeds(const std::vector<int>& seeds,
     // --- Pass 2: territory expansion (weighted) ---
     std::mt19937 expand_rng(seed_expand);
     std::vector<int> owner_map = expand_territory(
-        seeds, unclaimable, w, tile_ids, gw, gh, weights, expand_rng, progress);
+        seeds, unclaimable, ground.step_cost, gw, gh, weights, expand_rng, progress);
 
     // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
     assign_orphan_islands(owner_map, unclaimable, gw, gh);
@@ -1057,8 +1049,8 @@ std::vector<entity_id> generate_nations(
         return {};
 
     // --- Passes 1b, 2, 2b and the water (BL-1278: one shared path) ---
-    std::vector<int> owner_map = carve_from_seeds(seeds, unclaimable, sub, w, tile_ids, gw, gh,
-                                                  seed, progress);
+    const nation_carve_ground ground = nation_carve_ground_of(w, tile_ids, gw, gh);
+    std::vector<int> owner_map = carve_from_seeds(seeds, unclaimable, ground, seed, progress);
 
     // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
     //
@@ -1722,33 +1714,45 @@ int64_t garrison_strength_in(const world& w, uint32_t province_id)
 // ---------------------------------------------------------------------------
 // BL-1278 — the carve, previewed for the closing rounds
 // ---------------------------------------------------------------------------
-std::vector<int> preview_nation_carve(const world& w,
-                                      const std::vector<entity_id>& tile_ids,
-                                      int gw, int gh,
+nation_carve_ground nation_carve_ground_of(const world& w,
+                                          const std::vector<entity_id>& tile_ids,
+                                          int gw, int gh)
+{
+    nation_carve_ground g;
+    g.gw = gw;
+    g.gh = gh;
+    const int total = gw * gh > 0 ? gw * gh : 0;
+    g.sub.assign(static_cast<std::size_t>(total), terrain_substrate::barren);
+    g.step_cost.assign(static_cast<std::size_t>(total), 1.0f);
+    for (int idx = 0; idx < total && idx < static_cast<int>(tile_ids.size()); ++idx)
+    {
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid == null_entity) continue;
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end()) continue;
+        g.sub[static_cast<std::size_t>(idx)]       = it->second.substrate;
+        g.step_cost[static_cast<std::size_t>(idx)] = expansion_cost(it->second.landform);
+    }
+    return g;
+}
+
+std::vector<int> preview_nation_carve(const nation_carve_ground& ground,
                                       const std::vector<int>& seed_tiles,
                                       uint32_t seed)
 {
-    const int total = gw * gh;
+    const int total = ground.gw * ground.gh;
     std::vector<int> out(static_cast<std::size_t>(total > 0 ? total : 0), -1);
-    if (total <= 0 || static_cast<int>(tile_ids.size()) < total) return out;
+    if (total <= 0 || static_cast<int>(ground.sub.size()) < total
+        || static_cast<int>(ground.step_cost.size()) < total)
+        return out;
 
-    // The masks `generate_nations` builds, read the same way.
-    std::vector<terrain_substrate> sub(static_cast<std::size_t>(total), terrain_substrate::barren);
+    // The water mask `generate_nations` builds, read the same way.
     std::vector<bool> is_water_map(static_cast<std::size_t>(total), false);
     int land_tiles = 0;
     for (int idx = 0; idx < total; ++idx)
     {
-        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
-        if (tid != null_entity)
-        {
-            const auto it = w.tiles.find(tid);
-            if (it != w.tiles.end())
-            {
-                sub[static_cast<std::size_t>(idx)] = it->second.substrate;
-                if (is_water(it->second.substrate)) is_water_map[static_cast<std::size_t>(idx)] = true;
-            }
-        }
-        if (!is_water_map[static_cast<std::size_t>(idx)]) ++land_tiles;
+        if (is_water(ground.sub[static_cast<std::size_t>(idx)])) is_water_map[static_cast<std::size_t>(idx)] = true;
+        else ++land_tiles;
     }
     if (land_tiles <= 0) return out; // `generate_nations`' seed_target == 0 return
 
@@ -1768,9 +1772,7 @@ std::vector<int> preview_nation_carve(const world& w,
     if (seeds.empty()) return out;
 
     // Every water kind is unclaimable (NR-792), exactly as the real carve.
-    const std::vector<bool>& unclaimable = is_water_map;
-    const std::vector<int> owner_map =
-        carve_from_seeds(seeds, unclaimable, sub, w, tile_ids, gw, gh, seed, nullptr);
+    const std::vector<int> owner_map = carve_from_seeds(seeds, is_water_map, ground, seed, nullptr);
     for (int idx = 0; idx < total; ++idx)
     {
         const int k = owner_map[static_cast<std::size_t>(idx)];

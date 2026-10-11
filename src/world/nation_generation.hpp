@@ -222,6 +222,24 @@ std::vector<entity_id> generate_nations(
     struct generation_progress* progress = nullptr,
     nation_fold_record* fold_out = nullptr);
 
+/// BL-1278 — THE GROUND THE CARVE READS, and nothing else: per raster tile
+/// its substrate (water is unclaimable; the shore derivation reads it) and its
+/// landform's expansion step cost. A value snapshot, so a carve can be drawn
+/// with no world in hand — the closing rounds' spec carries one, and a replay
+/// of the Industrialisation span from its fixture draws the same carve.
+struct nation_carve_ground
+{
+    int gw = 0;
+    int gh = 0;
+    std::vector<terrain_substrate> sub;       ///< barren where no tile stands
+    std::vector<float>             step_cost; ///< 1.0 where no tile stands
+};
+
+/// The snapshot `generate_nations` itself carves from.
+nation_carve_ground nation_carve_ground_of(const world& w,
+                                          const std::vector<entity_id>& tile_ids,
+                                          int gw, int gh);
+
 /// BL-1278 — THE CARVE, PREVIEWED. Passes 1 (historical seeds), 1b, 2, 2b and
 /// the water derivation of `generate_nations`, run on the same code with the
 /// same seed, from @p seed_tiles (the anchors, as `settlement_seed_tiles`
@@ -229,9 +247,7 @@ std::vector<entity_id> generate_nations(
 /// per raster tile the index INTO @p seed_tiles of the anchor whose cell holds
 /// it (-1 = unclaimed). The closing rounds plan against it, so the history
 /// and the carve read one geometry. @p seed is `generate_nations`' own seed.
-std::vector<int> preview_nation_carve(const world& w,
-                                      const std::vector<entity_id>& tile_ids,
-                                      int gw, int gh,
+std::vector<int> preview_nation_carve(const nation_carve_ground& ground,
                                       const std::vector<int>& seed_tiles,
                                       uint32_t seed);
 

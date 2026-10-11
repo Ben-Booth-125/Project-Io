@@ -459,7 +459,6 @@ history_sim_params without_resume_pointers(history_sim_params p)
     p.resume_civilisations    = nullptr;
     p.resume_universal_creeds = nullptr;
     p.resume_live_roads       = nullptr;
-    p.closing_rounds          = nullptr; // BL-1278: the spec dies with the span's block
     return p;
 }
 
@@ -1957,57 +1956,47 @@ void run_industrialisation(generation_cursor& c)
         dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
         const uint32_t dseed = industrialisation_sim_seed(params);
 
-        // BL-1278 -- THE CLOSING ROUNDS' CARVE ORACLE (closing_rounds.hpp).
-        // The carve `generate_nations` will draw at the tail -- same anchors
-        // (`settlement_seed_tiles`' filter and order), same seed (run_tail's
-        // `params.seed ^ 0x4A71012u`), same code (`preview_nation_carve`) --
-        // mapped tile -> region, so the closing rounds plan the floor and the
-        // total against the fold that will actually be made.
-        const uint32_t nation_seed = params.seed ^ 0x4A71012u;
-        closing_rounds_spec closing;
-        closing.gw               = home_grid_width;
-        closing.gh               = home_grid_height;
-        closing.min_nation_tiles = c.kepler_np.min_nation_tiles;
-        closing.keep_city_states = c.kepler_np.keep_city_states;
-        closing.total_target     = params.nation_total_target;
-        closing.carve = [&w, &kepler_tiles, nation_seed](const std::vector<region>& regions) {
-            std::vector<int> anchors, region_of;
-            anchors.reserve(regions.size());
-            for (std::size_t ri = 0; ri < regions.size(); ++ri)
-                if (regions[ri].anchor >= 0)
-                {
-                    anchors.push_back(regions[ri].anchor);
-                    region_of.push_back(static_cast<int>(ri));
-                }
-            std::vector<int> cells = preview_nation_carve(w, kepler_tiles, home_grid_width,
-                                                          home_grid_height, anchors, nation_seed);
-            for (int& k : cells)
-                k = (k >= 0 && k < static_cast<int>(region_of.size()))
-                        ? region_of[static_cast<std::size_t>(k)] : -1;
-            return cells;
-        };
-        dp.closing_rounds = &closing;
+        // BL-1278 -- THE CLOSING ROUNDS' SPEC (closing_rounds.hpp): the
+        // ground the tail's carve reads, as a value, and the tail's own seed
+        // (run_tail's `params.seed ^ 0x4A71012u`), so the closing rounds plan
+        // the floor and the total against the fold that will actually be
+        // made. Co-owned by the fixture, so a replay closes the same way.
+        auto closing = std::make_shared<closing_rounds_spec>();
+        closing->ground           = nation_carve_ground_of(w, kepler_tiles, home_grid_width, home_grid_height);
+        closing->nation_seed      = params.seed ^ 0x4A71012u;
+        closing->min_nation_tiles = c.kepler_np.min_nation_tiles;
+        closing->keep_city_states = c.kepler_np.keep_city_states;
+        closing->total_target     = params.nation_total_target;
+        dp.closing_rounds = closing.get();
 
         // BL-1278 -- THE TOTAL'S LEAN (NATION_GENERATION.md sec The nation
         // count is a target, stage 1; Ben, 2026-10-11): conquest appetite and
         // secession pressure in this span, keyed on the target against the
-        // count the span OPENS on (the fold of the 1660 map, after the floor
-        // -- the same prediction the closing rounds make at its close).
-        // Fewer wanted: more appetite, less secession; more wanted: the
-        // reverse. Per mille of the gap, integer, half-weight, so a world
-        // asked for half its opening count campaigns 25% harder and secedes
-        // under a floor 25% lower. Unset target: no lean, dp untouched.
+        // count the span OPENS on (the fold of the 1660 map after the floor --
+        // the prediction the closing rounds make at its close). Per mille of
+        // the gap, integer, clamped to +-1000:
+        //   - APPETITE, both ways, at half weight: a world asked for half its
+        //     opening count campaigns 25% harder; one asked for double, 50%
+        //     less hard.
+        //   - SECESSION, only when MORE nations are wanted: this span carries
+        //     no secession floor of its own (0, Empires-only), so the lean
+        //     gives it one -- the Empires span's floor, scaled by the gap. When
+        //     fewer are wanted it stays 0: there is no secession to lower.
+        // Unset target: no lean, dp untouched.
         if (params.nation_total_target > 0)
         {
             const closing_plan open_plan = plan_closing_rounds(
                 kepler_settlement.regions, kepler_exploration.polities,
-                closing.carve(kepler_settlement.regions), closing.gw, closing.gh,
-                closing.min_nation_tiles, closing.keep_city_states, /*total_target=*/0);
+                closing_carve_cells(*closing, kepler_settlement.regions), closing->ground.gw,
+                closing->ground.gh, closing->min_nation_tiles, closing->keep_city_states,
+                /*total_target=*/0);
             const int n_open = std::max(1, open_plan.nations_after_floor);
             const int gap_q  = std::clamp((n_open - params.nation_total_target) * 1000 / n_open, -1000, 1000);
-            dp.campaign_appetite_q      = gap_q / 2;
-            dp.secession_supply_floor_q = static_cast<int>(
-                (static_cast<int64_t>(dp.secession_supply_floor_q) * (1000 - gap_q / 2)) / 1000);
+            dp.campaign_appetite_q = gap_q / 2;
+            if (gap_q < 0)
+                dp.secession_supply_floor_q = static_cast<int>(
+                    (static_cast<int64_t>(era_minus_one_sim_params(params).secession_supply_floor_q) * (-gap_q))
+                    / 1000);
         }
 
         // THE SPAN OPENS ON THE STRUCT. The region table the
@@ -2080,6 +2069,16 @@ void run_industrialisation(generation_cursor& c)
         // tail holds the fold to the count the closing rounds planned.
         c.closing_predicted = kepler_industrialisation_hs.closing_predicted;
         if (c.closing_predicted >= 0) c.kepler_np.floor_in_history = true;
+        // A TARGET MISSED IS A DEFECT, never a reported outcome (sec The
+        // nation count is a target: "both targets are always hit"). The
+        // closing rounds stop short only when no legal step is left -- no
+        // absorber, or no split that keeps both sides above the floor -- and
+        // that is recorded loudly here rather than shipped off target.
+        if (kepler_industrialisation_hs.closing_short_of_target)
+            record_handoff_violation(c, "closing_rounds",
+                                     "the total target " + std::to_string(params.nation_total_target)
+                                         + " was not reached: the closing rounds stopped at "
+                                         + std::to_string(c.closing_predicted) + " nations");
         {
             std::string why;
             if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
@@ -2172,6 +2171,7 @@ void run_industrialisation(generation_cursor& c)
             // BL-1053: no pointer into `kepler_exploration`, which
             // lives on the cursor and dies with it (BL-1084).
             fixture->industrialisation_params  = without_resume_pointers(dp);
+            fixture->industrialisation_closing = closing; // keeps `closing_rounds` valid (BL-1278)
             fixture->industrialisation_seed    = dseed;
             fixture->industrialisation_handoff = kepler_industrialisation;
             fixture->industrialisation_state   = kepler_industrialisation_hs;

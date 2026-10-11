@@ -28,8 +28,16 @@
 //                 T  total  == the total target;
 //                 M  majors == the major target;
 //                 E  every correction carries a history event dated inside
-//                    the Industrialisation span — at least |natural - target|
-//                    reconciliation events per count, none dated outside it.
+//                    the Industrialisation span, none dated outside it.
+//                    TOTAL (BL-1278 lane B fix round): every count change the
+//                    closing rounds made has its event — the 25/26 events
+//                    equal the rounds' own steps, and the steps equal the
+//                    rounds' count delta (before -> after the floor -> after),
+//                    however much the lean already closed. MAJORS: at least
+//                    |natural - target| major-reconciliation events.
+//                 H  the build recorded no handoff violation — a total the
+//                    closing rounds could not reach is one (never shipped
+//                    silently off target), and so is fold drift.
 //               EXPECTED TO FAIL until BL-1278's lanes B (the total, inside
 //               the history) and C (the majors, after the search) land: no
 //               pass reads the targets yet, and no reconciliation event kind
@@ -130,6 +138,11 @@ struct reading
     int      recon_total_in  = 0; ///< total-reconciliation events inside the span
     int      recon_major_in  = 0; ///< major-reconciliation events inside the span
     int      recon_outside   = 0; ///< either kind dated outside the span (a defect)
+    int      closing_steps   = 0; ///< the closing rounds' own steps (absorptions + secessions)
+    int      closing_delta   = 0; ///< |before - after floor| + |after floor - after|
+    bool     closing_ran     = false;
+    bool     handoff_invalid = false;
+    std::string handoff_violation;
     double   build_s         = 0;
     double   finish_s        = 0;
     bool     ok              = false;
@@ -202,6 +215,20 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
 
     const era_timelapse& ind = home->industrialisation_timelapse;
     if (!ind.steps.empty()) r.polities = static_cast<int>(ind.steps.back().sample_count);
+    {
+        const history_sim_state& hs = fx.industrialisation_state;
+        r.closing_ran   = hs.closing_predicted >= 0;
+        r.closing_steps = hs.closing_floor_absorptions + hs.closing_target_absorptions
+                        + hs.closing_target_secessions;
+        if (r.closing_ran)
+        {
+            const int a = hs.closing_nations_before - hs.closing_nations_after_floor;
+            const int b = hs.closing_nations_after_floor - hs.closing_predicted;
+            r.closing_delta = (a < 0 ? -a : a) + (b < 0 ? -b : b);
+        }
+    }
+    r.handoff_invalid   = rep.handoff_invalid;
+    r.handoff_violation = rep.handoff_violation;
     r.ind_start = ind.start_year;
     r.ind_end   = ind.start_year + ind.years;
     for (const lapse_event& e : ind.events)
@@ -296,9 +323,11 @@ int main(int argc, char** argv)
         {
             const reading r = build_and_read(dl, seed, 0, 0);
             if (!r.ok) continue;
-            std::printf("%-6u %6d %7d %8lld %10d %9d %8.1f %8.1f%s\n", r.seed, r.total, r.majors,
+            std::printf("%-6u %6d %7d %8lld %10d %9d %8.1f %8.1f%s%s%s\n", r.seed, r.total, r.majors,
                         static_cast<long long>(r.planned_specs), r.chartered, r.polities, r.build_s,
-                        r.finish_s, r.empty_nations > 0 ? "  (tileless nations present)" : "");
+                        r.finish_s, r.empty_nations > 0 ? "  (tileless nations present)" : "",
+                        r.handoff_invalid ? "  HANDOFF VIOLATION: " : "",
+                        r.handoff_invalid ? r.handoff_violation.c_str() : "");
             std::fflush(stdout);
             ++n;
             tsum += r.total; msum += r.majors;
@@ -328,17 +357,23 @@ int main(int argc, char** argv)
             if (!r.ok) { ++fails; ++checks; continue; }
             const int  gap_t = nat.total > tt ? nat.total - tt : tt - nat.total;
             const int  gap_m = nat.majors > mt ? nat.majors - mt : mt - nat.majors;
+            (void)gap_t; // the total's E no longer reads the natural gap (the lean closes part of it)
             const bool t_ok  = r.total == tt;
             const bool m_ok  = r.majors == mt;
-            const bool e_ok  = r.recon_total_in >= gap_t && r.recon_major_in >= gap_m && r.recon_outside == 0;
-            checks += 3;
-            fails += !t_ok + !m_ok + !e_ok;
+            const bool et_ok = r.closing_ran && r.recon_total_in == r.closing_steps
+                            && r.closing_steps == r.closing_delta && r.recon_outside == 0;
+            const bool em_ok = r.recon_major_in >= gap_m && r.recon_outside == 0;
+            const bool e_ok  = et_ok && em_ok;
+            const bool h_ok  = !r.handoff_invalid;
+            checks += 4;
+            fails += !t_ok + !m_ok + !e_ok + !h_ok;
             std::printf("  %s seed %-3u target %2d/%d  T total %2d (natural %2d) %s  M majors %d (natural %d) %s  "
-                        "E events total %d/%d major %d/%d outside %d %s  [%.0f+%.0f s]\n",
-                        (t_ok && m_ok && e_ok) ? "PASS" : "FAIL", seed, tt, mt, r.total, nat.total,
+                        "E events total %d/steps %d/delta %d %s major %d/%d %s outside %d  H %s%s  [%.0f+%.0f s]\n",
+                        (t_ok && m_ok && e_ok && h_ok) ? "PASS" : "FAIL", seed, tt, mt, r.total, nat.total,
                         t_ok ? "ok" : "MISS", r.majors, nat.majors, m_ok ? "ok" : "MISS", r.recon_total_in,
-                        gap_t, r.recon_major_in, gap_m, r.recon_outside, e_ok ? "ok" : "MISS", r.build_s,
-                        r.finish_s);
+                        r.closing_steps, r.closing_delta, et_ok ? "ok" : "MISS", r.recon_major_in, gap_m,
+                        em_ok ? "ok" : "MISS", r.recon_outside, h_ok ? "ok" : "VIOLATION ",
+                        h_ok ? "" : r.handoff_violation.c_str(), r.build_s, r.finish_s);
             std::fflush(stdout);
         }
     }

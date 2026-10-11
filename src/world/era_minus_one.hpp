@@ -64,6 +64,7 @@
 #include "world.hpp"
 
 #include <cstdint>
+#include <memory>
 
 class works_registry;
 
@@ -413,6 +414,13 @@ struct era_minus_one_fixture
     /// at `industrialisation_open_regions` (BL-1051, BL-1053).
     history_sim_params industrialisation_params;
     uint32_t           industrialisation_seed = 0;
+    /// BL-1278 -- THE CLOSING ROUNDS' SPEC, co-owned so the pointer
+    /// `industrialisation_params.closing_rounds` stays valid for as long as
+    /// any copy of this fixture lives: a re-run from these params runs the
+    /// same closing rounds (the floor, and the total) on the same carve
+    /// ground, and so closes where generation closed. Null when the span did
+    /// not run.
+    std::shared_ptr<const closing_rounds_spec> industrialisation_closing;
 
     /// The 1960 close exactly as generation folded it
     /// (`make_industrialisation_output`), default-constructed when the span did

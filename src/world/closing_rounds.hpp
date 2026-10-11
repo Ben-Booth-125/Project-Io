@@ -30,10 +30,10 @@
 // applies it with its own bookkeeping (`run_history_sim`'s close).
 
 #include "world/history_sim.hpp"
+#include "world/nation_generation.hpp"
 #include "world/settlement.hpp"
 
 #include <cstdint>
-#include <functional>
 #include <vector>
 
 /// What the closing rounds need from outside the sim. Held by the caller for
@@ -41,17 +41,22 @@
 /// `history_sim_params::closing_rounds` and never stores it.
 struct closing_rounds_spec
 {
-    /// THE CARVE ORACLE: given the region table as it stands at the close,
-    /// per raster tile the index of the region whose anchor's carve cell
-    /// holds it (-1 = no cell: open ocean, or a body with no land). The SAME
-    /// carve `generate_nations` draws (`preview_nation_carve`).
-    std::function<std::vector<int>(const std::vector<region>&)> carve;
-    int  gw = 0;
-    int  gh = 0;
+    /// THE CARVE'S GROUND, a value snapshot (`nation_carve_ground_of` over the
+    /// homeworld's tiles), and `generate_nations`' own seed. The carve oracle
+    /// (`closing_carve_cells`) draws the SAME carve the tail will, from the
+    /// region anchors as they stand at the close. Self-contained, so the
+    /// fixture can own the spec and a replay of the span draws the same carve.
+    nation_carve_ground ground;
+    uint32_t nation_seed      = 0;
     int  min_nation_tiles = 0;    ///< `nation_params::min_nation_tiles`; 0 = no floor.
     bool keep_city_states = true; ///< `nation_params::keep_city_states`.
     int  total_target     = 0;    ///< `world_params::nation_total_target`; 0 = unset.
 };
+
+/// The carve oracle: per raster tile the index of the REGION whose anchor's
+/// carve cell holds it (-1 = none), for @p regions as they stand. Anchors are
+/// read with `settlement_seed_tiles`' filter and order.
+std::vector<int> closing_carve_cells(const closing_rounds_spec& spec, const std::vector<region>& regions);
 
 enum class closing_step_kind : uint8_t
 {
@@ -75,6 +80,10 @@ struct closing_step
     /// region it holds; ownerless ground moves alone; a secession moves its
     /// seat and the unanchored hinterland already pointing at it.
     std::vector<int> moved;
+    /// A floor step where the SMALL realm took the larger unheld ground beside
+    /// it (ground no realm held cannot absorb): `from_polity` -1 (the ground),
+    /// `into_polity` the realm that was too small. The cause is the realm's size.
+    bool annex = false;
 };
 
 struct closing_plan
@@ -86,7 +95,7 @@ struct closing_plan
     int floor_absorptions   = 0;
     int target_absorptions  = 0;
     int target_secessions   = 0;
-    bool short_of_target    = false; ///< A target was set and no legal step could reach it.
+    bool short_of_target    = false; ///< A target was set and no legal step could reach it (a defect: recorded as a handoff violation).
 };
 
 /// Per region, the number of carve tiles its anchor's cell holds (0 for a
