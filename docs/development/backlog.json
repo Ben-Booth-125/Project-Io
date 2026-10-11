@@ -1009,6 +1009,28 @@
    "design": "MEASURED (2026-10-11, the subjection census at c05844d9 vs BL-1272 at the 90th-percentile sea-legs floor, 16 library seeds): with the holder share restored (9.0% vs 9.9%), Industrialisation still forms 96 subjections against the trees' 21 because the sphere-of-claim test (a native is blocked when one of the arriver's sphere partners already met it) passes 0.44% of free-and-funded pairs vs 0.076%; Exploration forms 56 vs 169 (sphere pass 4.5% vs 1.85%, but far fewer arrivers). The new arrivers are outlying coastal polities whose contacts their partners never shared. OPEN (design session): what the sphere test should read - partners' contact, the arriver's own reach, the native's contact with ANY great power - and how Exploration recovers its subjections. Probe: build_gen/verify/subjection_census.cpp on the BL-1272 agent worktree; save it as a committed tool when this is built. A world-mover."
   },
   {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-11",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-11, on the state-charter shortfall); filed by Claude",
+   "id": "BL-1298",
+   "short_name": "HISTORY_BANKS_MORE",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 4,
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "requires": [],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/nation_generation.cpp"
+   ],
+   "title": "Every nation opens with real credits: the history banks more across the spans, so no nation opens near zero or in debt",
+   "design": "RULED (Ben, 2026-10-11): NATION_GENERATION.md § Pass 7. The median nation opens on 0.41 credits (22 of 38 under one, reference seed, NR-912) at the 0.01 per-mille conversion, so state charters (BL-1278) go unpaid - treasuries covered 3,108 of 7,028 credits owed across the majors grid. Lever: polities earn and keep more across the spans (not a bigger conversion, not a handoff reserve); no pre-game debt. OPEN, by measurement: which earnings (levy, tribute, trade, works) and how much; the target opening distribution (e.g. median nation >= N quarters of levy); its effect on garrison sizing and contract funding, which scale off treasury. A world-mover: measure, re-bless with Ben's go. Until it lands, a short treasury pays what it holds and the champion opens poorer."
+  },
+  {
    "status": "designed",
    "glyph": "✓",
    "sprint": 53,

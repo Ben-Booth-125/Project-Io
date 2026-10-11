@@ -499,6 +499,14 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
+**Every nation opens with real credits, and none opens in debt (Ben, 2026-10-11).** The player is a
+nation and sees its starting credits, so a median nation opening on a fraction of a credit is a
+defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
+across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
+granted at the handoff. No nation, the player's or a rival's, takes on debt before the game starts —
+a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
+more, and through which earnings, is open design to be settled by measurement (BL-1298).
+
 `nation_component::treasury` opens on **what the history banked, not what the campaign has yet
 earned**. NATIONS.md's rule — a treasury nothing has credited is zero, and a treasury that started
 full would be a balance change smuggled in as a field — still holds for the ONGOING campaign; it
