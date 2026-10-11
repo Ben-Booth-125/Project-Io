@@ -95,7 +95,9 @@ each is reconciled where it can be read:
   under the total.
 - **A state charter where a minor cannot afford its champion (Ben, 2026-10-11).** If the richest
   championless minor's richest centre cannot meet a specialist's charter price, its treasury makes
-  up the gap, and the event is recorded as a **state charter**.
+  up the gap, and the event is recorded as a **state charter**. The gap is paid **in credits, at the
+  specialist's real credit price** — the rate a corporation's charter costs — so a state charter is a
+  visible expense on the treasury, never a nominal one (Ben, 2026-10-11).
 - **No target, no reconciliation.** A world built without targets — a harness, an old save, any
   build that skips the setup round — keeps its natural counts, uncapped. The wizard always sets
   both. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable

@@ -94,6 +94,11 @@ centre spends its budget on background firms. The budgets still decide **which**
 champion; the major target decides **how many** do, through the lean and reconciliation that
 `NATION_GENERATION.md` owns.
 
+**A champion that finds no ground falls back down its nation's centres (Ben, 2026-10-11).** If the
+richest affording centre's champion cannot be placed, the nation's next affording centre, richest
+first, takes the champion. A nation that can afford one keeps it unless none of its affording centres
+finds ground. This narrows NR-911's report-and-skip rule for champions only; firms keep it.
+
 ### Pass 2 — Industrial focus assignment
 
 Each corporation receives a primary `industrial_focus`:
