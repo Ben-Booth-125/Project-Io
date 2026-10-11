@@ -129,7 +129,7 @@ in one sharp jump are retired with the globe: there is nothing to replace.
 
 **The map takes no steering input.** The premise the globe carried survives it: **you set
 conditions here, you do not steer** (Ben, 2026-08-10). The Life map neither pans nor zooms,
-matching the pass rounds' map (a decision taken 2026-10-11, NR-1038); nothing on it is a control over the world.
+matching the pass rounds' map (Ben, 2026-10-11); nothing on it is a control over the world.
 
 ## Rounds — System, setup, Life, Culture, Empires, Exploration, Industrialisation
 

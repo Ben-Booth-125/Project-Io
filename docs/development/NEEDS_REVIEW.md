@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*28 entries — 27 open, 1 resolved.*
+*28 entries — 25 open, 3 resolved.*
 
 ---
 
@@ -235,31 +235,6 @@ Quick Start built on the main menu's seed and resources. Both now live on the se
 
 *Files: `docs/ui/STARTUP.md`*
 
-### NR-1037 — The Drawdown lean no longer shows on the Life pane: does the 2D map need a cue for it?
-*question · raised 2026-10-11 · from BL-1280 (Life round 2D map) build, 2026-10-11*
-
-The retired globe painted decorative scars for the Drawdown (Spend) lean. The Life map draws the real terrain, which Drawdown does not change, so only the Spend chart now shows the lean.
-
-**Why it matters.** STARTUP.md argues a lean whose effect is not drawn is a slider nobody can judge.
-
-- The Spend chart is enough
-- Draw a cue on the map (e.g. depleted deposits shaded)
-
-> **Recommendation:** The chart is enough until the map has a resource layer; a decorative cue would misstate the ground.
-
-*Files: `docs/ui/STARTUP.md`, `src/ui/startup_screens.cpp`*
-
-### NR-1038 — DECISION TAKEN: the Life map neither pans nor zooms, matching the pass rounds
-*decision · raised 2026-10-11 · from BL-1280 (Life round 2D map) build, 2026-10-11*
-
-STARTUP.md left pan/zoom on the Life map open. The pass rounds' map takes no mouse input, so the Life map takes none either. Written into STARTUP.md § The Life map.
-
-**Why it matters.** Whether a player can read detail on the Life map before the history runs.
-
-> **Recommendation:** Confirm; revisit for both maps together if reading is hard at the live click.
-
-*Files: `docs/ui/STARTUP.md`*
-
 ---
 
 ## Resolved
@@ -279,4 +254,33 @@ Two readings taken on your behalf. (a) 'Grows relatively large' is read as the l
 > **RESOLVED.** Ben, 2026-10-11 (sprint 53 form): (a) confirmed with a floor - the realm peaks at 25-35% of held regions, under the 50% cap; (b) confirmed - chosen at the Culture close, kept alive by the same isolation. Written: CIVILISATION.md, EXPLORATION.md.
 
 *Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/lore/HISTORY.md`*
+
+### NR-1037 — The Drawdown lean no longer shows on the Life pane: does the 2D map need a cue for it?
+*question · raised 2026-10-11 · from BL-1280 (Life round 2D map) build, 2026-10-11*
+
+The retired globe painted decorative scars for the Drawdown (Spend) lean. The Life map draws the real terrain, which Drawdown does not change, so only the Spend chart now shows the lean.
+
+**Why it matters.** STARTUP.md argues a lean whose effect is not drawn is a slider nobody can judge.
+
+- The Spend chart is enough
+- Draw a cue on the map (e.g. depleted deposits shaded)
+
+> **Recommendation:** The chart is enough until the map has a resource layer; a decorative cue would misstate the ground.
+
+> **RESOLVED.** Ben, 2026-10-11: the Spend chart is enough; no cue on the map.
+
+*Files: `docs/ui/STARTUP.md`, `src/ui/startup_screens.cpp`*
+
+### NR-1038 — DECISION TAKEN: the Life map neither pans nor zooms, matching the pass rounds
+*decision · raised 2026-10-11 · from BL-1280 (Life round 2D map) build, 2026-10-11*
+
+STARTUP.md left pan/zoom on the Life map open. The pass rounds' map takes no mouse input, so the Life map takes none either. Written into STARTUP.md § The Life map.
+
+**Why it matters.** Whether a player can read detail on the Life map before the history runs.
+
+> **Recommendation:** Confirm; revisit for both maps together if reading is hard at the live click.
+
+> **RESOLVED.** Ben, 2026-10-11: confirmed - no pan or zoom on the Life map, matching the pass rounds.
+
+*Files: `docs/ui/STARTUP.md`*
 

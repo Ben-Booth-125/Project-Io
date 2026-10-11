@@ -400,7 +400,7 @@
    "title": "The Drawdown lean no longer shows on the Life pane: does the 2D map need a cue for it?",
    "raised": "2026-10-11",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1280 (Life round 2D map) build, 2026-10-11",
    "what": "The retired globe painted decorative scars for the Drawdown (Spend) lean. The Life map draws the real terrain, which Drawdown does not change, so only the Spend chart now shows the lean.",
    "why_it_matters": "STARTUP.md argues a lean whose effect is not drawn is a slider nobody can judge.",
@@ -413,14 +413,14 @@
     "docs/ui/STARTUP.md",
     "src/ui/startup_screens.cpp"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-11: the Spend chart is enough; no cue on the map."
   },
   {
    "id": "NR-1038",
    "title": "DECISION TAKEN: the Life map neither pans nor zooms, matching the pass rounds",
    "raised": "2026-10-11",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1280 (Life round 2D map) build, 2026-10-11",
    "what": "STARTUP.md left pan/zoom on the Life map open. The pass rounds' map takes no mouse input, so the Life map takes none either. Written into STARTUP.md § The Life map.",
    "why_it_matters": "Whether a player can read detail on the Life map before the history runs.",
@@ -428,7 +428,7 @@
    "files": [
     "docs/ui/STARTUP.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-11: confirmed - no pan or zoom on the Life map, matching the pass rounds."
   }
  ]
 }
