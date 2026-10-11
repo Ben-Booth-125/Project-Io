@@ -647,11 +647,16 @@
     "BL-1279"
    ],
    "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/hard_coded_world.hpp",
     "src/world/nation_generation.cpp",
-    "src/world/nation_generation.hpp"
+    "src/world/finish_campaign_world.cpp",
+    "src/core/save_game.cpp"
    ],
    "title": "Hit the total and major nation targets every time, by a lean and then in-world reconciliation",
-   "design": "DIRECTION RULED (Ben, 2026-10-10, option C; always hit): NATION_GENERATION.md § The nation count is a target. Total <= 40, major 1..6, total >= major. Stage 1, the lean: the total sets placement seed density; the major target leans charter-capital concentration. Stage 2, reconciliation by history verbs: conquest/absorption (too many nations), a subject freed or a province seceding (too few), a national champion chartered in the richest championless minor (too few majors), a cross-border buy-out (too many majors). OPEN before build: which span runs reconciliation; how the richest minor is read; buy-out pricing; how the merge pass's min-territory stop composes with a target. MEASURE FIRST: the natural total and major counts across the 16 library seeds (living polities run ~40-115, so the 40 cap reconciles on nearly every seed). Gate: every library seed lands on both targets across a grid of target pairs, each correction recorded as a history event. RULED (Ben, 2026-10-11): reconciliation runs in the closing rounds of Industrialisation, before the polity fold (NATION_GENERATION.md). Still open: richest-minor reading, buy-out pricing, the min-territory stop. RULED (Ben, 2026-10-11): richest minor = most industry points on its ground; buy-out = the richest champion buys the poorest major's specialist whole at its charter price; the min-territory floor runs first and reconciliation closes the remaining gap (NATION_GENERATION.md § The nation count is a target). No open calls remain."
+   "design": "DIRECTION RULED (Ben, 2026-10-10, option C; always hit): NATION_GENERATION.md § The nation count is a target. Total <= 40, major 1..6, total >= major. Stage 1, the lean: the total sets placement seed density; the major target leans charter-capital concentration. Stage 2, reconciliation by history verbs: conquest/absorption (too many nations), a subject freed or a province seceding (too few), a national champion chartered in the richest championless minor (too few majors), a cross-border buy-out (too many majors). OPEN before build: which span runs reconciliation; how the richest minor is read; buy-out pricing; how the merge pass's min-territory stop composes with a target. MEASURE FIRST: the natural total and major counts across the 16 library seeds (living polities run ~40-115, so the 40 cap reconciles on nearly every seed). Gate: every library seed lands on both targets across a grid of target pairs, each correction recorded as a history event. RULED (Ben, 2026-10-11): reconciliation runs in the closing rounds of Industrialisation, before the polity fold (NATION_GENERATION.md). Still open: richest-minor reading, buy-out pricing, the min-territory stop. RULED (Ben, 2026-10-11): richest minor = most industry points on its ground; buy-out = the richest champion buys the poorest major's specialist whole at its charter price; the min-territory floor runs first and reconciliation closes the remaining gap (NATION_GENERATION.md § The nation count is a target). No open calls remain. BUILD CALLS (Ben, 2026-10-11, on the build plan): the size floor moves into the history as closing-round absorptions; the total is reconciled in Industrialisation's closing rounds; the majors are reconciled after the landscape search with events dated back; a minor that cannot afford its champion gets a state charter (treasury makes up the gap); unset targets keep the natural count, uncapped; the total's lean acts on conquest appetite and secession pressure. Targets ride world_params + the save (version bump), 0 = unset."
   },
   {
    "status": "proposed",
@@ -766,7 +771,7 @@
     "src/world/corporation_generation.cpp"
    ],
    "title": "The specialist roster is the set of champions: exactly one per major nation",
-   "design": "DESIGNED (Ben, 2026-10-10): CORPORATION_GENERATION.md § Pass 1, AMENDED FORWARD 2026-10-10. One specialist per major, chartered in its richest affording centre; none in a minor; other affording centres spend on background firms. Overturns the fixed count of 8 and the 2026-09-17 multi-seat nation rule. Gate: market-viability and the 16-seed sweep - fewer specialists moves the economy, so it waits on the shelf/trade landing and takes a re-bless with Ben's go."
+   "design": "DESIGNED (Ben, 2026-10-10): CORPORATION_GENERATION.md § Pass 1, AMENDED FORWARD 2026-10-10. One specialist per major, chartered in its richest affording centre; none in a minor; other affording centres spend on background firms. Overturns the fixed count of 8 and the 2026-09-17 multi-seat nation rule. Gate: market-viability and the 16-seed sweep - fewer specialists moves the economy, so it waits on the shelf/trade landing and takes a re-bless with Ben's go. BUILD NOTE (2026-10-11): the after-search major reconciliation (BL-1278) and one-champion-per-major share finish_campaign_world; build them as one lane."
   },
   {
    "status": "proposed",

@@ -56,10 +56,12 @@ not a reported outcome — the reverse of NR-911's report-and-count rule, for th
 **How a target is hit: a lean, then in-world reconciliation (Ben, 2026-10-10, option C).** A count
 is never imposed by deleting, splitting or relabelling a nation. Two stages, in order:
 
-1. **The lean.** Each target conditions the passes that make the number. The total sets the seed
-   density of placement in place of `land_tiles_per_seed` alone, and the major target leans how
-   Industrialisation concentrates charter capital (`INDUSTRIALISATION.md` § 1). A lean lands
-   near the target; it does not promise it.
+1. **The lean.** Each target conditions the passes that make the number. The total leans the
+   history's **conquest appetite and secession pressure** — fewer nations wanted, more appetite and
+   less secession; more wanted, the reverse (Ben, 2026-10-11; seed density cannot carry it, because
+   on a settled world the seeds are the history's region anchors and `land_tiles_per_seed` is never
+   read). The major target leans how Industrialisation concentrates charter capital
+   (`INDUSTRIALISATION.md` § 1). A lean lands near the target; it does not promise it.
 2. **Reconciliation, by the history's own verbs.** Whatever gap the lean leaves is closed by events
    the sim already knows, each recorded in the history with a cause a player can read:
    - **too many nations** — conquest and absorption, the Empires and Exploration verbs;
@@ -68,9 +70,18 @@ is never imposed by deleting, splitting or relabelling a nation. Two stages, in 
    - **too many majors** — a **cross-border buy-out**: one major's champion buys a surplus major's
      specialist whole, and the seller becomes a minor.
 
-**Reconciliation runs at the end of Industrialisation, before the polity fold (Ben, 2026-10-11).**
-One late pass, nearest the count that matters: the verbs above fire in the span's closing rounds,
-dated inside it, so the nations that reach the fold are already on both targets.
+**The total is reconciled in Industrialisation's closing rounds; the majors after the landscape
+search (Ben, 2026-10-11).** The two counts come into being at different points of the pipeline, so
+each is reconciled where it can be read:
+- **The total, inside the history.** The size floor moves into the history as **closing-round
+  absorptions** (§ Pass 2c): a realm below the minimum territory is absorbed by its neighbour as an
+  event of the span, and the remaining gap is closed by the verbs above in the same closing rounds.
+  The nations that reach the fold are already on the total.
+- **The majors, after the search.** A major is a nation holding a champion, and champions are
+  chartered by the landscape search, after the history closes. So the majors are reconciled once
+  the search's winner is applied — a champion chartered or bought out — and each correction is
+  recorded as a history event **dated back** into Industrialisation's closing rounds, so the record
+  reads as one history.
 
 **The three readings (Ben, 2026-10-11):**
 - **The richest minor** is the one with the most industry points standing on its ground
@@ -80,7 +91,13 @@ dated inside it, so the nations that reach the fold are already on both targets.
   industry-point measure.
 - **The minimum-territory floor runs first.** No nation survives below it; reconciliation then
   closes whatever gap the floor leaves, adding nations back by secession or a freed subject where the
-  floor took the count under the total. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
+  floor took the count under the total.
+- **A state charter where a minor cannot afford its champion (Ben, 2026-10-11).** If the richest
+  championless minor's richest centre cannot meet a specialist's charter price, its treasury makes
+  up the gap, and the event is recorded as a **state charter**.
+- **No target, no reconciliation.** A world built without targets — a harness, an old save, any
+  build that skips the setup round — keeps its natural counts, uncapped. The wizard always sets
+  both. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
 holds for everything else. These two counts are its one sanctioned exception: the player sets them,
 and the world's shape inside them stays the world's.
 
@@ -195,6 +212,11 @@ then the lower tile index). After this pass every non-ocean land tile on the bod
 a nation — there are no unclaimed islands.
 
 ### Pass 2c — Light "in history" merges: the size floor
+
+**Moving into the history (Ben, 2026-10-11; § The nation count is a target).** On a settled world the
+floor becomes closing-round absorptions in Industrialisation, recorded as events, so the total can be
+reconciled after it. What follows describes the rule the absorptions keep, and the post-pass that
+still runs where no history ran.
 
 A deterministic post-pass gives the map a "grown in history" feel without simulating history.
 The body is **over-seeded** in Pass 1, then the smallest nations are repeatedly **absorbed into
