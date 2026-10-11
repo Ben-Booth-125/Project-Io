@@ -5255,10 +5255,12 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
 /// CHAMPION CHARTERS EXACTLY ONE (the budgets decide which nations can; the
 /// major target, when set, decides how many do — `reconcile_majors`).
 ///
-/// A champion centre whose specialist then finds no ground charters none, and
-/// its nation's next affording centre does NOT step in: the price is set aside
-/// as it always was (the specialist test is decided before the walk, so B, the
-/// yards and the plan read the same answer the walk reaches). Pure, read-only.
+/// A champion centre whose specialist then finds no ground still set its price
+/// aside (decided before the walk, so B, the yards, the pool, the refusal and
+/// the plan read one answer); the walk then FALLS BACK down the nation's other
+/// affording centres, richest first, paying the fallback's specialist from that
+/// set-aside (Ben, 2026-10-11; `charter_spend_report::champion_fallbacks`).
+/// Pure, read-only.
 std::set<entity_id> charter_champion_centres(const world& w, const charter_budget& budget,
                                              const charter_spend_params& spend)
 {
@@ -6067,6 +6069,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // specialist, and a centre's specialist stakes its ground before its own firms.
     // BL-1283 (Ben, 2026-10-10): "exactly one specialist" is now per NATION, not
     // per centre — only the nation's champion centre charters one.
+    // BL-1283 fallback: per nation, the champion centre whose specialist found
+    // no ground, the reason it booked, and the price it set aside.
+    struct pending_fallback
+    {
+        std::size_t            centre_index = 0;
+        charter_unspent_reason why          = charter_unspent_reason::window_exhausted;
+        int64_t                set_aside    = 0;
+    };
+    std::map<entity_id, pending_fallback> pending_champion;
     for (const std::size_t oi : order)
     {
         charter_centre& cc = centres[oi];
@@ -6078,12 +6089,30 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         const int32_t fp               = spend.firm_price_of(cc.centre);
         const int64_t specialist_price = spend.specialist_price_of(cc.centre);
 
-        // --- this centre's specialist, if it is its nation's champion centre ---
-        // BL-1283: one per nation, at its richest affording centre.
-        if (champions.count(cc.centre) != 0)
+        // --- this centre's specialist: its nation's champion centre, or the
+        // FALLBACK down the nation's affording centres -------------------------
+        // BL-1283: one per nation, at its richest affording centre. Ben,
+        // 2026-10-11: where that centre's champion finds no ground, the nation's
+        // next affording centre (richest first: the walk's own order) takes it;
+        // the nation loses its champion only if none of its affording centres
+        // finds ground. THE PRICE TRAVELS DOWN: the champion centre set its price
+        // aside before the walk (the plan, B, the yards, the pool and the world
+        // refusal all read that), so the fallback's specialist is paid from that
+        // set-aside first (`rep.champion_fallbacks`) and from its own points only
+        // for any excess of its own price over it — none where the two centres
+        // share a trade reach price. So the pre-walk readings stay exact wherever
+        // the fallback's price is no dearer than the champion centre's; elsewhere
+        // the fallback's firm budget falls by the difference (the plan remains
+        // the upper bound it documents).
+        const bool is_champion = champions.count(cc.centre) != 0;
+        const auto pending_it  = pending_champion.find(cc.nation);
+        const bool is_fallback = !is_champion && pending_it != pending_champion.end()
+                                 && static_cast<int64_t>(cc.points) >= specialist_price;
+        if (is_champion || is_fallback)
         {
             const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
-            cc.points_after_specialist = cc.points - price;
+            if (is_champion)
+                cc.points_after_specialist = cc.points - price;
 
             charter_rung rung = charter_rung::centre_window;
             charter_unspent_reason why = charter_unspent_reason::window_exhausted;
@@ -6109,13 +6138,34 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                                             why, assets);
             if (corp_id == null_entity)
             {
-                // No ground in either window: the specialist's price stays
-                // unspent. Never an asset-light corp, never a nation-wide anchor.
-                // The remainder still buys firms below.
-                cc.unspent[static_cast<std::size_t>(why)] += price;
+                // No ground in either window. A CHAMPION centre's price stays
+                // unspent, booked under why, and the nation's next affording
+                // centre may take the champion; a fallback that fails spends
+                // nothing on it. Never an asset-light corp, never a nation-wide
+                // anchor. The rest still buys firms below.
+                if (is_champion)
+                {
+                    cc.unspent[static_cast<std::size_t>(why)] += price;
+                    pending_champion[cc.nation] = { oi, why, price };
+                }
             }
             else
+            {
+                if (is_fallback)
+                {
+                    // The set-aside travels to this centre; its own points pay
+                    // only the excess of its price over it.
+                    pending_fallback& pf = pending_it->second;
+                    charter_centre& from = centres[pf.centre_index];
+                    const int64_t moved  = std::min<int64_t>(pf.set_aside, price);
+                    from.unspent[static_cast<std::size_t>(pf.why)] -= static_cast<int32_t>(moved);
+                    rep.champion_fallbacks.push_back({ from.centre, cc.centre, moved });
+                    cc.points_after_specialist = cc.points - static_cast<int32_t>(price - moved);
+                    ++rep.champions_fallen_back;
+                    pending_champion.erase(pending_it);
+                }
                 record(corp_id, cc, /*specialist=*/true, rung, assets, price);
+            }
         }
 
         // --- then what remains buys this centre's background firms -------------
@@ -6948,6 +6998,22 @@ void date_chartered_firms(world& w, charter_spend_report& report,
     std::map<int, std::size_t> taken;
     for (charter_record& r : report.charters)
     {
+        if (r.corp == null_entity && r.absorbed_origin >= 0)
+        {
+            // BL-1278 lane C: a firm bought out whole still took its region's
+            // slot when it was chartered, so it keeps it — no other firm's
+            // founding year shifts. Only the row is dated; the firm is gone.
+            std::size_t& k = taken[r.absorbed_origin];
+            int32_t year = epoch_year;
+            const auto nit = notes.find(r.absorbed_origin);
+            if (nit != notes.end() && k < nit->second.size())
+                year = nit->second[k];
+            else if (const auto fit = furnace.find(r.absorbed_origin); fit != furnace.end())
+                year = fit->second;
+            ++k;
+            r.founded_year = year;
+            continue;
+        }
         const auto cit = w.corporations.find(r.corp);
         if (cit == w.corporations.end())
         {
@@ -7235,46 +7301,36 @@ void print_marketplace_retrofit(const marketplace_retrofit_report& r)
 
 namespace {
 
-/// Industry points -> credits, through the two stated conversions: points to
-/// the history's material at `industry_points_per_treasury_unit` (the rate the
-/// span paid treasuries IN at), material to credits at the nation fold's
-/// `treasury_credit_per_mille` (NATION_GENERATION.md § Pass 7). A MONEY
-/// AMOUNT, moved; never read by any decision.
-float major_points_to_credits(std::int64_t points)
-{
-    if (points <= 0)
-        return 0.0f;
-    const history_sim_params hp{};
-    const nation_params      np{};
-    const double material = static_cast<double>(points)
-                          / static_cast<double>(hp.industry_points_per_treasury_unit);
-    return static_cast<float>(material * static_cast<double>(np.treasury_credit_per_mille)
-                              / 1000.0);
-}
-
 /// The buy-out's transfer: @p seller passes WHOLE to @p buyer — holdings,
 /// units, balance, opening stock (held or placed), trade purse — and is gone.
+/// The buyer keeps its own `starting_capital` (its charter's record); the
+/// seller's cash arrives in its balance. If the buyer ends up holding the
+/// provisional seat (it was the seat, or the seat was the seller), it is
+/// DISARMED after the transfer: the seat opens unarmed (BL-1154), and the
+/// seller's muster base and unit would otherwise arm it.
 void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
 {
-    corporation_component& b = w.corporations.at(buyer);
-    corporation_component& s = w.corporations.at(seller);
-    b.assets.insert(b.assets.end(), s.assets.begin(), s.assets.end());
-    b.balance          += s.balance;
-    b.starting_capital += s.starting_capital;
-    b.trade_reserve    += s.trade_reserve;
-    b.trade_points     += s.trade_points;
-    for (std::size_t r = 0; r < resource_count; ++r)
-        b.produced_ever[r] = b.produced_ever[r] || s.produced_ever[r];
+    {
+        corporation_component& b = w.corporations.at(buyer);
+        const corporation_component& s = w.corporations.at(seller);
+        b.assets.insert(b.assets.end(), s.assets.begin(), s.assets.end());
+        b.balance       += s.balance;
+        b.trade_reserve += s.trade_reserve;
+        b.trade_points  += s.trade_points;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            b.produced_ever[r] = b.produced_ever[r] || s.produced_ever[r];
+    }
 
     // Opening stock: what is still held merges; what is on the shelves stays
     // there, its placement record now the buyer's (so an unplace takes it back
     // with the firm that holds it).
     if (const auto it = w.gen_opening_stock.find(seller); it != w.gen_opening_stock.end())
     {
+        const stockpile_component moved = it->second;
+        w.gen_opening_stock.erase(it);
         stockpile_component& held = w.gen_opening_stock[buyer];
         for (std::size_t r = 0; r < resource_count; ++r)
-            held.quantities[r] += it->second.quantities[r];
-        w.gen_opening_stock.erase(seller);
+            held.quantities[r] += moved.quantities[r];
     }
     if (const auto it = w.gen_opening_placed.find(seller); it != w.gen_opening_placed.end())
     {
@@ -7302,11 +7358,18 @@ void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
     if (w.player_entity == seller)
     {
         w.player_entity = buyer;
-        b.is_player     = true;
+        w.corporations.at(buyer).is_player = true;
     }
     w.corporations.erase(seller);
-    invalidate_logistics_caches(w);   // a port or hub changed hands
+    if (w.player_entity == buyer)
+        disarm_corporation(w, buyer);   // BL-1154: the seat opens unarmed
+    invalidate_logistics_caches(w);     // a port or hub changed hands
 }
+
+/// The key the charter rows are ordered by: the corp they were chartered as —
+/// the live id, or for a row whose firm was bought out, none (such rows are
+/// only ever made AFTER every insertion, so their place is already fixed).
+entity_id charter_row_key(const charter_record& r) { return r.corp; }
 
 } // namespace
 
@@ -7369,13 +7432,6 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
     std::map<entity_id, std::vector<entity_id>> majors = read_majors();
     out.natural = static_cast<int>(majors.size());
 
-    const auto charter_record_of = [&](entity_id corp) -> const charter_record* {
-        for (const charter_record& cr : charter.charters)
-            if (cr.corp == corp)
-                return &cr;
-        return nullptr;
-    };
-
     // --- TOO FEW: a national champion in the richest championless minor -------
     if (static_cast<int>(majors.size()) < major_target)
     {
@@ -7390,7 +7446,8 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
             return a < b;
         });
 
-        // Every population centre, grouped by the nation owning its tile.
+        // Every standing population centre, grouped by the nation owning its
+        // tile, richest budget first (ties to the lower id).
         std::map<entity_id, std::vector<std::pair<std::int32_t, entity_id>>> centres_of;
         for (const auto& [centre, tile] : w.population_centre_tile)
         {
@@ -7448,6 +7505,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 if (corp == null_entity)
                     continue;   // no ground here: the nation's next centre
 
+                corporation_component& champ = w.corporations.at(corp);
                 major_reconciliation_record rec;
                 rec.nation        = n;
                 rec.corp          = corp;
@@ -7455,15 +7513,50 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 rec.region        = cc.origin_region_idx;
                 rec.nation_points = pts(n);
                 rec.price_points  = spend.specialist_price_of(centre);
-                rec.centre_points = centre_pts;
-                const std::int64_t gap = std::max<std::int64_t>(0, rec.price_points - centre_pts);
-                rec.treasury_gap_points = gap;
-                if (gap > 0)
+
+                // WHAT THE CENTRE STILL HOLDS: only its UNSPENT points count —
+                // what the walk spent on its firms counts zero. They are taken
+                // off its unspent rows (ascending reason) and become the
+                // charter's price on the walk's account, so spent + unspent
+                // still equals the budget, per centre.
+                std::int64_t want_pts = rec.price_points;
+                std::int64_t consumed = 0;
+                for (charter_unspent& u : charter.unspent)
                 {
-                    // THE STATE CHARTER: the treasury makes up the gap.
+                    if (u.centre != centre || want_pts <= 0)
+                        continue;
+                    const std::int64_t take = std::min<std::int64_t>(u.points, want_pts);
+                    u.points -= static_cast<std::int32_t>(take);
+                    want_pts -= take;
+                    consumed += take;
+                }
+                charter.unspent.erase(std::remove_if(charter.unspent.begin(), charter.unspent.end(),
+                                                     [](const charter_unspent& u) { return u.points <= 0; }),
+                                      charter.unspent.end());
+                charter.points_unspent -= consumed;
+                charter.points_spent   += consumed;
+                rec.centre_points       = consumed;
+                rec.treasury_gap_points = rec.price_points - consumed;
+
+                // THE REAL CREDIT PRICE (Ben, 2026-10-11): what a specialist's
+                // charter buys — the capital the walk's own draw gives it
+                // (`charter_specialist_at`: today's 400 +/- 40% with the focus
+                // premium, from the centre's stream). Its points price buys
+                // exactly that, so a point is worth capital / price credits here.
+                const float credit_price = champ.starting_capital;
+                rec.credit_price = credit_price;
+                float from_centre = credit_price;
+                if (rec.treasury_gap_points > 0 && rec.price_points > 0)
+                {
+                    // THE STATE CHARTER: the treasury pays the gap, in credits,
+                    // at that price; those credits are the champion's capital.
                     rec.kind = static_cast<std::uint8_t>(lapse_event_kind::state_charter);
+                    const float gap_share = static_cast<float>(
+                        static_cast<double>(rec.treasury_gap_points)
+                        / static_cast<double>(rec.price_points));
+                    const float owed = credit_price * gap_share;
+                    from_centre      = credit_price - owed;
                     nation_component& nc = w.nations.at(n);
-                    const float owed = major_points_to_credits(gap);
                     const float paid = std::min(owed, std::max(0.0f, nc.treasury));
                     nc.treasury           -= paid;
                     rec.credits_moved      = paid;
@@ -7471,6 +7564,11 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 }
                 else
                     rec.kind = static_cast<std::uint8_t>(lapse_event_kind::champion_chartered);
+                // CONSERVED: the champion opens on what paid for it — the
+                // centre's share plus what the treasury actually paid. A short
+                // treasury opens a poorer champion; nothing is minted to cover it.
+                champ.starting_capital = from_centre + rec.credits_moved;
+                champ.balance          = champ.starting_capital;
 
                 // The charter report stays true: one more specialist.
                 charter_record cr;
@@ -7479,16 +7577,13 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 cr.specialist  = true;
                 cr.rung        = rung;
                 cr.anchor_tile = w.buildings.at(assets.front()).tile;
-                // PRICE 0 ON THE WALK'S ACCOUNT: the walk's budget is already spent
-                // and balanced (spent + unspent == budgeted); this charter draws
-                // nothing from it. Its price and the treasury's share are the
-                // reconciliation record's (`price_points`, `treasury_gap_points`).
-                cr.price       = 0;
+                cr.price       = static_cast<std::int32_t>(consumed);
                 for (const entity_id bid : assets)
                     cr.holdings.push_back(w.buildings.at(bid).tile);
-                charter.charters.push_back(std::move(cr));
-                std::sort(charter.charters.begin(), charter.charters.end(),
-                          [](const charter_record& a, const charter_record& b) { return a.corp < b.corp; });
+                const auto at = std::upper_bound(
+                    charter.charters.begin(), charter.charters.end(), corp,
+                    [](entity_id c, const charter_record& r) { return c < charter_row_key(r); });
+                charter.charters.insert(at, std::move(cr));
                 charter.specialists.push_back(corp);
                 std::sort(charter.specialists.begin(), charter.specialists.end());
 
@@ -7518,24 +7613,49 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         const entity_id buyer = majors.at(richest).front();
         for (const entity_id sold : majors.at(poorest))
         {
+            const corporation_component& sc = w.corporations.at(sold);
             major_reconciliation_record rec;
             rec.kind          = static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out);
             rec.nation        = poorest;
             rec.buyer_nation  = richest;
             rec.corp          = sold;
             rec.buyer_corp    = buyer;
-            rec.region        = w.corporations.at(sold).origin_region;
+            rec.region        = sc.origin_region;
             rec.nation_points = pts(poorest);
-            const charter_record* cr = charter_record_of(sold);
-            rec.centre        = cr != nullptr ? cr->centre : null_entity;
-            rec.price_points  = cr != nullptr ? cr->price : 0;
-            // AT THAT SPECIALIST'S CHARTER PRICE: from the buyer's balance to the
-            // seller nation's treasury — a transfer, never a mint.
-            const float price = major_points_to_credits(rec.price_points);
+            // AT THAT SPECIALIST'S CHARTER PRICE, in credits at the real rate:
+            // its points price bought its charter capital, so the price in
+            // credits is that capital. From the buyer to the seller nation's
+            // treasury — a transfer, never a mint.
+            const float price = sc.starting_capital;
+            rec.credit_price  = price;
+            const int32_t origin = sc.origin_region;
+            charter_record* sold_row  = nullptr;
+            charter_record* buyer_row = nullptr;
+            for (charter_record& cr : charter.charters)
+            {
+                if (cr.corp == sold)  sold_row  = &cr;
+                if (cr.corp == buyer) buyer_row = &cr;
+            }
+            rec.centre       = sold_row != nullptr ? sold_row->centre : null_entity;
+            rec.price_points = sold_row != nullptr ? sold_row->price : 0;
+
             major_absorb_specialist(w, buyer, sold);
             w.corporations.at(buyer).balance -= price;
             w.nations.at(poorest).treasury    += price;
             rec.credits_moved = price;
+
+            // The rows: the sold firm's names no erased id, but still counts
+            // against its region when the charters are dated; the buyer's
+            // holdings now include its ground.
+            if (sold_row != nullptr)
+            {
+                if (buyer_row != nullptr)
+                    buyer_row->holdings.insert(buyer_row->holdings.end(),
+                                               sold_row->holdings.begin(), sold_row->holdings.end());
+                sold_row->absorbed_into   = buyer;
+                sold_row->absorbed_origin = origin;
+                sold_row->corp            = null_entity;
+            }
             charter.specialists.erase(
                 std::remove(charter.specialists.begin(), charter.specialists.end(), sold),
                 charter.specialists.end());

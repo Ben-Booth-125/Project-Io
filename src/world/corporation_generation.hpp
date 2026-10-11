@@ -404,10 +404,14 @@ struct major_reconciliation_record
     std::int32_t region        = -1;          ///< the settlement region the event is pinned to
     std::int64_t nation_points = 0;           ///< the (seller's / minor's) industry points
     std::int64_t price_points  = 0;           ///< the specialist charter price, in points
-    std::int64_t centre_points = 0;           ///< charter: the centre's own budget points
-    std::int64_t treasury_gap_points = 0;     ///< state charter: what the treasury made up
-    float        credits_moved = 0.0f;        ///< the price / gap in credits, as moved
-    float        treasury_shortfall = 0.0f;   ///< state charter: credits the treasury lacked
+    std::int64_t centre_points = 0;           ///< charter: the centre's UNSPENT points it consumed
+    std::int64_t treasury_gap_points = 0;     ///< state charter: price - centre_points
+    /// THE REAL CREDIT PRICE (Ben, 2026-10-11): the capital the walk's own draw
+    /// gives this specialist — what its points price buys. A state charter's
+    /// gap and a buy-out's price are paid at it.
+    float        credit_price  = 0.0f;
+    float        credits_moved = 0.0f;        ///< state charter: the treasury's payment; buy-out: the price
+    float        treasury_shortfall = 0.0f;   ///< state charter: credits the treasury lacked (the champion opens that much poorer)
 };
 
 /// What `reconcile_majors` did. `natural` is the majors before it, `majors`
@@ -433,20 +437,26 @@ struct major_reconciliation_report
 ///    to the lower nation id) charters a champion at its richest population
 ///    centre (budget points descending, ties to the lower centre id), placed
 ///    exactly as the charter walk places a specialist (`charter_specialist_at`,
-///    the winner's @p seed, the centre's own streams). Where that centre's
-///    budget points fall short of its specialist price (`specialist_price_of`),
-///    the nation's TREASURY makes up the gap — a STATE CHARTER. A centre with no
-///    ground falls to the nation's next centre, a nation with none to the next
-///    minor.
+///    the winner's @p seed, the centre's own streams). Only the centre's UNSPENT
+///    points count (what the walk spent on its firms counts zero); they leave its
+///    unspent rows and become the charter's price. Where they fall short of the
+///    specialist price (`specialist_price_of`), the nation's TREASURY pays the
+///    gap IN CREDITS at the specialist's REAL credit price — its drawn charter
+///    capital, scaled by gap / price — a STATE CHARTER. The champion opens on
+///    exactly what paid for it (the centre's share plus what the treasury paid;
+///    a short treasury is reported, never minted over). A centre with no ground
+///    falls to the nation's next centre, a nation with none to the next minor.
 ///  * TOO MANY — a BUY-OUT: the RICHEST MAJOR's champion (same measure, ties to
 ///    the lower nation id; its lowest-id specialist) buys the POOREST MAJOR's
 ///    specialist whole (ties to the HIGHER nation id, so the two never
-///    coincide) at that specialist's charter price (its charter record's
-///    `price`; 0 where it has none): its holdings, units, balance and opening
-///    stock pass to the buyer, the price moves from the buyer's balance to the
-///    seller nation's treasury in credits, and the seller corporation is gone.
-///    The seller becomes a minor. A GENERATION EVENT, never a `corp_command`
-///    verb: no AI grant covers an acquisition.
+///    coincide) at that specialist's charter price in credits at the real rate
+///    (its charter capital): its holdings, units, balance and opening stock
+///    pass to the buyer, the price moves from the buyer's balance to the seller
+///    nation's treasury, and the seller corporation is gone (its charter row is
+///    kept, `corp` null, `absorbed_into` the buyer). A buyer left holding the
+///    provisional seat is disarmed (BL-1154). The seller becomes a minor. A
+///    GENERATION EVENT, never a `corp_command` verb: no AI grant covers an
+///    acquisition.
 ///
 /// Each correction is one record, which `finish_campaign_world` writes into the
 /// Industrialisation record as a history event dated in its closing round.

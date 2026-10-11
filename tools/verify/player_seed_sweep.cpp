@@ -1089,6 +1089,16 @@ std::string charter_balance_failure(const charter_budget& budget, const charter_
             || budget.points().count(t.to) == 0)
             add("a pool transfer is not between two budgeted centres, or moves nothing");
     }
+    // BL-1283: a champion's fallback moves the champion centre's set-aside to
+    // the centre that took the champion — points moved, never made or lost.
+    for (const charter_pool_transfer& t : rep.champion_fallbacks)
+    {
+        left[t.from] -= t.points;
+        left[t.to]   += t.points;
+        if (t.from == t.to || t.points <= 0 || budget.points().count(t.from) == 0
+            || budget.points().count(t.to) == 0)
+            add("a champion fallback is not between two budgeted centres, or moves nothing");
+    }
     for (const charter_record& r : rep.charters)
     {
         by_records += r.price;

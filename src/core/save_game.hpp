@@ -272,6 +272,11 @@ inline constexpr uint32_t save_game_magic =
 /// strict-equality contract, and only for the immediately previous layout;
 /// v21 and older are still refused whole. A v23 stream carrying an illegal
 /// target pair (`nation_targets_valid`) is corrupt and refused whole.
+/// v23 ALSO admits three `lapse_event_kind` values in the Industrialisation
+/// record, written by the finish's majors reconciliation (BL-1278 lane C):
+/// 27 `champion_chartered`, 28 `state_charter`, 29 `champion_bought_out`. No
+/// field moves; a build that predates them refuses such a stream on the kind
+/// range check, as it should.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

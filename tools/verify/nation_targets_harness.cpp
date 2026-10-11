@@ -133,6 +133,8 @@ struct reading
     double   build_s         = 0;
     double   finish_s        = 0;
     bool     ok              = false;
+    bool        handoff_invalid = false; ///< the report's handoff verdict (a missed reconciliation lands here)
+    std::string handoff_violation;
 };
 
 struct data_layer
@@ -213,6 +215,8 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
         r.recon_total_in += tot;
         r.recon_major_in += maj;
     }
+    r.handoff_invalid   = rep.handoff_invalid;
+    r.handoff_violation = rep.handoff_violation;
     r.ok = true;
     return r;
 }
@@ -339,6 +343,14 @@ int main(int argc, char** argv)
                         t_ok ? "ok" : "MISS", r.majors, nat.majors, m_ok ? "ok" : "MISS", r.recon_total_in,
                         gap_t, r.recon_major_in, gap_m, r.recon_outside, e_ok ? "ok" : "MISS", r.build_s,
                         r.finish_s);
+            // V: a recorded handoff violation (e.g. a reconciliation that ended
+            // off its target) is a failure in its own right, never silent.
+            if (r.handoff_invalid)
+            {
+                ++fails;
+                ++checks;
+                std::printf("    FAIL V handoff violation: %s\n", r.handoff_violation.c_str());
+            }
             std::fflush(stdout);
         }
     }
