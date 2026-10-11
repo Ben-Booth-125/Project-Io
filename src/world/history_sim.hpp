@@ -2868,6 +2868,13 @@ struct exploration_upkeep_spend
     int64_t industry_points_refused  = 0;
     /// BL-1169: treasury units the crowding brake kept in the purse this call.
     int64_t industry_treasury_kept_by_crowding = 0;
+    /// BL-1298 census, WRITE-ONLY (read by nothing in the sim): the EARN by
+    /// source this call, before the purse's clamp -- endowment, corridor,
+    /// trade -- and the material stock the 1200 consolidation folded in.
+    int64_t earn_endowment       = 0;
+    int64_t earn_corridor        = 0;
+    int64_t earn_trade           = 0;
+    int64_t consolidation_folded = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -4497,6 +4504,14 @@ struct history_sim_state
     /// each bill went short. The observable for "a cost in the world binds".
     int64_t treasury_spent_on_army_upkeep = 0;
     int64_t treasury_spent_on_navy_upkeep = 0;
+    /// BL-1298 census, WRITE-ONLY (read by nothing in the sim, in no digest):
+    /// the treasury EARNED over the run by source (`exploration_upkeep_spend`'s
+    /// `earn_*`, summed), and the seats' material stock the 1200 consolidation
+    /// folded into treasuries -- so a reader can say where the chests came from.
+    int64_t treasury_earned_endowment     = 0;
+    int64_t treasury_earned_corridor      = 0;
+    int64_t treasury_earned_trade         = 0;
+    int64_t treasury_from_consolidation   = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
     /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
