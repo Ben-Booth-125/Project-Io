@@ -2817,13 +2817,44 @@ int main()
             inland[0].nation = 0; inland[0].port_q = 0;
             harbour[0].nation = 0; harbour[0].port_q = 1000;
             const int64_t yl = n.sea_legs_year;
-            const bool before = !polity_holds_sea_legs(harbour, q, n, yl - 1);
-            const bool land   = !polity_holds_sea_legs(inland, q, n, yl);
-            const bool sea    = polity_holds_sea_legs(harbour, q, n, yl);
+            const bool before = !polity_holds_sea_legs(harbour, q, n, yl - 1, 0);
+            const bool land   = !polity_holds_sea_legs(inland, q, n, yl, 0);
+            const bool sea    = polity_holds_sea_legs(harbour, q, n, yl, 0);
             std::printf("      sea legs: before the year %s, inland after %s, harbour after %s\n",
                         before ? "no" : "YES", land ? "no" : "YES", sea ? "yes" : "NO");
             check(before && land && sea,
                   "G1g  sea legs need the year and a held region that can field a navy (can_field_naval)");
+        }
+
+        // G1h — sea legs need a FLEET AFLOAT at the year's median navy of the
+        // naval-capable polities (Ben, 2026-10-10 / 2026-10-11; TREES.md). Four
+        // naval-capable polities with navies 10 / 40 / 70 / 100 (an even count:
+        // the LOWER middle, 40) plus an inland polity with 1000 hulls, which is
+        // not naval-capable and so does not move the median. The polity at 10
+        // is below it and holds no sea legs; 40 (at it) and 100 (above) do.
+        // Before the year the median is 0 and nobody holds sea legs.
+        {
+            std::vector<polity> ps(5);
+            std::vector<region> rg(5);
+            const int64_t navy[5] = {10, 70, 40, 100, 1000};
+            for (int i = 0; i < 5; ++i)
+            {
+                ps[i].id = i; ps[i].alive = true; ps[i].navy_stock = navy[i];
+                for (int d = 0; d < sim_domain_count; ++d) ps[i].capacity[d] = 6;
+                rg[i].nation = i; rg[i].port_q = i == 4 ? 0 : 1000;
+            }
+            const int64_t yl = n.sea_legs_year;
+            const int64_t med  = sea_legs_navy_median(rg, ps, n, yl);
+            const int64_t med0 = sea_legs_navy_median(rg, ps, n, yl - 1);
+            const bool below = !polity_holds_sea_legs(rg, ps[0], n, yl, med);
+            const bool at    = polity_holds_sea_legs(rg, ps[2], n, yl, med);
+            const bool above = polity_holds_sea_legs(rg, ps[3], n, yl, med);
+            const bool shore = !polity_holds_sea_legs(rg, ps[4], n, yl, med);
+            std::printf("      fleet afloat: median %lld (before the year %lld); below %s, at %s, above %s, inland 1000 %s\n",
+                        static_cast<long long>(med), static_cast<long long>(med0),
+                        below ? "no" : "YES", at ? "yes" : "NO", above ? "yes" : "NO", shore ? "no" : "YES");
+            check(med == 40 && med0 == 0 && below && at && above && shore,
+                  "G1h  sea legs need a fleet at or above the year's median navy of the naval-capable polities");
         }
     }
 

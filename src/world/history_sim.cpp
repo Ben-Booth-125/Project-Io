@@ -389,16 +389,49 @@ void apply_coastal_naval_ramp(std::vector<polity>& polities, const std::vector<r
     }
 }
 
-bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
-                           const history_sim_params& p, int64_t year)
+bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
+                          const history_sim_params& p, int64_t year)
 {
     if (!sea_legs_open(p, year)) return false;
-    if (q.navy_stock < p.sea_legs_fleet_min) return false; // a fleet afloat (Ben, 2026-10-10)
     const roster_band band = roster_band_for_capacity(
         clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
     for (const region& r : regions)
         if (r.nation == q.id && can_field_naval(r, band)) return true;
     return false;
+}
+
+int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vector<polity>& polities,
+                             const history_sim_params& p, int64_t year)
+{
+    if (!sea_legs_open(p, year)) return 0;
+    // One pass over the regions, in index order: a polity is capable once any
+    // region it holds can field a navy at its band (the polity_naval_capable
+    // test, folded so the cost is O(regions), not O(polities x regions)).
+    std::vector<char> capable(polities.size(), 0);
+    for (const region& r : regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+        const std::size_t i = static_cast<std::size_t>(r.nation);
+        if (capable[i]) continue;
+        const polity& q = polities[i];
+        if (!q.alive || q.id != static_cast<int>(i)) continue;
+        const roster_band band = roster_band_for_capacity(
+            clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+        if (can_field_naval(r, band)) capable[i] = 1;
+    }
+    std::vector<int64_t> navies;
+    for (std::size_t i = 0; i < polities.size(); ++i)
+        if (capable[i]) navies.push_back(polities[i].navy_stock);
+    if (navies.empty()) return 0;
+    std::sort(navies.begin(), navies.end());
+    return navies[(navies.size() - 1) / 2]; // the lower middle
+}
+
+bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
+                           const history_sim_params& p, int64_t year, int64_t median_navy)
+{
+    if (!polity_naval_capable(regions, q, p, year)) return false;
+    return q.navy_stock >= median_navy; // a fleet afloat at the year's median (Ben, 2026-10-11)
 }
 
 
@@ -5839,12 +5872,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // rounds either -- § open question, declined for this wave).
             {
                 const std::size_t pc = out.polities.size();
+                // The fleet-afloat floor, read ONCE per round before the walk:
+                // the median navy of the year's naval-capable polities
+                // (TREES.md, Ben 2026-10-11). Navies do not move inside the walk.
+                const int64_t sea_legs_median = sea_legs_navy_median(ss.regions, out.polities, params, y);
                 for (std::size_t ai = 0; ai < pc; ++ai)
                 {
                     polity& arriving = out.polities[ai];
                     if (!arriving.alive || arriving.overlord >= 0) continue;
-                    // A DATE AND NAVAL CAPACITY, never a rank (TREES.md, Ben 2026-10-10).
-                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y)) continue;
+                    // A DATE, NAVAL CAPACITY AND A FLEET AT THE YEAR'S MEDIAN,
+                    // never a rank (TREES.md, Ben 2026-10-10 / 2026-10-11).
+                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y, sea_legs_median)) continue;
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
                     ++out.subjection_arrivals_walked; // BL-1171 diagnostic

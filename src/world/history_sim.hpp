@@ -461,12 +461,6 @@ struct history_sim_params
     /// median polity held it" is undefined and the acquisition median stands.
     int64_t sea_legs_year = 1640;
 
-#ifndef IO_SEA_LEGS_FLEET_MIN
-#define IO_SEA_LEGS_FLEET_MIN 100
-#endif
-    /// MEASUREMENT PLACEHOLDER (removed before commit).
-    int64_t sea_legs_fleet_min = IO_SEA_LEGS_FLEET_MIN;
-
     /// The treasury-bought third road rung (the Post Road): from this year a
     /// polity may buy it. Was the Exploration tree's Post Roads (the
     /// `post_roads` key). MEASURED: 191 acquisitions
@@ -3218,13 +3212,44 @@ int64_t isqrt64(int64_t v);
 ///
 /// Sea legs, the date half: has the year come?
 inline bool sea_legs_open(const history_sim_params& p, int64_t year) { return year >= p.sea_legs_year; }
-/// Sea legs (Ben, 2026-10-10: a date AND naval capacity): may @p q arrive
-/// across water to subject a coast in @p year? True iff the date has come and
-/// some region @p q holds (`region::nation`) can field a navy at its military
-/// band -- `can_field_naval`, the test general ocean crossing already reads
-/// (a harbour and the band's naval rows).
+/// Naval capability, the first half of sea legs (Ben, 2026-10-10: a date AND
+/// naval capacity): has the date come, and can some region @p q holds
+/// (`region::nation`) field a navy at its military band -- `can_field_naval`,
+/// the test general ocean crossing already reads (a harbour and the band's
+/// naval rows)?
+bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
+                          const history_sim_params& p, int64_t year);
+/// THE FLEET-AFLOAT FLOOR IS RELATIVE (Ben, 2026-10-11; TREES.md). The median
+/// `navy_stock` over @p year's naval-capable polities: every living polity
+/// (`alive`, `id` equal to its index; subjects included, since a subject's
+/// fleet is afloat too) passing `polity_naval_capable`. The values are sorted
+/// ascending and the LOWER middle is taken (index (n-1)/2), so an even count
+/// has one defined answer and the result is independent of polity order. 0
+/// when no polity is naval-capable (nobody then holds sea legs to compare).
+/// The subjection block computes it ONCE per round, before its walk.
+///
+/// WHY RELATIVE. Ben ruled that arriving across water to subject a native
+/// needs a fleet afloat. A fixed hull floor was measured first (16 library
+/// seeds): Industrialisation subjections fell 440 -> 132 -> 94 -> 63 -> 21 at
+/// 0 / 100 / 400 / 1600 / 25600 hulls, but Exploration's fell with them,
+/// 146 -> 92 -> 72 -> 42 -> 18, so no fixed number restored the one without
+/// gutting the other. Under the trees about half the polities held the
+/// node; the median of the naval-capable is that "about half" read off the
+/// fleets afloat. MEASURED (same seeds): the median floor gives
+/// Exploration 120 / Industrialisation 344 subjections and 144 subjects alive
+/// at 1960 (no floor: 146 / 440 / 178; under the trees 169 / 21 / 31). It
+/// bites little, because the median navy among the naval-capable is often
+/// small or zero; requiring a fleet above zero as well moves Industrialisation
+/// only to 271.
+int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vector<polity>& polities,
+                             const history_sim_params& p, int64_t year);
+/// Sea legs: may @p q arrive across water to subject a coast in @p year?
+/// True iff @p q is naval-capable (`polity_naval_capable`) AND its own
+/// `navy_stock` is at or above @p median_navy -- the year's
+/// `sea_legs_navy_median` (a fleet afloat, Ben 2026-10-10; relative,
+/// Ben 2026-10-11).
 bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
-                           const history_sim_params& p, int64_t year);
+                           const history_sim_params& p, int64_t year, int64_t median_navy);
 /// The naval ramp (Ben, 2026-10-10: coastal polities only): every living
 /// polity holding a coastal region (`region::port_q > 0`, the old `coastal`
 /// gate's reading) holds `coastal_sea_techs_at(year)` sea techs as naval
