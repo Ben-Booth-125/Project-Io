@@ -149,11 +149,6 @@ int region_value_q(const region& p)
 /// its scoring site never went through `region_value_q` in the first place
 /// (it reads `w_farm`/`w_ore`/`w_port` against the target directly), so this
 /// term is added there, and there only.
-/// BL-973: a modifier term read for a region's OWNER (defined with the tree
-/// effect surface, below the run loop, in this same unnamed namespace;
-/// declared here because the campaign pricing and resolution sites inside
-/// `run_history_sim` read it).
-int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t);
 
 /// Per-mille of prize one centre's worth of urban heads carries in the
 /// settlement term, saturating at five (50,000 heads). BL-1130 (Ben,
@@ -376,6 +371,36 @@ int64_t stack_size(const std::vector<army_stack_entry>& s)
 }
 
 } // namespace
+
+void apply_coastal_naval_ramp(std::vector<polity>& polities, const std::vector<region>& regions,
+                              const history_sim_params& p, int64_t year)
+{
+    const int64_t techs = coastal_sea_techs_at(p, year);
+    if (techs <= 0) return;
+    std::vector<char> coastal(polities.size(), 0);
+    for (const region& r : regions)
+        if (r.port_q > 0 && r.nation >= 0 && static_cast<std::size_t>(r.nation) < coastal.size())
+            coastal[static_cast<std::size_t>(r.nation)] = 1;
+    for (std::size_t i = 0; i < polities.size(); ++i)
+    {
+        polity& q = polities[i];
+        if (!q.alive || q.id != static_cast<int>(i) || !coastal[i]) continue;
+        q.naval_sea_techs = std::max<int64_t>(q.naval_sea_techs, techs);
+    }
+}
+
+bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
+                           const history_sim_params& p, int64_t year)
+{
+    if (!sea_legs_open(p, year)) return false;
+    if (q.navy_stock < p.sea_legs_fleet_min) return false; // a fleet afloat (Ben, 2026-10-10)
+    const roster_band band = roster_band_for_capacity(
+        clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+    for (const region& r : regions)
+        if (r.nation == q.id && can_field_naval(r, band)) return true;
+    return false;
+}
+
 
 // ---------------------------------------------------------------------------
 
@@ -1902,23 +1927,6 @@ int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regi
 int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water)
 {
     return met_across_water ? p.treaty_far_sea_penalty_q : p.treaty_far_penalty_q;
-}
-
-/// BL-1147 -- the three coastal sea techs whose taking is a naval deed
-/// (EMPIRE_TREE.md: Deep-Hull Sail, Lateen & Long-Range Rig, Ocean-Rated
-/// Hulls), as a mask over the empire tree's node indices, found by id once.
-static uint64_t coastal_sea_tech_mask()
-{
-    static const uint64_t mask = [] {
-        uint64_t m = 0;
-        for (int i = 0; i < io::empire_tree::node_count; ++i)
-        {
-            const std::string id = io::empire_tree::nodes[i].id;
-            if (id == "EM-RD-2b" || id == "EM-RD-3b" || id == "EM-RD-4a") m |= (1ULL << i);
-        }
-        return m;
-    }();
-    return mask;
 }
 
 void update_coast_cells(coast_cells& c, const std::vector<region>& regions,
@@ -4594,20 +4602,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                   });
     };
 
-    // BL-1056: did the span-open survey run on the table this call opened on?
-    // Read ONCE, here, so "the span did not run" (the Fuel Doctrine's coal pull
-    // keeps the seam) is never confused with "this polity holds no surveyed
-    // ground" (it reads 0). A pure function of the opening table.
-    const bool span_surveyed = industry_span_survey_ran(ss.regions);
-    // BL-1059 (Ben, 2026-09-19, NR-899): the two top-third bars, fixed ONCE
-    // here from the table the run opened on and never moved: every pull below
-    // reads these. Only regions carrying both span-open scores are read, and
-    // no score is ever rewritten after the open, so a run resumed mid-span
-    // re-derives the same bars. Off the span nothing is surveyed and both
-    // read `industry_ground_bar_none` (and nothing reads them).
-    out.ground_bars = industry_ground_bars_at_open(ss.regions);
-    const industry_ground_bars ground_bars = out.ground_bars;
-
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
         event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
@@ -4639,14 +4633,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
-
-        // ---- BL-973: fold every polity's held nodes into its effect surface
-        // before anything this round reads a term or a key. Re-run the
-        // instant a node is bought (the Invest verb below), so a purchase is
-        // visible to every later reader in the same round. Polity order is
-        // id order; the fold is pure in the masks, so the order is moot.
-        for (polity& q : out.polities)
-            apply_tree_effects(q);
 
         // ---- The founding schedule (BL-846) ------------------------------
         //
@@ -5198,6 +5184,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.polities[static_cast<std::size_t>(o)].naval_coastal_years += years;
             }
         }
+        // THE COASTAL SEA TECHS, A DATE RAMP FOR COASTAL POLITIES (TREES.md,
+        // Ben 2026-10-10): `apply_coastal_naval_ramp`. Run again at the
+        // span's close so a polity minted after this round's tally is read.
+        if (params.naval_points_accrue)
+            apply_coastal_naval_ramp(out.polities, ss.regions, params, y);
 
         // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
         //
@@ -5485,15 +5476,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // hash), each one's neighbour list read in its own stored
             // (insertion) order — the same discipline `rebuild_reach`'s own
             // walks already hold to.
-            // BL-973: the capability is the store effect keyed `post_roads`
-            // (EX-WY-1a's `upgrade`, today), read off the polity's folded
-            // effect surface — no node id is compared here any more.
-            if (params.post_road_treasury_cost > 0)
+            // THE RUNG OPENS ON A DATE (TREES.md, Ben 2026-10-10): from
+            // `post_roads_year` every polity may buy it; no polity holds
+            // technology, so nothing else distinguishes one buyer's right
+            // from another's.
+            if (params.post_road_treasury_cost > 0 && post_roads_open(params, y))
             {
                 for (polity& q : out.polities)
                 {
                     if (!q.alive) continue;
-                    if (!polity_holds_tree_key(q, io::tree_effect_key::post_roads)) continue;
                     if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
                         continue;
                     if (ss.regions[static_cast<std::size_t>(q.capital)].treasury
@@ -5852,7 +5843,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     polity& arriving = out.polities[ai];
                     if (!arriving.alive || arriving.overlord >= 0) continue;
-                    if (!polity_holds_exploration_sea_legs(arriving)) continue; // THE NODE, never a rank
+                    // A DATE AND NAVAL CAPACITY, never a rank (TREES.md, Ben 2026-10-10).
+                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y)) continue;
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
                     ++out.subjection_arrivals_walked; // BL-1171 diagnostic
@@ -6378,16 +6370,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const std::size_t hidx = static_cast<std::size_t>(hi);
                 const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
                                       ? reach[hidx] : (1 << 27);
-                // BL-973 FINDING, NOT WIRED: the `reach` term is folded into
-                // `polity::tree_mod_q` but deliberately NOT added here. At
-                // the authored magnitudes (empire reach nodes sum to 540‰,
-                // exploration's to 1380‰, against `work_reach_relief_cap_q`
-                // = 800) technology alone discounts most of the terrain
-                // price, and the BL-872 fixtures — cut-off ground stops
-                // growing, a far campaign starves — stop holding. Whether
-                // the store's magnitudes or the sim's cap moves is a
-                // design call; until it is made, `reach` is on the stated
-                // unread list (`tree_effect_declared_unread`).
                 const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
                 // 64-BIT ON PURPOSE (BL-922): the unreachable sentinel is
                 // 1 << 27, and sentinel x cost overflowed `int` at any cost
@@ -6511,8 +6493,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ? static_cast<int64_t>(reach[hs]) * 1000
                         + static_cast<int64_t>(edge_step(hub, static_cast<int>(ti))) * sea_cost_q
                     : static_cast<int64_t>(1 << 27) * 1000;
-                // (BL-973: the tree's `reach` term is NOT added here either —
-                // see the holdings-supply site above for the finding.)
                 const int hub_reach_q = (hub >= 0)
                     ? clampi(ss.regions[hs].work_reach_mod, 0, params.work_reach_relief_cap_q)
                     : 0;
@@ -7015,12 +6995,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // The two lines below are `muster_garrison`'s arithmetic
                     // asked as a question instead of applied as a mutation.
                     const int64_t def_men = defender_levy_estimate(tgt, params);
-                    // BL-973: the DEFENDER's held `defence` nodes stack with
-                    // its ground's works, in the same clamp.
-                    const int def_works   = clampi(tgt.work_defence_mod
-                                                 + nation_tree_mod_q(out.polities, owner[ti],
-                                                                     io::tree_modifier_term::defence),
-                                                   0, 1000);
+                    const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
                     const int def_scaled  = static_cast<int>(clampi64(
                         (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
 
@@ -8162,10 +8137,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 const int atk_ready = clampi(1000 - material_penalty_q, 0, 1000);
 
-                const int def_works_q = clampi(tgt.work_defence_mod
-                                             + nation_tree_mod_q(out.polities, owner[ti],
-                                                                 io::tree_modifier_term::defence), // BL-973
-                                               0, 1000);
+                const int def_works_q = clampi(tgt.work_defence_mod, 0, 1000);
                 const int def_ready = (best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000)
                                     + def_works_q;
 
@@ -8787,11 +8759,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // mechanism is wired and the boost is zero until that is fixed
                 // — which is a finding about BL-757, not a reason to route this
                 // through a domain it does not belong to.
-                // BL-973: the polity's held `industrial` nodes pull the
-                // same crossing forward, beside its works' mean.
                 const bool  ind_domain = (d == static_cast<int>(sim_domain::materials));
                 const int   ind_boost  = ind_domain
-                    ? clampi(mean_industrial_q + tree_mod_q(q, io::tree_modifier_term::industrial), 0, 1000)
+                    ? clampi(mean_industrial_q, 0, 1000)
                     : 0;
                 const int   progress   = clampi(best_score, 0, 1000) * step_years;
                 q.progress_q[d] += progress + (progress * ind_boost) / 1000;
@@ -8803,450 +8773,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     q.progress_q[d] -= cost;
                     ++q.capacity[d];
-                }
-
-                // ---- BL-912: THE EMPIRE TREE, INVESTED ALONGSIDE THE BAND -
-                //
-                // The domain band above is the DERIVED reading TREES.md keeps
-                // for the works gate and the unit roster boundary; this is
-                // the real state -- "the sim reads nodes, not bands"
-                // (TREES.md sec The sim reads nodes). Same Invest verb, same
-                // round: choosing a node is an argument to the verb the AI
-                // grant register already covers (AI_OPPONENT.md sec 11), not
-                // a new one.
-                {
-                    // Ground means, recomputed here: BL-767's own `ground_q`
-                    // locals above went out of scope with their block, and
-                    // this is cheap over one polity's own holdings.
-                    int64_t farm_sum = 0, ore_sum = 0, energy_sum = 0, port_sum = 0;
-                    for (int hi : held)
-                    {
-                        const region& hp = ss.regions[static_cast<std::size_t>(hi)];
-                        farm_sum   += hp.farm_q;
-                        ore_sum    += hp.ore_q;
-                        energy_sum += hp.energy_q;
-                        port_sum   += hp.port_q;
-                    }
-                    const int ground_farm_q = static_cast<int>(farm_sum   / n_held);
-                    const int ground_ore_q  = static_cast<int>(ore_sum    / n_held);
-                    const int ground_fuel_q = static_cast<int>(energy_sum / n_held);
-                    const int ground_port_q = static_cast<int>(port_sum   / n_held);
-
-                    // "Bound" terms reuse this round's own domain arrears —
-                    // the same shape BL-767's `pull` already reads — for the
-                    // three the empire tree also names.
-                    const int reach_bound_q    = clampi(
-                        (6 - q.capacity[static_cast<int>(sim_domain::transport)]) * 180, 0, 1000);
-                    const int manpower_bound_q = clampi(
-                        (6 - q.capacity[static_cast<int>(sim_domain::military)]) * 180, 0, 1000);
-                    const int food_bound_q     = clampi(
-                        (6 - q.capacity[static_cast<int>(sim_domain::agriculture)]) * 180, 0, 1000);
-
-                    // Stores: how empty the seat sits. A placeholder scale
-                    // (TREES.md sec Effects: "magnitudes are authored by
-                    // judgement"), read off the seat's own stock rather than
-                    // invented from nothing.
-                    const region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
-                    const int stores_low_q = clampi(
-                        1000 - static_cast<int>(clampi64(seat.material_stock / 4, 0, 1000)), 0, 1000);
-                    const int surplus_q = 1000 - std::max(
-                        { reach_bound_q, manpower_bound_q, food_bound_q, stores_low_q });
-
-                    // Re-pick only when nothing is targeted, or the target
-                    // went dark under it (a rival fork side closed, or the
-                    // ring it needs is no longer the frontier — cannot
-                    // happen without diffusion, kept as a real check anyway).
-                    if (q.empire_investing < 0
-                     || !empire_node_available(q.empire_mask, q.empire_investing))
-                    {
-                        q.empire_investing = static_cast<int16_t>(choose_empire_node(
-                            q.empire_mask, q.cohesion_q, stores_low_q, reach_bound_q,
-                            manpower_bound_q, food_bound_q, ground_ore_q, ground_farm_q,
-                            ground_fuel_q, ground_port_q, surplus_q));
-                        q.empire_progress_q = 0;
-                    }
-
-                    if (q.empire_investing >= 0)
-                    {
-                        // RESEARCH IS A FLOW (TREES.md sec State): a fraction
-                        // of the industry slice, scaled by the spire ring
-                        // held and by contact degree. Never a stockpile —
-                        // earned and spent the same round, on the node
-                        // currently targeted.
-                        int64_t industry_sum = 0;
-                        for (int hi : held)
-                            industry_sum += region_industry_output(
-                                ss.regions[static_cast<std::size_t>(hi)]);
-
-                        int spire_ring = 0;
-                        for (int i = 0; i < io::empire_tree::node_count; ++i)
-                        {
-                            const io::empire_tree::node& nd = io::empire_tree::nodes[i];
-                            if (nd.kind == io::empire_tree::node_kind::milestone
-                             && (q.empire_mask & (1ULL << i)))
-                                spire_ring = std::max(spire_ring, static_cast<int>(nd.ring));
-                        }
-
-                        // BL-908's directed contact table ("who has met
-                        // whom") is what TREES.md sec State names as the
-                        // second research scale. The table EXISTS
-                        // (`history_sim_state::contacts`, read through
-                        // `has_contact`; the Industry scorer's `known` term
-                        // reads it, BL-1038), but THIS rate does not:
-                        // contact_degree stays 0 (an inert multiplier,
-                        // `(1000+0*40)/1000 == 1`) because wiring it moves
-                        // every shipped world's empire tree, which is a
-                        // re-bless decision, not a comment fix. (The note
-                        // this replaces said BL-908 had not landed; it had.)
-                        const int contact_degree = 0;
-
-                        // BL-973: the `research` modifier term is the
-                        // tree's own reader of itself — every held
-                        // research node scales the flow (TREES.md sec
-                        // Effects: "the research rate itself").
-                        const int64_t research_q =
-                            (industry_sum * params.empire_research_fraction_q) / 1000
-                                * (1000 + spire_ring * 150) / 1000
-                                * (1000 + clampi(contact_degree, 0, 10) * 40) / 1000
-                                * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::research), 0, 4000)) / 1000;
-                        q.empire_progress_q += static_cast<int32_t>(
-                            clampi64(research_q * step_years, 0, INT32_MAX));
-
-                        const io::empire_tree::node& tn =
-                            io::empire_tree::nodes[q.empire_investing];
-                        const int tn_kind_base =
-                            tn.kind == io::empire_tree::node_kind::minor ? 1
-                          : tn.kind == io::empire_tree::node_kind::major ? 3 : 6;
-                        const int tn_cost =
-                            params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
-                        if (q.empire_progress_q >= tn_cost)
-                        {
-                            q.empire_mask |= (1ULL << q.empire_investing);
-                            // BL-1147: a coastal sea tech taken is a naval deed.
-                            if (params.naval_points_accrue
-                             && (coastal_sea_tech_mask() & (1ULL << q.empire_investing)) != 0)
-                                ++q.naval_sea_techs;
-                            q.empire_progress_q = 0;
-                            q.empire_investing  = -1;
-                            apply_tree_effects(q); // BL-973: the surface follows the mask at once
-                        }
-                    }
-
-                    // ---- BL-930: THE EXPLORATION TREE, invested alongside -
-                    // the empire tree, in the SAME round, on the SAME held-
-                    // ground means computed above. Gated on the empire rim
-                    // (`polity_holds_empire_rim`): EX-SP-1a's own gate is the
-                    // Empire tree's rim milestone (`EXPLORATION_TREE.md` sec
-                    // The spire; CIVILISATION.md sec "Some peoples gain the
-                    // capacity to explore"), so a polity that never reaches
-                    // that rim never invests here at all -- exactly the
-                    // per-polity threshold that doc names, expressed as an
-                    // ordinary availability gate rather than a special case.
-                    if (polity_holds_empire_rim(q))
-                    {
-                        if (q.exploration_investing < 0
-                         || !exploration_node_available(q.exploration_mask, q.exploration_investing))
-                        {
-                            // BL-932 -- PURSE_LOW, same shape as `stores_low_q`
-                            // above (a placeholder scale, TREES.md sec Effects),
-                            // read off the capital's own `treasury` (`seat`,
-                            // declared above in this same block) rather than
-                            // its `material_stock`: how empty the PURSE sits,
-                            // as distinct from how empty the granary does.
-                            const int purse_low_q = clampi(
-                                1000 - static_cast<int>(clampi64(seat.treasury / 4, 0, 1000)),
-                                0, 1000);
-                            // BL-939 -- WANTS_UNMET, read off the capital's
-                            // OWN market (a polity always knows its own
-                            // want, so no contact gate applies here -- that
-                            // gate is `market_scarcity_q`'s, for reading a
-                            // FOREIGN market). Mean over the four goods;
-                            // zero where the capital never stood a market.
-                            int wants_unmet_q = 0;
-                            if (seat.has_market)
-                            {
-                                int sum_q = 0;
-                                for (int g = 0; g < 4; ++g) sum_q += seat.scarcity_q[g];
-                                wants_unmet_q = clampi(sum_q / 4, 0, 1000);
-                            }
-                            // BL-940 -- THROUGHPUT_BOUND: how constrained the
-                            // polity's own network currently runs, read off
-                            // `region::network_supply_q` (already 0-1000,
-                            // terrain-and-road-priced reach from the capital
-                            // over held ground -- EXPLORATION.md sec Goods
-                            // move as throughput: "throughput in everything
-                            // but name") over the SAME `held` set the ground
-                            // means above already walk. Mean supply, inverted:
-                            // a realm whose own roads run thin scores high
-                            // here, which is what makes Post Roads (EX-WY-1a)
-                            // and its ring-2 siblings worth investing in.
-                            int64_t supply_sum_q = 0;
-                            for (int hi : held)
-                                supply_sum_q += ss.regions[static_cast<std::size_t>(hi)].network_supply_q;
-                            const int throughput_bound_q = clampi(
-                                1000 - static_cast<int>(supply_sum_q / n_held), 0, 1000);
-                            // BL-934 -- SUBJECT_HELD, now real: does this
-                            // polity hold at least one live subject? Read off
-                            // ANOTHER polity's `overlord` field, never this
-                            // one's -- a boolean-as-1000, same shape as
-                            // `coastal_holdings`/`ground_port` above.
-                            int subject_held_q = 0;
-                            for (const polity& other : out.polities)
-                                if (other.alive && other.overlord == q.id) { subject_held_q = 1000; break; }
-                            // BL-942 -- TWO WAYS TO BE STRONG. `cs == nullptr`
-                            // (a fixture isolating a different mechanism, same
-                            // guard every other creed read in this file uses)
-                            // reads as no lean either way, which is exactly
-                            // `creed_lean_weight_q`'s own no-op case.
-                            int cons_lean_q = 0, expn_lean_q = 0;
-                            if (cs != nullptr && q.culture >= 0
-                             && static_cast<std::size_t>(q.culture) < cs->cultures.size())
-                            {
-                                const culture& own = cs->cultures[static_cast<std::size_t>(q.culture)];
-                                cons_lean_q = consolidator_lean_q(own);
-                                expn_lean_q = expansion_lean_q(own);
-                            }
-                            q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
-                                q.exploration_mask, stores_low_q, reach_bound_q,
-                                ground_port_q, ground_farm_q, surplus_q,
-                                purse_low_q, wants_unmet_q, throughput_bound_q,
-                                subject_held_q, cons_lean_q, expn_lean_q,
-                                params.exploration_creed_lean_weight_q));
-                            q.exploration_progress_q = 0;
-                        }
-
-                        if (q.exploration_investing >= 0)
-                        {
-                            // Same "research is a flow" shape as the empire
-                            // tree's (TREES.md sec State): a fraction of the
-                            // held ground's industry output, spent the same
-                            // round it is earned.
-                            int64_t industry_sum = 0;
-                            for (int hi : held)
-                                industry_sum += region_industry_output(
-                                    ss.regions[static_cast<std::size_t>(hi)]);
-
-                            const int64_t research_q =
-                                (industry_sum * params.empire_research_fraction_q) / 1000
-                                    * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::research), 0, 4000)) / 1000; // BL-973
-                            q.exploration_progress_q += static_cast<int32_t>(
-                                clampi64(research_q * step_years, 0, INT32_MAX));
-
-                            const io::exploration_tree::node& tn =
-                                io::exploration_tree::nodes[q.exploration_investing];
-                            const int tn_kind_base =
-                                tn.kind == io::exploration_tree::node_kind::minor ? 1
-                              : tn.kind == io::exploration_tree::node_kind::major ? 3 : 6;
-                            const int tn_cost =
-                                params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
-                            if (q.exploration_progress_q >= tn_cost)
-                            {
-                                q.exploration_mask |= (1ULL << q.exploration_investing);
-                                q.exploration_progress_q = 0;
-                                q.exploration_investing  = -1;
-                                apply_tree_effects(q); // BL-973
-                            }
-                        }
-                    }
-
-                    // ---- BL-1038: THE INDUSTRY TREE, behind its switch -----
-                    //
-                    // The third tree on the same Invest verb, same round, same
-                    // held-ground readings. EVERY LIVING POLITY ENTERS AT THE
-                    // ROOT from `industry_open_year` (TREES.md sec Milestones,
-                    // the Industry exception): no rim gate, so a landlocked
-                    // realm Exploration's coast-bound rim would exclude for good
-                    // is only ever BEHIND here. With the switch off (every
-                    // span but the Industrialisation span's own) this block is
-                    // skipped whole and no Industry field is read or written.
-                    //
-                    // The readings below are the Industry scorer's ONLY: the
-                    // empire and exploration scorers above keep their own
-                    // gates (the empire's fuel mean, the exploration's open
-                    // fuel gate) and their own rate (the industry slice).
-                    if (params.industry_tree_enabled && y >= params.industry_open_year)
-                    {
-                        industry_scorer_reading ir;
-                        ir.reach_bound_q    = reach_bound_q;
-                        ir.manpower_bound_q = manpower_bound_q;
-                        ir.food_bound_q     = food_bound_q;
-                        ir.stores_low_q     = stores_low_q;
-                        ir.cohesion_q       = q.cohesion_q;
-                        ir.surplus_q        = surplus_q;
-                        ir.ground_ore_q     = ground_ore_q;
-                        ir.ground_farm_q    = ground_farm_q;
-                        ir.ground_port_q    = ground_port_q;
-
-                        // THE SEAM (INDUSTRY_TREE.md sec Aims): the richest
-                        // held region's fuel -- the span-open survey under
-                        // DEFAULT B below, energy_q with it off or where
-                        // nothing was surveyed -- so a realm holding one
-                        // coalfield passes the GATE however much else it
-                        // holds. The seam is the gate's reading, the re-check's
-                        // and `fuel_seen`'s; the `ground_fuel` TERM is not the
-                        // seam inside the span (BL-1056, NR-896: a share, set
-                        // at the pick below). And
-                        // LABOUR (`labour_bound`): of the held
-                        // non-subsistence surplus (`manpower_ceiling` — the
-                        // budget muster and industry share, settlement.hpp sec
-                        // Materials and labour), the share standing under arms,
-                        // i.e. the hands the works cannot have. A realm with no
-                        // surplus at all reads 0: nothing is being withheld.
-                        // BL-1041 DEFAULT B (RULED, Ben 2026-09-18, wave 1 form):
-                        // the seam reads each held region's FUEL READING -- the
-                        // span-open survey where it has one, energy_q where it
-                        // has none -- so the gate, its re-check and `fuel_seen`
-                        // (all of which read this one field) agree with the
-                        // points' fuel factor. The `ground_fuel` TERM is a
-                        // share over the span-open survey (set at the pick).
-                        // With nothing surveyed (every path but the span) the
-                        // seam IS the energy_q max, and `ground_fuel` reads it.
-                        const bool seam_reads_survey = params.industry_fuel_gate_reads_survey;
-                        int64_t ceiling_sum = 0, under_arms = 0;
-                        int foreign_held = 0;
-                        for (int hi : held)
-                        {
-                            const region& hp = ss.regions[static_cast<std::size_t>(hi)];
-                            ir.fuel_seam_q = std::max(ir.fuel_seam_q,
-                                seam_reads_survey ? industry_fuel_reading_q(hp) : clampi(hp.energy_q, 0, 1000));
-                            const int64_t ceiling = manpower_ceiling(hp.population, hp.work_manpower_mod);
-                            ceiling_sum += ceiling;
-                            under_arms  += std::min(std::max<int64_t>(hp.army_stock, 0), ceiling);
-                            if (q.culture >= 0 && hp.culture.plurality() != q.culture) ++foreign_held;
-                        }
-                        ir.labour_bound_q = ceiling_sum > 0
-                            ? static_cast<int>(clampi64((under_arms * 1000) / ceiling_sum, 0, 1000)) : 0;
-                        // `many_peoples`: the share of held ground whose
-                        // plurality people is not the realm's own — "held
-                        // ground whose shares still charge the holder". A share,
-                        // never a count, so it does not grow with the realm.
-                        ir.many_peoples_q = clampi((foreign_held * 1000) / n_held, 0, 1000);
-                        if (ir.fuel_seam_q >= industry_fuel_seam_bar_q) q.industry_fuel_seen = true;
-
-                        // RE-PICK when nothing is targeted, when the target
-                        // went dark under a fork, OR (Industry only) when its
-                        // gate closed since the pick — a seam region lost to
-                        // conquest or secession closes a `fuel` node that is
-                        // mid-purchase, so "no seam, no Railway" holds on
-                        // every round the target is funded, not only at the
-                        // pick (INDUSTRY_TREE.md sec Aims). The gate reads the
-                        // same `ir` means and seam filled above.
-                        //
-                        // ACCUMULATED PROGRESS IS LOST (reset to 0 below), the
-                        // same thing that happens when a fork closes under the
-                        // target. TREES.md sec State gives a polity ONE progress
-                        // integer, for the node it is investing in: carrying it
-                        // to the re-picked node would hand that node research
-                        // earned toward a different one, and there is no
-                        // per-node store to park it in until the seam returns.
-                        // The loss is the visible price of losing the seam.
-                        if (!industry_target_stands(q.industry_mask, q.industry_investing, ir))
-                        {
-                            // The readings only a re-pick needs, each a walk
-                            // over the polity table or the held set.
-                            //
-                            // `threatened`: the heaviest grudge any LIVING
-                            // polity holds against this one (grudge scale:
-                            // ground taken 300, a seat sacked 700 — clamped at
-                            // 1000). A neighbour's grudge is the visible cause.
-                            // `known`: the Industry masks of every living
-                            // polity this one has met (BL-908's contact table,
-                            // `has_contact(from = q)`), per node in the scorer.
-                            int threat = 0;
-                            for (const polity& other : out.polities)
-                            {
-                                if (!other.alive || other.id == q.id) continue;
-                                threat = std::max(threat, grudge_between(out, other.id, q.id));
-                                if (other.industry_mask != 0 && has_contact(out, q.id, other.id))
-                                    ir.known_mask |= other.industry_mask;
-                            }
-                            ir.threatened_q = clampi(threat, 0, 1000);
-
-                            // THE FUEL DOCTRINE'S TWO PULLS (BL-1056; Ben
-                            // 2026-09-19, NR-896): `ground_forest` and
-                            // `ground_fuel` are each the per-mille SHARE of held
-                            // regions whose span-open share clears its own
-                            // resource's top-third bar (BL-1059, NR-899,
-                            // NR-900), over
-                            // the SAME held regions (those carrying the
-                            // span-open survey) -- like with like, and neither grows with the realm,
-                            // where the best-of-held they replace could only
-                            // rise as it did. No gate reads either, so only a
-                            // pick needs them. Off the Industrialisation span nothing
-                            // was surveyed (`span_surveyed` false): forest reads
-                            // 0 (the old pin) and fuel -1, which leaves the term
-                            // on the seam. Inside it a realm holding no surveyed
-                            // region reads 0 on both.
-                            ir.ground_forest_q = industry_ground_forest_q(ss.regions, held, ground_bars);
-                            ir.ground_fuel_q   = industry_ground_fuel_q(ss.regions, held, ground_bars, span_surveyed);
-
-                            // `colonial_reach`: a held region the seat reaches
-                            // only across water — `line_crosses_sea`, the SAME
-                            // test that makes a campaign a sea leg.
-                            for (int hi : held)
-                            {
-                                if (hi == q.capital) continue;
-                                if (line_crosses_sea(seat, ss.regions[static_cast<std::size_t>(hi)],
-                                                     terrain, gw, gh, params.neighbour_radius))
-                                { ir.colonial_reach_q = 1000; break; }
-                            }
-
-                            // `fuel_bound`: the seat market's UNMET energy want
-                            // (BL-939/954's signal, after inbound trade) — fuel
-                            // demanded beyond what landed. 0 where the seat
-                            // stands no market.
-                            if (seat.has_market)
-                                ir.fuel_bound_q = clampi(
-                                    seat.scarcity_q[scarcity_good_index(region_class::energy)], 0, 1000);
-
-                            // `credit_bound`: how far the seat's purse falls
-                            // short of the one venture the sim prices in capital
-                            // — a post road (`post_road_treasury_cost`), the
-                            // rail head's own predecessor. 1000 with an empty
-                            // purse, 0 once the treasury could pay for it
-                            // outright. A placeholder scale, like `purse_low`'s.
-                            if (params.post_road_treasury_cost > 0)
-                                ir.credit_bound_q = static_cast<int>(clampi64(
-                                    1000 - (std::max<int64_t>(0, seat.treasury) * 1000)
-                                               / params.post_road_treasury_cost, 0, 1000));
-
-                            q.industry_investing = static_cast<int16_t>(
-                                choose_industry_node(q.industry_mask, ir));
-                            q.industry_progress_q = 0;
-                        }
-
-                        if (q.industry_investing >= 0)
-                        {
-                            // THE RATE READS URBAN MASS (TREES.md sec State):
-                            // the k largest held centres, clamped, then the
-                            // integer superlinear transform — never the
-                            // industry slice the other two trees earn from —
-                            // scaled by the Industry spire ring held and the
-                            // research modifier exactly as the empire rate is.
-                            const int64_t research_q = industry_research_per_year_q(
-                                industry_urban_mass(ss.regions, held),
-                                industry_spire_ring(q.industry_mask),
-                                tree_mod_q(q, io::tree_modifier_term::research), params);
-                            q.industry_progress_q = static_cast<int32_t>(clampi64(
-                                static_cast<int64_t>(q.industry_progress_q) + research_q * step_years,
-                                0, INT32_MAX));
-
-                            const io::industry_tree::node& tn =
-                                io::industry_tree::nodes[q.industry_investing];
-                            const int tn_kind_base =
-                                tn.kind == io::industry_tree::node_kind::minor ? 1
-                              : tn.kind == io::industry_tree::node_kind::major ? 3 : 6;
-                            const int tn_cost =
-                                params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
-                            if (q.industry_progress_q >= tn_cost)
-                            {
-                                q.industry_mask |= (1ULL << q.industry_investing);
-                                q.industry_progress_q = 0;
-                                q.industry_investing  = -1;
-                                apply_tree_effects(q); // the surface follows the mask at once
-                            }
-                        }
-                    }
                 }
                 break;
             }
@@ -9386,11 +8912,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // documented per year of Consolidate, so a coarse band credits
                 // the interval it actually covers. The clamp still bounds it,
                 // so a 100-year band recovers fully rather than overshooting.
-                // BL-973: held `cohesion` nodes scale the recovery rate
-                // (TREES.md sec Effects: "recovery on Consolidate").
-                q.cohesion_q = clampi(q.cohesion_q
-                                    + params.cohesion_recovery_q * step_years
-                                        * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::cohesion), 0, 4000)) / 1000,
+                q.cohesion_q = clampi(q.cohesion_q + params.cohesion_recovery_q * step_years,
                                       params.cohesion_floor_q, 1000);
                 break;
             }
@@ -10482,6 +10004,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     }
 
+    // The naval ramp, once more at the close (see the round's tally): a
+    // polity minted during the last round is read on the closing map.
+    if (params.naval_points_accrue && params.stop_year > params.start_year)
+        apply_coastal_naval_ramp(out.polities, ss.regions, params, params.stop_year - 1);
+
     // BL-914: the final flush. The per-year publish above always lags by one
     // year, so the last year simulated is never folded in inside the loop —
     // this is the one place that year's record reaches the tap.
@@ -10501,329 +10028,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 }
 
 // ---------------------------------------------------------------------------
-// The tree effect surface (BL-973) — one fold for every tree
+// Creed leans (BL-942)
 // ---------------------------------------------------------------------------
-//
-// The generated tables (`io::empire_tree`, `io::exploration_tree`, and since
-// BL-1038 `io::industry_tree`) have distinct `node` types with one layout, so the walkers are templates over
-// the node type rather than a per-tree twin — the same reason the generator
-// itself was generalised (BL-930). Walk order is the table's fixed authored
-// order; nothing here depends on anything transient.
-
-namespace {
-
-/// Fold one tree's held effects into the polity's surface.
-template <typename NodeT, int N, int E>
-void fold_tree_effects(uint64_t mask, const NodeT (&nodes)[N],
-                       const io::tree_effect (&effects)[E], polity& q)
-{
-    for (int i = 0; i < N; ++i)
-    {
-        if (!(mask & (1ULL << i))) continue;
-        const NodeT& n = nodes[i];
-        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
-        {
-            const io::tree_effect& e = effects[n.effects_begin + r];
-            if (e.kind == io::tree_effect_kind::modifier
-             && e.term != io::tree_modifier_term::none)
-                q.tree_mod_q[static_cast<int>(e.term)] += e.per_mille;
-            if (e.key != io::tree_effect_key::none)
-                q.tree_keys |= (1u << static_cast<unsigned>(e.key));
-        }
-    }
-}
-
-/// Rule 1's ring lock, read off the store: is there a held node carrying
-/// `open "ring <ring>"`?
-template <typename NodeT, int N, int E>
-bool tree_ring_open(uint64_t mask, int ring, const NodeT (&nodes)[N],
-                    const io::tree_effect (&effects)[E])
-{
-    for (int i = 0; i < N; ++i)
-    {
-        if (!(mask & (1ULL << i))) continue;
-        const NodeT& n = nodes[i];
-        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
-        {
-            const io::tree_effect& e = effects[n.effects_begin + r];
-            if (e.kind == io::tree_effect_kind::open && static_cast<int>(e.open_ring) == ring)
-                return true;
-        }
-    }
-    return false;
-}
-
-/// A term read for a region's OWNER. Every creation site assigns
-/// `id = out.polities.size()`, so the id is the index; that is checked
-/// rather than assumed, with the id walk (`dq`'s idiom) as the fallback.
-/// 0 for unowned ground or an unknown id. Called per candidate target in
-/// campaign pricing, hence O(1) on the common path.
-int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t)
-{
-    if (nation < 0) return 0;
-    const std::size_t ni = static_cast<std::size_t>(nation);
-    if (ni < ps.size() && ps[ni].id == nation) return tree_mod_q(ps[ni], t);
-    for (const polity& o : ps)
-        if (o.id == nation) return tree_mod_q(o, t);
-    return 0;
-}
-
-} // namespace
-
-void apply_tree_effects(polity& q)
-{
-    for (int i = 0; i < io::tree_modifier_term_count; ++i) q.tree_mod_q[i] = 0;
-    q.tree_keys = 0;
-    fold_tree_effects(q.empire_mask,      io::empire_tree::nodes,      io::empire_tree::effects,      q);
-    fold_tree_effects(q.exploration_mask, io::exploration_tree::nodes, io::exploration_tree::effects, q);
-    // BL-1038: the third tree. `industry_mask` is written only behind
-    // `history_sim_params::industry_tree_enabled`, so on every shipped path
-    // this walks a zero mask and sums nothing into the shared surface.
-    fold_tree_effects(q.industry_mask,    io::industry_tree::nodes,    io::industry_tree::effects,    q);
-}
-
-tree_effect_reader tree_effect_reader_of(const io::tree_effect& e)
-{
-    using K = io::tree_effect_kind;
-    using T = io::tree_modifier_term;
-    using Y = io::tree_effect_key;
-
-    // Identity reads first: a keyed effect is read by its key whatever its
-    // kind (the key is the contract; the kind is the doc's classification).
-    switch (e.key)
-    {
-        case Y::sea_legs:   return tree_effect_reader::sea_legs_gate;
-        case Y::post_roads: return tree_effect_reader::post_roads_gate;
-        case Y::none: break;
-    }
-    if (e.kind == K::open)
-    {
-        if (e.open_tree)      return tree_effect_reader::tree_gate;
-        if (e.open_ring > 0)  return tree_effect_reader::ring_gate;
-        return tree_effect_reader::unread;
-    }
-    if (e.kind == K::modifier)
-    {
-        switch (e.term)
-        {
-            // `reach` is folded but unread — see the holdings-supply site in
-            // run_history_sim for the BL-872 finding that keeps it so.
-            case T::defence:    return tree_effect_reader::modifier_defence;
-            case T::industrial: return tree_effect_reader::modifier_industrial;
-            case T::cohesion:   return tree_effect_reader::modifier_cohesion;
-            case T::research:   return tree_effect_reader::modifier_research;
-            default:            return tree_effect_reader::unread;
-        }
-    }
-    return tree_effect_reader::unread;
-}
-
-bool tree_effect_declared_unread(const io::tree_effect& e)
-{
-    using K = io::tree_effect_kind;
-    using T = io::tree_modifier_term;
-    if (e.key != io::tree_effect_key::none) return false; // keyed effects are read by key
-    switch (e.kind)
-    {
-        case K::open:
-            return false; // every open is a gate
-        case K::modifier:
-            switch (e.term)
-            {
-                // Consumers read region fields (`work_capacity_mod`,
-                // `work_manpower_mod`) inside settlement.cpp with no polity
-                // in scope, or the sim carries no such term at all (stores
-                // decay, plague resistance, forage, a labour split). `reach`
-                // HAS a surface (the hub's `work_reach_mod`) and is withheld
-                // on a measured finding — the BL-872 fixtures fail at the
-                // authored magnitudes; see the holdings-supply site.
-                case T::reach:
-                case T::carrying_capacity: case T::manpower: case T::stores:
-                case T::assimilation:      case T::plague:   case T::forage:
-                case T::muster_cost:
-                    return true;
-                default:
-                    return false;
-            }
-        // Works and unit rows still gate on the derived band (TREES.md's open
-        // question); the rest are prose the sim has no term for.
-        case K::unlock: case K::upgrade: case K::retire: case K::access: case K::reach:
-        case K::intel:  case K::institution: case K::doctrine: case K::resource:
-            return true;
-    }
-    return false;
-}
-
-// ---------------------------------------------------------------------------
-// The empire tree (BL-912) — availability, the scorer, the rim
-// ---------------------------------------------------------------------------
-
-bool empire_node_available(uint64_t mask, int node_idx)
-{
-    if (node_idx < 0 || node_idx >= io::empire_tree::node_count) return false;
-    const uint64_t bit = 1ULL << node_idx;
-    if (mask & bit) return false; // already held
-
-    const io::empire_tree::node& n = io::empire_tree::nodes[node_idx];
-
-    // A closed fork side goes dark PERMANENTLY (TREES.md sec Forks): taking
-    // one closes the other's availability window for good, and nothing ever
-    // un-completes, so this is a one-way gate on the mask alone.
-    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
-
-    // Rule 1/the spire: ring r is locked until a held node carries the
-    // store's `open "ring r"` effect — the milestone one ring down, by the
-    // spire's shape (TREES.md sec Milestones). Ring 1 has no gate. BL-973:
-    // read off the effect, not off "a milestone at ring r-1".
-    if (n.ring > 1
-     && !tree_ring_open(mask, static_cast<int>(n.ring), io::empire_tree::nodes, io::empire_tree::effects))
-        return false;
-
-    // Rule 2: travel is OR. Available if it is the tree's true root (its OWN
-    // declared `links` was empty — see `node::is_root`'s comment: every
-    // other ring-1 major names EM-SP-1a as ITS prerequisite, which makes
-    // EM-SP-1a non-isolated in the undirected `neighbours_mask` even though
-    // it has none of its own) or at least one linked neighbour is held.
-    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
-
-    // Rule 4, the AND half: a milestone's `requires` (majors from >=2
-    // branches at its own ring) must ALL be held, plus, if present, one side
-    // of its fork pair (TREES.md sec Milestones: requires_fork, EITHER side).
-    if (n.kind == io::empire_tree::node_kind::milestone)
-    {
-        if ((mask & n.requires_mask) != n.requires_mask) return false;
-        if (n.requires_fork_a >= 0)
-        {
-            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
-            if (!a && !b) return false;
-        }
-    }
-
-    return true;
-}
-
-int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
-                        int reach_bound_q, int manpower_bound_q, int food_bound_q,
-                        int ground_ore_q, int ground_farm_q, int ground_fuel_q,
-                        int ground_port_q, int surplus_q)
-{
-    using namespace io::empire_tree;
-
-    // THE SCORER (TREES.md sec "The scorer — one shape, three trees"): a
-    // frontier node is scored on the term its `pursued_when` names, plus a
-    // constant per-kind pull that keeps the spire climbing (a milestone opens
-    // the next ring for every branch at once, so it outweighs a lone major),
-    // minus its cost. Every term below reads a quantity the round already
-    // computed (ground means, cohesion, arrears-style binding); terms this
-    // slice cannot cheaply derive (`threatened`, `plague_struck`,
-    // `many_peoples`, `known`) are left at 0 rather than guessed — TREES.md
-    // sec Effects allows placeholder magnitudes, and a 0 term simply never
-    // wins the argmax on its own account, which is honest rather than wrong.
-    //
-    // INTEGER THROUGHOUT, and the tie-break is the LOWER NODE INDEX — the
-    // tree's own fixed authored order (io::empire_tree::nodes), so two
-    // polities scoring a tie always resolve it identically.
-    const int term_value[term_count] = {
-        /* spire             */ 1000,
-        /* stores_low        */ stores_low_q,
-        /* surplus           */ surplus_q,
-        /* reach_bound       */ reach_bound_q,
-        /* coastal_holdings  */ ground_port_q,
-        /* threatened        */ 0,
-        /* ground_ore        */ ground_ore_q,
-        /* manpower_bound    */ manpower_bound_q,
-        /* ground_grass      */ ground_farm_q, // farm_q is the pasture proxy
-                                                // elsewhere in this codebase
-                                                // (unit_roster.hpp), reused here
-        /* cohesion_low      */ 1000 - clampi(cohesion_q, 0, 1000),
-        /* ground_fuel       */ ground_fuel_q,
-        /* food_bound        */ food_bound_q,
-        /* ground_farm       */ ground_farm_q,
-        /* plague_struck     */ 0,
-        /* many_peoples      */ 0,
-    };
-
-    // Endowment gates (TREES.md sec The five rules, rule 2: "A major's
-    // endowment gate... [is an] additional AND condition on top of
-    // availability"). `grassland` has no ground signal of its own in this
-    // codebase and reuses the farm mean, exactly as `unit_roster.hpp` does
-    // for pasture ("PROXY FOR PASTURE — horses have no signal of their own").
-    // A bar of 250/1000 is a placeholder, per TREES.md sec Effects.
-    const auto gate_open = [&](gate_atom g) {
-        switch (g)
-        {
-        case gate_atom::none:       return true;
-        case gate_atom::ore_q:      return ground_ore_q  >= 250;
-        case gate_atom::fuel:       return ground_fuel_q >= 250;
-        case gate_atom::arable:     return ground_farm_q >= 250;
-        case gate_atom::coastal:    return ground_port_q > 0;
-        case gate_atom::grassland:  return ground_farm_q >= 250;
-        }
-        return true;
-    };
-
-    int best_idx = -1;
-    int best_score = INT32_MIN;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!empire_node_available(mask, i)) continue;
-        const node& n = nodes[i];
-        if (!gate_open(n.gate)) continue;
-        const int kind_bonus = n.kind == node_kind::milestone ? 600
-                              : n.kind == node_kind::major     ? 0
-                                                                : -100; // minors trail their major
-        const int term = clampi(term_value[static_cast<int>(node_term[i])], 0, 1000);
-        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
-                          * static_cast<int>(n.ring);
-        const int score = term + kind_bonus - cost_q;
-        if (score > best_score) { best_score = score; best_idx = i; }
-    }
-    return best_idx;
-}
-
-// ---------------------------------------------------------------------------
-// The exploration tree (BL-930) — availability, the scorer, the rim
-// ---------------------------------------------------------------------------
-
-bool exploration_node_available(uint64_t mask, int node_idx)
-{
-    if (node_idx < 0 || node_idx >= io::exploration_tree::node_count) return false;
-    const uint64_t bit = 1ULL << node_idx;
-    if (mask & bit) return false; // already held
-
-    const io::exploration_tree::node& n = io::exploration_tree::nodes[node_idx];
-
-    // A closed fork side goes dark PERMANENTLY (TREES.md sec Forks) — same
-    // one-way gate `empire_node_available` runs.
-    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
-
-    // Rule 1/the spire: ring r is locked until a held node carries the
-    // store's `open "ring r"` effect (BL-973 — the effect, not a counted
-    // milestone). Ring 1 has no gate.
-    if (n.ring > 1
-     && !tree_ring_open(mask, static_cast<int>(n.ring), io::exploration_tree::nodes, io::exploration_tree::effects))
-        return false;
-
-    // Rule 2: travel is OR. Available if it is the tree's true root, or at
-    // least one linked neighbour is held.
-    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
-
-    // Rule 4, the AND half: a milestone's `requires` set must ALL be held,
-    // plus, if present, one side of its fork pair.
-    if (n.kind == io::exploration_tree::node_kind::milestone)
-    {
-        if ((mask & n.requires_mask) != n.requires_mask) return false;
-        if (n.requires_fork_a >= 0)
-        {
-            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
-            if (!a && !b) return false;
-        }
-    }
-
-    return true;
-}
 
 int consolidator_lean_q(const culture& c)
 {
@@ -10852,103 +10058,8 @@ int expansion_lean_q(const culture& c)
     return clampi((sea_q + zeal_q) / 2, 0, 1000);
 }
 
-int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
-                             int ground_port_q, int ground_farm_q, int surplus_q,
-                             int purse_low_q, int wants_unmet_q, int throughput_bound_q,
-                             int subject_held_q, int consolidator_lean_q, int expansion_lean_q,
-                             int creed_lean_weight_q)
-{
-    using namespace io::exploration_tree;
-
-    // THE SCORER (TREES.md sec "The scorer — one shape, four trees"), read
-    // against this tree's own term set (exploration_tree_data.hpp's
-    // `scorer_term`, 12 distinct terms across the 31 nodes).
-    //
-    // `purse_low`/`wants_unmet`/`throughput_bound` are now real, threaded-
-    // through arguments (BL-932/BL-939/BL-940). `subject_held` is now real
-    // too (BL-934): the caller passes 1000 where the polity holds at least
-    // one subject, 0 otherwise (`polity::overlord >= 0` read on ANOTHER
-    // polity, never on this one) — a bare boolean rather than a count,
-    // exactly as `coastal_holdings`/`ground_port` are booleans-as-1000
-    // already. `threatened` and `known` are STILL 0 here for the same reason
-    // `choose_empire_node` leaves `threatened` at 0: this slice has no cheap
-    // "visible capability" or "foreign agent" signal to read yet. A 0 term
-    // never wins the argmax on its own account (it can still lose to one),
-    // which is honest rather than wrong.
-    //
-    // EVERY HARNESS CALL SITE FROM BEFORE THIS ITEM PASSES 0 FOR
-    // `subject_held_q` (the parameter's own default), so BL-934 landing is
-    // visible as a diff only where a caller actually threads a live value
-    // through, never as a silent change to an existing fixture.
-    //
-    // BL-942 -- TWO WAYS TO BE STRONG. `consolidator_lean_q`/
-    // `expansion_lean_q` (0-1000, `consolidator_lean_q`/`expansion_lean_q`
-    // free functions below, derived from the polity's own culture) WEIGHT
-    // the terms EXPLORATION.md sec Two ways to be strong names for each
-    // strategy -- `throughput_bound` for the consolidator (the road ladder,
-    // dense internal throughput: WY branch's own term already, per
-    // exploration_tree_data.hpp), `coastal_holdings`/`ground_port`/
-    // `subject_held` for the expansionist (ports, hulls, subjects: the HL/PT
-    // branches' own terms). This is a WEIGHTING of terms the scorer already
-    // has, never a flag or a branch on which one a polity "is" -- a lean of
-    // 0 on both axes reduces exactly to the pre-BL-942 scorer, and
-    // `creed_lean_weight_q == 0` does the same for every polity at once.
-    const int cons_bonus = clampi(consolidator_lean_q, 0, 1000)
-                          * clampi(creed_lean_weight_q, 0, 1000) / 1000;
-    const int expn_bonus = clampi(expansion_lean_q, 0, 1000)
-                          * clampi(creed_lean_weight_q, 0, 1000) / 1000;
-    const int term_value[term_count] = {
-        /* stores_low       */ stores_low_q,
-        /* spire            */ 1000,
-        /* purse_low        */ purse_low_q,       // BL-932
-        /* surplus          */ surplus_q,
-        /* coastal_holdings */ clampi(ground_port_q + expn_bonus, 0, 1000),      // BL-942
-        /* reach_bound      */ reach_bound_q,
-        /* wants_unmet      */ wants_unmet_q,     // BL-939
-        /* threatened       */ 0,
-        /* ground_port      */ clampi(ground_port_q + expn_bonus, 0, 1000),      // BL-942
-        /* subject_held     */ clampi(clampi(subject_held_q, 0, 1000) + expn_bonus, 0, 1000), // BL-934/942
-        /* throughput_bound */ clampi(throughput_bound_q + cons_bonus, 0, 1000), // BL-940/942
-        /* known            */ 0,
-    };
-
-    // Endowment gates, same shape as `choose_empire_node`'s: `coastal` reads
-    // whether the polity's held ground carries a port endowment, `arable`
-    // whether its farm mean clears the same placeholder 250/1000 bar.
-    const auto gate_open = [&](gate_atom g) {
-        switch (g)
-        {
-        case gate_atom::none:       return true;
-        case gate_atom::ore_q:      return true; // unused by this tree; open rather than blocking
-        case gate_atom::fuel:       return true; // unused by this tree
-        case gate_atom::arable:     return ground_farm_q >= 250;
-        case gate_atom::coastal:    return ground_port_q > 0;
-        case gate_atom::grassland:  return ground_farm_q >= 250;
-        }
-        return true;
-    };
-
-    int best_idx = -1;
-    int best_score = INT32_MIN;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!exploration_node_available(mask, i)) continue;
-        const node& n = nodes[i];
-        if (!gate_open(n.gate)) continue;
-        const int kind_bonus = n.kind == node_kind::milestone ? 600
-                              : n.kind == node_kind::major     ? 0
-                                                                : -100; // minors trail their major
-        const int term = clampi(term_value[static_cast<int>(node_term[i])], 0, 1000);
-        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
-                          * static_cast<int>(n.ring);
-        const int score = term + kind_bonus - cost_q;
-        if (score > best_score) { best_score = score; best_idx = i; }
-    }
-    return best_idx;
-}
-
 // ---------------------------------------------------------------------------
-// The industry tree (BL-1038) — availability, the scorer, the rate
+// Integer square root
 // ---------------------------------------------------------------------------
 
 int64_t isqrt64(int64_t v)
@@ -10969,205 +10080,6 @@ int64_t isqrt64(int64_t v)
         x = y;
     }
     return static_cast<int64_t>(x);
-}
-
-int64_t industry_urban_mass(const std::vector<region>& regions, const std::vector<int>& held)
-{
-    // The k largest, kept descending by bubbling each value down the array.
-    // Only the SUM is returned, and the sum of the k largest values does not
-    // depend on which of several equal values landed where.
-    int64_t top[industry_research_top_k] = {};
-    for (int hi : held)
-    {
-        if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
-        int64_t v = std::max<int64_t>(0, regions[static_cast<std::size_t>(hi)].urban_population);
-        for (int k = 0; k < industry_research_top_k; ++k)
-            if (v > top[k]) std::swap(v, top[k]);
-    }
-    int64_t sum = 0;
-    for (int k = 0; k < industry_research_top_k; ++k) sum += top[k];
-    return sum;
-}
-
-int industry_spire_ring(uint64_t mask)
-{
-    // The empire rate's own loop (the Invest block, BL-912), over this table.
-    int ring = 0;
-    for (int i = 0; i < io::industry_tree::node_count; ++i)
-    {
-        const io::industry_tree::node& nd = io::industry_tree::nodes[i];
-        if (nd.kind == io::industry_tree::node_kind::milestone && (mask & (1ULL << i)))
-            ring = std::max(ring, static_cast<int>(nd.ring));
-    }
-    return ring;
-}
-
-int64_t industry_research_per_year_q(int64_t urban_mass, int spire_ring, int research_mod_q,
-                                     const history_sim_params& params)
-{
-    // CLAMP FIRST, then transform. The cap is the design's own bound (a
-    // param); 2^32 heads is the arithmetic's, so that whatever the param says
-    // Mc * isqrt(Mc) stays under 2^48, and with the spire ring clamped to 6
-    // and the research modifier to 4000 no product below passes 2^62.
-    const int64_t cap = clampi64(params.industry_urban_mass_cap, 0, 1LL << 32);
-    const int64_t mc  = clampi64(urban_mass, 0, cap);
-    const int64_t ref = std::max<int64_t>(1, isqrt64(std::max<int64_t>(1, params.industry_urban_mass_reference)));
-    const int64_t superlinear = (mc * isqrt64(mc)) / ref;      // Mc x sqrt(Mc / reference)
-    const int64_t fraction    = clampi(params.industry_research_fraction_q, 0, 1000);
-    // FROM HERE ON, THE EMPIRE RATE'S OWN SCALING, factor for factor and in
-    // its order (TREES.md sec State: a research rate is scaled by the spire
-    // ring held and by contact degree; the Industry tree swaps only the base,
-    // the industry slice, for urban mass). Contact degree is 0 here as it is
-    // in every tree — the inert `(1000 + 0 * 40) / 1000` is not written out.
-    // The `research` modifier is every tree's reader of itself (BL-973).
-    const int64_t rate = (superlinear * fraction) / 1000
-                             * (1000 + clampi(spire_ring, 0, 6) * 150) / 1000
-                             * (1000 + clampi(research_mod_q, 0, 4000)) / 1000;
-    return rate;
-}
-
-bool industry_node_available(uint64_t mask, int node_idx)
-{
-    if (node_idx < 0 || node_idx >= io::industry_tree::node_count) return false;
-    const uint64_t bit = 1ULL << node_idx;
-    if (mask & bit) return false; // already held
-
-    const io::industry_tree::node& n = io::industry_tree::nodes[node_idx];
-
-    // A closed fork side goes dark permanently (TREES.md sec Forks).
-    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
-
-    // Rule 1/the spire: ring r is locked until a held node carries the
-    // store's `open "ring r"` effect. Ring 1 has no gate.
-    if (n.ring > 1
-     && !tree_ring_open(mask, static_cast<int>(n.ring), io::industry_tree::nodes, io::industry_tree::effects))
-        return false;
-
-    // Rule 2: travel is OR — the root is exempt, anything else needs a held
-    // neighbour.
-    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
-
-    // Rule 4, the AND half: a milestone's `requires` set, plus one side of
-    // its fork pair where it names one (IN-SP-1m: the Fuel Doctrine; IN-SP-2m:
-    // the Works Doctrine).
-    if (n.kind == io::industry_tree::node_kind::milestone)
-    {
-        if ((mask & n.requires_mask) != n.requires_mask) return false;
-        if (n.requires_fork_a >= 0)
-        {
-            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
-            if (!a && !b) return false;
-        }
-    }
-
-    return true;
-}
-
-namespace {
-
-/// BL-1056: the Fuel Doctrine's two pulls, taken over ONE region set. A held
-/// region counts only if it carries the span-open survey of BOTH scores -- the
-/// survey writes the two together. Each span-open SHARE is tested against ITS
-/// OWN resource's top-third bar (BL-1059, NR-899, NR-900). A region the span founded has no
-/// forest reading (DEFAULT A inherits fuel only), so it is out of BOTH pulls,
-/// never in one and out of the other. Writes the two clear-counts and the
-/// count read; order-free.
-void industry_ground_pull_counts(const std::vector<region>& regions, const std::vector<int>& held,
-                                 const industry_ground_bars& bars,
-                                 int64_t& read, int64_t& fuel_clear, int64_t& forest_clear)
-{
-    read = fuel_clear = forest_clear = 0;
-    for (int hi : held)
-    {
-        if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
-        const region& r = regions[static_cast<std::size_t>(hi)];
-        if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
-        ++read;
-        if (industry_ground_clears(r.survey_fuel_raw,   bars.fuel_raw))   ++fuel_clear;
-        if (industry_ground_clears(r.survey_forest_raw, bars.forest_raw)) ++forest_clear;
-    }
-}
-
-/// BL-1059: one resource's top-third bar over @p shares (every read region's
-/// span-open share, zeros included; sorted in place). k = floor(n / 3), the
-/// bar is the value at ascending position n - k, and a tie band at that value
-/// clears WHOLE (NR-904) -- see `industry_ground_bars`. A 0 at the cut becomes
-/// a bar of 1: zeros never clear, and every carrier does.
-int industry_top_third_bar(std::vector<int>& shares)
-{
-    const std::size_t n = shares.size();
-    const std::size_t k = n / 3;
-    if (k == 0) return industry_ground_bar_none;
-    std::sort(shares.begin(), shares.end());
-    return std::max(shares[n - k], 1);
-}
-
-} // namespace
-
-industry_ground_bars industry_ground_bars_at_open(const std::vector<region>& regions)
-{
-    // THE TOP-THIRD BARS (BL-1059; Ben, 2026-09-19, NR-899, NR-900;
-    // INDUSTRY_TREE.md sec The scorer). Read over EVERY region carrying both
-    // span-open scores -- the set the pulls read -- zeros included, so both
-    // resources clear at one rate of the world; ranked on the UNCLAMPED share,
-    // so a pile at the score's cap is not one tied value. A region with no
-    // share (a hand-built table only) ranks as 0. The sort makes each bar
-    // independent of region order.
-    std::vector<int> fuel, forest;
-    fuel.reserve(regions.size());
-    forest.reserve(regions.size());
-    for (const region& r : regions)
-    {
-        if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
-        fuel.push_back(std::max(r.survey_fuel_raw, 0));
-        forest.push_back(std::max(r.survey_forest_raw, 0));
-    }
-    industry_ground_bars b;
-    b.fuel_raw   = industry_top_third_bar(fuel);
-    b.forest_raw = industry_top_third_bar(forest);
-    return b;
-}
-
-bool industry_span_survey_ran(const std::vector<region>& regions)
-{
-    for (const region& r : regions)
-        if (r.survey_forest_q >= 0) return true;
-    return false;
-}
-
-int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held,
-                             const industry_ground_bars& bars)
-{
-    // THE SHARE OF HELD GROUND IN THE WORLD'S TOP THIRD FOR FOREST (BL-1056,
-    // NR-896; the bar BL-1059, NR-899; INDUSTRY_TREE.md sec The scorer). It
-    // was the BEST held score, which can only rise as a realm grows: breadth,
-    // not ground, decided the Fuel Doctrine. A share of held regions cannot
-    // grow with the realm's size -- a region not clearing the bar only ever lowers it,
-    // and one with no span-open reading leaves it alone. With no read region
-    // held the reading is 0: off the span that is the old pin, and inside it
-    // a realm on ground it has no reading of pulls toward neither side.
-    int64_t read = 0, fuel_clear = 0, forest_clear = 0;
-    industry_ground_pull_counts(regions, held, bars, read, fuel_clear, forest_clear);
-    return read > 0 ? static_cast<int>((forest_clear * 1000) / read) : 0;
-}
-
-int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector<int>& held,
-                           const industry_ground_bars& bars, bool survey_ran)
-{
-    // THE SHARE OF HELD GROUND IN THE WORLD'S TOP THIRD FOR FUEL (BL-1056,
-    // NR-896; the bar BL-1059, NR-899), over EXACTLY the regions the forest
-    // share reads, each against its own resource's bar, so the Fuel Doctrine
-    // compares like with like. -1 only when
-    // the span-open survey never happened (@p survey_ran false: every path but
-    // the Industrialisation span), and the term then keeps the seam, the old
-    // reading. Inside the span a realm with no read region reads 0, never the
-    // seam: a best-of-held fallback there would grow with the realm again.
-    // The GATE is not this -- it still reads any held seam.
-    if (!survey_ran) return -1;
-    int64_t read = 0, fuel_clear = 0, forest_clear = 0;
-    industry_ground_pull_counts(regions, held, bars, read, fuel_clear, forest_clear);
-    return read > 0 ? static_cast<int>((fuel_clear * 1000) / read) : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -11204,34 +10116,7 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
     return floor_q + ((1000 - floor_q) * f) / 1000;
 }
 
-int industry_tree_industrial_q(uint64_t industry_mask)
-{
-    using namespace io::industry_tree;
-    // KNOWN DRIFT, OPEN (BL-1041 cold review): INDUSTRIALISATION.md sec Beat 1 reads
-    // "Industry tree CAPACITY nodes held", and the store tags every node's
-    // diffusion kind (capacity / practice / artifact; TREES.md sec Diffusion
-    // follows kind). The GENERATED table (`industry_tree_data.hpp`) does not
-    // carry that kind, so this fold cannot filter on it and sums the
-    // `industrial` modifier of every held node -- practice nodes included
-    // (IN-MT-1e +30, IN-LD-1b +80, IN-LD-1c -40, IN-CH-2b +40, IN-CH-2c +20).
-    // Filtering needs the generator to emit the kind first.
-    int sum = 0;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!(industry_mask & (1ULL << i))) continue;
-        const node& n = nodes[i];
-        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
-        {
-            const io::tree_effect& e = effects[n.effects_begin + r];
-            if (e.kind == io::tree_effect_kind::modifier
-             && e.term == io::tree_modifier_term::industrial)
-                sum += e.per_mille;
-        }
-    }
-    return sum;
-}
-
-int64_t industry_points_scale_credit(const region& r, int industrial_q,
+int64_t industry_points_scale_credit(const region& r,
                                      const history_sim_params& p, int step_years,
                                      int64_t employed_heads)
 {
@@ -11241,17 +10126,12 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
     // BL-1149 — THE WORKS, NOT THE CROWD: the urban heads its works employ.
     const int64_t heads = std::min(r.urban_population, employed_heads);
     if (step_years < 1 || step_years > industry_points_step_years_max) return -1;
-    // The tree multiplier's DOMAIN (see the header): outside it is a table
-    // defect, refused rather than clamped into a plausible number.
-    const int64_t tree_mult_q = 1000 + static_cast<int64_t>(industrial_q);
-    if (tree_mult_q < 100 || tree_mult_q > 5000) return -1;
 
     // Staged so no product leaves int64: heads (<= 2^31) x rate (<= 10^6)
     // x years (<= 10^3) < 2.2e18, then divided before each further factor.
     int64_t pts = (heads * p.industry_points_per_million_urban_heads_year
                    * static_cast<int64_t>(step_years)) / 1000000;
     pts = (pts * industry_points_fuel_factor_q(industry_fuel_reading_q(r), p)) / 1000;
-    pts = (pts * tree_mult_q) / 1000;
     return pts;
 }
 
@@ -11410,23 +10290,13 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              int                        step_years,
                                              const works_registry*      works)
 {
-    // The holder's capacity, once per polity per round, indexed like the
-    // table (every creation site assigns id = index; checked, and a region
-    // whose holder does not resolve reads 0, like unheld ground).
-    std::vector<int> industrial(polities.size(), 0);
-    for (std::size_t i = 0; i < polities.size(); ++i)
-        if (polities[i].id == static_cast<int>(i))
-            industrial[i] = industry_tree_industrial_q(polities[i].industry_mask);
-
     industry_points_round out;
     for (region& r : regions)
     {
         if (r.centres <= 0) continue;
-        const int ind = (r.nation >= 0 && static_cast<std::size_t>(r.nation) < industrial.size())
-                            ? industrial[static_cast<std::size_t>(r.nation)] : 0;
         // BL-1149: the heads its works employ; no table, no work, none.
         const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
-        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years, employed);
+        const int64_t credit = industry_points_scale_credit(r, p, step_years, employed);
         if (credit < 0 || r.industry_points > industry_points_ceiling - credit)
         {
             ++out.refused; // nothing moves on this region
@@ -11436,177 +10306,6 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
         out.credited      += credit;
     }
     return out;
-}
-
-namespace {
-
-/// Compile-time string equality over the generated table's ids.
-constexpr bool industry_id_is(const char* a, const char* b)
-{
-    while (*a != '\0' && *a == *b) { ++a; ++b; }
-    return *a == *b;
-}
-
-/// A node's index in `io::industry_tree::nodes`, found BY ID at compile time,
-/// or -1. Never a magic index: a store edit that renumbers the table moves
-/// this with it, and one that drops the id fails the static_assert below.
-constexpr int industry_node_by_id(const char* id)
-{
-    for (int i = 0; i < io::industry_tree::node_count; ++i)
-        if (industry_id_is(io::industry_tree::nodes[i].id, id)) return i;
-    return -1;
-}
-
-/// IN-MT-1a, Coke Smelting: the node `furnace_lit` reads.
-constexpr int industry_coke_smelting_index = industry_node_by_id("IN-MT-1a");
-static_assert(industry_coke_smelting_index >= 0 && industry_coke_smelting_index < 64,
-              "IN-MT-1a (Coke Smelting) is not in the Industry store: `furnace_lit` reads it BY ID "
-              "(INDUSTRY_TREE.md sec The scorer) -- re-read the scorer before renaming it");
-
-} // namespace
-
-bool industry_coke_smelting_held(uint64_t mask)
-{
-    // Ben, 2026-09-18 (wave 1 form): `furnace_lit` is COKE SMELTING HELD -- a
-    // coal-fired furnace. It read "a Fuel Doctrine side held" (NR-892), and
-    // that was 1000 at every pick that reads the term: all three readers
-    // (Electrification, Synthetic Chemistry, Plant Registry) sit behind The
-    // Cheap Ton, which requires a side. exploration_sim_harness T8.7.3 pins it.
-    return (mask & (1ULL << industry_coke_smelting_index)) != 0;
-}
-
-void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
-                          int (&out)[io::industry_tree::term_count])
-{
-    using namespace io::industry_tree;
-
-    // THE ORDER GUARD. `out` is written BY NAME through the generated enum
-    // (`at(scorer_term::x)`), never positionally, so a store edit that
-    // reorders the terms cannot put a reading under the wrong term. These
-    // asserts make any such edit LOUD anyway: a new term would otherwise read
-    // a silent 0 here, a removed one fails to compile below, and a reorder
-    // means the store moved under the scorer and somebody should look. If one
-    // fires after `gen_empire_tree_table.js industry`, re-read
-    // INDUSTRY_TREE.md sec The scorer, give the new term a reading (or pin it
-    // at 0 by name, as two are below), then update these lines.
-    static_assert(term_count == 22, "industry scorer terms changed: every term needs a reading here");
-    static_assert(static_cast<int>(scorer_term::spire)           ==  0
-               && static_cast<int>(scorer_term::reach_bound)     ==  1
-               && static_cast<int>(scorer_term::furnace_lit)     ==  2
-               && static_cast<int>(scorer_term::ground_ore)      ==  3
-               && static_cast<int>(scorer_term::ground_fuel)     ==  4
-               && static_cast<int>(scorer_term::ground_forest)   ==  5
-               && static_cast<int>(scorer_term::tariff_pressure) ==  6
-               && static_cast<int>(scorer_term::threatened)      ==  7
-               && static_cast<int>(scorer_term::food_bound)      ==  8
-               && static_cast<int>(scorer_term::plague_struck)   ==  9
-               && static_cast<int>(scorer_term::coastal_holdings)== 10
-               && static_cast<int>(scorer_term::colonial_reach)  == 11
-               && static_cast<int>(scorer_term::cohesion_low)    == 12
-               && static_cast<int>(scorer_term::fuel_bound)      == 13
-               && static_cast<int>(scorer_term::labour_bound)    == 14
-               && static_cast<int>(scorer_term::manpower_bound)  == 15
-               && static_cast<int>(scorer_term::ground_farm)     == 16
-               && static_cast<int>(scorer_term::ground_port)     == 17
-               && static_cast<int>(scorer_term::surplus)         == 18
-               && static_cast<int>(scorer_term::known)           == 19
-               && static_cast<int>(scorer_term::credit_bound)    == 20
-               && static_cast<int>(scorer_term::many_peoples)    == 21,
-                  "industry scorer_term order moved: the store changed under the scorer");
-
-    const auto at = [&out](scorer_term t) -> int& { return out[static_cast<int>(t)]; };
-    for (int& v : out) v = 0;
-
-    // `furnace_lit` — the polity holds Coke Smelting (Ben, 2026-09-18, wave 1
-    // form; before it, a Fuel Doctrine side, which every reader held by
-    // construction). Found by id at compile time, never by a magic index.
-    const bool furnace_lit = industry_coke_smelting_held(mask);
-
-    at(scorer_term::spire)            = 1000;
-    at(scorer_term::reach_bound)      = r.reach_bound_q;
-    at(scorer_term::furnace_lit)      = furnace_lit ? 1000 : 0;
-    at(scorer_term::ground_ore)       = r.ground_ore_q;
-    // BL-1056 (NR-896): both Fuel Doctrine pulls read a SHARE of held ground
-    // clearing that resource's top-third bar (BL-1059, NR-899, NR-900); off
-    // the span no share is taken (-1) and the coal pull keeps the seam, the old
-    // reading. The GATE still reads the seam.
-    at(scorer_term::ground_fuel)      = r.ground_fuel_q >= 0 ? r.ground_fuel_q : r.fuel_seam_q;
-    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, share of held clearing the forest bar
-    at(scorer_term::tariff_pressure)  = 0; // PINNED: no landed price at a market before the campaign
-    at(scorer_term::threatened)       = r.threatened_q;
-    at(scorer_term::food_bound)       = r.food_bound_q;
-    at(scorer_term::plague_struck)    = 0; // PINNED: the history sim runs no plague (the empire scorer pins it too)
-    at(scorer_term::coastal_holdings) = r.ground_port_q;
-    at(scorer_term::colonial_reach)   = r.colonial_reach_q;
-    at(scorer_term::cohesion_low)     = 1000 - clampi(r.cohesion_q, 0, 1000);
-    at(scorer_term::fuel_bound)       = r.fuel_bound_q;
-    at(scorer_term::labour_bound)     = r.labour_bound_q;
-    at(scorer_term::manpower_bound)   = r.manpower_bound_q;
-    at(scorer_term::ground_farm)      = r.ground_farm_q;
-    at(scorer_term::ground_port)      = r.ground_port_q;
-    at(scorer_term::surplus)          = r.surplus_q;
-    at(scorer_term::known)            = 0; // per node: `choose_industry_node` reads `known_mask`
-    at(scorer_term::credit_bound)     = r.credit_bound_q;
-    at(scorer_term::many_peoples)     = r.many_peoples_q;
-
-    for (int& v : out) v = clampi(v, 0, 1000);
-}
-
-bool industry_gate_open(io::industry_tree::gate_atom g, const industry_scorer_reading& r)
-{
-    using io::industry_tree::gate_atom;
-    // The EMPIRE scorer's gate_open, atom for atom, except `fuel`: the seam
-    // (the max over held ground) against the same bar, where the empire reads
-    // the mean. `grassland` reuses the farm mean as the empire's does.
-    switch (g)
-    {
-    case gate_atom::none:       return true;
-    case gate_atom::ore_q:      return r.ground_ore_q  >= 250;
-    case gate_atom::fuel:       return r.fuel_seam_q   >= industry_fuel_seam_bar_q;
-    case gate_atom::arable:     return r.ground_farm_q >= 250;
-    case gate_atom::coastal:    return r.ground_port_q > 0;
-    case gate_atom::grassland:  return r.ground_farm_q >= 250;
-    }
-    return true;
-}
-
-int choose_industry_node(uint64_t mask, const industry_scorer_reading& r)
-{
-    using namespace io::industry_tree;
-
-    int term_value[term_count];
-    industry_term_values(mask, r, term_value);
-
-    // Same shape as the other two scorers: term + kind bonus - cost, integer,
-    // ties to the lower node index.
-    int best_idx = -1;
-    int best_score = INT32_MIN;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!industry_node_available(mask, i)) continue;
-        const node& n = nodes[i];
-        if (!industry_gate_open(n.gate, r)) continue;
-        const int kind_bonus = n.kind == node_kind::milestone ? 600
-                              : n.kind == node_kind::major     ? 0
-                                                                : -100; // minors trail their major
-        const int term = node_term[i] == scorer_term::known
-            ? (((r.known_mask >> i) & 1ULL) != 0 ? 1000 : 0)   // a met polity holds THIS node
-            : term_value[static_cast<int>(node_term[i])];
-        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
-                          * static_cast<int>(n.ring);
-        const int score = term + kind_bonus - cost_q;
-        if (score > best_score) { best_score = score; best_idx = i; }
-    }
-    return best_idx;
-}
-
-bool industry_target_stands(uint64_t mask, int investing, const industry_scorer_reading& r)
-{
-    if (investing < 0 || investing >= io::industry_tree::node_count) return false;
-    if (!industry_node_available(mask, investing)) return false; // a fork closed under it
-    // The gate, on THIS round's reading: a seam lost since the pick closes a
-    // `fuel` node exactly as it would have refused it at the pick.
-    return industry_gate_open(io::industry_tree::nodes[investing].gate, r);
 }
 
 // ---------------------------------------------------------------------------
@@ -12531,14 +11230,14 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
     }
 
     // 1b. BL-1147: the naval ledger is a tally of deeds -- never negative, and
-    //     never more coastal sea techs than the tree holds.
+    //     never more coastal sea techs than the ramp has years.
     for (std::size_t i = 0; i < o.polities.size(); ++i)
     {
         const polity& q = o.polities[i];
         if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0)
             return fail("polity " + std::to_string(i) + " carries a negative naval ledger");
-        if (q.naval_sea_techs > 3)
-            return fail("polity " + std::to_string(i) + " took more coastal sea techs than the tree holds");
+        if (q.naval_sea_techs > history_sim_params::coastal_naval_ramp_n)
+            return fail("polity " + std::to_string(i) + " holds more coastal sea techs than the ramp has years");
     }
 
     // 2. The holdings. Ascending polity ids, ascending region indices, every

@@ -1,12 +1,10 @@
 // ---------------------------------------------------------------------------
-// exploration_sim_harness — BL-930 (the Exploration tree wired into the sim)
-// and BL-931 (the Exploration span runs, 1200 -> 1660, on the shared engine).
+// exploration_sim_harness — BL-931 (the Exploration span runs, 1200 -> 1660,
+// on the shared engine). The Exploration and Industry trees' rows (T1-T4b,
+// T7, T8) went with the trees (BL-1272; docs/generation/trees/TREES.md: the
+// history runs no technology tree).
 //
 // Binds:
-//   T1   the tree's five-rule availability, read off io::exploration_tree
-//   T2   the rim read (`polity_holds_exploration_rim`)
-//   T3   the four new-but-unbuilt scorer terms stay pinned at a neutral 0
-//        until their owning items (BL-932/939/940, BL-933/934) land
 //   R1   resuming from a prior span's close reproduces the SAME state a
 //        fresh (non-resumed) run of that same span would have reached --
 //        i.e. `resume_polities == nullptr` is untouched by this item
@@ -44,15 +42,8 @@
 //   R8   BL-955: spend is ALLOCATED -- lean ranks, one scored choice per
 //        polity per round among port/navy/army/hold, the creed and Alarm
 //        deciding which, decays untouched, the argmax tie order
-//   T8   BL-1038: the INDUSTRY tree behind its switch -- every store effect
-//        read or declared unread, five-rule availability, both sides of every
-//        fork reachable under the sim's own availability, the rim (and that
-//        nothing consumes it), the pinned stubs named on the face, the seam
-//        fuel gate, the urban-mass rate (isqrt, top-k, clamp, superlinear),
-//        industry_mask 0 on the shipped world, the switch inert before its
-//        open year, and a switch-on span deterministic and fork-exclusive;
-//        the fix round adds the empire's spire-ring factor on the rate
-//        (T8.9.7/8) and the gate re-read on every funded round (T8.14)
+//   T10  BL-1041 DEFAULT A through the sim's own wiring: a region the span
+//        founds inherits its parent's surveyed fuel x0.7, its forest -1
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -79,52 +70,6 @@ void check(bool ok, const char* label)
 {
     std::printf("%s  %s\n", ok ? "PASS" : "FAIL", label);
     if (!ok) ++g_failures;
-}
-
-int find_node(const char* id)
-{
-    for (int i = 0; i < io::exploration_tree::node_count; ++i)
-        if (std::strcmp(io::exploration_tree::nodes[i].id, id) == 0) return i;
-    return -1;
-}
-
-/// BL-1038: the same lookup over the Industry table. The HARNESS names nodes
-/// by id; the sim never does.
-int find_industry_node(const char* id)
-{
-    for (int i = 0; i < io::industry_tree::node_count; ++i)
-        if (std::strcmp(io::industry_tree::nodes[i].id, id) == 0) return i;
-    return -1;
-}
-
-/// BL-1038: the monotone closure the lint's fork rule runs, but over the
-/// SIM's own `industry_node_available` — buy everything available and not
-/// refused until nothing moves. Gates are not applied (a gate is a map
-/// question). With one side of every fork refused, no excludes can bite
-/// mid-closure, so the fixed point does not depend on purchase order.
-uint64_t industry_closure(uint64_t refused)
-{
-    uint64_t held = 0;
-    bool moved = true;
-    while (moved)
-    {
-        moved = false;
-        for (int i = 0; i < io::industry_tree::node_count; ++i)
-        {
-            if ((refused >> i) & 1ULL) continue;
-            if (!industry_node_available(held, i)) continue;
-            held |= 1ULL << i;
-            moved = true;
-        }
-    }
-    return held;
-}
-
-int popcount64(uint64_t m)
-{
-    int n = 0;
-    for (; m != 0; m &= m - 1) ++n;
-    return n;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,161 +128,6 @@ exploration_spend_context spend_context(spend_fixture& fx)
 int main()
 {
     std::printf("=== exploration_sim_harness (BL-930 / BL-931) ===\n\n");
-
-    // -----------------------------------------------------------------
-    // T1: the tree's five-rule availability
-    // -----------------------------------------------------------------
-    {
-        const int root   = find_node("EX-SP-1a");
-        const int sp1m   = find_node("EX-SP-1m");
-        const int hl2a   = find_node("EX-HL-2a"); // Ocean Carrack
-        const int hl2b   = find_node("EX-HL-2b"); // Fleet of the Line (excludes hl2a)
-        const int pt1a   = find_node("EX-PT-1a");
-        const int wy1a   = find_node("EX-WY-1a");
-
-        check(root >= 0 && sp1m >= 0 && hl2a >= 0 && hl2b >= 0 && pt1a >= 0 && wy1a >= 0,
-              "T1.0  every id this harness names resolves to a real node");
-
-        check(exploration_node_available(0, root),
-              "T1.1  the tree's own root is available with nothing held");
-
-        // The milestone needs PT-1a and WY-1a held (its `requires_mask`) --
-        // not available off the root alone.
-        const uint64_t mask_root_only = 1ULL << root;
-        check(!exploration_node_available(mask_root_only, sp1m),
-              "T1.2  the ring-1 milestone refuses without its `requires` set");
-
-        const uint64_t mask_with_requires =
-            mask_root_only | (1ULL << pt1a) | (1ULL << wy1a);
-        check(exploration_node_available(mask_with_requires, sp1m),
-              "T1.3  the ring-1 milestone opens once PT-1a and WY-1a are both held");
-
-        // Fork exclusion: taking one side closes the other, permanently.
-        const uint64_t mask_carrack = 1ULL << hl2a;
-        check(!exploration_node_available(mask_carrack, hl2b),
-              "T1.4  taking the Ocean Carrack closes Fleet of the Line (fork excludes)");
-        const uint64_t mask_fleet = 1ULL << hl2b;
-        check(!exploration_node_available(mask_fleet, hl2a),
-              "T1.5  and the reverse: taking Fleet of the Line closes Ocean Carrack");
-
-        // Already-held nodes are never available again.
-        check(!exploration_node_available(mask_carrack, hl2a),
-              "T1.6  an already-held node is never available a second time");
-
-        // Ring 2 is locked without the ring-1 milestone.
-        check(!exploration_node_available(mask_with_requires, hl2a),
-              "T1.7  a ring-2 node stays locked until the ring-1 milestone is held");
-    }
-
-    // -----------------------------------------------------------------
-    // T2: the rim read
-    // -----------------------------------------------------------------
-    {
-        polity q;
-        check(!polity_holds_exploration_rim(q),
-              "T2.1  a fresh polity does not hold the rim");
-        q.exploration_mask = 1ULL << io::exploration_tree::rim_node_index;
-        check(polity_holds_exploration_rim(q),
-              "T2.2  setting the rim's own bit is read back as holding it");
-    }
-
-    // -----------------------------------------------------------------
-    // T3: the four stubbed scorer terms stay pinned at 0 -- named here so
-    // BL-932/939/940/933/934 landing shows as a DIFF in this harness rather
-    // than a silent change (EXPLORATION_TREE.md sec The scorer).
-    // -----------------------------------------------------------------
-    {
-        // EX-SP-2a's own term is `purse_low`; make it the ONLY available
-        // major-kind candidate at ring 2 by opening ring 2 (mask holds the
-        // ring-1 milestone) with every ground signal at its most generous —
-        // if `purse_low` were anything other than a pinned 0, this is the
-        // scenario that would show it, because nothing else competes.
-        const int sp1m = find_node("EX-SP-1m");
-        const int sp2a = find_node("EX-SP-2a"); // purse_low
-        const uint64_t mask = 1ULL << sp1m;
-
-        check(exploration_node_available(mask, sp2a),
-              "T3.0  EX-SP-2a (purse_low) is a legal target once ring 2 opens");
-
-        // Called with every OTHER term maxed out and purse_low itself EMPTY
-        // (treasury full, so purse_low_q == 0), the argmax still considers
-        // EX-SP-2a (it does not vanish from the candidate set), and it never
-        // wins over a live term at the same ring -- confirming an EMPTY
-        // purse_low loses fairly rather than by being wired wrong.
-        const int chosen_high_signals = choose_exploration_node(
-            mask, /*stores_low_q=*/1000, /*reach_bound_q=*/1000,
-            /*ground_port_q=*/1000, /*ground_farm_q=*/1000, /*surplus_q=*/1000,
-            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
-        check(chosen_high_signals != sp2a,
-              "T3.1  purse_low at 0 (full treasury) loses to any live ring-2 term when one is "
-              "available");
-
-        // BL-932: purse_low IS live now -- an EMPTY treasury (purse_low_q at
-        // its own max) DOES win EX-SP-2a when nothing else competes at all.
-        const int chosen_empty_purse = choose_exploration_node(
-            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
-            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
-            /*purse_low_q=*/1000, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
-        check(chosen_empty_purse == sp2a,
-              "T3.2  purse_low at 1000 (an empty treasury) wins EX-SP-2a when nothing else "
-              "competes -- BL-932 wired it live");
-    }
-
-    // -----------------------------------------------------------------
-    // T4: BL-939 -- wants_unmet, live at EX-GD-2a (Quayside Market)
-    // -----------------------------------------------------------------
-    {
-        const int gd1a = find_node("EX-GD-1a");
-        const int gd2a = find_node("EX-GD-2a"); // wants_unmet
-        const int sp1m = find_node("EX-SP-1m");
-        const uint64_t mask = (1ULL << sp1m) | (1ULL << gd1a);
-
-        check(exploration_node_available(mask, gd2a),
-              "T4.0  EX-GD-2a (wants_unmet) is a legal target once its ring-1 neighbour is held");
-
-        const int chosen_no_want = choose_exploration_node(
-            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
-            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
-            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
-        check(chosen_no_want != gd2a,
-              "T4.1  wants_unmet at 0 (every want already met) does not single out EX-GD-2a");
-
-        const int chosen_high_want = choose_exploration_node(
-            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
-            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
-            /*purse_low_q=*/0, /*wants_unmet_q=*/1000, /*throughput_bound_q=*/0);
-        check(chosen_high_want == gd2a,
-              "T4.2  wants_unmet at 1000 wins EX-GD-2a when nothing else competes -- BL-939 "
-              "wired it live");
-    }
-
-    // -----------------------------------------------------------------
-    // T4b: BL-940 -- throughput_bound, live at EX-WY-2a
-    // -----------------------------------------------------------------
-    {
-        const int wy1a = find_node("EX-WY-1a");
-        const int wy2a = find_node("EX-WY-2a"); // throughput_bound
-        const int sp1m = find_node("EX-SP-1m");
-        const uint64_t mask = (1ULL << sp1m) | (1ULL << wy1a);
-
-        check(exploration_node_available(mask, wy2a),
-              "T4b.0  EX-WY-2a (throughput_bound) is a legal target once Post Roads is held");
-
-        const int chosen_unbound = choose_exploration_node(
-            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
-            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
-            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/0);
-        check(chosen_unbound != wy2a,
-              "T4b.1  throughput_bound at 0 (a free-flowing network) does not single out EX-WY-2a");
-
-        const int chosen_bound = choose_exploration_node(
-            mask, /*stores_low_q=*/0, /*reach_bound_q=*/0,
-            /*ground_port_q=*/0, /*ground_farm_q=*/0, /*surplus_q=*/0,
-            /*purse_low_q=*/0, /*wants_unmet_q=*/0, /*throughput_bound_q=*/1000);
-        check(chosen_bound == wy2a,
-              "T4b.2  throughput_bound at 1000 wins EX-WY-2a when nothing else competes -- "
-              "BL-940 wired it live");
-    }
 
     // -----------------------------------------------------------------
     // T5: BL-939 -- the scarcity signal itself (refresh + the contact gate)
@@ -768,10 +558,11 @@ int main()
         // tip. The fixture's 1200 close is re-drawn by the re-classified water,
         // so the span resumes on a different map: it fights a third as much
         // and a realm holds subjects again, so purchases and tribute return.
-        check(ex1.battles == 86 && ex1.conquests == 83 && ex1.foundings == 112
-           && ex1.subjections_formed == 2 && ex1.subjections_freed == 0
-           && ex1.tribute_remitted == 2481129 && ex1.treaties_formed == 359
-           && ex1.treaties_broken == 1 && ex1.owner_changes.size() == 778,
+        // RE-PINNED 2026-10-10 (BL-1272, the history runs no technology tree): 86/83/112, 2, 0, 2481129, 359, 1, 778 -> 24/21/114, 5, 0, 37154489, 265, 0, 656 (1200 handoff polities 437 -> 255: the tree's defence/cohesion modifiers left the Empires span; sea legs open by date).
+        check(ex1.battles == 24 && ex1.conquests == 21 && ex1.foundings == 114
+           && ex1.subjections_formed == 5 && ex1.subjections_freed == 0
+           && ex1.tribute_remitted == 37154489 && ex1.treaties_formed == 265
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 656,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -845,14 +636,20 @@ int main()
             // 239/150/134, 0, 0, 0, 496, 4, 864 -> 86/83/112, 2, 0, 747063,
             // 359, 1, 778, read on main c77f2d5a. Subjects exist again on this
             // fixture, so the fork-off span and R3b's fork-on span no longer
-            // agree counter for counter: they share every war, treaty and
-            // ownership counter and differ only in tribute (747063 here
-            // against R3b's 2481129; the purchase fork is the only switch
-            // between them, its payment mechanism not traced further here).
-            check(off.battles == 86 && off.conquests == 83 && off.foundings == 112
-               && off.subjections_formed == 2 && off.subjections_freed == 0
-               && off.tribute_remitted == 747063 && off.treaties_formed == 359
-               && off.treaties_broken == 1 && off.owner_changes.size() == 778,
+            // agree counter for counter.
+            // RE-PINNED 2026-10-10 (BL-1272, the history runs no technology
+            // tree; R3b's cause): 86/83/112, 2, 0, 747063, 359, 1, 778 ->
+            // 24/21/114, 5, 0, 37154178, 265, 0, 656. The fork-off span and
+            // R3b's fork-on span share every war, treaty and ownership counter
+            // and differ only in tribute (37154178 here against R3b's
+            // 37154489; the purchase fork is the only switch between them, its
+            // payment mechanism not traced further here). The BL-1272 fix round
+            // (sea legs need naval capacity; the coastal naval ramp) left both
+            // pins unmoved on this fixture.
+            check(off.battles == 24 && off.conquests == 21 && off.foundings == 114
+               && off.subjections_formed == 5 && off.subjections_freed == 0
+               && off.tribute_remitted == 37154178 && off.treaties_formed == 265
+               && off.treaties_broken == 0 && off.owner_changes.size() == 656,
                   "R3d.1 CONTROL: the fork-off span matches its pinned counters exactly (battles, "
                   "conquests, foundings, subjections, tribute, treaties, owner record)");
             std::printf("      control (purchase off): battles=%lld conquests=%lld foundings=%lld "
@@ -930,19 +727,6 @@ int main()
                         static_cast<long long>(ex1.sea_lanes_opened));
         }
 
-        // BL-930, folded into a real run: at least the tree's own root can
-        // fire once the empire rim is available to SOME polity, or none do
-        // (a legitimate seed, per EXPLORATION_TREE.md's own sizing caveat) --
-        // report which, rather than asserting an outcome no single seed owes.
-        int rim_holders_1660 = 0, exploration_active = 0;
-        for (const polity& q : ex1.polities)
-        {
-            if (polity_holds_exploration_rim(q)) ++rim_holders_1660;
-            if (q.exploration_mask != 0) ++exploration_active;
-        }
-        std::printf("      exploration tree: %d/%zu polities hold the rim at 1660, "
-                    "%d hold at least one node\n",
-                    rim_holders_1660, ex1.polities.size(), exploration_active);
     }
 
     // -----------------------------------------------------------------
@@ -2016,713 +1800,18 @@ int main()
     }
 
     // -----------------------------------------------------------------
-    // T7: BL-973 — every EXPLORATION store effect reaches the sim through
-    //     the generated table, and is either read or declared unread.
-    //     Fails when a new kind/term is authored into the store with no
-    //     reader and no declaration, or when the unread list goes stale.
+    // T10 (was T8.15.1/2, BL-1041 fix round): DEFAULT A THROUGH THE SIM'S OWN
+    // WIRING, on the real generated world. The span runs from 1200 with every
+    // region SURVEYED at fuel 100: a region the run FOUNDS inherits its
+    // parent's surveyed fuel x0.7 (history_sim.cpp, the Settle founding):
+    // with A on, every founded region reads a value on the chain 100 -> 70 ->
+    // 49 -> ... and its forest stays -1; with A off it reads -1.
     // -----------------------------------------------------------------
-    {
-        int read = 0, unread = 0, both = 0, neither = 0;
-        int by_kind_read[io::tree_effect_kind_count]   = {};
-        int by_kind_unread[io::tree_effect_kind_count] = {};
-        for (int i = 0; i < io::exploration_tree::effect_count; ++i)
-        {
-            const io::tree_effect& e = io::exploration_tree::effects[i];
-            const bool r = tree_effect_reader_of(e) != tree_effect_reader::unread;
-            const bool u = tree_effect_declared_unread(e);
-            if (r && u) ++both; else if (!r && !u) { ++neither; std::printf("      NEITHER: %s\n", e.target); }
-            else if (r) { ++read;   ++by_kind_read[static_cast<int>(e.kind)]; }
-            else        { ++unread; ++by_kind_unread[static_cast<int>(e.kind)]; }
-        }
-        std::printf("      exploration effects: %d rows, %d read, %d declared unread, %d both, %d neither\n",
-                    io::exploration_tree::effect_count, read, unread, both, neither);
-        for (int k = 0; k < io::tree_effect_kind_count; ++k)
-            if (by_kind_read[k] || by_kind_unread[k])
-                std::printf("        %-12s read %2d  unread %2d\n",
-                            io::tree_effect_kind_names[k], by_kind_read[k], by_kind_unread[k]);
-        check(neither == 0, "T7.1  every exploration store effect has a reader or is on the stated unread list");
-        check(both == 0,    "T7.2  no exploration effect is both read and declared unread (the list is not stale)");
-
-        // The table covers every node: effect ranges tile the array exactly.
-        int tiled = 0;
-        bool contiguous = true;
-        for (int i = 0; i < io::exploration_tree::node_count; ++i)
-        {
-            const io::exploration_tree::node& n = io::exploration_tree::nodes[i];
-            if (static_cast<int>(n.effects_begin) != tiled) contiguous = false;
-            if (n.effects_n == 0) contiguous = false;
-            tiled += n.effects_n;
-        }
-        check(contiguous && tiled == io::exploration_tree::effect_count,
-              "T7.3  node effect ranges tile the effects table exactly, no node effectless");
-
-        // The fold: the three retired hand-wirings, re-read through the surface.
-        const int hl3a = find_node("EX-HL-3a");
-        const int wy1a = find_node("EX-WY-1a");
-        polity q;
-        q.exploration_mask = 1ULL << hl3a;
-        apply_tree_effects(q);
-        check(polity_holds_exploration_sea_legs(q)
-           && !polity_holds_tree_key(q, io::tree_effect_key::post_roads)
-           && tree_mod_q(q, io::tree_modifier_term::reach) == 260,
-              "T7.4  holding the sea-legs node folds its key and its reach +260 into the surface, nothing else");
-        q.exploration_mask |= 1ULL << wy1a;
-        apply_tree_effects(q);
-        check(polity_holds_tree_key(q, io::tree_effect_key::post_roads)
-           && tree_mod_q(q, io::tree_modifier_term::reach) == 410,
-              "T7.5  adding the post-roads node sets its key and sums reach to 410 (the fold is a sum)");
-        q.exploration_mask = 0;
-        apply_tree_effects(q);
-        check(q.tree_keys == 0 && tree_mod_q(q, io::tree_modifier_term::reach) == 0,
-              "T7.6  the fold is a rewrite, not an accumulator: an empty mask clears the surface");
-        const io::tree_effect& rim_e = io::exploration_tree::effects[
-            io::exploration_tree::nodes[io::exploration_tree::rim_node_index].effects_begin];
-        check(rim_e.kind == io::tree_effect_kind::open && rim_e.open_tree
-           && tree_effect_reader_of(rim_e) == tree_effect_reader::tree_gate,
-              "T7.7  the rim is the node carrying the open-next-tree effect, read as the tree gate");
-    }
-
-    // -----------------------------------------------------------------
-    // T8: BL-1038 — THE INDUSTRY TREE, behind `industry_tree_enabled`.
-    // -----------------------------------------------------------------
-    std::printf("\n--- T8: the Industry tree (BL-1038) ---\n");
-
-    // T8.1-T8.3: the effect table, the T7 shape. `tree_effect_reader_of`'s
-    // key switch has no default, so T8.1 is the real guard: an Industry
-    // effect authored with a kind, term or key the sim has no surface for
-    // and no declaration either fails here. (The store carries no keyed
-    // effect today; every non-modifier kind is on the stated unread list.)
-    {
-        int read = 0, unread = 0, both = 0, neither = 0;
-        int by_kind_read[io::tree_effect_kind_count]   = {};
-        int by_kind_unread[io::tree_effect_kind_count] = {};
-        int keyed = 0;
-        for (int i = 0; i < io::industry_tree::effect_count; ++i)
-        {
-            const io::tree_effect& e = io::industry_tree::effects[i];
-            if (e.key != io::tree_effect_key::none) ++keyed;
-            const bool r = tree_effect_reader_of(e) != tree_effect_reader::unread;
-            const bool u = tree_effect_declared_unread(e);
-            if (r && u) ++both; else if (!r && !u) { ++neither; std::printf("      NEITHER: %s\n", e.target); }
-            else if (r) { ++read;   ++by_kind_read[static_cast<int>(e.kind)]; }
-            else        { ++unread; ++by_kind_unread[static_cast<int>(e.kind)]; }
-        }
-        std::printf("      industry effects: %d rows, %d read, %d declared unread, %d both, %d neither, %d keyed\n",
-                    io::industry_tree::effect_count, read, unread, both, neither, keyed);
-        for (int k = 0; k < io::tree_effect_kind_count; ++k)
-            if (by_kind_read[k] || by_kind_unread[k])
-                std::printf("        %-12s read %2d  unread %2d\n",
-                            io::tree_effect_kind_names[k], by_kind_read[k], by_kind_unread[k]);
-        check(neither == 0, "T8.1  every industry store effect has a reader or is on the stated unread list");
-        check(both == 0,    "T8.2  no industry effect is both read and declared unread");
-
-        int tiled = 0;
-        bool contiguous = true;
-        for (int i = 0; i < io::industry_tree::node_count; ++i)
-        {
-            const io::industry_tree::node& n = io::industry_tree::nodes[i];
-            if (static_cast<int>(n.effects_begin) != tiled) contiguous = false;
-            if (n.effects_n == 0) contiguous = false;
-            tiled += n.effects_n;
-        }
-        check(contiguous && tiled == io::industry_tree::effect_count,
-              "T8.3  node effect ranges tile the industry effects table exactly, no node effectless");
-    }
-
-    // T8.4: five-rule availability over io::industry_tree.
-    const int in_root = find_industry_node("IN-SP-1a");
-    const int in_sp1m = find_industry_node("IN-SP-1m");
-    const int in_sp2a = find_industry_node("IN-SP-2a");
-    const int in_mt1e = find_industry_node("IN-MT-1e"); // Furnace Practice
-    const int in_coke = find_industry_node("IN-MT-1a"); // Coke Smelting
-    const int in_char = find_industry_node("IN-MT-1b"); // Charcoal Iron
-    const int in_rail = find_industry_node("IN-MV-1a"); // Railway
-    const int in_ld1b = find_industry_node("IN-LD-1b"); // Cleared Holdings
-    const int in_ld1c = find_industry_node("IN-LD-1c"); // Smallholder Tenure
-    const int in_ch2d = find_industry_node("IN-CH-2d"); // State Arsenal
-    const int in_ch2e = find_industry_node("IN-CH-2e"); // Private Works
-    const int in_ch1b = find_industry_node("IN-CH-1b"); // Patent Grants (`known`)
-    {
-        check(in_root >= 0 && in_sp1m >= 0 && in_sp2a >= 0 && in_mt1e >= 0 && in_coke >= 0
-           && in_char >= 0 && in_rail >= 0 && in_ld1b >= 0 && in_ld1c >= 0 && in_ch2d >= 0
-           && in_ch2e >= 0 && in_ch1b >= 0,
-              "T8.4.0  every industry id this harness names resolves to a real node");
-        check(io::industry_tree::nodes[in_root].is_root && industry_node_available(0, in_root),
-              "T8.4.1  the root (IN-SP-1a) is available with nothing held -- ungated, every polity enters");
-        const uint64_t root = 1ULL << in_root;
-        check(industry_node_available(root, in_mt1e),
-              "T8.4.2  Furnace Practice hangs off the root: available once the root is held");
-        check(!industry_node_available(root | (1ULL << in_rail), in_sp1m),
-              "T8.4.3  The Cheap Ton refuses with Railway but no Fuel Doctrine side");
-        check(industry_node_available(root | (1ULL << in_rail) | (1ULL << in_char), in_sp1m)
-           && industry_node_available(root | (1ULL << in_rail) | (1ULL << in_coke), in_sp1m),
-              "T8.4.4  The Cheap Ton opens with Railway and EITHER Fuel side (requires_fork)");
-        check(!industry_node_available(root | (1ULL << in_rail) | (1ULL << in_coke), in_sp2a)
-           && industry_node_available((1ULL << in_sp1m), in_sp2a),
-              "T8.4.5  ring 2 stays locked until The Cheap Ton is held, and opens with it");
-        const int pairs[3][2] = { {in_coke, in_char}, {in_ld1b, in_ld1c}, {in_ch2d, in_ch2e} };
-        bool excl = true;
-        for (const auto& p : pairs)
-        {
-            const uint64_t all = ~0ULL;
-            // Everything but the pair itself held, then one side: the other
-            // must be refused whatever else is held.
-            const uint64_t rest = all & ~(1ULL << p[0]) & ~(1ULL << p[1]);
-            excl = excl && !industry_node_available(rest | (1ULL << p[0]), p[1])
-                        && !industry_node_available(rest | (1ULL << p[1]), p[0]);
-        }
-        check(excl, "T8.4.6  all three forks exclude both ways (Fuel, Labour, Works Doctrine)");
-    }
-
-    // T8.5: BOTH SIDES OF EVERY FORK REACHABLE under the sim's own
-    // availability function -- the lint's new rule, re-proved in C++ against
-    // the generated table the sim actually reads.
-    {
-        const int pairs[3][2] = { {in_coke, in_char}, {in_ld1b, in_ld1c}, {in_ch2d, in_ch2e} };
-        const char* names[3] = { "Fuel", "Labour", "Works" };
-        bool all_ok = true;
-        for (int p = 0; p < 3; ++p)
-            for (int s = 0; s < 2; ++s)
-            {
-                const int side = pairs[p][s], partner = pairs[p][1 - s];
-                bool reached = false;
-                // Every choice of side at the OTHER two forks.
-                for (int m = 0; m < 4 && !reached; ++m)
-                {
-                    uint64_t refused = 1ULL << partner;
-                    int k = 0;
-                    for (int o = 0; o < 3; ++o)
-                    {
-                        if (o == p) continue;
-                        refused |= 1ULL << pairs[o][(m >> k) & 1];
-                        ++k;
-                    }
-                    reached = ((industry_closure(refused) >> side) & 1ULL) != 0;
-                }
-                std::printf("      %s Doctrine: %s %s with %s refused\n", names[p],
-                            io::industry_tree::nodes[side].id, reached ? "reachable" : "UNREACHABLE",
-                            io::industry_tree::nodes[partner].id);
-                all_ok = all_ok && reached;
-            }
-        check(all_ok, "T8.5  every fork side can be bought while its partner is refused (sim availability, gates open)");
-        const uint64_t full = industry_closure((1ULL << in_char) | (1ULL << in_ld1c) | (1ULL << in_ch2e));
-        check(((full >> io::industry_tree::rim_node_index) & 1ULL) != 0,
-              "T8.5b the rim (IN-SP-3m) is reachable on the coke / cleared / arsenal road");
-    }
-
-    // T8.6: the rim, and the honest note that nothing consumes it.
-    {
-        polity q;
-        check(!polity_holds_industry_rim(q), "T8.6.1  a fresh polity does not hold the Industry rim");
-        q.industry_mask = 1ULL << io::industry_tree::rim_node_index;
-        check(polity_holds_industry_rim(q), "T8.6.2  setting the rim's bit is read back as holding it");
-        const io::industry_tree::node& rn = io::industry_tree::nodes[io::industry_tree::rim_node_index];
-        const io::tree_effect& rim_e = io::industry_tree::effects[rn.effects_begin];
-        check(std::strcmp(rn.id, "IN-SP-3m") == 0 && rim_e.kind == io::tree_effect_kind::open
-           && rim_e.open_tree && tree_effect_reader_of(rim_e) == tree_effect_reader::tree_gate,
-              "T8.6.3  the rim is IN-SP-3m, the node opening the next tree, classified tree_gate");
-        std::printf("      NOTE  T8.6.3 is a CLASSIFICATION, not a consumer: IN-SP-3m opens \"%s\", and\n"
-                    "            nothing in the history sim reads polity_holds_industry_rim -- the campaign\n"
-                    "            tree lives past the 1960 handoff. The open is gated nowhere today.\n",
-                    rim_e.target);
-    }
-
-    // T8.7: THE PINNED STUBS, on the face. Every reading maxed, every term
-    // printed: the two pinned terms must still read 0. (BL-1051 gave
-    // `ground_forest` a source, so it left the pinned list and joined the
-    // live one; the mask holds Coke Smelting so `furnace_lit` is lit.)
-    {
-        industry_scorer_reading r;
-        r.reach_bound_q = r.manpower_bound_q = r.food_bound_q = r.stores_low_q = 1000;
-        r.cohesion_q = 0; r.surplus_q = 1000;
-        r.ground_ore_q = r.ground_farm_q = r.ground_port_q = r.fuel_seam_q = 1000;
-        r.threatened_q = r.fuel_bound_q = r.labour_bound_q = r.credit_bound_q = 1000;
-        r.colonial_reach_q = r.many_peoples_q = 1000;
-        r.ground_forest_q = 1000;
-        r.known_mask = ~0ULL;
-        int v[io::industry_tree::term_count];
-        industry_term_values((1ULL << in_root) | (1ULL << in_coke), r, v);
-        std::printf("      term values, every reading at its max (root + Coke Smelting held):\n       ");
-        for (int t = 0; t < io::industry_tree::term_count; ++t)
-            std::printf(" %s=%d%s", io::industry_tree::term_names[t], v[t], (t % 6 == 5) ? "\n       " : "");
-        std::printf("\n");
-        using T = io::industry_tree::scorer_term;
-        const auto at = [&v](T t) { return v[static_cast<int>(t)]; };
-        std::printf("      PINNED AT 0: tariff_pressure=%d (no landed price before the campaign),\n"
-                    "                   plague_struck=%d (the history sim runs no plague). `known` reads 0 in\n"
-                    "                   the table by design: it is per node, off known_mask.\n",
-                    at(T::tariff_pressure), at(T::plague_struck));
-        check(at(T::tariff_pressure) == 0 && at(T::plague_struck) == 0,
-              "T8.7.1  tariff_pressure and plague_struck stay pinned at 0 with every input maxed");
-        bool live = true;
-        for (int t = 0; t < io::industry_tree::term_count; ++t)
-        {
-            const T tt = static_cast<T>(t);
-            if (tt == T::tariff_pressure || tt == T::plague_struck || tt == T::known)
-                continue;
-            live = live && v[t] == 1000;
-        }
-        check(live, "T8.7.2  every other term (ground_forest, threatened, labour_bound, furnace_lit, ... ) is live at 1000");
-
-        // T8.7.3 (Ben, 2026-09-18, wave 1 form; was BL-1051/NR-892):
-        // `furnace_lit` reads COKE SMELTING HELD -- a coal-fired furnace. A
-        // Fuel Doctrine side held read 1000 at every pick that reads the term,
-        // because all three readers sit behind The Cheap Ton, which requires a
-        // side. Each node alone: exactly Coke Smelting lights it; Charcoal
-        // Iron, the root, Furnace Practice and every other node do not. The id
-        // is resolved BY NAME (`find_industry_node`, T8.4.0 fails loudly if it
-        // does not resolve), and the loop below fails if the sim reads any
-        // other index -- a store that moved IN-MT-1a moves both together.
-        bool only_coke = in_coke >= 0;
-        for (int i = 0; i < io::industry_tree::node_count; ++i)
-        {
-            int vi[io::industry_tree::term_count];
-            industry_term_values(1ULL << i, r, vi);
-            const bool lit = vi[static_cast<int>(T::furnace_lit)] == 1000;
-            if (lit != (i == in_coke)) only_coke = false;
-        }
-        int v0[io::industry_tree::term_count], vr[io::industry_tree::term_count], vch[io::industry_tree::term_count];
-        int vco[io::industry_tree::term_count], vcha[io::industry_tree::term_count];
-        industry_term_values(0, r, v0);
-        industry_term_values((1ULL << in_root) | (1ULL << in_mt1e), r, vr);
-        industry_term_values((1ULL << in_root) | (1ULL << in_mt1e) | (1ULL << in_char), r, vch);
-        industry_term_values(1ULL << in_coke, r, vco);
-        industry_term_values(1ULL << in_char, r, vcha);
-        const int fl = static_cast<int>(T::furnace_lit);
-        std::printf("      furnace_lit: nothing %d, root + Furnace Practice %d, + Charcoal Iron %d; Coke alone %d,"
-                    " Charcoal alone %d, root + Coke %d\n",
-                    v0[fl], vr[fl], vch[fl], vco[fl], vcha[fl], at(T::furnace_lit));
-        check(only_coke && vco[fl] == 1000 && vcha[fl] == 0 && vr[fl] == 0 && vch[fl] == 0 && v0[fl] == 0
-                  && at(T::furnace_lit) == 1000 && industry_coke_smelting_held(1ULL << in_coke)
-                  && !industry_coke_smelting_held(~(1ULL << in_coke)),
-              "T8.7.3  furnace_lit reads Coke Smelting (IN-MT-1a, by id) held: Coke alone 1000, Charcoal alone 0,"
-              " root + Furnace Practice 0, and no other node lights it");
-
-        // T8.7.5 (BL-1056; Ben, 2026-09-19, NR-896; was the BEST held score,
-        // and BL-1051's held mean before it): `ground_forest` is the per-mille
-        // SHARE of surveyed held regions whose span-open forest share clears
-        // the world's forest bar. A region without the span-open survey of
-        // both scores (here one the span founded, inheriting fuel 70 under
-        // DEFAULT A but no forest) stays out of both counts rather than
-        // reading as bare, ground not held never counts, a region under the
-        // bar does not clear it, and nothing surveyed reads 0 (the old pin).
-        //
-        // BL-1059 FIXTURE CHANGE (the bar semantics, NR-899/NR-900): the bar
-        // was the mean, strictly (score > 500); it is now each resource's own
-        // top third, ranked on the UNCLAMPED share (`survey_*_raw`), fixed at
-        // the span open and passed in. This five-region toy is not a world, so
-        // its bars are STATED; T8.7.7 tests the derivation. The toy's shares
-        // are half its scores (raw != score, so a pull reading the score
-        // instead of the share fails). THREE bars, so reading the bar is what
-        // passes: 350 (the old cut on these values: 1 of 3 -> 333), 250 (a
-        // bar the old cut disagrees with: the 500-score region clears too ->
-        // 666; the old '> 500' read 333, a score-vs-bar read 1000), and 400
-        // (nothing held clears -> 0; the old cut read 333).
-        {
-            industry_ground_bars tb;
-            tb.forest_raw = 350;
-            tb.fuel_raw   = 350;
-            industry_ground_bars tb_low = tb, tb_high = tb;
-            tb_low.forest_raw  = 250;
-            tb_high.forest_raw = 400;
-            std::vector<region> rg(5);
-            for (region& x : rg) { x.survey_fuel_q = 100; x.survey_fuel_raw = 50; }
-            const int wq[5] = { 300, 700, 500, -1, 900 }; // 500 is under 350's bar; 900 not held
-            for (int i = 0; i < 5; ++i)
-            {
-                rg[static_cast<std::size_t>(i)].survey_forest_q   = wq[i];
-                rg[static_cast<std::size_t>(i)].survey_forest_raw = wq[i] < 0 ? -1 : wq[i] / 2;
-            }
-            rg[3].survey_fuel_q   = 70;  // founded after the span opened: inheriting fuel, never forest
-            rg[3].survey_fuel_raw = -1;  // ... and never a share (DEFAULT A inherits the score)
-            const std::vector<int> held_fwd = {0, 1, 2, 3};
-            const std::vector<int> held_rev = {3, 2, 1, 0};
-            const std::vector<int> held_none_surveyed = {3};
-            const int m_fwd = industry_ground_forest_q(rg, held_fwd, tb);
-            const int m_rev = industry_ground_forest_q(rg, held_rev, tb);
-            const int m_low = industry_ground_forest_q(rg, held_fwd, tb_low);
-            const int m_hi  = industry_ground_forest_q(rg, held_fwd, tb_high);
-            const int m_uns = industry_ground_forest_q(rg, held_none_surveyed, tb);
-            const int m_emp = industry_ground_forest_q(rg, {}, tb);
-            std::vector<region> never(3); // the struct default: no span, never surveyed
-            const int m_off = industry_ground_forest_q(never, {0, 1, 2}, industry_ground_bars_at_open(never));
-            std::printf("      ground_forest held share: shares {150,350,250,unsurveyed} (450 unheld) -> bar 350 %d"
-                        " (reversed %d), bar 250 %d, bar 400 %d; only unsurveyed -> %d; none held -> %d; no span -> %d\n",
-                        m_fwd, m_rev, m_low, m_hi, m_uns, m_emp, m_off);
-            check(m_fwd == 333 && m_rev == 333 && m_low == 666 && m_hi == 0 && m_uns == 0 && m_emp == 0 && m_off == 0,
-                  "T8.7.5  ground_forest reads the SHARE of surveyed held ground whose forest share clears ITS bar"
-                  " (three bars, three answers; the old > 500 cut and a score read both fail), order-free; unheld and"
-                  " unsurveyed stay out; none -> 0");
-
-            // T8.7.6 (BL-1056): `ground_fuel` is the same share over the SAME
-            // regions forest reads (both span-open scores present), against its
-            // own bar (BL-1059 FIXTURE CHANGE: STATED; shares half the scores;
-            // bar 400 is the old cut on these values -> 333, bar 250 the one it
-            // disagrees with -> 666, where '> 500' read 333). Ground with no
-            // span-open survey -- never surveyed (energy_q 900) or founded in
-            // the span (inherited fuel 900, no forest) -- is out of the pull,
-            // never counted by its energy_q or its inheritance. -1 only when
-            // the span-open survey never ran (`industry_span_survey_ran`
-            // false), and the TERM then keeps the seam (the old reading); inside
-            // the span a realm holding only unsurveyed ground reads 0. The
-            // share replaces the seam in the term but never in the gate.
-            std::vector<region> fg(5);
-            for (region& x : fg) { x.survey_forest_q = 0; x.survey_forest_raw = 0; }
-            fg[0].survey_fuel_q = 800; fg[1].survey_fuel_q = 200; fg[2].survey_fuel_q = 500;
-            fg[0].survey_fuel_raw = 400; fg[1].survey_fuel_raw = 100; fg[2].survey_fuel_raw = 250;
-            fg[3].survey_fuel_q = -1;  fg[3].survey_forest_q = -1; fg[3].survey_forest_raw = -1;
-            fg[3].energy_q = 900;                                                         // never surveyed
-            fg[4].survey_fuel_q = 900; fg[4].survey_forest_q = -1; fg[4].survey_forest_raw = -1; // founded
-            const bool ran = industry_span_survey_ran(fg);
-            industry_ground_bars fb;
-            fb.fuel_raw = 400;
-            industry_ground_bars fb_low = fb;
-            fb_low.fuel_raw = 250;
-            const int s_all = industry_ground_fuel_q(fg, {0, 1, 2, 3, 4}, fb, ran);
-            const int s_rev = industry_ground_fuel_q(fg, {4, 3, 2, 1, 0}, fb, ran);
-            const int s_low = industry_ground_fuel_q(fg, {0, 1, 2, 3, 4}, fb_low, ran);
-            const int s_uns = industry_ground_fuel_q(fg, {3, 4}, fb, ran);
-            const int w_uns = industry_ground_forest_q(fg, {3, 4}, fb);
-            std::vector<region> nf(2); nf[0].energy_q = 900; nf[1].energy_q = 100;
-            const bool nf_ran = industry_span_survey_ran(nf);
-            const int s_off = industry_ground_fuel_q(nf, {0, 1}, industry_ground_bars_at_open(nf), nf_ran);
-            industry_scorer_reading fr;
-            fr.fuel_seam_q = 800; fr.ground_fuel_q = s_all;
-            int fv[io::industry_tree::term_count];
-            industry_term_values(0, fr, fv);
-            industry_scorer_reading fo = fr; fo.ground_fuel_q = -1;
-            int fov[io::industry_tree::term_count];
-            industry_term_values(0, fo, fov);
-            const int gf = static_cast<int>(T::ground_fuel);
-            std::printf("      ground_fuel held share: surveyed shares {400,100,250} + never-surveyed energy_q 900 +"
-                        " founded inherited 900 -> bar 400 %d (reversed %d), bar 250 %d; only unsurveyed, in the span"
-                        " -> fuel %d forest %d; span never ran -> %d; term %d (share) / %d (no share: the seam)\n",
-                        s_all, s_rev, s_low, s_uns, w_uns, s_off, fv[gf], fov[gf]);
-            check(ran && !nf_ran && s_all == 333 && s_rev == 333 && s_low == 666 && s_uns == 0 && w_uns == 0
-                      && s_off == -1 && fv[gf] == 333 && fov[gf] == 800
-                      && industry_gate_open(io::industry_tree::gate_atom::fuel, fr),
-                  "T8.7.6  ground_fuel reads the SHARE of the same surveyed held ground forest reads, against ITS bar"
-                  " (two bars, two answers); unsurveyed and inherited out; 0 on only-unsurveyed ground in the span; -1"
-                  " only when the span never ran, and the term then keeps the seam; the fuel gate still reads the seam");
-
-            // T8.7.7 (BL-1059; Ben, 2026-09-19, NR-899, NR-900, NR-904): THE
-            // TOP-THIRD BAR. Over EVERY region carrying both span-open scores,
-            // zeros included, ranked on the UNCLAMPED share: k = floor(n / 3),
-            // the bar is max(the ascending value at n - k, 1), clear = share > 0
-            // && >= bar, so a tie at the cut CLEARS WHOLE (NR-904: a bar never
-            // empties, and a tie band may clear more than a third), and with
-            // fewer than three regions nothing clears. `bars_of` builds a
-            // table from shares; the score is the share capped at 1000 (-1
-            // stays unsurveyed), so the cap pile below is one tied SCORE.
-            const auto table_of = [](const std::vector<int>& fuel, const std::vector<int>& forest) {
-                std::vector<region> r(fuel.size());
-                for (std::size_t i = 0; i < r.size(); ++i)
-                {
-                    r[i].survey_fuel_raw   = fuel[i];
-                    r[i].survey_forest_raw = forest[i];
-                    r[i].survey_fuel_q     = fuel[i]   < 0 ? -1 : std::min(fuel[i], 1000);
-                    r[i].survey_forest_q   = forest[i] < 0 ? -1 : std::min(forest[i], 1000);
-                }
-                return r;
-            };
-            const auto bars_of = [&table_of](const std::vector<int>& fuel, const std::vector<int>& forest) {
-                return industry_ground_bars_at_open(table_of(fuel, forest));
-            };
-            const auto clears_of = [](const std::vector<int>& shares, int bar) {
-                int c = 0;
-                for (int v : shares) if (industry_ground_clears(v, bar)) ++c;
-                return c;
-            };
-            // (a) Zeros RANKED: 12 regions, 9 carriers -> k 4, bar 6, and 4 of
-            // 12 clear -- a third of the WORLD, not of the carriers. Forest the
-            // same values reversed (order-free).
-            const std::vector<int> a_fuel = { 0, 1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 0 };
-            const industry_ground_bars b1 = bars_of(a_fuel, { 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0 });
-            // (b) THE REVIEW'S CLIFF: six of nine at the SCORE cap, their
-            // shares distinct -> bar 1400 and 3 clear (ranked on the score it
-            // would be one tied band). Forest: a tie band in the SHARE
-            // straddling the cut (four at 900 of nine) -> it clears WHOLE
-            // (NR-904): bar 900, 4 of 9 clear, more than a third by design.
-            const std::vector<int> b_fuel = { 100, 200, 300, 1100, 1200, 1300, 1400, 1500, 1600 };
-            const std::vector<int> b_forest = { 100, 200, 300, 400, 500, 900, 900, 900, 900 };
-            const industry_ground_bars b2 = bars_of(b_fuel, b_forest);
-            // (c) A tie band wholly above the cut: {100..600, 900 x3} -> bar
-            // 900, 3 clear. RARITY: two carriers of nine -> the cut lands in
-            // the zeros, bar 1, both carriers clear (and no zero does).
-            const std::vector<int> c_fuel = { 0, 0, 0, 0, 0, 0, 0, 50, 80 };
-            const industry_ground_bars b3 = bars_of(c_fuel, { 100, 200, 300, 400, 500, 600, 900, 900, 900 });
-            // (d) Fewer than three regions: nothing clears. (e) A founded region
-            // (forest -1) carrying fuel 5000 is not read; an all-tied forest
-            // is a tie band across the cut, and clears whole: all six.
-            const industry_ground_bars b4 = bars_of({ 500, 900 }, { 300, 700 });
-            const industry_ground_bars b5 = bars_of({ 1, 2, 3, 4, 5, 6, 5000 }, { 1, 1, 1, 1, 1, 1, -1 });
-            // (b) and (e) under the OLD rule (a straddling band out whole)
-            // would read 901 / 2 and clear nothing; NR-904 makes them 900 / 1.
-            std::printf("      top-third bars: zeros ranked (12 regions) -> fuel %d (%d clear) forest %d; score-cap pile"
-                        " -> fuel %d (%d clear); share tie band across the cut -> forest %d (%d of 9 clear); band above"
-                        " the cut -> forest %d; 2 carriers of 9 -> fuel %d (%d clear); <3 regions -> %s/%s; founded"
-                        " 5000 unread -> fuel %d; all-tied forest -> %d (%d of 6 clear)\n",
-                        b1.fuel_raw, clears_of(a_fuel, b1.fuel_raw), b1.forest_raw, b2.fuel_raw,
-                        clears_of(b_fuel, b2.fuel_raw), b2.forest_raw, clears_of(b_forest, b2.forest_raw), b3.forest_raw,
-                        b3.fuel_raw, clears_of(c_fuel, b3.fuel_raw),
-                        b4.fuel_raw == industry_ground_bar_none ? "none" : "SET",
-                        b4.forest_raw == industry_ground_bar_none ? "none" : "SET", b5.fuel_raw, b5.forest_raw,
-                        clears_of({ 1, 1, 1, 1, 1, 1 }, b5.forest_raw));
-            check(b1.fuel_raw == 6 && clears_of(a_fuel, b1.fuel_raw) == 4 && b1.forest_raw == 6
-                      && b2.fuel_raw == 1400 && clears_of(b_fuel, b2.fuel_raw) == 3
-                      && b2.forest_raw == 900 && clears_of(b_forest, b2.forest_raw) == 4
-                      && b3.forest_raw == 900 && b3.fuel_raw == 1 && clears_of(c_fuel, b3.fuel_raw) == 2
-                      && b4.fuel_raw == industry_ground_bar_none && b4.forest_raw == industry_ground_bar_none
-                      && b5.fuel_raw == 5 && b5.forest_raw == 1 && clears_of({ 1, 1, 1, 1, 1, 1 }, b5.forest_raw) == 6
-                      && !industry_ground_clears(0, 0) && !industry_ground_clears(0, 1)
-                      && industry_ground_clears(7, 7) && !industry_ground_clears(6, 7),
-                  "T8.7.7  the top-third bar: floor(n/3) of EVERY read region (zeros ranked) sets the cut, on the"
-                  " unclamped share (a score-cap pile no longer empties it), a tie at the cut clears WHOLE (NR-904),"
-                  " a 0 never clears however rare the resource, <3 regions clear nothing, founded ground unread");
-        }
-
-        // `known` is per node: Patent Grants reads 1000 only when a met polity
-        // holds IT. Hold its ring-1 neighbour, give ONE competitor a live
-        // term (ground ore 500 -> Furnace Practice scores 399, above Patent
-        // Grants' bare -3), then flip the one `known` bit.
-        industry_scorer_reading kr; // all zero; cohesion 1000
-        kr.ground_ore_q = 500;
-        const int in_ch1a = find_industry_node("IN-CH-1a");
-        const uint64_t mk = (1ULL << in_root) | (1ULL << in_ch1a);
-        const int without = choose_industry_node(mk, kr);
-        kr.known_mask = 1ULL << in_ch1b;
-        const int with_known = choose_industry_node(mk, kr);
-        check(with_known == in_ch1b && without != in_ch1b,
-              "T8.7.4  `known` is per node: Patent Grants wins only when a met polity already holds it");
-    }
-
-    // T8.8: THE FUEL GATE READS A SEAM, not the mean (INDUSTRY_TREE.md sec
-    // Aims). With Furnace Practice held, a polity with a seam buys Coke; one
-    // without answers the fuel question with Charcoal Iron.
-    {
-        industry_scorer_reading seam; // means all 0: the empire's mean gate would refuse fuel
-        seam.fuel_seam_q = industry_fuel_seam_bar_q;
-        industry_scorer_reading none = seam;
-        none.fuel_seam_q = industry_fuel_seam_bar_q - 1;
-        check(industry_gate_open(io::industry_tree::gate_atom::fuel, seam)
-           && !industry_gate_open(io::industry_tree::gate_atom::fuel, none),
-              "T8.8.1  fuel passes at one region's seam at the bar, and fails a hair under it");
-        const uint64_t mk = (1ULL << in_root) | (1ULL << in_mt1e);
-        seam.fuel_seam_q = 1000;
-        const int with_seam = choose_industry_node(mk, seam);
-        const int no_seam   = choose_industry_node(mk, none);
-        std::printf("      Furnace Practice held: seam 1000 -> %s, seam %d -> %s\n",
-                    with_seam >= 0 ? io::industry_tree::nodes[with_seam].id : "-",
-                    none.fuel_seam_q, no_seam >= 0 ? io::industry_tree::nodes[no_seam].id : "-");
-        check(with_seam == in_coke, "T8.8.2  a held seam (ground_fuel 1000) buys Coke Smelting");
-        check(no_seam == in_char,   "T8.8.3  no seam: Coke is gated out and Charcoal Iron answers the fuel question");
-    }
-
-    // T8.8.4 (BL-1051, NR-891; the reading ruled 2026-09-18, wave 1 form):
-    // THE WOODED POLITY CHOOSES CHARCOAL, it is not pushed there. T8.8.3 wins
-    // by default -- with every reading at 0, Charcoal Iron's bare -3 takes the
-    // tie on node index. Here a rival term is live (Machine Tools held, so
-    // Interchangeable Parts reads `threatened`), Coke's seam gate is shut in
-    // BOTH cases, and only the held ground's forest differs, fed through the
-    // real readings off a region table: bare ground loses the fuel question to
-    // the rival; wooded ground takes Charcoal Iron.
-    //
-    // BOTH READINGS ARE THE RULED ONES. The forest is the SHARE of held
-    // ground clearing the world's forest bar (BL-1056, NR-896; the bar
-    // BL-1059, NR-899/NR-900: two wooded regions of three read 666; the best-of-held it replaced read one wooded region
-    // of three as a wooded realm), and the seam is BL-1041 DEFAULT B's
-    // `industry_fuel_reading_q`: every region is SURVEYED at 100, under the
-    // bar, while its inherited energy_q (400) would have cleared it -- so the
-    // gate is shut by the survey, as the span reads it, not by energy_q.
-    // T8.8.5 records where the threshold moved: one wooded region of three
-    // (share 333) no longer outweighs the rival and takes Interchangeable
-    // Parts, where the best-of-held (900) took Charcoal Iron.
-    {
-        const int in_mt1c = find_industry_node("IN-MT-1c"); // Machine Tools
-        const int in_mt1d = find_industry_node("IN-MT-1d"); // Interchangeable Parts
-        const uint64_t mk = (1ULL << in_root) | (1ULL << in_mt1e) | (1ULL << in_mt1c);
-
-        // Two three-region realms on the same poor surveyed fuel, one with a
-        // wooded region, one open.
-        std::vector<region> rg(9);
-        const int wood[9] = { 900, 900, 0,  0, 50, 0,  900, 0, 0 }; // BL-1056: 666, 0, and one of three 333
-        // BL-1059 FIXTURE CHANGE (the bar semantics): the shares equal the
-        // scores here, and the bars are STATED at 500 on both resources, the
-        // cut the old mean made on these values (900 clears, 50 and the fuel
-        // 100 do not). Derived from this toy the fuel bar would be 100 -- every
-        // region ties at the cut and, a tie clearing whole (NR-904), clears --
-        // which is the tie rule working, not the scenario this check is about.
-        industry_ground_bars cb;
-        cb.fuel_raw   = 500;
-        cb.forest_raw = 500;
-        for (int i = 0; i < 9; ++i)
-        {
-            rg[i].energy_q          = 400; // would clear the 250 bar on the old read
-            rg[i].survey_fuel_q     = 100; // the span-open survey: under it
-            rg[i].survey_fuel_raw   = 100;
-            rg[i].survey_forest_q   = wood[i];
-            rg[i].survey_forest_raw = wood[i];
-        }
-        const std::vector<int> wooded = {0, 1, 2}, open_ground = {3, 4, 5};
-
-        const auto reading_for = [&](const std::vector<int>& held) {
-            industry_scorer_reading r;
-            for (int hi : held)
-                r.fuel_seam_q = std::max(r.fuel_seam_q, industry_fuel_reading_q(rg[static_cast<std::size_t>(hi)]));
-            r.threatened_q    = 500; // the rival: Interchangeable Parts scores 500 - 100 - 1 = 399
-            r.ground_forest_q = industry_ground_forest_q(rg, held, cb);
-            r.ground_fuel_q   = industry_ground_fuel_q(rg, held, cb, industry_span_survey_ran(rg)); // the sim's share
-            return r;
-        };
-        const industry_scorer_reading rw = reading_for(wooded), ro = reading_for(open_ground);
-        const int pick_w = choose_industry_node(mk, rw);
-        const int pick_o = choose_industry_node(mk, ro);
-        const bool coke_shut = !industry_gate_open(io::industry_tree::gate_atom::fuel, rw)
-                            && !industry_gate_open(io::industry_tree::gate_atom::fuel, ro);
-        std::printf("      no seam (surveyed fuel %d; energy_q %d), a rival reading threatened 500: wooded ground"
-                    " (forest share %d) -> %s; open ground (forest share %d) -> %s\n", rw.fuel_seam_q, rg[0].energy_q,
-                    rw.ground_forest_q, pick_w >= 0 ? io::industry_tree::nodes[pick_w].id : "-",
-                    ro.ground_forest_q, pick_o >= 0 ? io::industry_tree::nodes[pick_o].id : "-");
-        check(in_mt1c >= 0 && in_mt1d >= 0 && coke_shut && rw.ground_forest_q == 666 && ro.ground_forest_q == 0
-                  && pick_w == in_char && pick_o != in_char,
-              "T8.8.4  no seam either way (the survey's): the realm two-thirds clearing the forest bar (share 666) takes"
-              " Charcoal Iron, the open one (0) does not");
-
-        const industry_scorer_reading r3 = reading_for({6, 7, 8});
-        const int pick_3 = choose_industry_node(mk, r3);
-        std::printf("      one wooded region of three (forest share %d), the same rival -> %s\n", r3.ground_forest_q,
-                    pick_3 >= 0 ? io::industry_tree::nodes[pick_3].id : "-");
-        check(r3.ground_forest_q == 333 && pick_3 == in_mt1d,
-              "T8.8.5  BL-1056's moved threshold on record: a realm one-third wooded (share 333) under a rival reading"
-              " threatened 500 takes Interchangeable Parts, not Charcoal Iron");
-
-        // What a seam does to the same wooded realm, printed rather than
-        // asserted: Coke reads the seam, Charcoal the forest, and the larger
-        // term takes the fork (an exact tie breaks on node index, Coke first).
-        industry_scorer_reading rs = rw;
-        rs.fuel_seam_q   = 1000;
-        rs.ground_fuel_q = 1000; // every held region clearing the fuel bar
-        const int pick_s = choose_industry_node(mk, rs);
-        std::printf("      NOTE  the same wooded realm WITH a seam (ground_fuel %d vs ground_forest %d) -> %s\n",
-                    rs.ground_fuel_q, rs.ground_forest_q, pick_s >= 0 ? io::industry_tree::nodes[pick_s].id : "-");
-    }
-
-    // T8.9: THE RATE -- isqrt64 exact, top-k, clamp first, superlinear.
-    {
-        bool exact = true;
-        const int64_t probes[] = { 0, 1, 2, 3, 4, 5, 8, 9, 15, 16, 17, 99, 100, 101, 999999, 1000000,
-                                   1000001, 4294967295LL, 4294967296LL, 999999999999LL,
-                                   3037000499LL * 3037000499LL, INT64_MAX };
-        for (int64_t p : probes)
-        {
-            const int64_t r = isqrt64(p);
-            // r*r <= p < (r+1)^2, checked without overflow via division.
-            const bool lo = r == 0 || r <= p / r;
-            const bool hi = (r + 1) > p / (r + 1);
-            exact = exact && lo && hi;
-        }
-        for (int64_t p = 0; p < 200000; ++p)
-        {
-            const int64_t r = isqrt64(p);
-            exact = exact && r * r <= p && (r + 1) * (r + 1) > p;
-        }
-        check(exact && isqrt64(-5) == 0 && isqrt64(INT64_MAX) == 3037000499LL,
-              "T8.9.1  isqrt64 is the exact floor square root (0..200000, the int64 edges, negatives -> 0)");
-
-        std::vector<region> rg(5);
-        const int64_t urb[5] = { 5, 50, 10, 40, 30 };
-        for (int i = 0; i < 5; ++i) rg[static_cast<std::size_t>(i)].urban_population = urb[i];
-        const std::vector<int> fwd = { 0, 1, 2, 3, 4 }, rev = { 4, 3, 2, 1, 0 };
-        check(industry_research_top_k == 3 && industry_urban_mass(rg, fwd) == 120
-           && industry_urban_mass(rg, rev) == 120 && industry_urban_mass(rg, { 0 }) == 5,
-              "T8.9.2  urban mass sums the 3 largest held centres (50+40+30), whatever the held order");
-
-        const history_sim_params hp;
-        const int64_t ref = hp.industry_urban_mass_reference, cap = hp.industry_urban_mass_cap;
-        // rate(mass, spire ring, research modifier)
-        const auto rate = [&hp](int64_t m, int spire, int mod) { return industry_research_per_year_q(m, spire, mod, hp); };
-        const int64_t at_ref = rate(ref, 0, 0);
-        const int64_t half   = rate(ref / 2, 0, 0);
-        std::printf("      rate/yr at spire ring 0: mass %lld -> %lld, mass %lld -> %lld, mass %lld (cap) -> %lld;"
-                    " cap at spire ring 3 -> %lld\n",
-                    static_cast<long long>(ref / 2), static_cast<long long>(half),
-                    static_cast<long long>(ref), static_cast<long long>(at_ref),
-                    static_cast<long long>(cap), static_cast<long long>(rate(cap, 0, 0)),
-                    static_cast<long long>(rate(cap, 3, 0)));
-        check(at_ref == (ref * hp.industry_research_fraction_q) / 1000,
-              "T8.9.3  at the reference mass (spire ring 0) the rate is linear-equivalent: fraction x reference");
-        check(at_ref > 2 * half && rate(2 * ref, 0, 0) > 2 * at_ref,
-              "T8.9.4  superlinear: doubling the urban mass more than doubles the rate");
-        check(rate(cap, 0, 0) == rate(cap * 10, 0, 0) && rate(INT64_MAX, 0, 0) == rate(cap, 0, 0)
-           && rate(INT64_MAX, 6, 4000) == rate(cap, 6, 4000),
-              "T8.9.5  the mass is CLAMPED before the transform: 10x the cap (and INT64_MAX) earn the cap's rate");
-        check(rate(0, 3, 4000) == 0 && rate(-100, 0, 0) == 0 && rate(ref, 0, 1000) == 2 * at_ref,
-              "T8.9.6  no mass earns nothing, and the `research` modifier scales the rate as it scales the other trees'");
-
-        // T8.9.7 (fix round): THE SPIRE RING, applied as the EMPIRE rate
-        // applies it — `(1000 + ring * 150) / 1000` after the base and before
-        // the research modifier, each factor truncating in that order.
-        bool spire_ok = true;
-        for (int s = 0; s <= 3; ++s)
-            for (int mod : { 0, 250, 1000 })
-            {
-                const int64_t base = (rate(cap, 0, 0));
-                const int64_t want = base * (1000 + s * 150) / 1000 * (1000 + mod) / 1000;
-                spire_ok = spire_ok && rate(cap, s, mod) == want;
-            }
-        check(spire_ok && rate(ref, 1, 0) > at_ref && rate(ref, 3, 0) > rate(ref, 2, 0),
-              "T8.9.7  the spire ring scales the Industry rate by (1000 + 150 x ring) / 1000, the empire's own factor");
-        const int sp1m = find_industry_node("IN-SP-1m"), sp2m = find_industry_node("IN-SP-2m");
-        const int sp3m = find_industry_node("IN-SP-3m"), sp3a = find_industry_node("IN-SP-3a");
-        check(industry_spire_ring(0) == 0 && industry_spire_ring(1ULL << sp3a) == 0
-           && industry_spire_ring(1ULL << sp1m) == 1
-           && industry_spire_ring((1ULL << sp1m) | (1ULL << sp2m)) == 2
-           && industry_spire_ring((1ULL << sp1m) | (1ULL << sp2m) | (1ULL << sp3m)) == 3,
-              "T8.9.8  industry_spire_ring is the highest milestone ring held (a ring-3 major alone counts 0)");
-    }
-
-    // T8.14 (fix round): THE GATE IS RE-READ EVERY FUNDED ROUND, Industry only.
-    // A polity investing in Railway (fuel) keeps it while it holds a seam and
-    // loses it the round the seam is gone; the re-pick then never offers a
-    // fuel node. A fork closing under the target still drops it as before.
-    {
-        const uint64_t mk = 1ULL << in_root; // Railway hangs off the root
-        industry_scorer_reading with_seam;
-        with_seam.fuel_seam_q = 1000;
-        industry_scorer_reading seam_lost = with_seam;
-        seam_lost.fuel_seam_q = industry_fuel_seam_bar_q - 1;
-        check(industry_target_stands(mk, in_rail, with_seam),
-              "T8.14.1  a Railway target stands while the polity holds a seam at or over the bar");
-        check(!industry_target_stands(mk, in_rail, seam_lost),
-              "T8.14.2  the round the seam is lost, the Railway target no longer stands (the block re-picks)");
-        const int repick = choose_industry_node(mk, seam_lost);
-        check(repick >= 0 && io::industry_tree::nodes[repick].gate != io::industry_tree::gate_atom::fuel,
-              "T8.14.3  the re-pick without a seam never lands on a fuel-gated node");
-        check(industry_target_stands(mk, in_mt1e, seam_lost),
-              "T8.14.4  an ungated target (Furnace Practice) is untouched by the seam");
-        check(!industry_target_stands(mk | (1ULL << in_mt1e) | (1ULL << in_coke), in_char, with_seam)
-           && !industry_target_stands(mk, -1, with_seam),
-              "T8.14.5  a fork closed under the target, or no target, still does not stand");
-        std::printf("      NOTE  a target dropped this way LOSES its accumulated progress (reset to 0 at the\n"
-                    "            re-pick), as a fork closing under it does: one progress integer per tree,\n"
-                    "            for the node being bought (TREES.md sec State). The empire and exploration\n"
-                    "            trees still read a gate at the pick only.\n");
-    }
-
-    // T8.10-T8.13: on the REAL generated world.
-    check(fixture.exploration_ran, "T8.10.0  the shipped world ran its Exploration span (the fixture below needs it)");
+    check(fixture.exploration_ran, "T10.0  the shipped world ran its Exploration span (the fixture below needs it)");
     if (fixture.exploration_ran)
     {
-        // T8.10: industry_mask is 0 at 1660 on a shipped world.
-        bool zero = !fixture.exploration_params.industry_tree_enabled;
-        for (const polity& q : fixture.exploration_handoff.polities)
-            zero = zero && q.industry_mask == 0 && q.industry_investing == -1
-                        && q.industry_progress_q == 0 && !q.industry_fuel_seen;
-        for (const polity& q : fixture.exploration_state.polities)
-            zero = zero && q.industry_mask == 0;
-        check(zero, "T8.10  the shipped world runs with the Industry switch off and every polity's industry_mask is 0 at 1660");
-
-        const auto run_span = [&](bool enabled, int64_t open_year) {
+        struct survey_run { settlement_state ss; history_sim_state hs; };
+        const auto run_surveyed = [&](bool a_on) {
             history_sim_params ep = fixture.exploration_params;
             ep.resume_polities  = &fixture.pre_exploration_polities;
             ep.resume_grudges   = &fixture.pre_exploration_grudges;
@@ -2730,191 +1819,47 @@ int main()
             ep.resume_corridors = &fixture.pre_exploration_corridors;
             ep.resume_civilisations    = &fixture.pre_exploration_civilisations;    // BL-1049
             ep.resume_universal_creeds = &fixture.pre_exploration_universal_creeds;
-            ep.industry_tree_enabled = enabled;
-            ep.industry_open_year    = open_year;
-            settlement_state ss = fixture.pre_exploration_settlement;
-            creed_state      cs = fixture.pre_exploration_creeds;
-            return run_history_sim(ss, &cs, fixture.terrain.view(), fixture.gw, fixture.gh, ep,
+            ep.industry_survey_inherits_at_founding = a_on;
+            survey_run o;
+            o.ss = fixture.pre_exploration_settlement;
+            for (region& r : o.ss.regions)           r.survey_fuel_q = 100;
+            for (region& r : o.ss.pending_foundings) r.survey_fuel_q = 100;
+            creed_state cs = fixture.pre_exploration_creeds;
+            o.hs = run_history_sim(o.ss, &cs, fixture.terrain.view(), fixture.gw, fixture.gh, ep,
                                    fixture.exploration_seed, nullptr, fixture.works, nullptr);
+            return o;
         };
-        const auto same_run = [](const history_sim_state& a, const history_sim_state& b) {
-            if (a.owner_changes.size() != b.owner_changes.size() || a.polities.size() != b.polities.size())
-                return false;
-            for (std::size_t i = 0; i < a.owner_changes.size(); ++i)
-                if (a.owner_changes[i].year != b.owner_changes[i].year
-                 || a.owner_changes[i].region != b.owner_changes[i].region
-                 || a.owner_changes[i].owner != b.owner_changes[i].owner) return false;
-            for (std::size_t i = 0; i < a.polities.size(); ++i)
-                if (a.polities[i].industry_mask != b.polities[i].industry_mask
-                 || a.polities[i].empire_mask != b.polities[i].empire_mask
-                 || a.polities[i].exploration_mask != b.polities[i].exploration_mask
-                 || a.polities[i].alive != b.polities[i].alive) return false;
-            return a.battles == b.battles && a.conquests == b.conquests && a.foundings == b.foundings
-                && a.subjections_formed == b.subjections_formed && a.treaties_formed == b.treaties_formed
-                && a.tribute_remitted == b.tribute_remitted;
-        };
+        const std::size_t base_n = fixture.pre_exploration_settlement.regions.size();
+        // The inheritance chain from 100 at the x0.7 keep, plus 100 itself
+        // (a scheduled founding keeps its own, surveyed, reading).
+        std::vector<int> chain = { 100 };
+        for (int v = 100; v > 0;) { v = (v * 700) / 1000; chain.push_back(v); }
+        const auto on_chain = [&](int v) { return std::find(chain.begin(), chain.end(), v) != chain.end(); };
 
-        // T8.11: SWITCH ON, OPEN AT THE SPAN'S STOP -> the shipped span, bit
-        // for bit. No round reaches the open year, so nothing may move.
-        const int64_t stop = fixture.exploration_params.stop_year;
-        const history_sim_state on_at_stop = run_span(true, stop);
-        bool masks_zero = true;
-        for (const polity& q : on_at_stop.polities) masks_zero = masks_zero && q.industry_mask == 0;
-        check(masks_zero && same_run(on_at_stop, fixture.exploration_state),
-              "T8.11  switch ON with the open year at the span's stop reproduces generation's own span exactly");
+        const survey_run ab = run_surveyed(true);
+        const survey_run na = run_surveyed(false); // A off
 
-        // T8.12/T8.13: SWITCH ON FROM THE SPAN'S START (1200), twice: it
-        // invests, it is deterministic, and no polity ever holds both sides
-        // of a fork. REPORTED, not gated, beyond that: what a polity buys is
-        // the seed's business, and the 1660 -> 1960 reading is the sweep's.
-        const int64_t open = fixture.exploration_params.start_year;
-        const history_sim_state s1 = run_span(true, open);
-        const history_sim_state s2 = run_span(true, open);
-        check(same_run(s1, s2), "T8.12  a switch-on span is deterministic: same fixture twice, identical record and masks");
-
-        int alive = 0, holders = 0, rim = 0, seen_fuel = 0, both_sides = 0;
-        int had_round = 0, round_no_fuel = 0, proxy_bad = 0;
-        int fork_side[3][3] = {}; // [fork][0 = first side, 1 = second, 2 = neither]
-        std::vector<int> held_n;
-        const int pairs[3][2] = { {in_coke, in_char}, {in_ld1b, in_ld1c}, {in_ch2d, in_ch2e} };
-        for (const polity& q : s1.polities)
+        int founded = 0, founded_on_chain = 0, founded_forest_unsurveyed = 0;
+        for (std::size_t i = base_n; i < ab.ss.regions.size(); ++i)
         {
-            if (!q.alive) continue;
-            ++alive;
-            const int n = popcount64(q.industry_mask);
-            held_n.push_back(n);
-            if (n > 0) ++holders;
-            if (polity_holds_industry_rim(q)) ++rim;
-            if (q.industry_fuel_seen) ++seen_fuel;
-            // "Had an Industry round", with no sim field of its own: the
-            // first round always targets the ungated root, and from then on a
-            // polity is either investing or holds a node. A polity minted
-            // mid-run starts with every Industry field at its default.
-            const bool had = q.industry_investing >= 0 || q.industry_mask != 0;
-            if (had) { ++had_round; if (!q.industry_fuel_seen) ++round_no_fuel; }
-            else if (q.industry_fuel_seen || q.industry_progress_q != 0) ++proxy_bad;
-            for (int p = 0; p < 3; ++p)
-            {
-                const bool a = (q.industry_mask >> pairs[p][0]) & 1ULL;
-                const bool b = (q.industry_mask >> pairs[p][1]) & 1ULL;
-                if (a && b) ++both_sides;
-                ++fork_side[p][a ? 0 : b ? 1 : 2];
-            }
+            ++founded;
+            if (on_chain(ab.ss.regions[i].survey_fuel_q)) ++founded_on_chain;
+            if (ab.ss.regions[i].survey_forest_q == -1) ++founded_forest_unsurveyed;
         }
-        std::sort(held_n.begin(), held_n.end());
-        const auto pct = [&](int p) { return held_n.empty() ? 0 : held_n[(held_n.size() - 1) * static_cast<std::size_t>(p) / 100]; };
-        std::printf("      switch on from %lld to %lld: alive %d, holding any %d, nodes held min/p25/med/p75/max "
-                    "%d/%d/%d/%d/%d, rim %d, ever passed the fuel gate %d\n",
-                    static_cast<long long>(open), static_cast<long long>(stop), alive, holders,
-                    pct(0), pct(25), pct(50), pct(75), pct(100), rim, seen_fuel);
-        std::printf("      fuel gate: %d had an Industry round, %d of them never passed it; %d never had a round\n",
-                    had_round, round_no_fuel, alive - had_round);
-        check(proxy_bad == 0 && seen_fuel <= had_round,
-              "T8.13.3  the 'had an Industry round' reading is consistent: no polity outside it carries fuel_seen or progress");
-        std::printf("      forks (first/second/neither): Fuel coke %d / charcoal %d / %d, Labour cleared %d / "
-                    "smallholder %d / %d, Works arsenal %d / private %d / %d\n",
-                    fork_side[0][0], fork_side[0][1], fork_side[0][2], fork_side[1][0], fork_side[1][1],
-                    fork_side[1][2], fork_side[2][0], fork_side[2][1], fork_side[2][2]);
-        std::printf("      against the switch-off span: battles %lld -> %lld, conquests %lld -> %lld, "
-                    "owner changes %zu -> %zu\n",
-                    static_cast<long long>(fixture.exploration_state.battles), static_cast<long long>(s1.battles),
-                    static_cast<long long>(fixture.exploration_state.conquests), static_cast<long long>(s1.conquests),
-                    fixture.exploration_state.owner_changes.size(), s1.owner_changes.size());
-        check(holders > 0, "T8.13.1  with the switch on the tree is actually invested (some living polity holds a node)");
-        check(both_sides == 0, "T8.13.2  no living polity holds both sides of any fork in a real run");
-
-        // T8.15 (BL-1041 fix round): DEFAULTS A AND B THROUGH THE SIM'S OWN
-        // WIRING, on the real generated world -- never by rebuilding the seam
-        // in the harness. The span runs from 1200 with the Industry tree open
-        // and every region SURVEYED at fuel 100, under the 250 seam bar, while
-        // its settlement-pass energy_q is left as generated (many clear it).
-        //   A: a region the run FOUNDS inherits its parent's surveyed fuel
-        //      x0.7 (history_sim.cpp, the Settle founding): with A on, every
-        //      founded region reads a value on the chain 100 -> 70 -> 49 -> ...
-        //      and its forest stays -1; with A off it reads -1. Fails if the
-        //      inheritance line is removed.
-        //   B: the seam reads the survey (`seam_reads_survey`): with B on no
-        //      polity ever passes the fuel gate or holds a fuel-gated node;
-        //      with B off the same world's energy_q opens it for someone.
-        //      Fails if the seam goes back to energy_q.
+        int na_founded = 0, na_unsurveyed = 0;
+        for (std::size_t i = base_n; i < na.ss.regions.size(); ++i)
         {
-            struct survey_run { settlement_state ss; history_sim_state hs; };
-            const auto run_surveyed = [&](bool a_on, bool b_on) {
-                history_sim_params ep = fixture.exploration_params;
-                ep.resume_polities  = &fixture.pre_exploration_polities;
-                ep.resume_grudges   = &fixture.pre_exploration_grudges;
-                ep.resume_contacts  = &fixture.pre_exploration_contacts;
-                ep.resume_corridors = &fixture.pre_exploration_corridors;
-                ep.resume_civilisations    = &fixture.pre_exploration_civilisations;    // BL-1049
-                ep.resume_universal_creeds = &fixture.pre_exploration_universal_creeds;
-                ep.industry_tree_enabled                = true;
-                ep.industry_open_year                   = open;
-                ep.industry_survey_inherits_at_founding = a_on;
-                ep.industry_fuel_gate_reads_survey      = b_on;
-                survey_run o;
-                o.ss = fixture.pre_exploration_settlement;
-                for (region& r : o.ss.regions)           r.survey_fuel_q = 100;
-                for (region& r : o.ss.pending_foundings) r.survey_fuel_q = 100;
-                creed_state cs = fixture.pre_exploration_creeds;
-                o.hs = run_history_sim(o.ss, &cs, fixture.terrain.view(), fixture.gw, fixture.gh, ep,
-                                       fixture.exploration_seed, nullptr, fixture.works, nullptr);
-                return o;
-            };
-            const std::size_t base_n = fixture.pre_exploration_settlement.regions.size();
-            // The inheritance chain from 100 at the x0.7 keep, plus 100 itself
-            // (a scheduled founding keeps its own, surveyed, reading).
-            std::vector<int> chain = { 100 };
-            for (int v = 100; v > 0;) { v = (v * 700) / 1000; chain.push_back(v); }
-            const auto on_chain = [&](int v) { return std::find(chain.begin(), chain.end(), v) != chain.end(); };
-
-            const auto fuel_seen_or_gated = [](const history_sim_state& hs) {
-                int n = 0;
-                for (const polity& q : hs.polities)
-                {
-                    bool gated = false;
-                    for (int i = 0; i < io::industry_tree::node_count; ++i)
-                        if (((q.industry_mask >> i) & 1ULL)
-                         && io::industry_tree::nodes[i].gate == io::industry_tree::gate_atom::fuel) gated = true;
-                    if (q.industry_fuel_seen || gated) ++n;
-                }
-                return n;
-            };
-
-            const survey_run ab  = run_surveyed(true,  true);
-            const survey_run a_b = run_surveyed(true,  false); // B off
-            const survey_run na  = run_surveyed(false, true);  // A off
-
-            int founded = 0, founded_on_chain = 0, founded_forest_unsurveyed = 0;
-            for (std::size_t i = base_n; i < ab.ss.regions.size(); ++i)
-            {
-                ++founded;
-                if (on_chain(ab.ss.regions[i].survey_fuel_q)) ++founded_on_chain;
-                if (ab.ss.regions[i].survey_forest_q == -1) ++founded_forest_unsurveyed;
-            }
-            int na_founded = 0, na_unsurveyed = 0;
-            for (std::size_t i = base_n; i < na.ss.regions.size(); ++i)
-            {
-                ++na_founded;
-                if (na.ss.regions[i].survey_fuel_q == -1) ++na_unsurveyed;
-            }
-            const int seen_b_on  = fuel_seen_or_gated(ab.hs);
-            const int seen_b_off = fuel_seen_or_gated(a_b.hs);
-            std::printf("      T8.15 surveyed at fuel 100, 1200 -> 1660: A on founded %d, on the x0.7 chain %d, forest"
-                        " -1 %d; A off founded %d, unsurveyed %d. Polities past the fuel gate or holding a fuel node:"
-                        " B on %d, B off %d\n", founded, founded_on_chain, founded_forest_unsurveyed, na_founded,
-                        na_unsurveyed, seen_b_on, seen_b_off);
-            check(founded > 0 && founded_on_chain == founded && founded_forest_unsurveyed == founded,
-                  "T8.15.1  DEFAULT A: every region the run founds inherits its parent's surveyed fuel x0.7 (the"
-                  " 100 -> 70 -> 49 chain), its forest left -1");
-            check(na_founded > 0 && na_unsurveyed == na_founded,
-                  "T8.15.2  DEFAULT A off: the same foundings read -1 (T8.15.1 is the switch, not a default)");
-            check(seen_b_on == 0,
-                  "T8.15.3  DEFAULT B: on ground surveyed under the bar no polity passes the fuel gate or holds a"
-                  " fuel-gated node, whatever its energy_q");
-            check(seen_b_off > 0,
-                  "T8.15.4  DEFAULT B off: the same world's energy_q opens the fuel gate for some polity (T8.15.3 is"
-                  " the survey's doing)");
+            ++na_founded;
+            if (na.ss.regions[i].survey_fuel_q == -1) ++na_unsurveyed;
         }
+        std::printf("      T10 surveyed at fuel 100, 1200 -> 1660: A on founded %d, on the x0.7 chain %d, forest"
+                    " -1 %d; A off founded %d, unsurveyed %d\n", founded, founded_on_chain,
+                    founded_forest_unsurveyed, na_founded, na_unsurveyed);
+        check(founded > 0 && founded_on_chain == founded && founded_forest_unsurveyed == founded,
+              "T10.1  DEFAULT A: every region the run founds inherits its parent's surveyed fuel x0.7 (the"
+              " 100 -> 70 -> 49 chain), its forest left -1");
+        check(na_founded > 0 && na_unsurveyed == na_founded,
+              "T10.2  DEFAULT A off: the same foundings read -1 (T10.1 is the switch, not a default)");
     }
 
     std::printf("\n%s (%d failure%s)\n",

@@ -446,6 +446,17 @@ struct outcome_row
 
 } // namespace
 
+// BL-1272 G1a: absence detectors (a requires-expression must be dependent to
+// answer false rather than fail to compile).
+template <typename T> constexpr bool g1_has_empire_mask      = requires (T t) { t.empire_mask; };
+template <typename T> constexpr bool g1_has_exploration_mask = requires (T t) { t.exploration_mask; };
+template <typename T> constexpr bool g1_has_industry_mask    = requires (T t) { t.industry_mask; };
+template <typename T> constexpr bool g1_has_tree_mod_q       = requires (T t) { t.tree_mod_q; };
+template <typename T> constexpr bool g1_has_tree_keys        = requires (T t) { t.tree_keys; };
+template <typename T> constexpr bool g1_has_empire_progress  = requires (T t) { t.empire_progress_q; };
+template <typename T> constexpr bool g1_has_research_fraction = requires (T t) { t.empire_research_fraction_q; };
+template <typename T> constexpr bool g1_has_industry_tree_switch = requires (T t) { t.industry_tree_enabled; };
+
 int main()
 {
     std::printf("=== history sim harness (BL-277 scorer + BL-271 year tick) ===\n");
@@ -2310,16 +2321,16 @@ int main()
         town.energy_q = 500;
         region small = town;
         small.urban_population = 30000;
-        const int64_t crowd   = industry_points_scale_credit(town, 0, ip, 10, 60000);
+        const int64_t crowd   = industry_points_scale_credit(town, ip, 10, 60000);
         const int64_t worked  = [&] { region r = town; r.urban_population = 60000;
-                                      return industry_points_scale_credit(r, 0, ip, 10, 60000); }();
+                                      return industry_points_scale_credit(r, ip, 10, 60000); }();
         const int64_t loose   = [&] { region r = town; r.urban_population = 60000;
-                                      return industry_points_scale_credit(r, 0, ip, 10, 1000000); }();
-        const int64_t none    = industry_points_scale_credit(town, 0, ip, 10, 0);
-        const int64_t few     = industry_points_scale_credit(small, 0, ip, 10, 60000);
+                                      return industry_points_scale_credit(r, ip, 10, 1000000); }();
+        const int64_t none    = industry_points_scale_credit(town, ip, 10, 0);
+        const int64_t few     = industry_points_scale_credit(small, ip, 10, 60000);
         const int64_t few_ref = [&] { region r = small;
-                                      return industry_points_scale_credit(r, 0, ip, 10, 30000); }();
-        const int64_t bad     = industry_points_scale_credit(town, 0, ip, 10, -1);
+                                      return industry_points_scale_credit(r, ip, 10, 30000); }();
+        const int64_t bad     = industry_points_scale_credit(town, ip, 10, -1);
         std::printf("      scale credit: 500k heads / 60k employed %lld; 60k / 60k %lld; 60k / 1M %lld; "
                     "no works %lld; 30k / 60k %lld\n",
                     static_cast<long long>(crowd), static_cast<long long>(worked),
@@ -2694,71 +2705,126 @@ int main()
     }
 
     // -----------------------------------------------------------------
-    // E1: BL-973 — every EMPIRE store effect reaches the sim through the
-    //     generated table, and is either read or declared unread. The
-    //     exploration twin is exploration_sim_harness T7.
+    // G1: BL-1272 — the pre-game history runs no technology trees
+    //     (docs/generation/trees/TREES.md, Ben 2026-10-10). A polity holds
+    //     no tree state and earns no research; the Invest verb's spend has
+    //     one destination, the capacity ladder; what the trees gated opens
+    //     on a date, the same for every polity.
     // -----------------------------------------------------------------
     {
-        int read = 0, unread = 0, both = 0, neither = 0;
-        int by_kind_read[io::tree_effect_kind_count]   = {};
-        int by_kind_unread[io::tree_effect_kind_count] = {};
-        for (int i = 0; i < io::empire_tree::effect_count; ++i)
-        {
-            const io::tree_effect& e = io::empire_tree::effects[i];
-            const bool r = tree_effect_reader_of(e) != tree_effect_reader::unread;
-            const bool u = tree_effect_declared_unread(e);
-            if (r && u) ++both; else if (!r && !u) { ++neither; std::printf("      NEITHER: %s\n", e.target); }
-            else if (r) { ++read;   ++by_kind_read[static_cast<int>(e.kind)]; }
-            else        { ++unread; ++by_kind_unread[static_cast<int>(e.kind)]; }
-        }
-        std::printf("      empire effects: %d rows, %d read, %d declared unread, %d both, %d neither\n",
-                    io::empire_tree::effect_count, read, unread, both, neither);
-        for (int k = 0; k < io::tree_effect_kind_count; ++k)
-            if (by_kind_read[k] || by_kind_unread[k])
-                std::printf("        %-12s read %2d  unread %2d\n",
-                            io::tree_effect_kind_names[k], by_kind_read[k], by_kind_unread[k]);
-        check(neither == 0, "E1a  every empire store effect has a reader or is on the stated unread list");
-        check(both == 0,    "E1b  no empire effect is both read and declared unread (the list is not stale)");
+        // G1a — no tree state survives on a polity or in the params. A
+        // compile-time absence check, so a re-added field fails here by name.
+        constexpr bool no_tree_state =
+            !g1_has_empire_mask<polity> && !g1_has_exploration_mask<polity> && !g1_has_industry_mask<polity>
+         && !g1_has_tree_mod_q<polity>  && !g1_has_tree_keys<polity>         && !g1_has_empire_progress<polity>
+         && !g1_has_research_fraction<history_sim_params> && !g1_has_industry_tree_switch<history_sim_params>;
+        check(no_tree_state, "G1a  no polity carries tree state and no param prices research");
 
-        int tiled = 0;
-        bool contiguous = true;
-        for (int i = 0; i < io::empire_tree::node_count; ++i)
+        // G1b — the Invest verb's spend lands on the capacity ladder and only
+        // there. Run the fixture and account for every polity's ladder: the
+        // investment it holds is its bands' cumulative cost plus the progress
+        // carried. A positive total with nothing else on the polity to hold
+        // an investment (G1a) is the whole of where Invest's spend went.
+        settlement_state s = k1->settlement;
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 12345u);
+        int64_t ladder_total = 0;
+        int     raised       = 0;
+        for (const polity& q : a.polities)
         {
-            const io::empire_tree::node& n = io::empire_tree::nodes[i];
-            if (static_cast<int>(n.effects_begin) != tiled) contiguous = false;
-            if (n.effects_n == 0) contiguous = false;
-            tiled += n.effects_n;
+            bool up = false;
+            for (int d = 0; d < sim_domain_count; ++d)
+            {
+                for (int b = 1; b < q.capacity[d]; ++b)
+                    ladder_total += static_cast<int64_t>(params.capacity_band_cost) * b;
+                ladder_total += q.progress_q[d];
+                if (q.capacity[d] > 1) up = true;
+            }
+            if (up) ++raised;
         }
-        check(contiguous && tiled == io::empire_tree::effect_count,
-              "E1c  node effect ranges tile the effects table exactly, no node effectless");
+        std::printf("      invest on the ladder: %lld progress units held, %d of %zu polities raised a band\n",
+                    static_cast<long long>(ladder_total), raised, a.polities.size());
+        check(ladder_total > 0 && raised > 0,
+              "G1b  Invest spends on the capacity ladder (the only investment a polity holds)");
 
-        // The rim and the ring gates are store effects now, not counted milestones.
-        const io::tree_effect& rim_e = io::empire_tree::effects[
-            io::empire_tree::nodes[io::empire_tree::rim_node_index].effects_begin];
-        polity q;
-        q.empire_mask = 1ULL << io::empire_tree::rim_node_index;
-        apply_tree_effects(q);
-        check(rim_e.kind == io::tree_effect_kind::open && rim_e.open_tree
-           && tree_effect_reader_of(rim_e) == tree_effect_reader::tree_gate
-           && polity_holds_empire_rim(q),
-              "E1d  the empire rim is the node carrying the open-next-tree effect, and holding it is the rim read");
-        int ring_opens = 0;
-        for (int i = 0; i < io::empire_tree::effect_count; ++i)
-            if (io::empire_tree::effects[i].kind == io::tree_effect_kind::open
-             && io::empire_tree::effects[i].open_ring > 0) ++ring_opens;
-        check(ring_opens == 3,
-              "E1e  three ring-opening effects (rings 2, 3, 4) sit in the table for the availability gate to read");
-        // A summed modifier term: hold every node and the reach sum is the store's own total.
-        q.empire_mask = (io::empire_tree::node_count >= 64) ? ~0ULL : ((1ULL << io::empire_tree::node_count) - 1);
-        apply_tree_effects(q);
-        int reach_total = 0;
-        for (int i = 0; i < io::empire_tree::effect_count; ++i)
-            if (io::empire_tree::effects[i].kind == io::tree_effect_kind::modifier
-             && io::empire_tree::effects[i].term == io::tree_modifier_term::reach)
-                reach_total += io::empire_tree::effects[i].per_mille;
-        std::printf("      empire reach per-mille total over every node: %d\n", reach_total);
-        check(reach_total > 0 && tree_mod_q(q, io::tree_modifier_term::reach) == reach_total,
-              "E1f  holding every node folds the store's whole reach total into the surface");
+        // G1c — the three gates are dates, the same for every polity.
+        history_sim_params g = params;
+        check(!sea_legs_open(g, g.sea_legs_year - 1) && sea_legs_open(g, g.sea_legs_year)
+           && !post_roads_open(g, g.post_roads_year - 1) && post_roads_open(g, g.post_roads_year),
+              "G1c  sea legs and the post-road rung open on their year and not a year before");
+        bool ramp_ok = coastal_sea_techs_at(g, g.coastal_naval_ramp[0] - 1) == 0;
+        for (int i = 0; i < history_sim_params::coastal_naval_ramp_n; ++i)
+            ramp_ok = ramp_ok && coastal_sea_techs_at(g, g.coastal_naval_ramp[i]) == i + 1;
+        std::printf("      gates: sea legs %lld, post roads %lld, coastal sea techs %lld / %lld / %lld\n",
+                    static_cast<long long>(g.sea_legs_year), static_cast<long long>(g.post_roads_year),
+                    static_cast<long long>(g.coastal_naval_ramp[0]), static_cast<long long>(g.coastal_naval_ramp[1]),
+                    static_cast<long long>(g.coastal_naval_ramp[2]));
+        check(ramp_ok, "G1d  the coastal sea-tech count is the number of ramp years reached");
+
+        // G1e — the naval ramp is COASTAL (Ben, 2026-10-10). With the ledger on,
+        // every living polity holding a coastal region (port_q > 0) on the
+        // closing map holds the ramp's count at the close, and no polity holds
+        // more. (A polity that lost its coast keeps its sailors, so an inland
+        // polity at the close may hold the count; it is not asserted to be 0.)
+        history_sim_params n = params;
+        n.naval_points_accrue = true;
+        settlement_state sn = k1->settlement;
+        const history_sim_state b = run_history_sim(sn, nullptr, no_terrain, kgw, kgh, n, 12345u);
+        const int64_t want = coastal_sea_techs_at(n, n.stop_year - 1);
+        std::vector<char> coastal(b.polities.size(), 0);
+        for (const region& r : sn.regions)
+            if (r.port_q > 0 && r.nation >= 0 && static_cast<std::size_t>(r.nation) < coastal.size())
+                coastal[static_cast<std::size_t>(r.nation)] = 1;
+        int alive = 0, coastal_n = 0, off_ramp = 0, over = 0;
+        for (std::size_t i = 0; i < b.polities.size(); ++i)
+        {
+            const polity& q = b.polities[i];
+            if (q.naval_sea_techs > want) ++over;
+            if (!q.alive) continue;
+            ++alive;
+            if (coastal[i]) { ++coastal_n; if (q.naval_sea_techs != want) ++off_ramp; }
+        }
+        std::printf("      naval ramp: %d living polities, %d coastal at the close, %d of those off the ramp's %lld,"
+                    " %d polities over it\n", alive, coastal_n, off_ramp, static_cast<long long>(want), over);
+        check(coastal_n > 0 && off_ramp == 0 && over == 0,
+              "G1e  every living coastal polity holds the ramp's coastal sea techs at the close, and none holds more");
+
+        // G1f — the ramp on a hand-built table: coastal reads the count, inland
+        // reads 0, a held count is never lowered, and a polity minted after a
+        // tally is read by the next one (the sim tallies again at the close).
+        {
+            std::vector<polity> ps(2);
+            ps[0].id = 0; ps[0].alive = true;
+            ps[1].id = 1; ps[1].alive = true;
+            std::vector<region> rg(2);
+            rg[0].nation = 0; rg[0].port_q = 400;
+            rg[1].nation = 1; rg[1].port_q = 0;
+            const int64_t y3 = n.coastal_naval_ramp[2];
+            apply_coastal_naval_ramp(ps, rg, n, y3);
+            const bool first = ps[0].naval_sea_techs == 3 && ps[1].naval_sea_techs == 0;
+            rg[0].nation = 1; // the coast changes hands
+            ps.push_back(polity{}); ps[2].id = 2; ps[2].alive = true;
+            rg.push_back(region{}); rg[2].nation = 2; rg[2].port_q = 100;
+            apply_coastal_naval_ramp(ps, rg, n, y3);
+            check(first && ps[0].naval_sea_techs == 3 && ps[1].naval_sea_techs == 3 && ps[2].naval_sea_techs == 3,
+                  "G1f  the ramp reads coast, keeps a held count when the coast is lost, and reads a late-minted polity");
+        }
+
+        // G1g — sea legs are a date AND naval capacity (Ben, 2026-10-10).
+        {
+            polity q; q.id = 0; q.alive = true;
+            for (int d = 0; d < sim_domain_count; ++d) q.capacity[d] = 6;
+            std::vector<region> inland(1), harbour(1);
+            inland[0].nation = 0; inland[0].port_q = 0;
+            harbour[0].nation = 0; harbour[0].port_q = 1000;
+            const int64_t yl = n.sea_legs_year;
+            const bool before = !polity_holds_sea_legs(harbour, q, n, yl - 1);
+            const bool land   = !polity_holds_sea_legs(inland, q, n, yl);
+            const bool sea    = polity_holds_sea_legs(harbour, q, n, yl);
+            std::printf("      sea legs: before the year %s, inland after %s, harbour after %s\n",
+                        before ? "no" : "YES", land ? "no" : "YES", sea ? "yes" : "NO");
+            check(before && land && sea,
+                  "G1g  sea legs need the year and a held region that can field a navy (can_field_naval)");
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n",

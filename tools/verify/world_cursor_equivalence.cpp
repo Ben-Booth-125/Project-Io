@@ -199,12 +199,6 @@ void fold_polity(uint64_t& h, const polity& p)
     fold_i32(h, p.universal_creed);
     fold_i64(h, p.creed_adopted_year);
     fold_bool(h, p.alive);
-    fold_u64(h, p.empire_mask);
-    fold_i32(h, p.empire_progress_q);
-    fold_u64(h, p.exploration_mask);
-    fold_i32(h, p.exploration_progress_q);
-    fold_u64(h, p.industry_mask);
-    fold_i32(h, p.industry_progress_q);
     fold_i32(h, p.overlord);
     fold_i32(h, p.subject_kind);
     fold_i64(h, p.navy_stock);
@@ -212,7 +206,6 @@ void fold_polity(uint64_t& h, const polity& p)
     fold_i64(h, p.naval_crossings);
     fold_i64(h, p.naval_sea_techs);
     fold_i32(h, p.treaties_broken);
-    fold_u32(h, p.tree_keys);
 }
 
 void fold_polities(uint64_t& h, const std::vector<polity>& ps)
