@@ -1440,6 +1440,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             folded += seat.material_stock;
             seat.material_stock = 0;
             seat.treasury = clampi64(seat.treasury + folded, 0, 1LL << 48);
+            if (spend) spend->consolidation_folded += folded; // BL-1298, write-only
         }
 
         // BL-1041: the purse as the round's earn finds it -- the base the
@@ -1491,6 +1492,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         seat.treasury = clampi64(
             seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
+        if (spend) // BL-1298 census, write-only
+        {
+            spend->earn_endowment += endowment_income;
+            spend->earn_corridor  += corridor_income;
+            spend->earn_trade     += trade_income;
+        }
 
         // ---- BL-972 -- THE BILL, before any purchase. ----------------------
         // EXPLORATION.md sec Force persists now: each stock is one "the
@@ -5480,6 +5487,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-972: the bill and the levy, summed over the span.
             out.treasury_spent_on_army_upkeep += upkeep_spend.army_upkeep;
             out.treasury_spent_on_navy_upkeep += upkeep_spend.navy_upkeep;
+            out.treasury_earned_endowment     += upkeep_spend.earn_endowment;       // BL-1298
+            out.treasury_earned_corridor      += upkeep_spend.earn_corridor;        // write-only
+            out.treasury_earned_trade         += upkeep_spend.earn_trade;
+            out.treasury_from_consolidation   += upkeep_spend.consolidation_folded;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
