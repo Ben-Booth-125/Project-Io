@@ -95,7 +95,8 @@ struct closing_plan
     int floor_absorptions   = 0;
     int target_absorptions  = 0;
     int target_secessions   = 0;
-    bool short_of_target    = false; ///< A target was set and no legal step could reach it (a defect: recorded as a handoff violation).
+    int subfloor_secessions = 0; ///< Of those, splits taken below the floor (no floor-safe split existed): the total outranks the floor.
+    bool short_of_target    = false; ///< A target was set and no step of any kind could reach it -- no absorber, or no realm holding two cells (a defect: recorded as a handoff violation).
 };
 
 /// Per region, the number of carve tiles its anchor's cell holds (0 for a

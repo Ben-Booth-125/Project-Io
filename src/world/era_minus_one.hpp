@@ -421,6 +421,12 @@ struct era_minus_one_fixture
     /// ground, and so closes where generation closed. Null when the span did
     /// not run.
     std::shared_ptr<const closing_rounds_spec> industrialisation_closing;
+    /// BL-1278 -- AN INPUT, HARNESS ONLY: when > 0, the closing rounds run
+    /// at this size floor (tiles) instead of `nation_params::min_nation_tiles`,
+    /// so a harness can force the case where no floor-safe secession exists
+    /// and the total outranks the floor. 0 (every shipped build: generation
+    /// is never handed a fixture with it set) leaves the floor as derived.
+    int harness_floor_tiles = 0;
 
     /// The 1960 close exactly as generation folded it
     /// (`make_industrialisation_output`), default-constructed when the span did

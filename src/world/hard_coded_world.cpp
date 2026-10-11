@@ -1964,7 +1964,9 @@ void run_industrialisation(generation_cursor& c)
         auto closing = std::make_shared<closing_rounds_spec>();
         closing->ground           = nation_carve_ground_of(w, kepler_tiles, home_grid_width, home_grid_height);
         closing->nation_seed      = params.seed ^ 0x4A71012u;
-        closing->min_nation_tiles = c.kepler_np.min_nation_tiles;
+        closing->min_nation_tiles = (fixture != nullptr && fixture->harness_floor_tiles > 0)
+                                        ? fixture->harness_floor_tiles // harness-only seam (era_minus_one.hpp)
+                                        : c.kepler_np.min_nation_tiles;
         closing->keep_city_states = c.kepler_np.keep_city_states;
         closing->total_target     = params.nation_total_target;
         dp.closing_rounds = closing.get();

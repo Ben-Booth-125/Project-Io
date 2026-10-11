@@ -325,11 +325,17 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         // another, never the realm's seat and never empty ground -- and, where
         // its own cell is under the floor, the neighbouring cells of the same
         // realm it carries with it (adjacent across a cell border, lowest
-        // `network_supply_q` first, then the lower index) until the block
-        // clears the floor. NEVER UNDO THE FLOOR: the block and what the realm
-        // keeps must both clear it, or the start is no candidate; with none
-        // left the rounds stop short and the caller records the miss (never a
-        // silent ship off target). Preferred: the fewest regions; then the
+        // `network_supply_q` first, then the lower index), never so many that
+        // the realm keeps no cell. Every prefix of that growth is a candidate.
+        //
+        // THE TOTAL OUTRANKS THE FLOOR (Ben, 2026-10-11; NATION_GENERATION.md
+        // sec The nation count is a target). A FLOOR-SAFE split -- the block
+        // and what the realm keeps both clear the floor -- is always preferred
+        // where one exists. Where none does, the split with the SMALLEST
+        // SHORTFALL below the floor (summed over both sides) is taken, so the
+        // total is still hit; only "no split of any kind" (every realm holds
+        // one anchored region) stops the rounds short, and the caller records
+        // that miss. Tie order: shortfall; then the fewest regions; then the
         // ground furthest from its seat's reach (the sim's own secession
         // reading); then the larger block; then the lower index.
         while (N < total_target)
@@ -338,6 +344,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             int              best = -1;
             std::vector<int> best_block;
             int64_t          best_tiles = 0;
+            int64_t          best_short = 0;
             int              best_supply = 0;
             for (std::size_t r = 0; r < R; ++r)
             {
@@ -350,11 +357,34 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 if (static_cast<int>(r) == pseat) continue;
                 if (regions[r].population <= 0) continue;
                 const int supply = regions[r].network_supply_q;
-                // Grow the block (pure, bounded by the realm's own cells).
                 std::vector<int> block{static_cast<int>(r)};
                 int64_t bt = tiles[r];
-                while (min_tiles > 0 && bt < min_tiles)
+                for (;;)
                 {
+                    // This prefix as a candidate.
+                    const int64_t keep = G.tiles - bt;
+                    const int64_t shortfall =
+                        min_tiles > 0 ? std::max<int64_t>(0, min_tiles - bt) + std::max<int64_t>(0, min_tiles - keep)
+                                      : 0;
+                    const bool better =
+                        best < 0
+                        || shortfall < best_short
+                        || (shortfall == best_short
+                            && (block.size() < best_block.size()
+                                || (block.size() == best_block.size()
+                                    && (supply < best_supply || (supply == best_supply && bt > best_tiles)))));
+                    if (better)
+                    {
+                        best = static_cast<int>(r);
+                        best_block = block;
+                        best_tiles = bt;
+                        best_short = shortfall;
+                        best_supply = supply;
+                    }
+                    // Grow only while the block is under the floor, and never
+                    // to the realm's last cell.
+                    if (min_tiles <= 0 || bt >= min_tiles) break;
+                    if (block.size() + 1 >= G.anchored.size()) break;
                     int pick = -1;
                     for (const int m : block)
                         for (const int n : adj[static_cast<std::size_t>(m)])
@@ -373,21 +403,8 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                     block.push_back(pick);
                     bt += tiles[static_cast<std::size_t>(pick)];
                 }
-                if (min_tiles > 0 && (bt < min_tiles || G.tiles - bt < min_tiles)) continue;
-                if (block.size() >= G.anchored.size()) continue; // the realm keeps a cell
-                const bool better =
-                    best < 0
-                    || block.size() < best_block.size()
-                    || (block.size() == best_block.size()
-                        && (supply < best_supply || (supply == best_supply && bt > best_tiles)));
-                if (better)
-                {
-                    best = static_cast<int>(r);
-                    best_block = block;
-                    best_tiles = bt;
-                    best_supply = supply;
-                }
             }
+            if (best >= 0 && best_short > 0) ++plan.subfloor_secessions;
             if (best < 0) break;
 
             const std::size_t br = static_cast<std::size_t>(best);

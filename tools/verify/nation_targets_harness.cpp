@@ -44,7 +44,12 @@
 //               exists, so E counts 0 and says so. Exits 1 on any failure.
 //
 // FLAGS. --seeds a,b,c (default: docs/generation/seed_library.json, in library
-// order) and --pairs t:m,t:m (grid mode only) keep a run short.
+// order) and --pairs t:m,t:m (grid mode only) keep a run short. --floor N
+// (BL-1278) runs the closing rounds at a size floor of N tiles
+// (`era_minus_one_fixture::harness_floor_tiles`, a harness-only seam) on every
+// build of the run, natural included: raised, it forces the case where no
+// floor-safe secession exists and the total outranks the floor. Each grid
+// line prints how many secessions were taken below the floor ("subfloor").
 //
 // COST. One build + finish is roughly a minute or two (Release); the full grid
 // on sixteen seeds is 16 x (1 + 9) of them. Use --seeds / --pairs.
@@ -139,6 +144,7 @@ struct reading
     int      recon_major_in  = 0; ///< major-reconciliation events inside the span
     int      recon_outside   = 0; ///< either kind dated outside the span (a defect)
     int      closing_steps   = 0; ///< the closing rounds' own steps (absorptions + secessions)
+    int      subfloor        = 0; ///< secessions taken below the floor (the target outranks it)
     int      closing_delta   = 0; ///< |before - after floor| + |after floor - after|
     bool     closing_ran     = false;
     bool     handoff_invalid = false;
@@ -155,6 +161,8 @@ struct data_layer
     works_registry   works;
     recipe_registry  reg;
 };
+
+int g_floor = 0; ///< --floor: the harness-only closing-rounds floor (0 = as derived)
 
 reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, int major_target)
 {
@@ -176,6 +184,7 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
 
     generation_report     rep{};
     era_minus_one_fixture fx{};
+    fx.harness_floor_tiles = g_floor;
     const auto t0 = std::chrono::steady_clock::now();
     world w = make_hard_coded_world(p, &rep, dl.cfg, nullptr, &dl.works, &fx);
     const auto t1 = std::chrono::steady_clock::now();
@@ -218,6 +227,7 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
     {
         const history_sim_state& hs = fx.industrialisation_state;
         r.closing_ran   = hs.closing_predicted >= 0;
+        r.subfloor      = hs.closing_subfloor_secessions;
         r.closing_steps = hs.closing_floor_absorptions + hs.closing_target_absorptions
                         + hs.closing_target_secessions;
         if (r.closing_ran)
@@ -279,6 +289,7 @@ int main(int argc, char** argv)
     {
         if (std::strcmp(argv[i], "--natural") == 0) natural = true;
         else if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc) seeds = parse_seeds(argv[++i]);
+        else if (std::strcmp(argv[i], "--floor") == 0 && i + 1 < argc) g_floor = std::atoi(argv[++i]);
         else if (std::strcmp(argv[i], "--pairs") == 0 && i + 1 < argc)
         {
             if (!parse_pairs(argv[++i], pairs))
@@ -289,7 +300,7 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::printf("usage: nation_targets_harness [--natural] [--seeds a,b,c] [--pairs t:m,t:m]\n");
+            std::printf("usage: nation_targets_harness [--natural] [--seeds a,b,c] [--pairs t:m,t:m] [--floor N]\n");
             return 2;
         }
     }
@@ -311,7 +322,8 @@ int main(int argc, char** argv)
     dl.lua.load("scripts/economy.lua");
     dl.reg.load_from_lua(dl.lua);
 
-    std::printf("nation_targets_harness: %s, %zu seed(s)\n", natural ? "--natural" : "grid", seeds.size());
+    std::printf("nation_targets_harness: %s, %zu seed(s)%s\n", natural ? "--natural" : "grid", seeds.size(),
+                g_floor > 0 ? (", closing-rounds floor raised to " + std::to_string(g_floor) + " tiles").c_str() : "");
 
     if (natural)
     {
@@ -368,12 +380,12 @@ int main(int argc, char** argv)
             checks += 4;
             fails += !t_ok + !m_ok + !e_ok + !h_ok;
             std::printf("  %s seed %-3u target %2d/%d  T total %2d (natural %2d) %s  M majors %d (natural %d) %s  "
-                        "E events total %d/steps %d/delta %d %s major %d/%d %s outside %d  H %s%s  [%.0f+%.0f s]\n",
+                        "E events total %d/steps %d/delta %d %s major %d/%d %s outside %d  H %s%s  subfloor %d  [%.0f+%.0f s]\n",
                         (t_ok && m_ok && e_ok && h_ok) ? "PASS" : "FAIL", seed, tt, mt, r.total, nat.total,
                         t_ok ? "ok" : "MISS", r.majors, nat.majors, m_ok ? "ok" : "MISS", r.recon_total_in,
                         r.closing_steps, r.closing_delta, et_ok ? "ok" : "MISS", r.recon_major_in, gap_m,
                         em_ok ? "ok" : "MISS", r.recon_outside, h_ok ? "ok" : "VIOLATION ",
-                        h_ok ? "" : r.handoff_violation.c_str(), r.build_s, r.finish_s);
+                        h_ok ? "" : r.handoff_violation.c_str(), r.subfloor, r.build_s, r.finish_s);
             std::fflush(stdout);
         }
     }

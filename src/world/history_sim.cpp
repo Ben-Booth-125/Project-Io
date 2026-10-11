@@ -9942,6 +9942,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.closing_nations_after_floor = plan.nations_after_floor;
         out.closing_predicted           = plan.nations_after;
         out.closing_short_of_target     = plan.short_of_target;
+        out.closing_subfloor_secessions = plan.subfloor_secessions;
     }
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's

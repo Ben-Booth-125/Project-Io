@@ -4672,6 +4672,7 @@ struct history_sim_state
     int32_t closing_floor_absorptions  = 0;
     int32_t closing_target_absorptions = 0;
     int32_t closing_target_secessions  = 0;
+    int32_t closing_subfloor_secessions = 0; ///< Secessions taken below the floor (the target outranks it).
     bool    closing_short_of_target    = false;
 };
 
