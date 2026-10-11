@@ -152,14 +152,14 @@ verify.expect(hw > 0, "seed " .. HOP_SEED .. " carries over-water kin arrows (" 
 -- water count is above zero.
 if hw > 0 then
     -- The first hop's own year. On seed 13 that is 2374 BCE, inside the
-    -- globe's dissolve (the opening tenth of the span), so the dashed line
-    -- sits under a still-thick globe here; the frame after is the picture.
+    -- opening tenth of the span, where few hops are drawn yet; the frame
+    -- after is the picture.
     verify.history_year(hfirst)
     shot("routes_and_splits_6_hop")
     local d2, w2 = verify.history_kin()
     verify.expect(w2 >= 1, "a dashed over-water arrow is drawn at its hop year ("
                            .. hfirst .. ")")
-    -- A tenth of the span later, past the dissolve, where several hops are
+    -- A tenth of the span later, where several hops are
     -- in the frame at once.
     verify.history_year(hfirst + math.floor((hl - hf) * 0.10))
     shot("routes_and_splits_7_hops_later")

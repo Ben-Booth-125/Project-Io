@@ -1095,6 +1095,119 @@ std::string lapse_year_label(int year)
     return buf;
 }
 
+/// THE TERRAIN BASE, baked once (BL-915): run-merged land by landform band,
+/// the mountain rims, and the downstream river edges, all in tile units.
+/// Shared by `finish_history_lapse` (the pass rounds) and `bake_lapse_ground`
+/// (the Life round, BL-1280), so the Life map and the pass maps stand on ONE
+/// ground by construction. @p packed must hold gw*gh tiles. Returns the band
+/// per tile (0xFF water), which the road and fleet bakes read.
+static std::vector<uint8_t> bake_ground_layers(int gw, int gh, const uint8_t* packed,
+                                               const uint16_t* terrain, std::size_t terrain_len,
+                                               std::vector<lapse_base_run>&   base_runs,
+                                               std::vector<lapse_relief_seg>& relief_segs,
+                                               std::vector<lapse_river_seg>&  river_segs)
+{
+    base_runs.clear();
+    river_segs.clear();
+    relief_segs.clear();
+    const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    const bool have_terrain = (terrain != nullptr && terrain_len == n);
+
+    // The base band per tile, 0xFF for water. Computed once so the run merge
+    // and the relief edges below read the same thing.
+    std::vector<uint8_t> band(n, 0xFF);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (is_water(preview_substrate(packed[i]))) continue;
+        band[i] = have_terrain ? base_kind(lapse_landform(terrain[i])) : 0;
+    }
+
+    for (int r = 0; r < gh; ++r)
+    {
+        int c = 0;
+        while (c < gw)
+        {
+            const uint8_t kind = band[static_cast<std::size_t>(r * gw + c)];
+            if (kind == 0xFF) { ++c; continue; }
+            int e = c + 1;
+            while (e < gw && band[static_cast<std::size_t>(r * gw + e)] == kind) ++e;
+            base_runs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
+                                   static_cast<uint16_t>(e), kind});
+            c = e;
+        }
+    }
+
+    // RELIEF EDGES. Only MOUNTAIN (band 3) gets a rim, and only where its north
+    // or south neighbour is LOW ground — flat, valley, a cut, or water; a step
+    // down to highland is left to the band colours. The landform field is noisy
+    // at tile grain, so rimming every highland step drew scanlines across whole
+    // continents (measured: 978 rims for 1,966 base runs) — a rim is worth
+    // drawing only where the drop is a real one. The north rim is lit and the
+    // south rim shadowed, the same top-left light every canvas here assumes.
+    // Merged along the row.
+    {
+        const auto elevated = [](uint8_t b) { return b == 3; };
+        const auto height_of = [](uint8_t b) { return (b == 0xFF || b == 4) ? 0 : (b >= 2 ? 2 : 0); };
+        for (int r = 0; r < gh; ++r)
+        {
+            for (int lit = 1; lit >= 0; --lit)
+            {
+                const int nr = lit ? r - 1 : r + 1;
+                int c = 0;
+                while (c < gw)
+                {
+                    const uint8_t b = band[static_cast<std::size_t>(r * gw + c)];
+                    const bool rim = elevated(b)
+                        && (nr < 0 || nr >= gh
+                            || height_of(band[static_cast<std::size_t>(nr * gw + c)]) < height_of(b));
+                    if (!rim) { ++c; continue; }
+                    int e = c + 1;
+                    while (e < gw)
+                    {
+                        const uint8_t b2 = band[static_cast<std::size_t>(r * gw + e)];
+                        const bool rim2 = elevated(b2)
+                            && (nr < 0 || nr >= gh
+                                || height_of(band[static_cast<std::size_t>(nr * gw + e)]) < height_of(b2));
+                        if (!rim2) break;
+                        ++e;
+                    }
+                    relief_segs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
+                                             static_cast<uint16_t>(e), static_cast<uint8_t>(lit)});
+                    c = e;
+                }
+            }
+        }
+    }
+
+    // Rivers: one segment per DOWNSTREAM edge, from the tile's centre to its
+    // downstream neighbour's — so every river edge is drawn exactly once, by the
+    // tile upstream of it, and consecutive edges chain into a polyline. The
+    // river bits are keyed by odd-r hex side (river_generation.hpp), so the
+    // neighbour is read off the shared side table rather than a square-grid
+    // guess. A segment that would cross the wrap seam is dropped: a line across
+    // the whole map is not a river.
+    if (have_terrain)
+    {
+        for (int r = 0; r < gh; ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const uint16_t t = terrain[static_cast<std::size_t>(r * gw + c)];
+                const uint8_t down = lapse_river_downstream(t) & lapse_river_edges(t);
+                if (down == 0) continue;
+                for (int side = 0; side < 6; ++side)
+                {
+                    if ((down & (1u << side)) == 0) continue;
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side);
+                    if (nb.gy < 0 || nb.gy >= gh) continue;
+                    if (nb.gx < 0 || nb.gx >= gw) continue; // the wrap seam
+                    river_segs.push_back({static_cast<int16_t>(c),     static_cast<int16_t>(r),
+                                            static_cast<int16_t>(nb.gx), static_cast<int16_t>(nb.gy)});
+                }
+            }
+    }
+    return band;
+}
+
 void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len,
                           const uint16_t* terrain, std::size_t terrain_len)
 {
@@ -1163,103 +1276,8 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // merge, and the scale is applied at draw time. A missing terrain raster
     // (the async build not landed, or an older caller) bakes flat land, so the
     // map is never blocked on the ground.
-    h.base_runs.clear();
-    h.river_segs.clear();
-    h.relief_segs.clear();
-    const bool have_terrain = (terrain != nullptr && terrain_len == n);
-
-    // The base band per tile, 0xFF for water. Computed once so the run merge
-    // and the relief edges below read the same thing.
-    std::vector<uint8_t> band(n, 0xFF);
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        if (is_water(preview_substrate(packed[i]))) continue;
-        band[i] = have_terrain ? base_kind(lapse_landform(terrain[i])) : 0;
-    }
-
-    for (int r = 0; r < gh; ++r)
-    {
-        int c = 0;
-        while (c < gw)
-        {
-            const uint8_t kind = band[static_cast<std::size_t>(r * gw + c)];
-            if (kind == 0xFF) { ++c; continue; }
-            int e = c + 1;
-            while (e < gw && band[static_cast<std::size_t>(r * gw + e)] == kind) ++e;
-            h.base_runs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
-                                   static_cast<uint16_t>(e), kind});
-            c = e;
-        }
-    }
-
-    // RELIEF EDGES. Only MOUNTAIN (band 3) gets a rim, and only where its north
-    // or south neighbour is LOW ground — flat, valley, a cut, or water; a step
-    // down to highland is left to the band colours. The landform field is noisy
-    // at tile grain, so rimming every highland step drew scanlines across whole
-    // continents (measured: 978 rims for 1,966 base runs) — a rim is worth
-    // drawing only where the drop is a real one. The north rim is lit and the
-    // south rim shadowed, the same top-left light every canvas here assumes.
-    // Merged along the row.
-    {
-        const auto elevated = [](uint8_t b) { return b == 3; };
-        const auto height_of = [](uint8_t b) { return (b == 0xFF || b == 4) ? 0 : (b >= 2 ? 2 : 0); };
-        for (int r = 0; r < gh; ++r)
-        {
-            for (int lit = 1; lit >= 0; --lit)
-            {
-                const int nr = lit ? r - 1 : r + 1;
-                int c = 0;
-                while (c < gw)
-                {
-                    const uint8_t b = band[static_cast<std::size_t>(r * gw + c)];
-                    const bool rim = elevated(b)
-                        && (nr < 0 || nr >= gh
-                            || height_of(band[static_cast<std::size_t>(nr * gw + c)]) < height_of(b));
-                    if (!rim) { ++c; continue; }
-                    int e = c + 1;
-                    while (e < gw)
-                    {
-                        const uint8_t b2 = band[static_cast<std::size_t>(r * gw + e)];
-                        const bool rim2 = elevated(b2)
-                            && (nr < 0 || nr >= gh
-                                || height_of(band[static_cast<std::size_t>(nr * gw + e)]) < height_of(b2));
-                        if (!rim2) break;
-                        ++e;
-                    }
-                    h.relief_segs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
-                                             static_cast<uint16_t>(e), static_cast<uint8_t>(lit)});
-                    c = e;
-                }
-            }
-        }
-    }
-
-    // Rivers: one segment per DOWNSTREAM edge, from the tile's centre to its
-    // downstream neighbour's — so every river edge is drawn exactly once, by the
-    // tile upstream of it, and consecutive edges chain into a polyline. The
-    // river bits are keyed by odd-r hex side (river_generation.hpp), so the
-    // neighbour is read off the shared side table rather than a square-grid
-    // guess. A segment that would cross the wrap seam is dropped: a line across
-    // the whole map is not a river.
-    if (have_terrain)
-    {
-        for (int r = 0; r < gh; ++r)
-            for (int c = 0; c < gw; ++c)
-            {
-                const uint16_t t = terrain[static_cast<std::size_t>(r * gw + c)];
-                const uint8_t down = lapse_river_downstream(t) & lapse_river_edges(t);
-                if (down == 0) continue;
-                for (int side = 0; side < 6; ++side)
-                {
-                    if ((down & (1u << side)) == 0) continue;
-                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side);
-                    if (nb.gy < 0 || nb.gy >= gh) continue;
-                    if (nb.gx < 0 || nb.gx >= gw) continue; // the wrap seam
-                    h.river_segs.push_back({static_cast<int16_t>(c),     static_cast<int16_t>(r),
-                                            static_cast<int16_t>(nb.gx), static_cast<int16_t>(nb.gy)});
-                }
-            }
-    }
+    std::vector<uint8_t> band = bake_ground_layers(gw, gh, packed, terrain, terrain_len,
+                                                  h.base_runs, h.relief_segs, h.river_segs);
 
     // --- Promoted road corridors (BL-917), baked once -------------------------
     //
@@ -2298,6 +2316,17 @@ float legend_band_h(const legend_layout& g)
     return g.cols.empty() ? 0.0f : g.h + 2.0f * legend_pad + legend_gap_top + 4.0f;
 }
 
+} // namespace
+
+float lapse_legend_reserve_h()
+{
+    // One band, a heading row plus three: measure_lapse_legend's own sums.
+    const float row_h = std::max(18.0f, ImGui::GetTextLineHeight() + 4.0f);
+    return row_h * 4.0f + 2.0f * legend_pad + legend_gap_top + 4.0f;
+}
+
+namespace {
+
 /// Paint the measured legend with its block's top-left at @p o, on a dark
 /// backing. Returns the primitives drawn; @p listed gets the labels in order,
 /// for the capture log.
@@ -2341,6 +2370,88 @@ int paint_lapse_legend(const history_lapse& h, const legend_layout& g, ImDrawLis
 
 } // namespace
 
+/// THE GROUND PASS, shared by the pass rounds' map and the Life map (BL-1280):
+/// the baked base runs by landform band, then the lit north rim and shadowed
+/// south rim of every range. Tile edges snap to whole pixels (see
+/// `draw_lapse_map`). Returns the primitives drawn.
+static int paint_ground_layer(ImDrawList* dl, ImVec2 tl, float scale,
+                              const std::vector<lapse_base_run>&   base_runs,
+                              const std::vector<lapse_relief_seg>& relief_segs)
+{
+    const auto px = [&](float c) { return std::floor(tl.x + c * scale); };
+    const auto py = [&](float r) { return std::floor(tl.y + r * scale); };
+    int prims = 0;
+    for (const lapse_base_run& b : base_runs)
+    {
+        paint_ground(dl, px(static_cast<float>(b.c0)), py(static_cast<float>(b.row)),
+                         px(static_cast<float>(b.c1)), py(static_cast<float>(b.row + 1)), b.kind);
+        ++prims;
+    }
+    for (const lapse_relief_seg& s : relief_segs)
+    {
+        const float y = s.lit ? py(static_cast<float>(s.row)) + 0.5f
+                              : py(static_cast<float>(s.row + 1)) - 0.5f;
+        paint_relief_rim(dl, px(static_cast<float>(s.c0)), px(static_cast<float>(s.c1)), y,
+                         s.lit != 0);
+        ++prims;
+    }
+    return prims;
+}
+
+/// THE RIVER PASS, shared likewise: tile centre to downstream centre.
+static int paint_river_layer(ImDrawList* dl, ImVec2 tl, float scale,
+                             const std::vector<lapse_river_seg>& river_segs)
+{
+    const auto px = [&](float c) { return std::floor(tl.x + c * scale); };
+    const auto py = [&](float r) { return std::floor(tl.y + r * scale); };
+    const float half = scale * 0.5f;
+    for (const lapse_river_seg& s : river_segs)
+        paint_river(dl, {px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
+                        {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
+                    scale);
+    return static_cast<int>(river_segs.size());
+}
+
+void bake_lapse_ground(lapse_ground& g, int gw, int gh,
+                       const uint8_t* packed, std::size_t packed_len,
+                       const uint16_t* terrain, std::size_t terrain_len)
+{
+    g = lapse_ground{};
+    if (gw <= 0 || gh <= 0 || packed == nullptr
+        || packed_len != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return; // the gate world's raster is not built yet
+    bake_ground_layers(gw, gh, packed, terrain, terrain_len,
+                       g.base_runs, g.relief_segs, g.river_segs);
+    g.grid_w = gw;
+    g.grid_h = gh;
+}
+
+void draw_lapse_ground(const lapse_ground& g)
+{
+    const ImVec2 avail  = ImGui::GetContentRegionAvail();
+    ImDrawList*  dl     = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    if (avail.x <= 1.0f || avail.y <= 1.0f) return;
+    if (!g.baked())
+    {
+        ImGui::Dummy(avail);
+        return;
+    }
+
+    // The pass rounds' frame, the pass rounds' ground, the pass rounds' rivers:
+    // the Culture record lands on exactly this picture (STARTUP.md § The Life
+    // map, "one map from Life to Begin").
+    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
+    lapse_map_frame_keyed(g.grid_w, g.grid_h, avail.x, avail.y, lapse_legend_reserve_h(),
+                          fx, fy, scale);
+    const ImVec2 tl{origin.x + fx, origin.y + fy};
+    paint_sea(dl, tl, {tl.x + scale * static_cast<float>(g.grid_w),
+                       tl.y + scale * static_cast<float>(g.grid_h)});
+    paint_ground_layer(dl, tl, scale, g.base_runs, g.relief_segs);
+    paint_river_layer(dl, tl, scale, g.river_segs);
+    ImGui::Dummy(avail);
+}
+
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year)
 {
@@ -2382,23 +2493,21 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // pane begins. The offset is authored rather than derived — it is a framing
     // judgement about this screen, and deriving it from some other quantity
     // would only disguise that. THE RULE LIVES IN `lapse_map_frame` (BL-1091):
-    // the wizard's globe dissolve stamps its year over this same corner, and
-    // one framing shared beats two that agree by luck.
-    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
-    lapse_map_frame(gw, gh, avail.x, avail.y, fx, fy, scale);
-
+    // the Life map (`draw_lapse_ground`) and its stamp share this same frame,
+    // and one framing shared beats two that agree by luck.
     // BL-1118: THE LEGEND'S BAND. The key is measured before the map is
     // framed: where the pane's band under the map already holds it (1920x1080
     // leaves ~290 px) nothing moves; where it does not, the map is framed in
     // the height left above the key rather than the key being laid over the
-    // map, which is the subject.
+    // map, which is the subject. BL-1280 fix round: the band claimed is never
+    // less than the fixed reservation the Life map frames with, so the Culture
+    // record lands in the Life map's exact rect at any window size (a legend
+    // that wraps to a second band on a very narrow pane still claims more).
     const legend_layout legend = measure_lapse_legend(h, L, avail.x - 2.0f * legend_pad - 4.0f);
-    {
-        const float need  = legend_band_h(legend);
-        const float below = avail.y - (fy + scale * static_cast<float>(gh));
-        if (need > 0.0f && below < need && avail.y - need > 40.0f)
-            lapse_map_frame(gw, gh, avail.x, avail.y - need, fx, fy, scale);
-    }
+    const float key_h = legend.cols.empty() ? 0.0f
+                                            : std::max(legend_band_h(legend), lapse_legend_reserve_h());
+    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
+    lapse_map_frame_keyed(gw, gh, avail.x, avail.y, key_h, fx, fy, scale);
     const float mw = scale * static_cast<float>(gw);
     const float mh = scale * static_cast<float>(gh);
     const ImVec2 tl{origin.x + fx, origin.y + fy};
@@ -2421,26 +2530,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    frame — see finish_history_lapse. ──
     int prims = 0;
     if (L.has(lapse_layer::ground))
-    {
-        for (const lapse_base_run& b : h.base_runs)
-        {
-            const float x0 = px(static_cast<float>(b.c0));
-            const float x1 = px(static_cast<float>(b.c1));
-            const float y0 = py(static_cast<float>(b.row));
-            const float y1 = py(static_cast<float>(b.row + 1));
-            paint_ground(dl, x0, y0, x1, y1, b.kind);
-            ++prims;
-        }
-        for (const lapse_relief_seg& s : h.relief_segs)
-        {
-            const float x0 = px(static_cast<float>(s.c0));
-            const float x1 = px(static_cast<float>(s.c1));
-            const float y  = s.lit ? py(static_cast<float>(s.row)) + 0.5f
-                                   : py(static_cast<float>(s.row + 1)) - 0.5f;
-            paint_relief_rim(dl, x0, x1, y, s.lit != 0);
-            ++prims;
-        }
-    }
+        prims += paint_ground_layer(dl, tl, scale, h.base_runs, h.relief_segs);
 
     // ── 2. THE FILL, as a translucent TINT over the ground. One owner per tile,
     //    RUN-MERGED along the row: a political map is long runs of one owner,
@@ -2741,16 +2831,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    reads best on top of the tint rather than dimmed under it. Tile centre
     //    to downstream centre, baked once. ──
     if (L.has(lapse_layer::rivers))
-    {
-        const float half = scale * 0.5f;
-        for (const lapse_river_seg& s : h.river_segs)
-        {
-            paint_river(dl, {px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
-                            {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
-                        scale);
-        }
-        prims += static_cast<int>(h.river_segs.size());
-    }
+        prims += paint_river_layer(dl, tl, scale, h.river_segs);
 
     // ── 3b. THE PROMOTED ROAD NETWORK (BL-917), over the rivers: a corridor
     //    not yet promoted at the playhead's year is not drawn at all — the

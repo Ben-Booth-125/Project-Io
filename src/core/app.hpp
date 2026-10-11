@@ -670,7 +670,7 @@ private:
     std::vector<planetology_state> m_wiz_preview; ///< Live chain result per prototype body at the resolved params.
     std::vector<planetology_state> m_wiz_undrawn; ///< The same run with drawdown forced to 0 — the Spend chart's "before" reference.
 
-    // The REAL homeworld surface for the preview globe: raster PACKED terrain
+    // The REAL homeworld surface the wizard's maps draw: raster PACKED terrain
     // axes (substrate << 4 | cover — ui::preview_pack, BL-519)
     // from generate_home_surface_preview (same pipeline, same gate, same
     // seed as "Begin" — bench + parity: tools/verify/home_surface_bench.cpp).
@@ -681,8 +681,8 @@ private:
     // pending (std::async's dtor would block); a params move mid-build sets the
     // stale flag and the poll relaunches on arrival.
     //
-    // Since BL-915 the build returns TWO rasters: the packed axes the globe
-    // samples, and the packed landform + river edges the lapse maps draw their
+    // Since BL-915 the build returns TWO rasters: the packed axes (the maps'
+    // land mask), and the packed landform + river edges the maps draw their
     // terrain base from (ui::wizard_surface).
     //
     // BL-1084: THE LIFE ROUND BUILDS THE REAL GATE WORLD. The worker is no
@@ -740,6 +740,11 @@ private:
     uint32_t             m_carve_seen = 0;
     std::vector<uint8_t> m_wiz_surface;       ///< Raster compositions; empty = not yet built.
     std::vector<uint16_t> m_wiz_terrain;      ///< Packed landform + river edges per tile (ui::pack_lapse_terrain, BL-915); same length as m_wiz_surface.
+    /// BL-1280 -- THE LIFE MAP's ground, baked off m_wiz_surface/m_wiz_terrain
+    /// (ui::bake_lapse_ground) the first frame it is drawn after they change;
+    /// reset wherever they are reassigned. The Life round draws it and the
+    /// Culture round holds it through its wait (STARTUP.md § The Life map).
+    ui::lapse_ground m_wiz_life_ground;
     bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.

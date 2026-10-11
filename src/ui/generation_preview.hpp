@@ -3,28 +3,21 @@
 #include "world/planetology.hpp"
 
 #include <cstddef>
+#include <cstdint>
 
 // ---------------------------------------------------------------------------
-// Generation preview pane — the wizard's "what we see" half
+// Generation preview pane — the System round's drawing of the system
 //
 // The New World wizard splits into a control column (stage folds, leans,
-// reroll) and this pane: a stylised painting of the world the current roll
-// produced, drawn straight from planetology_state. Nothing here is generated —
-// it is a pure reading of the same preview the charts plot, so the picture
-// and the plots cannot disagree.
+// reroll) and a pane. On round 1, System, the pane is this: a stylised drawing
+// of the system the current roll produced — star colour and size, orbits, body
+// sizes — read straight from planetology_state, so the picture and the charts
+// cannot disagree. Nothing here is generated.
 //
-// Per round the pane shows what the round settles:
-//   round 0 — the system: star colour/size, orbits, body sizes.
-//   round 1 — the homeworld surface: ocean, atmosphere, ice, life tint, and
-//             the industrial drawdown worked over it (BL-1091: the Drawdown
-//             lean sits on the Life round, so its globe shows the lean's work).
-//   round 2+ — the same worked surface; the wizard no longer walks a third
-//             planetology round, and the Culture round holds this globe through
-//             its wait before dissolving it into the migration map.
-//
-// Deliberately stylised, not a tile map: the wizard resolves preferences, and
-// a painting that moves when a lean moves is the feedback loop wanted here.
-// The real surface appears when "Begin" builds it.
+// Every later round draws the homeworld as the 2D MAP instead (STARTUP.md
+// § The Life map; the globe that used to stand here is retired, Ben,
+// 2026-10-10): the Life round's map is `ui::draw_lapse_ground`, the pass
+// rounds' is `ui::draw_lapse_map`, and they are one map by construction.
 // ---------------------------------------------------------------------------
 
 namespace ui {
@@ -41,26 +34,11 @@ struct preview_body
     const planetology_state* state           = nullptr;
 };
 
-/// The homeworld's REAL surface, when the app has one: raster-order PACKED
-/// terrain axes, home_grid_width × height.
-///
-/// PACKING (BL-519): one byte per tile, `substrate << 4 | cover`. Both enums fit
-/// in four bits (8 substrates, 10 covers), so the split cost the preview no
-/// memory and no new plumbing. `cover_density` is deliberately NOT carried — the
-/// globe is a ~100px sphere sampled by majority vote per cell, where a density
-/// gradation could not be seen; it draws at a mid density instead. See
-/// `preview_pack` / `preview_substrate` / `preview_cover` below.
-/// When `comp` is non-null the globe samples THIS — the actual map "Begin"
-/// will hand over — instead of the stylised continent blobs; the blobs remain
-/// only as the fallback while the first async build is still in flight.
-struct preview_surface_view
-{
-    int            gw   = 0;
-    int            gh   = 0;
-    const uint8_t* comp = nullptr; ///< Packed axes; see preview_pack.
-};
+// The wizard's packed homeworld raster: one byte per tile, `substrate << 4 |
+// cover` (BL-519). The maps read the substrate alone, for the land mask
+// (`history_lapse.cpp`); the format is kept so the raster stays one byte a tile.
 
-/// Pack a tile's two terrain axes into the preview's one byte.
+/// Pack a tile's two terrain axes into the raster's one byte.
 inline uint8_t preview_pack(terrain_substrate sub, terrain_cover cov)
 {
     return static_cast<uint8_t>((static_cast<int>(sub) << 4) | static_cast<int>(cov));
@@ -71,25 +49,9 @@ inline terrain_substrate preview_substrate(uint8_t packed)
     return static_cast<terrain_substrate>((packed >> 4) & 0x0F);
 }
 
-inline terrain_cover preview_cover(uint8_t packed)
-{
-    return static_cast<terrain_cover>(packed & 0x0F);
-}
-
-/// The density the globe draws a cover at. A constant on purpose — see the
-/// packing note above.
-inline constexpr uint8_t k_preview_cover_density = 150;
-
-/// Paint the round's preview into the current window's remaining content
-/// region. Pure draw-list painting; no widgets, no state.
-///
-/// @param rot Homeworld rotation in radians — the sampled longitude offset.
-///            The caller owns the clock (wall-time in play, 0 under --verify,
-///            so golden captures never race an animation).
-/// @param surface The real homeworld raster, if built. See preview_surface_view.
-void draw_generation_preview(const preview_body* bodies, std::size_t count,
-                             const planetology_params& params, int round,
-                             float rot = 0.0f,
-                             const preview_surface_view& surface = {});
+/// Paint the System round's drawing of the system into the current window's
+/// remaining content region. Pure draw-list painting; no widgets, no state.
+void draw_system_preview(const preview_body* bodies, std::size_t count,
+                         const planetology_params& params);
 
 } // namespace ui
