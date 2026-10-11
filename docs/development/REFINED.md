@@ -17,7 +17,7 @@ wave, Ben's go). A cold `code-reviewer` pass with a fix round budgeted. UI items
   on the three targets, civil war 16/16, revolution 0/16. (The src/ detectors and tags remain.)
 - [x] BL-1272 (generation without research) — merged bdaf1947; sea legs at the P90 free navy with a
   hull; gates green; movement recorded. Archive at close.
-- [x] BL-1280 (Life round 2D map) — merged e3f049d7 after a cold-review fix round. **Ben's live click owed.**
+- [x] BL-1280 (Life round 2D map) — merged e3f049d7 after a cold-review fix round. Ben's live click passed 2026-10-11.
 
 ### BL-1278 (nation count targets) + BL-1283 (one champion per major) — Delivery Full
 
