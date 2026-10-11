@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 26 open, 3 resolved.*
+*31 entries — 27 open, 4 resolved.*
 
 ---
 
@@ -235,19 +235,30 @@ Quick Start built on the main menu's seed and resources. Both now live on the se
 
 *Files: `docs/ui/STARTUP.md`*
 
-### NR-1039 — DECISION TAKEN: save_game_version 23 reads a v22 save (the nation targets as unset) instead of refusing it
-*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane A, 2026-10-11*
+### NR-1040 — DECISION TAKEN: inside the history, a city state is a one-region realm with people and a centre on its ground
+*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
 
-Every earlier envelope bump refused the old version outright. v23 appends the two nation targets at the very end of the envelope, so a v22 file is a v23 file minus 8 bytes; read_save_game now accepts v22 and reads both targets as 0 (natural count). v21 and older are still refused. Tested by save_envelope_roundtrip S9.
+The size floor now runs in the history, before campaign population centres exist. The old exemption tested a campaign centre in the realm's carve cell; inside the history the only reading is region::centres > 0 with population > 0 on its one anchored region. That reading spares a few more small realms: natural nation counts move 19..73 -> 20..76 (mean 46.1 -> 46.8); majors unchanged.
 
-**Why it matters.** It breaks the envelope's strict-equality convention for one version, so a v22 save keeps loading.
+**Why it matters.** It is the whole cause of the floor move's count movement on settled worlds with no targets set.
 
-- Keep: v22 loads with unset targets
-- Revert to strict refusal (two lines in read_save_game plus test S9)
+- Keep the history-grain reading
+- Build a centre-placement oracle into the closing rounds so the count is preserved exactly (placement logic before the close; heavy)
 
-> **Recommendation:** Keep: nothing in a v22 world depends on a target, and unset is exactly what it was built under.
+> **Recommendation:** Keep: the history-grain test is the doc's own wording, and the movement is about one nation a seed.
 
-*Files: `src/core/save_game.cpp`, `tools/verify/save_envelope_roundtrip.cpp`*
+*Files: `src/world/closing_rounds.cpp`, `docs/generation/NATION_GENERATION.md`*
+
+### NR-1041 — NOVEL WORK: the nation carve now crosses into the history sim as an oracle
+*novel-work · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
+
+To land the total inside the history, the carve was pulled out of generate_nations into a shared carve_from_seeds, and the history's closing rounds call a preview of it to predict the fold's count (with a drift guard in generation). No doc owns a carve that the history reads; NATION_GENERATION.md owns the ruling only.
+
+**Why it matters.** A new seam between the history sim and nation generation, which every later change to either must respect.
+
+> **Recommendation:** Accept, and have NATION_GENERATION.md § Pass 2c/2d describe the closing rounds and the shared carve (D1 follow-through).
+
+*Files: `src/world/closing_rounds.cpp`, `src/world/nation_generation.cpp`*
 
 ---
 
@@ -297,4 +308,20 @@ STARTUP.md left pan/zoom on the Life map open. The pass rounds' map takes no mou
 > **RESOLVED.** Ben, 2026-10-11: confirmed - no pan or zoom on the Life map, matching the pass rounds.
 
 *Files: `docs/ui/STARTUP.md`*
+
+### NR-1039 — DECISION TAKEN: save_game_version 23 reads a v22 save (the nation targets as unset) instead of refusing it
+*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane A, 2026-10-11*
+
+Every earlier envelope bump refused the old version outright. v23 appends the two nation targets at the very end of the envelope, so a v22 file is a v23 file minus 8 bytes; read_save_game now accepts v22 and reads both targets as 0 (natural count). v21 and older are still refused. Tested by save_envelope_roundtrip S9.
+
+**Why it matters.** It breaks the envelope's strict-equality convention for one version, so a v22 save keeps loading.
+
+- Keep: v22 loads with unset targets
+- Revert to strict refusal (two lines in read_save_game plus test S9)
+
+> **Recommendation:** Keep: nothing in a v22 world depends on a target, and unset is exactly what it was built under.
+
+> **RESOLVED.** Ben, 2026-10-11: keep - a v22 save loads with the targets unset.
+
+*Files: `src/core/save_game.cpp`, `tools/verify/save_envelope_roundtrip.cpp`*
 
