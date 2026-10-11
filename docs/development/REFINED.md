@@ -1,5 +1,53 @@
 # REFINED — active worklist
 
+## Sprint 53 — the player is a nation; the history written on purpose (opened 2026-10-11)
+
+**Goal.** Generation first (Ben): measure the patterns, land the tech tail's generation lane, then hit
+the nation-count targets and one champion per major. Designs ruled 2026-10-11 and written in their
+owning docs (NATION_GENERATION, CIVILISATION, EXPLORATION, INDUSTRIALISATION, NATIONS, STARTUP,
+MILITARY, TREES). Handoff: `NEXT_SESSION.md`.
+
+**Gates.** Every merge: the item's harnesses, `world_determinism`, `history_sim_harness` (R3a2/R3a3
+baseline), `exploration_sim_harness`; world-movers add `player_seed_sweep --guard 12`,
+`market_viability`, `history_patterns`, `realm_names_check`, and report movement (one re-bless per
+wave, Ben's go). A cold `code-reviewer` pass with a fix round budgeted. UI items: Ben's live click.
+
+### Done this sprint
+- [x] BL-1286 (history pattern detectors) — measure first: `tools/verify/history_patterns.cpp`; 0/16
+  on the three targets, civil war 16/16, revolution 0/16. (The src/ detectors and tags remain.)
+- [x] BL-1272 (generation without research) — merged bdaf1947; sea legs at the P90 free navy with a
+  hull; gates green; movement recorded. Archive at close.
+- [x] BL-1280 (Life round 2D map) — merged e3f049d7 after a cold-review fix round. **Ben's live click owed.**
+
+### BL-1278 (nation count targets) + BL-1283 (one champion per major) — Delivery Full
+
+Requirement (item-spanning): every library seed lands on both targets across a grid of target pairs
+(total 6/20/40 x majors 1/3/6, total >= majors), each correction recorded as a history event dated
+inside Industrialisation; unset targets (0) leave every world byte-identical to today.
+
+- [ ] **A1 (lane A)** Targets on the descriptor: `world_params::nation_total_target`,
+  `major_target` (0 = unset), validated (total <= 40, majors 1..6, total >= majors, else rejected);
+  carried by the save (`save_game_version` 22 -> 23; older saves read unset). Files:
+  hard_coded_world.hpp, core/save_game.{hpp,cpp}. Gate: world_determinism byte-equal, save round-trip.
+- [ ] **A2 (lane A)** `tools/verify/nation_targets_harness.cpp`: `--natural` prints each library
+  seed's total, majors, and planned/chartered specialists; the grid mode checks both counts after
+  `finish_campaign_world` and that each correction has a dated event. Expected to FAIL until B/C land.
+- [ ] **B1 (lane B, after A1)** The size floor as closing-round absorptions in Industrialisation
+  (history_sim, era_minus_one / hard_coded_world `run_industrialisation`), events recorded; Pass 2c
+  stays for worlds with no history.
+- [ ] **B2 (lane B)** Total reconciliation in the same closing rounds: conquest/absorption (too many),
+  freed subject / secession (too few), each an event with a cause; bounded iterations, fixed tie order.
+- [ ] **B3 (lane B)** The total's lean: conquest appetite and secession pressure keyed on the target.
+- [ ] **C1 (lane C, after A1)** BL-1283: one specialist per major, in its richest affording centre;
+  none in a minor (corporation_generation `plan_charters_by_nation` + the charter walk, landscape search).
+- [ ] **C2 (lane C)** Majors reconciled after the search's winner is applied (finish_campaign_world):
+  champion chartered in the richest championless minor by industry points (a **state charter** when
+  its treasury makes up the price gap); buy-out by the richest champion of the poorest major's
+  specialist at charter price; events dated back into Industrialisation's close.
+- [ ] **D1** Docs follow-through (CORPORATION_GENERATION Pass 1, STARTUP setup round fields), the
+  re-bless with Ben's go.
+
+
 ## Sprint 52 — the Digitisation tech tree (opened 2026-10-10, CLOSED 2026-10-10)
 
 **Closed (Ben: "cut this sprint as a success on building the tech tree").** Wave 0 and lane C
