@@ -65,7 +65,8 @@ is never imposed by deleting, splitting or relabelling a nation. Two stages, in 
 2. **Reconciliation, by the history's own verbs.** Whatever gap the lean leaves is closed by events
    the sim already knows, each recorded in the history with a cause a player can read:
    - **too many nations** — conquest and absorption, the Empires and Exploration verbs;
-   - **too few nations** — a subject freed or a province seceding, the Exploration verbs;
+   - **too few nations** — a province seceding (a subject is already its own nation at the fold, so
+     freeing one adds none);
    - **too few majors** — a **national champion** chartered in the richest minor that lacks one;
    - **too many majors** — a **cross-border buy-out**: one major's champion buys a surplus major's
      specialist whole, and the seller becomes a minor.
@@ -90,8 +91,8 @@ each is reconciled where it can be read:
   that specialist's charter price; the seller becomes a minor. "Richest" and "poorest" read the same
   industry-point measure.
 - **The minimum-territory floor runs first.** No nation survives below it; reconciliation then
-  closes whatever gap the floor leaves, adding nations back by secession or a freed subject where the
-  floor took the count under the total.
+  closes whatever gap the floor leaves, adding nations back by secession where the floor took the count
+  under the total.
 - **A state charter where a minor cannot afford its champion (Ben, 2026-10-11).** If the richest
   championless minor's richest centre cannot meet a specialist's charter price, its treasury makes
   up the gap, and the event is recorded as a **state charter**.
