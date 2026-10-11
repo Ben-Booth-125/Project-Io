@@ -479,6 +479,13 @@ landscape search. Whether a lane *decays* once its traffic stops is this doc's o
 
 ## Force persists now, and persistence has a bill
 
+**A realm sizes its army to what it earns (Ben, 2026-10-11; overturns NR-878 for the standing army).**
+The army bill never empties the chest: a realm keeps only the standing army its earn can carry,
+so an army is a cost the realm budgets rather than a drain that bankrupts it. The navy and the
+other stocks keep the ruling below. The census that prompted it: with almost no ongoing income,
+the army bill turned 314 realms that held real chests at 1200 into near-zero nations by 1960
+(`../generation/NATION_GENERATION.md` § Pass 7).
+
 **SETTLED (Ben, 2026-09-16, NR-878): the actor has NO PURSE TERM, and poverty is the brake.** With the saturation caps replaced by a real per-head bill, a polity ranked above about 500 on either lean buys a stock step whenever one is affordable and the bill then drains what it bought with: over the span the per-seed MEDIAN polity treasury falls from 1.26M to **211**, the top decile loses about 3%, and roughly **14% of polity-rounds cannot pay the army bill**. Ben ruled that shape ACCEPTED: **a realm that over-builds is poor, and being poor is the consequence.** No solvency rule was added to a step's eligibility, and no cap came back.
 
 The reading is structural rather than a tuning miss, and the figures say so: at a tenth of the rate the median still ends at 181k, because a cap-sized army over 115 rounds costs about one median hoard. **The caps were hiding a 600x treasury spread** — so what looks like a new failure is an old one becoming visible, which is the whole point of putting the cost in the world. The visible consequence to watch is displacement: its median fell to 0.85 on this arm while the pooled figure held at 1.64. If a later reading shows the spent purse suppressing displacement rather than differentiating realms, that is the evidence that reopens this call.

@@ -511,9 +511,16 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   revisited once the campaign shows what a state spends.
 - **Lift the floor, keep the order.** Poor nations gain the most; the realms that inherited empires'
   chests stay the richest. The spread narrows from the bottom, never by cutting the top.
-- **The levers:** the history **earns more** — trade, endowment and corridor income — and **keeps
-  more**, converting less of a chest into industry points in Industrialisation. Not a larger
-  conversion rate, not a reserve granted at the handoff.
+- **The lever is earning (Ben, 2026-10-11, on the treasury census).** A realm **taxes its seats'
+  stores every round** — a standing levy on what its own ground produces, swept into the chest as
+  the 1200 consolidation once swept it, but every round rather than once — and **endowment income
+  is rescaled** so a small realm earns too. Not a larger conversion rate, not a reserve granted at
+  the handoff. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
+  the library, so it is not where the money goes.)
+- **Measured before the ruling** (`tools/verify/treasury_census.cpp`, 16 library seeds): 99.6% of
+  every chest is the one-time 1200 fold of the seats' stores; the ongoing earn after it is about
+  2,200 credits pooled over 760 years against 307,000 folded; the standing-army bill then drains the
+  chests, so the median nation opens on **0.02 credits** and 49 of 77 majors on under one.
 
 The rate's own rationale below was argued against the old median (0.41 credits) and the corporate
 economy as it stood; it is re-read once the measured chests land, rather than kept by inertia.
@@ -553,7 +560,8 @@ the skew below is the history's, not the rate's.** Measured on the reference see
   quarterly income at the open — ~7.5 credits a nation in quarter one when the rate was chosen. The
   rate was first argued on the median POLITY chest (~10 million material, ~100 credits: thirteen
   quarters of levy). But a nation opens on its OWN folded chest, and most realms fold small ones:
-  on the reference seed the **median nation opens on 0.41 credits**, 22 of the 38 on under one,
+  on the reference seed the **median nation opened on 0.41 credits** when the rate was chosen (3.64,
+summing 13,683, on the 2026-10-11 census), 22 of the 38 on under one,
   and 14 on 100 or more — thirteen quarters of levy and upward. So the reserve is held by the
   realms that inherited empires' chests, and most realms open on their levy alone. Ten times the
   rate (0.1 ‰) would lift that median to ~4 credits and multiply every hoard with it.
