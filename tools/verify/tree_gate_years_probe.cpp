@@ -5,8 +5,8 @@
 // docs/generation/trees/TREES.md: the pre-game history runs no technology
 // tree; three things the trees gated open on a calendar year instead, for
 // every polity alike, save the two conditions below (Ben, 2026-10-10):
-//   (a) sea legs        `sea_legs_year` AND naval capacity AND a fleet at the
-//                       year's median navy (subjection across water, Ben 2026-10-11)
+//   (a) sea legs        `sea_legs_year` AND naval capacity AND a fleet in the
+//                       year's top tenth of free naval-capable navies (Ben 2026-10-11)
 //   (b) post roads      `history_sim_params::post_roads_year` (the treasury-bought third rung)
 //   (c) coastal sea techs `coastal_naval_ramp`, coastal polities only (naval deeds)
 // Each date is MEASURED, not picked. This probe prints the dates in force
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
                 static_cast<long long>(d.sea_legs_year), static_cast<long long>(d.post_roads_year),
                 static_cast<long long>(d.coastal_naval_ramp[0]), static_cast<long long>(d.coastal_naval_ramp[1]),
                 static_cast<long long>(d.coastal_naval_ramp[2]));
-    std::printf("sea legs fleet floor: the year's median navy of the naval-capable polities (Ben, 2026-10-11)\n");
+    std::printf("sea legs fleet floor: P%d of the year's free naval-capable navies (Ben, 2026-10-11)\n", sea_legs_fleet_percentile);
     std::printf("  seed | alive 1200 | sea techs held @1200 | fleets opened (hulls) | subjections expl / ind |"
                 " post roads expl / ind | subjects alive 1960 | treaties across water expl / ind\n");
     int64_t t_se = 0, t_si = 0, t_live = 0, t_twe = 0, t_twi = 0;
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
                     static_cast<long long>(fx.industrialisation_state.treaties_formed_across_water));
         std::fflush(stdout);
     }
-    std::printf("POOLED floor median: subjections expl %lld ind %lld | subjects alive 1960 %lld | treaties across water"
+    std::printf("POOLED floor top tenth: subjections expl %lld ind %lld | subjects alive 1960 %lld | treaties across water"
                 " expl %lld ind %lld\n", static_cast<long long>(t_se),
                 static_cast<long long>(t_si), static_cast<long long>(t_live), static_cast<long long>(t_twe),
                 static_cast<long long>(t_twi));

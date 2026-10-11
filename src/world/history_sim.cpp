@@ -400,8 +400,8 @@ bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
     return false;
 }
 
-int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vector<polity>& polities,
-                             const history_sim_params& p, int64_t year)
+int64_t sea_legs_navy_floor(const std::vector<region>& regions, const std::vector<polity>& polities,
+                            const history_sim_params& p, int64_t year)
 {
     if (!sea_legs_open(p, year)) return 0;
     // One pass over the regions, in index order: a polity is capable once any
@@ -424,14 +424,16 @@ int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vect
         if (capable[i]) navies.push_back(polities[i].navy_stock);
     if (navies.empty()) return 0;
     std::sort(navies.begin(), navies.end());
-    return navies[(navies.size() - 1) / 2]; // the lower middle
+    // THE INDEX RULE: floor((n - 1) x P / 100), integer arithmetic.
+    const std::size_t at = ((navies.size() - 1) * static_cast<std::size_t>(sea_legs_fleet_percentile)) / 100;
+    return navies[at];
 }
 
 bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
-                           const history_sim_params& p, int64_t year, int64_t median_navy)
+                           const history_sim_params& p, int64_t year, int64_t navy_floor)
 {
     if (!polity_naval_capable(regions, q, p, year)) return false;
-    return q.navy_stock >= median_navy; // a fleet afloat at the year's median (Ben, 2026-10-11)
+    return q.navy_stock >= navy_floor; // a fleet in the year's top tenth (Ben, 2026-10-11)
 }
 
 
@@ -5873,16 +5875,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 const std::size_t pc = out.polities.size();
                 // The fleet-afloat floor, read ONCE per round before the walk:
-                // the median navy of the year's naval-capable polities
+                // the 90th percentile of the year's free naval-capable navies
                 // (TREES.md, Ben 2026-10-11). Navies do not move inside the walk.
-                const int64_t sea_legs_median = sea_legs_navy_median(ss.regions, out.polities, params, y);
+                const int64_t sea_legs_floor = sea_legs_navy_floor(ss.regions, out.polities, params, y);
                 for (std::size_t ai = 0; ai < pc; ++ai)
                 {
                     polity& arriving = out.polities[ai];
                     if (!arriving.alive || arriving.overlord >= 0) continue;
-                    // A DATE, NAVAL CAPACITY AND A FLEET AT THE YEAR'S MEDIAN,
-                    // never a rank (TREES.md, Ben 2026-10-10 / 2026-10-11).
-                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y, sea_legs_median)) continue;
+                    // A DATE, NAVAL CAPACITY AND A FLEET IN THE YEAR'S TOP
+                    // TENTH, never a rank (TREES.md, Ben 2026-10-10 / 2026-10-11).
+                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y, sea_legs_floor)) continue;
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
                     ++out.subjection_arrivals_walked; // BL-1171 diagnostic

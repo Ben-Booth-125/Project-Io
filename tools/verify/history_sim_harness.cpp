@@ -2826,39 +2826,40 @@ int main()
                   "G1g  sea legs need the year and a held region that can field a navy (can_field_naval)");
         }
 
-        // G1h — sea legs need a FLEET AFLOAT at the year's median navy of the
-        // naval-capable polities (Ben, 2026-10-10 / 2026-10-11; TREES.md). Four
-        // naval-capable polities with navies 10 / 40 / 70 / 100 (an even count:
-        // the LOWER middle, 40) plus an inland polity with 1000 hulls, which is
-        // not naval-capable and so does not move the median, plus two naval-
-        // capable SUBJECTS with 1 hull each, which do not set it either (only
-        // free polities do, Ben 2026-10-11; counted, they would drag the lower
-        // middle to 10). The polity at 10 is below it and holds no sea legs;
-        // 40 (at it) and 100 (above) do. Before the year the median is 0 and
-        // nobody holds sea legs.
+        // G1h — sea legs need a FLEET AFLOAT in the top tenth of the year's
+        // free naval-capable navies (Ben, 2026-10-10 / 2026-10-11; TREES.md).
+        // Ten free naval-capable polities with navies 10..100 (stored out of
+        // order): n = 10, index floor(9 x 90 / 100) = 8, floor 90. Plus an
+        // inland polity with 1000 hulls (not naval-capable, does not count)
+        // and two naval-capable SUBJECTS with 1000 hulls each (only free
+        // polities count, Ben 2026-10-11; counted, n = 12 would put the floor
+        // at index 9, 100). The polity at 80 is below the floor and holds no
+        // sea legs; 90 (at it) and 100 (above) do; the inland one does not.
+        // Before the year the floor is 0 and nobody holds sea legs.
         {
-            std::vector<polity> ps(7);
-            std::vector<region> rg(7);
-            const int64_t navy[7] = {10, 70, 40, 100, 1000, 1, 1};
-            for (int i = 0; i < 7; ++i)
+            const int np = 13;
+            std::vector<polity> ps(np);
+            std::vector<region> rg(np);
+            const int64_t navy[np] = {50, 100, 10, 80, 30, 90, 20, 60, 40, 70, 1000, 1000, 1000};
+            for (int i = 0; i < np; ++i)
             {
                 ps[i].id = i; ps[i].alive = true; ps[i].navy_stock = navy[i];
                 for (int d = 0; d < sim_domain_count; ++d) ps[i].capacity[d] = 6;
-                rg[i].nation = i; rg[i].port_q = i == 4 ? 0 : 1000;
+                rg[i].nation = i; rg[i].port_q = i == 10 ? 0 : 1000;
             }
-            ps[5].overlord = 3; ps[6].overlord = 3;
+            ps[11].overlord = 1; ps[12].overlord = 1;
             const int64_t yl = n.sea_legs_year;
-            const int64_t med  = sea_legs_navy_median(rg, ps, n, yl);
-            const int64_t med0 = sea_legs_navy_median(rg, ps, n, yl - 1);
-            const bool below = !polity_holds_sea_legs(rg, ps[0], n, yl, med);
-            const bool at    = polity_holds_sea_legs(rg, ps[2], n, yl, med);
-            const bool above = polity_holds_sea_legs(rg, ps[3], n, yl, med);
-            const bool shore = !polity_holds_sea_legs(rg, ps[4], n, yl, med);
-            std::printf("      fleet afloat: median %lld (before the year %lld); below %s, at %s, above %s, inland 1000 %s\n",
-                        static_cast<long long>(med), static_cast<long long>(med0),
+            const int64_t fl  = sea_legs_navy_floor(rg, ps, n, yl);
+            const int64_t fl0 = sea_legs_navy_floor(rg, ps, n, yl - 1);
+            const bool below = !polity_holds_sea_legs(rg, ps[3], n, yl, fl);
+            const bool at    = polity_holds_sea_legs(rg, ps[5], n, yl, fl);
+            const bool above = polity_holds_sea_legs(rg, ps[1], n, yl, fl);
+            const bool shore = !polity_holds_sea_legs(rg, ps[10], n, yl, fl);
+            std::printf("      fleet afloat: P%d floor %lld (before the year %lld); 80 %s, 90 %s, 100 %s, inland 1000 %s\n",
+                        sea_legs_fleet_percentile, static_cast<long long>(fl), static_cast<long long>(fl0),
                         below ? "no" : "YES", at ? "yes" : "NO", above ? "yes" : "NO", shore ? "no" : "YES");
-            check(med == 40 && med0 == 0 && below && at && above && shore,
-                  "G1h  sea legs need a fleet at or above the year's median navy of the free naval-capable polities");
+            check(sea_legs_fleet_percentile == 90 && fl == 90 && fl0 == 0 && below && at && above && shore,
+                  "G1h  sea legs need a fleet in the top tenth (90th percentile) of the year's free naval-capable navies");
         }
     }
 

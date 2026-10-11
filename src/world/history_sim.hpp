@@ -3219,37 +3219,45 @@ inline bool sea_legs_open(const history_sim_params& p, int64_t year) { return ye
 /// naval rows)?
 bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
                           const history_sim_params& p, int64_t year);
-/// THE FLEET-AFLOAT FLOOR IS RELATIVE (Ben, 2026-10-11; TREES.md). The median
-/// `navy_stock` over @p year's naval-capable polities: every living polity
-/// (`alive`, `id` equal to its index) that is FREE (`overlord < 0`; Ben,
-/// 2026-10-11: only free polities set the bar a free arriving power must
-/// clear) and passes `polity_naval_capable`. The values are sorted
-/// ascending and the LOWER middle is taken (index (n-1)/2), so an even count
-/// has one defined answer and the result is independent of polity order. 0
-/// when no polity is naval-capable (nobody then holds sea legs to compare).
-/// The subjection block computes it ONCE per round, before its walk.
+/// THE FLEET-AFLOAT FLOOR IS RELATIVE (Ben, 2026-10-11; TREES.md): the
+/// percentile of the year's free naval-capable navies a polity's own fleet
+/// must reach to hold sea legs. 90 = the top tenth (Ben, 2026-10-11).
+constexpr int sea_legs_fleet_percentile = 90;
+/// The fleet-afloat floor for @p year. The list is the `navy_stock` of every
+/// living polity (`alive`, `id` equal to its index) that is FREE
+/// (`overlord < 0`; Ben, 2026-10-11: only free polities set the bar a free
+/// arriving power must clear) and passes `polity_naval_capable`, gathered in
+/// region-index order and sorted ascending. THE INDEX RULE: with n entries
+/// the floor is the entry at index floor((n - 1) x P / 100), P =
+/// `sea_legs_fleet_percentile`, integer arithmetic only -- so every count has
+/// one defined answer, the result is independent of polity order, and P = 50
+/// is the lower middle. 0 before the date or when no polity is
+/// naval-capable. The subjection block computes it ONCE per round, before
+/// its walk.
 ///
-/// WHY RELATIVE. Ben ruled that arriving across water to subject a native
-/// needs a fleet afloat. A fixed hull floor was measured first (16 library
-/// seeds): Industrialisation subjections fell 440 -> 132 -> 94 -> 63 -> 21 at
-/// 0 / 100 / 400 / 1600 / 25600 hulls, but Exploration's fell with them,
-/// 146 -> 92 -> 72 -> 42 -> 18, so no fixed number restored the one without
-/// gutting the other. Under the trees about half the polities held the
-/// node; the median of the naval-capable is that "about half" read off the
-/// fleets afloat. MEASURED (same seeds): the median of the free gives
-/// Exploration 123 / Industrialisation 339 subjections and 149 subjects alive
-/// at 1960 (subjects counted: 120 / 344 / 144; no floor: 146 / 440 / 178;
-/// under the trees 169 / 21 / 31). It bites little, because the median navy
-/// among the naval-capable is often small or zero.
-int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vector<polity>& polities,
-                             const history_sim_params& p, int64_t year);
+/// WHY RELATIVE, AND WHY THE TOP TENTH. Ben ruled that arriving across water
+/// to subject a native needs a fleet afloat. A fixed hull floor was measured
+/// first (16 library seeds): Industrialisation subjections fell 440 -> 132 ->
+/// 94 -> 63 -> 21 at 0 / 100 / 400 / 1600 / 25600 hulls, but Exploration's
+/// fell with them, 146 -> 92 -> 72 -> 42 -> 18, so no fixed number restored
+/// the one without gutting the other. The median of the free naval-capable
+/// let 39% of free polity-rounds hold sea legs in Industrialisation, where
+/// under the trees 9.9% held the node. MEASURED (same seeds, the subjection
+/// census): at the 90th percentile 9.0% hold sea legs in Industrialisation,
+/// and subjections formed are Exploration 56 / Industrialisation 96 with 71
+/// subjects alive at 1960 (under the trees 169 / 21 / 31; at the median
+/// 123 / 339 / 149). The remaining Industrialisation gap is the
+/// sphere-of-claim test, which passes 0.44% of free, funded pairs against
+/// the trees' 0.076% -- filed separately, not a matter for this floor.
+int64_t sea_legs_navy_floor(const std::vector<region>& regions, const std::vector<polity>& polities,
+                            const history_sim_params& p, int64_t year);
 /// Sea legs: may @p q arrive across water to subject a coast in @p year?
 /// True iff @p q is naval-capable (`polity_naval_capable`) AND its own
-/// `navy_stock` is at or above @p median_navy -- the year's
-/// `sea_legs_navy_median` (a fleet afloat, Ben 2026-10-10; relative,
-/// Ben 2026-10-11).
+/// `navy_stock` is at or above @p navy_floor -- the year's
+/// `sea_legs_navy_floor` (a fleet afloat, Ben 2026-10-10; in the top tenth
+/// of the free naval-capable, Ben 2026-10-11).
 bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
-                           const history_sim_params& p, int64_t year, int64_t median_navy);
+                           const history_sim_params& p, int64_t year, int64_t navy_floor);
 /// The naval ramp (Ben, 2026-10-10: coastal polities only): every living
 /// polity holding a coastal region (`region::port_q > 0`, the old `coastal`
 /// gate's reading) holds `coastal_sea_techs_at(year)` sea techs as naval
