@@ -368,6 +368,13 @@ player's nation is scored like any rival. A subsidy landing on the player's cham
 *to* the player, not an action *on* it (NR-569d). The champion is never a claimant, because
 `corp_ai` never scores it.
 
+**The player's verbs are everything the scorer sets (Ben, 2026-10-11).** The player's nation gets
+the four faculties a rival major exercises: **budget weights** over the priority lines, **import
+tariffs**, **law** (§ 4. Law authorship), and **muster** (`../military/MILITARY.md` § The muster
+interface). No faculty a rival nation has is withheld from the human, and none is added: stance and
+embargo stay derived and declared as `RELATIONS.md` owns them. Each verb arrives over the AI-facing
+seam as untrusted input (the standing rules' seam rule), and each has an entry in `ACTIONS.json`.
+
 ### The spend rules
 
 Three rules keep the budget honest, each a requirement row in `nation_budget_harness`:

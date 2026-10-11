@@ -770,9 +770,18 @@ Every world has one realm that, early in Empires, grows to the largest share of 
 successive victories and then breaks down within a set window. This overturns the rule below for that
 one realm and that one fact — the window. The fall still happens only by the mechanism of this section:
 supply fails, regions secede, and the reasons stay readable off the map. Everything else collapses as
-before. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
+before.
+
+**How large the rise goes (Ben, 2026-10-11, confirming NR-1034 with a floor).** At its peak the realm
+holds at least a **floor of 25 to 35 percent of the world's held regions** — the exact floor is set
+inside that band by measurement — and stays **under the 50 percent non-hegemony cap**, which is not
+overturned: a hegemon still fails the handoff. Region share, not population share, is the measure.
+The unforced worlds fall well short of the floor: their largest realm peaks at 8 to 23 percent. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
 only walking away; the deaths are soldiers', plus the famine and displacement mechanism
-`MILITARY_HISTORY.md` owns.
+`MILITARY_HISTORY.md` owns. **What counts as one (Ben, 2026-10-11):** a successor that breaks away
+holding at least a quarter of what its parent kept, and then takes a seat from or ends its parent (or
+is taken back) within fifty years. Secession already produces this on every unforced world, so the
+lean is met by the existing mechanism; what it lacks is only the civilian deaths.
 
 **MECHANICAL, NEVER SCHEDULED.** No collapse fires on a date or a counter. A realm fragments
 because a specific region's supply fell under a floor, for reasons a player could read off the map

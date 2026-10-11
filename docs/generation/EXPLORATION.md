@@ -262,6 +262,19 @@ colonised in this phase. Its lag is a development lag read from its remoteness, 
 Culture round, never a flag that says "colonise me"; and it is bound by the ordinary subjection verbs
 below. Other cultures may be colonised too; this one always is.
 
+**Chosen at the Culture close, and kept alive by the same isolation (Ben, 2026-10-11, confirming
+NR-1034).** The late culture is the culture most remote by reach when the Culture round closes, one
+per world. The isolation that slows its development also slows its conquest through Empires, so it
+reaches this phase holding a realm of its own to be colonised. Unforced, the most isolated culture
+has no realm left by 1200 on half the library — which is why the lag must carry both effects.
+
+**The lag is diffusion by contact (Ben, 2026-10-11).** Development spreads between peoples in
+proportion to the reach between them: what a neighbour knows reaches a polity along the corridors
+that join them, and the cheaper the reach the faster it arrives. Every culture feels this force;
+the most remote culture simply receives the least, so it falls behind for a reason a player can read
+off the map — distance, water, a road never built. It is a systemic force, not a handicap on one
+culture; the late culture is lagging because it is isolated, never isolated because it is chosen.
+
 
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
 heartland first sails: its push — land crowding (people per unit of farmland) times navy, in this age — sends voyages, plants settler colonies

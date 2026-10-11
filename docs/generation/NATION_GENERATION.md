@@ -68,14 +68,26 @@ is never imposed by deleting, splitting or relabelling a nation. Two stages, in 
    - **too many majors** — a **cross-border buy-out**: one major's champion buys a surplus major's
      specialist whole, and the seller becomes a minor.
 
-The mechanics of each step — which span runs the reconciliation, how the richest minor is read,
-how a buy-out is priced — are open design. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
+**Reconciliation runs at the end of Industrialisation, before the polity fold (Ben, 2026-10-11).**
+One late pass, nearest the count that matters: the verbs above fire in the span's closing rounds,
+dated inside it, so the nations that reach the fold are already on both targets.
+
+**The three readings (Ben, 2026-10-11):**
+- **The richest minor** is the one with the most industry points standing on its ground
+  (`region::industry_points`, summed) — what a charter is built from.
+- **A buy-out** is made by the richest champion, which buys the poorest major's specialist whole at
+  that specialist's charter price; the seller becomes a minor. "Richest" and "poorest" read the same
+  industry-point measure.
+- **The minimum-territory floor runs first.** No nation survives below it; reconciliation then
+  closes whatever gap the floor leaves, adding nations back by secession or a freed subject where the
+  floor took the count under the total. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
 holds for everything else. These two counts are its one sanctioned exception: the player sets them,
 and the world's shape inside them stays the world's.
 
-The library spread shows why both stages are needed. Living polities run from about 40 to 115 across
-`seed_library.json`, so the 40 cap sits at the floor of every curated world, and reconciliation
-removes nations on almost every seed.
+The library spread shows why both stages are needed. Unforced, the curated worlds of
+`seed_library.json` end with 20 to 69 nations folded from 37 to 95 living polities, and 3 to 11
+nations holding a planned specialist (measured 2026-10-11). Reconciliation therefore removes nations on
+about half the library and adds them on the rest, and trims majors where more than six would form.
 
 **Same pipeline, all bodies.** Nation generation runs only on bodies with sufficient habitable
 area — the homeworld. The pipeline is body-agnostic; it reads tile

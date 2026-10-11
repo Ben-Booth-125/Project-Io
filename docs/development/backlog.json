@@ -630,7 +630,7 @@
    "design": "RULED (Ben, 2026-10-10, the doc-check form): widen the code to match the doc. PRODUCTION.md (~545-549): 'for a building that makes or uses power, the solver reads power's supply and demand pooled over the building's grid'. The code applies the pooled read to OUTPUTS only, and only for processing facilities (economy_system.cpp ~976-992, ~1013-1015); a power input is priced at the plant's own market's posted price (~1082). WORK: price power as an input on the grid too, by the same pooled read; measure the 16-seed gate before/after; a cold review (the dial and the player's auto-solver both call solve_workforce_target)."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 53,
    "written": "2026-10-10",
@@ -651,7 +651,7 @@
     "src/world/nation_generation.hpp"
    ],
    "title": "Hit the total and major nation targets every time, by a lean and then in-world reconciliation",
-   "design": "DIRECTION RULED (Ben, 2026-10-10, option C; always hit): NATION_GENERATION.md § The nation count is a target. Total <= 40, major 1..6, total >= major. Stage 1, the lean: the total sets placement seed density; the major target leans charter-capital concentration. Stage 2, reconciliation by history verbs: conquest/absorption (too many nations), a subject freed or a province seceding (too few), a national champion chartered in the richest championless minor (too few majors), a cross-border buy-out (too many majors). OPEN before build: which span runs reconciliation; how the richest minor is read; buy-out pricing; how the merge pass's min-territory stop composes with a target. MEASURE FIRST: the natural total and major counts across the 16 library seeds (living polities run ~40-115, so the 40 cap reconciles on nearly every seed). Gate: every library seed lands on both targets across a grid of target pairs, each correction recorded as a history event."
+   "design": "DIRECTION RULED (Ben, 2026-10-10, option C; always hit): NATION_GENERATION.md § The nation count is a target. Total <= 40, major 1..6, total >= major. Stage 1, the lean: the total sets placement seed density; the major target leans charter-capital concentration. Stage 2, reconciliation by history verbs: conquest/absorption (too many nations), a subject freed or a province seceding (too few), a national champion chartered in the richest championless minor (too few majors), a cross-border buy-out (too many majors). OPEN before build: which span runs reconciliation; how the richest minor is read; buy-out pricing; how the merge pass's min-territory stop composes with a target. MEASURE FIRST: the natural total and major counts across the 16 library seeds (living polities run ~40-115, so the 40 cap reconciles on nearly every seed). Gate: every library seed lands on both targets across a grid of target pairs, each correction recorded as a history event. RULED (Ben, 2026-10-11): reconciliation runs in the closing rounds of Industrialisation, before the polity fold (NATION_GENERATION.md). Still open: richest-minor reading, buy-out pricing, the min-territory stop. RULED (Ben, 2026-10-11): richest minor = most industry points on its ground; buy-out = the richest champion buys the poorest major's specialist whole at its charter price; the min-territory floor runs first and reconciliation closes the remaining gap (NATION_GENERATION.md § The nation count is a target). No open calls remain."
   },
   {
    "status": "proposed",
@@ -673,7 +673,7 @@
     "src/core/app.hpp"
    ],
    "title": "A setup round before Life, carrying the total and major nation targets",
-   "design": "RULED (Ben, 2026-10-10): STARTUP.md § Rounds, A SETUP ROUND PRECEDES LIFE. It takes the two nation targets before the Life round builds the world. OPEN: what else it holds (Ben: 'along with the existing choices at each phase' - whether per-round leans move here or stay on their rounds), and where it sits against System. The next design step of sprint 53."
+   "design": "RULED (Ben, 2026-10-10): STARTUP.md § Rounds, A SETUP ROUND PRECEDES LIFE. It takes the two nation targets before the Life round builds the world. OPEN: what else it holds (Ben: 'along with the existing choices at each phase' - whether per-round leans move here or stay on their rounds), and where it sits against System. The next design step of sprint 53. RULED (Ben, 2026-10-11): the setup round sits between System and Life and holds the two targets plus the seed (entry, Roll, Copy) and the abundance radio, which leave the main menu; per-round leans stay on their rounds (STARTUP.md § Rounds). The ACTIONS.json chrome.menu_*_seed entries move with the controls. OPEN: what Quick Start builds on (NR-1036)."
   },
   {
    "status": "designed",
@@ -790,7 +790,7 @@
     "docs/ai/ACTIONS.json"
    ],
    "title": "The player governs its nation: budget, tariff and law verbs, the nation step skips it, and the nation musters",
-   "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys their equipment as a real buyer on the order book, NR-1028); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry."
+   "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys their equipment as a real buyer on the order book, NR-1028); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry. RULED (Ben, 2026-10-11): the verb set is everything the scorer sets - budget weights, import tariffs, law, muster - no more, no less (NATIONS.md § What a nation does each tick). The nation commissions a military base and pays a corporation to build it, owning the result (MILITARY.md § The muster interface). OPEN: which corporation takes a commission and its price; the elimination check."
   },
   {
    "status": "designed",
@@ -812,7 +812,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "Detectors for the five history patterns, measured across the 16 library seeds before any target is built",
-   "design": "DESIGNED (Ben, 2026-10-10): GENERATION_STRATEGY.md § History patterns. One predicate per pattern over the history record (lapse_event + span records), naming the polities it touched; emits pattern tags carried polity -> nation (NATION_GENERATION's fold). FIRST: measure how often each pattern already happens across the 16 library seeds, unforced - it sets each lean's size and whether reconciliation has much to do. The detectors are also the gates of BL-1287, BL-1288, BL-1289."
+   "design": "DESIGNED (Ben, 2026-10-10): GENERATION_STRATEGY.md § History patterns. One predicate per pattern over the history record (lapse_event + span records), naming the polities it touched; emits pattern tags carried polity -> nation (NATION_GENERATION's fold). FIRST: measure how often each pattern already happens across the 16 library seeds, unforced - it sets each lean's size and whether reconciliation has much to do. The detectors are also the gates of BL-1287, BL-1288, BL-1289. MEASURED (2026-10-11, tools/verify/history_patterns.cpp over the 16 library seeds, provisional thresholds, main 54d462a0): rise and fall 0/16 (largest realm peaks at 7.6-22.6% of held regions, none near the 50% hegemony cap; 9/16 peak in the second half of Empires; none halves with a successor breaking from it); late culture 0/16 (the most isolated founding culture has no living realm at the Empires close on 8/16 seeds and is never bound in Exploration; Exploration binds 0-5 of 28-75 cultures); world war 0/16 (at most 3 of the six most populous realms touched by conflict in any 30-year window; total population never falls in the span); civil war 16/16 under the loose reading (a successor with a quarter of its parent fights it within 50 years: 4-175 per seed - the existing secession already makes it, minus the civilian famine/displacement mechanism); revolution 0/16 (the Industrialisation span records no split at all). BL-1278 reading: nations 20-69 (9/16 over 40), living polities 37-95, nations with a planned specialist 3-11 (3/16 over 6). The src/ detectors and tags remain this item's build. RULED (Ben, 2026-10-11): the detectors take the readings written into CIVILISATION.md (rise size floor, civil war reading) and EXPLORATION.md (late culture at the Culture close)."
   },
   {
    "status": "proposed",
@@ -835,7 +835,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "The rise and fall: one realm grows largest through successive victories early in Empires and breaks down within a window, every world",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS TARGETED). Overturns 'never scheduled' for one realm's window only; the fall is still breakdown + secession. OPEN: the window's span and how 'early' is read; lean then reconciliation verbs; the non-hegemony cap (NR-1034)."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS TARGETED). Overturns 'never scheduled' for one realm's window only; the fall is still breakdown + secession. OPEN: the window's span and how 'early' is read; lean then reconciliation verbs; the non-hegemony cap (NR-1034). RULED (Ben, 2026-10-11): peak at a floor of 25-35% of held regions (set in band by measurement), under the 50% cap; region share is the measure (CIVILISATION.md). Unforced peak 8-23%."
   },
   {
    "status": "proposed",
@@ -858,7 +858,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "The late culture: one distant culture develops slower from its isolation and is colonised in Exploration, every world",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): EXPLORATION.md § A colony is a subject (THE LATE CULTURE IS TARGETED). A development lag read from remoteness, carried from the Culture round; bound by the ordinary subjection verbs. OPEN: the lag mechanism (no development-lag mechanism exists today), which culture is chosen (NR-1034), reconciliation if the lean misses."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): EXPLORATION.md § A colony is a subject (THE LATE CULTURE IS TARGETED). A development lag read from remoteness, carried from the Culture round; bound by the ordinary subjection verbs. OPEN: the lag mechanism (no development-lag mechanism exists today), which culture is chosen (NR-1034), reconciliation if the lean misses. RULED (Ben, 2026-10-11): chosen at the Culture close (most remote by reach); the same isolation that lags its development slows its conquest, so it reaches Exploration holding a realm (EXPLORATION.md). Unforced, that culture has no realm by 1200 on 8/16 seeds. RULED (Ben, 2026-10-11): the lag is development diffusing by contact in proportion to reach; every culture feels it, the most remote receives least (EXPLORATION.md)."
   },
   {
    "status": "proposed",
@@ -881,7 +881,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "A world war in every world: population, industry, roads and ports, and treasuries lost, and the world redevelops before 1960",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § A world war in every world. Overturns 'permitted, never forced'. Builds on the PROPOSED mutual-defence spread (the clause exists in code; no world-war, conscript or refugee code exists). OPEN: razing industry and capital is not designed; war debt; redevelopment pace so 1960 opens on a recovery; Alarm interplay. Moves the 1960 economy: re-bless with Ben's go."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § A world war in every world. Overturns 'permitted, never forced'. Builds on the PROPOSED mutual-defence spread (the clause exists in code; no world-war, conscript or refugee code exists). OPEN: razing industry and capital is not designed; war debt; redevelopment pace so 1960 opens on a recovery; Alarm interplay. Moves the 1960 economy: re-bless with Ben's go. RULED (Ben, 2026-10-11): fought inside a fixed 1900-1930 window; razing only on regions fought over (industry_points, port_stock_q cut, roads through them demoted a tier); treasuries drained to no lower than zero, no debt carried into 1960 (INDUSTRIALISATION.md § A world war in every world)."
   },
   {
    "status": "proposed",
@@ -904,7 +904,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "Civil war as a lean: a splitting realm's halves fight; soldiers die, and a famine and displacement mechanism takes civilians",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md and MILITARY_HISTORY.md § Armies are distinct from population. Secession gains a fighting step; civilian deaths only via a separately authored famine/displacement mechanism (the door the 2026-09-09 ruling left open). OPEN: the mechanism itself; guard against the empty-region failure."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md and MILITARY_HISTORY.md § Armies are distinct from population. Secession gains a fighting step; civilian deaths only via a separately authored famine/displacement mechanism (the door the 2026-09-09 ruling left open). OPEN: the mechanism itself; guard against the empty-region failure. RULED (Ben, 2026-10-11): the loose reading counts and is already met 16/16 (successor >= 1/4 of parent, fighting within 50 y; CIVILISATION.md). The build is ONLY the civilian famine/displacement mechanism."
   },
   {
    "status": "proposed",
