@@ -25,11 +25,11 @@ Requirement (item-spanning): every library seed lands on both targets across a g
 (total 6/20/40 x majors 1/3/6, total >= majors), each correction recorded as a history event dated
 inside Industrialisation; unset targets (0) leave every world byte-identical to today.
 
-- [ ] **A1 (lane A)** Targets on the descriptor: `world_params::nation_total_target`,
+- [x] **A1 (lane A)** Targets on the descriptor: `world_params::nation_total_target`,
   `major_target` (0 = unset), validated (total <= 40, majors 1..6, total >= majors, else rejected);
   carried by the save (`save_game_version` 22 -> 23; older saves read unset). Files:
   hard_coded_world.hpp, core/save_game.{hpp,cpp}. Gate: world_determinism byte-equal, save round-trip.
-- [ ] **A2 (lane A)** `tools/verify/nation_targets_harness.cpp`: `--natural` prints each library
+- [x] **A2 (lane A)** `tools/verify/nation_targets_harness.cpp`: `--natural` prints each library
   seed's total, majors, and planned/chartered specialists; the grid mode checks both counts after
   `finish_campaign_world` and that each correction has a dated event. Expected to FAIL until B/C land.
 - [ ] **B1 (lane B, after A1)** The size floor as closing-round absorptions in Industrialisation

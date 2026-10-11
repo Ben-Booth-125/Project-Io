@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*28 entries — 25 open, 3 resolved.*
+*29 entries — 26 open, 3 resolved.*
 
 ---
 
@@ -234,6 +234,20 @@ Quick Start built on the main menu's seed and resources. Both now live on the se
 > **Recommendation:** The third: one place for the inputs, and Quick Start still skips every lapse.
 
 *Files: `docs/ui/STARTUP.md`*
+
+### NR-1039 — DECISION TAKEN: save_game_version 23 reads a v22 save (the nation targets as unset) instead of refusing it
+*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane A, 2026-10-11*
+
+Every earlier envelope bump refused the old version outright. v23 appends the two nation targets at the very end of the envelope, so a v22 file is a v23 file minus 8 bytes; read_save_game now accepts v22 and reads both targets as 0 (natural count). v21 and older are still refused. Tested by save_envelope_roundtrip S9.
+
+**Why it matters.** It breaks the envelope's strict-equality convention for one version, so a v22 save keeps loading.
+
+- Keep: v22 loads with unset targets
+- Revert to strict refusal (two lines in read_save_game plus test S9)
+
+> **Recommendation:** Keep: nothing in a v22 world depends on a target, and unset is exactly what it was built under.
+
+*Files: `src/core/save_game.cpp`, `tools/verify/save_envelope_roundtrip.cpp`*
 
 ---
 

@@ -31,3 +31,4 @@
 {"version":43,"kind":"world","owner":"BL-1217 G1b R2 spare-net-of-final-buyers (market background_fill)","ts":"2026-10-09T06:30:50.071Z","branch":"worktree-agent-a123195de030662e7"}
 {"version":46,"kind":"world","owner":"BL-1265 shelf economy","ts":"2026-10-10T04:23:33.493Z","branch":"claude/shelf-economy-trade-42f8f4"}
 {"version":47,"kind":"world","owner":"BL-1273 nation tech state","ts":"2026-10-10T08:50:54.442Z","branch":"worktree-agent-a97cb4dfc91a4ac03"}
+{"version":23,"kind":"envelope","owner":"BL-1278 nation count targets","ts":"2026-10-11T15:30:00.000Z","branch":"worktree-agent-adb738d3644c2bb3e"}
