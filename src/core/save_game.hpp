@@ -261,7 +261,20 @@ inline constexpr uint32_t save_game_magic =
 ///     the range check admits those numbers under this version whether or not
 ///     the lane that writes them has landed.
 /// A v21 stream is refused whole on the same strict-equality contract.
-inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
+///
+/// LAYOUT 23 = LAYOUT 22 PLUS TWO INTS AT THE ENVELOPE'S TAIL (BL-1278, nation
+/// count targets): `world_params::nation_total_target` then `::major_target`,
+/// written by `w_envelope` after `planetary_pan_y` and read back by
+/// `r_envelope` into `params`. At the TAIL, not inside `w_world_params`, on
+/// purpose: it makes the v22 layout a strict prefix of v23, so this reader
+/// accepts a v22 stream too and reads both targets as 0 (unset -- the natural
+/// count, which is what a v22 world was built at). THE ONE EXCEPTION to the
+/// strict-equality contract, and only for the immediately previous layout;
+/// v21 and older are still refused whole. A v23 stream carrying an illegal
+/// target pair (`nation_targets_valid`) is corrupt and refused whole.
+inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
+/// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
+inline constexpr uint32_t save_game_version_prefix_compatible = 22;
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.
