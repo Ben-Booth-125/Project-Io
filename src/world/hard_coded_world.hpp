@@ -254,9 +254,27 @@ struct world_params
     int culture_profile_amenity_div = 4;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
-    // Note: there is no nation-count knob. The number of nations on the home body is a
-    // *consequence* of its habitable land area and the minimum-viable-territory floor
-    // (nation_params in world/nation_generation.hpp), not a value the player pre-sets.
+
+    /// THE NATION COUNT IS A TARGET (BL-1278; NATION_GENERATION.md § The
+    /// nation count is a target, Ben 2026-10-10 -- overturning the 2026-07-30
+    /// "count is an outcome, no nations slider" ruling). Two numbers the
+    /// wizard's setup round sets before the Life round builds the world:
+    ///
+    ///   nation_total_target -- nations alive on the homeworld when generation
+    ///                          ends; when set, in [max(1, major_target), 40].
+    ///   major_target        -- nations holding a champion when generation
+    ///                          ends; when set, in [1, 6].
+    ///
+    /// 0 = UNSET, per field: the natural count, uncapped, and no reconciliation
+    /// -- every world built at {0, 0} is the world it was before the fields
+    /// existed, byte for byte. Out-of-range values are REJECTED by the caller
+    /// through `nation_targets_valid` below, never clamped silently.
+    ///
+    /// On the save seam since envelope version 23, written at the envelope's
+    /// TAIL rather than inside `w_world_params`, so the v22 layout is a strict
+    /// prefix and a v22 save reads both as unset (save_game.cpp).
+    int             nation_total_target = 0;
+    int             major_target        = 0;
 
     /// What the player expressed on the New World wizard (BL-167). Preferences,
     /// not parameters: make_hard_coded_world resolves these against the seed —
@@ -264,6 +282,28 @@ struct world_params
     /// floor — and the resolved values land in the generation_report.
     world_preferences preferences{};
 };
+
+/// The upper bounds of the two nation targets (NATION_GENERATION.md § The
+/// nation count is a target).
+inline constexpr int nation_total_target_max = 40;
+inline constexpr int major_target_max        = 6;
+
+/// True when the descriptor's nation targets are legal: each is 0 (unset) or
+/// in range -- total in [1, 40], majors in [1, 6] -- and, when both are set,
+/// total >= majors. Pure; a caller rejects a descriptor that fails it rather
+/// than clamping (an untrusted-input boundary must mutate nothing).
+constexpr bool nation_targets_valid(const world_params& p)
+{
+    const int t = p.nation_total_target;
+    const int m = p.major_target;
+    if (t < 0 || t > nation_total_target_max)
+        return false;
+    if (m < 0 || m > major_target_max)
+        return false;
+    if (t > 0 && m > 0 && t < m)
+        return false;
+    return true;
+}
 
 /// Coarse progress sink for a caller drawing a loading screen (Ben, 2026-08-12).
 ///

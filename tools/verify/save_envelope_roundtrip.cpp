@@ -27,6 +27,8 @@
 //       stored order is not its chronological order.
 //   S7  A version mismatch is refused WHOLE, and both destinations are left
 //       exactly as they were (the atomicity `read_save_game` documents).
+//   S9  BL-1278: a v22 stream (v23 minus its tail targets) reads, targets 0.
+//   S10 BL-1278: an illegal nation-target pair is refused whole.
 //
 // Kept outside src/ so the CMake game glob does not pull it into the build.
 
@@ -38,6 +40,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -197,6 +200,10 @@ save_envelope make_envelope()
     e.params.preferences.roll[0]      = 11;
     e.params.preferences.roll[1]      = 22;
     e.params.preferences.roll[2]      = 33;
+    // BL-1278 (save_game_version 23): the nation targets at the envelope's
+    // tail. Distinct, legal (total >= majors), and neither 0.
+    e.params.nation_total_target = 17;
+    e.params.major_target        = 4;
 
     generation_report::body_entry be;
     be.name         = "Vhessari Prime";
@@ -549,6 +556,9 @@ int main()
                   && le.params.industrialisation_span_enabled
                   && !le.params.resume_seeds_corridor_tier,
               "S3 the three span switches survive in their slots (false/true/false, BL-1047)");
+        // BL-1278, pinned to literals: two consecutive ints at the tail.
+        check(le.params.nation_total_target == 17 && le.params.major_target == 4,
+              "S3 the nation targets survive in their slots (17 / 4, BL-1278, v23)");
         // Pinned to literals, not compared to the original: three consecutive
         // int64s of the same type are exactly the shape a symmetric writer/reader
         // transposition survives.
@@ -912,6 +922,86 @@ int main()
         le.speed = 99;
         check(!read_save_game(k_path, lw, le) && le.speed == 99,
               "S8 a v12-versioned stream (pre event layer) is refused with the destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S9 -- BL-1278: a v22 stream is the v23 stream minus its last eight bytes
+    // (the two nation targets at the tail), and it still reads -- both targets
+    // unset, everything else whole. The one accepted predecessor, pinned to a
+    // literal (a past format: a later bump can only make it older).
+    // -----------------------------------------------------------------------
+    static_assert(save_game_version_prefix_compatible == 22,
+                  "BL-1278 accepts exactly layout 22 as a strict prefix of 23");
+    {
+        world w = make_world();
+        seed_exchanges(w, 4);
+        const save_envelope env = make_envelope();
+        write_save_game(k_path, w, env);
+        const auto full = std::filesystem::file_size(k_path);
+        std::filesystem::resize_file(k_path, full - 2 * sizeof(int32_t));
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v22 = 22;
+            f.write(reinterpret_cast<const char*>(&v22), sizeof(v22));
+        }
+        world         lw;
+        save_envelope le;
+        le.params.nation_total_target = 33; // must be overwritten with 0
+        le.params.major_target        = 5;
+        check(read_save_game(k_path, lw, le), "S9 a v22 stream (no targets) is ACCEPTED");
+        check(le.params.nation_total_target == 0 && le.params.major_target == 0,
+              "S9 a v22 stream reads both nation targets as 0 (unset)");
+        check(le.params.seed == env.params.seed && le.params.span_seed[3] == 0x5A3Du
+                  && le.planetary_pan_y == env.planetary_pan_y,
+              "S9 the rest of a v22 envelope reads whole (seed, span seeds, the last view float)");
+
+        // v21 is still refused: the exception is one layout wide.
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v21 = 21;
+            f.write(reinterpret_cast<const char*>(&v21), sizeof(v21));
+        }
+        le.speed = 99;
+        check(!read_save_game(k_path, lw, le) && le.speed == 99,
+              "S9 a v21-versioned stream is still refused, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S10 -- BL-1278: an illegal target pair in a v23 stream is corrupt and
+    // refused whole (nation_targets_valid), never clamped.
+    // -----------------------------------------------------------------------
+    {
+        world w = make_world();
+        save_envelope bad = make_envelope();
+        bad.params.nation_total_target = 3;
+        bad.params.major_target        = 5; // total < majors
+        check(!nation_targets_valid(bad.params), "S10 total < majors is invalid");
+        write_save_game(k_path, w, bad);
+        world         lw;
+        save_envelope le;
+        le.speed = 99;
+        check(!read_save_game(k_path, lw, le) && le.speed == 99,
+              "S10 a stream with total < majors is refused, destination untouched");
+        bad.params.nation_total_target = 41;
+        bad.params.major_target        = 0;
+        write_save_game(k_path, w, bad);
+        check(!read_save_game(k_path, lw, le) && le.speed == 99,
+              "S10 a stream with total 41 (> 40) is refused");
+        bad.params.nation_total_target = 0;
+        bad.params.major_target        = 7;
+        write_save_game(k_path, w, bad);
+        check(!read_save_game(k_path, lw, le) && le.speed == 99,
+              "S10 a stream with majors 7 (> 6) is refused");
+        world_params ok{};
+        check(nation_targets_valid(ok), "S10 {0, 0} (unset) is valid");
+        ok.nation_total_target = 40; ok.major_target = 6;
+        check(nation_targets_valid(ok), "S10 {40, 6} is valid");
+        ok.nation_total_target = 6; ok.major_target = 6;
+        check(nation_targets_valid(ok), "S10 {6, 6} is valid");
+        ok.nation_total_target = -1; ok.major_target = 0;
+        check(!nation_targets_valid(ok), "S10 a negative total is invalid");
     }
 
     std::remove(k_path);
