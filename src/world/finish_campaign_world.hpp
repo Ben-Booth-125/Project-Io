@@ -97,6 +97,9 @@ struct finish_campaign_result
     charter_spend_params    spend{};
     /// The winner's spend report (untouched when the budget was empty).
     charter_spend_report    charter;
+    /// BL-1278 lane C: what the majors' reconciliation did (`reconcile_majors`);
+    /// `target` 0 and no records when `world_params::major_target` is unset.
+    major_reconciliation_report majors;
     /// BL-1268: what the retrofit placed from the history's trade record.
     marketplace_retrofit_report retrofit;
     /// Wall clock of the search and of the settle, milliseconds -- REPORTED
@@ -122,10 +125,16 @@ std::int64_t finish_campaign_weight_ms(const world_params& params);
 /// the settle ran on. @p report is the build's own (the genesis history reads
 /// it). @p progress may be null (a harness, `--serve`).
 ///
+/// @p report is WRITTEN once (BL-1278 lane C): with `params.major_target` set,
+/// each correction the majors' reconciliation makes is appended to the
+/// homeworld's Industrialisation record as a history event dated in its
+/// closing round (`champion_chartered`, `state_charter`, `champion_bought_out`).
+/// Unset, the report is untouched.
+///
 /// Prints the `[stockpile_budget]` and `[landscape_search]` lines Begin always
 /// printed, and one `[finish_campaign_world]` line at the end -- the log proof
 /// tools/verify/begin_adopts_check.js reads.
-finish_campaign_result finish_campaign_world(world& w, const generation_report& report,
+finish_campaign_result finish_campaign_world(world& w, generation_report& report,
                                              recipe_registry& reg,
                                              const world_params& params,
                                              const world_gen_config& cfg,

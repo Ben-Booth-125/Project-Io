@@ -5144,6 +5144,21 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "%s breaks from %s as the realms settle to their number.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
         break;
+    case lapse_event_kind::champion_chartered:
+        // BL-1278 lane C: a minor raises a national champion from its own capital.
+        std::snprintf(buf, sizeof buf, "%s charters a national champion at %s.",
+                      polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::state_charter:
+        // BL-1278 lane C: the same, the treasury making up the price.
+        std::snprintf(buf, sizeof buf, "The treasury of %s charters a national champion at %s.",
+                      polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::champion_bought_out:
+        // BL-1278 lane C: the cross-border buy-out; `other` is the buyer.
+        std::snprintf(buf, sizeof buf, "A champion of %s buys out the champion of %s.",
+                      polity_name_of(h, e.other), polity_name_of(h, e.polity));
+        break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5194,6 +5209,10 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::schism:
     case lapse_event_kind::furnace_lit:
     case lapse_event_kind::rung_crossed:         return 0; // BL-1100: a realm's crossing, a handful per world
+    // BL-1278 lane C: the majors' corrections, a handful per world at most.
+    case lapse_event_kind::champion_chartered:
+    case lapse_event_kind::state_charter:
+    case lapse_event_kind::champion_bought_out:  return 0;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

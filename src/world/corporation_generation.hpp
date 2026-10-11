@@ -390,6 +390,86 @@ struct lapse_event;
 void date_chartered_firms(world& w, charter_spend_report& report,
                           const std::vector<lapse_event>& events, int32_t epoch_year);
 
+/// BL-1278 lane C — ONE CORRECTION the majors' reconciliation made.
+struct major_reconciliation_record
+{
+    /// `lapse_event_kind` as its wire byte: `champion_chartered`,
+    /// `state_charter` or `champion_bought_out`.
+    std::uint8_t kind          = 0;
+    entity_id    nation        = null_entity; ///< the minor raised / the major that sold
+    entity_id    buyer_nation  = null_entity; ///< buy-out only: the richest major
+    entity_id    corp          = null_entity; ///< the champion chartered / the specialist sold
+    entity_id    buyer_corp    = null_entity; ///< buy-out only: the champion that bought it
+    entity_id    centre        = null_entity; ///< charter: the centre it was chartered at
+    std::int32_t region        = -1;          ///< the settlement region the event is pinned to
+    std::int64_t nation_points = 0;           ///< the (seller's / minor's) industry points
+    std::int64_t price_points  = 0;           ///< the specialist charter price, in points
+    std::int64_t centre_points = 0;           ///< charter: the centre's UNSPENT points it consumed
+    std::int64_t treasury_gap_points = 0;     ///< state charter: price - centre_points
+    /// THE REAL CREDIT PRICE (Ben, 2026-10-11): the capital the walk's own draw
+    /// gives this specialist — what its points price buys. A state charter's
+    /// gap and a buy-out's price are paid at it.
+    float        credit_price  = 0.0f;
+    float        credits_moved = 0.0f;        ///< state charter: the treasury's payment; buy-out: the price
+    float        treasury_shortfall = 0.0f;   ///< state charter: credits the treasury lacked (the champion opens that much poorer)
+};
+
+/// What `reconcile_majors` did. `natural` is the majors before it, `majors`
+/// after; `missed` when the target could not be reached (no minor left with a
+/// population centre whose windows hold ground for a champion).
+struct major_reconciliation_report
+{
+    int  target  = 0;
+    int  natural = 0;
+    int  majors  = 0;
+    bool missed  = false;
+    std::vector<major_reconciliation_record> records;
+};
+
+/// BL-1278 lane C (NATION_GENERATION.md § The nation count is a target; Ben,
+/// 2026-10-10/11) — THE MAJORS RECONCILED AFTER THE SEARCH'S WINNER IS APPLIED.
+/// A MAJOR is a nation home to a non-background corporation (GLOSSARY.md
+/// § Major nation). With @p major_target 0 (unset) this returns at once and
+/// mutates nothing. Otherwise, on the homeworld's nations:
+///
+///  * TOO FEW — the RICHEST CHAMPIONLESS MINOR (most `region::industry_points`
+///    standing on its ground, summed over the settlement regions it holds; ties
+///    to the lower nation id) charters a champion at its richest population
+///    centre (budget points descending, ties to the lower centre id), placed
+///    exactly as the charter walk places a specialist (`charter_specialist_at`,
+///    the winner's @p seed, the centre's own streams). Only the centre's UNSPENT
+///    points count (what the walk spent on its firms counts zero); they leave its
+///    unspent rows and become the charter's price. Where they fall short of the
+///    specialist price (`specialist_price_of`), the nation's TREASURY pays the
+///    gap IN CREDITS at the specialist's REAL credit price — its drawn charter
+///    capital, scaled by gap / price — a STATE CHARTER. The champion opens on
+///    exactly what paid for it (the centre's share plus what the treasury paid;
+///    a short treasury is reported, never minted over). A centre with no ground
+///    falls to the nation's next centre, a nation with none to the next minor.
+///  * TOO MANY — a BUY-OUT: the RICHEST MAJOR's champion (same measure, ties to
+///    the lower nation id; its lowest-id specialist) buys the POOREST MAJOR's
+///    specialist whole (ties to the HIGHER nation id, so the two never
+///    coincide) at that specialist's charter price in credits at the real rate
+///    (its charter capital): its holdings, units, balance and opening stock
+///    pass to the buyer, the price moves from the buyer's balance to the seller
+///    nation's treasury, and the seller corporation is gone (its charter row is
+///    kept, `corp` null, `absorbed_into` the buyer). A buyer left holding the
+///    provisional seat is disarmed (BL-1154). The seller becomes a minor. A
+///    GENERATION EVENT, never a `corp_command` verb: no AI grant covers an
+///    acquisition.
+///
+/// Each correction is one record, which `finish_campaign_world` writes into the
+/// Industrialisation record as a history event dated in its closing round.
+/// @p charter (the winner's spend report) is kept true: a new champion joins
+/// `specialists` and `charters`, a sold one leaves `specialists`. Bounded (each
+/// step adds or removes one major, or exhausts a candidate), deterministic
+/// (sorted walks, integer ranking; no float decides anything).
+major_reconciliation_report reconcile_majors(world& w, const recipe_registry& reg,
+                                             const charter_budget& budget,
+                                             const charter_spend_params& spend,
+                                             charter_spend_report& charter,
+                                             int major_target, std::uint32_t seed);
+
 /// BL-1060 — the refusal a spend's params cannot decide alone: under
 /// `sqrt_capital`, a density ceiling that BINDS on some budgeted body and yet
 /// leaves under one firm per turn good once the yards' places come off it, so
@@ -538,7 +618,10 @@ bool is_budget_world(const world& w, const charter_budget* budget,
 /// walk stops at). Per budgeted centre, on the walk's resolution (the centre's
 /// tile, its body, and the nation owning it; a centre without one plans
 /// nothing), spent BUDGET DESCENDING, TIES TO THE LOWER CENTRE ID:
-///   * one SPECIALIST when its points cover `spend.specialist_price_of(centre)`;
+///   * one SPECIALIST when it is its nation's CHAMPION CENTRE — the nation's
+///     richest centre whose points cover `spend.specialist_price_of(centre)`
+///     (BL-1283: one specialist per nation; every other centre, affording or
+///     not, spends its whole budget on firms);
 ///   * then its FIRMS — the points left, less any pooled remainder it sends plus
 ///     any it receives (NR-913, `plan_charter_pool`, the walk's own plan; zero
 ///     under the shipped `charter_pool::none`), in whole firm charters — each

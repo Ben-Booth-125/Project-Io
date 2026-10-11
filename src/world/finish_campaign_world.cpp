@@ -3,6 +3,7 @@
 #include "world/campaign_settle.hpp"
 #include "world/corporation_generation.hpp" // assign_default_recipes
 #include "world/economy_system.hpp"        // economy_step_phase_clock (BL-1117)
+#include "world/era_timelapse.hpp"          // lapse_event_kind (BL-1278 lane C)
 #include "world/hard_coded_world.hpp"       // generation_progress, generation_step_cost_ms
 #include "world/history_log.hpp"            // seed_genesis_history
 #include "world/recipe_registry.hpp"
@@ -62,6 +63,63 @@ void report_step_ms(generation_progress* p, int label, std::int64_t ms)
                                                       std::memory_order_relaxed);
 }
 
+/// BL-1278 lane C -- the majors' corrections, written into the homeworld's
+/// Industrialisation record as history events DATED BACK into its closing
+/// round: the year of its last recorded step (else its last year; else, on a
+/// world the span never ran for, the epoch is all there is and the events go
+/// unwritten -- the corrections still stand in the world and the report).
+/// `polity` / `other` name the realms through the polity fold's own record
+/// (`body_entry::nation_polity`); a nation the fold never named takes
+/// `lapse_event_none`. Inserted at their year's end, so the record stays
+/// ascending. Returns the year written (0 when none was).
+std::int32_t record_major_events(generation_report& report, const world& w,
+                                 const major_reconciliation_report& rec)
+{
+    if (rec.records.empty())
+        return 0;
+    generation_report::body_entry* home = nullptr;
+    for (generation_report::body_entry& be : report.bodies)
+        if (be.is_homeworld)
+        {
+            home = &be;
+            break;
+        }
+    if (home == nullptr)
+        return 0;
+    era_timelapse& t = home->industrialisation_timelapse;
+    if (t.years <= 0 && t.steps.empty())
+        return 0;
+    const std::int32_t year = !t.steps.empty() ? t.steps.back().year : t.start_year + t.years;
+    const auto polity_of = [&](entity_id n) -> std::uint16_t {
+        if (n == null_entity)
+            return lapse_event_none;
+        for (std::size_t i = 0; i < home->nation_ids.size() && i < home->nation_polity.size(); ++i)
+            if (home->nation_ids[i] == n)
+            {
+                const std::int32_t p = home->nation_polity[i];
+                return (p >= 0 && p < static_cast<std::int32_t>(lapse_event_none))
+                           ? static_cast<std::uint16_t>(p) : lapse_event_none;
+            }
+        return lapse_event_none;
+    };
+    (void)w;
+    for (const major_reconciliation_record& r : rec.records)
+    {
+        lapse_event e;
+        e.year   = year;
+        e.kind   = r.kind;
+        e.region = (r.region >= 0 && r.region < static_cast<std::int32_t>(lapse_event_none))
+                       ? static_cast<std::uint16_t>(r.region) : lapse_event_none;
+        e.polity = polity_of(r.nation);
+        e.other  = r.kind == static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out)
+                       ? polity_of(r.buyer_nation) : lapse_event_none;
+        const auto at = std::upper_bound(t.events.begin(), t.events.end(), year,
+                                         [](std::int32_t y, const lapse_event& x) { return y < x.year; });
+        t.events.insert(at, e);
+    }
+    return year;
+}
+
 } // namespace
 
 era_band campaign_band_from_world(const world& /*w*/)
@@ -101,7 +159,7 @@ std::int64_t finish_campaign_weight_ms(const world_params& params)
          + generation_step_cost_ms(k_label_settle, params);
 }
 
-finish_campaign_result finish_campaign_world(world& w, const generation_report& report,
+finish_campaign_result finish_campaign_world(world& w, generation_report& report,
                                              recipe_registry& reg,
                                              const world_params& params,
                                              const world_gen_config& cfg,
@@ -161,6 +219,19 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     out.search    = search_landscape(w, reg, sp);
     apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
                               &out.stockpile.budget, out.spend, &out.charter);
+    // BL-1278 lane C -- THE MAJORS RECONCILED AFTER THE WINNER IS APPLIED
+    // (NATION_GENERATION.md § The nation count is a target, Ben 2026-10-11): a
+    // major is a nation holding a champion, and champions are chartered by the
+    // search, so the major target is met HERE -- a champion chartered in the
+    // richest minor (a state charter where its treasury makes up the price), or
+    // a buy-out of the poorest major's specialist by the richest champion. Each
+    // correction is written into the Industrialisation record, dated back into
+    // its closing round, so the record reads as one history. Unset (0): nothing
+    // runs and nothing moves. Before the charter web is published and before
+    // the retrofit, so both read the reconciled roster.
+    out.majors = reconcile_majors(w, reg, out.stockpile.budget, out.spend, out.charter,
+                                  params.major_target, out.search.winner.placement_seed);
+    const std::int32_t reconcile_year = record_major_events(report, w, out.majors);
     // BL-1086 (the review's R4): a budget world laid no roster in generation,
     // so the loading screen's charter ledger is published HERE, from the
     // winner's web as it was just chartered. Write-only; a report the legacy
@@ -192,6 +263,60 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
         date_chartered_firms(w, out.charter, events ? *events : none,
                              static_cast<int32_t>(params.epoch_year));
     }
+    // BL-1278 lane C: a champion the reconciliation chartered was founded the
+    // year its event is dated, not on its region's works notes.
+    for (const major_reconciliation_record& rec : out.majors.records)
+        if (reconcile_year != 0
+            && rec.kind != static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out))
+            if (const auto c = w.corporations.find(rec.corp); c != w.corporations.end())
+            {
+                c->second.founded_year = reconcile_year;
+                for (charter_record& cr : out.charter.charters)
+                    if (cr.corp == rec.corp)
+                        cr.founded_year = reconcile_year;
+            }
+    if (out.majors.target > 0)
+    {
+        int chartered = 0, state = 0, bought = 0;
+        float shortfall = 0.0f, paid = 0.0f;
+        for (const major_reconciliation_record& rec : out.majors.records)
+        {
+            const auto k = static_cast<lapse_event_kind>(rec.kind);
+            chartered += k == lapse_event_kind::champion_chartered;
+            state     += k == lapse_event_kind::state_charter;
+            bought    += k == lapse_event_kind::champion_bought_out;
+            shortfall += rec.treasury_shortfall;
+            if (k == lapse_event_kind::state_charter) paid += rec.credits_moved;
+        }
+        std::printf("[majors] target %d: natural %d -> %d (%d champion charter(s), %d state "
+                    "charter(s), %d buy-out(s), dated %d)%s",
+                    out.majors.target, out.majors.natural, out.majors.majors, chartered, state,
+                    bought, static_cast<int>(reconcile_year), out.majors.missed ? " MISSED" : "");
+        if (shortfall > 0.0f)
+            std::printf("; treasuries paid %.2f of %.2f credits owed (short %.2f)",
+                        static_cast<double>(paid), static_cast<double>(paid + shortfall),
+                        static_cast<double>(shortfall));
+        std::printf("\n");
+        std::fflush(stdout);
+        // OFF TARGET IS A DEFECT, NEVER A QUIET OUTCOME (NATION_GENERATION.md:
+        // both targets are always hit): a reconciliation that could not reach
+        // the major target is recorded on the report's handoff verdict, as the
+        // history's own handoff validators record theirs, and said on stderr.
+        if (out.majors.missed)
+        {
+            char msg[160];
+            std::snprintf(msg, sizeof msg, "majors: target %d, reached %d (no minor left with "
+                          "ground for a champion)", out.majors.target, out.majors.majors);
+            report.handoff_invalid = true;
+            if (!report.handoff_violation.empty())
+                report.handoff_violation += "; ";
+            report.handoff_violation += msg;
+            std::fprintf(stderr, "[handoff] %s\n", msg);
+        }
+    }
+    if (out.charter.champions_fallen_back > 0)
+        std::printf("[charter] %d champion(s) fell back to their nation's next affording centre\n",
+                    out.charter.champions_fallen_back);
     if (out.stockpile.points_total != 0 || out.stockpile.rejected)
     {
         const stockpile_budget& sb = out.stockpile;

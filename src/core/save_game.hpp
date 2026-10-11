@@ -277,8 +277,13 @@ inline constexpr uint32_t save_game_magic =
 /// event-kind range check; no field changes width: `absorbed_at_close` (25,
 /// a closing-round absorption -- the size floor's, or one surplus to the
 /// total) and `seceded_at_close` (26, a closing-round secession to the
-/// total). Kinds 27-29 are held for lane C. A v22 stream carries none of
+/// total). A v22 stream carries none of
 /// them, so the prefix acceptance above is unchanged.
+/// v23 ALSO admits three `lapse_event_kind` values in the Industrialisation
+/// record, written by the finish's majors reconciliation (BL-1278 lane C):
+/// 27 `champion_chartered`, 28 `state_charter`, 29 `champion_bought_out`. No
+/// field moves; a build that predates them refuses such a stream on the kind
+/// range check, as it should.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;
