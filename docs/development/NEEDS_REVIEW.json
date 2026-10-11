@@ -342,7 +342,7 @@
    "title": "DECISION TAKEN: the rise-and-fall realm stays under the non-hegemony cap; the late culture is the world's most isolated",
    "raised": "2026-10-10",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben, 2026-10-10 history-patterns form",
    "what": "Two readings taken on your behalf. (a) 'Grows relatively large' is read as the largest share of its world by a clear margin, still under BL-224's non-hegemony cap - the cap is not overturned, so a pass-1 hegemon still fails the handoff. (b) The late culture is the culture most remote by reach when the Culture round closes, one per world; others may also be colonised naturally. Written: GENERATION_STRATEGY § History patterns, CIVILISATION, EXPLORATION.",
    "why_it_matters": "(a) decides whether the rise-and-fall target fights the non-hegemony invariant; (b) decides whether the late culture is chosen by a reading or emerges.",
@@ -353,7 +353,7 @@
     "docs/generation/EXPLORATION.md",
     "docs/lore/HISTORY.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-11 (sprint 53 form): (a) confirmed with a floor - the realm peaks at 25-35% of held regions, under the 50% cap; (b) confirmed - chosen at the Culture close, kept alive by the same isolation. Written: CIVILISATION.md, EXPLORATION.md."
   },
   {
    "id": "NR-1035",
