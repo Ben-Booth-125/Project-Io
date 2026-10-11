@@ -505,7 +505,18 @@ defect, not a skew to report. The lever is **the history banks more**: polities 
 across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
 granted at the handoff. No nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
-more, and through which earnings, is open design to be settled by measurement (BL-1298).
+more, and through which earnings, is settled by measurement (BL-1298) against these rulings
+(Ben, 2026-10-11):
+- **The target:** a typical (median) nation opens on **1,000 to 2,000 credits** — for now, to be
+  revisited once the campaign shows what a state spends.
+- **Lift the floor, keep the order.** Poor nations gain the most; the realms that inherited empires'
+  chests stay the richest. The spread narrows from the bottom, never by cutting the top.
+- **The levers:** the history **earns more** — trade, endowment and corridor income — and **keeps
+  more**, converting less of a chest into industry points in Industrialisation. Not a larger
+  conversion rate, not a reserve granted at the handoff.
+
+The rate's own rationale below was argued against the old median (0.41 credits) and the corporate
+economy as it stood; it is re-read once the measured chests land, rather than kept by inertia.
 
 `nation_component::treasury` opens on **what the history banked, not what the campaign has yet
 earned**. NATIONS.md's rule — a treasury nothing has credited is zero, and a treasury that started
