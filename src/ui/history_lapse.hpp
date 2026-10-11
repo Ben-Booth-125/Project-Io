@@ -1270,6 +1270,30 @@ inline void lapse_map_frame(int gw, int gh, float avail_w, float avail_h,
     tl_y  = (avail_h - scale * static_cast<float>(gh)) * 0.5f;
 }
 
+/// THE KEY'S RESERVED BAND (BL-1280 fix round): the height under the map the
+/// legend may claim, as the framing sees it -- one band whose tallest column
+/// holds three rows, which is the ground key every map carries (Sea, Ground and
+/// relief, River) and the Culture record's tallest column too. A FIXED
+/// reservation, so the Life map (no record, no legend yet) frames exactly as the
+/// Culture map it hands over to, at any window size. Needs an ImGui frame (it
+/// reads the font's line height).
+float lapse_legend_reserve_h();
+
+/// THE ONE FRAMING every wizard map uses (BL-1280 fix round): `lapse_map_frame`
+/// over the pane, then -- where the band left under the map is shallower than
+/// @p key_h and the pane can spare it -- framed again in the height above the
+/// key, so the key never covers the map. `draw_lapse_map` passes the larger of
+/// its legend's band and `lapse_legend_reserve_h()`; the Life map and its stamp
+/// pass the reservation alone. Same inputs, same rect: no jump at the hand-over.
+inline void lapse_map_frame_keyed(int gw, int gh, float avail_w, float avail_h, float key_h,
+                                  float& tl_x, float& tl_y, float& scale)
+{
+    lapse_map_frame(gw, gh, avail_w, avail_h, tl_x, tl_y, scale);
+    const float below = avail_h - (tl_y + scale * static_cast<float>(gh));
+    if (key_h > 0.0f && below < key_h && avail_h - key_h > 40.0f)
+        lapse_map_frame(gw, gh, avail_w, avail_h - key_h, tl_x, tl_y, scale);
+}
+
 /// BL-1092 -- how many kin arrows the record has drawn by @p year: the
 /// foundings at or before it that had a previous region to come from. The
 /// board's migration counter and the verify API's read of the same bake.

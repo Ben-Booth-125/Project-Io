@@ -2741,14 +2741,14 @@ void app::draw_generation_screen()
                                   m_wiz_terrain.size());
         // The lapse header over the map's own corner, in the map's own idiom
         // (history_lapse.cpp's year stamp): the body's name, and the year when
-        // there is one. Framed by `lapse_map_frame`, the one rule both maps
+        // there is one. Framed by `lapse_map_frame_keyed`, the one rule both maps
         // use, so the stamp the Life map wears sits exactly where the Culture
         // map's own stamp appears when the record lands -- no jump.
         const auto draw_lapse_stamp = [&](ImVec2 pane_origin, ImVec2 pane_avail,
                                           const std::string& body, const std::string& when) {
             float fx = 0.0f, fy = 0.0f, sc = 0.0f;
-            ui::lapse_map_frame(home_grid_width, home_grid_height, pane_avail.x, pane_avail.y,
-                                fx, fy, sc);
+            ui::lapse_map_frame_keyed(home_grid_width, home_grid_height, pane_avail.x, pane_avail.y,
+                                      ui::lapse_legend_reserve_h(), fx, fy, sc);
             const std::string label = body.empty() ? when
                                     : when.empty() ? body
                                                    : body + "  " + when;
@@ -2772,6 +2772,19 @@ void app::draw_generation_screen()
             ui::draw_lapse_ground(m_wiz_life_ground);
             if (m_wiz_life_ground.baked())
                 draw_lapse_stamp(pane_origin, pane_avail, body, when);
+
+            // The honest wait note, wherever the Life map stands (the Life
+            // round, and the Culture round holding it): while a gate build is
+            // in flight the map still shows the PREVIOUS roll's surface (or
+            // nothing, before the first gate world lands), and the ground will
+            // swap when the new one does.
+            if (m_wiz_surface_future.valid())
+            {
+                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
+                ImGui::TextUnformatted("  resolving the surface...");
+                ImGui::PopStyleColor();
+            }
         };
 
         if (lapse_round)
@@ -2879,17 +2892,6 @@ void app::draw_generation_screen()
         {
             // Round 2, Life: the homeworld as the 2D map, the primary view.
             draw_life_map(home_name, std::string{});
-
-            // The honest wait note: while a build is in flight the map still
-            // shows the PREVIOUS roll's surface (or nothing, on the very first
-            // frames, before the first gate world lands).
-            if (m_wiz_surface_future.valid())
-            {
-                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
-                ImGui::TextUnformatted("  resolving the surface...");
-                ImGui::PopStyleColor();
-            }
         }
         ImGui::EndChild();
     }

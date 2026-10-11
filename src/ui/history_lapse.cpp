@@ -2316,6 +2316,17 @@ float legend_band_h(const legend_layout& g)
     return g.cols.empty() ? 0.0f : g.h + 2.0f * legend_pad + legend_gap_top + 4.0f;
 }
 
+} // namespace
+
+float lapse_legend_reserve_h()
+{
+    // One band, a heading row plus three: measure_lapse_legend's own sums.
+    const float row_h = std::max(18.0f, ImGui::GetTextLineHeight() + 4.0f);
+    return row_h * 4.0f + 2.0f * legend_pad + legend_gap_top + 4.0f;
+}
+
+namespace {
+
 /// Paint the measured legend with its block's top-left at @p o, on a dark
 /// backing. Returns the primitives drawn; @p listed gets the labels in order,
 /// for the capture log.
@@ -2431,7 +2442,8 @@ void draw_lapse_ground(const lapse_ground& g)
     // the Culture record lands on exactly this picture (STARTUP.md § The Life
     // map, "one map from Life to Begin").
     float fx = 0.0f, fy = 0.0f, scale = 0.0f;
-    lapse_map_frame(g.grid_w, g.grid_h, avail.x, avail.y, fx, fy, scale);
+    lapse_map_frame_keyed(g.grid_w, g.grid_h, avail.x, avail.y, lapse_legend_reserve_h(),
+                          fx, fy, scale);
     const ImVec2 tl{origin.x + fx, origin.y + fy};
     paint_sea(dl, tl, {tl.x + scale * static_cast<float>(g.grid_w),
                        tl.y + scale * static_cast<float>(g.grid_h)});
@@ -2483,21 +2495,19 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // would only disguise that. THE RULE LIVES IN `lapse_map_frame` (BL-1091):
     // the Life map (`draw_lapse_ground`) and its stamp share this same frame,
     // and one framing shared beats two that agree by luck.
-    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
-    lapse_map_frame(gw, gh, avail.x, avail.y, fx, fy, scale);
-
     // BL-1118: THE LEGEND'S BAND. The key is measured before the map is
     // framed: where the pane's band under the map already holds it (1920x1080
     // leaves ~290 px) nothing moves; where it does not, the map is framed in
     // the height left above the key rather than the key being laid over the
-    // map, which is the subject.
+    // map, which is the subject. BL-1280 fix round: the band claimed is never
+    // less than the fixed reservation the Life map frames with, so the Culture
+    // record lands in the Life map's exact rect at any window size (a legend
+    // that wraps to a second band on a very narrow pane still claims more).
     const legend_layout legend = measure_lapse_legend(h, L, avail.x - 2.0f * legend_pad - 4.0f);
-    {
-        const float need  = legend_band_h(legend);
-        const float below = avail.y - (fy + scale * static_cast<float>(gh));
-        if (need > 0.0f && below < need && avail.y - need > 40.0f)
-            lapse_map_frame(gw, gh, avail.x, avail.y - need, fx, fy, scale);
-    }
+    const float key_h = legend.cols.empty() ? 0.0f
+                                            : std::max(legend_band_h(legend), lapse_legend_reserve_h());
+    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
+    lapse_map_frame_keyed(gw, gh, avail.x, avail.y, key_h, fx, fy, scale);
     const float mw = scale * static_cast<float>(gw);
     const float mh = scale * static_cast<float>(gh);
     const ImVec2 tl{origin.x + fx, origin.y + fy};

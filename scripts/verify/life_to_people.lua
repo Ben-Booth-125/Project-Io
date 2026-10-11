@@ -139,3 +139,19 @@ verify.show_panel("tile", false)
 -- The clipping ledger over every frame above: the lean rows and the stamp
 -- are the shapes that overrun.
 verify.expect_no_clipping("life_to_people")
+
+-- ── 5. One frame at a small window (BL-1280 fix round) ───────────────────
+-- At 1280x720 the band under the map is too shallow for the key, so the map
+-- is framed above a reserved band. The Life map (no record, no key yet) and
+-- the landed Culture map must frame in the SAME rect: compare the two PNGs.
+-- After the clipping ledger above on purpose: that ledger is the 1920x1080
+-- design-review read.
+verify.window(1280, 720)
+verify.generation_stage(2)
+verify.frames(4)
+verify.capture("life_to_people_7_small_culture_wait")
+verify.history_run(0)
+verify.frames(4)
+local sf = select(1, verify.history_span())
+verify.history_year(sf)
+shot("life_to_people_8_small_culture_landed")
