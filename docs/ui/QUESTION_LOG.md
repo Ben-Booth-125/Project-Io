@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
+**65 surfaces** — 7 settled, 58 awaiting Ben's wording.
 
 ---
 
@@ -433,6 +433,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.
 
 *Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
+
+### New World wizard - round 2, Life: the homeworld map (and its hold through the Culture round's wait)
+
+**Answers:** What does the world I just set the conditions for look like - its seas, its ranges, its rivers - and is this the ground the peoples will settle?
+
+**Because:** THE GLOBE IS RETIRED (Ben, 2026-10-10; STARTUP.md § The Life map). The Life round builds the real Life-gate world, so the pane draws that world's tile raster as the same 2D map the pass rounds play their records on, over the same terrain base (land by landform band, the mountain rims, the rivers) and in the same frame (lapse_map_frame). It earns the pane because it is the primary view of what the round decided: a lean that moves the coastline or the ranges moves the map, and the charts are the extras on top. ONE MAP FROM LIFE TO BEGIN: the Culture round holds this map under a 2400 BCE stamp until its record lands, then plays the record on the same ground in the same frame, so nothing is replaced and the player never loses the picture between rounds. The System round keeps its drawing of the system - star colour and size, orbits, body sizes - so the pane is never empty while there is no body yet. No input: you set conditions here, you do not steer (Ben, 2026-08-10); the pass rounds' map takes no pan or zoom, and this map does what they do.
+
+*Demanded by BL-1280 · `src/ui/startup_screens.cpp`, `src/ui/history_lapse.cpp`, `src/ui/generation_preview.cpp` · id `wizard_life_map`*
 
 ### Round 6 tail caption (under the playing Industrialisation map)
 

@@ -223,7 +223,7 @@ void app::refresh_wizard_preview()
     preview_system(undrawn, m_wiz_resolved.home_orbit_au,
                    m_pending_world_params.seed, m_wiz_undrawn);
 
-    // The globe's real surface. Synchronous under --verify (a capture must never
+    // The Life map's real surface. Synchronous under --verify (a capture must never
     // race the worker); asynchronous in play, marked stale if already in flight.
     //
     // BL-1084: in play the build IS the Life gate world (slot 0), so the gate
@@ -249,6 +249,7 @@ void app::refresh_wizard_preview()
             m_wiz_terrain[i] = ui::pack_lapse_terrain(tc.landform, tc.river_edges,
                                                       tc.river_downstream);
         }
+        m_wiz_life_ground = {}; // BL-1280: rebaked off the new raster on next draw
     }
     else if (m_wiz_surface_future.valid())
         m_wiz_surface_stale = true;
@@ -263,7 +264,7 @@ void app::launch_wizard_surface_build()
     // own Life-gate stage -- the star, the system, the homeworld's tiles WITH
     // THEIR DEPOSITS, its rivers -- on the same params, config and works Begin
     // would use, so the Culture round takes this world forward rather than
-    // building its own. The globe's rasters are packed off the gate world's
+    // building its own. The maps' rasters are packed off the gate world's
     // homeworld tiles, in raster order: the same pipeline, gate and seeds the
     // retired scratch preview ran (home_surface_bench holds the two equal).
     //
@@ -1490,11 +1491,12 @@ void app::poll_wizard_surface()
     wizard_gate_build built = m_wiz_surface_future.get();
     m_wiz_surface = std::move(built.surface.comp);
     m_wiz_terrain = std::move(built.surface.terrain);
+    m_wiz_life_ground = {}; // BL-1280: the Life map rebakes off the new raster
     if (m_wiz_surface_stale)
     {
         // Preferences moved while that build ran: it is already the wrong
         // world, so go straight around again with the current params. The
-        // globe shows its surface meanwhile, as it always did; its gate world
+        // Life map shows its surface meanwhile; its gate world
         // is dropped here with `built` (BL-1084).
         m_wiz_surface_stale = false;
         launch_wizard_surface_build();
@@ -1978,7 +1980,7 @@ void app::draw_generation_screen()
     if (lapse_round && !m_wiz_history[lapse_index].empty())
     {
         // The land mask comes from the wizard's OWN packed surface — the same
-        // raster the globe samples and the same one "Begin" builds — so the
+        // raster the Life map draws and the same one "Begin" builds — so the
         // coastline a frontier stalls at is the coastline the campaign has. It is
         // a no-op until that async build lands; the round simply retries.
         ui::history_lapse& rec = m_wiz_history[lapse_index];
@@ -2011,8 +2013,7 @@ void app::draw_generation_screen()
         const bool live = m_wiz_history_future[lapse_index].valid()
                           && !m_wiz_record_landed[lapse_index];
 
-        // FROZEN UNDER --verify, for the reason the globe's rotation is: a capture
-        // must never race an animation. The year is then whatever the script set.
+        // FROZEN UNDER --verify: a capture must never race an animation. The year is then whatever the script set.
         //
         // BL-914: a LIVE round is always advancing — there is nothing to pause
         // yet, only a frontier the playhead can be waiting at (`year == last`,
@@ -2233,7 +2234,7 @@ void app::draw_generation_screen()
             //    BL-860 / BL-946 / BL-1068) ──
             //
             // THE TRANSPORT IS DELIBERATELY PLAIN. The wizard's standing premise —
-            // *you set conditions here, you do not steer* — and the globe's own
+            // *you set conditions here, you do not steer* — and the map's own
             // no-input ruling both argue for the plainer answer, and BL-829 files
             // scrub/pause as a question to be settled by WATCHING rather than in
             // advance. So: it runs, and it can be run again from the start. No
@@ -2717,57 +2718,41 @@ void app::draw_generation_screen()
         }
         ImGui::EndChild(); // ##wiz_left
 
-        // ── Right two-thirds: what this roll LOOKS like. A stylised painting read
-        //    straight from the preview states — the system in round 0, the homeworld
-        //    surface in round 1, its industrial history in round 2. ──
+        // ── Right two-thirds: what this roll LOOKS like. The System round draws
+        //    the system; every round after it draws the homeworld as ONE 2D map
+        //    (STARTUP.md § The Life map; the globe is retired, Ben, 2026-10-10). ──
         ImGui::SameLine();
         ImGui::BeginChild("##wiz_preview", {0.0f, 0.0f}, false,
                           ImGuiWindowFlags_NoBackground);
 
-        // THE GLOBE, built once for both branches below. The planetology
-        // rounds draw it as their primary view; the Culture round HOLDS it
-        // through its wait and dissolves it into the migration map (BL-1091;
-        // Ben, 2026-09-24, rulings R12; STARTUP.md § The globe: "the globe
-        // does not leave with the Life round"). Kepler turns slowly — one
-        // revolution per minute, wall-clock — so the far hemisphere can be
-        // read too; frozen under --verify (m_golden_dir set), since a golden
-        // capture must never race an animation.
-        std::vector<ui::preview_body> pv;
-        pv.reserve(static_cast<std::size_t>(n_bodies));
-        for (int i = 0; i < n_bodies; ++i)
-        {
-            const body_inputs& bi = prototype_body(i);
-            pv.push_back(ui::preview_body{
-                m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
-                bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
-                bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
-        }
-        const float rot = m_golden_dir.empty()
-            ? static_cast<float>(std::fmod(ImGui::GetTime() / 60.0, 1.0)) * 6.2831853f
-            : 0.0f;
-        const ui::preview_surface_view surf{
-            home_grid_width, home_grid_height,
-            m_wiz_surface.size() == static_cast<std::size_t>(home_grid_width)
-                                        * static_cast<std::size_t>(home_grid_height)
-                ? m_wiz_surface.data() : nullptr };
-        // The Life round's globe -- the last planetology round's view, which
-        // is the world the Culture round inherits -- at the pane's cursor.
-        const auto draw_life_globe = [&]() {
-            ui::draw_generation_preview(pv.data(), pv.size(), m_wiz_resolved.params,
-                                        wizard_planetology_round_count - 1, rot, surf);
-        };
+        // THE LIFE MAP (BL-1280): the pass rounds' ground, baked off the
+        // Life-gate world's raster -- slot 0's tiles in play, the synchronous
+        // preview of the same pipeline under --verify -- and drawn in the pass
+        // rounds' frame. The Life round draws it as its primary view and the
+        // Culture round holds it through its wait, so the record lands on the
+        // ground the player was already reading. Baked once per raster; a
+        // raster reassignment resets it (refresh_wizard_preview,
+        // poll_wizard_surface). No input: the pass rounds' map takes none.
+        if (!m_wiz_life_ground.baked())
+            ui::bake_lapse_ground(m_wiz_life_ground, home_grid_width, home_grid_height,
+                                  m_wiz_surface.empty() ? nullptr : m_wiz_surface.data(),
+                                  m_wiz_surface.size(),
+                                  m_wiz_terrain.empty() ? nullptr : m_wiz_terrain.data(),
+                                  m_wiz_terrain.size());
         // The lapse header over the map's own corner, in the map's own idiom
-        // (history_lapse.cpp's year stamp): the body's name and the year.
-        // Framed by `lapse_map_frame`, the one rule the drawer uses, so the
-        // stamp the globe wears through the wait sits exactly where the map's
-        // stamp appears as the globe thins -- no jump at the dissolve.
+        // (history_lapse.cpp's year stamp): the body's name, and the year when
+        // there is one. Framed by `lapse_map_frame`, the one rule both maps
+        // use, so the stamp the Life map wears sits exactly where the Culture
+        // map's own stamp appears when the record lands -- no jump.
         const auto draw_lapse_stamp = [&](ImVec2 pane_origin, ImVec2 pane_avail,
-                                          const std::string& body, int year) {
+                                          const std::string& body, const std::string& when) {
             float fx = 0.0f, fy = 0.0f, sc = 0.0f;
             ui::lapse_map_frame(home_grid_width, home_grid_height, pane_avail.x, pane_avail.y,
                                 fx, fy, sc);
-            const std::string label = body.empty() ? ui::lapse_year_label(year)
-                                                   : body + "  " + ui::lapse_year_label(year);
+            const std::string label = body.empty() ? when
+                                    : when.empty() ? body
+                                                   : body + "  " + when;
+            if (label.empty()) return;
             const ImVec2 ts = ImGui::CalcTextSize(label.c_str());
             const ImVec2 at{pane_origin.x + fx + 8.0f, pane_origin.y + fy + 6.0f};
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -2776,15 +2761,25 @@ void app::draw_generation_screen()
                               IM_COL32(8, 9, 12, 190));
             dl->AddText(at, col_bright, label.c_str()); // fit-exempt: a year stamp sized by CalcTextSize
         };
+        // The homeworld's coined name (BL-257), for the Life map's stamp.
+        std::string home_name;
+        for (int i = 0; i < n_bodies; ++i)
+            if (prototype_body(i).is_homeworld)
+                home_name = m_wiz_names.bodies[static_cast<std::size_t>(i)];
+        const auto draw_life_map = [&](const std::string& body, const std::string& when) {
+            const ImVec2 pane_origin = ImGui::GetCursorScreenPos();
+            const ImVec2 pane_avail  = ImGui::GetContentRegionAvail();
+            ui::draw_lapse_ground(m_wiz_life_ground);
+            if (m_wiz_life_ground.baked())
+                draw_lapse_stamp(pane_origin, pane_avail, body, when);
+        };
 
         if (lapse_round)
         {
-            // ── The lapse rounds replace the globe with a 2D MAP (Ben, 2026-09-08,
-            //    at the live app). A globe shows a world; a map shows a FRONTIER,
-            //    and the frontier is these rounds' whole subject — a border that
-            //    stalls at a strait reads as a stall on a map and as foreshortening
-            //    on a sphere. It inherits the globe's no-input rule: nothing here is
-            //    a widget. ──
+            // ── The lapse rounds play their record on the 2D MAP (Ben, 2026-09-08,
+            //    at the live app): a map shows a FRONTIER, and the frontier is
+            //    these rounds' whole subject. No input: nothing here is a
+            //    widget. ──
             // NOTHING BESIDE A WAIT (Ben, 2026-09-16). While the pass is still
             // computing, this pane stays empty: the left column says "Loading the
             // ... round" and that is the whole of the surface. Drawing the sim's
@@ -2792,26 +2787,27 @@ void app::draw_generation_screen()
             // map appears when there is a finished record to play, and plays it
             // from its first year.
             //
-            // EXCEPT THE CULTURE ROUND, WHICH HOLDS THE GLOBE (BL-1091; Ben,
-            // 2026-09-24, rulings R12). Rounds 4-6 open on the ground their
-            // predecessor left, carried as colour under the map (the hand-over
-            // cross-fade at landing); round 3 has no predecessor lapse, and a
-            // blank pane between the Life round's globe and the migration map
-            // broke the one continuity the wizard is built on. So the wait
-            // keeps the Life round's globe in the pane under a 2400 BCE stamp,
-            // and once the record lands the map REPLACES it at once (Ben,
-            // 2026-09-25: a sharp jump, so the globe never covers the map).
+            // EXCEPT THE CULTURE ROUND, WHICH HOLDS THE LIFE MAP (BL-1280;
+            // STARTUP.md § The Life map, "one map from Life to Begin"). Rounds
+            // 4-6 open on the ground their predecessor left, carried as colour
+            // under the map (the hand-over cross-fade at landing); round 3 has
+            // no predecessor lapse, so its wait keeps the Life round's map in
+            // the pane under a 2400 BCE stamp, and the record plays on that
+            // same map when it lands -- same ground, same frame, same stamp
+            // corner, so there is nothing to replace. The same holds before
+            // any run exists on the round (a record not yet kept): the pane is
+            // never blank between Life and the record.
             // BL-1084: the wait is a run whose record has not landed.
-            if (m_wiz_history_future[lapse_index].valid() && !m_wiz_record_landed[lapse_index])
+            const bool round_waiting = m_wiz_history_future[lapse_index].valid()
+                                       && !m_wiz_record_landed[lapse_index];
+            if (lapse_index == 0 && (round_waiting || m_wiz_history[lapse_index].empty()))
             {
-                if (lapse_index == 0)
-                {
-                    const ImVec2 pane_origin = ImGui::GetCursorScreenPos();
-                    const ImVec2 pane_avail  = ImGui::GetContentRegionAvail();
-                    draw_life_globe();
-                    draw_lapse_stamp(pane_origin, pane_avail, m_wiz_history[lapse_index].body_name,
-                                     static_cast<int>(colonisation_start_year));
-                }
+                const std::string& body = m_wiz_history[lapse_index].body_name.empty()
+                                              ? home_name : m_wiz_history[lapse_index].body_name;
+                draw_life_map(body, ui::lapse_year_label(static_cast<int>(colonisation_start_year)));
+            }
+            else if (round_waiting)
+            {
                 /* the other rounds' wait draws nothing */
             }
             else if (m_wiz_history[lapse_index].empty())
@@ -2822,12 +2818,9 @@ void app::draw_generation_screen()
                 // is only ever seen for the first moment or two of a run —
                 // before its worker has published a first region and a first
                 // owner for it — rather than for the whole wait as before.
+                // (The Culture round never reaches here: it holds the Life map.)
                 const bool running = m_wiz_history_future[lapse_index].valid();
-                if (lapse_index == 0)
-                    ImGui::TextWrapped(running
-                        ? "  The first records are being set down."
-                        : "  No record has been kept for this world yet.");
-                else if (lapse_index == 1)
+                if (lapse_index == 1)
                     ImGui::TextWrapped(running
                         ? "  The history is starting."
                         : "  The history has not been run for this world yet.");
@@ -2843,12 +2836,8 @@ void app::draw_generation_screen()
             }
             else
             {
-                // A SHARP JUMP, NOT A DISSOLVE (Ben, 2026-09-25, at the live
-                // app: "we need to sharply jump from life to cultures, so the
-                // globe doesn't block a player's view"). The globe holds only
-                // through the wait, when there is no map yet; the moment the
-                // record lands the map is the whole pane. The cross-fade that
-                // painted the globe over the map's opening tenth is gone.
+                // The record plays on the map. On the Culture round this is
+                // the Life map's own ground with the record over it (BL-1280).
                 const ui::history_lapse& rec = m_wiz_history[lapse_index];
                 ui::draw_lapse_map(rec, hist_slice, m_wiz_history_year[lapse_index]);
 
@@ -2869,15 +2858,32 @@ void app::draw_generation_screen()
                 }
             }
         }
+        else if (m_wiz_round == 0)
+        {
+            // Round 1, System: the drawing of the system -- star colour and size,
+            // orbits, body sizes -- so the pane is never empty while there is no
+            // body yet (STARTUP.md § The Life map).
+            std::vector<ui::preview_body> pv;
+            pv.reserve(static_cast<std::size_t>(n_bodies));
+            for (int i = 0; i < n_bodies; ++i)
+            {
+                const body_inputs& bi = prototype_body(i);
+                pv.push_back(ui::preview_body{
+                    m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
+                    bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
+                    bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
+            }
+            ui::draw_system_preview(pv.data(), pv.size(), m_wiz_resolved.params);
+        }
         else
         {
-            ui::draw_generation_preview(pv.data(), pv.size(),
-                                        m_wiz_resolved.params, m_wiz_round, rot, surf);
+            // Round 2, Life: the homeworld as the 2D map, the primary view.
+            draw_life_map(home_name, std::string{});
 
-            // The honest wait note: while a build is in flight the globe still
-            // shows the PREVIOUS roll's surface (or the stylised stand-in on
-            // the very first frames).
-            if (m_wiz_surface_future.valid() && m_wiz_round > 0)
+            // The honest wait note: while a build is in flight the map still
+            // shows the PREVIOUS roll's surface (or nothing, on the very first
+            // frames, before the first gate world lands).
+            if (m_wiz_surface_future.valid())
             {
                 ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
                 ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));

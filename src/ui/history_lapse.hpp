@@ -15,11 +15,11 @@
 // ---------------------------------------------------------------------------
 //
 // WHAT THIS IS FOR. The New World wizard's round 4 (STARTUP.md § Rounds 4 and 5)
-// replaces the globe with a 2D MAP and plays the Era -1 ownership record across
-// it, with an ordered top-16 board beside it. Ben, 2026-09-08, at the live app:
-// *a globe shows a world; a map shows a FRONTIER*, and the frontier is the whole
-// subject of the round — a border that stalls at a strait reads as a stall on a
-// map and as foreshortening on a sphere.
+// plays the Era -1 ownership record across a 2D MAP, with an ordered top-16
+// board beside it. Ben, 2026-09-08, at the live app: *a map shows a FRONTIER*,
+// and the frontier is the whole subject of the round — a border that stalls at
+// a strait reads as a stall. The Life round draws the same map with no record
+// on it (`draw_lapse_ground`, BL-1280; STARTUP.md § The Life map).
 //
 // A REPLAY, NEVER A RE-RUN. Everything drawn here is folded out of
 // `era_timelapse` — the change list generation already emits — through
@@ -67,8 +67,7 @@
 // correctly and silently inert today rather than firing on the Empire era's
 // own close.
 //
-// DRAW COST. ImGui carries 16-bit draw indices, which is why the wizard's globe
-// is 48 meridian slices rather than ~7,500 projected hexes. The map is drawn at
+// DRAW COST. ImGui carries 16-bit draw indices. The map is drawn at
 // TILE resolution but RUN-MERGED along each row: a political map is long runs of
 // one colour, so a 261x121 raster collapses to on the order of a thousand rects.
 // The region granularity of the record is what makes that possible — there is no
@@ -107,8 +106,8 @@ inline terrain_landform lapse_landform(uint16_t t)
 inline uint8_t lapse_river_edges(uint16_t t)      { return static_cast<uint8_t>((t >> 4)  & 0x3Fu); }
 inline uint8_t lapse_river_downstream(uint16_t t) { return static_cast<uint8_t>((t >> 10) & 0x3Fu); }
 
-/// What the wizard's async surface build hands back: the packed axes the globe
-/// samples (`preview_pack`) and the packed terrain the lapse maps draw.
+/// What the wizard's async surface build hands back: the packed axes the maps
+/// read their land mask from (`preview_pack`) and the packed terrain they draw.
 struct wizard_surface
 {
     std::vector<uint8_t>  comp;
@@ -743,8 +742,7 @@ struct history_lapse
     /// presentation only -- like `prim_report_done` below.
     mutable double works_close_t0 = -1.0;
     /// True under `--verify`: every mark draws at full strength at once, so a
-    /// capture never races the stagger (the rule the globe's rotation and the
-    /// playhead already obey, STARTUP.md § The globe).
+    /// capture never races the stagger (the rule the playhead already obeys).
     bool works_close_frozen = false;
 
     /// The map prints its primitive count to stderr ONCE per record, so the
@@ -777,6 +775,45 @@ struct history_lapse
 /// all linear in the raster or in the change list.
 void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len,
                           const uint16_t* terrain = nullptr, std::size_t terrain_len = 0);
+
+// ---------------------------------------------------------------------------
+// BL-1280 -- THE LIFE MAP: the pass rounds' ground with no record on it
+// ---------------------------------------------------------------------------
+//
+// The globe is retired (Ben, 2026-10-10; STARTUP.md § The Life map). The Life
+// round draws the homeworld as the SAME 2D map the pass rounds use, from the
+// Life-gate world's tile raster, over the same terrain base -- and that map
+// holds through the Culture round's wait, so the record lands on the ground
+// the player was already looking at. One bake (`bake_ground_layers` in the
+// .cpp, which `finish_history_lapse` calls too) and one framing
+// (`lapse_map_frame`) make the two maps one map by construction, not by luck.
+
+/// The terrain base alone, baked once per gate world: the layers a pass
+/// round's `history_lapse` carries under its fill, in tile units.
+struct lapse_ground
+{
+    int grid_w = 0;
+    int grid_h = 0;
+    std::vector<lapse_base_run>   base_runs;
+    std::vector<lapse_river_seg>  river_segs;
+    std::vector<lapse_relief_seg> relief_segs;
+
+    bool baked() const { return grid_w > 0 && grid_h > 0; }
+};
+
+/// Bake @p g from the wizard's packed rasters (the same pair
+/// `finish_history_lapse` takes). A no-op leaving @p g unbaked while
+/// @p packed is missing or the wrong length; a missing @p terrain bakes flat
+/// land and no rivers, exactly as the pass rounds do.
+void bake_lapse_ground(lapse_ground& g, int gw, int gh,
+                       const uint8_t* packed, std::size_t packed_len,
+                       const uint16_t* terrain = nullptr, std::size_t terrain_len = 0);
+
+/// Paint @p g into the current window's remaining content region, framed by
+/// `lapse_map_frame` exactly as `draw_lapse_map` frames a record: sea, the
+/// ground, the mountain rims, the rivers. TAKES NO INPUT -- the pass rounds'
+/// map takes none, and the Life map does what they do (no pan, no zoom).
+void draw_lapse_ground(const lapse_ground& g);
 
 /// Assign every polity its identity slot (BL-915; pinned and family-wedged by
 /// BL-1087): the pins the predecessor handed over are kept, a clash between
@@ -949,10 +986,10 @@ const char* lapse_layer_label(const history_lapse& h, lapse_layer l);
 /// Paint the political map for one already-materialised ownership slice into the
 /// current window's remaining content region.
 ///
-/// TAKES NO MOUSE INPUT, and that is inherited rather than incidental: the globe
-/// it replaces takes none by design (STARTUP.md § The globe — and why it does not
-/// take input), and BL-829 does not lift the rule. Pure draw-list painting, no
-/// widgets, so there is nothing here for a click to land on.
+/// TAKES NO MOUSE INPUT, by design: *you set conditions here, you do not steer*
+/// (STARTUP.md § The Life map), and BL-829 does not lift the rule. Pure
+/// draw-list painting, no widgets, so there is nothing here for a click to land
+/// on -- no pan and no zoom, which the Life map inherits.
 ///
 /// THE LEGEND (BL-1118) is painted here too, in the pane's band under the map
 /// -- draw list only, like the map. Where the band is too shallow for it, the
@@ -1199,8 +1236,8 @@ std::string lapse_year_label(int year);
 /// @p gw x @p gh tiles fitted aspect-preserved, centred, and nudged right by
 /// the authored `lapse_map_nudge_x` (Ben, 2026-09-09: centred in the pane the
 /// map sat visually left of the space it was given). ONE rule for the drawer
-/// and for the wizard's globe dissolve (BL-1091), which must stamp the year
-/// over the same corner the map's own stamp lands on: a second framing
+/// and for the Life map (`draw_lapse_ground`, BL-1280) and its stamp, which
+/// must sit where the Culture map's own stamp lands on: a second framing
 /// formula would be the drift a header exists to prevent. Pure geometry;
 /// `draw_lapse_map` calls it for its own frame.
 inline constexpr float lapse_map_nudge_x = 120.0f;
