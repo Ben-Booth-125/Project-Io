@@ -253,6 +253,32 @@ struct world_params
     int culture_profile_lack_max_q  = 250;
     int culture_profile_amenity_div = 4;
 
+    /// BL-1298 -- THE HISTORY BANKS MORE (NATION_GENERATION.md sec Pass 7,
+    /// Ben 2026-10-11): the standing levy's per-mille share of the seats'
+    /// stores swept every round, and the endowment income rate, copied into
+    /// BOTH resumed spans' params by `exploration_sim_params`
+    /// (`history_sim_params::treasury_levy_per_mille_q` /
+    /// `treasury_endowment_income_q`). Fields here so `treasury_census` can
+    /// calibrate them on the shipped worlds. NOT ON THE SAVE SEAM, exactly as
+    /// the two above and flagged the same way: at the defaults a saved
+    /// descriptor rebuilds the identical world; a non-default value is a
+    /// tuning world that does not round-trip.
+    ///
+    /// MEASURED (treasury_census, 16 library seeds, build-only median nation
+    /// opening in credits, levy 100): endowment 40 -> 87, 100k -> 221,
+    /// 300k -> 559, 600k -> 1,289, 1M -> 2,394. The levy SATURATES: at
+    /// endowment 300k, levy 25 / 100 / 250 -> 575 / 559 / 577, because the
+    /// seats' production, not the share, bounds what it sweeps (~111k cr in
+    /// Exploration, ~96k in Industrialisation, pooled). 100 (a tenth of the
+    /// stores a round) and 700,000 are the round values that land the median
+    /// in NATION_GENERATION.md sec Pass 7's 1,000-2,000 band.
+    int treasury_levy_per_mille_q   = 100;
+    int treasury_endowment_income_q = 700000;
+    /// ...and the standing army sized to the realm's earn (EXPLORATION.md sec
+    /// Force persists now, Ben 2026-10-11). On in every shipped world; a field
+    /// only so the census can read the pre-ruling arm. Same seam note.
+    bool standing_army_sized_to_earn = true;
+
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
 
     /// THE NATION COUNT IS A TARGET (BL-1278; NATION_GENERATION.md § The

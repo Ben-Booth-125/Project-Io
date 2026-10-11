@@ -2221,6 +2221,36 @@ struct history_sim_params
     /// round); neither moved reading 8, which consolidation dominates.
     int treasury_trade_income_q = 100;
 
+    /// BL-1298 -- THE STANDING LEVY (NATION_GENERATION.md sec Pass 7, Ben
+    /// 2026-10-11: "a realm taxes its seats' stores every round"). On every
+    /// decision round AFTER `consolidation_year` (the 1200 round itself folds
+    /// the whole stock, once), each living polity sweeps this per-mille of
+    /// the `material_stock` on every seat it holds -- and on its capital,
+    /// exactly the ground the consolidation reads -- into the capital's
+    /// `region::treasury`. A share PER ROUND (both resumed spans run a 4-year
+    /// band), floored per seat. It is EARN: it counts toward the round's
+    /// surplus and toward what the realm's earn can carry
+    /// (`standing_army_sized_to_earn`). Domain 0-1000; 0 = off (the struct
+    /// default, so every fixture and the Empires round is unmoved), and a
+    /// `consolidation_year` of INT64_MIN ("never") never levies either.
+    /// Generation's value rides on `world_params::treasury_levy_per_mille_q`.
+    int treasury_levy_per_mille_q = 0;
+
+    /// BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS (EXPLORATION.md
+    /// sec Force persists now, Ben 2026-10-11, overturning NR-878 for the
+    /// standing army only). When on, a polity whose army bill for the round
+    /// exceeds the round's EARN (levy + endowment + corridor + trade +
+    /// tribute) disbands, before the bill is paid, the paid standing heads
+    /// that earn cannot carry: every region carrying its paid heads keeps
+    /// the same per-mille share, and the disbanded men go home to that
+    /// ground's `manpower_stock` exactly as the unpaid decay's do. The bill
+    /// is then met out of the round's earn, so the army never draws the
+    /// chest down. A rule on the stock, not a term in the scorer: the spend
+    /// choice is untouched. The navy and the other stocks keep NR-878. Off
+    /// in the struct; `exploration_sim_params` turns it on (Industrialisation
+    /// inherits it).
+    bool standing_army_sized_to_earn = false;
+
     /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
     /// WOULD open (the marginal volume, both directions, every good --
     /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
@@ -2875,6 +2905,12 @@ struct exploration_upkeep_spend
     int64_t earn_corridor        = 0;
     int64_t earn_trade           = 0;
     int64_t consolidation_folded = 0;
+    /// BL-1298: the standing levy swept from seats this call, the paid heads
+    /// disbanded because the round's earn could not carry them, and the
+    /// polity-rounds on which that sizing bound. Write-only.
+    int64_t earn_levy            = 0;
+    int64_t army_disbanded_by_earn = 0;
+    int64_t army_sized_rounds    = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -4512,6 +4548,11 @@ struct history_sim_state
     int64_t treasury_earned_corridor      = 0;
     int64_t treasury_earned_trade         = 0;
     int64_t treasury_from_consolidation   = 0;
+    /// BL-1298, write-only: the standing levy summed over the run, the paid
+    /// heads the earn-sized army disbanded, and the polity-rounds it bound.
+    int64_t treasury_earned_levy          = 0;
+    int64_t army_disbanded_by_earn        = 0;
+    int64_t army_sized_rounds             = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
     /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over

@@ -1447,6 +1447,35 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // round's SURPLUS (earn less the army and navy bills) is read against.
         const int64_t purse_before_earn = seat.treasury;
 
+        // ---- BL-1298 -- THE STANDING LEVY: EVERY ROUND AFTER THE FOLD. ----
+        // NATION_GENERATION.md sec Pass 7 (Ben, 2026-10-11): "a realm taxes
+        // its seats' stores every round -- swept into the chest as the 1200
+        // consolidation once swept it, but every round rather than once." The
+        // ground read is the consolidation's (every held seat, plus the
+        // capital); the take is a per-mille share of each seat's stock,
+        // floored per seat. Earned after the purse's opening read, so it is
+        // part of the round's surplus and of what the realm's earn carries.
+        // Out of domain (outside 1-1000) it levies nothing.
+        int64_t levy_income = 0;
+        if (params.treasury_levy_per_mille_q > 0 && params.treasury_levy_per_mille_q <= 1000
+            && params.consolidation_year != INT64_MIN && year > params.consolidation_year)
+        {
+            const int64_t share = params.treasury_levy_per_mille_q;
+            for (std::size_t ri = 0; ri < regions.size(); ++ri)
+            {
+                region& r = regions[ri];
+                const bool is_cap = static_cast<int>(ri) == q.capital;
+                if (!is_cap && !(r.is_seat && r.nation == q.id)) continue;
+                if (r.material_stock <= 0) continue;
+                // material_stock <= 2^48 and share <= 1000: under 2^58.
+                const int64_t take = (r.material_stock * share) / 1000;
+                r.material_stock -= take;
+                levy_income      += take;
+            }
+            seat.treasury = clampi64(seat.treasury + levy_income, 0, 1LL << 48);
+            if (spend) spend->earn_levy += levy_income; // write-only
+        }
+
         // ---- ONGOING EARN: endowment, the inherited network, a market. ----
         // "Fed by what the polity already holds and already reaches" — read
         // fresh every round rather than cached, so ground lost or gained this
@@ -1513,9 +1542,54 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
         const bool had_navy = q.navy_stock > 0; // the round's OPENING fleet, for the lapse record
         {
-            const int64_t heads = realm_paid[pi];
+            int64_t heads = realm_paid[pi];
             const int64_t rate  =
                 std::max<int64_t>(params.standing_army_upkeep_per_1000_heads_year_q, 0) * years_q;
+            // ---- BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS. ----
+            // EXPLORATION.md sec Force persists now (Ben, 2026-10-11,
+            // overturning NR-878 for the standing army): "a realm keeps only
+            // the standing army its earn can carry". Where the round's bill
+            // exceeds the round's earn, every region carrying this realm's
+            // paid heads keeps the same per-mille share -- the share the earn
+            // carries -- and the rest go home to that ground's pool, capped
+            // at its ceiling, as the unpaid decay's men do. The bill below is
+            // then within the earn, so the chest is never drawn down by it.
+            if (params.standing_army_sized_to_earn && heads > 0 && rate > 0)
+            {
+                const int64_t round_earn = std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                // heads <= 2^48 and rate <= ~2^34 at any sane constant; the
+                // division form keeps the comparison free of the product.
+                const int64_t carried = std::min<int64_t>(heads,
+                    round_earn >= (INT64_MAX / 1000) ? heads : (round_earn * 1000) / rate);
+                if (carried < heads)
+                {
+                    // carried < heads <= 2^48, so carried * 1000 < 2^58.
+                    const int64_t keep_q = (carried * 1000) / heads; // 0..999
+                    int64_t kept_sum = 0, gone_sum = 0;
+                    for (region& r : regions)
+                    {
+                        if (r.nation != q.id) continue;
+                        const int64_t paid = standing_army_heads(r);
+                        if (paid <= 0) continue;
+                        const int64_t kept = (paid * keep_q) / 1000;
+                        const int64_t gone = paid - kept;
+                        r.standing_army = kept;
+                        r.army_stock    = std::max<int64_t>(r.army_stock - gone, 0);
+                        const int64_t ceiling = manpower_ceiling(r.population, r.work_manpower_mod);
+                        r.manpower_stock = clampi64(r.manpower_stock + gone, 0, ceiling);
+                        kept_sum += kept;
+                        gone_sum += gone;
+                    }
+                    heads = kept_sum;
+                    realm_paid[pi] = kept_sum;
+                    if (spend)
+                    {
+                        spend->army_disbanded_by_earn += gone_sum;
+                        ++spend->army_sized_rounds;
+                    }
+                }
+            }
             if (heads > 0 && rate > 0)
             {
                 const int64_t due = (heads * rate) / 1000;
@@ -5491,6 +5565,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_earned_corridor      += upkeep_spend.earn_corridor;        // write-only
             out.treasury_earned_trade         += upkeep_spend.earn_trade;
             out.treasury_from_consolidation   += upkeep_spend.consolidation_folded;
+            out.treasury_earned_levy          += upkeep_spend.earn_levy;
+            out.army_disbanded_by_earn        += upkeep_spend.army_disbanded_by_earn;
+            out.army_sized_rounds             += upkeep_spend.army_sized_rounds;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
