@@ -70,9 +70,17 @@ is never imposed by deleting, splitting or relabelling a nation. Two stages, in 
 
 **Reconciliation runs at the end of Industrialisation, before the polity fold (Ben, 2026-10-11).**
 One late pass, nearest the count that matters: the verbs above fire in the span's closing rounds,
-dated inside it, so the nations that reach the fold are already on both targets. How the richest
-minor is read, how a buy-out is priced, and how the merge pass's minimum-territory stop composes with
-the total remain open design. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
+dated inside it, so the nations that reach the fold are already on both targets.
+
+**The three readings (Ben, 2026-10-11):**
+- **The richest minor** is the one with the most industry points standing on its ground
+  (`region::industry_points`, summed) — what a charter is built from.
+- **A buy-out** is made by the richest champion, which buys the poorest major's specialist whole at
+  that specialist's charter price; the seller becomes a minor. "Richest" and "poorest" read the same
+  industry-point measure.
+- **The minimum-territory floor runs first.** No nation survives below it; reconciliation then
+  closes whatever gap the floor leaves, adding nations back by secession or a freed subject where the
+  floor took the count under the total. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
 holds for everything else. These two counts are its one sanctioned exception: the player sets them,
 and the world's shape inside them stays the world's.
 
