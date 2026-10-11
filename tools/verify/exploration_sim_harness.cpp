@@ -559,9 +559,10 @@ int main()
         // so the span resumes on a different map: it fights a third as much
         // and a realm holds subjects again, so purchases and tribute return.
         // RE-PINNED 2026-10-10 (BL-1272, the history runs no technology tree): 86/83/112, 2, 0, 2481129, 359, 1, 778 -> 24/21/114, 5, 0, 37154489, 265, 0, 656 (1200 handoff polities 437 -> 255: the tree's defence/cohesion modifiers left the Empires span; sea legs open by date).
+        // RE-PINNED 2026-10-11 (BL-1272, Ben: a fleet afloat has a hull): subjections 5 -> 1, tribute 37154489 -> 1. On this fixture the P90 navy floor is 0, so all five subjects were taken by powers with no ships; the > 0 hull clause alone moves it.
         check(ex1.battles == 24 && ex1.conquests == 21 && ex1.foundings == 114
-           && ex1.subjections_formed == 5 && ex1.subjections_freed == 0
-           && ex1.tribute_remitted == 37154489 && ex1.treaties_formed == 265
+           && ex1.subjections_formed == 1 && ex1.subjections_freed == 0
+           && ex1.tribute_remitted == 1 && ex1.treaties_formed == 265
            && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 656,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
@@ -645,10 +646,12 @@ int main()
             // 37154489; the purchase fork is the only switch between them, its
             // payment mechanism not traced further here). The BL-1272 fix round
             // (sea legs need naval capacity; the coastal naval ramp) left both
-            // pins unmoved on this fixture.
+            // pins unmoved on this fixture. RE-PINNED 2026-10-11 (Ben: a fleet
+            // afloat has a hull, R3b's cause): subjections 5 -> 1, tribute
+            // 37154178 -> 1.
             check(off.battles == 24 && off.conquests == 21 && off.foundings == 114
-               && off.subjections_formed == 5 && off.subjections_freed == 0
-               && off.tribute_remitted == 37154178 && off.treaties_formed == 265
+               && off.subjections_formed == 1 && off.subjections_freed == 0
+               && off.tribute_remitted == 1 && off.treaties_formed == 265
                && off.treaties_broken == 0 && off.owner_changes.size() == 656,
                   "R3d.1 CONTROL: the fork-off span matches its pinned counters exactly (battles, "
                   "conquests, foundings, subjections, tribute, treaties, owner record)");
