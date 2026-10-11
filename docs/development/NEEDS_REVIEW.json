@@ -374,6 +374,26 @@
     "src/world/placement_rules.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1036",
+   "title": "Quick Start draws no setup round: what seed, abundance and nation targets does it build on?",
+   "raised": "2026-10-11",
+   "kind": "question",
+   "status": "open",
+   "source": "Sprint 53 design form, 2026-10-11 (seed and abundance move to the setup round)",
+   "what": "Quick Start built on the main menu's seed and resources. Both now live on the setup round, with the nation targets, and Quick Start draws no round.",
+   "why_it_matters": "Quick Start needs every input the setup round holds; BL-1279 (wizard setup round) cannot move the controls without an answer.",
+   "options": [
+    "Keep a compact seed/abundance/targets strip on the menu for Quick Start only",
+    "Quick Start rolls a seed and uses defaults (Standard abundance, default targets)",
+    "Quick Start opens the setup round alone, then builds straight through"
+   ],
+   "recommendation": "The third: one place for the inputs, and Quick Start still skips every lapse.",
+   "files": [
+    "docs/ui/STARTUP.md"
+   ],
+   "resolution": null
   }
  ]
 }

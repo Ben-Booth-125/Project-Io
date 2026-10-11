@@ -294,7 +294,7 @@ A world's history is told, as the Empires round's causes already are; it is neve
 ## The world descriptor — seed + generation parameters
 
 Generation is driven by a small **world descriptor** (BL-114, world descriptor) — a master
-**seed** plus a `world_params` struct — chosen on the main-menu **New World** setup and threaded
+**seed** plus a `world_params` struct — chosen on the wizard's setup round (`../ui/STARTUP.md` § Rounds) and threaded
 through `make_hard_coded_world(world_params)`. Same descriptor → identical world on a given
 binary; this is the reproducible key the setup screen surfaces (with a dice-randomise and a
 copyable readout). The descriptor lives in the app, **not** the `world` struct, so it stays off

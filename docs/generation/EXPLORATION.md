@@ -268,6 +268,13 @@ per world. The isolation that slows its development also slows its conquest thro
 reaches this phase holding a realm of its own to be colonised. Unforced, the most isolated culture
 has no realm left by 1200 on half the library — which is why the lag must carry both effects.
 
+**The lag is diffusion by contact (Ben, 2026-10-11).** Development spreads between peoples in
+proportion to the reach between them: what a neighbour knows reaches a polity along the corridors
+that join them, and the cheaper the reach the faster it arrives. Every culture feels this force;
+the most remote culture simply receives the least, so it falls behind for a reason a player can read
+off the map — distance, water, a road never built. It is a systemic force, not a handicap on one
+culture; the late culture is lagging because it is isolated, never isolated because it is chosen.
+
 
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
 heartland first sails: its push — land crowding (people per unit of farmland) times navy, in this age — sends voyages, plants settler colonies

@@ -849,6 +849,17 @@ campaign opens on a recovery. It is still not the rupture: the Era 1 catastrophe
 past (`../lore/HISTORY.md`). The ruling below stands for how a world war forms; its "never forced"
 and the acceptance row "never all, never none" are overturned.
 
+**When and what it costs (Ben, 2026-10-11).**
+- **A fixed late window, 1900 to 1930.** The war is fought inside it, leaving the last thirty years
+  of the span to redevelop. It is the second sanctioned window after the rise and fall's; how the
+  war forms inside it is still the mutual-defence spread below.
+- **Razing falls only on ground fought over.** A region the war contests loses works
+  (`region::industry_points`) and port stock (`region::port_stock_q`), and every road through it
+  is demoted one tier. Regions the war never reaches are untouched.
+- **Treasuries are drained, and no debt is carried.** Each belligerent's treasury is spent down by
+  the war's cost and never goes below zero. Nothing is owed at 1960: the campaign opens on rebuilt
+  ground and refilled treasuries, not on a ledger of debt.
+
 #### Revolution
 
 **A LEAN (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns).** The disparity between a

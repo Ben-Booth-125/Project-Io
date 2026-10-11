@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*25 entries — 24 open, 1 resolved.*
+*26 entries — 25 open, 1 resolved.*
 
 ---
 
@@ -219,6 +219,21 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 > **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
+
+### NR-1036 — Quick Start draws no setup round: what seed, abundance and nation targets does it build on?
+*question · raised 2026-10-11 · from Sprint 53 design form, 2026-10-11 (seed and abundance move to the setup round)*
+
+Quick Start built on the main menu's seed and resources. Both now live on the setup round, with the nation targets, and Quick Start draws no round.
+
+**Why it matters.** Quick Start needs every input the setup round holds; BL-1279 (wizard setup round) cannot move the controls without an answer.
+
+- Keep a compact seed/abundance/targets strip on the menu for Quick Start only
+- Quick Start rolls a seed and uses defaults (Standard abundance, default targets)
+- Quick Start opens the setup round alone, then builds straight through
+
+> **Recommendation:** The third: one place for the inputs, and Quick Start still skips every lapse.
+
+*Files: `docs/ui/STARTUP.md`*
 
 ---
 
