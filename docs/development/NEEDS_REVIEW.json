@@ -342,7 +342,7 @@
    "title": "DECISION TAKEN: the rise-and-fall realm stays under the non-hegemony cap; the late culture is the world's most isolated",
    "raised": "2026-10-10",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben, 2026-10-10 history-patterns form",
    "what": "Two readings taken on your behalf. (a) 'Grows relatively large' is read as the largest share of its world by a clear margin, still under BL-224's non-hegemony cap - the cap is not overturned, so a pass-1 hegemon still fails the handoff. (b) The late culture is the culture most remote by reach when the Culture round closes, one per world; others may also be colonised naturally. Written: GENERATION_STRATEGY § History patterns, CIVILISATION, EXPLORATION.",
    "why_it_matters": "(a) decides whether the rise-and-fall target fights the non-hegemony invariant; (b) decides whether the late culture is chosen by a reading or emerges.",
@@ -353,7 +353,7 @@
     "docs/generation/EXPLORATION.md",
     "docs/lore/HISTORY.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-11 (sprint 53 form): (a) confirmed with a floor - the realm peaks at 25-35% of held regions, under the 50% cap; (b) confirmed - chosen at the Culture close, kept alive by the same isolation. Written: CIVILISATION.md, EXPLORATION.md."
   },
   {
    "id": "NR-1035",
@@ -374,6 +374,61 @@
     "src/world/placement_rules.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1036",
+   "title": "Quick Start draws no setup round: what seed, abundance and nation targets does it build on?",
+   "raised": "2026-10-11",
+   "kind": "question",
+   "status": "open",
+   "source": "Sprint 53 design form, 2026-10-11 (seed and abundance move to the setup round)",
+   "what": "Quick Start built on the main menu's seed and resources. Both now live on the setup round, with the nation targets, and Quick Start draws no round.",
+   "why_it_matters": "Quick Start needs every input the setup round holds; BL-1279 (wizard setup round) cannot move the controls without an answer.",
+   "options": [
+    "Keep a compact seed/abundance/targets strip on the menu for Quick Start only",
+    "Quick Start rolls a seed and uses defaults (Standard abundance, default targets)",
+    "Quick Start opens the setup round alone, then builds straight through"
+   ],
+   "recommendation": "The third: one place for the inputs, and Quick Start still skips every lapse.",
+   "files": [
+    "docs/ui/STARTUP.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1037",
+   "title": "The Drawdown lean no longer shows on the Life pane: does the 2D map need a cue for it?",
+   "raised": "2026-10-11",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1280 (Life round 2D map) build, 2026-10-11",
+   "what": "The retired globe painted decorative scars for the Drawdown (Spend) lean. The Life map draws the real terrain, which Drawdown does not change, so only the Spend chart now shows the lean.",
+   "why_it_matters": "STARTUP.md argues a lean whose effect is not drawn is a slider nobody can judge.",
+   "options": [
+    "The Spend chart is enough",
+    "Draw a cue on the map (e.g. depleted deposits shaded)"
+   ],
+   "recommendation": "The chart is enough until the map has a resource layer; a decorative cue would misstate the ground.",
+   "files": [
+    "docs/ui/STARTUP.md",
+    "src/ui/startup_screens.cpp"
+   ],
+   "resolution": "Ben, 2026-10-11: the Spend chart is enough; no cue on the map."
+  },
+  {
+   "id": "NR-1038",
+   "title": "DECISION TAKEN: the Life map neither pans nor zooms, matching the pass rounds",
+   "raised": "2026-10-11",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1280 (Life round 2D map) build, 2026-10-11",
+   "what": "STARTUP.md left pan/zoom on the Life map open. The pass rounds' map takes no mouse input, so the Life map takes none either. Written into STARTUP.md § The Life map.",
+   "why_it_matters": "Whether a player can read detail on the Life map before the history runs.",
+   "recommendation": "Confirm; revisit for both maps together if reading is hard at the live click.",
+   "files": [
+    "docs/ui/STARTUP.md"
+   ],
+   "resolution": "Ben, 2026-10-11: confirmed - no pan or zoom on the Life map, matching the pass rounds."
   }
  ]
 }
