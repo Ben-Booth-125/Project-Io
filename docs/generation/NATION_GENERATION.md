@@ -95,7 +95,13 @@ each is reconciled where it can be read:
   under the total.
 - **A state charter where a minor cannot afford its champion (Ben, 2026-10-11).** If the richest
   championless minor's richest centre cannot meet a specialist's charter price, its treasury makes
-  up the gap, and the event is recorded as a **state charter**.
+  up the gap, and the event is recorded as a **state charter**. The gap is paid **in credits, at the
+  specialist's real credit price** — the rate a corporation's charter costs — so a state charter is a
+  visible expense on the treasury, never a nominal one (Ben, 2026-10-11).
+- **The target outranks the floor (Ben, 2026-10-11).** Where no secession can leave both sides
+  above the minimum territory, the closing rounds still split a province, choosing the split that
+  leaves the smallest shortfall, so the total is always hit. A nation below the floor is the cost of
+  a target the ground could not otherwise hold; a target is never missed to keep the floor.
 - **No target, no reconciliation.** A world built without targets — a harness, an old save, any
   build that skips the setup round — keeps its natural counts, uncapped. The wizard always sets
   both. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable

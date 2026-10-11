@@ -700,7 +700,7 @@
     "src/ui/generation_screen.cpp"
    ],
    "title": "Retire the wizard globe; the Life round draws the homeworld on the pass rounds' 2D map",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The Life map. The globe (48-slice render) is retired; System keeps its system drawing; the Life round draws the Life-gate world on the 2D map the pass rounds use, which holds through the Culture wait. Retire the globe code and its captures; update any golden or verify script that names it. OPEN: whether the Life map may pan/zoom for reading (no steering input either way). Needs a live click."
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The Life map. The globe (48-slice render) is retired; System keeps its system drawing; the Life round draws the Life-gate world on the 2D map the pass rounds use, which holds through the Culture wait. Retire the globe code and its captures; update any golden or verify script that names it. OPEN: whether the Life map may pan/zoom for reading (no steering input either way). Needs a live click. BUILT AND MERGED (e3f049d7, cold-reviewed with a fix round: one frame for the Life and Culture maps at any window size, wait note on Culture); life_to_people.lua passes; Ben's live click PASSED 2026-10-11. Ready to archive at sprint close."
   },
   {
    "status": "designed",
