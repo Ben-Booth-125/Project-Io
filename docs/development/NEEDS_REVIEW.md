@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 25 open, 4 resolved.*
+*31 entries — 27 open, 4 resolved.*
 
 ---
 
@@ -234,6 +234,31 @@ Quick Start built on the main menu's seed and resources. Both now live on the se
 > **Recommendation:** The third: one place for the inputs, and Quick Start still skips every lapse.
 
 *Files: `docs/ui/STARTUP.md`*
+
+### NR-1040 — DECISION TAKEN: inside the history, a city state is a one-region realm with people and a centre on its ground
+*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
+
+The size floor now runs in the history, before campaign population centres exist. The old exemption tested a campaign centre in the realm's carve cell; inside the history the only reading is region::centres > 0 with population > 0 on its one anchored region. That reading spares a few more small realms: natural nation counts move 19..73 -> 20..76 (mean 46.1 -> 46.8); majors unchanged.
+
+**Why it matters.** It is the whole cause of the floor move's count movement on settled worlds with no targets set.
+
+- Keep the history-grain reading
+- Build a centre-placement oracle into the closing rounds so the count is preserved exactly (placement logic before the close; heavy)
+
+> **Recommendation:** Keep: the history-grain test is the doc's own wording, and the movement is about one nation a seed.
+
+*Files: `src/world/closing_rounds.cpp`, `docs/generation/NATION_GENERATION.md`*
+
+### NR-1041 — NOVEL WORK: the nation carve now crosses into the history sim as an oracle
+*novel-work · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
+
+To land the total inside the history, the carve was pulled out of generate_nations into a shared carve_from_seeds, and the history's closing rounds call a preview of it to predict the fold's count (with a drift guard in generation). No doc owns a carve that the history reads; NATION_GENERATION.md owns the ruling only.
+
+**Why it matters.** A new seam between the history sim and nation generation, which every later change to either must respect.
+
+> **Recommendation:** Accept, and have NATION_GENERATION.md § Pass 2c/2d describe the closing rounds and the shared carve (D1 follow-through).
+
+*Files: `src/world/closing_rounds.cpp`, `src/world/nation_generation.cpp`*
 
 ---
 
