@@ -3221,8 +3221,9 @@ bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
                           const history_sim_params& p, int64_t year);
 /// THE FLEET-AFLOAT FLOOR IS RELATIVE (Ben, 2026-10-11; TREES.md). The median
 /// `navy_stock` over @p year's naval-capable polities: every living polity
-/// (`alive`, `id` equal to its index; subjects included, since a subject's
-/// fleet is afloat too) passing `polity_naval_capable`. The values are sorted
+/// (`alive`, `id` equal to its index) that is FREE (`overlord < 0`; Ben,
+/// 2026-10-11: only free polities set the bar a free arriving power must
+/// clear) and passes `polity_naval_capable`. The values are sorted
 /// ascending and the LOWER middle is taken (index (n-1)/2), so an even count
 /// has one defined answer and the result is independent of polity order. 0
 /// when no polity is naval-capable (nobody then holds sea legs to compare).
@@ -3235,12 +3236,11 @@ bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
 /// 146 -> 92 -> 72 -> 42 -> 18, so no fixed number restored the one without
 /// gutting the other. Under the trees about half the polities held the
 /// node; the median of the naval-capable is that "about half" read off the
-/// fleets afloat. MEASURED (same seeds): the median floor gives
-/// Exploration 120 / Industrialisation 344 subjections and 144 subjects alive
-/// at 1960 (no floor: 146 / 440 / 178; under the trees 169 / 21 / 31). It
-/// bites little, because the median navy among the naval-capable is often
-/// small or zero; requiring a fleet above zero as well moves Industrialisation
-/// only to 271.
+/// fleets afloat. MEASURED (same seeds): the median of the free gives
+/// Exploration 123 / Industrialisation 339 subjections and 149 subjects alive
+/// at 1960 (subjects counted: 120 / 344 / 144; no floor: 146 / 440 / 178;
+/// under the trees 169 / 21 / 31). It bites little, because the median navy
+/// among the naval-capable is often small or zero.
 int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vector<polity>& polities,
                              const history_sim_params& p, int64_t year);
 /// Sea legs: may @p q arrive across water to subject a coast in @p year?

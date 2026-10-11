@@ -414,7 +414,7 @@ int64_t sea_legs_navy_median(const std::vector<region>& regions, const std::vect
         const std::size_t i = static_cast<std::size_t>(r.nation);
         if (capable[i]) continue;
         const polity& q = polities[i];
-        if (!q.alive || q.id != static_cast<int>(i)) continue;
+        if (!q.alive || q.id != static_cast<int>(i) || q.overlord >= 0) continue; // free polities only
         const roster_band band = roster_band_for_capacity(
             clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
         if (can_field_naval(r, band)) capable[i] = 1;
