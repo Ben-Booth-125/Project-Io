@@ -12,6 +12,63 @@ release.
 
 ## [Unreleased]
 
+## [0.1.30] — 2026-10-11
+
+*The shelf and the tree. Two sprints cut as one release. Sprint 50 set out to get goods that exist to
+the processors that want them, met its gate, and then had the economy's spine redesigned under it:
+corporations hold no stock, every good sits on a market's shelf, and trade is the only way goods
+cross markets. Sprint 52 designed the Digitisation tech tree and moved technology to the nation:
+every nation starts equal, holds nothing, and researches from a queue.*
+
+### Added
+
+- **The shelf economy** (BL-1265 (shelf economy)): production lands on its market's shelf and is paid
+  on landing; everyone buys from the shelf. Corporation pools, held opening stock and the order book
+  are gone.
+- **Trade** (BL-1266 (trade core), BL-1270 (trade capacity table)): Planetary Marketplaces and Ports
+  make trade points; per-resource capacity; auto trades and reserved manual trades. Trade buildings
+  burn coal for upkeep.
+- **Rivals trade** (BL-1267 (AI trades)): a rival sets, changes and clears its own manual trades and
+  reserve, and may build a Marketplace scored as any build.
+- **Trade in the history** (BL-1268 (trade in generation), Part A): the history's trade record
+  retrofits Planetary Marketplaces at handoff.
+- **Trade UI** (BL-1269 (trade UI)): the Market ledger's Trades tab sets manual trades and the reserve;
+  the Marketplace is in the Build door. Sell-order and dispatch surfaces retire.
+- **The Digitisation tree** (BL-1271 (Digitisation tree store)): 160 nodes over four tiers, written
+  down in RESEARCH.md and DIGITISATION_TREE.md with a checked store.
+- **Nation tech state** (BL-1273 (nation tech state)): every nation holds a tree state, a research pool
+  and a queue, paced at base 120 + 20 × √(line spend) at 200 RP a cost unit, an age about eighty years.
+- **A logistics row** on the market-viability gate (BL-1223 (gate logistics row)); every lens has its
+  own glyph on the minimap strip (BL-1225 (every lens on strip)).
+
+### Changed
+
+- **Inputs reach processors** (sprint 50 waves 1–2): idle mines found at the cause, mine upkeep supplied,
+  steel no longer stays home, power crosses markets, every grid has generation, processors are placed
+  to their inputs, and the settle scorer stops building plant that starves. At the sprint's own gate,
+  processors running at handoff went from 54.7% to 96.6%.
+- **The network** (BL-1195 (convoy lane follows legs), BL-1252 (no parallel roads)): a convoy is drawn
+  and interdicted along the legs it travels; road generation lays no parallel road beside a
+  serviceable one.
+- **The old campaign tech gates retire**: their recipes (the Toolmaker, the Bessemer Converter,
+  refined copper) are open to every nation from the start.
+- **Save format v47**: carries both the shelf economy's stream (claimed as v46) and the nation tech
+  state. Older saves are refused, as before.
+
+### Known — recorded, not fixed
+
+- **The gate on this release** (main, 16 seeds, 400 ticks): G1 92.9, G1 at tick 50 85.5, **G1b 6.0
+  (over its 5% target)**, G2 111.7, G3 94.7. world_determinism and the seed sweep pass;
+  history_sim_harness is at its R3a2/R3a3 baseline. The tech tree's share of the movement is
+  BL-1277's (tech wave re-bless) to attribute; NR-1035 holds the sprint 50 merge reading.
+- **Trade fell about 87%** under the shelf economy, and cities demoted; Ben files those fixes himself
+  in a later sprint.
+- **The tech tail** is carried to sprint 53: generation without research, effects wired, the tree
+  panel, nation research AI, quest deed state and the re-bless.
+- **Live clicks owed**: the Trades tab's refusal text, and the tech tree panel.
+- **Broken harnesses**: `chain_depth` (pools), `nation_scorer_harness` and
+  `battle_engagement_harness` (the retired mercenary design), under BL-1231 (broken harnesses).
+
 ## [0.1.29] — 2026-10-10
 
 *The ground you can read. Sprint 51 was a visibility pass. It set out to show the opening market on a
@@ -1445,7 +1502,10 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.27...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.30...HEAD
+[0.1.30]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.29...v0.1.30
+[0.1.29]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.28...v0.1.29
+[0.1.28]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.27...v0.1.28
 [0.1.27]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.26...v0.1.27
 [0.1.26]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.25...v0.1.26
 [0.1.25]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.24...v0.1.25

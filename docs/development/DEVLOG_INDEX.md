@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 232 entries across 2 volume(s).
+One line per session, newest first — 233 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-10-11 | [Sprint 53 designed; sprints 50 and 52 onto main and cut — version 0.1.30](DEVLOG.md) | BL-1245 BL-1277 BL-1278 BL-1284 BL-1285 BL-1286 BL-1290 BL-1291 BL-1294 BL-1295 | DEVLOG.md |
 | 2026-10-10 | [Sprint 51 closes: the ground you can read — version 0.1.29](DEVLOG.md) | BL-1215 BL-1218 BL-1239 BL-1240 BL-1241 BL-1242 BL-1243 BL-1244 BL-1246 BL-1247 BL-1250 BL-1251 BL-1253 BL-1254 BL-1255 BL-1256 BL-1257 BL-1258 BL-1259 BL-1260 BL-1261 BL-1291 BL-1292 BL-1293 | DEVLOG.md |
 | 2026-10-10 | [Sprint 50 extended: the shelf economy and trade built (BL-1265..BL-1270)](DEVLOG.md) | BL-1265 BL-1266 BL-1267 BL-1268 BL-1269 BL-1270 | DEVLOG.md |
 | 2026-10-10 | [Sprint 52: the Digitisation tech tree designed and the nation core built](DEVLOG.md) | BL-1271 BL-1272 BL-1273 BL-1274 BL-1275 BL-1276 BL-1277 BL-1285 | DEVLOG.md |

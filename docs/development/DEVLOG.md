@@ -10,6 +10,36 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-11 — Sprint 53 designed; sprints 50 and 52 onto main and cut — version 0.1.30
+
+**Runtime:** 2026-10-10 to 2026-10-11; modes Design (the nation identity, the generation targets, the
+history patterns), then Delivery Light for the merges and the cut.
+
+### Decided
+- **The player is a major nation operating its champion corporation** (BL-1245, player is a nation;
+  NR-1020 resolved, NR-885 overturned). The design test re-subjected to the nation; elimination at no
+  territory; the nation musters and buys equipment as a real order-book buyer (NR-1028); rivals may
+  act toward a human-played nation (NR-1026). Build split into BL-1278..BL-1284.
+- **Nation counts are targets, always hit** (option C): total <= 40, majors 1..6, by a lean then
+  in-world reconciliation. Majors and seats one-to-one. Globe retired; the Life round draws the 2D
+  map; a setup round precedes Life; the seat becomes a nation selection screen.
+- **History patterns**: the rise and fall, the late culture and the world war always hit; civil war and
+  revolution leans; tracked to the nation card (BL-1286..BL-1290, BL-1294, BL-1295; NR-1034 open).
+
+### Merged and cut
+- Sprint 51's wrap-up, then sprint 50 (the shelf economy and trade) and sprint 52 (the Digitisation
+  tech tree) onto main, each gated on Release harnesses. One real break fixed (building_state on the
+  retired pool_key_for_tile) and two pre-existing link gaps. Id collisions across three parallel
+  sprints renumbered: sprint 50's NR-1011/NR-1020 -> NR-1029/NR-1030; sprint 52's BL-1278 -> BL-1285
+  and NR-1025..1027 -> NR-1031..1033; this session's own BL-1291/1292 -> BL-1294/1295. Save v47
+  carries v46. Gate on main: G1 92.9, G1 t50 85.5, G1b 6.0, G2 111.7, G3 94.7 (NR-1035; BL-1277).
+- Sprint 50 closed with its retro; NR-1033 closed as superseded; cut as **v0.1.30**.
+
+### Open
+- Sprint 53 handoff: `docs/development/NEXT_SESSION.md`. Open calls NR-1034, NR-1035.
+
+---
+
 ## 2026-10-10 — Sprint 51 closes: the ground you can read — version 0.1.29
 
 **Runtime:** 2026-10-08 to 2026-10-10; modes Design (the sprint cut), then Delivery Full in parallel

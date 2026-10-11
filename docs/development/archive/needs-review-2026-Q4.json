@@ -354,117 +354,6 @@
       "what": "The hard-edge stroke is drawn in a muted version of the nation's identity colour. With the wash retired the stroke is the only national read, and across a many-nation frontier the muted strokes look alike (dark blue). Options: draw the stroke in the nation's full identity colour; widen the stroke slightly; accept (borders are context, the Selection element names the nation). RULED (Ben, 2026-10-10): \"Borders also [great]\" - keep the stroke as built.",
       "resolved": "2026-10-10"
     },
-    "NR-1020": {
-      "id": "NR-1020",
-      "title": "The player is a nation: six calls before the doc sweep",
-      "raised": "2026-10-08",
-      "kind": "question",
-      "status": "resolved",
-      "source": "Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)",
-      "what": "Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.",
-      "why_it_matters": "Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.",
-      "options": [
-        "Answer on one design form, then sweep in a single pass"
-      ],
-      "resolution": "Ben, 2026-10-10 (sprint 53 identity form): (1) verbs - budget weights, tariffs, law; force raised by the nation, its equipment bought; (2) the nation step skips the player's nation - recorded as a narrowing in AI_OPPONENT § 11; (3) design test - what the NATION can field / must answer to: other nations, its population, its corporations; (4) the space corporation is the CHAMPION, a separate corp the player operates directly; (5) the parameter is the MAJOR target (1..6, always hit) beside a TOTAL target (<= 40); a minor runs shallow with no specialist; (6) eliminated when it holds no territory. Written into the docs listed on BL-1245 (player is a nation)."
-    },
-    "NR-1025": {
-      "id": "NR-1025",
-      "title": "Up to six humans on the selection screen: is multiplayer now in prototype scope?",
-      "raised": "2026-10-10",
-      "kind": "question",
-      "status": "resolved",
-      "source": "Ben, 2026-10-10 identity form ('Yes: the selection screen seats up to six humans')",
-      "what": "TECH_FOUNDATIONS.md § Direction and MULTIPLAYER_PRINCIPLES.md hold multiplayer OUT of prototype scope and off the backlog. Your answer commits the seat screen to up to six human picks. Written so far: STARTUP § The seat and CORPORATION_GENERATION say up to six humans may each take a major; MANUAL no longer says single-player. Not written: any amendment to TECH_FOUNDATIONS.",
-      "why_it_matters": "The standing rules forbid building outside the prototype scope; BL-1281 (nation selection screen) cannot build six seats until the scope says so.",
-      "options": [
-        "Amend TECH_FOUNDATIONS: multi-human seating (hot-seat or lockstep) enters scope",
-        "Design the screen for six seats, build one human seat now; scope stays as is",
-        "Single player only; drop the six-seat line"
-      ],
-      "recommendation": "Option 2: it costs nothing now and keeps the shape; MULTIPLAYER_PRINCIPLES already protects the lockstep path.",
-      "files": [
-        "docs/tech/TECH_FOUNDATIONS.md",
-        "docs/ui/STARTUP.md",
-        "docs/multiplayer/MULTIPLAYER_PRINCIPLES.md"
-      ],
-      "resolution": "Ben, 2026-10-10: design for six seats, build one human seat now; scope unchanged. Written into STARTUP § The seat and CORPORATION_GENERATION § Player corporation; MANUAL says single-player again."
-    },
-    "NR-1026": {
-      "id": "NR-1026",
-      "title": "New AI subject: rival nations and corporations acting toward a nation a human plays",
-      "raised": "2026-10-10",
-      "kind": "question",
-      "status": "resolved",
-      "source": "AI_OPPONENT.md § 11, raised 2026-10-10 with BL-1245 (player is a nation)",
-      "what": "No grant names a human-played STATE as the subject of AI action. NR-517 covers a rival acting politically against a corp a human owns; the 2026-08-18 grant lets nations carry pair-state toward another polity, but every polity was AI. Under the new identity, rival nations will declare stances at, set tariffs against and go to war with the player's nation, and rival firms will lobby it. Per the standing rule this is raised, not assumed.",
-      "why_it_matters": "Without it the AI nations must treat the player's nation as inert, which would gut Conflict; with it the register gains a new subject.",
-      "options": [
-        "Grant: rival nations and corporations may act toward a human-played nation with the same verbs they use on any nation",
-        "Grant with exclusions (name them)",
-        "Not yet: rivals treat the player's nation as inert until a later sprint"
-      ],
-      "recommendation": "Grant as option 1 - every verb is already legal toward an AI nation, and symmetry is a CONCEPT rule.",
-      "files": [
-        "docs/ai/AI_OPPONENT.md"
-      ],
-      "resolution": "Ben, 2026-10-10: GRANTED - rival nations and corporations may use the same verbs toward a human-played nation that they use toward any nation. Recorded in AI_OPPONENT § 11 with its admits / does-not-admit; NATIONS § The channel cites it."
-    },
-    "NR-1027": {
-      "id": "NR-1027",
-      "title": "DECISION TAKEN: 'major and seat-eligible are 1 to 1' read as one specialist per major and none elsewhere; minors keep background firms; majors are the space-programme nations",
-      "raised": "2026-10-10",
-      "kind": "decision",
-      "status": "resolved",
-      "source": "Ben, 2026-10-10 identity session",
-      "what": "Three readings taken on your behalf. (a) 1:1 means the specialist roster IS the champions - exactly one per major, so the specialist count equals the major target (1..6), overturning the fixed 8 and the rule that a nation holds every seat its cities bought. (b) Your 'minor: no corporations' is read as no SPECIALIST; background firms still form in minors, since without them a minor has no producers and its markets go empty. (c) BL-1245's 'how many nations run a space programme' parameter is the major target; a minor runs no space programme. Written: GLOSSARY, NATIONS § Major and minor nations, CORPORATION_GENERATION Pass 1.",
-      "why_it_matters": "(a) cuts full-AI corporations from ~8 to at most 6, which moves the economy gate; (b) decides whether minors have an economy at all.",
-      "recommendation": "Confirm, or overturn (b) if minors should hold no firms at all.",
-      "files": [
-        "docs/generation/CORPORATION_GENERATION.md",
-        "docs/politics/NATIONS.md",
-        "docs/GLOSSARY.md"
-      ],
-      "resolution": "Ben, 2026-10-10: all three readings confirmed - (a) one specialist per major, none elsewhere; (b) minors keep background firms; (c) majors are the space-programme nations, minors run none."
-    },
-    "NR-1028": {
-      "id": "NR-1028",
-      "title": "DECISION TAKEN: the nation buys equipment through the state procurement seam, not the market order book",
-      "raised": "2026-10-10",
-      "kind": "decision",
-      "status": "resolved",
-      "source": "Ben, 2026-10-10 identity form ('buys equipment from corporations on the market')",
-      "what": "NATIONS.md holds that a nation pays only by direct transfer and never places an order: the space programme already buys through the procurement seam at the supplier market's price. The form said 'on the market'; taken as that seam, so a nation still never touches the book. The rule that the player's corp is never drained by a state purchase stands, including by its own nation. Written: CONCEPT § Development through ages, MILITARY § The muster interface.",
-      "why_it_matters": "If you meant a real market buyer, the nation gains an order-book role and NATIONS.md's conservation ruling changes.",
-      "recommendation": "Confirm.",
-      "files": [
-        "docs/CONCEPT.md",
-        "docs/military/MILITARY.md",
-        "docs/politics/NATIONS.md"
-      ],
-      "resolution": "Ben, 2026-10-10: OVERTURNED - the nation is a real buyer on the order book for military equipment. Written into CONCEPT § Development through ages, MILITARY § The muster interface, and NATIONS (the table, 'touches the market for one thing only', § 2. Conservation's one exception). The space programme stays a procurement transfer; the 2026-08-22 'payment to corps is direct' ruling stands for everything else."
-    },
-    "NR-1029": {
-      "id": "NR-1029",
-      "title": "Opening stock placed on the shelves unpaid, split by where the corporation's buildings stand",
-      "raised": "2026-10-10",
-      "kind": "decision-taken",
-      "status": "resolved",
-      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
-      "what": "CORPORATION_GENERATION.md § Pass 4b says the opening stock goes on the shelves of the markets each corporation sits in, its share split over its own markets, and \"is the market's from then on\". Built: the split weights each market by how many of the corporation's buildings its catchment holds (the HQ market alone if none); no money moves at placement. Before, the corporation was paid when the held stock sold at a clear.",
-      "why_it_matters": "Corporations open with less income than before (they no longer sell their opening stock); G2's settle mean is the denominator that moves.",
-      "options": [
-        "Keep: unpaid, split by building count (built)",
-        "Pay the corporation the stock at base price on placement",
-        "Split evenly over its markets instead of by building count"
-      ],
-      "recommendation": "Keep. The doc says the stock is the market's; paying at placement would re-create the windfall the held-stock rule existed to tame.",
-      "files": [
-        "src/world/market_clearing.cpp (place_opening_stock)"
-      ],
-      "resolution": "Ben, 2026-10-10 (review form): accepted as built.",
-      "renumbered_from": "NR-1011 (sprint 50 branch; collided with main's NR-1011, 2026-10-10 merge)"
-    },
     "NR-1012": {
       "id": "NR-1012",
       "title": "Trade points: a Marketplace makes them at its staffed rate, a Port flat",
@@ -630,6 +519,189 @@
       ],
       "resolution": "Ben, 2026-10-10 (review form): approved as built; the owner and siting rules written into TRADE.md § Trade in generation. Part B as its own item after the re-bless."
     },
+    "NR-1020": {
+      "id": "NR-1020",
+      "title": "The player is a nation: six calls before the doc sweep",
+      "raised": "2026-10-08",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)",
+      "what": "Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.",
+      "why_it_matters": "Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.",
+      "options": [
+        "Answer on one design form, then sweep in a single pass"
+      ],
+      "resolution": "Ben, 2026-10-10 (sprint 53 identity form): (1) verbs - budget weights, tariffs, law; force raised by the nation, its equipment bought; (2) the nation step skips the player's nation - recorded as a narrowing in AI_OPPONENT § 11; (3) design test - what the NATION can field / must answer to: other nations, its population, its corporations; (4) the space corporation is the CHAMPION, a separate corp the player operates directly; (5) the parameter is the MAJOR target (1..6, always hit) beside a TOTAL target (<= 40); a minor runs shallow with no specialist; (6) eliminated when it holds no territory. Written into the docs listed on BL-1245 (player is a nation)."
+    },
+    "NR-1021": {
+      "id": "NR-1021",
+      "title": "The exchange ring now covers about six ticks",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1269 trades_tab check, 2026-10-10",
+      "what": "Every landing and every shelf draw files an exchange row, ~1,170 rows a tick on the verify world (one market alone 6,295 rows in six ticks), so the 8,192-row ring holds ticks 10..15. The ring's sizing comment extrapolated ~120 rows a quarter. The Trades tab's Recent exchanges therefore show only the last few ticks, and a market that clears nothing shows none (trades_tab.lua now aims at the busiest home-body market).",
+      "why_it_matters": "History the player reads; widening the ring is a save-format change.",
+      "options": [
+        "Widen the ring (save change, measure size)",
+        "Aggregate rows per (market, good, side, tick)",
+        "Accept the short window"
+      ],
+      "recommendation": "Aggregate per (market, good, side, tick): the history keeps its span without growing the save.",
+      "files": [
+        "src/world/components.hpp (exchange_record_ring)",
+        "src/world/market_clearing.cpp (record_exchange)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): aggregate exchange rows per market, good, side and tick."
+    },
+    "NR-1022": {
+      "id": "NR-1022",
+      "title": "DECISION TAKEN: the old campaign tech gates and scripts/tech_tree.lua retire; what they gated is open to every nation",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)",
+      "what": "The four hand-authored gates (garrison -> military base, toolmaker, Bessemer steel, refined copper) and the ~150-node inert Lua tree retire with per-corporation earned_techs. Taken because every nation now starts at the same tech level holding nothing, and a second gating system over the nation's tree would contradict it. The military base, toolmaker and both recipes are open from the start.",
+      "why_it_matters": "BL-344's military-base gate was the deliberate proof that tech reaches military outcomes; the Digitisation tree's Force branch carries that proof now. If any of the four should stay gated, it becomes a node.",
+      "options": [],
+      "recommendation": "Taken; overturn by naming the node it should become.",
+      "files": [
+        "src/world/tech_gate.cpp",
+        "scripts/tech_tree.lua"
+      ],
+      "resolution": "Written: RESEARCH.md, PRODUCTION.md, MILITARY.md, SYSTEMS.md (NR-1022, old gates open); built in BL-1273."
+    },
+    "NR-1023": {
+      "id": "NR-1023",
+      "title": "DECISION TAKEN: research points come from the academic-research budget line, Universities and research institutes, into the nation's pool",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)",
+      "what": "RESEARCH.md names the budget line and Universities. The corporation-level science float from research institutes (accrued, never spent) folds into the institute's nation's pool rather than surviving as a second currency. Rates are dials for the sweep against the pacing rule.",
+      "why_it_matters": "A corporation's research institute now feeds its nation, not the firm; whether a firm should keep a research stake of its own is RESEARCH.md's open question.",
+      "options": [],
+      "recommendation": "Taken.",
+      "files": [
+        "docs/economy/RESEARCH.md",
+        "src/world/economy_system.cpp"
+      ],
+      "resolution": "Written: RESEARCH.md § Research points; PRODUCTION.md (institutes add RP to their nation, staffed at construction - Ben, 2026-10-10); built in BL-1273."
+    },
+    "NR-1024": {
+      "id": "NR-1024",
+      "title": "DECISION TAKEN: the third road rung and coastal naval points follow sea legs to measured dates",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)",
+      "what": "Ben ruled ocean crossings in generation gated by date. The two sibling pieces the trees gated - the treasury-bought third road rung (Post Roads) and naval points from coastal sea technology - take the same rule: the median polity's acquisition year in the last-blessed history. Applied as the sibling of an approved fix.",
+      "why_it_matters": "Without a gate the road rung opens from the start and naval points vanish, both bigger world movers than a date.",
+      "options": [],
+      "recommendation": "Taken.",
+      "files": [
+        "docs/generation/trees/TREES.md",
+        "src/world/history_sim.cpp"
+      ],
+      "resolution": "Superseded by Ben's rulings 2026-10-10 in TREES.md (sea legs: date, naval capacity and a fleet afloat; naval ramp coastal, re-weighted; dates the acquisition median)."
+    },
+    "NR-1025": {
+      "id": "NR-1025",
+      "title": "Up to six humans on the selection screen: is multiplayer now in prototype scope?",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben, 2026-10-10 identity form ('Yes: the selection screen seats up to six humans')",
+      "what": "TECH_FOUNDATIONS.md § Direction and MULTIPLAYER_PRINCIPLES.md hold multiplayer OUT of prototype scope and off the backlog. Your answer commits the seat screen to up to six human picks. Written so far: STARTUP § The seat and CORPORATION_GENERATION say up to six humans may each take a major; MANUAL no longer says single-player. Not written: any amendment to TECH_FOUNDATIONS.",
+      "why_it_matters": "The standing rules forbid building outside the prototype scope; BL-1281 (nation selection screen) cannot build six seats until the scope says so.",
+      "options": [
+        "Amend TECH_FOUNDATIONS: multi-human seating (hot-seat or lockstep) enters scope",
+        "Design the screen for six seats, build one human seat now; scope stays as is",
+        "Single player only; drop the six-seat line"
+      ],
+      "recommendation": "Option 2: it costs nothing now and keeps the shape; MULTIPLAYER_PRINCIPLES already protects the lockstep path.",
+      "files": [
+        "docs/tech/TECH_FOUNDATIONS.md",
+        "docs/ui/STARTUP.md",
+        "docs/multiplayer/MULTIPLAYER_PRINCIPLES.md"
+      ],
+      "resolution": "Ben, 2026-10-10: design for six seats, build one human seat now; scope unchanged. Written into STARTUP § The seat and CORPORATION_GENERATION § Player corporation; MANUAL says single-player again."
+    },
+    "NR-1026": {
+      "id": "NR-1026",
+      "title": "New AI subject: rival nations and corporations acting toward a nation a human plays",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "AI_OPPONENT.md § 11, raised 2026-10-10 with BL-1245 (player is a nation)",
+      "what": "No grant names a human-played STATE as the subject of AI action. NR-517 covers a rival acting politically against a corp a human owns; the 2026-08-18 grant lets nations carry pair-state toward another polity, but every polity was AI. Under the new identity, rival nations will declare stances at, set tariffs against and go to war with the player's nation, and rival firms will lobby it. Per the standing rule this is raised, not assumed.",
+      "why_it_matters": "Without it the AI nations must treat the player's nation as inert, which would gut Conflict; with it the register gains a new subject.",
+      "options": [
+        "Grant: rival nations and corporations may act toward a human-played nation with the same verbs they use on any nation",
+        "Grant with exclusions (name them)",
+        "Not yet: rivals treat the player's nation as inert until a later sprint"
+      ],
+      "recommendation": "Grant as option 1 - every verb is already legal toward an AI nation, and symmetry is a CONCEPT rule.",
+      "files": [
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "resolution": "Ben, 2026-10-10: GRANTED - rival nations and corporations may use the same verbs toward a human-played nation that they use toward any nation. Recorded in AI_OPPONENT § 11 with its admits / does-not-admit; NATIONS § The channel cites it."
+    },
+    "NR-1027": {
+      "id": "NR-1027",
+      "title": "DECISION TAKEN: 'major and seat-eligible are 1 to 1' read as one specialist per major and none elsewhere; minors keep background firms; majors are the space-programme nations",
+      "raised": "2026-10-10",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben, 2026-10-10 identity session",
+      "what": "Three readings taken on your behalf. (a) 1:1 means the specialist roster IS the champions - exactly one per major, so the specialist count equals the major target (1..6), overturning the fixed 8 and the rule that a nation holds every seat its cities bought. (b) Your 'minor: no corporations' is read as no SPECIALIST; background firms still form in minors, since without them a minor has no producers and its markets go empty. (c) BL-1245's 'how many nations run a space programme' parameter is the major target; a minor runs no space programme. Written: GLOSSARY, NATIONS § Major and minor nations, CORPORATION_GENERATION Pass 1.",
+      "why_it_matters": "(a) cuts full-AI corporations from ~8 to at most 6, which moves the economy gate; (b) decides whether minors have an economy at all.",
+      "recommendation": "Confirm, or overturn (b) if minors should hold no firms at all.",
+      "files": [
+        "docs/generation/CORPORATION_GENERATION.md",
+        "docs/politics/NATIONS.md",
+        "docs/GLOSSARY.md"
+      ],
+      "resolution": "Ben, 2026-10-10: all three readings confirmed - (a) one specialist per major, none elsewhere; (b) minors keep background firms; (c) majors are the space-programme nations, minors run none."
+    },
+    "NR-1028": {
+      "id": "NR-1028",
+      "title": "DECISION TAKEN: the nation buys equipment through the state procurement seam, not the market order book",
+      "raised": "2026-10-10",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben, 2026-10-10 identity form ('buys equipment from corporations on the market')",
+      "what": "NATIONS.md holds that a nation pays only by direct transfer and never places an order: the space programme already buys through the procurement seam at the supplier market's price. The form said 'on the market'; taken as that seam, so a nation still never touches the book. The rule that the player's corp is never drained by a state purchase stands, including by its own nation. Written: CONCEPT § Development through ages, MILITARY § The muster interface.",
+      "why_it_matters": "If you meant a real market buyer, the nation gains an order-book role and NATIONS.md's conservation ruling changes.",
+      "recommendation": "Confirm.",
+      "files": [
+        "docs/CONCEPT.md",
+        "docs/military/MILITARY.md",
+        "docs/politics/NATIONS.md"
+      ],
+      "resolution": "Ben, 2026-10-10: OVERTURNED - the nation is a real buyer on the order book for military equipment. Written into CONCEPT § Development through ages, MILITARY § The muster interface, and NATIONS (the table, 'touches the market for one thing only', § 2. Conservation's one exception). The space programme stays a procurement transfer; the 2026-08-22 'payment to corps is direct' ruling stands for everything else."
+    },
+    "NR-1029": {
+      "id": "NR-1029",
+      "title": "Opening stock placed on the shelves unpaid, split by where the corporation's buildings stand",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "CORPORATION_GENERATION.md § Pass 4b says the opening stock goes on the shelves of the markets each corporation sits in, its share split over its own markets, and \"is the market's from then on\". Built: the split weights each market by how many of the corporation's buildings its catchment holds (the HQ market alone if none); no money moves at placement. Before, the corporation was paid when the held stock sold at a clear.",
+      "why_it_matters": "Corporations open with less income than before (they no longer sell their opening stock); G2's settle mean is the denominator that moves.",
+      "options": [
+        "Keep: unpaid, split by building count (built)",
+        "Pay the corporation the stock at base price on placement",
+        "Split evenly over its markets instead of by building count"
+      ],
+      "recommendation": "Keep. The doc says the stock is the market's; paying at placement would re-create the windfall the held-stock rule existed to tame.",
+      "files": [
+        "src/world/market_clearing.cpp (place_opening_stock)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): accepted as built.",
+      "renumbered_from": "NR-1011 (sprint 50 branch; collided with main's NR-1011, 2026-10-10 merge)"
+    },
     "NR-1030": {
       "id": "NR-1030",
       "title": "Trade capacity table, point rates and trade-building upkeep: the proposal and its 16-seed reading (BL-1270)",
@@ -653,26 +725,68 @@
       "resolution": "Ben, 2026-10-10 (review form): approved as is; G1b 5.3% accepted.",
       "renumbered_from": "NR-1020 (sprint 50 branch; collided with main's NR-1020, 2026-10-10 merge)"
     },
-    "NR-1021": {
-      "id": "NR-1021",
-      "title": "The exchange ring now covers about six ticks",
+    "NR-1031": {
+      "id": "NR-1031",
+      "title": "DECISION TAKEN: four loose ends of the retired generation trees",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 52 sibling-doc sweep (2026-10-10), after research left generation",
+      "what": "(1) The explorer set dissolves: it was the Empire rim milestone and its only reader was entry to the Exploration tree; who crosses water is now date (sea legs), harbour and military capacity (can_field_naval). (2) No hard fuel gate replaces the Industry tree's fuel gate; fuel within reach stays a soft input to industry points. (3) The wizard board keeps no research column: the history researches nothing. (4) A quest's deed reads the NATION as its subject (condition_set gains a nation subject where it has only corps), wired with the effects (BL-1274, tech effects wired). The ancient roster stays authored as reference content no campaign nation is offered.",
+      "why_it_matters": "Each removes a reader of tree state without inventing a new gate; overturn any by naming the quantity that should gate it.",
+      "options": [],
+      "recommendation": "Taken.",
+      "files": [
+        "docs/generation/CIVILISATION.md",
+        "docs/generation/EXPLORATION.md",
+        "docs/generation/INDUSTRIALISATION.md",
+        "docs/ui/question_log.json"
+      ],
+      "resolution": "Written: CIVILISATION.md, EXPLORATION.md, INDUSTRIALISATION.md, question_log.json; deed subject = nation (RESEARCH.md; BL-1285).",
+      "renumbered_from": "NR-1025 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where NR-1025 was already taken"
+    },
+    "NR-1032": {
+      "id": "NR-1032",
+      "title": "What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?",
       "raised": "2026-10-10",
       "kind": "question",
       "status": "resolved",
-      "source": "BL-1269 trades_tab check, 2026-10-10",
-      "what": "Every landing and every shelf draw files an exchange row, ~1,170 rows a tick on the verify world (one market alone 6,295 rows in six ticks), so the 8,192-row ring holds ticks 10..15. The ring's sizing comment extrapolated ~120 rows a quarter. The Trades tab's Recent exchanges therefore show only the last few ticks, and a market that clears nothing shows none (trades_tab.lua now aims at the busiest home-body market).",
-      "why_it_matters": "History the player reads; widening the ring is a save-format change.",
+      "source": "Sprint 52 sibling-doc sweep (2026-10-10), after research left generation",
+      "what": "The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.",
+      "why_it_matters": "The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.",
       "options": [
-        "Widen the ring (save change, measure size)",
-        "Aggregate rows per (market, good, side, tick)",
-        "Accept the short window"
+        "A: derive it from charter reach - the share of the realm's processing plant held by chartered firms at the 1960 fold (an in-world quantity with a visible cause)",
+        "B: drop the lean; the regime reads subject history and world war only",
+        "C: seed it from the nation's character enums"
       ],
-      "recommendation": "Aggregate per (market, good, side, tick): the history keeps its span without growing the save.",
+      "recommendation": "A.",
       "files": [
-        "src/world/components.hpp (exchange_record_ring)",
-        "src/world/market_clearing.cpp (record_exchange)"
+        "docs/generation/INDUSTRIALISATION.md"
       ],
-      "resolution": "Ben, 2026-10-10 (review form): aggregate exchange rows per market, good, side and tick."
+      "resolution": "RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean).",
+      "renumbered_from": "NR-1026 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where NR-1026 was already taken"
+    },
+    "NR-1033": {
+      "id": "NR-1033",
+      "title": "NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)",
+      "raised": "2026-10-10",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "BL-1276 (tech tree panel), lane U",
+      "what": "The research panel queues nodes through three verbs appended to corp_command (queue_research, unqueue_research, clear_research), accepted only from the SEATED corporation and acting on its home nation's queue; every other corporation is refused, the scorer never emits them, and the MCP verb list carries them with range checks. Taken as the bridge until sprint 53 (BL-1245, player is a nation) seats the player on the nation itself. Also taken: a press on a queued node unqueues it and every queued entry that needs it - the standing toggle rule applied to the queue.",
+      "why_it_matters": "A corporation acting on its nation's state is a new reach for the player seat. When the player becomes the nation (sprint 53) these verbs move to the nation; a wire agent seated as a corp can steer its nation's research meanwhile.",
+      "options": [
+        "Keep as the bridge until sprint 53",
+        "Restrict to the in-app UI only (not the wire)"
+      ],
+      "recommendation": "Keep as the bridge.",
+      "files": [
+        "src/world/corp_command.cpp",
+        "tools/mcp/server.js",
+        "src/ui/tech_tree_panel.cpp"
+      ],
+      "renumbered_from": "NR-1027 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where NR-1027 was already taken",
+      "resolution": "Closed by Ben, 2026-10-11: superseded. The bridge it asked about - the seated corporation editing its home nation's research queue until the player is a nation - is moot: the player IS a nation (BL-1245, player is a nation; CONCEPT.md § Player identity), and a nation queues its own research."
     }
   }
 }
