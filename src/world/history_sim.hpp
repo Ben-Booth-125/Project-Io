@@ -452,7 +452,9 @@ struct history_sim_params
 
     /// Sea legs: from this year a polity that can field a navy may arrive
     /// across water to subject a coast (the subjection block,
-    /// `polity_holds_sea_legs`: the date AND naval capacity, Ben 2026-10-10).
+    /// `polity_holds_sea_legs`: the date AND naval capacity, Ben 2026-10-10,
+    /// AND a fleet afloat at or above the year's 90th-percentile entry of the
+    /// free naval-capable navies, `sea_legs_navy_floor`, Ben 2026-10-11).
     /// Was the Exploration tree's Oceanic
     /// Navigation (the `sea_legs` key). MEASURED: 150 polities acquired the
     /// key over the 16 seeds (first 112 CE); the pooled median acquisition is
@@ -3220,42 +3222,48 @@ inline bool sea_legs_open(const history_sim_params& p, int64_t year) { return ye
 bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
                           const history_sim_params& p, int64_t year);
 /// THE FLEET-AFLOAT FLOOR IS RELATIVE (Ben, 2026-10-11; TREES.md): the
-/// percentile of the year's free naval-capable navies a polity's own fleet
-/// must reach to hold sea legs. 90 = the top tenth (Ben, 2026-10-11).
+/// percentile P of the year's free naval-capable navies whose entry a
+/// polity's own fleet must reach to hold sea legs (Ben, 2026-10-11).
 constexpr int sea_legs_fleet_percentile = 90;
 /// The fleet-afloat floor for @p year. The list is the `navy_stock` of every
 /// living polity (`alive`, `id` equal to its index) that is FREE
 /// (`overlord < 0`; Ben, 2026-10-11: only free polities set the bar a free
 /// arriving power must clear) and passes `polity_naval_capable`, gathered in
 /// region-index order and sorted ascending. THE INDEX RULE: with n entries
-/// the floor is the entry at index floor((n - 1) x P / 100), P =
-/// `sea_legs_fleet_percentile`, integer arithmetic only -- so every count has
-/// one defined answer, the result is independent of polity order, and P = 50
-/// is the lower middle. 0 before the date or when no polity is
-/// naval-capable. The subjection block computes it ONCE per round, before
-/// its walk.
+/// the floor is the 90th-percentile entry, the one at index
+/// floor((n - 1) x 90 / 100) (P = `sea_legs_fleet_percentile`), integer
+/// arithmetic only -- so every count has one defined answer, the result is
+/// independent of polity order, and P = 50 would be the lower middle. A
+/// polity at or above that entry clears it, so ties at the floor all clear
+/// and a SMALL list admits a larger share than a tenth: of 10 entries the
+/// floor is index 8, and 2 of 10 clear it. 0 before the date or when no
+/// polity is naval-capable. The subjection block computes it ONCE per round,
+/// before its walk.
 ///
-/// WHY RELATIVE, AND WHY THE TOP TENTH. Ben ruled that arriving across water
-/// to subject a native needs a fleet afloat. A fixed hull floor was measured
-/// first (16 library seeds): Industrialisation subjections fell 440 -> 132 ->
-/// 94 -> 63 -> 21 at 0 / 100 / 400 / 1600 / 25600 hulls, but Exploration's
-/// fell with them, 146 -> 92 -> 72 -> 42 -> 18, so no fixed number restored
-/// the one without gutting the other. The median of the free naval-capable
-/// let 39% of free polity-rounds hold sea legs in Industrialisation, where
-/// under the trees 9.9% held the node. MEASURED (same seeds, the subjection
-/// census): at the 90th percentile 9.0% hold sea legs in Industrialisation,
-/// and subjections formed are Exploration 56 / Industrialisation 96 with 71
-/// subjects alive at 1960 (under the trees 169 / 21 / 31; at the median
-/// 123 / 339 / 149). The remaining Industrialisation gap is the
-/// sphere-of-claim test, which passes 0.44% of free, funded pairs against
-/// the trees' 0.076% -- filed separately, not a matter for this floor.
+/// WHY RELATIVE, AND WHY THE 90TH PERCENTILE. Ben ruled that arriving across
+/// water to subject a native needs a fleet afloat. A fixed hull floor was
+/// measured first (16 library seeds, tree_gate_years_probe): Industrialisation
+/// subjections fell 440 -> 132 -> 94 -> 63 -> 21 at 0 / 100 / 400 / 1600 /
+/// 25600 hulls, but Exploration's fell with them, 146 -> 92 -> 72 -> 42 -> 18,
+/// so no fixed number restored the one without gutting the other. Subjections
+/// formed at the 90th percentile are Exploration 56 / Industrialisation 96
+/// with 71 subjects alive at 1960 (under the trees 169 / 21 / 31; at the
+/// median 123 / 339 / 149). The holder shares were measured ad hoc 2026-10-11 with an instrumented census against c05844d9 (BL-1297 owns committing it):
+/// the median let 39% of free polity-rounds hold sea legs in
+/// Industrialisation where under the trees 9.9% held the node, and the 90th
+/// percentile lets 9.0%. The remaining Industrialisation gap is the
+/// sphere-of-claim test, which passes 0.44% of free, funded pairs against the
+/// trees' 0.076% (same ad hoc census) -- filed separately, not a matter for
+/// this floor.
 int64_t sea_legs_navy_floor(const std::vector<region>& regions, const std::vector<polity>& polities,
                             const history_sim_params& p, int64_t year);
 /// Sea legs: may @p q arrive across water to subject a coast in @p year?
-/// True iff @p q is naval-capable (`polity_naval_capable`) AND its own
-/// `navy_stock` is at or above @p navy_floor -- the year's
-/// `sea_legs_navy_floor` (a fleet afloat, Ben 2026-10-10; in the top tenth
-/// of the free naval-capable, Ben 2026-10-11).
+/// True iff @p q is naval-capable (`polity_naval_capable`) AND it has a
+/// fleet afloat -- `navy_stock > 0`, a hull in the water (Ben, 2026-10-10:
+/// "a fleet afloat"), so a floor of 0 never admits a polity with no ships --
+/// AND that `navy_stock` is at or above @p navy_floor, the year's
+/// 90th-percentile entry (index floor((n-1) x 90 / 100)) of the free
+/// naval-capable navies, `sea_legs_navy_floor` (Ben, 2026-10-11).
 bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
                            const history_sim_params& p, int64_t year, int64_t navy_floor);
 /// The naval ramp (Ben, 2026-10-10: coastal polities only): every living

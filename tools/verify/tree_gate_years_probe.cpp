@@ -5,8 +5,8 @@
 // docs/generation/trees/TREES.md: the pre-game history runs no technology
 // tree; three things the trees gated open on a calendar year instead, for
 // every polity alike, save the two conditions below (Ben, 2026-10-10):
-//   (a) sea legs        `sea_legs_year` AND naval capacity AND a fleet in the
-//                       year's top tenth of free naval-capable navies (Ben 2026-10-11)
+//   (a) sea legs        `sea_legs_year` AND naval capacity AND a fleet afloat at or
+//                       above the year's 90th-percentile free naval-capable navy (Ben 2026-10-11)
 //   (b) post roads      `history_sim_params::post_roads_year` (the treasury-bought third rung)
 //   (c) coastal sea techs `coastal_naval_ramp`, coastal polities only (naval deeds)
 // Each date is MEASURED, not picked. This probe prints the dates in force
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
                     static_cast<long long>(fx.industrialisation_state.treaties_formed_across_water));
         std::fflush(stdout);
     }
-    std::printf("POOLED floor top tenth: subjections expl %lld ind %lld | subjects alive 1960 %lld | treaties across water"
+    std::printf("POOLED floor P90: subjections expl %lld ind %lld | subjects alive 1960 %lld | treaties across water"
                 " expl %lld ind %lld\n", static_cast<long long>(t_se),
                 static_cast<long long>(t_si), static_cast<long long>(t_live), static_cast<long long>(t_twe),
                 static_cast<long long>(t_twi));

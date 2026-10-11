@@ -433,7 +433,10 @@ bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
                            const history_sim_params& p, int64_t year, int64_t navy_floor)
 {
     if (!polity_naval_capable(regions, q, p, year)) return false;
-    return q.navy_stock >= navy_floor; // a fleet in the year's top tenth (Ben, 2026-10-11)
+    // A fleet afloat has a hull (Ben, 2026-10-10), and it stands at or above
+    // the year's 90th-percentile entry (index floor((n-1)*90/100)) of the
+    // free naval-capable navies (Ben, 2026-10-11).
+    return q.navy_stock > 0 && q.navy_stock >= navy_floor;
 }
 
 

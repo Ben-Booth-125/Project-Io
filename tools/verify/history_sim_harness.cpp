@@ -2812,6 +2812,7 @@ int main()
         // G1g — sea legs are a date AND naval capacity (Ben, 2026-10-10).
         {
             polity q; q.id = 0; q.alive = true;
+            q.navy_stock = 1; // a fleet afloat (G1h owns that condition)
             for (int d = 0; d < sim_domain_count; ++d) q.capacity[d] = 6;
             std::vector<region> inland(1), harbour(1);
             inland[0].nation = 0; inland[0].port_q = 0;
@@ -2826,8 +2827,10 @@ int main()
                   "G1g  sea legs need the year and a held region that can field a navy (can_field_naval)");
         }
 
-        // G1h — sea legs need a FLEET AFLOAT in the top tenth of the year's
-        // free naval-capable navies (Ben, 2026-10-10 / 2026-10-11; TREES.md).
+        // G1h — sea legs need a FLEET AFLOAT (a hull, navy_stock > 0) at or
+        // above the year's 90th-percentile entry (index floor((n-1)*90/100))
+        // of the free naval-capable navies (Ben, 2026-10-10 / 2026-10-11;
+        // TREES.md).
         // Ten free naval-capable polities with navies 10..100 (stored out of
         // order): n = 10, index floor(9 x 90 / 100) = 8, floor 90. Plus an
         // inland polity with 1000 hulls (not naval-capable, does not count)
@@ -2835,7 +2838,11 @@ int main()
         // polities count, Ben 2026-10-11; counted, n = 12 would put the floor
         // at index 9, 100). The polity at 80 is below the floor and holds no
         // sea legs; 90 (at it) and 100 (above) do; the inland one does not.
-        // Before the year the floor is 0 and nobody holds sea legs.
+        // Before the year the floor is 0 and nobody holds sea legs. Then a
+        // list that is at least 90% zeros: nine free naval-capable polities
+        // with 0 hulls and one with 1, floor index 8 = 0 -- the zero-hull
+        // polity still holds NO sea legs (a fleet afloat has a hull), the
+        // 1-hull one does.
         {
             const int np = 13;
             std::vector<polity> ps(np);
@@ -2858,8 +2865,23 @@ int main()
             std::printf("      fleet afloat: P%d floor %lld (before the year %lld); 80 %s, 90 %s, 100 %s, inland 1000 %s\n",
                         sea_legs_fleet_percentile, static_cast<long long>(fl), static_cast<long long>(fl0),
                         below ? "no" : "YES", at ? "yes" : "NO", above ? "yes" : "NO", shore ? "no" : "YES");
-            check(sea_legs_fleet_percentile == 90 && fl == 90 && fl0 == 0 && below && at && above && shore,
-                  "G1h  sea legs need a fleet in the top tenth (90th percentile) of the year's free naval-capable navies");
+            std::vector<polity> zs(10);
+            std::vector<region> zr(10);
+            for (int i = 0; i < 10; ++i)
+            {
+                zs[i].id = i; zs[i].alive = true; zs[i].navy_stock = i == 9 ? 1 : 0;
+                for (int d = 0; d < sim_domain_count; ++d) zs[i].capacity[d] = 6;
+                zr[i].nation = i; zr[i].port_q = 1000;
+            }
+            const int64_t zf = sea_legs_navy_floor(zr, zs, n, yl);
+            const bool zero_out = !polity_holds_sea_legs(zr, zs[0], n, yl, zf);
+            const bool one_in   = polity_holds_sea_legs(zr, zs[9], n, yl, zf);
+            std::printf("      zero-heavy list: floor %lld; 0 hulls %s, 1 hull %s\n", static_cast<long long>(zf),
+                        zero_out ? "no" : "YES", one_in ? "yes" : "NO");
+            check(sea_legs_fleet_percentile == 90 && fl == 90 && fl0 == 0 && below && at && above && shore
+               && zf == 0 && zero_out && one_in,
+                  "G1h  sea legs need a fleet afloat (> 0 hulls) at or above the 90th-percentile entry"
+                  " (index floor((n-1)*90/100)) of the year's free naval-capable navies");
         }
     }
 
