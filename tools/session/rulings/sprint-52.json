@@ -1,0 +1,84 @@
+{
+ "_note": "Sprint 52 rulings for tools/session/ruling_check.js --register. anchor = a regex the owning doc must carry; stale = OLD wording that must not survive in docs/ outside docs/development. Code match is a reading, not checked here.",
+ "rulings": [
+  {
+   "ruling": "Research is removed from generation; every nation starts equal, holding nothing",
+   "doc": "docs/economy/RESEARCH.md",
+   "anchor": "Every nation starts the campaign at the same tech level, holding nothing",
+   "stale": [
+    "research fraction of (its|the) industry slice",
+    "industry tree mask seeding",
+    "seeded from (its|the) (nation's )?Industry mask"
+   ],
+   "owner": "BL-1272 (generation without research), BL-1273 (nation tech state)"
+  },
+  {
+   "ruling": "The nation holds technology",
+   "doc": "docs/economy/RESEARCH.md",
+   "anchor": "The nation holds technology [(]Ben, 2026-10-10[)]",
+   "stale": [
+    "a nation holds no tech field of its own",
+    "earned techs (on|per) (each )?corporation"
+   ],
+   "owner": "BL-1273 (nation tech state)"
+  },
+  {
+   "ruling": "Every nation opens on the industrial band (overturns NR-929)",
+   "doc": "docs/economy/ERAS.md",
+   "anchor": "Every nation opens on the industrial recipe band",
+   "stale": [
+    "band (is )?per nation",
+    "actor-aware registry"
+   ],
+   "owner": "BL-1273 (nation tech state)"
+  },
+  {
+   "ruling": "The age tree grammar: four tiers, requirement groups, pairs, quests key the next age, placeholders",
+   "doc": "docs/economy/RESEARCH.md",
+   "anchor": "A link is a requirement, and a node with several requirement groups needs all of them",
+   "owner": "BL-1271 (Digitisation tree store)"
+  },
+  {
+   "ruling": "An AI nation may fill its own research queue",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "An AI nation may fill its own research queue",
+   "owner": "BL-1275 (nation research AI)"
+  },
+  {
+   "ruling": "Works lean derived from charter reach (NR-1032)",
+   "doc": "docs/generation/INDUSTRIALISATION.md",
+   "anchor": "It is derived from charter reach",
+   "stale": [
+    "what derives the lean instead is[s]+open"
+   ],
+   "owner": "regime stub (no code reads it yet)"
+  },
+  {
+   "ruling": "Research pacing: base + square root of the line's spend; an age lasts about eighty years",
+   "doc": "docs/economy/RESEARCH.md",
+   "anchor": "An age lasts about eighty years",
+   "stale": [
+    "converts to RP at a fixed rate"
+   ],
+   "owner": "BL-1273 (nation tech state)"
+  },
+  {
+   "ruling": "Sea legs: date + naval capacity + a fleet afloat; coastal naval ramp re-weighted; dates the acquisition median",
+   "doc": "docs/generation/trees/TREES.md",
+   "anchor": "fleet afloat",
+   "owner": "BL-1272 (generation without research)"
+  },
+  {
+   "ruling": "Rocketry gates launch; propellant stays open",
+   "doc": "docs/economy/RESEARCH.md",
+   "anchor": "space-access gate",
+   "owner": "BL-1274 (tech effects wired)"
+  },
+  {
+   "ruling": "Research institutes staffed at construction like Universities",
+   "doc": "docs/economy/PRODUCTION.md",
+   "anchor": "staffed at construction [(]Ben, 2026-10-10[)]",
+   "owner": "BL-1274 (tech effects wired)"
+  }
+ ]
+}

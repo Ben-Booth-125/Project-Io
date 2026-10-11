@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*25 entries — 25 open, 0 resolved.*
+*31 entries — 26 open, 5 resolved.*
 
 ---
 
@@ -231,10 +231,93 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
 
+### NR-1033 — NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)
+*novel-work · raised 2026-10-10 · from BL-1276 (tech tree panel), lane U*
+
+The research panel queues nodes through three verbs appended to corp_command (queue_research, unqueue_research, clear_research), accepted only from the SEATED corporation and acting on its home nation's queue; every other corporation is refused, the scorer never emits them, and the MCP verb list carries them with range checks. Taken as the bridge until sprint 53 (BL-1245, player is a nation) seats the player on the nation itself. Also taken: a press on a queued node unqueues it and every queued entry that needs it - the standing toggle rule applied to the queue.
+
+**Why it matters.** A corporation acting on its nation's state is a new reach for the player seat. When the player becomes the nation (sprint 53) these verbs move to the nation; a wire agent seated as a corp can steer its nation's research meanwhile.
+
+- Keep as the bridge until sprint 53
+- Restrict to the in-app UI only (not the wire)
+
+> **Recommendation:** Keep as the bridge.
+
+*Files: `src/world/corp_command.cpp`, `tools/mcp/server.js`, `src/ui/tech_tree_panel.cpp`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-1022 — DECISION TAKEN: the old campaign tech gates and scripts/tech_tree.lua retire; what they gated is open to every nation
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)*
+
+The four hand-authored gates (garrison -> military base, toolmaker, Bessemer steel, refined copper) and the ~150-node inert Lua tree retire with per-corporation earned_techs. Taken because every nation now starts at the same tech level holding nothing, and a second gating system over the nation's tree would contradict it. The military base, toolmaker and both recipes are open from the start.
+
+**Why it matters.** BL-344's military-base gate was the deliberate proof that tech reaches military outcomes; the Digitisation tree's Force branch carries that proof now. If any of the four should stay gated, it becomes a node.
+
+> **Recommendation:** Taken; overturn by naming the node it should become.
+
+> **RESOLVED.** Written: RESEARCH.md, PRODUCTION.md, MILITARY.md, SYSTEMS.md (NR-1022, old gates open); built in BL-1273.
+
+*Files: `src/world/tech_gate.cpp`, `scripts/tech_tree.lua`*
+
+### NR-1023 — DECISION TAKEN: research points come from the academic-research budget line, Universities and research institutes, into the nation's pool
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)*
+
+RESEARCH.md names the budget line and Universities. The corporation-level science float from research institutes (accrued, never spent) folds into the institute's nation's pool rather than surviving as a second currency. Rates are dials for the sweep against the pacing rule.
+
+**Why it matters.** A corporation's research institute now feeds its nation, not the firm; whether a firm should keep a research stake of its own is RESEARCH.md's open question.
+
+> **Recommendation:** Taken.
+
+> **RESOLVED.** Written: RESEARCH.md § Research points; PRODUCTION.md (institutes add RP to their nation, staffed at construction - Ben, 2026-10-10); built in BL-1273.
+
+*Files: `docs/economy/RESEARCH.md`, `src/world/economy_system.cpp`*
+
+### NR-1024 — DECISION TAKEN: the third road rung and coastal naval points follow sea legs to measured dates
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)*
+
+Ben ruled ocean crossings in generation gated by date. The two sibling pieces the trees gated - the treasury-bought third road rung (Post Roads) and naval points from coastal sea technology - take the same rule: the median polity's acquisition year in the last-blessed history. Applied as the sibling of an approved fix.
+
+**Why it matters.** Without a gate the road rung opens from the start and naval points vanish, both bigger world movers than a date.
+
+> **Recommendation:** Taken.
+
+> **RESOLVED.** Superseded by Ben's rulings 2026-10-10 in TREES.md (sea legs: date, naval capacity and a fleet afloat; naval ramp coastal, re-weighted; dates the acquisition median).
+
+*Files: `docs/generation/trees/TREES.md`, `src/world/history_sim.cpp`*
+
+### NR-1031 — DECISION TAKEN: four loose ends of the retired generation trees
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
+
+(1) The explorer set dissolves: it was the Empire rim milestone and its only reader was entry to the Exploration tree; who crosses water is now date (sea legs), harbour and military capacity (can_field_naval). (2) No hard fuel gate replaces the Industry tree's fuel gate; fuel within reach stays a soft input to industry points. (3) The wizard board keeps no research column: the history researches nothing. (4) A quest's deed reads the NATION as its subject (condition_set gains a nation subject where it has only corps), wired with the effects (BL-1274, tech effects wired). The ancient roster stays authored as reference content no campaign nation is offered.
+
+**Why it matters.** Each removes a reader of tree state without inventing a new gate; overturn any by naming the quantity that should gate it.
+
+> **Recommendation:** Taken.
+
+> **RESOLVED.** Written: CIVILISATION.md, EXPLORATION.md, INDUSTRIALISATION.md, question_log.json; deed subject = nation (RESEARCH.md; BL-1285).
+
+*Files: `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/question_log.json`*
+
+### NR-1032 — What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?
+*question · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
+
+The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.
+
+**Why it matters.** The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.
+
+- A: derive it from charter reach - the share of the realm's processing plant held by chartered firms at the 1960 fold (an in-world quantity with a visible cause)
+- B: drop the lean; the regime reads subject history and world war only
+- C: seed it from the nation's character enums
+
+> **Recommendation:** A.
+
+> **RESOLVED.** RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean).
+
+*Files: `docs/generation/INDUSTRIALISATION.md`*
 

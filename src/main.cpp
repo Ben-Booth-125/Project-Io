@@ -17,7 +17,6 @@
 #include "world/supply_system.hpp"
 #include "world/survey_system.hpp"
 #include "world/stockpile_budget.hpp" // BL-1042: the budget the search-less paths state
-#include "world/tech_gate.hpp"
 #include "world/trade.hpp" // BL-1266: run_trades
 
 #ifdef _WIN32
@@ -189,7 +188,6 @@ int run_serve(int ticks, long long as_corp, bool as_any)
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
         run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
-        advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         // Age any dispatched survey by the days this tick spans (app.cpp does the
         // same on the day boundary). Without it the geographic fog never lifted
         // here: `survey` was an applicable verb whose effect never arrived, so no
@@ -313,7 +311,6 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
         run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
-        advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
     }
 
     std::filesystem::create_directories(out_dir);

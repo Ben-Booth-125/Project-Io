@@ -3271,8 +3271,6 @@ int remove_specialist_roster(world& w)
         for (const entity_id uid : owned)
             w.units.erase(uid);
 
-        w.earned_techs.erase(cid);
-        w.corp_modifiers.erase(cid);
         w.corp_embargo_conditions.erase(cid);
 
         if (w.player_entity == cid)

@@ -61,7 +61,7 @@ struct building_report;
 enum class standing_component : uint8_t
 {
     economic = 0, ///< Net worth: cash + the assessed value of buildings and held stock.
-    research,     ///< The corp's accumulated `science` (reached, never spent).
+    research,     ///< Zero since BL-1273: the nation holds technology, not the firm.
     military,     ///< Summed `unit_strength` over the corp's fielded units.
 };
 
@@ -213,13 +213,12 @@ struct corp_ai_params
         // other two convert INTO, so this weight is 1 by definition and moving
         // it is really a rescaling of the other two.
         1.0f,
-        // RESEARCH — 25 credits per science point. A research_institute
-        // produces exactly 1.0 science per econ tick
-        // (`economy.military.science_per_research_institute_tick`) and costs
-        // 15 maintenance + 10 wages per tick to run, so 25 credits is what a
-        // science point costs to make. Marginal production cost, not a market
-        // price: `science` has no market slot at all, by design — it is
-        // stockpiled, market-invisible and never decays.
+        // RESEARCH — 25 credits per point. Anchored on the retired per-corp
+        // `science` float (a research institute's 1.0/tick against its 25
+        // credits/tick of upkeep). That float retired with BL-1273 (the nation
+        // holds technology), so the component reads 0 and this weight
+        // multiplies nothing; it is kept so a corporation research stake —
+        // RESEARCH.md's open question — lands as data, not a rewrite.
         25.0f,
         // MILITARY — 1.35 credits per point of `unit_strength`. The anchor is
         // the SUSTAINED cost of a fielded regiment over its service life, not

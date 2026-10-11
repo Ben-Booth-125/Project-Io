@@ -11,6 +11,10 @@
 > own tree (../CIVILISATION, EMPIRE_TREE) · how a pantheon or a tongue is coined (../../lore/CREEDS).
 > **Confused with:** TREES.md, ../COLONISATION.md, EMPIRE_TREE.md.
 
+> **RETIRED (Ben, 2026-10-10).** Research is removed from generation and nothing reads this tree; it
+> is the record of a retired design. What it gated is gated by date now (`TREES.md`); technology is
+> the campaign's (`../../economy/RESEARCH.md`).
+
 ---
 
 ## Aims

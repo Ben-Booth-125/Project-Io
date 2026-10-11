@@ -174,12 +174,18 @@ in `tools/verify/README.md`.
   ree_alloy, machinery, alloys, electronics, spacecraft_components) is produced
   at least once and never sits pegged at the `[0.25×, 4×]` band ceiling for the
   whole run. Links the same TUs as `econ_harness`.
-- **`military_capability_harness`** — capability points (BL-332): a completed
-  `military_base` credits its owning corp's `military_points` and a completed
-  `research_institute` credits `science`, at the authored per-tick rate,
-  symmetric across player and non-player corps; a building still under
-  construction (`ticks_remaining > 0`) or decommissioned accumulates nothing.
-  Links the same TUs as `econ_harness`.
+- **`nation_tech_harness`** — the nation's tech state (BL-1273, RESEARCH.md):
+  R1 accrual (the academic-research line's share, staffed Universities and
+  research institutes into the nation's pool, deterministically; under
+  construction or decommissioned counts nothing), R2 the queue (requirements
+  queued ahead, cheapest member of a choice, AND groups, pair refusal mutating
+  nothing, overflow, a deed-unmet quest passed over), R3 the save seam, and R0
+  a campaign run over the curated seeds (`--seeds N`, default 16; every nation
+  opens holding nothing on the industrial band, accrues, completes nodes, run
+  twice identical) with the pacing measurement. Build:
+  `node tools/verify/build_harness.js nation_tech_harness`. It replaced
+  `tech_gate_harness`, `tech_effect_union_harness` and
+  `military_capability_harness`, whose per-corp gates and `science` retired.
 - **`procurement_harness`** — the procurement/contract seam (BL-350): one contract
   quoted, accepted, paced and delivered end to end with the treasury debited in
   the split shape (a deposit at `accept_quote`, the remainder paced across
@@ -507,10 +513,9 @@ in `tools/verify/README.md`.
   **G5 — the start gate: a RULED opening, exactly, and nothing stranded** (BL-589, 2026-08-24).
   A fresh ancient corp (reached depth 0, no tech earned) is walked against a table of the opening
   Ben actually ruled — not a narrower first-cut guess — and every recipe outside the one deliberate
-  lock (`refined_copper`, gated by `E0-EC-03`) must match its ruled open/closed state exactly. Then
-  proves the lock is not a permanent orphan: builds a corp meeting `E0-EC-03`'s own authored
-  predicate (one processing facility, Cr 400+ surplus), calls `advance_tech_gates`, and confirms the
-  gate resolves and `recipe_unlocked` flips. Four assertions, all currently green.
+  closure (`refined_copper`, now closed on the ancient band by its era tag) must match its ruled
+  open/closed state exactly. The per-corp tech gates (`E0-EC-03`, `E0-EC-01`) retired with BL-1273
+  (NR-1022), so the Toolmaker is in the opening and the "the gate resolves" rows went with the gate.
 
   **R3 — every named building's material basket is obtainable in its own band** (BL-590/BL-592,
   2026-08-24). A per-building material override (BL-590) could name a good only the industrial arc

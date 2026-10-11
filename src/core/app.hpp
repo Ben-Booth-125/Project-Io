@@ -14,7 +14,6 @@
 #include "world/recipe_registry.hpp"
 #include "world/spawn_seat.hpp"      // BL-630: the spawn shortlist and the seat
 #include "world/corp_command.hpp"    // BL-1076: the pick is corp_verb::take_seat
-#include "world/tech_tree.hpp"
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
 
@@ -1141,7 +1140,6 @@ private:
     std::chrono::steady_clock::time_point m_paint_t0{};
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
-    tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.
     std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.

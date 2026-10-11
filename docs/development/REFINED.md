@@ -1,5 +1,76 @@
 # REFINED — active worklist
 
+## Sprint 52 — the Digitisation tech tree (opened 2026-10-10, CLOSED 2026-10-10)
+
+**Closed (Ben: "cut this sprint as a success on building the tech tree").** Wave 0 and lane C
+(BL-1273) landed. Every unticked task below CARRIES to sprint 53 on its branch; the checkpoints
+and resume steps are in `HANDOFF_TECH_TREE.md`.
+
+**Goal.** Every nation researches the Digitisation tree from an equal start — a research pool, a
+queue it can plan, 160 nodes — and the history no longer researches at all. The sprint row in
+`sprints.json` carries waves, risk and done-when. Built on `claude/tech-trees-game-eras-8036ed`.
+
+**Gates.** Every merge: the item's harnesses, `world_determinism` twice, `save_roundtrip` if the
+save moves, a cold `code-reviewer` pass with a fix round budgeted. World-movers report movement and
+never re-bless; BL-1277 owns the one re-bless. Ben's live click for BL-1276.
+
+### Wave 0 — the docs (main session)
+
+**BL-1271 (Digitisation tree store).**
+- [x] D1 RESEARCH.md: holder, equal start, RP sources, the grammar, the queue, unread effects.
+- [x] D2 DIGITISATION_TREE.md + `digitisation_tree.json` (160 nodes) + `tools/session/tech_tree_store.js`.
+- [x] D3 TREES.md retired with the gate table; the four generation tree docs bannered; ERAS.md band
+  fixed industrial; AI_OPPONENT.md § 11 research-queue grant.
+- [x] D4 Sibling sweep of the generation, economy, politics and UI docs (agent, in place).
+
+### Wave 1 — two lanes (worktrees)
+
+**Lane G — BL-1272 (generation without research).** `generation-dev`. Files: `history_sim.*`,
+`era_minus_one.cpp`, `tree_effect.hpp`, `*_tree_data.hpp`, the tree generator/lint, the sim
+harnesses.
+- [ ] G1 Measure, on the blessed history (16 seeds): the median acquisition year of sea legs, the
+  Post Roads key and each coastal sea-tech node. Record the numbers.
+- [ ] G2 Remove the three invested trees from Invest and every reader; tree modifiers and the
+  industry-tree industry-points credit go; replace the three gates with the measured dates
+  (`history_sim_params`).
+- [ ] G3 Retire `gen_empire_tree_table.js` outputs and generation `tree_lint.js` targets; harness
+  assertions updated with a stated cause each.
+- [ ] G4 Report movement: `history_sweep` 16 seeds before/after, `world_determinism` x2.
+  provides: `history_sim_params::{sea_legs_year, post_roads_year, coastal_naval_ramp}`; removes
+  `polity::{empire_,exploration_,industry_}*`, `tree_mod_q`, `apply_tree_effects`.
+  consumes: nothing from lane C.
+
+**Lane C — BL-1273 (nation tech state).** `economy-dev`. Files: new `nation_tech.*`,
+`digitisation_tree_data.hpp` + `tools/session/gen_tech_tree_table.js`, `world.hpp`,
+`components.hpp`, `nation_step.cpp`, `world_save.*`, `tech_gate.*`, `condition_set.cpp`, the band
+call sites, `economy_system.cpp` (science), new `tools/verify/nation_tech_harness.cpp`.
+- [x] C1 Generator: store JSON → `digitisation_tree_data.hpp` (ids, tier, ring, cost units,
+  requirement groups, excludes, deed key, effect slots).
+- [x] C2 `nation_tech_state` per nation: held bitset, pool, queue, in-progress remainder; saved at a
+  bumped `world_save_version` (`next_save_version.js`).
+- [x] C3 Accrual: budget line + staffed Universities + research institutes → pool, per quarter;
+  corp `science` folds in (NR-1023).
+- [x] C4 Queue: enqueue-with-prerequisites, head funding, overflow, deed-waiting quests, pair guard.
+- [x] C5 Retire `earned_techs`/gates/Lua tree (NR-1022); every consumer reads the nation's tree;
+  band fixed `industrial` (ERAS.md).
+- [x] C6 `nation_tech_harness`: R0–R3 rows; `save_roundtrip`; `world_determinism` x2.
+  provides: `nation_tech_state`, `nation_holds(w, nation, node)`, `enqueue_node`,
+  `advance_research(w)`, `dg::nodes[]`, `dg::effect` slots.
+  consumes: nothing from lane G.
+
+### Wave 2 — on the core (after lane C merges)
+
+- [ ] E1 BL-1274 (tech effects wired): machine effects in the store; wired levers; declared-unread
+  register + audit. consumes: `dg::effect`, `nation_holds`.
+- [ ] A1 BL-1275 (nation research AI): scorer appends one frontier node. consumes: `enqueue_node`.
+- [ ] D1 BL-1285 (quest deed state): per-nation deed history; deed_met wired where the quantity exists. consumes: `dg::effect`, `deed_met`.
+- [ ] U1 BL-1276 (tech tree panel): ring render, inspect, plan mode, ACTIONS/question log/ui_elements,
+  verify script; Ben's live click. consumes: `nation_tech_state`, `enqueue_node`, `dg::nodes[]`.
+
+### Close
+
+- [ ] X1 BL-1277 (tech wave re-bless): per-cause before/after in world shape; Ben authorises.
+
 ## Sprint 50 — logistics and trade flow (opened 2026-10-07)
 
 **Goal.** Goods that exist reach the markets and processors that want them: BL-1217 (inputs

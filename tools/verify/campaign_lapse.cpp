@@ -97,7 +97,6 @@
 #include "world/standing.hpp"
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
@@ -221,7 +220,6 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
                  &rep.building_labour);
     attribute(&phase_deltas::budget);
     run_nation_step(w, reg, rep, t);
-    advance_tech_gates(w);
     attribute(&phase_deltas::nation);
     attribute(&phase_deltas::arrivals);
     // BL-743: the insolvency wind-up, last — app::step_economy's own order.

@@ -6,7 +6,7 @@
 #include "era_band.hpp"     // era_band (BL-1101: the world's own recipe band, below)
 #include "faithful_unordered_map.hpp" // every unordered store below (BL-1034: copies tick as their source)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
-#include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
+#include "nation_tech.hpp"  // nation_tech_state (BL-1273: the nation holds technology, below)
 #include "nation_budget.hpp" // nation_budget (Sprint N3 T2: the persistent weight map, below)
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
@@ -611,7 +611,7 @@ struct world
     /// serialisation seam as the TRAILING section of the history-log stream, so
     /// a stream written before BL-466 is still a valid prefix.
     /// NOT folded into `state_hash`, and that is deliberate rather than an
-    /// oversight (the omission corp_modifiers documents, documented here too
+    /// oversight (documented here
     /// after NR-401 asked). `state_hash` folds the fields a TICK may mutate, so a
     /// divergence in it means the simulation diverged; the partition is
     /// generation output and never moves once built, so including it would make
@@ -764,13 +764,20 @@ struct world
     /// or a load cannot reorder it (and it is never iterated by the sim).
     std::map<entity_id, lp_anchor_field> lp_anchor_fields;
 
-    /// Techs each corporation has EARNED, by tech id (BL-344). Per-corp, never
-    /// global: two corporations research independently, and a gate that read a
-    /// world-wide set would unlock a rival's content for the player. `std::map`
-    /// + `std::set` for deterministic iteration (the `corp_market_pools`
-    /// rationale). Empty at world setup — nothing is earned until a tech's
-    /// `condition_set` is satisfied and `advance_tech_gates` records it.
-    std::map<entity_id, std::set<std::string>> earned_techs;
+    /// Each nation's tech state (BL-1273; RESEARCH.md § Who holds technology):
+    /// the held set over the Digitisation tree, the RP pool and the queue —
+    /// nation_tech.hpp. The NATION holds technology; a corporation reaches it
+    /// through its home nation (`corp_nation_holds`). Keyed by nation entity id,
+    /// beside `nation_budgets` and for its reasons: a `std::map` walks ascending
+    /// with no sort, and an ABSENT entry is a nation holding nothing with an
+    /// empty pool — every nation's state on a fresh world. Written once a
+    /// quarter by `advance_research` (the nation step). SERIALISED
+    /// (world_save.cpp, format v47) and folded into `state_hash` when non-empty.
+    ///
+    /// Replaces the per-corporation `earned_techs` / `corp_modifiers` pair and
+    /// the four hand-authored tech gates (NR-1022): what they gated is open to
+    /// every nation.
+    std::map<entity_id, nation_tech_state> nation_tech;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it
@@ -778,70 +785,6 @@ struct world
     /// than a corporate setting (BL-094). A `std::vector` in authored order;
     /// evaluation order is therefore fixed and the money loop is deterministic.
     std::vector<law> laws;
-
-    /// True iff `corp` has earned `tech_id`. The single read point for the tech
-    /// gate and for `condition_subject::research`, so the two cannot disagree.
-    ///
-    /// @param corp    Corporation entity id.
-    /// @param tech_id Tech id as authored in scripts/tech_tree.lua.
-    /// @return        Whether that corporation has earned that tech.
-    bool has_tech(entity_id corp, const std::string& tech_id) const
-    {
-        const auto it = earned_techs.find(corp);
-        return it != earned_techs.end() && it->second.count(tech_id) != 0;
-    }
-
-    /// Scalar modifiers each corporation has been granted by earned techs'
-    /// `modify_scalar` effects (BL-479; laws join via BL-480). Per-corp and
-    /// append-ordered: `advance_tech_gates` appends a tech's effects at the
-    /// earn moment, in gate-table order, so the fold order below is the earn
-    /// order and is deterministic. NOT folded into `state_hash`: the canonical
-    /// fact is the earned set, and hashing an accumulation of it would only
-    /// double-count.
-    ///
-    /// DERIVED IN ORIGIN BUT ORDER-BEARING, SO IT IS SERIALISED (BL-536,
-    /// NR-510). This comment used to say "recomputable from `earned_techs`
-    /// × the gate table", and BL-107 carried a change-note instructing the save
-    /// format to re-fold it on load. Both were wrong; the save does neither.
-    /// `advance_tech_gates` appends in gate-table order WITHIN ONE CALL, but it
-    /// runs every tick — so the stored sequence is ordered by (earn tick, gate
-    /// index), while a re-fold can only reproduce (gate index). The two diverge
-    /// as soon as a corp satisfies a higher-index gate before a lower-index one,
-    /// which nothing prevents. It matters because `modified_scalar` folds in
-    /// stored order across `add` and `multiply`, which do not commute. The order
-    /// is information the earned set does not carry, so it is state.
-    /// `std::map` for deterministic iteration
-    /// (the `corp_market_pools` rationale). Empty at world setup, and stays
-    /// empty for the life of any world whose techs carry only
-    /// unlock_structure — which is what keeps such a world bit-identical to
-    /// the pre-BL-479 build.
-    std::map<entity_id, std::vector<scalar_modifier>> corp_modifiers;
-
-    /// `base` with every modifier `corp` holds on `subject` folded in, in
-    /// stored (earn) order. THE single read point for the effect side, as
-    /// `has_tech` is for the earned set — an economy read site asks this and
-    /// nothing else, so two sites cannot fold differently.
-    ///
-    /// Returns `base` UNTOUCHED — the same bits, no arithmetic performed —
-    /// when `corp` is `null_entity`, holds no modifiers, or holds none on this
-    /// subject. That is the R1 guarantee: a world with no modify_scalar tech
-    /// pays nothing and drifts nowhere.
-    ///
-    /// @param corp    Corporation whose modifiers apply (`null_entity` = none).
-    /// @param subject The scalar being read.
-    /// @param base    The unmodified value the call site computed.
-    /// @return        The modified value (== `base` when nothing applies).
-    float modified_scalar(entity_id corp, modifier_subject subject, float base) const
-    {
-        const auto it = corp_modifiers.find(corp);
-        if (it == corp_modifiers.end())
-            return base;
-        float v = base;
-        for (const scalar_modifier& m : it->second)
-            if (m.subject == subject)
-                v = apply_scalar_modifier(v, m);
-        return v;
-    }
 
     /// Per-body market index (BL-356): body -> its markets in ascending id order.
     /// A derived cache like body_tile_index, serving market_for_tile / clear_markets

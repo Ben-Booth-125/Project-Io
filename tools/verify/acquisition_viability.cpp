@@ -104,7 +104,6 @@
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
@@ -229,7 +228,6 @@ void tick(world& w, const recipe_registry& reg, int t, bool spectating)
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
     run_nation_step(w, reg, rep, t);
-    advance_tech_gates(w);
 }
 
 std::vector<entity_id> sorted_corp_ids(const world& w)

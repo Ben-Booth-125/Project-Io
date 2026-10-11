@@ -599,8 +599,8 @@ and a bridge are legible only against the terrain they cross.
 The wizard's "Begin" — and, on the cold path, the one and only generation call.
 **Round 6 does all of Begin's world work (Ben, 2026-09-24).** Everything that mutates the
 world before play is one `world/*` function, `finish_campaign_world` — the world-only half of
-setup (the genesis history, the survey states), the recipe band read from the history's
-industry state, the default recipes, the stockpile budget, the landscape search (phase 6) and
+setup (the genesis history, the survey states), the industrial recipe band every nation opens on
+(`../economy/ERAS.md` § Where the ladder starts), the default recipes, the stockpile budget, the landscape search (phase 6) and
 the winner's apply, the recipe pass and the twelve-tick settle — called by the round-6 worker
 after its build (§ Round 6) and by the cold path's worker (menu → Begin with no wizard,
 `--autostart`) after its own, **the same call in the same order**, so an adopted world and a
@@ -618,7 +618,7 @@ presentation half:
 2. **Set up the presentation:** the epoch formatter, the chat line, zoom/focus/frame;
    `m_econ_steps = 12`; the tech tree and the persona bench; the balance series from the
    returns the settle filed. The recipe registry is loaded from Lua on the main thread before
-   round 6 launches and a copy handed to the worker, which bands it from the world it built;
+   round 6 launches and a copy handed to the worker, which bands it industrial;
    Begin moves that banded copy into `m_registry`. The twelve pre-game ticks have no
    presentation half of their own — no agency comms, history samples or last report come from
    them (delegated reading, 2026-09-24, NEEDS_REVIEW): the ticks have no calendar and no

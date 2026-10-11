@@ -158,8 +158,6 @@ std::vector<std::string> dangling_refs(const world& w, entity_id gone)
     if (w.corporations.count(gone) != 0)                       note("world::corporations (the component itself)");
     if (w.player_entity == gone)                               note("world::player_entity");
     if (w.corp_embargo_conditions.count(gone) != 0)            note("world::corp_embargo_conditions");
-    if (w.earned_techs.count(gone) != 0)                       note("world::earned_techs");
-    if (w.corp_modifiers.count(gone) != 0)                     note("world::corp_modifiers");
 
     for (const auto& kv : w.corporations)
     {
@@ -424,8 +422,6 @@ fixture build_fixture()
     w.sentiment.pairs[{f.bystander, f.target}] = sentiment_value{1.0f, -2.0f};
     w.sentiment.pairs[{f.target, f.bystander}] = sentiment_value{0.5f,  0.5f};
     w.corp_embargo_conditions[f.target] = condition_set{};
-    w.earned_techs[f.target].insert("TECH-SMELTING");
-    w.corp_modifiers[f.target].push_back(scalar_modifier{});
     {
         active_battle b{};
         b.province = 1; b.attacker = f.target; b.defender = f.bystander;

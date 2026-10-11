@@ -136,6 +136,38 @@ capacity table and retrofit rates, the exchange ring window). The re-bless, the 
 (Trades tab, Build door, CARGO), and the merge back to `worktree-sprint-50`.
 ---
 
+## 2026-10-10 — Sprint 52: the Digitisation tech tree designed and the nation core built
+
+**Runtime:** 2026-10-10, one session; modes Design (the tree, through four reshapes), then Delivery
+Full, then the close. Branch `claude/tech-trees-game-eras-8036ed`.
+
+### Designed (Ben, all written into RESEARCH.md, DIGITISATION_TREE.md, TREES.md, ERAS.md)
+- **Research leaves generation; every nation starts equal and holds nothing; the nation holds
+  technology; all nations playable on the industrial band** (overturns NR-929).
+- **The tree**, after four shapes (six domains + spire; a 50/4 template; three segmented trees; then
+  connected clusters): 160 nodes in three trees of three branches on four rings — travel, minor,
+  major, quest; a major needs both its minors; joints and masteries need both parents; pick-one pairs
+  carry the Era 1 traps; one quest per branch keys the next age's branch; four placeholder clusters
+  for espionage and politics; a research queue an AI nation's scorer fills (grant, AI_OPPONENT § 11).
+- **Pacing:** four conversion shapes measured; only a per-nation base passes. Ruled base 120 +
+  20 x sqrt(line spend) at 200 RP a cost unit; an age is about eighty years.
+- **Generation gates:** sea legs = date + naval capacity + a fleet afloat; coastal naval ramp
+  re-weighted (9600 -> 353, naval points at 1200 match baseline); dates are the acquisition median.
+  Works lean from charter reach (NR-1032). Rocketry gates launch; propellant open. Institutes staffed.
+
+### Landed
+- **BL-1271 (Digitisation tree store):** docs, the 160-node store, `tech_tree_store.js --check`; two
+  sibling sweeps over 25 docs.
+- **BL-1273 (nation tech state)**, merged 14e8cace after a cold review and fix round: nation_tech
+  state, pool, queue, save v47, old per-corp gates retired. nation_tech_harness 16 seeds x2 PASS
+  (751/751 reach the first ring-2 major in 32 quarters, p50 21); save_roundtrip; world_determinism
+  x2 identical digests. The app links on the merged tree.
+
+### Carried to sprint 53 (HANDOFF_TECH_TREE.md)
+BL-1272 (generation without research) — fleet threshold mid-edit; BL-1274 (tech effects wired) and
+BL-1276 (tech tree panel, shift-click) — fix rounds written, unbuilt; BL-1275, BL-1285, BL-1277 not
+started. Every lane needed a fix round after cold review.
+
 ## 2026-10-04 — Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed
 
 **Runtime:** 2026-10-03 evening to 2026-10-04; modes Delivery Full (the three held branches), then

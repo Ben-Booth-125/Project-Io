@@ -11,7 +11,7 @@
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
 #include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
-#include "tech_gate.hpp"       // recipe_unlocked (BL-588)
+#include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
 
@@ -138,11 +138,13 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
          * wt_scalar
          * building_supply_scalar(b)
          * (1.0f - tc.hazard_level);
-    // BL-479: fold the owning corp's earned extraction_rate modifiers into the
-    // single definition of the draw. `null_entity` (or a corp with none) hands
-    // back `nominal` untouched — no arithmetic — so a world with no
-    // modify_scalar tech stays bit-identical to the pre-BL-479 build.
-    return w.modified_scalar(corp, modifier_subject::extraction_rate, nominal);
+    // BL-1273: the owning corp's home nation's held-node extraction_rate
+    // multiplier, folded into the single definition of the draw (BL-479's
+    // per-corp read site before it). `nation_scalar` hands back `nominal`
+    // untouched — no arithmetic — until the effect pass (BL-1274) fills it.
+    const auto cit = w.corporations.find(corp);
+    const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+    return nation_scalar(w, nation, modifier_subject::extraction_rate, nominal);
 }
 
 // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared pro-rata",
@@ -1675,36 +1677,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         if (b.recipe_switch_cooldown > 0)
             --b.recipe_switch_cooldown;
 
-    // BL-332 research points: a flat per-tick credit to the owning corp's
-    // science for every COMPLETED research_institute it holds — passive, no
-    // workforce dependency (the type staffs at zero), symmetric across every
-    // corp. Read by condition_subject::science (BL-455). Runs after
-    // run_construction so a base finishing this tick already counts, mirroring
-    // the rest of this function's build-then-produce ordering. Iterates each
-    // corp's own `assets` vector (not w.buildings), so per-corp determinism
-    // needs no extra sort — only that corp's own building list, in its own
-    // stored order, decides its own accumulator.
-    {
-        const auto& mp = reg.military();
-        for (auto& [corp, cc] : w.corporations)
-        {
-            for (const entity_id bid : cc.assets)
-            {
-                const auto bit = w.buildings.find(bid);
-                if (bit == w.buildings.end())
-                    continue;
-                const building_component& b = bit->second;
-                if (b.ticks_remaining > 0 || b.decommissioned)
-                    continue; // still under construction, or torn down
-                // BL-455 (2026-08-17): the military_base branch that credited
-                // cc.military_points was removed with the field. It had no
-                // reader anywhere in src/ — see components.hpp for why deletion
-                // beat inventing a consumer.
-                if (b.type == building_type::research_institute)
-                    cc.science += mp.science_per_research_institute_tick;
-            }
-        }
-    }
+    // BL-1273 (NR-1023): the BL-332 per-corp `science` credit that sat here is
+    // gone. A completed research institute now feeds its owner corp's home
+    // nation's research pool, once a quarter, in the nation step's research
+    // pass (`advance_research`, nation_tech.hpp) — the nation holds technology.
 
     // BL-613 education: the qualification-raising pass.
     //

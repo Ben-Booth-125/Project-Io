@@ -22,7 +22,8 @@
 //
 //   * SCALAR effects (this file). A subject here names one scalar the
 //     simulation already computes, and a modifier moves it. Read by tech
-//     (tech_gate.hpp's effect union) and by world::modified_scalar.
+//     (the nation's held nodes, via nation_tech.hpp's `nation_scalar`, BL-1273;
+//     the per-corp tech_gate union and world::modified_scalar before it).
 //   * MONEY-FLOW effects (law.hpp's `law_effect_kind`). A levy or a tariff is
 //     a TRANSFER between two balances, not a scalar the simulation computes —
 //     there is no subject here it could be expressed as, and inventing one
@@ -99,7 +100,7 @@ enum class modifier_op : uint8_t
 };
 
 /// One scalar modifier: `<subject> <op> <magnitude>`. The `modify_scalar` arm
-/// of the tech effect union (tech_gate.hpp) and, later, of a law's effect
+/// of a node's effect (nation_tech.hpp, BL-1274) and, later, of a law's effect
 /// (BL-480). Trivially copyable, fixed layout — a future save-format record.
 struct scalar_modifier
 {
@@ -110,7 +111,7 @@ struct scalar_modifier
 
 /// Apply one modifier to a value. Pure, branch-on-enum arithmetic — the whole
 /// effect model, on purpose. Fold order over a modifier LIST is the caller's
-/// contract (world::modified_scalar folds in stored order, which is earn
+/// contract (`nation_scalar` must fold in a stated order — BL-1274 — the earn
 /// order), because add and multiply do not commute and determinism requires
 /// the order to be stated rather than accidental.
 inline float apply_scalar_modifier(float value, const scalar_modifier& m)

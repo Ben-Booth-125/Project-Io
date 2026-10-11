@@ -86,7 +86,7 @@ const WORLD = path.join(ROOT, 'src', 'world');
 // two in lockstep). contract_template joined the exclusion with BL-570 and
 // this mirror missed it until 2026-08-25, which is exactly the rot the header
 // comment warns about.
-const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'world_gen_config']);
+const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'world_gen_config']);
 
 // WHICH HARNESSES NEED THE LUA BUILDER IS DERIVED, NOT LISTED (BL-774, closing
 // NR-767). This used to be a hand-written four-entry map. The real set is 23 —

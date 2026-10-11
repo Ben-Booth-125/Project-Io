@@ -1,0 +1,2636 @@
+{
+ "_schema": "digitisation_tree.json — the Digitisation tech tree store (DIGITISATION_TREE.md is the authority; this file holds every node). requires = AND over groups, each group satisfied by ANY member. cost = cost_units x RP_PER_UNIT (DIGITISATION_TREE.md § Cost). Effects are prose until the effect pass gives each a machine form.",
+ "_note": "Every advantage, cost and deed is a placeholder to be re-priced in play (Ben, 2026-10-10). Validate with tools/session/tree_lint.js digitisation.",
+ "tree": "digitisation",
+ "age": "Digitisation",
+ "tiers": {
+  "travel": 1,
+  "minor": 2,
+  "major": 6,
+  "quest": 3
+ },
+ "trees": [
+  {
+   "key": "PR",
+   "name": "Production",
+   "thesis": "what the nation can extract and make",
+   "branches": [
+    {
+     "key": "PR-EX",
+     "name": "Extraction",
+     "travel_theme": "+1% extraction rate at every extraction building"
+    },
+    {
+     "key": "PR-PC",
+     "name": "Processing",
+     "travel_theme": "+1% output per batch at every processing building"
+    },
+    {
+     "key": "PR-EN",
+     "name": "Energy",
+     "travel_theme": "-1% fuel draw at every building"
+    }
+   ]
+  },
+  {
+   "key": "NE",
+   "name": "Network",
+   "thesis": "how far and fast the nation moves goods and word",
+   "branches": [
+    {
+     "key": "NE-SO",
+     "name": "Signal & Orbit",
+     "travel_theme": "+1% national research"
+    },
+    {
+     "key": "NE-MK",
+     "name": "Markets",
+     "travel_theme": "+1% trade capacity at every Marketplace"
+    },
+    {
+     "key": "NE-FR",
+     "name": "Freight",
+     "travel_theme": "-1% logistics cost"
+    }
+   ]
+  },
+  {
+   "key": "ST",
+   "name": "State",
+   "thesis": "what the nation can field, hold and keep calm",
+   "branches": [
+    {
+     "key": "ST-FO",
+     "name": "Force",
+     "travel_theme": "+1% strength for every unit"
+    },
+    {
+     "key": "ST-OR",
+     "name": "Order",
+     "travel_theme": "-1% unrest in every province"
+    },
+    {
+     "key": "ST-AC",
+     "name": "Accord",
+     "travel_theme": "-1% Alarm toward you"
+    }
+   ]
+  }
+ ],
+ "placeholders": {
+  "espionage": "the espionage system — not yet designed",
+  "politics": "the politics system — not yet designed"
+ },
+ "nodes": [
+  {
+   "id": "DG-PR-EX-T1",
+   "name": "Field Practice I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [],
+   "advantage": "+1% extraction rate at every extraction building",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-PR-EX-T2",
+   "name": "Field Practice II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T1"
+    ]
+   ],
+   "advantage": "+1% extraction rate at every extraction building",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-PR-EX-A1",
+   "name": "Seismic Survey",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T2"
+    ]
+   ],
+   "advantage": "deposits in your provinces reveal 1 province further",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EX-A2",
+   "name": "Drill-Bit Metallurgy",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T2"
+    ]
+   ],
+   "advantage": "Oil Platforms +5% extraction rate",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EX-A",
+   "name": "Offshore Drilling",
+   "tier": "major",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-A1"
+    ],
+    [
+     "DG-PR-EX-A2"
+    ]
+   ],
+   "advantage": "Oil Platforms may be placed on shelf sea; Oil Platforms +25% extraction rate",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-PR-EX-T3",
+   "name": "Field Practice III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-A"
+    ]
+   ],
+   "advantage": "+1% extraction rate at every extraction building",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EX-T4",
+   "name": "Field Practice IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T3"
+    ]
+   ],
+   "advantage": "+1% extraction rate at every extraction building",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-PR-EX-T5",
+   "name": "Field Practice V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-A"
+    ]
+   ],
+   "advantage": "+1% extraction rate at every extraction building",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EX-T6",
+   "name": "Field Practice VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T5"
+    ]
+   ],
+   "advantage": "+1% extraction rate at every extraction building",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-PR-EX-B1",
+   "name": "Mine Ventilation",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T4"
+    ]
+   ],
+   "advantage": "Mines +5% extraction rate",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EX-B2",
+   "name": "Rock Bolting",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T4"
+    ]
+   ],
+   "advantage": "Mine maintenance -10%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EX-B",
+   "name": "Deep-Shaft Mining",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-B1"
+    ],
+    [
+     "DG-PR-EX-B2"
+    ]
+   ],
+   "advantage": "province building ceiling +1 for extraction buildings; Mines +10% extraction rate",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-EX-C1",
+   "name": "Hybrid Seed",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T6"
+    ]
+   ],
+   "advantage": "Farms +5% output",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EX-C2",
+   "name": "Desalination",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-T6"
+    ]
+   ],
+   "advantage": "coastal Water extraction sites; Water extraction +10%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EX-C",
+   "name": "Green Revolution",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-C1"
+    ],
+    [
+     "DG-PR-EX-C2"
+    ]
+   ],
+   "advantage": "Farms +25% output; Chemical Plants unlock the fertiliser recipe",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-EX-M",
+   "name": "Resource Base",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-B"
+    ],
+    [
+     "DG-PR-EX-C"
+    ]
+   ],
+   "advantage": "+3% extraction rate at every extraction building",
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-EX-Q",
+   "name": "Strategic Reserve",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-A"
+    ]
+   ],
+   "deed": "your own stock of crude oil and iron ore covers 4 quarters of your demand",
+   "advantage": "Mines and Oil Platforms +5% extraction rate",
+   "keys_next_branch": "Asteroid Prospecting",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-PC-T1",
+   "name": "Shop-Floor Practice I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [],
+   "advantage": "+1% output per batch at every processing building",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-PR-PC-T2",
+   "name": "Shop-Floor Practice II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T1"
+    ]
+   ],
+   "advantage": "+1% output per batch at every processing building",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-PR-PC-A1",
+   "name": "Catalysts",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T2"
+    ]
+   ],
+   "advantage": "Chemical Plants +5% output per batch",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-PC-A2",
+   "name": "Polymer Chemistry",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T2"
+    ]
+   ],
+   "advantage": "plastics recipe inputs -10%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-PC-A",
+   "name": "Bulk Petrochemicals",
+   "tier": "major",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-A1"
+    ],
+    [
+     "DG-PR-PC-A2"
+    ]
+   ],
+   "advantage": "Chemical Plants unlock the plastics recipe; Refineries +20% output per batch",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-PR-PC-T3",
+   "name": "Shop-Floor Practice III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-A"
+    ]
+   ],
+   "advantage": "+1% output per batch at every processing building",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-PC-T4",
+   "name": "Shop-Floor Practice IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T3"
+    ]
+   ],
+   "advantage": "+1% output per batch at every processing building",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-PR-PC-T5",
+   "name": "Shop-Floor Practice V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-A"
+    ]
+   ],
+   "advantage": "+1% output per batch at every processing building",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-PC-T6",
+   "name": "Shop-Floor Practice VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T5"
+    ]
+   ],
+   "advantage": "+1% output per batch at every processing building",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-PR-PC-B1",
+   "name": "Clean Rooms",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T4"
+    ]
+   ],
+   "advantage": "microchip recipe +10% yield",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-PC-B2",
+   "name": "Photolithography",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T4"
+    ]
+   ],
+   "advantage": "Electronics Labs +5% output per batch",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-PC-B",
+   "name": "Semiconductor Foundry",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-B1"
+    ],
+    [
+     "DG-PR-PC-B2"
+    ]
+   ],
+   "advantage": "Electronics Labs unlock the microchip recipe; Electronics Labs +10% output per batch",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-PC-C1",
+   "name": "Numerical Control",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T6"
+    ]
+   ],
+   "advantage": "Fabricators +5% output per batch",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-PC-C2",
+   "name": "Process Automation",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T6"
+    ]
+   ],
+   "advantage": "wages in processing buildings -5%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-PC-C",
+   "name": "Industrial Robotics",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-C1"
+    ],
+    [
+     "DG-PR-PC-C2"
+    ]
+   ],
+   "advantage": "every processing building +20% output per batch and wages -10%",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-PC-M",
+   "name": "Industrial Depth",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-B"
+    ],
+    [
+     "DG-PR-PC-C"
+    ]
+   ],
+   "advantage": "+3% output per batch at every processing building",
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-PC-Q",
+   "name": "Domestic Chips",
+   "tier": "quest",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-B"
+    ]
+   ],
+   "deed": "your microchip output covers your own electronics demand for 4 quarters",
+   "advantage": "Electronics Labs +10% output per batch",
+   "keys_next_branch": "Orbital Assembly",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-PR-EN-T1",
+   "name": "Fuel Economy I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [],
+   "advantage": "-1% fuel draw at every building",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-PR-EN-T2",
+   "name": "Fuel Economy II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T1"
+    ]
+   ],
+   "advantage": "-1% fuel draw at every building",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-PR-EN-A1",
+   "name": "Pipeline Networks",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T2"
+    ]
+   ],
+   "advantage": "fuel logistics cost -10%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EN-A2",
+   "name": "Heat Recovery",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T2"
+    ]
+   ],
+   "advantage": "fuel draw of processing buildings -5%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EN-A",
+   "name": "Catalytic Cracking",
+   "tier": "major",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-A1"
+    ],
+    [
+     "DG-PR-EN-A2"
+    ]
+   ],
+   "advantage": "Refineries +20% refined fuel per batch",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-PR-EN-T3",
+   "name": "Fuel Economy III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-A"
+    ]
+   ],
+   "advantage": "-1% fuel draw at every building",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EN-T4",
+   "name": "Fuel Economy IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T3"
+    ]
+   ],
+   "advantage": "-1% fuel draw at every building",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-PR-EN-T5",
+   "name": "Fuel Economy V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-A"
+    ]
+   ],
+   "advantage": "-1% fuel draw at every building",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EN-T6",
+   "name": "Fuel Economy VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T5"
+    ]
+   ],
+   "advantage": "-1% fuel draw at every building",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-PR-EN-B1",
+   "name": "Reactor Safety",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T4"
+    ]
+   ],
+   "advantage": "each Nuclear Plant raises rivals’ Alarm by 1 instead of 2",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EN-B2",
+   "name": "Uranium Enrichment",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T4"
+    ]
+   ],
+   "advantage": "Nuclear Plant output +25%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EN-B",
+   "name": "Civil Nuclear Power",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-B1"
+    ],
+    [
+     "DG-PR-EN-B2"
+    ]
+   ],
+   "advantage": "unlocks the Nuclear Plant: powers 4 province buildings with no fuel draw. Trap: each one raises every rival’s Alarm toward you by 2",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-EN-C1",
+   "name": "Cryogenic Storage",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T6"
+    ]
+   ],
+   "advantage": "propellant holding losses -50%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EN-C2",
+   "name": "Rocket-Fuel Chemistry",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-T6"
+    ]
+   ],
+   "advantage": "propellant recipe +5% yield",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-PR-EN-C",
+   "name": "Propellant Synthesis",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-C1"
+    ],
+    [
+     "DG-PR-EN-C2"
+    ]
+   ],
+   "advantage": "Chemical Plants unlock the propellant recipe at +20% yield",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-EN-M",
+   "name": "Energy Security",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-B"
+    ],
+    [
+     "DG-PR-EN-C"
+    ]
+   ],
+   "advantage": "-3% fuel draw at every building",
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-EN-Q",
+   "name": "Propellant at Scale",
+   "tier": "quest",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-C"
+    ]
+   ],
+   "deed": "a propellant plant fully staffed for 8 quarters",
+   "advantage": "propellant output +15%",
+   "keys_next_branch": "In-Situ Propellant",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-NE-SO-T1",
+   "name": "Research Grant I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [],
+   "advantage": "+1% national research",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-NE-SO-T2",
+   "name": "Research Grant II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T1"
+    ]
+   ],
+   "advantage": "+1% national research",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-NE-SO-A1",
+   "name": "Telex Network",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T2"
+    ]
+   ],
+   "advantage": "rivals’ prices and stocks seen 1 quarter fresher",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-SO-A2",
+   "name": "Mass Higher Education",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T2"
+    ]
+   ],
+   "advantage": "universities +20% research",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-SO-A",
+   "name": "Mainframe Computing",
+   "tier": "major",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-A1"
+    ],
+    [
+     "DG-NE-SO-A2"
+    ]
+   ],
+   "advantage": "national research +15%",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-NE-SO-T3",
+   "name": "Research Grant III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-A"
+    ]
+   ],
+   "advantage": "+1% national research",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-SO-T4",
+   "name": "Research Grant IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T3"
+    ]
+   ],
+   "advantage": "+1% national research",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-NE-SO-T5",
+   "name": "Research Grant V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-A"
+    ]
+   ],
+   "advantage": "+1% national research",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-SO-T6",
+   "name": "Research Grant VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T5"
+    ]
+   ],
+   "advantage": "+1% national research",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-NE-SO-B1",
+   "name": "Pad Ground Support",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T4"
+    ]
+   ],
+   "advantage": "Launchpad build cost -25%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-SO-B2",
+   "name": "Guidance Systems",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T4"
+    ]
+   ],
+   "advantage": "launch propellant -5%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-SO-B",
+   "name": "Rocketry",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-B1"
+    ],
+    [
+     "DG-NE-SO-B2"
+    ]
+   ],
+   "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-SO-C1",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T6"
+    ]
+   ],
+   "placeholder": "espionage",
+   "advantage": "reserved for espionage: signals intelligence",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-SO-C2",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T6"
+    ]
+   ],
+   "placeholder": "espionage",
+   "advantage": "reserved for espionage: signals intelligence",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-SO-C",
+   "name": "[Espionage]",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-C1"
+    ],
+    [
+     "DG-NE-SO-C2"
+    ]
+   ],
+   "placeholder": "espionage",
+   "advantage": "placeholder cluster: signals intelligence; effects authored when the espionage system exists",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-SO-M",
+   "name": "Research Culture",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-B"
+    ]
+   ],
+   "advantage": "+3% national research",
+   "pending_requires": [
+    [
+     "DG-NE-SO-C"
+    ]
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-SO-Q",
+   "name": "First Cargo to Orbit",
+   "tier": "quest",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-B"
+    ]
+   ],
+   "deed": "one convoy completed to another body",
+   "advantage": "launch propellant -5%",
+   "keys_next_branch": "Interplanetary Convoys",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-NE-MK-T1",
+   "name": "Trade Desk I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [],
+   "advantage": "+1% trade capacity at every Marketplace",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-NE-MK-T2",
+   "name": "Trade Desk II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T1"
+    ]
+   ],
+   "advantage": "+1% trade capacity at every Marketplace",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-NE-MK-A1",
+   "name": "Commodity Futures",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T2"
+    ]
+   ],
+   "advantage": "trade capacity +5% at your Marketplaces",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-MK-A2",
+   "name": "Consumer Credit",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T2"
+    ]
+   ],
+   "advantage": "household demand in your markets +3%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-MK-A",
+   "name": "Electronic Settlement",
+   "tier": "major",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-A1"
+    ],
+    [
+     "DG-NE-MK-A2"
+    ]
+   ],
+   "advantage": "trades settle the tick they clear; Ports earn +25% trade points",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-NE-MK-T3",
+   "name": "Trade Desk III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-A"
+    ]
+   ],
+   "advantage": "+1% trade capacity at every Marketplace",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-MK-T4",
+   "name": "Trade Desk IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T3"
+    ]
+   ],
+   "advantage": "+1% trade capacity at every Marketplace",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-NE-MK-T5",
+   "name": "Trade Desk V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-A"
+    ]
+   ],
+   "advantage": "+1% trade capacity at every Marketplace",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-MK-T6",
+   "name": "Trade Desk VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T5"
+    ]
+   ],
+   "advantage": "+1% trade capacity at every Marketplace",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-NE-MK-B1",
+   "name": "Communication Satellites",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T4"
+    ]
+   ],
+   "advantage": "activity fog lifts on every market you trade with",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-MK-B2",
+   "name": "Just-in-Time Inventory",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T4"
+    ]
+   ],
+   "advantage": "stock holding cost and spoilage -20%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-MK-B",
+   "name": "Packet Networks",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-B1"
+    ],
+    [
+     "DG-NE-MK-B2"
+    ]
+   ],
+   "advantage": "trade capacity +30% at every Marketplace; national research +10%",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-MK-C1",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T6"
+    ]
+   ],
+   "placeholder": "politics",
+   "advantage": "reserved for politics: lobbying and market regulation",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-MK-C2",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-T6"
+    ]
+   ],
+   "placeholder": "politics",
+   "advantage": "reserved for politics: lobbying and market regulation",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-MK-C",
+   "name": "[Politics]",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-C1"
+    ],
+    [
+     "DG-NE-MK-C2"
+    ]
+   ],
+   "placeholder": "politics",
+   "advantage": "placeholder cluster: lobbying and market regulation; effects authored when the politics system exists",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-MK-M",
+   "name": "Market Depth",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-B"
+    ]
+   ],
+   "advantage": "+3% trade capacity at every Marketplace",
+   "pending_requires": [
+    [
+     "DG-NE-MK-C"
+    ]
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-MK-Q",
+   "name": "Open Markets",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-A"
+    ]
+   ],
+   "deed": "trade with the markets of 3 other nations in one quarter",
+   "advantage": "trade points +5%",
+   "keys_next_branch": "Off-World Exchange",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-FR-T1",
+   "name": "Route Planning I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [],
+   "advantage": "-1% logistics cost",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-NE-FR-T2",
+   "name": "Route Planning II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T1"
+    ]
+   ],
+   "advantage": "-1% logistics cost",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-NE-FR-A1",
+   "name": "Pallet Standards",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T2"
+    ]
+   ],
+   "advantage": "handling cost -5%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-FR-A2",
+   "name": "Gantry Cranes",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T2"
+    ]
+   ],
+   "advantage": "Port throughput +10%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-FR-A",
+   "name": "Container Shipping",
+   "tier": "major",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-A1"
+    ],
+    [
+     "DG-NE-FR-A2"
+    ]
+   ],
+   "advantage": "convoys carry +50% cargo per dispatch; Ports upgrade to Container Ports",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-NE-FR-T3",
+   "name": "Route Planning III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-A"
+    ]
+   ],
+   "advantage": "-1% logistics cost",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-FR-T4",
+   "name": "Route Planning IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T3"
+    ]
+   ],
+   "advantage": "-1% logistics cost",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-NE-FR-T5",
+   "name": "Route Planning V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-A"
+    ]
+   ],
+   "advantage": "-1% logistics cost",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-FR-T6",
+   "name": "Route Planning VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T5"
+    ]
+   ],
+   "advantage": "-1% logistics cost",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-NE-FR-B1",
+   "name": "Asphalt Paving",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T4"
+    ]
+   ],
+   "advantage": "road maintenance -10%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-FR-B2",
+   "name": "Trucking Fleets",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T4"
+    ]
+   ],
+   "advantage": "inland convoy capacity +10%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-FR-B",
+   "name": "Motorway Grid",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-B1"
+    ],
+    [
+     "DG-NE-FR-B2"
+    ]
+   ],
+   "advantage": "road-tier upgrades cost -30%; road travel time -15%",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-FR-C1",
+   "name": "Air Cargo Hubs",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T6"
+    ]
+   ],
+   "advantage": "high-value convoy capacity +10%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-FR-C2",
+   "name": "Satellite Navigation",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-T6"
+    ]
+   ],
+   "advantage": "travel time -5% everywhere",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-FR-C",
+   "name": "Jet Freight",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-C1"
+    ],
+    [
+     "DG-NE-FR-C2"
+    ]
+   ],
+   "advantage": "perishables and electronics travel time -40%",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-FR-M",
+   "name": "Logistics Backbone",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-B"
+    ],
+    [
+     "DG-NE-FR-C"
+    ]
+   ],
+   "advantage": "-3% logistics cost",
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-FR-Q",
+   "name": "Ten Lanes",
+   "tier": "quest",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-B"
+    ]
+   ],
+   "deed": "10 convoy routes served every quarter for 4 quarters",
+   "advantage": "logistics cost -5%",
+   "keys_next_branch": "Orbital Port & Depots",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-ST-FO-T1",
+   "name": "Drill & Training I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [],
+   "advantage": "+1% strength for every unit",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-FO-T2",
+   "name": "Drill & Training II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T1"
+    ]
+   ],
+   "advantage": "+1% strength for every unit",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-FO-A1",
+   "name": "Armoured Carriers",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T2"
+    ]
+   ],
+   "advantage": "land unit upkeep -5%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-FO-A2",
+   "name": "Early Warning Radar",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T2"
+    ]
+   ],
+   "advantage": "home-province defence +10%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-FO-A",
+   "name": "Mechanised Divisions",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-A1"
+    ],
+    [
+     "DG-ST-FO-A2"
+    ]
+   ],
+   "advantage": "unlocks mechanised infantry; every land unit +20% strength",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-ST-FO-T3",
+   "name": "Drill & Training III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-A"
+    ]
+   ],
+   "advantage": "+1% strength for every unit",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-FO-T4",
+   "name": "Drill & Training IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T3"
+    ]
+   ],
+   "advantage": "+1% strength for every unit",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-FO-T5",
+   "name": "Drill & Training V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-A"
+    ]
+   ],
+   "advantage": "+1% strength for every unit",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-FO-T6",
+   "name": "Drill & Training VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T5"
+    ]
+   ],
+   "advantage": "+1% strength for every unit",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-FO-B1",
+   "name": "Helicopter Lift",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T4"
+    ]
+   ],
+   "advantage": "muster time -10%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-FO-B2",
+   "name": "Precision Munitions",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T4"
+    ]
+   ],
+   "advantage": "units +10% strength when attacking",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-FO-B",
+   "name": "Airmobile Forces",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-B1"
+    ],
+    [
+     "DG-ST-FO-B2"
+    ]
+   ],
+   "advantage": "unit movement +50% along reach",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-FO-C1",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T6"
+    ]
+   ],
+   "placeholder": "espionage",
+   "advantage": "reserved for espionage: covert operations",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-FO-C2",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T6"
+    ]
+   ],
+   "placeholder": "espionage",
+   "advantage": "reserved for espionage: covert operations",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-FO-C",
+   "name": "[Espionage]",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-C1"
+    ],
+    [
+     "DG-ST-FO-C2"
+    ]
+   ],
+   "placeholder": "espionage",
+   "advantage": "placeholder cluster: covert operations; effects authored when the espionage system exists",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-FO-M",
+   "name": "Combined Arms",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-B"
+    ]
+   ],
+   "advantage": "+3% strength for every unit",
+   "pending_requires": [
+    [
+     "DG-ST-FO-C"
+    ]
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-Q",
+   "name": "Proven Readiness",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-A"
+    ]
+   ],
+   "deed": "every home province held through a war, or a war won",
+   "advantage": "muster time -20%",
+   "keys_next_branch": "Space Force",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-OR-T1",
+   "name": "Civil Service I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [],
+   "advantage": "-1% unrest in every province",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-OR-T2",
+   "name": "Civil Service II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T1"
+    ]
+   ],
+   "advantage": "-1% unrest in every province",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-OR-A1",
+   "name": "Public Housing",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T2"
+    ]
+   ],
+   "advantage": "unrest -3% in every province",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-OR-A2",
+   "name": "Social Insurance",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T2"
+    ]
+   ],
+   "advantage": "tax yield +3%",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-OR-A",
+   "name": "Welfare State",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-A1"
+    ],
+    [
+     "DG-ST-OR-A2"
+    ]
+   ],
+   "advantage": "unrest -10% in every province; wage floor +5% (a cost)",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-ST-OR-T3",
+   "name": "Civil Service III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-A"
+    ]
+   ],
+   "advantage": "-1% unrest in every province",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-OR-T4",
+   "name": "Civil Service IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T3"
+    ]
+   ],
+   "advantage": "-1% unrest in every province",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-OR-T5",
+   "name": "Civil Service V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-A"
+    ]
+   ],
+   "advantage": "-1% unrest in every province",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-OR-T6",
+   "name": "Civil Service VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T5"
+    ]
+   ],
+   "advantage": "-1% unrest in every province",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-OR-B1",
+   "name": "Opinion Polling",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T4"
+    ]
+   ],
+   "advantage": "unrest forecast 2 quarters ahead",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-OR-Ba",
+   "name": "Mass Television",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-B1"
+    ]
+   ],
+   "advantage": "tax yield +10%; unrest -15%; assimilation +20%",
+   "cost_units": 24,
+   "excludes": "DG-ST-OR-Bb"
+  },
+  {
+   "id": "DG-ST-OR-Bb",
+   "name": "Mass Surveillance",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-B1"
+    ]
+   ],
+   "advantage": "unrest -30% now, but the unrest floor rises 5 points a year. Destabiliser",
+   "cost_units": 24,
+   "excludes": "DG-ST-OR-Ba"
+  },
+  {
+   "id": "DG-ST-OR-C1",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T6"
+    ]
+   ],
+   "placeholder": "politics",
+   "advantage": "reserved for politics: regime, elections, succession",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-OR-C2",
+   "name": "Reserved minor",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-T6"
+    ]
+   ],
+   "placeholder": "politics",
+   "advantage": "reserved for politics: regime, elections, succession",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-OR-C",
+   "name": "[Politics]",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-C1"
+    ],
+    [
+     "DG-ST-OR-C2"
+    ]
+   ],
+   "placeholder": "politics",
+   "advantage": "placeholder cluster: regime, elections, succession; effects authored when the politics system exists",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-OR-M",
+   "name": "Civic Trust",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-Ba",
+     "DG-ST-OR-Bb"
+    ]
+   ],
+   "advantage": "-3% unrest in every province",
+   "pending_requires": [
+    [
+     "DG-ST-OR-C"
+    ]
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-OR-Q",
+   "name": "Broad Consensus",
+   "tier": "quest",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-Ba",
+     "DG-ST-OR-Bb"
+    ]
+   ],
+   "deed": "unrest below the floor in every province for 8 quarters",
+   "advantage": "tax yield +5%",
+   "keys_next_branch": "Settlement Charters",
+   "cost_units": 12
+  },
+  {
+   "id": "DG-ST-AC-T1",
+   "name": "Diplomatic Corps I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [],
+   "advantage": "-1% Alarm toward you",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-AC-T2",
+   "name": "Diplomatic Corps II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T1"
+    ]
+   ],
+   "advantage": "-1% Alarm toward you",
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-AC-A1",
+   "name": "Trade Missions",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T2"
+    ]
+   ],
+   "advantage": "sentiment +5 with every nation you trade with",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-AC-Aa",
+   "name": "Free-Trade Accords",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-A1"
+    ]
+   ],
+   "advantage": "tariffs with accord partners fall to 0; their Alarm toward you -10",
+   "cost_units": 12,
+   "excludes": "DG-ST-AC-Ab"
+  },
+  {
+   "id": "DG-ST-AC-Ab",
+   "name": "Import Substitution",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-A1"
+    ]
+   ],
+   "advantage": "tariffs +20%; domestic processing +10%. Severer: rivals’ Alarm +5, export routes thin",
+   "cost_units": 12,
+   "excludes": "DG-ST-AC-Aa"
+  },
+  {
+   "id": "DG-ST-AC-T3",
+   "name": "Diplomatic Corps III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-Aa",
+     "DG-ST-AC-Ab"
+    ]
+   ],
+   "advantage": "-1% Alarm toward you",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-AC-T4",
+   "name": "Diplomatic Corps IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T3"
+    ]
+   ],
+   "advantage": "-1% Alarm toward you",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-AC-T5",
+   "name": "Diplomatic Corps V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-Aa",
+     "DG-ST-AC-Ab"
+    ]
+   ],
+   "advantage": "-1% Alarm toward you",
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-AC-T6",
+   "name": "Diplomatic Corps VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T5"
+    ]
+   ],
+   "advantage": "-1% Alarm toward you",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-AC-B1",
+   "name": "Hotline",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T4"
+    ]
+   ],
+   "advantage": "Alarm spikes decay 20% faster",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-AC-Ba",
+   "name": "Strategic Deterrent",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-B1"
+    ]
+   ],
+   "advantage": "attackers’ odds -50% on your home provinces. Escalator: every rival’s Alarm toward you +10",
+   "cost_units": 24,
+   "excludes": "DG-ST-AC-Bb"
+  },
+  {
+   "id": "DG-ST-AC-Bb",
+   "name": "Survivable Forces",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-B1"
+    ]
+   ],
+   "advantage": "units +25% defence; Alarm toward you drifts -5% a year. Looks aggressive, stabilises",
+   "cost_units": 24,
+   "excludes": "DG-ST-AC-Ba"
+  },
+  {
+   "id": "DG-ST-AC-C1",
+   "name": "Inspection Regimes",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T6"
+    ]
+   ],
+   "advantage": "world Ceiling +3",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-AC-C2",
+   "name": "Confidence Measures",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-T6"
+    ]
+   ],
+   "advantage": "Alarm toward you -5%",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-AC-C",
+   "name": "Arms Control Verification",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-C1"
+    ],
+    [
+     "DG-ST-AC-C2"
+    ]
+   ],
+   "advantage": "every nation’s Alarm toward you -25%; world Ceiling +10",
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-AC-M",
+   "name": "Diplomatic Standing",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-Ba",
+     "DG-ST-AC-Bb"
+    ],
+    [
+     "DG-ST-AC-C"
+    ]
+   ],
+   "advantage": "-3% Alarm toward you",
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-AC-Q",
+   "name": "Quiet Borders",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-Aa",
+     "DG-ST-AC-Ab"
+    ]
+   ],
+   "deed": "Alarm toward you below Ceiling for 8 quarters",
+   "advantage": "Alarm toward you decays 10% faster",
+   "keys_next_branch": "Planetary Accords",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-J-PREX-PRPC",
+   "name": "Integrated Mills",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "PR",
+   "branch": null,
+   "requires": [
+    [
+     "DG-PR-EX-T6"
+    ],
+    [
+     "DG-PR-PC-T4"
+    ]
+   ],
+   "advantage": "+1% extraction rate and +1% processing output",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-J-PRPC-PREN",
+   "name": "Cogeneration",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "PR",
+   "branch": null,
+   "requires": [
+    [
+     "DG-PR-PC-T6"
+    ],
+    [
+     "DG-PR-EN-T4"
+    ]
+   ],
+   "advantage": "+1% processing output and -1% fuel draw",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-J-PREN-NESO",
+   "name": "Launch Logistics",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "PR+NE",
+   "branch": null,
+   "requires": [
+    [
+     "DG-PR-EN-T6"
+    ],
+    [
+     "DG-NE-SO-T4"
+    ]
+   ],
+   "advantage": "+2% propellant output and +1% national research",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-J-NESO-NEMK",
+   "name": "Market Data",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "NE",
+   "branch": null,
+   "requires": [
+    [
+     "DG-NE-SO-T6"
+    ],
+    [
+     "DG-NE-MK-T4"
+    ]
+   ],
+   "advantage": "+1% national research and +1% trade capacity",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-J-NEFR-STFO",
+   "name": "Military Logistics",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "NE+ST",
+   "branch": null,
+   "requires": [
+    [
+     "DG-NE-FR-T6"
+    ],
+    [
+     "DG-ST-FO-T4"
+    ]
+   ],
+   "advantage": "+3% unit movement and -1% logistics cost",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-J-STOR-STAC",
+   "name": "Public Diplomacy",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "ST",
+   "branch": null,
+   "requires": [
+    [
+     "DG-ST-OR-T6"
+    ],
+    [
+     "DG-ST-AC-T4"
+    ]
+   ],
+   "advantage": "-1% unrest and -1% Alarm toward you",
+   "cost_units": 3
+  },
+  {
+   "id": "DG-J-STAC-PREX",
+   "name": "Resource Diplomacy",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "ST+PR",
+   "branch": null,
+   "requires": [
+    [
+     "DG-ST-AC-T6"
+    ],
+    [
+     "DG-PR-EX-T4"
+    ]
+   ],
+   "advantage": "+1% extraction rate and -1% Alarm toward you",
+   "cost_units": 3
+  }
+ ]
+}

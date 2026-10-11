@@ -5,6 +5,7 @@
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
 #include "corp_command.hpp"    // BL-743: firm_exit_params — the insolvency wind-up trigger
 #include "network_upkeep.hpp"  // BL-643: network_upkeep_params — the logistics_maintenance line's material rates
+#include "nation_tech.hpp"     // BL-1273: research_params — the research dials
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
@@ -140,7 +141,7 @@ inline bool recipe_runs_on_body(const recipe& rc, const body_component& b)
 /// body (no air to read, nothing to refuse on — the callers' own existence
 /// checks refuse those).
 struct world;
-bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in tech_gate.cpp (a Lua-free TU)
+bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in construction.cpp (a Lua-free TU)
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
 /// to key a processing method's resource pip (construction_panel.cpp) and,
@@ -797,17 +798,14 @@ struct logistics_node_params
     float discount_cap            = 0.50f; ///< ceiling on the summed node discount (fraction of the haul cost).
 };
 
-/// BL-332 research accumulation rate, authored in scripts/economy.lua under the
-/// top-level `military` table. A flat per-tick credit to the owning corp's
-/// corporation_component.science for every COMPLETED research_institute it owns —
-/// see economy_system.cpp's research-points pass.
-///
-/// `military_points_per_base_tick` was removed 2026-08-17 (BL-455) with the field
-/// it fed. The struct keeps its name because BL-394's hire costs live in it too.
+/// The `military` table of scripts/economy.lua. Its two research-flavoured rates
+/// are gone: `military_points_per_base_tick` with its field (BL-455, 2026-08-17)
+/// and `science_per_research_institute_tick` with `corporation_component::science`
+/// (BL-1273, NR-1023 — institutes feed the nation's research pool now, at
+/// `research_params::rp_per_institute`). The struct keeps its name because
+/// BL-394's hire costs live in it.
 struct military_capability_params
 {
-    float science_per_research_institute_tick = 1.0f;
-
     /// BL-394: hire_unit's credit cost, debited from the corp's balance at
     /// apply time — cost = hire_base_cost + hire_cost_per_power × the roster
     /// row's power_mod. The base is a FLOOR: row 0's gate is all-zero, so the
@@ -1220,6 +1218,10 @@ public:
     /// rather than clamped, the space_programme discipline.
     const network_upkeep_params& network_upkeep() const { return m_network_upkeep; }
 
+    /// BL-1273 the research dials (economy.research in Lua; nation_tech.hpp
+    /// documents the conversion). Defaults are research_params' own.
+    const research_params& research() const { return m_research; }
+
     /// BL-628 whole-firm acquisition tunables (economy.acquisition in Lua).
     /// One number, `multiple`, range-checked at load and rejected rather than
     /// clamped. The trailing WINDOW is not here: it is
@@ -1459,6 +1461,7 @@ public:
     const firm_exit_params& firm_exit() const { return m_firm_exit; }
     void set_firm_exit(const firm_exit_params& p) { m_firm_exit = p; }
     void set_network_upkeep(const network_upkeep_params& p) { m_network_upkeep = p; }
+    void set_research(const research_params& p) { m_research = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
     void set_economics(building_type type, const building_economics& e)
@@ -1741,6 +1744,9 @@ private:
     /// Default-constructed — every rate zero, so a hand-built harness registry
     /// derives no upkeep draw unless it sets them.
     network_upkeep_params m_network_upkeep = {};
+
+    /// BL-1273 the research dials (economy.research).
+    research_params m_research = {};
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

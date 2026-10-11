@@ -10,6 +10,10 @@
 > EMPIRE_TREE) · the phase after it (../INDUSTRIALISATION, INDUSTRY_TREE).
 > **Confused with:** EMPIRE_TREE.md, INDUSTRY_TREE.md, ../../economy/RESEARCH.md.
 
+> **RETIRED (Ben, 2026-10-10).** Research is removed from generation and nothing reads this tree; it
+> is the record of a retired design. What it gated is gated by date now (`TREES.md`); technology is
+> the campaign's (`../../economy/RESEARCH.md`).
+
 The Exploration tree is the third of the four trees `TREES.md` defines, and it runs inside the
 exploration age, **1200 → 1660 CE** (`../EXPLORATION.md`). It is **invested**: the Era −1 sim's
 polities are the actors, and the Invest verb takes one node a round, chosen by the scorer.

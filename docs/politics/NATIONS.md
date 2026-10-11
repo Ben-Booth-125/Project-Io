@@ -155,7 +155,7 @@ indexed by them):
 | `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
 | `schooling` | population capability |
 | `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
-| `academic_research` | the civil tech ladder — `science` is reached, not spent, and this is the debit BL-478 (ancient research spend) is shaped around |
+| `academic_research` | the civil tech ladder — treasury the line spends converts to the nation's research points (`../economy/RESEARCH.md` § Research points) |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
 | `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
@@ -331,8 +331,7 @@ economic premise already assumes nations that act.
 
 `run_nation_step` (`src/world/nation_step.{hpp,cpp}`) is where a nation acts. It runs **after
 `apply_budget`** — the treasury holds this quarter's levy and tariff only then; running it inside
-`run_economy_step` would spend last quarter's revenue — and **before `advance_tech_gates`**, whose
-`surplus` gate reads the corp balance a subsidy has just moved. Four moves, in order, and each is
+`run_economy_step` would spend last quarter's revenue. Four moves, in order, and each is
 somebody else's machinery:
 
 1. **Score.** `score_national_budgets` returns a weight vector for exactly the nations **due** on
@@ -353,6 +352,10 @@ somebody else's machinery:
    spend on a build. A dispatch that cannot proceed (the body was surveyed by someone else this
    very tick) is recorded on the report as a failed earmark and its credit **clawed back** to the
    treasury — a nation does not pay for a survey that did not start.
+
+**Research is the step's last move.** `advance_research` (`src/world/nation_tech.hpp`) runs after
+every other move in the step: the academic-research line pays what the queue still
+owes, and the pool flows down the queue (`docs/economy/RESEARCH.md` § Research points).
 
 The cadence key is `world::current_econ_tick` — the quarter counter, never the day tick.
 
@@ -434,8 +437,8 @@ Ben: *"Treasury can be used for things that it is used for in the real world. Lo
 maintenance, Schooling, Military research, Academic research, public space exploration."*
 
 A nation holds **weights, not amounts** — § What a nation holds 3 is this ruling made data. Every
-line spends through machinery Io already has. Research in particular is the **debit mechanism
-BL-478 (ancient research spend) is shaped around**, since `science` is reached, not spent.
+line spends through machinery Io already has. Research in particular converts treasury into the
+nation's research points, which buy nodes of the age's tree (`../economy/RESEARCH.md`).
 
 *Owned by BL-537 (national budget) and BL-538 (treasury priority lines).*
 

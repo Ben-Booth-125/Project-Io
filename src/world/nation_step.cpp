@@ -9,6 +9,7 @@
 #include "nation_ai.hpp"
 #include "nation_budget.hpp"
 #include "nation_generation.hpp" // BL-572: garrison_strength_in
+#include "nation_tech.hpp"       // BL-1273: advance_research
 #include "network_upkeep.hpp"    // BL-643: the logistics_maintenance line's consumer
 #include "province.hpp"          // BL-572: province_holder_for, province lookup
 #include "recipe_registry.hpp"
@@ -171,6 +172,12 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // own comment on run_nation_garrison_upkeep for why.
     run_nation_garrison_upkeep(w, reg);
 
+    // ---- 6. Research (BL-1273, RESEARCH.md) — the academic_research line's
+    // consumer, on the garrison-upkeep precedent (no corp claimant: the share is
+    // recomputed and spent as a direct expenditure), plus Universities and
+    // research institutes, into each nation's pool and down its queue. Once
+    // per economy tick, which is the quarter.
+    advance_research(w, reg.research(), &report.research);
 }
 
 

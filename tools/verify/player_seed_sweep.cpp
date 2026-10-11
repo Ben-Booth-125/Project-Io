@@ -92,7 +92,6 @@
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 #include "world_digest.hpp"       // fnv1a64, hash_snapshot, world_state_digest (BL-1034)

@@ -11,6 +11,6 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\money_conservation.cpp ^
    src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
    src\world\unit_roster.cpp src\world\law.cpp src\world\building_profit.cpp ^
    src\world\corp_ai.cpp src\world\stance.cpp src\world\supply_system.cpp ^
-   src\world\tech_gate.cpp src\world\river_generation.cpp src\world\orbital_system.cpp ^
+   src\world\nation_tech.cpp src\world\river_generation.cpp src\world\orbital_system.cpp ^
    /Fo:build_gen\verify\money_conservation\ /Fe:build_gen\verify\money_conservation.exe
 if exist build_gen\verify\money_conservation.exe build_gen\verify\money_conservation.exe

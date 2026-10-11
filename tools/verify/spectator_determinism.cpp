@@ -56,7 +56,6 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -507,9 +506,8 @@ int families_covered(const std::map<verb_family, int>& f)
 }
 
 /// One full sim tick, matching ai_skill_harness's loop exactly (economy step →
-/// market clearing → budget → tech gates). The tech-gate advance is not
-/// optional garnish: without it no corp ever earns E0-ML-01, so military_base
-/// can never complete and the hire/muster path silently zeroes out.
+/// market clearing → budget). The tech-gate advance that closed it retired with
+/// BL-1273 (NR-1022): military_base is open to every corp without it.
 void run_tick(world& w, const recipe_registry& reg, int tick, bool spectating)
 {
     w.current_day_tick  = tick;
@@ -517,7 +515,6 @@ void run_tick(world& w, const recipe_registry& reg, int tick, bool spectating)
     const economy_report rep = run_economy_step(w, reg, spectating);
     const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);
-    advance_tech_gates(w);
 }
 
 /// The best-endowed corp in a freshly generated world, picked by a STABLE

@@ -78,7 +78,6 @@
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp" // BL-648: NAME the good in a failure, never an id
 #include "world/supply_system.hpp"  // BL-648: the launch draw declares what it burns
-#include "world/tech_gate.hpp" // BL-589: the start-gate audit reads recipe_unlocked/advance_tech_gates
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -748,8 +747,10 @@ int main()
             // draw goods the ancient band already makes, so nothing else could
             // close them. 16 -> 18.
             "timber_frame_construction", "stone_and_brick_construction",
-            // "toolmaker" is DELIBERATELY NOT here — see the note above: it is
-            // the one ancient recipe still closed at tick 0, and by TECH now.
+            // BL-1273 (NR-1022, 2026-10-10): the per-corp tech gates retired —
+            // E0-EC-01's lock on the Toolmaker with them — and what they gated
+            // is open to every nation. 19 -> 20.
+            "toolmaker",
         };
         auto expected_open = [&](const std::string& name) {
             for (const char* n : k_open)
@@ -809,24 +810,9 @@ int main()
                                                                  : "OPEN — the closure has been lost"));
         check(!copper_in_band || saw_refined_copper_locked,
               "refined_copper is closed at tick 0 — by era band or by tech lock, the one deliberate closure");
-
-        // Not a permanent orphan: build a corp whose state satisfies E0-EC-03's
-        // own authored predicate (one processing facility, Cr 400+ surplus) and
-        // confirm advance_tech_gates actually earns it and recipe_unlocked
-        // flips — proving the closure is a gate, not a silent dead end.
-        const entity_id tile = w.create_entity();
-        const entity_id bld  = w.create_entity();
-        building_component bc{};
-        bc.tile = tile;
-        bc.type = building_type::processing_facility;
-        w.buildings[bld] = bc;
-        w.corporations[corp].assets.push_back(bld);
-        w.corporations[corp].balance = 500.0f;
-        const int earned = advance_tech_gates(w);
-        check(earned >= 1 && w.has_tech(corp, "E0-EC-03"),
-              "E0-EC-03 resolves once its own authored predicate is met");
-        check(recipe_unlocked(w, reg, corp, reg.recipe_id("refined_copper")),
-              "...and refined_copper is placeable immediately after");
+        // BL-1273 (NR-1022): E0-EC-03's tech lock retired with the per-corp
+        // gates, so the "its gate actually resolves" rows that stood here are
+        // gone with the gate; on the industrial band refined_copper is open.
     }
 
     // --- R1: no orphan resources, either direction ----------------------------

@@ -64,19 +64,15 @@ void report_step_ms(generation_progress* p, int label, std::int64_t ms)
 
 } // namespace
 
-era_band campaign_band_from_world(const world& w)
+era_band campaign_band_from_world(const world& /*w*/)
 {
-    // THE BAND IS THE WORLD'S OWN (BL-1101, Ben 2026-09-24): derived once at
-    // the Industrialisation fold from the history's industry state
-    // (`derive_campaign_band`, history_sim.hpp) and carried on
-    // `world::campaign_band`, never from the epoch. A world whose fold never ran
-    // -- a harness fixture built without the prehistory, or a descriptor with
-    // the span switched off -- carries `any`, which would ADMIT both rosters at
-    // once; it bands as the shipped 1960 default, `industrial`, so a fixture
-    // never sees a roster no campaign can (the review's fix round on BL-1101).
-    // The shipped descriptor always runs the fold, so the fallback is a
-    // harness fact, not a design one.
-    return w.campaign_band == era_band::any ? era_band::industrial : w.campaign_band;
+    // EVERY NATION OPENS ON THE INDUSTRIAL BAND (BL-1273, Ben 2026-10-10;
+    // ERAS.md § Where the ladder starts). The world's stored band (BL-1101's
+    // history-derived verdict) is no longer read: a seed whose history never
+    // industrialised opens on the industrial roster like every other, and the
+    // asymmetry between starts lives in geography, history, population and the
+    // corporate web, never in tech (RESEARCH.md § Who holds technology).
+    return era_band::industrial;
 }
 
 landscape_search_params campaign_search_params(std::uint32_t world_seed, int corporation_count)

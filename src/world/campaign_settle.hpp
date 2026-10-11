@@ -48,7 +48,7 @@ inline constexpr int k_campaign_settle_ticks = 12;
 inline constexpr int k_campaign_settle_lap_count = 6;
 inline constexpr const char* k_campaign_settle_lap_names[k_campaign_settle_lap_count] = {
     "convoys", "run_economy_step", "clear_markets", "apply_budget+nation_step",
-    "tech_gates", "standings+credit+firm_exits" };
+    "retired (tech gates)", "standings+credit+firm_exits" };
 
 /// What one tick hands back to a caller that keeps presentation state: the
 /// app stores all three (the ledgers read the report, the Corporations panel
@@ -85,7 +85,7 @@ struct settle_tick_hooks
 ///      Point pool for the tick                                  (lap 1)
 ///   2. `clear_markets`                                          (lap 2)
 ///   3. `apply_budget`, then the nation step on the moved treasury (lap 3)
-///   4. `advance_tech_gates`                                     (lap 4)
+///   4. (retired with BL-1273: the tech gates; research is in step 3) (lap 4)
 ///   5. `compute_corp_standings`, then `run_firm_exits` LAST -- it reads the
 ///      returns this tick's budget just filed                    (lap 5)
 ///

@@ -25,7 +25,7 @@ legible in a ledger line.
     condition_set   the PREDICATE side   src/world/condition_set.{hpp,cpp}   BL-342 (condition evaluator)
     modifier_set    the EFFECT side      src/world/modifier_set.hpp          BL-479 (tech effect union)
 
-A law is a `condition_set` plus an effect. A tech gate is a `condition_set` plus an effect. An
+A law is a `condition_set` plus an effect. A quest is a `condition_set` (its deed) plus an effect. An
 embargo is a `condition_set` and nothing else. That is the whole architecture, and its virtue is
 that **a new rule family costs an enumerator, not a subsystem**.
 
@@ -46,13 +46,13 @@ That is the failure mode the meta layer exists to prevent, and it is worth remem
 **One atomic condition is `<subject> <comparator> <operand>`**, plus the qualifier its subject
 reads. A `condition_set` is **a flat AND-list** of them.
 
-**Ten subjects.** Six were promoted from `tech_tree.hpp`'s original descriptive labels — kept
+**Nine subjects.** Six were promoted from the original tech tree's descriptive labels — kept
 because they were chosen against real authored content, and *"re-deriving them abstractly would be
 inventing where evidence already exists."*
 
 | Subject | Measures | Qualified by |
 |---|---|---|
-| `research` | has the corp earned this tech (1/0) | `key`, a tech id |
+| `research` | does the corp's home nation hold this node (1/0) | `key`, a Digitisation node id |
 | `structure` | count of that building the corp owns | `structure` |
 | `stockpile` | units on the shelves of the markets the corp sits in | `resource` |
 | `produced` | has the corp ever made this good (1/0) (Ben, 2026-10-10) | `resource` |
@@ -61,7 +61,6 @@ inventing where evidence already exists."*
 | `era` | campaign era of the corp | — |
 | `military_units` | total unit count fielded | — |
 | `military_strength` | summed combat strength | — |
-| `science` | accumulated research points | — |
 | `province_held` | is this province held by the corp (1/0) | `province`, a province id |
 
 **Five comparators:** `at_least` (the common case), `greater_than`, `exactly`, `at_most`,
@@ -85,8 +84,9 @@ inventing where evidence already exists."*
    failure the pivot is trying to avoid."*
 
 **`evaluate` carries a subject corp.** Every consumer is per-corporation — a levy is charged to a
-corp, an earned tech is per-corp state and not a world fact — so a world-only predicate could not
+corp, and a held node is read through the corp's home nation — so a world-only predicate could not
 answer either question.
+
 
 **`condition_text` is shared on purpose.** One human rendering of a predicate, so the tech viewer
 and the laws ledger *"cannot word the same predicate differently."* UI callers pass label
@@ -100,16 +100,16 @@ go through prose.
 the campaign's and the history sim's — are distinct quantities (NR-333), and a predicate over a
 contested quantity is a predicate whose meaning is contested.
 
-**Three consumers:**
+**Two consumers:**
 
 | Consumer | Predicate asks |
 |---|---|
 | `law.cpp` | is this law in force on this corp? |
-| `tech_gate.cpp` | has this corp earned this tech? |
 | `corp_command.cpp` | is this buyer embargoed by this supplier? |
 
-**Quests** are the fourth reader the header names; BL-087 (era-1 tech/quest system) owns the quest
-object.
+**Quests** are the third reader the header names: a quest node's deed is a predicate the nation
+must meet before the node completes (`docs/economy/RESEARCH.md` § Quests key the next age).
+BL-087 (era-1 tech/quest system) owns the quest object.
 
 **The mercenary contract WAS a fifth, and it is what `province_held` exists for.** BL-570 gave
 `condition_set` its first location-qualified subject because a contract's spine — *"a contract is a
@@ -145,15 +145,16 @@ not earned its row, and should be removed rather than left waiting. That is what
 only proven by an instance* (below) from justifying a fifth unread entry the way it justifies the
 first.
 
-**Fold order is the caller's contract.** `world::modified_scalar` folds in stored order, which is
-earn order — stated rather than accidental, *because add and multiply do not commute.*
+**Fold order is the caller's contract.** `nation_scalar` (`src/world/nation_tech.hpp`) folds a
+nation's held-node modifiers in a stated order — the earn order, never an accidental one, *because
+add and multiply do not commute.*
 
 **Two properties mirror the predicate side.** It is **closed** — a subject not named cannot be
 moved by the meta layer, and that is the point. And it is **append-only once serialised**:
 `modifier_subject` is a `uint8_t` inside records that cross the save seam (BL-107, save format;
 `src/world/world_save.cpp`), so a value may be appended but never inserted, renumbered or removed.
-`condition_subject` carries the same rule, which is why `science` sits last in its enum rather than
-filed with its siblings. `condition_subject`, `condition_comparator`, `modifier_subject`,
+`condition_subject` carries the same rule: a value leaves it only with a save-version bump that
+refuses the older stream rather than misreading the byte. `condition_subject`, `condition_comparator`, `modifier_subject`,
 `modifier_op` and `law_effect_kind` all cross the seam as a `uint8` per enum, read back
 range-gated — so a mis-ordered append breaks a save, not a future one.
 
@@ -187,9 +188,9 @@ Worth stating plainly, because it is invisible from either file alone.
 
 | | Predicate side | Effect side |
 |---|---|---|
-| Subjects | **10** | **6** |
-| Consumers | 3 (law, tech gate, embargo) | 1 (tech, via `modified_scalar`) |
-| Included by | 7 files | **2 files** (`world.hpp`, `tech_gate.hpp`) |
+| Subjects | **9** | **6** |
+| Consumers | 2 (law, embargo) | 1 (tech, via `nation_scalar`) |
+| Included by | 5 files | **1 file** (`nation_tech.hpp`) |
 
 BL-479's own framing was that the effect vocabulary had been one field — `unlocks_structure` — *"a
 9:1 condition-to-effect asymmetry."* Widening it to six subjects narrowed the count and left the
@@ -202,8 +203,8 @@ BL-479's own framing was that the effect vocabulary had been one field — `unlo
 2026-08-22, design register): **the effect side is two vocabularies, for a defensible reason.**
 
 - **Scalar effects** (`modifier_subject`). A subject names one scalar the simulation already
-  computes, and a modifier moves it. Read by tech (`tech_gate.hpp`'s effect union) and by
-  `world::modified_scalar`.
+  computes, and a modifier moves it. Read by tech: a nation's held nodes, through
+  `nation_scalar` (`nation_tech.hpp`).
 - **Money-flow effects** (`law_effect_kind` in `law.hpp` — `extraction_levy`, `import_tariff`). A
   levy or a tariff is a **transfer between two balances**, not a scalar the simulation computes.
   There is no subject in the scalar list it could be expressed as, and inventing one would distort
@@ -223,15 +224,16 @@ same kind of thing. `modifier_subject` does **not** grow subjects a levy could b
 
 None of the three maps onto either of the others.
 
-### The tech-gate effect union grew a third arm (BL-588, 2026-08-24)
+### A node's effect has three arms (BL-588)
 
-A DIFFERENT axis from the two-vocabulary split above: `tech_gate.hpp`'s own `tech_effect_kind` —
-what earning a tech DOES — had exactly two arms (`unlock_structure`, `modify_scalar`) until this
-item, so a tech could gate a *building type* but never the *method* a building already standing
-runs. `unlock_recipe` closes that: it names a `recipe::name` (never an id — ids are positional and
-a gate must survive a roster reorder), mirrored on `tech_gate::unlocks_recipe` the same way
-`unlocks_structure` already is, checked through `recipe_unlocked` at both `construct_building` and
+A DIFFERENT axis from the two-vocabulary split above: what holding a node DOES. A node may unlock a
+*building type*, move a scalar, or unlock a *recipe* — the method a building already standing runs.
+A recipe unlock names a `recipe::name` (never an id — ids are positional and an unlock must survive
+a roster reorder). The nation holds the node and its corporations inherit it: `structure_unlocked`
+and `recipe_unlocked` (`src/world/nation_tech.hpp`) ask whether the corp's home nation holds every
+node that unlocks the thing, and `recipe_unlocked` is asked at both `construct_building` and
 `try_switch_recipe` — guarding only placement would leave a retool bypass, so both doors ask. A
+type or recipe no node unlocks is open to every nation. A
 recipe lock and a structure lock report the same `tech_locked` code on every seam — an agent cannot
 tell them apart, which is deliberate; the two stay distinct in MEANING, not in the code an agent
 reads. **`tech_locked` is the only method lock**: within the roster a campaign's era band admits,
@@ -240,14 +242,12 @@ research decides what a corp may run, and nothing else does. See `docs/economy/P
 
 ---
 
-## `science` is REACHED, not SPENT
+## A gate is REACHED; research points are SPENT
 
-A `tech_gate` is a predicate over corp state: it asks whether a condition holds, and holds again
-next tick. **Nothing in the gate system debits anything.** So science is a threshold a corp passes,
-not a currency it pays down — and making it spendable *"would need an entirely different mechanism
-and would be a design change, not a wiring job."* That is precisely what BL-478 (ancient research
-spend) owns (NR-387), and what the research budget lines in BL-538 (treasury priority lines) would
-supply.
+A gate is a predicate: it asks whether a condition holds, and holds again next tick. **Nothing in
+the gate system debits anything.** A quest's deed is a gate of this kind. Research points are the
+other mechanism a spend needed: they accrue to the nation and are paid down on nodes
+(`docs/economy/RESEARCH.md` § Research points; Ben, 2026-10-10), never through a predicate.
 
 ---
 
@@ -257,19 +257,17 @@ supply.
 |---|---|
 | The predicate: subjects, comparators, `evaluate`, `measure_condition`, `condition_text` | `src/world/condition_set.{hpp,cpp}` |
 | The effect: subjects, ops, `apply_scalar_modifier` | `src/world/modifier_set.hpp` |
-| Per-corp modifier fold | `src/world/world.hpp` § `modified_scalar` |
-| Tech gates and the effect union | `src/world/tech_gate.{hpp,cpp}` |
-| The tree that authors identity and topology (never the predicate) | `src/world/tech_tree.{hpp,cpp}`, `scripts/tech_tree.lua` |
+| Per-nation tech state, the modifier fold and the unlock checks | `src/world/nation_tech.{hpp,cpp}` § `nation_scalar`, `structure_unlocked`, `recipe_unlocked` |
+| The tree (identity, topology, cost) | `docs/economy/tech/digitisation_tree.json` → `src/world/digitisation_tree_data.hpp` (`tools/session/gen_tech_tree_table.js`) |
 | Laws | `src/world/law.{hpp,cpp}` |
 | Embargo | `src/world/corp_command.cpp` § `request_quote` |
 | The scalar modifier's reader | `src/world/economy_system.cpp` § `extraction_nominal` |
 | The save seam both vocabularies cross | `src/world/world_save.{hpp,cpp}` |
 
-**A note on the split that looks odd and is not.** The gate table lives in the Lua-free
-`tech_gate.cpp` rather than in `tech_tree.cpp`, because `tech_tree.cpp` loads Lua and is excluded
-from the SDL/Lua-free world superset — and a gate that gates construction must be linkable by
-`construction.cpp` and by a headless harness. **The Lua file authors identity and topology; it never
-authors the predicate.** One authority for what a gate requires.
+**The tree is a generated C++ table, not a script.** An unlock that gates construction must be
+linkable by `construction.cpp` and by a headless harness from the SDL/Lua-free world superset, so
+the JSON store compiles into a header rather than loading through Lua. One authority for what a node
+unlocks: the store.
 
 **Related authorities.** [`docs/politics/NATIONS.md`](politics/NATIONS.md) (laws, and the
 enforcement seam), [`SYSTEMS.md`](SYSTEMS.md) § Conditions (the one-paragraph overview this document
@@ -279,6 +277,7 @@ expands), `docs/research/TECH_EFFECTS.md` (research scaffolding for what a tech 
 
 **Backlog.** BL-342 (condition evaluator) and BL-479 (tech effect union) own the two halves.
 BL-155 (law/policy surface) holds the four-family taxonomy nothing in code names. BL-156 (tech
-system) owns the gate/quest object. BL-478 (ancient research spend) owns the spend side of science.
+system) owns the gate/quest object. BL-478 (ancient research spend) owns the spend side of research.
+
 BL-087 (era-1 tech/quest system) owns quests. BL-107 (save format) owns the seam both vocabularies
 cross. BL-570 (condition province subject) owns `province_held` and the contract-template table.

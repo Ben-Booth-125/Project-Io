@@ -12,8 +12,8 @@
 > be strong and how a creed decides which · how a good acquires a cultural preference · what the
 > phase hands Industrialisation.
 > **Not here:** what crosses into it from the Empire phase (CIVILISATION § The closure of the
-> Empire era) · the nodes of its technology tree and the grammar every tree obeys
-> (trees/EXPLORATION_TREE, trees/TREES) · the phase after it (INDUSTRIALISATION) · how a market
+> Empire era) · why the history runs no technology tree, and what gates sea legs and roads
+> instead (trees/TREES) · the phase after it (INDUSTRIALISATION) · how a market
 > clears once there is a price (../economy/MARKETS) · the campaign-era money loop
 > (../economy/FINANCE) · the pass map and the calendar (GENERATION_STRATEGY § Pass 2).
 > **Confused with:** CIVILISATION.md, COLONISATION.md, INDUSTRIALISATION.md,
@@ -42,7 +42,7 @@ and strengthen the economic power of colonial actors."* Every mechanism below ex
 of those two, and a mechanism that moves neither has no business here.
 
 **The name is Exploration** (Ben, 2026-09-11). *Exploration* describes what the age looks like
-and is not a term; the phase, its tree and its store all carry the one name.
+and is not a term; the phase carries the one name.
 
 ---
 
@@ -148,6 +148,8 @@ with no reason. The pair is what makes a trade route a consequence rather than a
 **The road ladder gets its third rung here.** The Empire sim promotes a corridor by use — a Track
 at four uses, a Road above it, and no tier beyond. A phase about throughput is where the next rung
 belongs, bought with capital rather than earned by traffic, which is Ben's *"upgrade of roads"*.
+The rung may be bought from a measured date, not behind a held node (Ben, 2026-10-10;
+`trees/TREES.md`).
 
 **A resumed corridor reopens at the rung it was recorded at (Ben, 2026-09-18).** A span that opens
 from a handoff seeds each corridor at its recorded rung: a bought rung is never demoted to the rung
@@ -269,7 +271,7 @@ heartland owns the design; this age plants, the next grows.
 
 **SETTLED (Ben, 2026-09-11): a colony is a LIVE POLITY with an overlord link.** Not a region
 annotation and not a new actor class. The polity table already holds everything a colony needs —
-a capital, a culture, cohesion, held ground, a tree mask — and the colony's whole distinction is
+a capital, a culture, cohesion, held ground — and the colony's whole distinction is
 that one field points at somebody else.
 
 **`polity::parent` is NOT that field.** `parent` records lineage: who this polity broke away
@@ -314,10 +316,12 @@ whether its seat has a port (Ben, 2026-09-24).** A coastal people taken by force
 polity, and nothing about its coast makes it a trade province; which verb binds is decided on the
 ground's terms in § Two ways to claim ground across water.
 
-**The asymmetry that permits either is technological, and it is a node, not a rank.** Nothing
-reads size. What decides who can arrive at all is what the arriving polity holds — the sea legs
-and the institutions — exactly as the explorer set at 1200 CE is a held rim milestone rather than
-a ranking (`CIVILISATION.md` § Some peoples gain the capacity to explore).
+**The asymmetry that permits either is held, not ranked.** Nothing reads size. What decides who
+can arrive at all is what the arriving polity holds — the sea legs and the institutions. The
+permission to arrive across water and subject a coast is held by every polity from a measured
+date, not bought as a node (Ben, 2026-10-10;
+`trees/TREES.md`); the explorer set is `CIVILISATION.md` § Some peoples gain the capacity to
+explore.
 
 ---
 
@@ -472,7 +476,7 @@ The reading is structural rather than a tuning miss, and the figures say so: at 
 2026-09-11): the navy CARRIES too, as a starting fleet earned at sea in the Empires age.** A
 polity accrues **naval points** through the Empires span from three deeds: the coastal provinces
 it holds, counted per year held; the sea crossings it makes, the sea legs it walks; and the
-coastal sea techs it takes (Deep-Hull Sail and on, `trees/EMPIRE_TREE.md`). At the handoff its
+date ramp that stands for coastal sea technology (Ben, 2026-10-10; `trees/TREES.md`). At the handoff its
 points become its opening `navy_stock`, so the coastal empires open the age already at sea and
 the Exploration age's first crossings, purchases and lanes follow who held the sea before it.
 **The points pass to the polity that earned them:** a polity that lost its coast keeps its
@@ -762,9 +766,8 @@ expire, which nothing in the Empire phase does.
 **The verbs are the Empire verbs, and a treasury spends beside them.** Settle, Invest,
 Consolidate and Campaign carry over unchanged. What this phase adds is the ability to spend on a
 port, a hull or a garrison, and to bind. The first three are one scored allocation inside the
-upkeep step (§ Force persists now); a binding forms by the treaty test (§ What a treaty is). The
-tree node a polity invests in is still weighed on the scorer's one shape (`trees/TREES.md`
-§ The scorer).
+upkeep step (§ Force persists now); a binding forms by the treaty test (§ What a treaty is).
+Invest buys no tree node: the history runs no tree (Ben, 2026-10-10; `trees/TREES.md`).
 
 **If the shared engine turns out to be the wrong frame, the tell will be a reading it cannot
 move** (§ What the phase is judged on). Revising it then is Ben's call and is explicitly left
@@ -772,23 +775,12 @@ open; forking it pre-emptively is not.
 
 ---
 
-## The tree
+## No tree
 
-**The Exploration tree is the third of four** (`trees/TREES.md`), and its existence is Ben's
-ruling of 2026-09-11: *"Exploration and industry use different trees."* The chain is
-Colonisation → Empire → **Exploration** → Industry.
-
-**The Empire tree's rim milestone — *The Enforceable Promise* — opens THIS tree**, not the
-Industry tree, and the Industry tree's root is gated behind Exploration's own rim. That is the
-whole structural consequence of the ruling, and it is why a 1960 spread is now manufactured across
-two intervening trees rather than one.
-
-**Sized to 460 years**, which is roughly a quarter of the Empire phase's span, so the tree is
-correspondingly shallower — three rings, four branches, three milestones (`trees/TREES.md`
-§ Sizes). Its concerns are the phase's: hulls and crossings, the charter and the treasury,
-the port and the garrison, and what a people does with a good it did not grow.
-
-Its nodes, its forks and its scorer terms are `trees/EXPLORATION_TREE.md`'s.
+**The phase runs no technology tree (Ben, 2026-10-10, retiring the Exploration tree of
+2026-09-11).** Its polities earn no research and invest in no node. What the tree gated — sea legs,
+the treasury-bought third road rung, coastal naval points — is gated by a measured date instead,
+and no milestone opens a next tree (`trees/TREES.md`).
 
 ---
 
@@ -839,8 +831,6 @@ and what preference different cultures develop for these goods."*
 - **Standing treaties and their remaining terms** — the diplomatic position 1660 opens on.
 - **Ports, navies and standing armies**, at whatever level upkeep left them.
 - **The contact and want tables**, grown: a world that has met itself, mostly.
-- **Exploration tree masks** — what each polity brings into the Industry tree, which every living
-  polity enters at 1660 (`trees/TREES.md` § Milestones, and how a tree unlocks the next).
 - **The grudge table and the surviving network**, grown across the span and filtered over this
   span's dead, exactly as the Empire handoff filters its own.
 - **The sea legs it walked**, each with its count of uses — what the lane stamp reads
@@ -894,7 +884,7 @@ that ran off it.
   phase should is unsettled, and the answer decides whether a subject is an actor or a leaf.
 - **How preference interacts with assimilation.** A culture absorbed into another carries its
   preferences somewhere; whether they blend, persist or lapse is unowned.
-- **Whether the 460-year span is enough rounds** for a tree, a treasury and a fleet to all turn
+- **Whether the 460-year span is enough rounds** for a treasury and a fleet to both turn
   over believably. A measurement owed before any constant is tuned.
 - **The depletion formula itself** — which abstract inputs, and what arithmetic. It is a stated
   formula by construction (§ Spend is estimated at the end), so writing it down IS the work; an

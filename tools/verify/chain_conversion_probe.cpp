@@ -38,7 +38,6 @@
 #include "world/resource_names.hpp"
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
@@ -185,7 +184,6 @@ int main(int argc, char** argv)
         apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                      &rep.building_labour);
         run_nation_step(w, reg, rep, t);
-        advance_tech_gates(w);
     }
     const site_counts after = count_sites(w);
     const std::map<int, int> proc_after = count_processors(w);

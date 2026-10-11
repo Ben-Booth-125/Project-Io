@@ -6831,6 +6831,318 @@
    "batch": "sprint-51",
    "resolved": "2026-10-10",
    "archived": "docs/development/archive/requirements-2026-Q4.json"
+  },
+  {
+   "brief": "digitisation-tree-store",
+   "title": "BL-1271 - The Digitisation tree is written down and checked",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1271 - sprint 52 (Ben, 2026-10-10)",
+   "batch": "sprint-52",
+   "resolved": "2026-10-10",
+   "resolution": "Delivered with sprint 52.",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: node tools/session/tech_tree_store.js --check"
+     ],
+     "requirement": "The store holds 160 nodes - 70 travel (7 joints, 9 masteries), 51 minor, 30 major, 9 quest - and passes every grammar rule: requirement groups resolve, pairs are symmetric, one quest and one mastery per branch, every node reachable from a first travel node.",
+     "notes": "",
+     "result_metric": "tech_tree_store.js digitisation --check OK - 160 nodes (70 travel incl. 7 joints and 9 masteries, 51 minor, 30 major, 9 quest)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: tech_tree_store.js --check; header_graph.js --dangling (compare counts)"
+     ],
+     "requirement": "The doc carries the store's tables current, and no authority doc cites a heading that does not exist in RESEARCH.md, DIGITISATION_TREE.md or TREES.md.",
+     "notes": "",
+     "result_metric": "tables current; header_graph dangling counts unchanged by the new docs (compared, the tool FAILs repo-wide)."
+    }
+   ]
+  },
+  {
+   "brief": "generation-without-research",
+   "title": "BL-1272 - The pre-game history runs no technology trees",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1272 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sim_harness (a row asserting no tree state); code read by the cold review"
+     ],
+     "requirement": "No polity holds, earns or invests in a tree node: the history sim carries no tree mask, progress or research rate, and the Invest verb spends only on the capacity ladder.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep before/after on 16 seeds; the measured years in the item's result"
+     ],
+     "requirement": "Sea legs, the treasury-bought third road rung and coastal naval points are gated by dates, each measured as the median polity's acquisition year in the last-blessed history and recorded with that measurement.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism x2; the three sim harnesses; history_sweep 16 seeds"
+     ],
+     "requirement": "Generation stays deterministic and its movement is reported, not blessed: world_determinism twice, history_sim_harness, exploration_sim_harness and industrialisation_sim_harness pass or carry a stated cause for every changed assertion.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "nation-tech-state",
+   "title": "BL-1273 - Every nation holds a tree state, a research pool and a queue",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1273 - sprint 52 (Ben, 2026-10-10)",
+   "batch": "sprint-52",
+   "resolved": "2026-10-10",
+   "resolution": "Merged 14e8cace; verified on the merged tree.",
+   "rows": [
+    {
+     "id": "R0",
+     "status": "complete",
+     "verification": [
+      "headless: nation_tech_harness --seeds 16 (new); world_determinism x2"
+     ],
+     "requirement": "ITEM-SPANNING: on a 16-seed campaign run every nation opens holding no node on the industrial band, accrues research, and completes nodes through its queue; the run is identical twice.",
+     "notes": "",
+     "result_metric": "nation_tech_harness 16 seeds x2: every nation opens holding nothing on the industrial band, pools empty at the seat, the scripted queue completes, byte-identical twice; pacing at 200 RP a unit: 751/751 reach DG-PR-EX-A in 32 quarters, p10/p50/p90 10/21/30. The live game queues nothing until BL-1275 (nation research AI)."
+    },
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: nation_tech_harness accrual rows"
+     ],
+     "requirement": "Research points accrue to each nation each quarter from its academic-research budget line and its staffed Universities and research institutes, deterministically.",
+     "notes": "",
+     "result_metric": "accrual rows PASS (base + sqrt(line spend) + Universities + institutes); the line pays only what the queue owes."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: nation_tech_harness queue rows"
+     ],
+     "requirement": "The queue: queuing a node queues its unheld requirement groups ahead of it (cheapest member of a choice); RP flow to the head and overflow on; a quest with an unmet deed is passed over and completes when its deed is met; a queue holding one side of a pair refuses the other.",
+     "notes": "",
+     "result_metric": "queue rows PASS: prerequisite expansion, AND groups, pair refusal, overflow, quest passed over. Quest COMPLETION awaits deed_met (BL-1285)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: save_roundtrip"
+     ],
+     "requirement": "Nation tech state - held set, pool, queue, the in-progress remainder - survives save and load at a bumped world_save_version.",
+     "notes": "",
+     "result_metric": "save_roundtrip OK at v47, incl. refusal of an out-of-range or contradictory queue."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: build + world_determinism; code read by the cold review"
+     ],
+     "requirement": "The per-corporation earned_techs gates and scripts/tech_tree.lua are retired; every former consumer (placement, construction, recipe switch, corp_ai, selection panel, condition research) reads the nation's tree; the build is green.",
+     "notes": "",
+     "result_metric": "old gates and the Lua tree retired; the build links; every consumer reads the nation hooks, which return open/identity until BL-1274 - structural only."
+    }
+   ]
+  },
+  {
+   "brief": "tech-effects-wired",
+   "title": "BL-1274 - Every node moves its lever or is declared unread",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1274 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: nation_tech_harness effect audit"
+     ],
+     "requirement": "Every node in the store carries a machine effect or a declared-unread effect naming the system it waits on, and a harness fails if the store and the code's declaration disagree.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: nation_tech_harness lever rows"
+     ],
+     "requirement": "Each wired effect moves its lever: holding the node changes the named scalar or unlocks the named recipe or structure, measured on a fixture world.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "nation-research-ai",
+   "title": "BL-1275 - An AI nation fills its research queue by its scorer",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1275 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: nation_tech_harness AI rows; world_determinism x2"
+     ],
+     "requirement": "A non-player nation appends one frontier node at a time to its own queue, scored by relief to its binding terms less cost; the player's nation is never queued for; the choice replays identically.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: nation_tech_harness --seeds 16 --ticks 160"
+     ],
+     "requirement": "Over a 40-quarter run on 16 seeds AI nations hold a spread of nodes across all three trees, with no nation stalled on an empty queue.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "tech-tree-panel",
+   "title": "BL-1276 - The research panel draws the ring and plans a queue",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1276 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua captures"
+     ],
+     "requirement": "The panel draws all 160 nodes as three trees in a ring with the four tiers, AND links, pairs, quests and placeholders distinguishable, and a node's exact advantage, cost, requirements and deed on hover.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "live click: Ben opens the panel in the built app and queues a rim major"
+     ],
+     "requirement": "In plan mode a press on a far node queues it with its prerequisites and shows each entry's arrival quarter; a press on a pair's other side is refused with a reason.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: actions_query.js; render_question_log.js; ui_coverage.js --check"
+     ],
+     "requirement": "ACTIONS.json carries every research control, the question log carries the panel's question, and the ui_elements inventory names the panel and its checks.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "tech-wave-rebless",
+   "title": "BL-1277 - Sprint 52's one re-bless",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1277 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: history_sweep and market-viability before/after; Ben's authorisation recorded"
+     ],
+     "requirement": "The wave's before and after are described in world shape per cause (generation without research; the industrial band; any opening movement from effects), and Ben authorises the re-bless against that description in one commit.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "quest-deed-state",
+   "title": "BL-1285 - A quest completes when its nation's deed is met",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1285 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: nation_tech_harness deed rows on a fixture"
+     ],
+     "requirement": "Every deed whose quantity the game carries is evaluated on the nation: a fixture nation that meets it completes its queued quest, one that does not keeps it waiting, and the deed history survives save and load.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: nation_tech_harness effect/deed audit"
+     ],
+     "requirement": "Every deed is either wired or declared unread naming the system it waits on, and the audit fails if the store and the code disagree.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

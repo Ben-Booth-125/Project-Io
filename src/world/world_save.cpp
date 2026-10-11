@@ -46,10 +46,8 @@ constexpr auto max_ideology   = ideology::isolationist;
 constexpr auto max_posture    = expansionism::aggressive;
 constexpr auto max_econ_focus = economic_focus::trade;
 constexpr auto max_law_effect = law_effect_kind::import_tariff;
-constexpr auto max_cond_subj  = condition_subject::produced; // NR-1015 appended after province_held (BL-570)
+constexpr auto max_cond_subj  = condition_subject::produced; // NR-1015 appended after province_held (BL-570); science removed by BL-1273 (v47)
 constexpr auto max_cond_cmp   = condition_comparator::less_than;
-constexpr auto max_mod_subj   = modifier_subject::collapse_strain;
-constexpr auto max_mod_op     = modifier_op::multiply;
 constexpr auto max_unit_class = unit_class::naval;
 constexpr auto max_stance     = siege_stance::invest;
 constexpr auto max_season     = season::winter;
@@ -390,7 +388,6 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_ids(o, c.assets);
     w_id(o, c.hq_building);
     w_f32(o, c.influence_range);
-    w_f32(o, c.science);
     w_bool_array(o, c.produced_ever);
     w_vec(o, c.returns, w_return); // BL-626: world_save_version 16
     w_i32(o, c.founded_year);      // BL-1099: world_save_version 27
@@ -412,7 +409,7 @@ bool r_corp(std::istream& i, corporation_component& c)
           && r_enum(i, c.ownership_class, max_ownership)
           && r_f32(i, c.starting_capital) && r_f32(i, c.balance) && r_bool(i, c.is_player)
           && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
-          && r_f32(i, c.influence_range) && r_f32(i, c.science)
+          && r_f32(i, c.influence_range)
           && r_bool_array(i, c.produced_ever) && r_vec(i, c.returns, r_return)
           && r_i32(i, c.founded_year) && r_i32(i, c.origin_region)
           && r_f32(i, c.refund_unbooked) && r_f32(i, c.refund_opening)
@@ -621,17 +618,79 @@ bool r_law(std::istream& i, law& l)
         && r_id(i, l.enacting_nation) && r_f32(i, l.rate) && r_int(i, l.scope_resource);
 }
 
-void w_modifier(std::ostream& o, const scalar_modifier& m)
+// --- Nation tech state (BL-1273, format v47) ---------------------------------
+//
+// One record per nation: the pool (milli-RP, int64), the held set and the
+// queue. The held set is written as the node count it was written under, then
+// that many bits packed into 32-bit words, so a store that APPENDS nodes (the
+// store is append-only: gen_tech_tree_table.js) still reads an older bitset —
+// the new tail reads unheld. Refused whole, never repaired: a count past this
+// build's tree, a set bit past the count, a negative pool, a queue entry
+// outside the tree, a duplicate queue entry, a queued node already held, and
+// both sides of a pick-one pair held or queued together — every one of them a
+// state `enqueue_node` and `flow_research_queue` can never produce.
+void w_nation_tech(std::ostream& o, const nation_tech_state& t)
 {
-    w_enum(o, m.subject);
-    w_enum(o, m.op);
-    w_f32(o, m.magnitude);
+    w_i64(o, t.pool_milli);
+    const uint32_t count = static_cast<uint32_t>(io::dg::node_count);
+    w_u32(o, count);
+    for (uint32_t i = 0; i < count; i += 32)
+    {
+        uint32_t word = 0;
+        for (uint32_t b = 0; b < 32 && i + b < count; ++b)
+            if (t.held.test(i + b))
+                word |= (1u << b);
+        w_u32(o, word);
+    }
+    w_vec(o, t.queue, [](std::ostream& s, const uint16_t& n) { w_u16(s, n); });
 }
 
-bool r_modifier(std::istream& i, scalar_modifier& m)
+bool r_nation_tech(std::istream& i, nation_tech_state& t)
 {
-    return r_enum(i, m.subject, max_mod_subj) && r_enum(i, m.op, max_mod_op)
-        && r_f32(i, m.magnitude);
+    uint32_t count = 0;
+    if (!(r_i64(i, t.pool_milli) && r_u32(i, count)))
+        return false;
+    if (t.pool_milli < 0)
+        return false;
+    if (count > static_cast<uint32_t>(io::dg::node_count))
+        return false;
+    t.held.reset();
+    for (uint32_t base = 0; base < count; base += 32)
+    {
+        uint32_t word = 0;
+        if (!r_u32(i, word))
+            return false;
+        for (uint32_t b = 0; b < 32; ++b)
+        {
+            if ((word & (1u << b)) == 0)
+                continue;
+            if (base + b >= count)
+                return false; // a bit past the written count: corrupt
+            t.held.set(base + b);
+        }
+    }
+    if (!r_vec(i, t.queue, [](std::istream& s, uint16_t& n) { return r_u16(s, n); }))
+        return false;
+    std::bitset<io::dg::node_count> queued;
+    for (const uint16_t n : t.queue)
+    {
+        if (n >= static_cast<uint16_t>(io::dg::node_count))
+            return false; // outside the tree
+        if (queued.test(n) || t.held.test(n))
+            return false; // queued twice, or queued while already held
+        queued.set(n);
+    }
+    for (int n = 0; n < io::dg::node_count; ++n)
+    {
+        const int ex = io::dg::nodes[static_cast<std::size_t>(n)].excludes;
+        if (ex < 0)
+            continue;
+        const bool a = t.held.test(static_cast<std::size_t>(n)) || queued.test(static_cast<std::size_t>(n));
+        const bool b = t.held.test(static_cast<std::size_t>(ex)) || queued.test(static_cast<std::size_t>(ex));
+        if (a && b)
+            return false; // both sides of a pick-one pair
+    }
+    return true;
 }
 
 // --- Battles (BL-536 reverses world.hpp's "NOT SERIALISED, deliberately") ----
@@ -941,16 +1000,13 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_id_pair_set(out, w.corp_friend_pairs);
     w_id_pair_set(out, w.corp_friend_offers);
 
-    // --- research, law, and the modifiers that are NOT recomputable ----------
-    w_map(out, w.earned_techs, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
-          [](std::ostream& s, const std::set<std::string>& v) {
-              w_count(s, v.size());
-              for (const std::string& id : v)
-                  w_str(s, id);
-          });
+    // --- research and law ---------------------------------------------------
+    // BL-1273 (v47): each nation's tech state, ascending as held (std::map). It
+    // replaces the per-corp `earned_techs` set and the order-bearing
+    // `corp_modifiers` list (NR-1022), both retired with the four tech gates.
+    w_map(out, w.nation_tech, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
+          w_nation_tech);
     w_vec(out, w.laws, w_law);
-    w_map(out, w.corp_modifiers, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
-          [](std::ostream& s, const std::vector<scalar_modifier>& v) { w_vec(s, v, w_modifier); });
 
     // --- battles ------------------------------------------------------------
     // In `world::battles`' own order, which is kept sorted by
@@ -1142,30 +1198,17 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!r_id_pair_set(in, s.corp_friend_offers))
         return false;
 
-    if (!r_map(in, s.earned_techs, [](std::istream& st, entity_id& k) { return r_id(st, k); },
-               [](std::istream& st, std::set<std::string>& v) {
-                   uint32_t n = 0;
-                   if (!r_count(st, n))
-                       return false;
-                   v.clear();
-                   for (uint32_t i = 0; i < n; ++i)
-                   {
-                       std::string id;
-                       if (!r_str(st, id))
-                           return false;
-                       v.insert(std::move(id));
-                   }
-                   return true;
-               }))
+    // BL-1273 (v47): the nation tech map, where the per-corp earned set and
+    // corp_modifiers used to sit. An entry whose nation is not in the stream's
+    // nation store is refused: the map is keyed by nation, never by anything else.
+    if (!r_map(in, s.nation_tech, [](std::istream& st, entity_id& k) { return r_id(st, k); },
+               r_nation_tech))
         return false;
+    for (const auto& [nid, st] : s.nation_tech)
+        if (s.nations.find(nid) == s.nations.end())
+            return false;
     if (!r_vec(in, s.laws, r_law))
         return false;
-    if (!r_map(in, s.corp_modifiers, [](std::istream& st, entity_id& k) { return r_id(st, k); },
-               [](std::istream& st, std::vector<scalar_modifier>& v) {
-                   return r_vec(st, v, r_modifier);
-               }))
-        return false;
-
     if (!r_vec(in, s.battles, r_battle))
         return false;
 

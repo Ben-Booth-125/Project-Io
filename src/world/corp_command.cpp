@@ -537,8 +537,6 @@ void sever_battles_and_opinions(world& w, entity_id target)
                  : std::next(it);
 
     w.corp_embargo_conditions.erase(target); // a refusal-to-deal predicate is the firm's own
-    w.earned_techs.erase(target);            // FINANCE.md lists what transfers; research is not on it
-    w.corp_modifiers.erase(target);          // scalar modifiers were applied TO that firm
 }
 
 void dissolve_into(world& w, entity_id acquirer, entity_id target)
