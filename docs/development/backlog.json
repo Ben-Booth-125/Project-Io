@@ -957,6 +957,33 @@
    "status": "designed",
    "glyph": "✓",
    "sprint": 53,
+   "written": "2026-10-11",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-11, the state-industry form); filed by Claude",
+   "id": "BL-1296",
+   "short_name": "STATE_INDUSTRY",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [
+    "BL-1283"
+   ],
+   "files": [
+    "src/world/components.hpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "src/core/world_save.cpp"
+   ],
+   "title": "State industry: a major owns its strategic-sector buildings outright, the treasury runs their books, and the player runs them beside the champion",
+   "design": "DESIGNED (Ben, 2026-10-11): NATIONS.md § State industry; GLOSSARY State/Private industry; CONCEPT § Player identity; AI_OPPONENT.md § 11 (rival state industry under the champion layer, granted). Buildings owned by a major with no corporation between; sectors energy, steel, arms, transport infrastructure, space; majors only; sales/costs through the treasury (a second market exception beside military equipment); fixed for the prototype (nationalise/privatise later); player runs its state industry and its champion. OPEN before build: how generation hands a major its state buildings (re-owning strategic-sector buildings already placed on its ground vs a pass of its own, and how the champion and background firms are kept whole); the building owner field and save format; treasury solvency when a state building loses money; which verbs (ACTIONS.json) the player gets over a state building - the corp verbs, presumably. Moves the 1960 economy: re-bless with Ben's go."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,

@@ -2101,3 +2101,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   player's private state beyond what any nation may observe; nothing that acts ON the player's
   nation or champion, which stay unscored. Pure, seeded, deterministic, replayable, legal verbs
   only, never a planner.
+
+  **A rival major's state industry runs under its champion's layer — granted (Ben, 2026-10-11;
+  `../politics/NATIONS.md` § State industry).** State buildings are a new actor grain: buildings a
+  nation owns with no corporation between. A rival major's state buildings may take the same
+  scored decisions its champion's buildings take, over the same verbs, paid from its treasury.
+  **What it does NOT admit:** no decision for the player's own state industry, which is the
+  player's; no state building for a minor; no verb a corporation lacks. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.

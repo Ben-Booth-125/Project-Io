@@ -60,17 +60,41 @@ and the distinction is load-bearing:
 
 | | Corporation | Nation |
 |---|---|---|
-| Owns | buildings and trades — never goods: what it makes is sold onto a market's shelf | **tiles** |
-| Money | `balance`, spent on the market every tick | `treasury`, spent by direct transfer, and on the order book for military equipment only |
+| Owns | buildings and trades — never goods: what it makes is sold onto a market's shelf | **tiles**, and for a major its **state industry** (§ State industry) |
+| Money | `balance`, spent on the market every tick | `treasury`, spent by direct transfer, on the order book for military equipment, and through its state buildings' own sales and purchases |
 | Acts through | `corp_command`'s verbs | the **national budget** — a weight vector over priority lines |
 | Decides | `corp_ai`, every tick | `nation_ai`, on the same staggered cadence |
 | Objective | profit — accumulative, unbounded | **positional** — needed and unthreatened |
 | Can author law | no | **yes — and only it can** |
 
+### State industry — buildings a major owns outright (Ben, 2026-10-11)
+
+**Industry is state or private.** **State industry** is a set of buildings a major nation owns
+directly, with no corporation between them and the nation. **Private industry** is every building a
+corporation owns, the champion's included. The two are distinguished by owner, not by recipe: a state
+steel works and a private one run the same recipe under the same rules.
+
+- **Which sectors.** State industry is the strategic sectors only: **energy, steel, arms, transport
+  infrastructure, and space**. Everything else is private.
+- **Which nations.** Majors only. A minor's industry stays with private background firms.
+- **Its money is the treasury's.** A state building's sales land in the treasury, and its inputs,
+  wages and maintenance are paid from it. This widens the treasury's touch on the market beyond
+  military equipment, for these buildings and these goods only.
+- **Fixed for the prototype.** Nothing moves between state and private in play; nationalising and
+  privatising are later verbs.
+- **Who runs it.** The player runs its nation's state industry and its champion side by side —
+  critical sectors like steel, railway and space alongside the champion's private book. A rival
+  major's state industry runs under the same scored layer as its champion
+  (`../ai/AI_OPPONENT.md` § 11).
+
+This overturns, for a major's state industry only, the rule that a nation owns tiles and never
+buildings. How generation hands a major its state buildings is open design.
+
 That table is the whole of this document in miniature. A nation has the two faculties a
-corporation lacks — territory and legislative authority — and it touches the market for one thing
-only, the equipment its units carry (§ 2. Conservation). Every other credit that leaves it lands on
-a named corporation's balance.
+corporation lacks — territory and legislative authority — and it touches the market for two things
+only: the equipment its units carry (§ 2. Conservation), and, for a major, what its state buildings
+buy and sell (§ State industry). Every other credit that leaves it lands on a named corporation's
+balance.
 
 ---
 
@@ -464,6 +488,10 @@ The nation that musters its own units (`../military/MILITARY.md` § The muster i
 their equipment as a real buyer, and its bids clear against the shelf like any other. That purchase
 is a market purchase, not a transfer, so the two rules above do not reach it. Every other
 nation↔corp flow, the space programme's procurement included, stays a direct transfer.
+
+**A second exception: a major's state buildings trade on the market (Ben, 2026-10-11; § State
+industry).** They sell onto a market's shelf and buy their inputs as any corporation's building
+does, with the treasury in place of a balance. Those flows are market flows, not transfers.
 
 The market is otherwise untouched. `clear_markets` is the buyer of every landing and pays its owner with
 nobody's money, and total corporate cash rises and falls every tick by design. The two standards
