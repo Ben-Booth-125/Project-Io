@@ -314,13 +314,14 @@ the world's serialisation seam; the save file records it so a load rebuilds the 
 | `body_count` (`int`) | **Reserved.** The body set is hand-authored prototype *profiles* (hot inner planet / homeworld / moon / metallic asteroid — their **names** are generated per seed, BL-257, body naming); a true count knob needs the generator to synthesise variable body profiles. The field exists so the descriptor is forward-shaped. | heaviest |
 | `preferences` (`world_preferences`) | The New World wizard's input: eight **leans** (`any`/`low`/`mid`/`high`), resolved against the seed by `resolve_preferences` with reject-and-reroll until the homeworld clears the strict Earth-like floor. Preferences, not parameters — see `PLANETOLOGY.md` § Preferences, not parameters. | cheap |
 
-**There is no nation-count field.** The number of nations on the home body is a *consequence* of
-generation, not a descriptor input: seeds scale with habitable land area, every nation below a
-minimum viable territory is absorbed (`NATION_GENERATION.md` § Pass 1 / Pass 2c), and the seed
-budget itself is **driven by the history ladder's `fragmentation_q`** — a broken, many-cradled
-world seeds more densely and keeps smaller survivors (`nation_params_from_ladder`,
-`history_ladder.cpp`). The New World setup screen therefore has no nations slider — a world's
-political granularity is something the player discovers, not something they dial in.
+**The nation counts are targets the setup round sets (Ben, 2026-10-10).**
+The player chooses a total and a major target before the Life round; both are always hit, by a lean
+on the passes and then reconciliation through the history's own verbs (`NATION_GENERATION.md`
+§ The nation count is a target). Beneath the lean the mechanism is unchanged: seeds scale with
+habitable land area, every nation below a minimum viable territory is absorbed
+(`NATION_GENERATION.md` § Pass 1 / Pass 2c), and the seed budget is driven by the history ladder's
+`fragmentation_q` (`nation_params_from_ladder`, `history_ladder.cpp`). This overturns the
+2026-07-30 rule that the count is a consequence only and the screen carries no nations slider.
 
 **Abundance honours the resource ceiling.** `standard` **is** the earth-like ceiling (1.0×); the
 other tiers step *down* (`lean` 0.65, `sparse` 0.40) — there is no tier above Earth. Determinism
