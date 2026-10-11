@@ -189,6 +189,10 @@ struct generation_cursor
     /// BL-1152 -- the Industrialisation span's fleet ledger at 1960 (the 1660
     /// one rides in `exploration.fleet`). Empty when the span did not run.
     fleet_ledger       fleet_1960;
+    /// BL-1278 -- the nation count the Industrialisation span's closing rounds
+    /// planned for the fold (`history_sim_state::closing_predicted`), or -1
+    /// when they did not run. `run_tail` holds `generate_nations` to it.
+    int                closing_predicted = -1;
 
     // tail (the history's close)
     /// The close has run (the tail's first act, or a stopped build's ending).

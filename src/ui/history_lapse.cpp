@@ -3860,6 +3860,13 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
                     }
                 }
             break;
+        case lapse_event_kind::absorbed_at_close:
+            // BL-1278: a closing-round absorption ends the absorbed REALM when
+            // both parties are named (`polity` absorbed, `other` absorber);
+            // unheld ground (`polity` none) and a small realm taking unheld
+            // ground (`other` none) end nobody.
+            if (e.polity == lapse_event_none || e.other == lapse_event_none) break;
+            [[fallthrough]];
         case lapse_event_kind::realm_ended:
             // The link dissolves with either party (the sim: "the overlord is
             // gone; the link dissolves with it"), and so does a treaty.
@@ -4784,7 +4791,10 @@ lapse_arc summarise_lapse_arc(const history_lapse& h)
     // A REALM THAT ENDED is one the sim recorded ending — never one merely
     // missing from the closing step, which is what every dead realm is.
     for (const lapse_event& e : h.lapse.events)
-        if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)) ++out.eliminated;
+        if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)
+            || (e.kind == static_cast<uint8_t>(lapse_event_kind::absorbed_at_close) // BL-1278
+                && e.polity != lapse_event_none && e.other != lapse_event_none))
+            ++out.eliminated;
 
     int biggest_end = 0, smallest_end = 0;
     for (std::size_t id = 0; id < first_r.size(); ++id)
@@ -5104,6 +5114,35 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         // (`region`) and the staging hub it was victualled from (`other`).
         std::snprintf(buf, sizeof buf, "%s sails against %s from %s.",
                       polity_name_of(h, e.polity), R, region_name_of(h, e.other));
+        break;
+    case lapse_event_kind::absorbed_at_close:
+    {
+        // BL-1278 (NATION_GENERATION.md sec Pass 2c, sec The nation count is a
+        // target): the CAUSE is the date. The size floor's absorptions fall in
+        // the span's last simulated year; the total's corrections at the close
+        // itself (the record's start + years). The slots say who: `polity`
+        // absorbed by `other`; `polity` none for unheld ground; `other` none
+        // where the realm in `polity` was too small and took unheld ground.
+        const bool to_total = e.year >= h.lapse.start_year + h.lapse.years;
+        if (e.other == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "%s, too small to stand alone, takes the unheld ground at %s.",
+                          polity_name_of(h, e.polity), R);
+        else if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, to_total ? "%s takes the unheld ground at %s as the realms settle."
+                                                    : "%s takes the unheld ground at %s, too small to stand alone.",
+                          polity_name_of(h, e.other), R);
+        else if (to_total)
+            std::snprintf(buf, sizeof buf, "%s is absorbed by %s as the realms settle to their number.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        else
+            std::snprintf(buf, sizeof buf, "%s, too small to stand alone, is absorbed by %s.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    }
+    case lapse_event_kind::seceded_at_close:
+        // BL-1278: a province breaks away to bring the realms to the player's total.
+        std::snprintf(buf, sizeof buf, "%s breaks from %s as the realms settle to their number.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
         break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`

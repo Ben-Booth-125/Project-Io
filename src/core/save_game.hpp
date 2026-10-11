@@ -272,6 +272,13 @@ inline constexpr uint32_t save_game_magic =
 /// strict-equality contract, and only for the immediately previous layout;
 /// v21 and older are still refused whole. A v23 stream carrying an illegal
 /// target pair (`nation_targets_valid`) is corrupt and refused whole.
+/// AND TWO EVENT KINDS appended to `lapse_event_kind` under this number
+/// (BL-1278 lane B, the closing rounds), each moving `count` and so the
+/// event-kind range check; no field changes width: `absorbed_at_close` (25,
+/// a closing-round absorption -- the size floor's, or one surplus to the
+/// total) and `seceded_at_close` (26, a closing-round secession to the
+/// total). Kinds 27-29 are held for lane C. A v22 stream carries none of
+/// them, so the prefix acceptance above is unchanged.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

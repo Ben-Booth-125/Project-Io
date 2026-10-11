@@ -154,6 +154,7 @@ struct ocean_current_field; // BL-1120/BL-1140: ocean_currents.hpp
 struct sea_field;           // BL-1152: ocean_currents.hpp
 struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
+struct closing_rounds_spec; // BL-1278: closing_rounds.hpp, on the same raw-pointer footing.
 
 /// Scorer weights and loop bounds. Defaults are PLACEHOLDERS, not tuned
 /// values: BL-277 records that the `w_*` weights are BL-275 sweep outputs
@@ -2670,6 +2671,32 @@ struct history_sim_params
     // `navy_upkeep_per_1000_units_year_q`) and the levy bound
     // (`standing_army_levy_per_mille_q`) are the forces that now limit a
     // stock, and both are visible in the world rather than inside the actor.
+
+    // --- BL-1278: THE NATION COUNT, INSIDE THE HISTORY ----------------------
+    // NATION_GENERATION.md § The nation count is a target / § Pass 2c (Ben,
+    // 2026-10-11).
+
+    /// THE CLOSING ROUNDS. Non-null only on the Industrialisation span of a
+    /// settled world (`run_industrialisation`): at the close, before the
+    /// closing step is recorded, the size floor runs as absorptions and, with
+    /// a total set, the total is reconciled by absorption or secession — each
+    /// a recorded event (`lapse_event_kind::absorbed_at_close`,
+    /// `seceded_at_close`). Planned by `plan_closing_rounds` against the carve
+    /// ground the spec carries. A raw non-owning pointer like the resume
+    /// pointers, but KEPT on the fixture's copy: the spec is a self-contained
+    /// value the fixture co-owns (`era_minus_one_fixture::
+    /// industrialisation_closing`), so a replay of the span from
+    /// `fixture.industrialisation_params` runs the same closing rounds.
+    const closing_rounds_spec* closing_rounds = nullptr;
+
+    /// THE TOTAL'S LEAN ON CONQUEST APPETITE, per mille on a campaign's value
+    /// (+ more appetite, - less), applied beside the creed's appetite lean.
+    /// 0 everywhere but an Industrialisation span whose world carries a total
+    /// target fewer (+) or more (-) than the span opens on — the lean of
+    /// § The nation count is a target, stage 1. 0 is the identity. Its
+    /// secession half is `secession_supply_floor_q`, which that span leaves
+    /// at 0 and the lean raises only when MORE nations are wanted.
+    int campaign_appetite_q = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -4634,6 +4661,19 @@ struct history_sim_state
     /// polity's own Settle. `foundings == foundings_scheduled + foundings_settled`.
     int64_t foundings_scheduled = 0;
     int64_t foundings_settled   = 0;
+
+    /// BL-1278 — THE CLOSING ROUNDS' OWN COUNT (zero, and `closing_predicted`
+    /// -1, on every run whose params carried no `closing_rounds`). The fold's
+    /// predicted nation count after the rounds is what `run_tail` holds
+    /// `generate_nations` to (the drift guard). Read by no decision.
+    int32_t closing_nations_before      = -1; ///< The fold's count before any closing step.
+    int32_t closing_nations_after_floor = -1; ///< ... after the floor's absorptions.
+    int32_t closing_predicted          = -1;
+    int32_t closing_floor_absorptions  = 0;
+    int32_t closing_target_absorptions = 0;
+    int32_t closing_target_secessions  = 0;
+    int32_t closing_subfloor_secessions = 0; ///< Secessions taken below the floor (the target outranks it).
+    bool    closing_short_of_target    = false;
 };
 
 /// Sentinel for "no polity owns this region in this year slice".

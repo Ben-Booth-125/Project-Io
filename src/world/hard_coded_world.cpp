@@ -14,6 +14,7 @@
 #include "grudge_sentiment.hpp"  // BL-898: the Era -1 grudge record's one consumer
 #include "history_ladder.hpp"
 #include "history_sim.hpp"      // BL-271 wired into generation, 2026-08-12
+#include "closing_rounds.hpp"   // BL-1278: the size floor and the total, inside the history
 #include "logistics.hpp"        // BL-910: body_tile_grid, for the close's capital markets
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
@@ -1955,6 +1956,51 @@ void run_industrialisation(generation_cursor& c)
         dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
         const uint32_t dseed = industrialisation_sim_seed(params);
 
+        // BL-1278 -- THE CLOSING ROUNDS' SPEC (closing_rounds.hpp): the
+        // ground the tail's carve reads, as a value, and the tail's own seed
+        // (run_tail's `params.seed ^ 0x4A71012u`), so the closing rounds plan
+        // the floor and the total against the fold that will actually be
+        // made. Co-owned by the fixture, so a replay closes the same way.
+        auto closing = std::make_shared<closing_rounds_spec>();
+        closing->ground           = nation_carve_ground_of(w, kepler_tiles, home_grid_width, home_grid_height);
+        closing->nation_seed      = params.seed ^ 0x4A71012u;
+        closing->min_nation_tiles = (fixture != nullptr && fixture->harness_floor_tiles > 0)
+                                        ? fixture->harness_floor_tiles // harness-only seam (era_minus_one.hpp)
+                                        : c.kepler_np.min_nation_tiles;
+        closing->keep_city_states = c.kepler_np.keep_city_states;
+        closing->total_target     = params.nation_total_target;
+        dp.closing_rounds = closing.get();
+
+        // BL-1278 -- THE TOTAL'S LEAN (NATION_GENERATION.md sec The nation
+        // count is a target, stage 1; Ben, 2026-10-11): conquest appetite and
+        // secession pressure in this span, keyed on the target against the
+        // count the span OPENS on (the fold of the 1660 map after the floor --
+        // the prediction the closing rounds make at its close). Per mille of
+        // the gap, integer, clamped to +-1000:
+        //   - APPETITE, both ways, at half weight: a world asked for half its
+        //     opening count campaigns 25% harder; one asked for double, 50%
+        //     less hard.
+        //   - SECESSION, only when MORE nations are wanted: this span carries
+        //     no secession floor of its own (0, Empires-only), so the lean
+        //     gives it one -- the Empires span's floor, scaled by the gap. When
+        //     fewer are wanted it stays 0: there is no secession to lower.
+        // Unset target: no lean, dp untouched.
+        if (params.nation_total_target > 0)
+        {
+            const closing_plan open_plan = plan_closing_rounds(
+                kepler_settlement.regions, kepler_exploration.polities,
+                closing_carve_cells(*closing, kepler_settlement.regions), closing->ground.gw,
+                closing->ground.gh, closing->min_nation_tiles, closing->keep_city_states,
+                /*total_target=*/0);
+            const int n_open = std::max(1, open_plan.nations_after_floor);
+            const int gap_q  = std::clamp((n_open - params.nation_total_target) * 1000 / n_open, -1000, 1000);
+            dp.campaign_appetite_q = gap_q / 2;
+            if (gap_q < 0)
+                dp.secession_supply_floor_q = static_cast<int>(
+                    (static_cast<int64_t>(era_minus_one_sim_params(params).secession_supply_floor_q) * (-gap_q))
+                    / 1000);
+        }
+
         // THE SPAN OPENS ON THE STRUCT. The region table the
         // resume reads is the handoff's own (equal to the live one
         // at this line -- the fold copied it -- so this moves
@@ -2021,6 +2067,20 @@ void run_industrialisation(generation_cursor& c)
         const industrialisation_output kepler_industrialisation = make_industrialisation_output(
             kepler_settlement, kepler_industrialisation_hs, &kepler_creeds);
         c.fleet_1960 = kepler_industrialisation.fleet; // BL-1152: the cursor carries the 1960 ledger
+        // BL-1278: the floor ran in the history; Pass 2c stands down, and the
+        // tail holds the fold to the count the closing rounds planned.
+        c.closing_predicted = kepler_industrialisation_hs.closing_predicted;
+        if (c.closing_predicted >= 0) c.kepler_np.floor_in_history = true;
+        // A TARGET MISSED IS A DEFECT, never a reported outcome (sec The
+        // nation count is a target: "both targets are always hit"). The
+        // closing rounds stop short only when no legal step is left -- no
+        // absorber, or no split that keeps both sides above the floor -- and
+        // that is recorded loudly here rather than shipped off target.
+        if (kepler_industrialisation_hs.closing_short_of_target)
+            record_handoff_violation(c, "closing_rounds",
+                                     "the total target " + std::to_string(params.nation_total_target)
+                                         + " was not reached: the closing rounds stopped at "
+                                         + std::to_string(c.closing_predicted) + " nations");
         {
             std::string why;
             if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
@@ -2113,6 +2173,7 @@ void run_industrialisation(generation_cursor& c)
             // BL-1053: no pointer into `kepler_exploration`, which
             // lives on the cursor and dies with it (BL-1084).
             fixture->industrialisation_params  = without_resume_pointers(dp);
+            fixture->industrialisation_closing = closing; // keeps `closing_rounds` valid (BL-1278)
             fixture->industrialisation_seed    = dseed;
             fixture->industrialisation_handoff = kepler_industrialisation;
             fixture->industrialisation_state   = kepler_industrialisation_hs;
@@ -2370,6 +2431,15 @@ void run_tail(generation_cursor& c)
     const std::vector<entity_id> kepler_nations =
         generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,
                          /*seed=*/params.seed ^ 0x4A71012u, progress, &kepler_fold);
+    // BL-1278 -- THE DRIFT GUARD. The closing rounds planned the fold's count
+    // from a preview of this very carve; the fold must produce it. A mismatch
+    // means the preview and the carve have parted, and every target built on
+    // it is then wrong without saying so -- so it is a handoff violation.
+    if (c.closing_predicted >= 0 && static_cast<int>(kepler_nations.size()) != c.closing_predicted)
+        record_handoff_violation(c, "closing_rounds",
+                                 "the fold made " + std::to_string(kepler_nations.size())
+                                     + " nations; the closing rounds planned "
+                                     + std::to_string(c.closing_predicted));
     if (report != nullptr)
         for (generation_report::body_entry& be : report->bodies)
             if (be.id == kepler)

@@ -1342,7 +1342,14 @@ std::vector<std::string> span_params_issues(const history_sim_params& dp, const 
         EMPIRES_ONLY(supply_upgrade_material_cost);
         EMPIRES_ONLY(supply_upgrade_reach_gain_q);
         EMPIRES_ONLY(supply_upgrade_threshold_q);
-        EMPIRES_ONLY(secession_supply_floor_q);
+        // BL-1278: THE ONE EXCEPTION, AND ONLY WITH A TARGET. The total's lean
+        // (NATION_GENERATION.md sec The nation count is a target) gives the
+        // span a secession floor when the world wants MORE nations than it
+        // opens on; with the target unset (every world this row builds unless
+        // `nation_total_target` is set) the field must sit at the default
+        // exactly as before. Checked as Empires-only for unset targets only.
+        if (wp.nation_total_target == 0) EMPIRES_ONLY(secession_supply_floor_q);
+        else if (!(E.secession_supply_floor_q == B.secession_supply_floor_q)) ++empires_only;
         EMPIRES_ONLY(secession_min_regions);
         EMPIRES_ONLY(universal_creed_humbled_cohesion_q);
         EMPIRES_ONLY(universal_creed_min_trade_links);
