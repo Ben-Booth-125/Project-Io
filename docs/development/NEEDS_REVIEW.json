@@ -435,7 +435,7 @@
    "title": "DECISION TAKEN: save_game_version 23 reads a v22 save (the nation targets as unset) instead of refusing it",
    "raised": "2026-10-11",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1278 (nation count targets) lane A, 2026-10-11",
    "what": "Every earlier envelope bump refused the old version outright. v23 appends the two nation targets at the very end of the envelope, so a v22 file is a v23 file minus 8 bytes; read_save_game now accepts v22 and reads both targets as 0 (natural count). v21 and older are still refused. Tested by save_envelope_roundtrip S9.",
    "why_it_matters": "It breaks the envelope's strict-equality convention for one version, so a v22 save keeps loading.",
@@ -448,7 +448,7 @@
     "src/core/save_game.cpp",
     "tools/verify/save_envelope_roundtrip.cpp"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-11: keep - a v22 save loads with the targets unset."
   }
  ]
 }
