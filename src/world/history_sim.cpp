@@ -1,4 +1,5 @@
 #include "history_sim.hpp"
+#include "closing_rounds.hpp" // BL-1278: the size floor and the total, planned for the close
 
 #include "ocean_currents.hpp" // BL-1120: the current field a sea leg is priced with
 
@@ -7351,6 +7352,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (value < 0) value = 0;
                     }
 
+                    // BL-1278 -- THE TOTAL'S LEAN (NATION_GENERATION.md sec The
+                    // nation count is a target, stage 1): fewer nations wanted,
+                    // more appetite; more wanted, less. Same idiom and the same
+                    // single application as the creed's appetite above. 0 on
+                    // every span but a targeted Industrialisation one.
+                    if (params.campaign_appetite_q != 0)
+                    {
+                        value = value + (value * params.campaign_appetite_q) / 1000;
+                        if (value < 0) value = 0;
+                    }
+
                     // BL-953 -- A WANT POINTS THE CAMPAIGN OUTWARD
                     // (EXPLORATION.md sec A want points a campaign outward).
                     // The decider's own want for the good this ground holds,
@@ -9718,6 +9730,151 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // closes is offered once more to its realm's nearest centre as the map now
     // stands. A sack's points stay on the ruin (NR-901).
     rehome_stranded_at_close(ss.regions, owner, settlement_ended_by_sack, gw);
+
+    // ---- BL-1278: THE CLOSING ROUNDS (NATION_GENERATION.md sec Pass 2c, ----
+    // sec The nation count is a target; Ben, 2026-10-11). The size floor is an
+    // event of the span now, not a post-pass over the carve: a realm (or ground
+    // no realm held) whose carve cell falls below the minimum territory is
+    // absorbed by a neighbour here, in the span's last year. With a total set,
+    // the gap the floor leaves is closed in the same rounds -- absorption where
+    // there are too many, a province seceding where there are too few. The plan
+    // is pure (`plan_closing_rounds`, over the carve `generate_nations` will
+    // draw); this block applies it with the sim's own bookkeeping, so the map,
+    // the change list, the events and the closing step agree. Pass 2c does not
+    // run after it (`nation_params::floor_in_history`).
+    if (params.closing_rounds != nullptr && params.closing_rounds->carve)
+    {
+        const closing_rounds_spec& cr = *params.closing_rounds;
+        const std::vector<int> cells = cr.carve(ss.regions);
+        const closing_plan plan = plan_closing_rounds(ss.regions, out.polities, cells, cr.gw, cr.gh,
+                                                      cr.min_nation_tiles, cr.keep_city_states,
+                                                      cr.total_target);
+        const int64_t y = params.stop_year > params.start_year ? params.stop_year - 1 : params.start_year;
+        event_year = y;
+        const auto realm_label = [&](int pid) -> std::string {
+            if (pid < 0 || pid >= static_cast<int>(out.polities.size())) return std::string("unheld ground");
+            const polity& q = out.polities[static_cast<std::size_t>(pid)];
+            if (!q.name.empty()) return q.name;
+            if (q.capital >= 0 && q.capital < static_cast<int>(ss.regions.size()))
+                return ss.regions[static_cast<std::size_t>(q.capital)].name;
+            return std::string("a realm");
+        };
+        for (const closing_step& st : plan.steps)
+        {
+            if (st.kind == closing_step_kind::target_secede)
+            {
+                const int qid  = st.from_polity;
+                const int seat = st.region;
+                if (qid < 0 || qid >= static_cast<int>(out.polities.size())) continue;
+                if (out.polities.size() >= owner_index_limit) break;
+                const std::size_t pi = static_cast<std::size_t>(qid);
+                polity np;
+                np.id      = static_cast<int>(out.polities.size());
+                np.culture = ss.regions[static_cast<std::size_t>(seat)].culture.plurality();
+                np.capital = seat;
+                np.aggression_q =
+                    (cs && np.culture >= 0 && np.culture < static_cast<int>(cs->cultures.size()))
+                        ? leaned_aggression_q(params, cs->cultures[static_cast<std::size_t>(np.culture)].aggression_q)
+                        : 500;
+                for (int d = 0; d < sim_domain_count; ++d)
+                {
+                    np.capacity[d]   = out.polities[pi].capacity[d];
+                    np.progress_q[d] = out.polities[pi].progress_q[d];
+                }
+                np.cohesion_q      = out.polities[pi].cohesion_q;
+                np.industrial_year = out.polities[pi].industrial_year;
+                np.parent          = qid;
+                coin_name_for(np);
+                out.polities.push_back(np);
+                note_event(lapse_event_kind::seceded_at_close, seat, np.id, qid);
+                for (const int r : st.moved)
+                {
+                    const std::size_t ri = static_cast<std::size_t>(r);
+                    owner[ri]             = np.id;
+                    ss.regions[ri].nation = np.id;
+                    void_stale_standing_army(ss.regions[ri]);
+                    ss.regions[ri].seat_region = seat;
+                    ss.regions[ri].is_seat     = (r == seat);
+                    out.owner_changes.push_back(owner_change{
+                        static_cast<int32_t>(y), static_cast<uint16_t>(r), static_cast<uint16_t>(np.id)});
+                }
+                touch_owner(qid);
+                touch_owner(np.id);
+                for (std::size_t h = 0; h < owner.size(); ++h)
+                    if (owner[h] == qid && ss.regions[h].seat_region == seat)
+                        ss.regions[h].seat_region = out.polities[pi].capital;
+                raise_grudge(qid, np.id, grudge_kind::ground_taken, seat, y, params.grudge_ground_taken);
+                ++out.closing_target_secessions;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    ss.regions[static_cast<std::size_t>(seat)].name + " breaks away from "
+                        + realm_label(qid) + " as the old order closes",
+                    std::string{}});
+                continue;
+            }
+
+            const int dead = st.from_polity;
+            const int into = st.into_polity;
+            if (into < 0 || into >= static_cast<int>(out.polities.size())) continue;
+            const std::string absorbed_name =
+                dead >= 0 ? realm_label(dead)
+                          : (st.region >= 0 ? ss.regions[static_cast<std::size_t>(st.region)].name
+                                            : std::string("unheld ground"));
+            for (const int r : st.moved)
+            {
+                const std::size_t ri = static_cast<std::size_t>(r);
+                owner[ri]             = into;
+                ss.regions[ri].nation = into;
+                void_stale_standing_army(ss.regions[ri]);
+                if (dead < 0 && !ss.regions[ri].is_seat)
+                    ss.regions[ri].seat_region = out.polities[static_cast<std::size_t>(into)].capital;
+                out.owner_changes.push_back(owner_change{
+                    static_cast<int32_t>(y), static_cast<uint16_t>(r), static_cast<uint16_t>(into)});
+            }
+            touch_owner(dead);
+            touch_owner(into);
+            note_event(lapse_event_kind::absorbed_at_close, st.region, dead, into);
+            if (dead >= 0 && dead < static_cast<int>(out.polities.size()))
+            {
+                out.polities[static_cast<std::size_t>(dead)].alive = false;
+                extinguish_polity(dead, into, st.region, y);
+                // Its subjects outlive their overlord, freed (EXPLORATION.md
+                // sec A colony is a subject: the link ends with either party).
+                for (polity& sq : out.polities)
+                    if (sq.overlord == dead)
+                    {
+                        sq.overlord     = -1;
+                        sq.subject_kind = -1;
+                        note_event(lapse_event_kind::subject_freed, sq.capital, sq.id, dead);
+                    }
+            }
+            if (st.kind == closing_step_kind::floor_absorb) ++out.closing_floor_absorptions;
+            else                                            ++out.closing_target_absorptions;
+            out.history.push_back(history_event{
+                years_from_calendar_year(y), chain_stage::legacy,
+                absorbed_name + " is absorbed by " + realm_label(into)
+                    + (st.kind == closing_step_kind::floor_absorb
+                           ? ", too small to stand alone as the old order closes"
+                           : " as the realms consolidate"),
+                std::string{}});
+        }
+        if (!plan.steps.empty())
+        {
+            // A flow names two living parties (the handoff validator's rule).
+            std::vector<char> live(out.polities.size(), 0);
+            for (const int o : owner)
+                if (o >= 0 && static_cast<std::size_t>(o) < live.size()) live[static_cast<std::size_t>(o)] = 1;
+            out.trade_flows.erase(
+                std::remove_if(out.trade_flows.begin(), out.trade_flows.end(),
+                               [&](const trade_flow& f) {
+                                   return f.seller >= live.size() || f.buyer >= live.size()
+                                       || !live[f.seller] || !live[f.buyer];
+                               }),
+                out.trade_flows.end());
+        }
+        out.closing_predicted       = plan.nations_after;
+        out.closing_short_of_target = plan.short_of_target;
+    }
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval

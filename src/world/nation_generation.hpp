@@ -153,6 +153,15 @@ struct nation_params
     /// nation did before this item. Empty (the default) keeps the pre-BL-1089
     /// naming bit-for-bit.
     std::vector<std::string> polity_names;
+
+    /// BL-1278 — THE FLOOR RAN IN THE HISTORY (NATION_GENERATION.md § Pass
+    /// 2c; Ben, 2026-10-11). True when the Industrialisation span's closing
+    /// rounds (`closing_rounds.hpp`) already absorbed every realm below
+    /// `min_nation_tiles` as events of the span and reconciled the total:
+    /// Pass 2c then does not run, so the fold's count is the count the
+    /// closing rounds planned. False (the default, and every world with no
+    /// history) keeps the post-pass exactly as it was.
+    bool floor_in_history = false;
 };
 
 /// BL-1089 — WHAT THE FOLD DID, per nation, in the order `generate_nations`
@@ -212,6 +221,19 @@ std::vector<entity_id> generate_nations(
     uint32_t seed,
     struct generation_progress* progress = nullptr,
     nation_fold_record* fold_out = nullptr);
+
+/// BL-1278 — THE CARVE, PREVIEWED. Passes 1 (historical seeds), 1b, 2, 2b and
+/// the water derivation of `generate_nations`, run on the same code with the
+/// same seed, from @p seed_tiles (the anchors, as `settlement_seed_tiles`
+/// gives them) — and nothing else: no fold, no floor, no world write. Returns
+/// per raster tile the index INTO @p seed_tiles of the anchor whose cell holds
+/// it (-1 = unclaimed). The closing rounds plan against it, so the history
+/// and the carve read one geometry. @p seed is `generate_nations`' own seed.
+std::vector<int> preview_nation_carve(const world& w,
+                                      const std::vector<entity_id>& tile_ids,
+                                      int gw, int gh,
+                                      const std::vector<int>& seed_tiles,
+                                      uint32_t seed);
 
 // ---------------------------------------------------------------------------
 // BL-571 — nation garrisons (docs/military/MILITARY.md § Nation garrisons)

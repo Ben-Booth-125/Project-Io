@@ -101,8 +101,12 @@ std::vector<uint32_t> library_seeds(const char* path)
 /// `realm_ended` or `broke_away` passed off as a correction.
 bool is_total_reconciliation(const lapse_event& e)
 {
-    (void)e;
-    return false;
+    // BL-1278 lane B: the closing rounds' two kinds — an absorption (the size
+    // floor's, or one surplus to the total; the prose line carries which) and
+    // a secession closing a total the history left short. Both are emitted
+    // only by the closing rounds, never by the span's own verbs.
+    return e.kind == static_cast<uint8_t>(lapse_event_kind::absorbed_at_close)
+        || e.kind == static_cast<uint8_t>(lapse_event_kind::seceded_at_close);
 }
 bool is_major_reconciliation(const lapse_event& e)
 {

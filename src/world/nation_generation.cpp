@@ -864,6 +864,61 @@ std::string make_nation_name(std::mt19937& rng, const tongue& t, const tongue_le
     }
 }
 
+/// BL-1278 — PASSES 1b, 2, 2b AND THE WATER, shared by `generate_nations`
+/// and `preview_nation_carve` so the closing rounds' carve and the real one
+/// are one code path, not two kept in step. @p progress is the BL-305 tap
+/// (null for a preview); `begin_carve` sits where it always sat, after the
+/// weights are drawn.
+std::vector<int> carve_from_seeds(const std::vector<int>& seeds,
+                                  const std::vector<bool>& unclaimable,
+                                  const std::vector<terrain_substrate>& sub,
+                                  const world& w,
+                                  const std::vector<entity_id>& tile_ids,
+                                  int gw, int gh,
+                                  uint32_t seed,
+                                  generation_progress* progress)
+{
+    const uint32_t seed_expand = seed ^ 0x1F2E3D4Cu;
+    const uint32_t seed_weight = seed ^ 0x6D2B79F5u;
+    const int seed_count = static_cast<int>(seeds.size());
+
+    // --- Pass 1b: per-seed growth weights (BL-053) ---
+    // Skewed so most seeds stay small and a few become "great powers": the cube of
+    // a uniform draw maps to w in [0.4, 3.4], heavily massed at the low end.
+    std::mt19937 weight_rng(seed_weight);
+    std::vector<float> weights(static_cast<std::size_t>(seed_count));
+    {
+        std::uniform_real_distribution<float> u(0.0f, 1.0f);
+        for (int i = 0; i < seed_count; ++i)
+        {
+            const float t = u(weight_rng);
+            weights[static_cast<std::size_t>(i)] = 0.4f + 3.0f * t * t * t;
+        }
+    }
+
+    // BL-305: open the carve now the seed count is known, so the loading screen
+    // has a blank map of the right shape before the first tile lands.
+    if (progress) progress->begin_carve(gw, gh, seed_count);
+
+    // --- Pass 2: territory expansion (weighted) ---
+    std::mt19937 expand_rng(seed_expand);
+    std::vector<int> owner_map = expand_territory(
+        seeds, unclaimable, w, tile_ids, gw, gh, weights, expand_rng, progress);
+
+    // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
+    assign_orphan_islands(owner_map, unclaimable, gw, gh);
+
+    // --- Water takes its owner from the shore (NR-792; between 2b and 2d) --
+    // Not a numbered pass of NATION_GENERATION.md (the "Pass 2c" this label
+    // once wore is the size floor below, and one name for two passes was the
+    // stale-comment fix sprint 47's rulings named). Must run AFTER the land
+    // carve and orphan islands (its sources are owned land tiles) and BEFORE
+    // the polity fold, so a water tile is remapped by the fold exactly as the
+    // shore it was derived from is.
+    derive_water_ownership(owner_map, sub, gw, gh);
+    return owner_map;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -884,8 +939,6 @@ std::vector<entity_id> generate_nations(
 
     // Distinct seed offsets keep each pass's RNG stream independent.
     const uint32_t seed_seeds  = seed ^ 0xA3B4C5D6u;
-    const uint32_t seed_expand = seed ^ 0x1F2E3D4Cu;
-    const uint32_t seed_weight = seed ^ 0x6D2B79F5u;
     const uint32_t seed_pol    = seed ^ 0x8C7B6A59u;
     const uint32_t seed_name   = seed ^ 0x4E5F607Au;
 
@@ -1003,40 +1056,9 @@ std::vector<entity_id> generate_nations(
     if (seed_count == 0)
         return {};
 
-    // --- Pass 1b: per-seed growth weights (BL-053) ---
-    // Skewed so most seeds stay small and a few become "great powers": the cube of
-    // a uniform draw maps to w in [0.4, 3.4], heavily massed at the low end.
-    std::mt19937 weight_rng(seed_weight);
-    std::vector<float> weights(static_cast<std::size_t>(seed_count));
-    {
-        std::uniform_real_distribution<float> u(0.0f, 1.0f);
-        for (int i = 0; i < seed_count; ++i)
-        {
-            const float t = u(weight_rng);
-            weights[static_cast<std::size_t>(i)] = 0.4f + 3.0f * t * t * t;
-        }
-    }
-
-    // BL-305: open the carve now the seed count is known, so the loading screen
-    // has a blank map of the right shape before the first tile lands.
-    if (progress) progress->begin_carve(gw, gh, seed_count);
-
-    // --- Pass 2: territory expansion (weighted) ---
-    std::mt19937 expand_rng(seed_expand);
-    std::vector<int> owner_map = expand_territory(
-        seeds, unclaimable, w, tile_ids, gw, gh, weights, expand_rng, progress);
-
-    // --- Pass 2b: orphan-island assignment (claim sea-disconnected ground) ---
-    assign_orphan_islands(owner_map, unclaimable, gw, gh);
-
-    // --- Water takes its owner from the shore (NR-792; between 2b and 2d) --
-    // Not a numbered pass of NATION_GENERATION.md (the "Pass 2c" this label
-    // once wore is the size floor below, and one name for two passes was the
-    // stale-comment fix sprint 47's rulings named). Must run AFTER the land
-    // carve and orphan islands (its sources are owned land tiles) and BEFORE
-    // the polity fold, so a water tile is remapped by the fold exactly as the
-    // shore it was derived from is.
-    derive_water_ownership(owner_map, sub, gw, gh);
+    // --- Passes 1b, 2, 2b and the water (BL-1278: one shared path) ---
+    std::vector<int> owner_map = carve_from_seeds(seeds, unclaimable, sub, w, tile_ids, gw, gh,
+                                                  seed, progress);
 
     // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
     //
@@ -1120,8 +1142,12 @@ std::vector<entity_id> generate_nations(
     // BL-769: the floor now judges POLITY-GRAIN territories, because the fold
     // ran first — so a realm is absorbed for being a small realm, not for being
     // one province of a large one.
+    // BL-1278: after a history whose closing rounds ran the floor, nothing is
+    // left for it to do here, and running it again would move the count the
+    // closing rounds planned (the drift guard in `run_tail` holds them equal).
+    const bool floor_here = params.min_nation_tiles > 0 && !params.floor_in_history;
     const std::vector<bool> city_states =
-        params.keep_city_states
+        (params.keep_city_states && floor_here)
             ? mark_city_states(w, tile_ids, owner_map, fold, seed_polity, seed_count, total)
             : std::vector<bool>{};
 
@@ -1133,8 +1159,12 @@ std::vector<entity_id> generate_nations(
     for (int si = 0; si < seed_count; ++si) seed_to_nation[static_cast<std::size_t>(si)] = si;
 
     int nation_count = seed_count;
-    if (params.min_nation_tiles > 0)
-        nation_count = merge_undersized_nations(owner_map, seed_count, params.min_nation_tiles,
+    // BL-1278: with the floor run in the history the merge is called at a
+    // floor of 0 — it absorbs nothing and only COMPACTS the fold's
+    // representative indices, which the nations below are numbered by.
+    if (floor_here || params.floor_in_history)
+        nation_count = merge_undersized_nations(owner_map, seed_count,
+                                                floor_here ? params.min_nation_tiles : 0,
                                                 gw, gh, city_states, &absorbed_into, &seed_to_nation);
 
     // BL-305: 2b and 2c both rewrite owner indices wholesale (the merge also
@@ -1687,4 +1717,65 @@ int64_t garrison_strength_in(const world& w, uint32_t province_id)
         total += unit_strength(w, u);
     }
     return total;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1278 — the carve, previewed for the closing rounds
+// ---------------------------------------------------------------------------
+std::vector<int> preview_nation_carve(const world& w,
+                                      const std::vector<entity_id>& tile_ids,
+                                      int gw, int gh,
+                                      const std::vector<int>& seed_tiles,
+                                      uint32_t seed)
+{
+    const int total = gw * gh;
+    std::vector<int> out(static_cast<std::size_t>(total > 0 ? total : 0), -1);
+    if (total <= 0 || static_cast<int>(tile_ids.size()) < total) return out;
+
+    // The masks `generate_nations` builds, read the same way.
+    std::vector<terrain_substrate> sub(static_cast<std::size_t>(total), terrain_substrate::barren);
+    std::vector<bool> is_water_map(static_cast<std::size_t>(total), false);
+    int land_tiles = 0;
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid != null_entity)
+        {
+            const auto it = w.tiles.find(tid);
+            if (it != w.tiles.end())
+            {
+                sub[static_cast<std::size_t>(idx)] = it->second.substrate;
+                if (is_water(it->second.substrate)) is_water_map[static_cast<std::size_t>(idx)] = true;
+            }
+        }
+        if (!is_water_map[static_cast<std::size_t>(idx)]) ++land_tiles;
+    }
+    if (land_tiles <= 0) return out; // `generate_nations`' seed_target == 0 return
+
+    // Pass 1's historical-seed filter: off-grid, water and duplicate anchors dropped.
+    std::vector<bool> taken(static_cast<std::size_t>(total), false);
+    std::vector<int>  seeds, source;
+    for (std::size_t si = 0; si < seed_tiles.size(); ++si)
+    {
+        const int idx = seed_tiles[si];
+        if (idx < 0 || idx >= total) continue;
+        if (is_water_map[static_cast<std::size_t>(idx)]) continue;
+        if (taken[static_cast<std::size_t>(idx)]) continue;
+        taken[static_cast<std::size_t>(idx)] = true;
+        seeds.push_back(idx);
+        source.push_back(static_cast<int>(si));
+    }
+    if (seeds.empty()) return out;
+
+    // Every water kind is unclaimable (NR-792), exactly as the real carve.
+    const std::vector<bool>& unclaimable = is_water_map;
+    const std::vector<int> owner_map =
+        carve_from_seeds(seeds, unclaimable, sub, w, tile_ids, gw, gh, seed, nullptr);
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int k = owner_map[static_cast<std::size_t>(idx)];
+        if (k >= 0 && k < static_cast<int>(source.size()))
+            out[static_cast<std::size_t>(idx)] = source[static_cast<std::size_t>(k)];
+    }
+    return out;
 }
