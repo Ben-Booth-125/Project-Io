@@ -519,7 +519,11 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   stores every round** — a standing levy on what its own ground produces, swept into the chest as
   the 1200 consolidation once swept it, but every round rather than once — and **endowment income
   is rescaled** so a small realm earns too. Not a larger conversion rate, not a reserve granted at
-  the handoff. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
+  the handoff. **The endowment is summed over the ground a realm holds, not averaged (Ben,
+  2026-10-12)**, so a larger realm earns more and the inherited order holds: a flat per-realm
+  endowment reached the band but scrambled which realms were richest. With real chests, the
+  treasury's conversion into industry points (`industry_points_per_treasury_unit`) is re-sized so
+  the treasury term is again the same order as the scale term. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
   the library, so it is not where the money goes.)
 - **Measured before the ruling** (`tools/verify/treasury_census.cpp`, 16 library seeds): 99.6% of
   every chest is the one-time 1200 fold of the seats' stores; the ongoing earn after it is about
