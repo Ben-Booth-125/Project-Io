@@ -283,7 +283,9 @@ the patterns are named for what they do.
 **They are fixed by design, not player-set (Ben, 2026-10-10).** Every world carries the three targets
 and the two leans; the setup round carries only the nation counts. A target is hit as the counts
 are: a lean conditions the passes, then reconciliation closes any gap with the history's own verbs,
-each recorded with a cause. A lean makes a pattern likely and promises nothing.
+each recorded with a cause. **The backstop escalates the lean in-world (Ben, 2026-10-12):** where a
+target pattern's lean misses, it is pressed harder in bounded steps until the pattern's detector
+passes, each step a recorded cause. A lean makes a pattern likely and promises nothing.
 
 **Every pattern is tracked (Ben, 2026-10-10).** Each pattern has a **detector** — a predicate over the
 history record that proves the target was hit and names the polities it touched. The detector is
