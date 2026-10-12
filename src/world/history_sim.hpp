@@ -2697,6 +2697,34 @@ struct history_sim_params
     /// secession half is `secession_supply_floor_q`, which that span leaves
     /// at 0 and the lean raises only when MORE nations are wanted.
     int campaign_appetite_q = 0;
+
+    // --- BL-1290 (civil war deaths) ------------------------------------------
+    // MILITARY_HISTORY.md sec Armies are distinct from population (Ben,
+    // 2026-10-10/11/12): a civil war kills civilians ONLY through a famine and
+    // displacement mechanism of its own, never a coefficient in a battle. A
+    // CIVIL WAR is a successor that broke away (or schismed) holding at least
+    // `civil_war_min_share_q` per mille of what its parent kept and at least
+    // `civil_war_min_regions` regions, then fighting that parent within
+    // `civil_war_window_years` (CIVILISATION.md, "What counts as one"). Every
+    // region a battle between the two targets is FOUGHT OVER that round: it
+    // loses `civil_war_famine_q` per mille per year of the round to famine
+    // (`remove_region_people` -- the dead leave their food behind, so the
+    // ground regrows), and a further `civil_war_flight_q` per mille per year
+    // FLEES to the nearest safe region of the same people that can feed them
+    // (`settle_refugees`, bounded by its `refugee_room`; exactly the heads
+    // landed leave -- people conserved, and no ceiling moves on either end, so
+    // the emptied ground regrows). At most once per region per decision round, and
+    // each share is capped at `civil_war_round_cap_q` per round, so no region
+    // is emptied. Both recorded (`lapse_event_kind::civil_war_famine`,
+    // `civil_war_flight`). 0 = off: the struct default, so every span but
+    // Empires (era_minus_one_sim_params) and every legacy harness arc is
+    // byte-identical.
+    int civil_war_famine_q      = 0;
+    int civil_war_flight_q      = 0;
+    int civil_war_round_cap_q   = 150;
+    int civil_war_min_share_q   = 250;
+    int civil_war_min_regions   = 3;
+    int civil_war_window_years  = 50;
 };
 
 // ---------------------------------------------------------------------------
@@ -4609,6 +4637,19 @@ struct history_sim_state
     /// or a relay that moved this round); a rise here says the supply index
     /// and the map disagree again. Report-only; `history_sweep` prints it.
     int64_t regions_seceded_graph_cut = 0;
+
+    /// BL-1290 (civil war deaths) -- report-only tallies of the civil-war
+    /// famine and flight (history_sim_params::civil_war_famine_q). `civil_wars`
+    /// counts the splits that qualified as halves (a quarter of the parent's
+    /// kept ground, 3+ regions); `civil_war_strikes` the (region, round) pairs
+    /// fought over between such halves inside the window; `civil_war_no_refuge`
+    /// the strikes whose people had no safe region of their own to flee to (the
+    /// flight then moves nobody -- counted, never silent). Not saved.
+    int64_t civil_wars             = 0;
+    int64_t civil_war_strikes      = 0;
+    int64_t civil_war_famine_dead  = 0;
+    int64_t civil_war_fled         = 0;
+    int64_t civil_war_no_refuge    = 0;
 
     /// BL-869 — every civilisation mixing actually grew, in formation order.
     /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`
