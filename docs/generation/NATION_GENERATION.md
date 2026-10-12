@@ -101,7 +101,10 @@ each is reconciled where it can be read:
 - **A champion the reconciliation must charter may take any land tile of its nation (Ben,
   2026-10-12).** Where no placement window of the minor's centres holds ground, the champion is
   placed on any land tile its nation holds, so the major target is hit; it may open with weaker
-  holdings. Ordinary chartering keeps its windows.
+  holdings. Ordinary chartering keeps its windows. **Where the nation has no free land tile at
+  all** — its own background firms hold every one — the state charter founds the champion by
+  **consolidating those firms**: they merge into it with their holdings, recorded in the same
+  state-charter event, and nothing is destroyed (Ben, 2026-10-12).
 - **The target outranks the floor (Ben, 2026-10-11).** Where no secession can leave both sides
   above the minimum territory, the closing rounds still split a province, choosing the split that
   leaves the smallest shortfall, so the total is always hit. A nation below the floor is the cost of
