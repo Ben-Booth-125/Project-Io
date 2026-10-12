@@ -502,6 +502,8 @@ enum class charter_rung : std::uint8_t
     centre_window = 1, ///< the centre nation's tiles within `window_radius` of the centre tile
     region_window = 2, ///< the centre nation's tiles in the centre's NEAREST region, and
                        ///< only when that region is the centre nation's own
+    nation_wide   = 3, ///< BL-1278 (Ben, 2026-10-12): ANY land tile of the nation, nearest the centre
+                       ///< first -- only for a champion the majors' reconciliation MUST charter
 };
 
 struct charter_unspent

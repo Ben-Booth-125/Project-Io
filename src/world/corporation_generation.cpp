@@ -5757,7 +5757,8 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
                                 const charter_spend_params& spend, uint32_t seed,
                                 std::unordered_set<entity_id>& occupied, chain_reach& chain,
                                 const output_want* want, charter_rung& rung,
-                                charter_unspent_reason& why, std::vector<entity_id>& assets_out)
+                                charter_unspent_reason& why, std::vector<entity_id>& assets_out,
+                                bool nation_wide = false)
 {
     const nation_component& nc = w.nations.at(cc.nation);
     const corporation_params capital_params;   // the draw: today's starting capital, 400 +/- 40%
@@ -5791,6 +5792,73 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
                                                   chain_rejected, /*dig=*/nullptr,
                                                   /*refused=*/nullptr, /*grids=*/nullptr,
                                                   want);
+    if (assets.empty() && nation_wide)
+    {
+        // BL-1278 (Ben, 2026-10-12): a champion the reconciliation MUST charter
+        // may take ANY land tile of its nation when no window of the centre
+        // holds ground. THE ORDER: every land tile the nation holds on the
+        // centre's body, nearest the centre first (the walk's wrapped squared
+        // metric, `charter_region_dist`), ties to the lower raster index
+        // (row x width + col) — so the window, and the draw over it, is fixed.
+        // Chain-feasible first; where the chain refuses everywhere, the
+        // holdings are kept as placed (a weaker opening, never a missed target).
+        std::vector<std::pair<std::pair<int, std::int64_t>, entity_id>> ranked;
+        for (const entity_id tid : nc.tiles)
+        {
+            const auto t = w.tiles.find(tid);
+            if (t == w.tiles.end() || t->second.body != cc.body || is_water(t->second.substrate))
+                continue;
+            const int d = cc.gw > 0 ? charter_region_dist(cc.x, cc.y, t->second.grid_x,
+                                                         t->second.grid_y, cc.gw)
+                                    : 0;
+            const std::int64_t raster = static_cast<std::int64_t>(t->second.grid_y) * cc.gw
+                                      + t->second.grid_x;
+            ranked.push_back({ { d, raster }, tid });
+        }
+        std::sort(ranked.begin(), ranked.end());
+        std::vector<entity_id> window;
+        window.reserve(ranked.size());
+        for (const auto& r : ranked)
+            window.push_back(r.second);
+        // THE FOCUS FIRST, THEN THE OTHERS in enum order: a small nation can hold
+        // no free deposit for an extraction anchor and still hold workable land
+        // a processing or trading anchor stands on. The champion takes the
+        // first focus that lands, and carries it.
+        std::vector<industrial_focus> foci{ focus };
+        for (const industrial_focus f : { industrial_focus::extraction, industrial_focus::processing,
+                                          industrial_focus::trade })
+            if (f != focus)
+                foci.push_back(f);
+        for (const industrial_focus f : foci)
+        {
+            if (window.empty() || !assets.empty())
+                break;
+            std::mt19937 wide_rng = charter_stream(seed, k_charter_salt_spec_asset ^ 0x5EEDu, cc.centre);
+            assets = place_starting_assets(w, nc, f, occupied, wide_rng, &window, nullptr,
+                                           dig_site::none);
+            if (!assets.empty())
+            {
+                // A copy: a refused chain unplaces what it authored, and the
+                // nation-wide holding is then laid again without the chain test.
+                std::vector<entity_id> tried = assets;
+                if (!make_chain_feasible(w, reg, chain, tried, occupied, nullptr, /*whole=*/true,
+                                         nullptr, want))
+                {
+                    std::mt19937 again = charter_stream(seed, k_charter_salt_spec_asset ^ 0x5EEDu,
+                                                        cc.centre);
+                    assets = place_starting_assets(w, nc, f, occupied, again, &window,
+                                                   nullptr, dig_site::none);
+                }
+                else
+                    assets = tried;
+            }
+            if (!assets.empty())
+            {
+                rung  = charter_rung::nation_wide;
+                focus = f;
+            }
+        }
+    }
     if (assets.empty())
         return null_entity;
 
@@ -7477,10 +7545,19 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
             occupied.insert(kv.second.tile);
         chain_reach chain = make_chain_reach(w, reg);
 
+        // TWO PASSES (Ben, 2026-10-12). The first places as the walk does, in
+        // each centre's windows; only when every minor's windows are spent does
+        // the second let the champion take ANY land tile of its nation, nearest
+        // its richest centre first (`charter_specialist_at`'s nation-wide
+        // fallback) — so the target is hit, and ordinary chartering keeps its
+        // windows.
+        for (int pass = 0; pass < 2; ++pass)
         for (const entity_id n : minors)
         {
             if (static_cast<int>(majors.size()) >= major_target)
                 break;
+            if (majors.count(n) != 0)
+                continue;   // raised in the first pass
             const auto cit = centres_of.find(n);
             if (cit == centres_of.end())
                 continue;
@@ -7501,9 +7578,13 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 std::vector<entity_id> assets;
                 const entity_id corp = charter_specialist_at(w, reg, cc, settle, spend, seed,
                                                              occupied, chain, &want, rung, why,
-                                                             assets);
+                                                             assets, /*nation_wide=*/pass == 1);
                 if (corp == null_entity)
-                    continue;   // no ground here: the nation's next centre
+                {
+                    if (pass == 1)
+                        break;      // the nation holds no free land at all: the next minor
+                    continue;       // no ground here: the nation's next centre
+                }
 
                 corporation_component& champ = w.corporations.at(corp);
                 major_reconciliation_record rec;
