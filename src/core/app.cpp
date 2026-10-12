@@ -609,6 +609,12 @@ bool app::same_world_params(const world_params& a, const world_params& b)
         && a.industrialisation_span_enabled == b.industrialisation_span_enabled
         && a.industrialisation_stop_year == b.industrialisation_stop_year
         && a.resume_seeds_corridor_tier == b.resume_seeds_corridor_tier
+        // BL-1298: the history's treasury knobs (shipped at their defaults;
+        // a tuning world built off them is a different world).
+        && a.treasury_levy_per_mille_q == b.treasury_levy_per_mille_q
+        && a.treasury_endowment_income_q == b.treasury_endowment_income_q
+        && a.standing_army_sized_to_earn == b.standing_army_sized_to_earn
+        && a.industry_points_per_1000_treasury_units == b.industry_points_per_1000_treasury_units
         && a.body_count == b.body_count
         && x.star == y.star && x.world_size == y.world_size && x.interior == y.interior
         && x.metal == y.metal && x.ocean == y.ocean && x.oxygen_story == y.oxygen_story

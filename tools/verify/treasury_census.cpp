@@ -65,6 +65,7 @@ namespace {
 // optional per-nation dump (seed, name, build credits, finish credits, major).
 int   g_levy  = -1;
 int   g_endow = -1;
+long long g_ipu = -1;   // --ipu N: industry points per treasury unit (-1 = shipped)
 bool  g_no_size = false; // --no-size: the army is NOT sized to the earn (the pre-ruling arm)
 FILE* g_dump  = nullptr;
 
@@ -281,6 +282,11 @@ struct seed_out
     std::vector<std::pair<double, double>> fold_vs_close;
     std::vector<double> order_rho; ///< per seed (pooled block only)
     int top3_kept = 0, top3_seeds = 0;
+    /// Industry points standing at the 1960 close: all of them, and the
+    /// treasury-paid tally (`region::industry_points_from_treasury`); the
+    /// scale term is the difference. Per-seed treasury shares (pooled block).
+    double ip_total = 0, ip_treasury = 0;
+    std::vector<double> ip_share;
     int fate_never = 0;   ///< took < 1 cr at 1200
     int fate_drained = 0; ///< took >= 1 cr at 1200, holds < 1 cr at the close
     int fate_kept = 0;    ///< holds >= 1 cr at the close
@@ -308,6 +314,7 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
     if (g_levy  >= 0) p.treasury_levy_per_mille_q   = g_levy;
     if (g_endow >= 0) p.treasury_endowment_income_q = g_endow;
     if (g_no_size)    p.standing_army_sized_to_earn = false;
+    if (g_ipu >= 1)   p.industry_points_per_1000_treasury_units = g_ipu;
     generation_report     rep{};
     era_minus_one_fixture fx{};
     const auto t0 = std::chrono::steady_clock::now();
@@ -379,6 +386,12 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
     for (const region& r : fx.pre_exploration_settlement.regions) o.empires_material_at_1200 += r.material_stock;
     if (fx.exploration_ran)
         o.exp = read_span(fx.exploration_state, fx.pre_exploration_settlement.regions, fx.exploration_handoff.regions);
+    if (fx.industrialisation_ran)
+        for (const region& r : fx.industrialisation_handoff.regions)
+        {
+            o.ip_total    += static_cast<double>(r.industry_points);
+            o.ip_treasury += static_cast<double>(r.industry_points_from_treasury);
+        }
     if (fx.industrialisation_ran)
         o.ind = read_span(fx.industrialisation_state, fx.industrialisation_open_regions,
                           fx.industrialisation_handoff.regions);
@@ -473,6 +486,10 @@ void print_seed_block(const seed_out& o, bool do_finish)
                     median(o.order_rho), o.top3_kept, 3 * o.top3_seeds);
     std::printf("    fate: took <1 cr at 1200 %d | took >=1 cr, <1 cr at close %d (they took %.0f cr) | >=1 cr at close %d\n",
                 o.fate_never, o.fate_drained, o.drained_cr, o.fate_kept);
+    if (o.ip_total > 0)
+        std::printf("  INDUSTRY POINTS at the close: %.4g total = scale %.4g + treasury %.4g (treasury share %.3f%s)\n",
+                    o.ip_total, o.ip_total - o.ip_treasury, o.ip_treasury, o.ip_treasury / o.ip_total,
+                    o.ip_share.empty() ? "" : (", per-seed median " + std::to_string(median(o.ip_share))).c_str());
     std::printf("  CONCENTRATION\n");
     print_conc("after build", o.t0);
     if (do_finish) print_conc("after finish", o.t1);
@@ -487,6 +504,7 @@ int main(int argc, char** argv)
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--levy") == 0 && i + 1 < argc) { g_levy = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--ipu") == 0 && i + 1 < argc) { g_ipu = std::atoll(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--no-size") == 0) { g_no_size = true; continue; }
         if (std::strcmp(argv[i], "--endow") == 0 && i + 1 < argc) { g_endow = std::atoi(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) { g_dump = std::fopen(argv[++i], "wb"); continue; }
@@ -514,7 +532,7 @@ int main(int argc, char** argv)
         dl.reg.load_from_lua(dl.lua);
     }
 
-    std::printf("levy %d per mille, endowment %d (-1 = shipped default)\n", g_levy, g_endow);
+    std::printf("levy %d per mille, endowment %d, ipu %lld (-1 = shipped default)\n", g_levy, g_endow, g_ipu);
     std::printf("treasury_census: %zu seed(s)%s  (1 credit = 100,000 material, Pass 7's 0.01 per mille)\n",
                 seeds.size(), do_finish ? ", with finish_campaign_world" : ", build only");
     seed_out pooled;
@@ -542,6 +560,8 @@ int main(int argc, char** argv)
         cat(pooled.chest_old, o.chest_old); cat(pooled.chest_new, o.chest_new);
         cat(pooled.fold_1200, o.fold_1200);
         pooled.order_rho.push_back(spearman_rho(o.fold_vs_close));
+        pooled.ip_total += o.ip_total; pooled.ip_treasury += o.ip_treasury;
+        if (o.ip_total > 0) pooled.ip_share.push_back(o.ip_treasury / o.ip_total);
         pooled.top3_kept += top3_overlap(o.fold_vs_close);
         ++pooled.top3_seeds;
         pooled.fate_never += o.fate_never; pooled.fate_drained += o.fate_drained;

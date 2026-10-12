@@ -2409,7 +2409,7 @@ bool bl1169_self_check()
         p.treasury_endowment_income_q = 1000;
         p.industry_points_enabled = true;
         p.industry_open_year = 1660;
-        p.industry_points_per_treasury_unit = 1000;
+        p.industry_points_per_1000_treasury_units = 1000000; // BL-1298: per thousand units now; = 1000 per unit
         p.industry_points_treasury_share_q = 250;
         p.industry_points_crowding_k = k;
         return p;
@@ -2457,7 +2457,7 @@ bool bl1169_self_check()
     const int64_t d0 = on.rg[0].industry_points - 2000, d1 = on.rg[1].industry_points - 1000;
     // The brake alone, on the same spread, says the same thing.
     std::vector<std::pair<int, int64_t>> spread = unbraked;
-    const int64_t kept_direct = industry_points_crowd_brake(pre, spread, k_shipped, 1000, &w);
+    const int64_t kept_direct = industry_points_crowd_brake(pre, spread, k_shipped, 1000000, &w);
     std::printf("BL-1169 self-check (3): K = %lld, crowding 2000/1000, share 100000/100000 -> converted %lld/%lld"
                 " (expect 33333/50667), debited %lld (expect 84), kept in the purse %lld (expect 116), purse %lld"
                 " (expect 716); the brake alone kept %lld units\n",
@@ -2488,7 +2488,7 @@ bool bl1169_self_check()
         one[0].nation = 0; one[0].centres = 1; one[0].urban_population = 1000; one[0].works_built = 1u;
         one[0].industry_points = c; // crowding = points x 1000 / 1000 heads = c
         std::vector<std::pair<int, int64_t>> s1 = { { 0, 100000 } };
-        if (industry_points_crowd_brake(one, s1, k_shipped, 1000, &w) < 0) { ++rises; continue; }
+        if (industry_points_crowd_brake(one, s1, k_shipped, 1000000, &w) < 0) { ++rises; continue; }
         const int64_t conv = s1[0].second;
         if (prev >= 0 && conv > prev) ++rises;
         if (prev >= 0 && conv < prev) ++falls;
@@ -2502,7 +2502,7 @@ bool bl1169_self_check()
     { two[i].nation = 0; two[i].centres = 1; two[i].urban_population = 1000; two[i].works_built = 1u; }
     two[0].industry_points = 4000; two[1].industry_points = 3000;
     std::vector<std::pair<int, int64_t>> s2 = { { 0, 100000 }, { 1, 100000 } };
-    const int64_t k2 = industry_points_crowd_brake(two, s2, k_shipped, 1000, &w);
+    const int64_t k2 = industry_points_crowd_brake(two, s2, k_shipped, 1000000, &w);
     // And in the loop itself (row 3's run): the region at crowding 2000 took
     // less than the one at 1000 from the same 100000-point share.
     std::printf("BL-1169 self-check (4): share 100000 over crowding 0..2^40 -> %d rises, %d falls; at 0 %lld"
@@ -2543,9 +2543,9 @@ bool bl1169_self_check()
         || at_one.sp.industry_treasury_debited != 1 || at_one.sp.industry_treasury_kept_by_crowding != 199)
         fail("(5): K = 1, the domain's low boundary, did not brake as the rule says");
     std::vector<std::pair<int, int64_t>> s3 = unbraked, s4 = unbraked, s5 = unbraked;
-    const int64_t b_over = industry_points_crowd_brake(pre, s3, kmax + 1, 1000, &w);
-    const int64_t b_zero = industry_points_crowd_brake(pre, s4, 0, 1000, &w);
-    const int64_t b_max  = industry_points_crowd_brake(pre, s5, kmax, 1000, &w);
+    const int64_t b_over = industry_points_crowd_brake(pre, s3, kmax + 1, 1000000, &w);
+    const int64_t b_zero = industry_points_crowd_brake(pre, s4, 0, 1000000, &w);
+    const int64_t b_max  = industry_points_crowd_brake(pre, s5, kmax, 1000000, &w);
     std::printf("BL-1169 self-check (5): K = 10^9 valid %s, converts %lld, debits %lld; K = 10^9+1 valid %s, converts"
                 " %lld, debits %lld, purse %lld; K = -1 valid %s, converts %lld; the brake at 10^9+1 / 0 / 10^9 returns"
                 " %lld / %lld / %lld\n",

@@ -1500,8 +1500,13 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (a_held || b_held) ++corridor_touch;
         }
 
+        // BL-1298 (Ben, 2026-10-12): summed over held ground where the span
+        // says so, so a larger realm earns more; the mean form otherwise.
+        // sum_q <= regions x 1000 and the rate is an int: far inside int64.
+        const int64_t endowment_base_q =
+            params.treasury_endowment_summed ? endowment_sum_q : endowment_mean_q;
         const int64_t endowment_income =
-            (endowment_mean_q * params.treasury_endowment_income_q / 1000)
+            (endowment_base_q * params.treasury_endowment_income_q / 1000)
                 * std::max(step_years, 1);
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
@@ -1657,8 +1662,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // there is nowhere for its works to stand: no debit, no credit, and the
         // treasury keeps the round's share. (It used to land the whole credit on
         // the capital's region, townless ground no campaign centre can receive.)
-        // A treasury unit is `industry_points_per_treasury_unit` points (a
-        // unit choice, history_sim.hpp says why). Only inside the span (the switch,
+        // A thousand treasury units are `industry_points_per_1000_treasury_units`
+        // points (a unit choice, history_sim.hpp says why). Only inside the span (the switch,
         // from its open year) and only on in-domain constants; a conversion
         // that would carry ANY receiving region past `industry_points_ceiling`,
         // or whose heads leave the apportionment's domain, is refused whole and
@@ -1668,12 +1673,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             const int64_t surplus = std::max<int64_t>(seat.treasury - purse_before_earn, 0);
             // surplus <= 2^48 (the treasury's own clamp) and share <= 1000, so
-            // the product stays under 2^58; `paid_in` <= 2^48, and times the
-            // exchange rate (<= 10^4 < 2^14) the credit stays under 2^62.
+            // the product stays under 2^58; `paid_in` <= 2^48.
             const int64_t paid_in = (surplus * params.industry_points_treasury_share_q) / 1000;
             if (paid_in > 0)
             {
-                const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
+                const int64_t credit = industry_points_for_treasury_units(
+                    paid_in, params.industry_points_per_1000_treasury_units);
                 std::vector<std::pair<int, int64_t>> spread;
                 bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread, works);
                 // BL-1169 -- A CROWDED HEARTLAND CONVERTS AT A LOWER RATE
@@ -1688,7 +1693,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 {
                     const int64_t kept = industry_points_crowd_brake(
                         regions, spread, params.industry_points_crowding_k,
-                        params.industry_points_per_treasury_unit, works);
+                        params.industry_points_per_1000_treasury_units, works);
                     if (kept < 0) refuse = true; // out of the brake's domain: refused whole
                     else debit -= kept;
                 }
@@ -10447,7 +10452,8 @@ bool industry_points_params_valid(const history_sim_params& p)
 {
     return p.industry_points_per_million_urban_heads_year >= 0
         && p.industry_points_per_million_urban_heads_year <= 1000000
-        && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
+        && p.industry_points_per_1000_treasury_units >= 1
+        && p.industry_points_per_1000_treasury_units <= industry_points_per_1000_units_max
         && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
         && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000
         && p.industry_points_crowding_k >= 0 && p.industry_points_crowding_k <= industry_points_crowding_k_max;
@@ -10608,10 +10614,11 @@ int64_t industry_points_crowding_q(const region& r, const works_registry* works)
 
 int64_t industry_points_crowd_brake(const std::vector<region>& regions,
                                     std::vector<std::pair<int, int64_t>>& spread,
-                                    int64_t k, int64_t points_per_unit,
+                                    int64_t k, int64_t points_per_1000_units,
                                     const works_registry* works)
 {
-    if (k < 1 || k > industry_points_crowding_k_max || points_per_unit < 1) return -1;
+    if (k < 1 || k > industry_points_crowding_k_max || points_per_1000_units < 1
+        || points_per_1000_units > industry_points_per_1000_units_max) return -1;
     // Each receiving region converts its share at f = K / (K + crowding),
     // held in parts per million (K <= 10^9, so K x 10^6 < 2^60), and the
     // share times f is staged (s / 10^6) x f + ((s % 10^6) x f) / 10^6.
@@ -10636,8 +10643,14 @@ int64_t industry_points_crowd_brake(const std::vector<region>& regions,
     // worth of points a round) still converts, on the least crowded receiver,
     // so every unit either stays or lands at the full exchange rate -- no
     // point is deleted.
-    const int64_t kept_units = kept_points / points_per_unit;
-    spread[best].second += kept_points - kept_units * points_per_unit;
+    // BL-1298: the rate is per THOUSAND units, staged so nothing overflows:
+    // kept_units = floor(kept_points x 1000 / rate), and the points those
+    // units are worth (`industry_points_for_treasury_units`) never exceed
+    // kept_points, so the residue is >= 0. At a rate divisible by 1000 this
+    // is the per-unit arithmetic it replaced, digit for digit.
+    const int64_t r = points_per_1000_units;
+    const int64_t kept_units = (kept_points / r) * 1000 + ((kept_points % r) * 1000) / r;
+    spread[best].second += kept_points - industry_points_for_treasury_units(kept_units, r);
     return kept_units;
 }
 

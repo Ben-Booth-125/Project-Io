@@ -520,8 +520,8 @@ struct history_sim_params
     //   polity's `capital` treasury: `industry_points_treasury_share_q` per
     //   mille of the round's SURPLUS -- the purse's net rise across the
     //   round's earn and its army and navy bills, floored at 0 -- leaves the
-    //   treasury and lands as points, `industry_points_per_treasury_unit` to
-    //   the unit. RULED a consequence (Ben, 2026-09-18): no polity scores it,
+    //   treasury and lands as points, `industry_points_per_1000_treasury_units`
+    //   to the thousand units. RULED a consequence (Ben, 2026-09-18): no polity scores it,
     //   so it is no verb. The points SPREAD over the polity's held regions
     //   that stand centres, by the heads their works employ (NR-964, amending
     //   NR-897's urban scale; `industry_points_apportion_by_scale`;
@@ -551,8 +551,27 @@ struct history_sim_params
     /// over the span. The treasury's exchange rate below is set against it.
     int64_t industry_points_per_million_urban_heads_year = 1000;
 
-    /// Points one TREASURY unit converts to (domain 1-10000, so a conversion
-    /// of up to the treasury's own 2^48 ceiling stays inside int64). 1000. A
+    /// Points a THOUSAND treasury units convert to (domain 1 -
+    /// `industry_points_per_1000_units_max`, staged by
+    /// `industry_points_for_treasury_units` so a conversion of up to the
+    /// treasury's own 2^48 ceiling stays inside int64). PER THOUSAND since
+    /// BL-1298: once the history banked real chests the right rate fell below
+    /// one point per unit, which a per-unit integer cannot say.
+    ///
+    /// The struct keeps 1,000,000 (= the old 1000 per unit) so every fixture
+    /// reads as before; GENERATION's value rides on
+    /// `world_params::industry_points_per_1000_treasury_units` (see below).
+    ///
+    /// BL-1298 RE-SIZE (Ben, 2026-10-12, NATION_GENERATION.md sec Pass 7): the
+    /// treasury now earns a standing levy and a summed endowment, so the
+    /// capitals' Industrialisation surplus is several hundred times larger and
+    /// at 1000 points per unit the treasury term swamped the scale term (share
+    /// ~0.999 of all points). The rate is re-sized by the SAME rule as below --
+    /// the treasury term the same order as the scale term -- measured with
+    /// `treasury_census` (INDUSTRY POINTS line); world_params records the
+    /// ladder and the chosen value.
+    ///
+    /// The original reasoning, which still sets the rule: A
     /// UNIT CHOICE, NOT A FINDING, and it is what sets reading 8's
     /// treasury-paid share: sized so the treasury term and the scale term are
     /// the same order on the library's median world. MEASURED (BL-1041, the 16
@@ -564,7 +583,7 @@ struct history_sim_params
     /// At 1000 the treasury-paid share runs 0.16-0.82 (median 0.69): a
     /// property of each world (how its capitals' surplus ran against its
     /// cities), scaled as a whole by this constant.
-    int64_t industry_points_per_treasury_unit = 1000;
+    int64_t industry_points_per_1000_treasury_units = 1000000;
 
     /// The fuel factor's FLOOR, per mille (domain 0-1000). A city standing on
     /// no fuel at all still builds at this share of a coalfield city's rate,
@@ -2251,6 +2270,16 @@ struct history_sim_params
     /// inherits it).
     bool standing_army_sized_to_earn = false;
 
+    /// BL-1298 -- THE ENDOWMENT IS SUMMED OVER HELD GROUND (NATION_GENERATION.md
+    /// sec Pass 7, Ben 2026-10-12). When on, `treasury_endowment_income_q` is
+    /// a per-mille of the SUM of the polity's held regions' endowment
+    /// (`(farm_q+ore_q+energy_q+port_q)/4` each), not their mean: a larger
+    /// realm earns more, so the order the 1200 chests set holds. (A flat
+    /// per-realm mean reached the band but scrambled which realms were
+    /// richest.) Off in the struct, so the fixtures that pin the mean form
+    /// keep it; `exploration_sim_params` turns it on for both resumed spans.
+    bool treasury_endowment_summed = false;
+
     /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
     /// WOULD open (the marginal volume, both directions, every good --
     /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
@@ -3503,8 +3532,21 @@ int64_t industry_points_crowding_q(const region& r, const works_registry* works)
 /// 1..`industry_points_crowding_k_max`): the caller refuses the conversion.
 int64_t industry_points_crowd_brake(const std::vector<region>& regions,
                                     std::vector<std::pair<int, int64_t>>& spread,
-                                    int64_t k, int64_t points_per_unit,
+                                    int64_t k, int64_t points_per_1000_units,
                                     const works_registry* works);
+
+/// BL-1298: the largest `industry_points_per_1000_treasury_units` may be set
+/// to (10^7, i.e. 10^4 points per unit, the old per-unit domain's ceiling).
+inline constexpr int64_t industry_points_per_1000_units_max = 10000000LL;
+
+/// BL-1298: the points @p units treasury units convert to at @p per_1000
+/// points per thousand units, floored, staged so it cannot overflow for
+/// units <= 2^48 (a treasury's own clamp) and per_1000 <= the max above:
+/// (units / 1000) x rate + ((units % 1000) x rate) / 1000.
+inline int64_t industry_points_for_treasury_units(int64_t units, int64_t per_1000)
+{
+    return (units / 1000) * per_1000 + ((units % 1000) * per_1000) / 1000;
+}
 
 /// What one round's scale accrual did.
 struct industry_points_round
@@ -4592,7 +4634,7 @@ struct history_sim_state
     /// open work filled at home, a conversion, not a move along a corridor).
     int64_t urbanisation_heads_within     = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
-    /// points above divided by `industry_points_per_treasury_unit`): the
+    /// points above at `industry_points_per_1000_treasury_units`): the
     /// observable for how hard paying in draws on the round's other spend.
     int64_t treasury_spent_on_industry    = 0;
     /// BL-1169: TREASURY UNITS the crowding brake left in capitals' purses

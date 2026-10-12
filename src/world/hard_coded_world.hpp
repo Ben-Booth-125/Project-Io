@@ -254,30 +254,56 @@ struct world_params
     int culture_profile_amenity_div = 4;
 
     /// BL-1298 -- THE HISTORY BANKS MORE (NATION_GENERATION.md sec Pass 7,
-    /// Ben 2026-10-11): the standing levy's per-mille share of the seats'
-    /// stores swept every round, and the endowment income rate, copied into
-    /// BOTH resumed spans' params by `exploration_sim_params`
-    /// (`history_sim_params::treasury_levy_per_mille_q` /
-    /// `treasury_endowment_income_q`). Fields here so `treasury_census` can
-    /// calibrate them on the shipped worlds. NOT ON THE SAVE SEAM, exactly as
-    /// the two above and flagged the same way: at the defaults a saved
-    /// descriptor rebuilds the identical world; a non-default value is a
-    /// tuning world that does not round-trip.
+    /// Ben 2026-10-11/12): the standing levy's per-mille share of the seats'
+    /// stores swept every round, the endowment income rate (per-mille of the
+    /// held ground's SUMMED endowment -- `history_sim_params::
+    /// treasury_endowment_summed`, which `exploration_sim_params` turns on),
+    /// the army sized to the earn, and the treasury's exchange rate into
+    /// industry points. Copied into the resumed spans by
+    /// `exploration_sim_params` / `industrialisation_sim_params`. Fields here
+    /// so `treasury_census` can calibrate them on the shipped worlds.
     ///
-    /// MEASURED (treasury_census, 16 library seeds, build-only median nation
-    /// opening in credits, levy 100): endowment 40 -> 87, 100k -> 221,
-    /// 300k -> 559, 600k -> 1,289, 1M -> 2,394. The levy SATURATES: at
-    /// endowment 300k, levy 25 / 100 / 250 -> 575 / 559 / 577, because the
-    /// seats' production, not the share, bounds what it sweeps (~111k cr in
-    /// Exploration, ~96k in Industrialisation, pooled). 100 (a tenth of the
-    /// stores a round) and 700,000 are the round values that land the median
-    /// in NATION_GENERATION.md sec Pass 7's 1,000-2,000 band.
+    /// THE SAVE: not written by the envelope (`w_world_params`), exactly as
+    /// the BL-1107 pair above. That is sound because these DEFAULTS ARE THE
+    /// SHIPPED VALUES: nothing in the app sets them, the envelope's
+    /// `world_params` is default-constructed before it is read, so a loaded
+    /// descriptor carries these values and rebuilds the world it was saved
+    /// from. Only a tuning world built off a non-default value fails to
+    /// round-trip. `app::same_world_params` compares all four, so the
+    /// wizard's world cache can never adopt a world built under another value.
+    ///
+    /// MEASURED (treasury_census, 16 library seeds, build-only pooled median
+    /// nation opening, credits; in-world ORDER = per-seed median Spearman of
+    /// each polity's 1200 fold against its close chest / top-3 folds among the
+    /// top-3 chests; main read 0.02 credits and 0.271 / 17 of 48).
+    ///   MEAN endowment (2026-10-11, levy 100): 300k -> 559 (0.286 / 19);
+    ///     700k -> 1,560 (0.218 / 14) -- the band reached, the order lost.
+    ///   SUMMED endowment (2026-10-12, levy 100): 20k -> 315 (0.593 / 27);
+    ///     50k -> 826 (0.553 / 27); 60k -> 938 (0.594 / 27); 75k -> 1,311
+    ///     (0.555 / 26); 90k -> 1,746 (0.572 / 26); 100k -> 2,190
+    ///     (0.588 / 25); 200k -> 5,152 (0.462 / 23). Levy alone: 87
+    ///     (0.597 / 21).
+    ///   The levy SATURATES (levy 25 / 100 at 75k: 1,332 / 1,315): the seats'
+    ///   production, not the share, bounds what it sweeps.
+    /// 100 (a tenth of the stores a round) and 80,000 land the pooled median
+    /// mid-band with the order better than main's.
     int treasury_levy_per_mille_q   = 100;
-    int treasury_endowment_income_q = 700000;
+    int treasury_endowment_income_q = 80000;
     /// ...and the standing army sized to the realm's earn (EXPLORATION.md sec
     /// Force persists now, Ben 2026-10-11). On in every shipped world; a field
-    /// only so the census can read the pre-ruling arm. Same seam note.
+    /// only so the census can read the pre-ruling arm.
     bool standing_army_sized_to_earn = true;
+    /// ...and the treasury's exchange rate into industry points in the
+    /// Industrialisation span, points per THOUSAND treasury units
+    /// (`history_sim_params::industry_points_per_1000_treasury_units`, whose
+    /// comment carries the rule: the treasury term the same order as the scale
+    /// term). MEASURED (treasury_census, endowment 75k, levy 100): the scale
+    /// term stands at 1.81e8 points over the library at every rate; the
+    /// treasury term reads 3.80e8 / 8.17e8 / 1.39e9 at 20 / 50 / 100 (share of
+    /// all points 0.68 / 0.82 / 0.89); at the old 1000 per unit it read 5.4e11
+    /// (endowment 100k, share 0.999), against main's 4.75e8 (share 0.73). 30 -- 0.03 points
+    /// per unit -- puts the share back near main's.
+    int64_t industry_points_per_1000_treasury_units = 30;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
 

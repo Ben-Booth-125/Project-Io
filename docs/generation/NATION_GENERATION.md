@@ -522,7 +522,7 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   the handoff. **The endowment is summed over the ground a realm holds, not averaged (Ben,
   2026-10-12)**, so a larger realm earns more and the inherited order holds: a flat per-realm
   endowment reached the band but scrambled which realms were richest. With real chests, the
-  treasury's conversion into industry points (`industry_points_per_treasury_unit`) is re-sized so
+  treasury's conversion into industry points (`industry_points_per_1000_treasury_units`, per thousand units since the rate fell below one point a unit) is re-sized so
   the treasury term is again the same order as the scale term. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
   the library, so it is not where the money goes.)
 - **Measured before the ruling** (`tools/verify/treasury_census.cpp`, 16 library seeds): 99.6% of
