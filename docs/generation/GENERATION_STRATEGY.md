@@ -290,7 +290,9 @@ passes, each step a recorded cause. A lean makes a pattern likely and promises n
 **Every pattern is tracked (Ben, 2026-10-10).** Each pattern has a **detector** — a predicate over the
 history record that proves the target was hit and names the polities it touched. The detector is
 both the gate and the record: the polities it names carry a **pattern tag** into the nation they
-fold into, and the nation selection card shows those tags, a short timeline of the nation's key
+fold into — **a realm that ends passes its tags to whoever ended it, and a successor carries its
+parent line's (Ben, 2026-10-12)**, so a pattern reaches the nation even when its realms died before
+1960 — and the nation selection card shows those tags, a short timeline of the nation's key
 events, and a link into the History ledger filtered to that nation (`../ui/STARTUP.md` § The seat).
 A world's history is told, as the Empires round's causes already are; it is never narrated over.
 ## The world descriptor — seed + generation parameters
