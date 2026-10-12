@@ -98,6 +98,10 @@ each is reconciled where it can be read:
   up the gap, and the event is recorded as a **state charter**. The gap is paid **in credits, at the
   specialist's real credit price** — the rate a corporation's charter costs — so a state charter is a
   visible expense on the treasury, never a nominal one (Ben, 2026-10-11).
+- **A champion the reconciliation must charter may take any land tile of its nation (Ben,
+  2026-10-12).** Where no placement window of the minor's centres holds ground, the champion is
+  placed on any land tile its nation holds, so the major target is hit; it may open with weaker
+  holdings. Ordinary chartering keeps its windows.
 - **The target outranks the floor (Ben, 2026-10-11).** Where no secession can leave both sides
   above the minimum territory, the closing rounds still split a province, choosing the split that
   leaves the smallest shortfall, so the total is always hit. A nation below the floor is the cost of

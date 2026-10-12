@@ -146,6 +146,7 @@ struct reading
     int      ind_end         = 0;
     int      recon_total_in  = 0; ///< total-reconciliation events inside the span
     int      recon_major_in  = 0; ///< major-reconciliation events inside the span
+    int      majors_pre      = 0; ///< majors just before reconcile_majors in THIS build (the gap E-major reads)
     int      recon_outside   = 0; ///< either kind dated outside the span (a defect)
     int      closing_steps   = 0; ///< the closing rounds' own steps (absorptions + secessions)
     int      subfloor        = 0; ///< secessions taken below the floor (the target outranks it)
@@ -193,7 +194,8 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
     world w = make_hard_coded_world(p, &rep, dl.cfg, nullptr, &dl.works, &fx);
     const auto t1 = std::chrono::steady_clock::now();
     recipe_registry seed_reg = dl.reg; // the worker's copy, banded inside the finish
-    (void)finish_campaign_world(w, rep, seed_reg, p, dl.cfg, nullptr);
+    const finish_campaign_result fin = finish_campaign_world(w, rep, seed_reg, p, dl.cfg, nullptr);
+    r.majors_pre = fin.majors.natural; // the majors the reconciliation found, after the history's total moved them
     const auto t2 = std::chrono::steady_clock::now();
     r.build_s  = std::chrono::duration<double>(t1 - t0).count();
     r.finish_s = std::chrono::duration<double>(t2 - t1).count();
@@ -378,7 +380,14 @@ int main(int argc, char** argv)
             const bool m_ok  = r.majors == mt;
             const bool et_ok = r.closing_ran && r.recon_total_in == r.closing_steps
                             && r.closing_steps == r.closing_delta && r.recon_outside == 0;
-            const bool em_ok = r.recon_major_in >= gap_m && r.recon_outside == 0;
+            // E-major reads the gap the reconciliation itself faced: the
+            // history's total corrections absorb or split majors first, so the
+            // natural build's count is the wrong reference (measured 2026-10-12:
+            // 47 false misses on the 16 x 9 grid).
+            const int  gap_pre = r.majors_pre > mt ? r.majors_pre - mt : mt - r.majors_pre;
+            (void)gap_m;
+            const bool em_ok = mt == 0 || (r.recon_major_in == gap_pre && r.recon_outside == 0)
+                            || (r.handoff_invalid && r.recon_major_in < gap_pre);
             const bool e_ok  = et_ok && em_ok;
             const bool h_ok  = !r.handoff_invalid;
             checks += 4;
@@ -387,7 +396,7 @@ int main(int argc, char** argv)
                         "E events total %d/steps %d/delta %d %s major %d/%d %s outside %d  H %s%s  subfloor %d  [%.0f+%.0f s]\n",
                         (t_ok && m_ok && e_ok && h_ok) ? "PASS" : "FAIL", seed, tt, mt, r.total, nat.total,
                         t_ok ? "ok" : "MISS", r.majors, nat.majors, m_ok ? "ok" : "MISS", r.recon_total_in,
-                        r.closing_steps, r.closing_delta, et_ok ? "ok" : "MISS", r.recon_major_in, gap_m,
+                        r.closing_steps, r.closing_delta, et_ok ? "ok" : "MISS", r.recon_major_in, gap_pre,
                         em_ok ? "ok" : "MISS", r.recon_outside, h_ok ? "ok" : "VIOLATION ",
                         h_ok ? "" : r.handoff_violation.c_str(), r.subfloor, r.build_s, r.finish_s);
             std::fflush(stdout);
