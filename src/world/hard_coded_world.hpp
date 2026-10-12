@@ -837,6 +837,18 @@ struct generation_report
         std::vector<int32_t>   nation_absorbed_count;
         std::vector<int32_t>   nation_absorbed;
 
+        /// BL-1286 (history pattern detectors; GENERATION_STRATEGY.md sec History
+        /// patterns) — per nation, parallel to `nation_ids`: the PATTERN TAGS its
+        /// realm and the realms folded into it carried, a mask of
+        /// `history_pattern_bit` (history_pattern_detectors.hpp). Read by the nation card
+        /// (STARTUP.md sec The seat), never by the world. DERIVED, NOT
+        /// SERIALISED: it is a pure function of the records above (the four
+        /// time-lapses, the settlement and the fold's arrays), all of which the
+        /// save carries, so `fill_history_pattern_tags` fills it at generation
+        /// and `r_body_entry` re-derives it on load — no stream byte moves and
+        /// `save_game_version` does not. Empty wherever the fold arrays are.
+        std::vector<uint8_t>   nation_pattern_tags;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276
@@ -1038,6 +1050,12 @@ struct generation_report
     bool        handoff_invalid = false;
     std::string handoff_violation;
 };
+
+/// BL-1286: run the history-pattern detectors over @p be's own records and fold
+/// their tags onto its nations (`body_entry::nation_pattern_tags`). Pure in
+/// everything but @p be's tag vector; a body with no fold record gets none. The
+/// ONE derivation both generation and a save load call.
+void fill_history_pattern_tags(generation_report::body_entry& be);
 
 /// Construct and return a world populated with the prototype's authored bodies.
 ///

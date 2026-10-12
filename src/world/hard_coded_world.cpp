@@ -19,6 +19,7 @@
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
 #include "market_fold.hpp"      // BL-1125: markets can die
+#include "history_pattern_detectors.hpp"  // BL-1286: the pattern tags on the report
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -63,6 +64,21 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
 }
 
 } // namespace
+
+// BL-1286: declared in hard_coded_world.hpp. Generation calls it beside the
+// fold record; `r_body_entry` (save_game.cpp) calls it after a load, so the
+// derived tags never cross the save stream.
+void fill_history_pattern_tags(generation_report::body_entry& be)
+{
+    be.nation_pattern_tags.clear();
+    if (be.nation_polity.empty()) return;
+    const history_pattern_reading reading = detect_history_patterns(
+        be.prehistory_timelapse, be.exploration_timelapse, be.industrialisation_timelapse,
+        be.settlement, be.tiles.gw);
+    be.nation_pattern_tags = fold_history_pattern_tags(reading, be.nation_polity,
+                                                       be.nation_absorbed_first,
+                                                       be.nation_absorbed_count, be.nation_absorbed);
+}
 
 // THE MIGRATION'S OWN RECORD, declared in hard_coded_world.hpp: the wizard's
 // Culture round lifts it off a finished report under --verify (BL-919), so it
@@ -2449,6 +2465,7 @@ void run_tail(generation_cursor& c)
                 be.nation_absorbed_first = kepler_fold.absorbed_first;
                 be.nation_absorbed_count = kepler_fold.absorbed_count;
                 be.nation_absorbed       = kepler_fold.absorbed;
+                fill_history_pattern_tags(be); // BL-1286: record-only, reads the four records above
                 break;
             }
 
