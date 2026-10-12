@@ -792,7 +792,10 @@ peaks of 25 to 41 percent across the library).
 **The fall acts on the map (Ben, 2026-10-12).** The breakdown is pressed by changes a player can see:
 the overextended realm's roads and works decay — their reach relief falls on the ground itself — and
 its far garrisons thin, so the supply that fails and the regions that secede have a visible cause.
-No private price is paid by this realm alone. The rise keeps its recorded lean — appetite, the
+No private price is paid by this realm alone. **Bare ground relays no supply for the falling realm
+(Ben, 2026-10-13):** held ground its garrisons have left carries no supply onward in its reach walk,
+so a thinned outer march really cuts the network and the ground beyond it secedes. Decay alone left
+compact realms supplied (8 of 16 seeds halved), because supply falls with reach steps, not with roads. The rise keeps its recorded lean — appetite, the
 defensive rally, cohesion on conquest — as the sanctioned exception the targeted pattern is, each step
 a recorded event. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
 only walking away; the deaths are soldiers', plus the famine and displacement mechanism
