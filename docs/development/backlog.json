@@ -1031,6 +1031,28 @@
    "design": "RULED (Ben, 2026-10-11): NATION_GENERATION.md § Pass 7. The median nation opens on 0.41 credits (22 of 38 under one, reference seed, NR-912) at the 0.01 per-mille conversion, so state charters (BL-1278) go unpaid - treasuries covered 3,108 of 7,028 credits owed across the majors grid. Lever: polities earn and keep more across the spans (not a bigger conversion, not a handoff reserve); no pre-game debt. OPEN, by measurement: which earnings (levy, tribute, trade, works) and how much; the target opening distribution (e.g. median nation >= N quarters of levy); its effect on garrison sizing and contract funding, which scale off treasury. A world-mover: measure, re-bless with Ben's go. Until it lands, a short treasury pays what it holds and the champion opens poorer. RULED (Ben, 2026-10-11, the treasury form): median nation opens on 1,000-2,000 credits (for now); lift the floor and keep the order (poor gain most, rich stay richest); levers = earn more (trade, endowment, corridor income) and keep more (less treasury -> industry points in Industrialisation). MEASURE FIRST: tools/verify/treasury_census.cpp (in progress). RULED on the census (Ben, 2026-10-11): income = a standing levy sweeping the seats' stores into the chest every round + endowment income rescaled so small realms earn; the standing army is sized to what the realm earns (overturns NR-878 for the army; EXPLORATION.md § Force persists now); \"keep more\" dropped. Census: tools/verify/treasury_census.cpp (merged b1fca210). Build: calibrate the levy share and endowment rate so the median nation opens on 1,000-2,000 credits with the order kept; report movement; re-bless with Ben's go."
   },
   {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-12",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-12, \"consider what the wait period is caused by\"); filed by Claude",
+   "id": "BL-1299",
+   "short_name": "DELIVERY_THROUGHPUT",
+   "category": "Tooling",
+   "priority": "M",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DELIVERY.md",
+   "requires": [],
+   "files": [
+    "docs/development/DELIVERY.md",
+    ".claude/agents/code-reviewer.md"
+   ],
+   "title": "Cut the delivery loop's waits beyond the parallel gates: a review checklist in every build brief, a blocker pass before building, one heavy run per machine",
+   "design": "FUTURE WORK (Ben, 2026-10-12: build the parallel runner and the two tiers now - done 48a82109 - and consider the others later). (1) Fewer fix rounds: sprint 53's cold reviews repeatedly caught the same classes - replay drift (resume pointers), money conservation, dangling ids after removing an entity, silent target misses, save-format notes, stale prose/event text. Put that checklist in every Full-mode build brief so agents self-check before reporting, and keep the cold reviewer for seam-touching work. (2) Settle calls before building: five sprint-53 builds stopped mid-way on a design conflict (floor vs target, empty treasuries, no free tile, the order vs the band, sea-legs premise); a short pre-build \"what could block this\" pass in planning surfaces them in one form. (3) A machine queue: concurrent agents running heavy harnesses slowed each other (a 16-seed grid took 16 h); serialise heavy runs per machine (a lock file the par-seeds runner and build_lua_harness respect). Measure each against sprint 53's timings."
+  },
+  {
    "status": "designed",
    "glyph": "✓",
    "sprint": 53,
