@@ -1553,6 +1553,21 @@ int64_t take_countryside(region& p, int64_t heads);
 /// farm-fed people's ceiling is unchanged.
 void settle_urban_migrants(region& p, int64_t heads);
 
+/// BL-1290 (civil war deaths): the refugees region @p p can FEED — its
+/// farm-fed ceiling less its farm-fed people, never below zero.
+int64_t refugee_room(const region& p);
+
+/// BL-1290: land up to @p heads REFUGEES in region @p p's countryside as
+/// FARM-FED heads, never more than `refugee_room` — so the region's next
+/// demography step clamps none of them away. Returns the heads landed; the
+/// caller removes exactly that many from the region they fled, so people are
+/// conserved. NO CEILING MOVES, on either end, unlike the urbanisation stream's
+/// pair (`take_countryside` / `settle_urban_migrants`, NR-958): the ground a
+/// war emptied keeps its farmland and regrows, and a fought-over region is
+/// never left permanently at a lowered ceiling. Not industrial heads, not in
+/// the centres — a flight is not the stream.
+int64_t settle_refugees(region& p, int64_t heads);
+
 /// The manpower ceiling a region's CURRENT population can support — a
 /// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a
 /// region cannot bank more than its living population could ever field.

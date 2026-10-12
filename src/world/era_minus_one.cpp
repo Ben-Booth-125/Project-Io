@@ -317,6 +317,18 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // And the defect its loop exposed: a region taken this round is measured
     // by its new holder before it can secede from it (history_sim.hpp).
     hp.secession_waits_for_holder = true;
+
+    // BL-1290 (civil war deaths) -- THIS ROUND'S ALONE (MILITARY_HISTORY.md sec
+    // Armies are distinct from population, Ben 2026-10-12: the civil war is an
+    // Empires pattern; the ruling's exception does not reach Exploration, and
+    // Industrialisation's war deaths are their own mechanism). Per mille of a
+    // fought-over region's people per year of the round: famine 10, flight 15
+    // -- 40 and 60 per mille a 4-year round, capped at 150 each, at most once a
+    // round. Placeholder magnitudes on the same footing as the w_* weights: a
+    // region struck every round of a fifty-year war keeps about half its
+    // people, so a civil war SHOWS on the population map without emptying it.
+    hp.civil_war_famine_q = 10;
+    hp.civil_war_flight_q = 15;
     return hp;
 }
 

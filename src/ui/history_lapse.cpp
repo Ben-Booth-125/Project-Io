@@ -1262,11 +1262,11 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
 
     // BL-1118: which event kinds the record carries -- the layer predicates
     // that hang on a kind read one bit per frame (`lapse_layers_drawn`).
-    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 32,
-                  "event_kinds is a 32-bit mask over lapse_event_kind");
+    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 64,
+                  "event_kinds is a 64-bit mask over lapse_event_kind");
     h.event_kinds = 0;
     for (const lapse_event& e : h.lapse.events)
-        if (e.kind < 32) h.event_kinds |= 1u << e.kind;
+        if (e.kind < 64) h.event_kinds |= std::uint64_t{1} << e.kind;
 
     // --- The terrain base, baked once (BL-915) -------------------------------
     //
@@ -1781,7 +1781,7 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h)
     lapse_layer_set s;
     if (!h.derived()) return s;
     const auto kind = [&](lapse_event_kind k) {
-        return ((h.event_kinds >> static_cast<unsigned>(k)) & 1u) != 0;
+        return ((h.event_kinds >> static_cast<unsigned>(k)) & std::uint64_t{1}) != 0;
     };
 
     // THE EMPIRES CUT (Ben, 2026-09-25, walking round 4: "the Empires round
@@ -5180,6 +5180,19 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
             std::snprintf(buf, sizeof buf, "The overreach of %s deepens; more of its ground slips from %s.",
                           polity_name_of(h, e.polity), R);
         break;
+    case lapse_event_kind::civil_war_famine:
+        // BL-1290 (MILITARY_HISTORY.md sec Armies are distinct from
+        // population): the ground a civil war is fought over starves. `polity`
+        // held it when the halves fought; `other` is the half that attacked.
+        std::snprintf(buf, sizeof buf, "Famine grips %s as %s and %s fight their civil war.",
+                      R, polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::civil_war_flight:
+        // BL-1290: and its people flee to the nearest safe ground of their own
+        // kin; `other` is that destination REGION, not a polity.
+        std::snprintf(buf, sizeof buf, "Refugees flee the civil war at %s for %s.",
+                      R, region_name_of(h, e.other));
+        break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5250,6 +5263,10 @@ int ticker_priority(const lapse_event& e)
     // BL-1095: a wet campaign fires as often as the corridors do; the map's
     // sail is its mark, and the ticker names it only when the arc is quiet.
     case lapse_event_kind::sea_leg_campaign:     return 2;
+    // BL-1290: the famine is the civil war's moment on the ticker (common
+    // tier); the flight beside it names where the people went, and takes the
+    // ticker only when the arc is quiet -- the map is its primary telling.
+    case lapse_event_kind::civil_war_flight:     return 2;
     default:                                     return 1;
     }
 }

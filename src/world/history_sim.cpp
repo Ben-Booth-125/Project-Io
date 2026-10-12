@@ -4695,6 +4695,126 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t next_decision = params.start_year;
     int     step_years    = step_for_year(params, params.start_year);
 
+    // ---- BL-1290 (civil war deaths) ------------------------------------------
+    //
+    // MILITARY_HISTORY.md sec Armies are distinct from population (Ben,
+    // 2026-10-10/11/12). A civil war kills soldiers in its battles as any war
+    // does; what it ADDS is a famine and a flight on the ground it is fought
+    // over, authored here as such and recorded as such -- never a coefficient
+    // inside `resolve_battle`, whose losses stay on the armies alone.
+    //
+    // THE HALVES. A successor (secession or schism) is a civil-war half when,
+    // read the moment its block moved, it holds at least
+    // `civil_war_min_regions` regions and at least `civil_war_min_share_q` per
+    // mille of what its parent kept (CIVILISATION.md, "What counts as one").
+    // Recorded in birth order; read by the battle site below, which treats a
+    // battle between the two halves inside `civil_war_window_years` of the
+    // split as the civil war being fought over the target region.
+    struct civil_war_halves { int child; int parent; int64_t year; };
+    std::vector<civil_war_halves> civil_war_pairs;
+    const bool civil_war_on = params.civil_war_famine_q > 0 || params.civil_war_flight_q > 0;
+    // Per region, the decision year it was last struck / last a battle target.
+    // Grown on demand: the founding schedule appends regions mid-span.
+    std::vector<int64_t> civil_war_struck_year;
+    std::vector<int64_t> battle_target_year;
+    const auto year_slot = [&](std::vector<int64_t>& v, std::size_t i) -> int64_t& {
+        if (v.size() <= i) v.resize(std::max(ss.regions.size(), i + 1), INT64_MIN);
+        return v[i];
+    };
+    const auto note_civil_war_split = [&](int child, int parent) {
+        if (!civil_war_on || child < 0 || parent < 0) return;
+        int child_n = 0, parent_n = 0;
+        for (std::size_t i = 0; i < owner.size(); ++i)
+        {
+            if (owner[i] == child) ++child_n;
+            else if (owner[i] == parent) ++parent_n;
+        }
+        if (child_n < params.civil_war_min_regions || parent_n <= 0) return;
+        if (static_cast<int64_t>(child_n) * 1000
+            < static_cast<int64_t>(parent_n) * params.civil_war_min_share_q) return;
+        civil_war_pairs.push_back({child, parent, event_year});
+        ++out.civil_wars;
+    };
+    // A battle at region @p ti between @p attacker and @p defender, this
+    // decision round. Marks the target, and -- when the two are civil-war
+    // halves inside the window -- strikes the region once this round: famine
+    // first (the dead leave their food, so the ground regrows), then flight
+    // of the survivors to the nearest SAFE region of the same people: held,
+    // land, settled, its plurality the struck region's, not the attacker's,
+    // and neither struck nor a battle target this round. Nearest by region
+    // distance, ties on the lower index -- one destination, named in the record.
+    const auto strike_civil_war = [&](int ti, int attacker, int defender, int64_t yr, int round_years) {
+        if (ti < 0 || static_cast<std::size_t>(ti) >= ss.regions.size()) return;
+        year_slot(battle_target_year, static_cast<std::size_t>(ti)) = yr;
+        if (!civil_war_on || attacker < 0 || defender < 0 || attacker == defender) return;
+        bool civil = false;
+        for (const civil_war_halves& cw : civil_war_pairs)
+        {
+            const bool pair = (cw.child == attacker && cw.parent == defender)
+                           || (cw.child == defender && cw.parent == attacker);
+            if (pair && yr - cw.year <= params.civil_war_window_years) { civil = true; break; }
+        }
+        if (!civil) return;
+        int64_t& struck = year_slot(civil_war_struck_year, static_cast<std::size_t>(ti));
+        if (struck == yr) return; // once per region per round: the per-year bound
+        struck = yr;
+        region& r = ss.regions[static_cast<std::size_t>(ti)];
+        if (r.population <= 0) return;
+        ++out.civil_war_strikes;
+        const int64_t yrs = clampi64(round_years, 1, 1000);
+        const int cap_q = clampi(params.civil_war_round_cap_q, 0, 1000);
+        const int famine_q = static_cast<int>(clampi64(params.civil_war_famine_q * yrs, 0, cap_q));
+        const int flight_q = static_cast<int>(clampi64(params.civil_war_flight_q * yrs, 0, cap_q));
+
+        const int64_t dead = remove_region_people(r, (r.population * famine_q) / 1000);
+        if (dead > 0)
+        {
+            out.civil_war_famine_dead += dead;
+            note_event(lapse_event_kind::civil_war_famine, ti, defender, attacker);
+        }
+
+        const int people = r.culture.plurality();
+        int dest = -1, dest_d = 1 << 30;
+        if (people >= 0 && flight_q > 0)
+            for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+            {
+                if (static_cast<int>(i) == ti) continue;
+                if (owner[i] < 0 || owner[i] == attacker) continue;
+                const region& d = ss.regions[i];
+                if (d.domain != region_domain::land || d.population <= 0) continue;
+                if (d.culture.plurality() != people) continue;
+                if (year_slot(battle_target_year, i) == yr) continue;
+                if (year_slot(civil_war_struck_year, i) == yr) continue;
+                if (refugee_room(d) <= 0) continue; // safe, and able to feed them
+                const int dd = region_distance(r, d, gw);
+                if (dd < dest_d) { dest_d = dd; dest = static_cast<int>(i); }
+            }
+        if (flight_q > 0 && dest < 0) ++out.civil_war_no_refuge;
+        if (dest >= 0)
+        {
+            region& d = ss.regions[static_cast<std::size_t>(dest)];
+            const int64_t d_before = d.population;
+            // Landed first, so the source loses exactly the heads the refuge
+            // could feed: the flight is bounded by the share AND by the room.
+            const int64_t fled = settle_refugees(d, (r.population * flight_q) / 1000);
+            if (fled > 0)
+            {
+                remove_region_people(r, fled);
+                // The arrivals are the struck region's own plurality share of
+                // the fled; their people's weight in the destination's mix
+                // rises by their fraction of its new count.
+                const int64_t arrive_q = (fled * 1000) / (d_before + fled);
+                const int     mix_q    = static_cast<int>(
+                    (arrive_q * r.culture.share_of(people)) / 1000);
+                if (mix_q > 0) d.culture.shift_toward(people, mix_q);
+                out.civil_war_fled += fled;
+                note_event(lapse_event_kind::civil_war_flight, ti, defender, dest);
+            }
+        }
+        // The ceiling a smaller people can field fell with it; nothing is replenished here.
+        r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+    };
+
     // BL-953 -- THE ROUND'S LIVE CULTURAL PREFERENCE (EXPLORATION.md sec
     // Preference is read LIVE). Derived AT MOST ONCE per decision round, from
     // that round's own regions/contacts/polities, and read by every campaign
@@ -8530,6 +8650,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
 
+                // BL-1290: the ground a civil war is fought over starves and
+                // flees -- after the battle, never inside it, and before any
+                // conquest moves the flag, so the record names the holder the
+                // fight was over. A no-op for every other battle (it only
+                // marks the target, which the flight's "safe" test reads).
+                strike_civil_war(static_cast<int>(ti), q.id, dq ? dq->id : -1, y, step_years);
+
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
                 //
                 // A ground-down frontier eventually gives (BL-308): the bar a
@@ -9509,6 +9636,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     raise_grudge(qid, np.id, grudge_kind::ground_taken,
                                  seat, y, params.grudge_ground_taken);
 
+                    note_civil_war_split(np.id, qid); // BL-1290: a half, or a city state walking off?
                     ++out.secessions;
                     out.regions_seceded += static_cast<int64_t>(block.size());
                     out.secession_piece_sizes.push_back(static_cast<int32_t>(block.size())); // BL-926
@@ -9938,6 +10066,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         raise_grudge(qid, np.id, grudge_kind::faith_sundered,
                                      seat, y, params.grudge_ground_taken);
 
+                        note_civil_war_split(np.id, qid); // BL-1290: the detector reads a schism as a split too
                         ++out.schisms;
                         out.regions_sundered += static_cast<int64_t>(block.size());
                         out.history.push_back(history_event{
