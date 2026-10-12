@@ -721,6 +721,9 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         if (first < 0 || count < 0 || first + count > static_cast<int64_t>(b.nation_absorbed.size()))
             return false;
     }
+    // BL-1286: the pattern tags are DERIVED from what was just read, never
+    // written -- re-derived here so a loaded report carries what generation's did.
+    fill_history_pattern_tags(b);
     return true;
 }
 
