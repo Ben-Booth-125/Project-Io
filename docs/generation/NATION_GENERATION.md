@@ -350,6 +350,13 @@ table for that case alone — a region with no name at all would be worse than o
 register. That is a degenerate-input guard, not a second naming system.
 
 
+**A realm's name is length-capped** (Ben, 2026-10-13), so a nation's full name fits the lists
+that print it — the Market ledger's nation list is the binding one, at 3/5 of the fold-out
+column. `coin_realm_name` tries its three forms and returns the first within the cap, falling
+back to the bare name, which is always within it; the cap is a constant beside the coiner. The
+coiner stays a pure function of tongue and salt, so the cap changes names and nothing else —
+no draw moves, no digest moves.
+
 **A nation inherits its founding realm's name, verbatim** (Ben, 2026-09-24, superseding the
 lowest-indexed-seed rule). A realm is named **once, at its founding**, in the tongue of the culture
 of the region it was founded on — `polity::name`, coined by `coin_lexicon` over that culture's

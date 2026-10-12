@@ -1197,6 +1197,98 @@
    ],
    "title": "The bottom strip grows ~20 px: the minimap widens 27 px at 4:3 and the band follows",
    "design": "DESIGNED (Ben, 2026-10-13): MINIMAP.md § Sizing and placement, mm_w = max(336, 0.28 x min) + 27. selection_band_height derives from it, so the comms dock and Selection band grow with it; the band narrows by the same 27 px. Check every bottom-strip and right-column surface at 1720x1080 and 1280x720 for clipping. Needs a live look."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
+   "requires": [],
+   "id": "BL-1303",
+   "short_name": "MARKET_NAMES_UNIQUE",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/ui/market_ledger.cpp"
+   ],
+   "title": "Markets read the body's name and share it: name each market for the largest city in its catchment",
+   "design": "DEFECT (Ben, 2026-10-13: many markets share one name, the body's). Likely cause: market_city_name matches population_centre_tile == mc.centre_tile, but generation sets centre_tile to trade_flow_proxy_site(...) or a capital shell's anchor_tile, which is not the centre's own tile, so the lookup misses and falls back to body_label. Rule now written in MARKETS.md § Market centres and seeding: name = the largest population centre whose tile clears to the market (market_for_tile); fallback '<body> market N', N by ascending market id, never the bare body name. UI-side only, no save change. Confirm the cause first; count distinct names per seed before and after."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
+   "requires": [
+    "BL-1303"
+   ],
+   "id": "BL-1304",
+   "short_name": "MARKET_LABELS_ON_CANVAS",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/PLANETARY.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "title": "Each market's name is drawn on its market city: the city label gains a market glyph",
+   "design": "DESIGNED (Ben, 2026-10-13): PLANETARY.md § Market labels. The city that names a market (BL-1303's rule) draws its existing settlement label with a small market glyph before it; same layer, LOD and culling. Needs a live look."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
+   "requires": [],
+   "id": "BL-1305",
+   "short_name": "MARKET_LEDGER_TOP_SECTION",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/ledgers/market.md",
+   "files": [
+    "src/ui/market_ledger.cpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/ui_elements.json",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The Market ledger's top section: nations by full name (3/5) beside stacked metrics (2/5); goods rows condensed to 2/5",
+   "design": "DESIGNED (Ben, 2026-10-13): ledgers/market.md § 2. Top section ~2/7 of column height, tabs ~5/7. Left 3/5: nations_in_market as a list of swatch + full name (replaces the initials chip row). Right 2/5, stacked: Sold here, Traded in, Traded out — values per quarter, from the clearing and trade records (find the existing reads; derive nothing the records cannot support, and say so if a figure has no source). Goods rows: 0.4 x the old 10-row height, floored at one frame height; retire the market_goods_rows dial if nothing else uses it. Needs a live click at 1920x1080."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
+   "requires": [],
+   "id": "BL-1306",
+   "short_name": "NATION_NAME_CAP",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/tongue.cpp",
+    "src/world/tongue.hpp"
+   ],
+   "title": "Realm (and so nation) names are length-capped so a full name fits a list",
+   "design": "DESIGNED (Ben, 2026-10-13): NATION_GENERATION.md § Pass 5. coin_realm_name returns the first of its three forms within the cap, else the bare name. Measure first: the name-length distribution over the 16 library seeds (realm_names_check or a small harness). Cap value pending NR-1045 (recommended 20 chars). Must move no digest: run world_determinism and history_sim_harness before and after."
   }
  ]
 }

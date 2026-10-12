@@ -61,7 +61,11 @@ markets anchor to population-centre tiles, and how finely a nation's territory f
 markets follows its tradeable-resource concentration — a resource-rich nation admits smaller
 centres (more markets), a barren one folds into its neighbour's. One pass at world-gen,
 deterministic, with a seeded jitter on the borderline. If no centre qualifies, one unanchored
-fallback market is seeded. The home body carries many markets, and *no single one of them stands
+fallback market is seeded. **A market's name is its anchoring city's name** — the largest
+population centre whose tile clears to that market (`market_for_tile`), so two markets on one
+body never share a name. The body's name is not a market name: a market with no centre in its
+catchment reads as *<body> market N*, N by ascending market id, and never as the bare body name.
+The home body carries many markets, and *no single one of them stands
 for the body*.
 
 **A living polity's capital carries a market, priced at a premium (Ben, 2026-09-23).** The Era −1

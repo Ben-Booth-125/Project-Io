@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 26 open, 0 resolved.*
+*27 entries — 27 open, 0 resolved.*
 
 ---
 
@@ -244,6 +244,21 @@ Written into SELECTION.md: (1) Selecting a building by any route keeps selected_
 > **Recommendation:** Accept. Also note the tile card is ~260 px wide at 1720x1080, so the expanded profitability charts get about 60% of their old width; the live click will show whether that reads.
 
 *Files: `docs/ui/SELECTION.md`*
+
+### NR-1045 — Sprint 54 market pass: the nation-name cap value and four calls taken filling gaps
+*decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1303..BL-1306, the market notes)*
+
+(1) Nation-name cap: 20 characters recommended. The nation list's name column is ~205 px (3/5 of a 384 px column, less the swatch), about 29 average glyphs at the UI font; 20 leaves room for a wide-glyph name. BL-1306 measures the real distribution first and reports how many names the cap shortens. (2) Market metrics are VALUES per quarter (Sold here, Traded in, Traded out), not quantities — goods of different kinds do not add. (3) The canvas market label is the city's existing label with a market glyph, not a second label. (4) A market with no city in its catchment reads '<body> market N', never the bare body name. (5) The nation list replaces the initials chip row outright.
+
+**Why it matters.** (1) renames every nation whose name runs over; (2) decides what the metrics column can claim.
+
+- Accept all, cap 20
+- Accept with a different cap
+- Overturn any by number
+
+> **Recommendation:** Accept, cap 20 — revisit after BL-1306's measurement if it shortens more than a quarter of names.
+
+*Files: `docs/ui/ledgers/market.md`, `docs/generation/NATION_GENERATION.md`, `docs/economy/MARKETS.md`, `docs/ui/PLANETARY.md`*
 
 ---
 
