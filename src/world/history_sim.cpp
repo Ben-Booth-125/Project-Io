@@ -10016,13 +10016,51 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 if (y >= rise_fall_pick_year)
                 {
-                    // THE FRONT-RUNNER: the largest share, ties to the lower id.
-                    int best = -1, best_pm = -1;
+                    // THE FRONT-RUNNER: the largest share, ties to the lower id
+                    // -- unless it is BOXED (Ben, 2026-10-12, CIVILISATION.md
+                    // sec How an empire actually falls, "A boxed front-runner
+                    // gives way"). Its REACHABLE GROUND is the component of its
+                    // capital in the campaign graph (`neighbours`, the only
+                    // edges a campaign or an Organise can walk), counted in
+                    // regions of any holder; it can hold the floor when that
+                    // count is at least the floor's share of the world's held
+                    // regions now. Where the largest cannot, the rise falls to
+                    // the largest realm whose ground can -- candidates walked
+                    // by share descending, ties to the lower id. Where none
+                    // can, the largest is kept and the miss is recorded.
+                    const auto reachable_regions = [&](int pid) -> int {
+                        const int cap = out.polities[static_cast<std::size_t>(pid)].capital;
+                        std::vector<char> seen(neighbours.size(), 0);
+                        std::vector<int> stack{ cap };
+                        int comp = 0;
+                        while (!stack.empty())
+                        {
+                            const int r = stack.back(); stack.pop_back();
+                            if (r < 0 || static_cast<std::size_t>(r) >= seen.size() || seen[static_cast<std::size_t>(r)]) continue;
+                            seen[static_cast<std::size_t>(r)] = 1; ++comp;
+                            for (int n : neighbours[static_cast<std::size_t>(r)]) stack.push_back(n);
+                        }
+                        return comp;
+                    };
+                    const auto can_hold_floor = [&](int comp) {
+                        return static_cast<int64_t>(comp) * 1000 >= static_cast<int64_t>(rise_fall_floor_pm) * total;
+                    };
+                    std::vector<std::pair<int, int>> ranked; // (-share, id): share descending, ties to the lower id
                     for (std::size_t pi = 0; pi < held_by.size(); ++pi)
+                        if (held_by[pi] > 0) ranked.push_back({ -share_pm(static_cast<int>(pi)), static_cast<int>(pi) });
+                    std::sort(ranked.begin(), ranked.end());
+                    int best = -1, best_pm = -1, best_room = 0;
+                    const int largest = ranked.empty() ? -1 : ranked.front().second;
+                    for (const auto& rk : ranked)
                     {
-                        if (held_by[pi] <= 0) continue;
-                        const int s = share_pm(static_cast<int>(pi));
-                        if (s > best_pm) { best_pm = s; best = static_cast<int>(pi); }
+                        const int room = reachable_regions(rk.second);
+                        if (!can_hold_floor(room)) continue;
+                        best = rk.second; best_pm = -rk.first; best_room = room;
+                        break;
+                    }
+                    if (best < 0 && largest >= 0)
+                    {
+                        best = largest; best_pm = -ranked.front().first; best_room = reachable_regions(largest);
                     }
                     if (best < 0)
                     {
@@ -10031,6 +10069,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     else
                     {
+                        if (best != largest)
+                        {
+                            // THE GIVE-WAY, recorded: who was boxed, and why.
+                            const polity& bq = out.polities[static_cast<std::size_t>(largest)];
+                            const std::string bseat = (bq.capital >= 0 && static_cast<std::size_t>(bq.capital) < ss.regions.size())
+                                                        ? ss.regions[static_cast<std::size_t>(bq.capital)].name : std::string{};
+                            const std::string bwho = bq.name.empty() ? bseat : bq.name;
+                            out.history.push_back(history_event{
+                                years_from_calendar_year(y), chain_stage::legacy,
+                                bwho + " leads the world from " + bseat
+                                    + ", but its reachable ground cannot hold an empire",
+                                std::string{}});
+                            out.rise_fall_boxed_realm = largest;
+                            out.rise_fall_boxed_room  = reachable_regions(largest);
+                        }
                         rf_realm      = best;
                         rf_phase      = 1;
                         rf_start_pm   = best_pm;
@@ -10039,22 +10092,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         rf_peak_year  = rf_pre_peak_year[static_cast<std::size_t>(best)];
                         rf_rise_level = 1;
                         rf_note_level(true, rf_rise_level, y);
-                        // REPORT-ONLY: the ground its campaigns can ever reach --
-                        // the component of its capital in the campaign graph.
-                        {
-                            std::vector<char> seen(neighbours.size(), 0);
-                            std::vector<int> stack{ rf_realm >= 0 ? out.polities[static_cast<std::size_t>(rf_realm)].capital : -1 };
-                            int comp = 0;
-                            while (!stack.empty())
-                            {
-                                const int r = stack.back(); stack.pop_back();
-                                if (r < 0 || static_cast<std::size_t>(r) >= seen.size() || seen[static_cast<std::size_t>(r)]) continue;
-                                seen[static_cast<std::size_t>(r)] = 1; ++comp;
-                                for (int n : neighbours[static_cast<std::size_t>(r)]) stack.push_back(n);
-                            }
-                            out.rise_fall_room_regions = comp;
-                            out.rise_fall_room_total   = static_cast<int32_t>(total);
-                        }
+                        out.rise_fall_room_regions = best_room;
+                        out.rise_fall_room_total   = static_cast<int32_t>(total);
                     }
                 }
             }

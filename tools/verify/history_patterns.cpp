@@ -110,7 +110,8 @@ struct row
     // RF
     int rf_polity = -1, rf_start_q = 0, rf_peak_q = 0, rf_margin_x100 = 0, rf_peak_year = 0, rf_peak_frac_pm = 0;
     int rf_captures = 0, rf_fall_years = -1, rf_fall_q = -1, rf_breakaways = 0;
-    int rf_rise_level = 0, rf_fall_level = 0; ///< the levels the sim pressed (its recorded causes)
+    int rf_rise_level = 0, rf_fall_level = 0;
+    int rf_boxed = -1; ///< the boxed front-runner the rise gave way from (-1: none) ///< the levels the sim pressed (its recorded causes)
     bool rf_ended = false, rf_hit = false;
     // LC
     int lc_culture = -1, lc_gap = 0, lc_second_gap = 0, lc_regions = 0, lc_lag_x100 = -1;
@@ -162,6 +163,24 @@ void read_rise_and_fall(const era_timelapse& t, row& r)
     for (const auto& kv : shares_at(t, t.steps[pick]))
         if (kv.second > best0) { best0 = kv.second; best = kv.first; }
     if (best < 0) return;
+    // A BOXED FRONT-RUNNER GIVES WAY (Ben, 2026-10-12): where the largest's
+    // reachable ground (its capital's campaign-graph component, which the
+    // record does not carry) cannot hold the floor, the sim names the largest
+    // realm whose ground can, and records it -- the first `rise_pressed`
+    // event's realm. The detector follows that record and prints who was boxed.
+    for (const lapse_event& e : t.events)
+        if (is(e, K::rise_pressed))
+        {
+            if (e.polity != lapse_event_none && static_cast<int>(e.polity) != best)
+            {
+                r.rf_boxed = best;
+                best  = e.polity;
+                const auto sh = shares_at(t, t.steps[pick]);
+                const auto it = sh.find(best);
+                best0 = it == sh.end() ? 0 : it->second;
+            }
+            break;
+        }
     r.rf_polity  = best;
     r.rf_start_q = best0;
     // ITS PEAK: its largest share at any step of the span (the first step
@@ -478,10 +497,10 @@ int main(int argc, char** argv)
         const era_timelapse& last = !ind.steps.empty() ? ind : (!exp.steps.empty() ? exp : emp);
         if (!last.steps.empty()) r.living_polities = last.steps.back().sample_count;
 
-        std::printf("seed %-3u (%.0f s)  RF %s realm %d %d‰ at -200, peak %d‰ in %d x%.2f, %d seats, fall %dy to %d‰, %d split%s, levels %d/%d  |"
+        std::printf("seed %-3u (%.0f s)  RF %s realm %d%s %d‰ at -200, peak %d‰ in %d x%.2f, %d seats, fall %dy to %d‰, %d split%s, levels %d/%d  |"
                     "  LC %s culture %d gap %d (next %d) %d realm%s lag %d%% bound %d (%d/%d cultures colonised)  |"
                     "  WW %s %d/6 in %d-%d, pop drop %d‰  |  CW %d/%d  RV %d/%d  |  nations %d, %d w/ specialist, polities %d\n",
-                    seed, r.build_s, r.rf_hit ? "HIT " : "miss", r.rf_polity, r.rf_start_q, r.rf_peak_q, r.rf_peak_year,
+                    seed, r.build_s, r.rf_hit ? "HIT " : "miss", r.rf_polity, r.rf_boxed >= 0 ? (" (boxed " + std::to_string(r.rf_boxed) + " gave way)").c_str() : "", r.rf_start_q, r.rf_peak_q, r.rf_peak_year,
                     r.rf_margin_x100 / 100.0, r.rf_captures, r.rf_fall_years, r.rf_fall_q, r.rf_breakaways,
                     r.rf_ended ? " ended" : "", r.rf_rise_level, r.rf_fall_level,
                     r.lc_hit ? "HIT " : "miss", r.lc_culture, r.lc_gap, r.lc_second_gap, r.lc_polities, r.lc_polities == 1 ? "" : "s", r.lc_lag_x100, r.lc_bound,

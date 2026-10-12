@@ -4787,8 +4787,10 @@ struct history_sim_state
     int32_t     rise_fall_breakaways  = 0;  ///< Successors (secession or schism) out of it between peak and fall.
     int32_t     rise_fall_rise_level  = 0;  ///< The highest rise level pressed (1 = the lean, more = the backstop).
     int32_t     rise_fall_fall_level  = 0;  ///< The highest overextension level pressed.
-    int32_t     rise_fall_room_regions = 0; ///< REPORT-ONLY: regions in its capital's campaign-graph component at the pick.
-    int32_t     rise_fall_room_total   = 0; ///< REPORT-ONLY: held regions in the world at the pick.
+    int32_t     rise_fall_room_regions = 0; ///< Its REACHABLE GROUND: regions in its capital's campaign-graph component at the pick.
+    int32_t     rise_fall_room_total   = 0; ///< Held regions in the world at the pick (the floor is read against these).
+    int32_t     rise_fall_boxed_realm  = -1; ///< The realm largest at the pick, when it was boxed and the rise gave way (-1: it did not).
+    int32_t     rise_fall_boxed_room   = 0;  ///< That boxed realm's reachable ground, in regions.
     bool        rise_fall_missed      = false;
     std::string rise_fall_why;              ///< Which clause missed, when it did.
 };
