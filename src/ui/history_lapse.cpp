@@ -5159,6 +5159,27 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "A champion of %s buys out the champion of %s.",
                       polity_name_of(h, e.other), polity_name_of(h, e.polity));
         break;
+    case lapse_event_kind::rise_pressed:
+        // BL-1287 (CIVILISATION.md sec How an empire actually falls): the realm
+        // largest at 200 BCE pressed one level harder on its way up -- `other`
+        // the level, 1 the lean itself, more the backstop's escalation.
+        if (e.other <= 1)
+            std::snprintf(buf, sizeof buf, "%s presses its lead from %s: its roads carry its armies on.",
+                          polity_name_of(h, e.polity), R);
+        else
+            std::snprintf(buf, sizeof buf, "%s presses its conquests harder from %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::overextended:
+        // BL-1287: after its peak, the same realm's reach is overextended one
+        // level further, and its far provinces slip beyond its seat.
+        if (e.other <= 1)
+            std::snprintf(buf, sizeof buf, "%s has overreached: %s can no longer rule its far provinces.",
+                          polity_name_of(h, e.polity), R);
+        else
+            std::snprintf(buf, sizeof buf, "The overreach of %s deepens; more of its ground slips from %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5213,6 +5234,9 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::champion_chartered:
     case lapse_event_kind::state_charter:
     case lapse_event_kind::champion_bought_out:  return 0;
+    // BL-1287: the rise and fall's levels, a handful per world, all one realm's.
+    case lapse_event_kind::rise_pressed:
+    case lapse_event_kind::overextended:         return 0;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

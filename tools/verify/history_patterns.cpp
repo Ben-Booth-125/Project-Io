@@ -6,11 +6,15 @@
 // history alone (the four era_timelapse records + the post-sim settlement),
 // how near each of the five patterns already comes WITHOUT any target built:
 //
-//   RF  The rise and fall (Empires, always). The realm with the largest peak
-//       share of held regions: its peak share, its margin over the next realm
-//       at that step, how early in the span it peaked, the seats it took on the
-//       way up, how long until its share halved, and the successors that broke
-//       away from it in between. Hegemony (BL-224) is a share >= 500 per mille.
+//   RF  The rise and fall (Empires, always; BL-1287 — the RULED predicate,
+//       CIVILISATION.md § How an empire actually falls). The realm largest by
+//       share of held regions at 200 BCE: its share then, its peak share over
+//       the span and the year of it (by 400 CE), its margin over the next realm
+//       at that step, the seats it took on the way up, how long until its share
+//       halved (within 300 years) and the share it fell to, and the successors
+//       that broke away from it in between (at least one). The peak must clear
+//       the floor `rise_fall_floor_pm` and stay under hegemony (BL-224, 500‰).
+//       Its constants are the sim's own (history_sim.hpp `rise_fall_*`).
 //   LC  The late culture (Culture -> Exploration, always). The founding culture
 //       most isolated by grid gap (the smallest column-wrapped distance from
 //       any of its regions to any foreign-founded region — a GEOMETRIC PROXY
@@ -31,8 +35,8 @@
 // budget world, the PLANNED charters the carve ledger records — the specialists
 // themselves are chartered after this build, in finish_campaign_world).
 //
-// Every predicate threshold here is PROVISIONAL — a reading aid for the design
-// session, not a ruling. The raw readings are printed beside each verdict so a
+// Every predicate threshold here but RF's is PROVISIONAL — a reading aid for the
+// design session, not a ruling. The raw readings are printed beside each verdict so a
 // different threshold can be read off the same run. Exits 0 always: this is a
 // census, not a gate (the gates are BL-1287/1288/1289's, built on these).
 //
@@ -90,10 +94,8 @@ std::vector<uint32_t> library_seeds(const char* path)
 }
 
 // --- provisional thresholds (reading aids, not rulings) -----------------------
-constexpr int    rf_early_frac_pm   = 500;  ///< peak in the first half of Empires
-constexpr int    rf_margin_x100     = 150;  ///< peak share >= 1.5x the next realm's
-constexpr int    rf_min_captures    = 3;    ///< "successive victories"
-constexpr int    rf_fall_window_y   = 400;  ///< share halves within this many years
+// RF reads the RULED constants (history_sim.hpp `rise_fall_*`, BL-1287), so the
+// detector and the sim's backstop judge one predicate; it is a gate, not a reading aid.
 constexpr int    hegemony_q         = 500;  ///< BL-224, history_sim_harness
 constexpr int    lc_lag_x100        = 85;   ///< culture materials mean <= 85% of world mean
 constexpr int    ww_window_y        = 30;
@@ -106,8 +108,9 @@ struct row
     uint32_t seed = 0;
     double   build_s = 0;
     // RF
-    int rf_polity = -1, rf_peak_q = 0, rf_margin_x100 = 0, rf_peak_year = 0, rf_peak_frac_pm = 0;
-    int rf_captures = 0, rf_fall_years = -1, rf_breakaways = 0;
+    int rf_polity = -1, rf_start_q = 0, rf_peak_q = 0, rf_margin_x100 = 0, rf_peak_year = 0, rf_peak_frac_pm = 0;
+    int rf_captures = 0, rf_fall_years = -1, rf_fall_q = -1, rf_breakaways = 0;
+    int rf_rise_level = 0, rf_fall_level = 0; ///< the levels the sim pressed (its recorded causes)
     bool rf_ended = false, rf_hit = false;
     // LC
     int lc_culture = -1, lc_gap = 0, lc_second_gap = 0, lc_regions = 0, lc_lag_x100 = -1;
@@ -149,42 +152,65 @@ std::map<int, int> shares_at(const era_timelapse& t, const timelapse_step& st)
 void read_rise_and_fall(const era_timelapse& t, row& r)
 {
     if (t.steps.empty()) return;
-    // The realm with the largest peak share, and the step it peaked at.
-    int best = -1, best_q = -1, best_step = -1;
+    // THE FRONT-RUNNER: the realm with the largest share at the step at
+    // 200 BCE (the first recorded step at or after it), ties to the lower id.
+    std::size_t pick = t.steps.size();
     for (std::size_t si = 0; si < t.steps.size(); ++si)
-        for (const auto& kv : shares_at(t, t.steps[si]))
-            if (kv.second > best_q) { best_q = kv.second; best = kv.first; best_step = static_cast<int>(si); }
+        if (t.steps[si].year >= rise_fall_pick_year) { pick = si; break; }
+    if (pick == t.steps.size()) return;
+    int best = -1, best0 = -1;
+    for (const auto& kv : shares_at(t, t.steps[pick]))
+        if (kv.second > best0) { best0 = kv.second; best = kv.first; }
     if (best < 0) return;
+    r.rf_polity  = best;
+    r.rf_start_q = best0;
+    // ITS PEAK: its largest share at any step of the span (the first step
+    // that reaches it), so a peak "by 400 CE" means it never stood higher after.
+    int best_q = -1, best_step = -1;
+    for (std::size_t si = 0; si < t.steps.size(); ++si)
+    {
+        const auto sh = shares_at(t, t.steps[si]);
+        const auto it = sh.find(best);
+        if (it != sh.end() && it->second > best_q) { best_q = it->second; best_step = static_cast<int>(si); }
+    }
+    if (best_step < 0) return;
     const timelapse_step& peak = t.steps[static_cast<std::size_t>(best_step)];
     int second = 0;
     for (const auto& kv : shares_at(t, peak))
         if (kv.first != best && kv.second > second) second = kv.second;
-    r.rf_polity       = best;
     r.rf_peak_q       = best_q;
     r.rf_margin_x100  = second > 0 ? best_q * 100 / second : 9999;
     r.rf_peak_year    = peak.year;
     r.rf_peak_frac_pm = t.years > 0 ? static_cast<int>(static_cast<int64_t>(peak.year - t.start_year) * 1000 / t.years) : 0;
     // The fall: the first later step at which its share is at most half the peak.
     int fall_year = 0;
-    for (std::size_t si = static_cast<std::size_t>(best_step) + 1; si < t.steps.size() && fall_year == 0; ++si)
+    bool fell = false;
+    for (std::size_t si = static_cast<std::size_t>(best_step) + 1; si < t.steps.size() && !fell; ++si)
     {
         const auto sh = shares_at(t, t.steps[si]);
         const auto it = sh.find(best);
         const int q   = it == sh.end() ? 0 : it->second;
-        if (q * 2 <= best_q) fall_year = t.steps[si].year;
+        if (q * 2 <= best_q) { fall_year = t.steps[si].year; fell = true; r.rf_fall_q = q; }
     }
-    r.rf_fall_years = fall_year != 0 ? fall_year - peak.year : -1;
-    const int fall_end = fall_year != 0 ? fall_year : t.start_year + t.years;
+    r.rf_fall_years = fell ? fall_year - peak.year : -1;
+    const int fall_end = fell ? fall_year : t.start_year + t.years;
     for (const lapse_event& e : t.events)
     {
         if (is(e, K::seat_captured) && e.polity == best && e.year <= peak.year) ++r.rf_captures;
         if ((is(e, K::broke_away) || is(e, K::schism)) && e.other == best && e.year > peak.year && e.year <= fall_end)
             ++r.rf_breakaways;
         if (is(e, K::realm_ended) && e.polity == best) r.rf_ended = true;
+        if (is(e, K::rise_pressed) && e.polity == best) r.rf_rise_level = std::max<int>(r.rf_rise_level, e.other);
+        if (is(e, K::overextended) && e.polity == best) r.rf_fall_level = std::max<int>(r.rf_fall_level, e.other);
     }
-    r.rf_hit = r.rf_peak_frac_pm <= rf_early_frac_pm && r.rf_margin_x100 >= rf_margin_x100
-            && r.rf_peak_q < hegemony_q && r.rf_captures >= rf_min_captures
-            && r.rf_fall_years >= 0 && r.rf_fall_years <= rf_fall_window_y && r.rf_breakaways >= 1;
+    // THE RULING (CIVILISATION.md § How an empire actually falls, Ben
+    // 2026-10-11/12), clause for clause: the front-runner at 200 BCE peaks by
+    // 400 CE at or above the floor and under the hegemony cap, and its share
+    // halves within 300 years of the peak, with successors breaking away.
+    r.rf_hit = r.rf_peak_year <= rise_fall_peak_by_year
+            && r.rf_peak_q >= rise_fall_floor_pm && r.rf_peak_q < rise_fall_hegemony_pm
+            && r.rf_fall_years >= 0 && r.rf_fall_years <= rise_fall_window_years
+            && r.rf_breakaways >= 1;
 }
 
 /// Polity -> founding culture, read off the seat its first appearance names.
@@ -452,16 +478,19 @@ int main(int argc, char** argv)
         const era_timelapse& last = !ind.steps.empty() ? ind : (!exp.steps.empty() ? exp : emp);
         if (!last.steps.empty()) r.living_polities = last.steps.back().sample_count;
 
-        std::printf("seed %-3u (%.0f s)  RF %s peak %d‰ x%.2f at %d‰ of span, %d seats, fall %dy, %d split%s  |"
+        std::printf("seed %-3u (%.0f s)  RF %s realm %d %d‰ at -200, peak %d‰ in %d x%.2f, %d seats, fall %dy to %d‰, %d split%s, levels %d/%d  |"
                     "  LC %s culture %d gap %d (next %d) %d realm%s lag %d%% bound %d (%d/%d cultures colonised)  |"
                     "  WW %s %d/6 in %d-%d, pop drop %d‰  |  CW %d/%d  RV %d/%d  |  nations %d, %d w/ specialist, polities %d\n",
-                    seed, r.build_s, r.rf_hit ? "HIT " : "miss", r.rf_peak_q, r.rf_margin_x100 / 100.0, r.rf_peak_frac_pm,
-                    r.rf_captures, r.rf_fall_years, r.rf_breakaways, r.rf_ended ? " ended" : "",
+                    seed, r.build_s, r.rf_hit ? "HIT " : "miss", r.rf_polity, r.rf_start_q, r.rf_peak_q, r.rf_peak_year,
+                    r.rf_margin_x100 / 100.0, r.rf_captures, r.rf_fall_years, r.rf_fall_q, r.rf_breakaways,
+                    r.rf_ended ? " ended" : "", r.rf_rise_level, r.rf_fall_level,
                     r.lc_hit ? "HIT " : "miss", r.lc_culture, r.lc_gap, r.lc_second_gap, r.lc_polities, r.lc_polities == 1 ? "" : "s", r.lc_lag_x100, r.lc_bound,
                     r.lc_cultures_bound, r.lc_cultures,
                     r.ww_hit ? "HIT " : "miss", r.ww_belligerents, r.ww_window_start, r.ww_window_start + ww_window_y,
                     r.ww_pop_drop_pm, r.cw_count, r.cw_breakaways, r.rv_count, r.rv_splits,
                     r.nations, r.nations_with_specialist, r.living_polities);
+        if (rep.handoff_invalid)
+            std::printf("seed %u: HANDOFF VIOLATION %s\n", seed, rep.handoff_violation.c_str());
         std::fflush(stdout);
         rows.push_back(r);
     }
@@ -473,7 +502,8 @@ int main(int argc, char** argv)
         hegemon += r.rf_peak_q >= hegemony_q;
     }
     const int n = static_cast<int>(rows.size());
-    std::printf("\nhistory_patterns over %d seeds (provisional thresholds):\n", n);
+    std::printf("\nhistory_patterns over %d seeds (RF ruled: floor %d‰, peak by %d, halves within %d y; the rest provisional):\n",
+                n, rise_fall_floor_pm, rise_fall_peak_by_year, rise_fall_window_years);
     std::printf("  rise and fall  %2d/%d   (targets: always)   %d seeds peaked at hegemony\n", rf, n, hegemon);
     std::printf("  late culture   %2d/%d   (targets: always)\n", lc, n);
     std::printf("  world war      %2d/%d   (targets: always)\n", ww, n);
@@ -483,13 +513,15 @@ int main(int argc, char** argv)
     if (csv != nullptr)
     {
         std::ofstream o(csv);
-        o << "seed,rf_hit,rf_peak_q,rf_margin_x100,rf_peak_frac_pm,rf_captures,rf_fall_years,rf_breakaways,rf_ended,"
+        o << "seed,rf_hit,rf_polity,rf_start_q,rf_peak_q,rf_peak_year,rf_margin_x100,rf_peak_frac_pm,rf_captures,"
+             "rf_fall_years,rf_fall_q,rf_breakaways,rf_ended,"
              "lc_hit,lc_culture,lc_gap,lc_second_gap,lc_regions,lc_polities,lc_lag_x100,lc_bound,lc_cultures_bound,lc_cultures,"
              "ww_hit,ww_belligerents,ww_window_start,ww_moments,ww_pop_drop_pm,cw_count,cw_breakaways,rv_count,rv_splits,"
              "nations,nations_with_specialist,specialists,living_polities\n";
         for (const row& r : rows)
-            o << r.seed << ',' << r.rf_hit << ',' << r.rf_peak_q << ',' << r.rf_margin_x100 << ',' << r.rf_peak_frac_pm << ','
-              << r.rf_captures << ',' << r.rf_fall_years << ',' << r.rf_breakaways << ',' << r.rf_ended << ','
+            o << r.seed << ',' << r.rf_hit << ',' << r.rf_polity << ',' << r.rf_start_q << ',' << r.rf_peak_q << ','
+              << r.rf_peak_year << ',' << r.rf_margin_x100 << ',' << r.rf_peak_frac_pm << ','
+              << r.rf_captures << ',' << r.rf_fall_years << ',' << r.rf_fall_q << ',' << r.rf_breakaways << ',' << r.rf_ended << ','
               << r.lc_hit << ',' << r.lc_culture << ',' << r.lc_gap << ',' << r.lc_second_gap << ',' << r.lc_regions << ','
               << r.lc_polities << ',' << r.lc_lag_x100 << ',' << r.lc_bound << ',' << r.lc_cultures_bound << ',' << r.lc_cultures << ','
               << r.ww_hit << ',' << r.ww_belligerents << ',' << r.ww_window_start << ',' << r.ww_moments << ','

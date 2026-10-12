@@ -2697,7 +2697,89 @@ struct history_sim_params
     /// secession half is `secession_supply_floor_q`, which that span leaves
     /// at 0 and the lean raises only when MORE nations are wanted.
     int campaign_appetite_q = 0;
+
+    // --- BL-1287: THE RISE AND FALL, A TARGET OF THE EMPIRES SPAN -------------
+    // CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS
+    // TARGETED, Ben 2026-10-10/11/12); GENERATION_STRATEGY.md § History patterns.
+
+    /// ON only on generation's own Empires round (`era_minus_one_sim_params`).
+    /// The realm largest at `rise_fall_pick_year` is leaned on its way up --
+    /// its campaigns pressed harder (appetite, harder at a seat, read on
+    /// Organise too with the opposition it reads cut), its network carrying
+    /// further (the terrain price of reach and the burden of breadth relieved)
+    /// and rallying its armies to its own ground under attack while its seat
+    /// keeps its guard, its victories steadying it (cohesion) -- until it
+    /// peaks; then the same
+    /// network is overextended (the terrain price of reach raised, its works'
+    /// reach relief no longer kept up) so that its
+    /// far ground falls under `secession_supply_floor_q` and secedes by the
+    /// BL-896 mechanism until its share halves. Each lean is a LEVEL; the
+    /// backstop raises a level, one bounded step at a time, whenever a recorded
+    /// step finds the realm behind its course, and every step is a recorded
+    /// cause (a history line and a lapse event). Struct-default OFF, so every
+    /// isolating fixture keeps its meaning and the later spans never lean.
+    bool rise_fall_target = false;
+
+    /// BL-1287 (a defect the rise exposed): ground conquered this round is
+    /// not walked by the secession block until its new holder has measured
+    /// it (its next turn) -- `network_supply_q` still carries the old
+    /// holder's reading. ON on generation's Empires round beside the target;
+    /// struct-default OFF so every isolating fixture keeps its meaning.
+    bool secession_waits_for_holder = false;
+
+    /// Per level, per mille: the appetite lean on the realm's campaign value
+    /// (the same idiom as `campaign_appetite_q`).
+    int rise_appetite_step_q  = 400;
+    /// Per level, per mille, ADDED to the appetite step when the target is a
+    /// seat: the rise is pressed at the cities that carry their hinterland.
+    int rise_seat_step_q      = 500;
+    /// Per level, ADDED to a candidate's value (scaled by its estimated odds,
+    /// per mille), so a march the pressed realm expects to win outbids the
+    /// quiet verbs (Invest's score grows with the ground a large realm holds).
+    int rise_appetite_add_q   = 40;
+    /// Per level, per mille: the cut to the cultural opposition the rising
+    /// realm's Organise reads (bar, price and score alike) -- its ascendancy
+    /// draws in peoples it would once have counted strangers.
+    int rise_kin_step_q       = 50;
+    /// Per level, per mille: the cut to its terrain price of reach and to
+    /// its burden of breadth on the way up (floored at a fifth of the price).
+    int rise_reach_step_q     = 80;
+    /// Per level, per mille: the cohesion each conquest of its restores.
+    int rise_cohesion_step_q  = 40;
+    /// The rise's level ceiling: the backstop never presses past it.
+    int rise_max_level        = 12;
+    /// Per level, per mille: what overextension adds to the realm's terrain
+    /// price of reach after its peak, and the fall's level ceiling.
+    int fall_reach_step_q     = 400;
+    /// Per level, per mille: the share of its works' reach relief (roads
+    /// and waystations, `region::work_reach_mod`) the overextended realm no
+    /// longer keeps up.
+    int fall_relief_step_q    = 150;
+    int fall_max_level        = 12;
+    /// The share (per mille of held regions) at which the rise stops being
+    /// pressed, below the hegemony cap so a hegemon still fails (BL-224); and
+    /// the year by which it stops whatever the share, ahead of
+    /// `rise_fall_peak_by_year` so the turn lands inside the window.
+    int rise_ceiling_pm       = 420;
+    int64_t rise_stop_year    = 340;
+    /// A rise above the floor that sets no new peak for this many years has
+    /// run its course, and turns.
+    int64_t rise_stall_years  = 60;
+    /// The share the backstop steers the rise toward, above the floor so
+    /// the floor is cleared with room.
+    int rise_goal_pm          = 340;
 };
+
+// BL-1287 -- THE RULED PREDICATE (CIVILISATION.md § How an empire actually
+// falls, Ben 2026-10-11/12). One set of constants, read by the sim's backstop
+// and by `history_patterns`' detector, so the two judge one thing.
+inline constexpr int rise_fall_pick_year    = -200; ///< the front-runner is read here
+inline constexpr int rise_fall_peak_by_year = 400;  ///< its share peaks at or before this year
+inline constexpr int rise_fall_window_years = 300;  ///< and halves within this many years of the peak
+inline constexpr int rise_fall_hegemony_pm  = 500;  ///< the non-hegemony cap (BL-224), never reached
+/// The floor its peak must clear, per mille of held regions: inside the ruled
+/// 25-35% band, set by measurement (BL-1287).
+inline constexpr int rise_fall_floor_pm     = 250;
 
 // ---------------------------------------------------------------------------
 // BL-931 — OBJECTS WITH A TERM.
@@ -4689,6 +4771,26 @@ struct history_sim_state
     int32_t closing_target_secessions  = 0;
     int32_t closing_subfloor_secessions = 0; ///< Secessions taken below the floor (the target outranks it).
     bool    closing_short_of_target    = false;
+
+    /// BL-1287 — THE RISE AND FALL'S OWN READING (all -1/0/false on a run
+    /// whose params did not carry `rise_fall_target`). Taken at the recorded
+    /// steps' cadence off the same counts the record samples, so it reads
+    /// what `history_patterns`' detector reads. Read by no decision outside
+    /// the backstop itself; `rise_fall_missed` is a DEFECT the caller records
+    /// as a violation, never a reported outcome.
+    int32_t     rise_fall_realm       = -1; ///< The front-runner read at `rise_fall_pick_year`.
+    int32_t     rise_fall_start_pm    = 0;  ///< Its share then, per mille of held regions.
+    int32_t     rise_fall_peak_pm     = 0;  ///< Its largest share at any read of the span.
+    int32_t     rise_fall_peak_year   = 0;
+    int32_t     rise_fall_fall_year   = 0;  ///< First read after the peak at or under half of it (0: never).
+    int32_t     rise_fall_fall_pm     = -1;
+    int32_t     rise_fall_breakaways  = 0;  ///< Successors (secession or schism) out of it between peak and fall.
+    int32_t     rise_fall_rise_level  = 0;  ///< The highest rise level pressed (1 = the lean, more = the backstop).
+    int32_t     rise_fall_fall_level  = 0;  ///< The highest overextension level pressed.
+    int32_t     rise_fall_room_regions = 0; ///< REPORT-ONLY: regions in its capital's campaign-graph component at the pick.
+    int32_t     rise_fall_room_total   = 0; ///< REPORT-ONLY: held regions in the world at the pick.
+    bool        rise_fall_missed      = false;
+    std::string rise_fall_why;              ///< Which clause missed, when it did.
 };
 
 /// Sentinel for "no polity owns this region in this year slice".

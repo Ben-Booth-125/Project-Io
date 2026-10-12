@@ -284,6 +284,11 @@ inline constexpr uint32_t save_game_magic =
 /// 27 `champion_chartered`, 28 `state_charter`, 29 `champion_bought_out`. No
 /// field moves; a build that predates them refuses such a stream on the kind
 /// range check, as it should.
+/// v23 ALSO admits two `lapse_event_kind` values in the Empires record,
+/// appended by the rise and fall (BL-1287): 30 `rise_pressed` and 31
+/// `overextended`, each a level the pattern's lean or backstop pressed. No
+/// field moves; the kind range check is the only reader that changes, and a
+/// build that predates them refuses such a stream on it.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;
