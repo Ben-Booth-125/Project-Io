@@ -303,6 +303,18 @@ large); for a `design-owed` item, **Design** is the implied first step.
    body — matching actual practice (e.g. the BL-233 terrain-combat measurement and the
    BL-233/234 filing commits).
 
+### Gates run parallel, in two tiers (Ben, 2026-10-12)
+
+The multi-seed gates were the sprint's waits, not its work: every harness swept its seeds serially on
+one core of a 16-thread machine. Run them through the `par-seeds` skill
+(`tools/verify/par_seeds.sh`), which shards the seeds one process per core and recomputes pooled
+figures from the shards' numerators. Two tiers:
+
+- **Quick** (4 seeds: 0, 28, 46, 12) — while iterating, calibrating or in a fix round.
+- **Full** (the 16 library seeds) — once, at the merge gate.
+
+One heavy parallel run per machine at a time; a second only slows the first.
+
 ### The symbol-level dependency contract (`provides` / `consumes`)
 
 `waits_on` / `blocked_on` in `backlog.json` capture *item-level* ordering — coarse, and enough to

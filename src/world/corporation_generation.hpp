@@ -446,6 +446,14 @@ struct major_reconciliation_report
 ///    exactly what paid for it (the centre's share plus what the treasury paid;
 ///    a short treasury is reported, never minted over). A centre with no ground
 ///    falls to the nation's next centre, a nation with none to the next minor.
+///    Only when every minor's windows are spent, a SECOND pass lets the
+///    champion take ANY land tile of its nation, nearest its richest centre
+///    first, ties to the lower raster index (Ben, 2026-10-12; rung
+///    `nation_wide`), so the target is hit with weaker holdings.
+///    Where even that finds no free land tile — the nation's own background
+///    firms hold every one — a THIRD pass founds the champion by consolidating
+///    ALL those firms into it (holdings, units, cash, opening stock; rung
+///    `consolidated`), recorded in the same state-charter event.
 ///  * TOO MANY — a BUY-OUT: the RICHEST MAJOR's champion (same measure, ties to
 ///    the lower nation id; its lowest-id specialist) buys the POOREST MAJOR's
 ///    specialist whole (ties to the HIGHER nation id, so the two never
