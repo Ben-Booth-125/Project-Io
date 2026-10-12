@@ -389,6 +389,7 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.treasury_endowment_income_q = params.treasury_endowment_income_q;
     hp.standing_army_sized_to_earn = params.standing_army_sized_to_earn;
     hp.treasury_endowment_summed   = true; // Ben, 2026-10-12: summed over held ground
+    hp.treasury_endowment_world_share = true; // Ben, 2026-10-12: as a share of the world
 
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration

@@ -1400,6 +1400,26 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         }
     }
 
+    // BL-1298 -- THE WORLD'S HELD GROUND, read once before any polity earns
+    // (NATION_GENERATION.md sec Pass 7, Ben 2026-10-12: "a realm earns by the
+    // share of its world's held ground it holds"). The summed endowment of
+    // every region a living polity holds, and how many living polities hold
+    // any. Only read under `treasury_endowment_world_share`.
+    int64_t world_held_endowment_q = 0;
+    int64_t world_holding_realms   = 0;
+    if (params.treasury_endowment_world_share)
+    {
+        std::vector<char> holds(polities.size(), 0);
+        for (const region& r : regions)
+        {
+            if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+            if (!polities[static_cast<std::size_t>(r.nation)].alive) continue;
+            world_held_endowment_q += (r.farm_q + r.ore_q + r.energy_q + r.port_q) / 4;
+            holds[static_cast<std::size_t>(r.nation)] = 1;
+        }
+        for (const char h : holds) world_holding_realms += h;
+    }
+
     // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
     // (EXPLORATION.md sec The engine is shared). PAY and INVEST beyond the
     // ordinary verb are still owed to a later item (BL-933's stocks).
@@ -1505,9 +1525,21 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // sum_q <= regions x 1000 and the rate is an int: far inside int64.
         const int64_t endowment_base_q =
             params.treasury_endowment_summed ? endowment_sum_q : endowment_mean_q;
-        const int64_t endowment_income =
+        int64_t endowment_income =
             (endowment_base_q * params.treasury_endowment_income_q / 1000)
                 * std::max(step_years, 1);
+        // BL-1298 (Ben, 2026-10-12) -- AS A SHARE OF THE WORLD: the realm's
+        // share of its world's held endowment, times the realms holding any,
+        // so a realm holding the AVERAGE share earns
+        // `treasury_endowment_income_q` a year whatever the world's size.
+        // A larger realm still earns more (the order holds); a small world's
+        // realms are not poorer for the world being small. Products stay far
+        // inside int64: rate (int) x sum_q (<= regions x 1000) x realms.
+        if (params.treasury_endowment_world_share)
+            endowment_income = world_held_endowment_q > 0
+                ? ((static_cast<int64_t>(params.treasury_endowment_income_q) * endowment_sum_q
+                    * world_holding_realms) / world_held_endowment_q) * std::max(step_years, 1)
+                : 0;
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
         // BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING.

@@ -255,13 +255,14 @@ struct world_params
 
     /// BL-1298 -- THE HISTORY BANKS MORE (NATION_GENERATION.md sec Pass 7,
     /// Ben 2026-10-11/12): the standing levy's per-mille share of the seats'
-    /// stores swept every round, the endowment income rate (per-mille of the
-    /// held ground's SUMMED endowment -- `history_sim_params::
-    /// treasury_endowment_summed`, which `exploration_sim_params` turns on),
-    /// the army sized to the earn, and the treasury's exchange rate into
-    /// industry points. Copied into the resumed spans by
-    /// `exploration_sim_params` / `industrialisation_sim_params`. Fields here
-    /// so `treasury_census` can calibrate them on the shipped worlds.
+    /// stores swept every round, the endowment income rate (a year's income
+    /// for a realm holding its world's AVERAGE share of the held endowment --
+    /// `history_sim_params::treasury_endowment_world_share`, which
+    /// `exploration_sim_params` turns on), the army sized to the earn, and the
+    /// treasury's exchange rate into industry points. Copied into the resumed
+    /// spans by `exploration_sim_params` / `industrialisation_sim_params`.
+    /// Fields here so `treasury_census` can calibrate them on the shipped
+    /// worlds.
     ///
     /// THE SAVE: not written by the envelope (`w_world_params`), exactly as
     /// the BL-1107 pair above. That is sound because these DEFAULTS ARE THE
@@ -272,38 +273,43 @@ struct world_params
     /// round-trip. `app::same_world_params` compares all four, so the
     /// wizard's world cache can never adopt a world built under another value.
     ///
-    /// MEASURED (treasury_census, 16 library seeds, build-only pooled median
-    /// nation opening, credits; in-world ORDER = per-seed median Spearman of
-    /// each polity's 1200 fold against its close chest / top-3 folds among the
+    /// MEASURED (treasury_census, 16 library seeds, build-only; median nation
+    /// opening in credits; in-world ORDER = per-seed median Spearman of each
+    /// polity's 1200 fold against its close chest / top-3 folds among the
     /// top-3 chests; main read 0.02 credits and 0.271 / 17 of 48).
-    ///   MEAN endowment (2026-10-11, levy 100): 300k -> 559 (0.286 / 19);
-    ///     700k -> 1,560 (0.218 / 14) -- the band reached, the order lost.
-    ///   SUMMED endowment (2026-10-12, levy 100): 20k -> 315 (0.593 / 27);
-    ///     50k -> 826 (0.553 / 27); 60k -> 938 (0.594 / 27); 75k -> 1,311
-    ///     (0.555 / 26); 90k -> 1,746 (0.572 / 26); 100k -> 2,190
-    ///     (0.588 / 25); 200k -> 5,152 (0.462 / 23). Levy alone: 87
-    ///     (0.597 / 21).
-    ///   The levy SATURATES (levy 25 / 100 at 75k: 1,332 / 1,315): the seats'
-    ///   production, not the share, bounds what it sweeps.
-    /// 100 (a tenth of the stores a round) and 80,000 land the pooled median
-    /// mid-band with the order better than main's.
+    ///   MEAN endowment (2026-10-11, levy 100): 700k -> pooled 1,560,
+    ///     13 of 16 seeds in band, order 0.218 / 14 -- the order lost.
+    ///   SUMMED endowment (2026-10-12): 80k -> pooled 1,469, order
+    ///     0.555 / 25, but 8 of 16 seeds in band (a small world's realms poor).
+    ///   WORLD-SHARE endowment (2026-10-12, levy 100, rate 30): quick tier
+    ///     (seeds 0/28/46/12) 150k -> 1,026/264/1,685/442; 250k ->
+    ///     1,001/550/2,539/1,278; 400k -> 2,126/1,340/3,274/2,357. Full tier:
+    ///     300k -> median of seed medians 1,613, 11 of 16 in band, order
+    ///     0.557 / 28; 350k -> 1,935, 8 of 16, order 0.601 / 26.
+    ///   The levy SATURATES (levy 25 / 100 at summed 75k: 1,332 / 1,315): the
+    ///   seats' production, not the share, bounds what it sweeps.
+    /// 100 (a tenth of the stores a round) and 300,000 put the most seeds in
+    /// the band with the order better than main's.
     int treasury_levy_per_mille_q   = 100;
-    int treasury_endowment_income_q = 80000;
+    int treasury_endowment_income_q = 300000;
     /// ...and the standing army sized to the realm's earn (EXPLORATION.md sec
     /// Force persists now, Ben 2026-10-11). On in every shipped world; a field
     /// only so the census can read the pre-ruling arm.
     bool standing_army_sized_to_earn = true;
     /// ...and the treasury's exchange rate into industry points in the
     /// Industrialisation span, points per THOUSAND treasury units
-    /// (`history_sim_params::industry_points_per_1000_treasury_units`, whose
-    /// comment carries the rule: the treasury term the same order as the scale
-    /// term). MEASURED (treasury_census, endowment 75k, levy 100): the scale
-    /// term stands at 1.81e8 points over the library at every rate; the
-    /// treasury term reads 3.80e8 / 8.17e8 / 1.39e9 at 20 / 50 / 100 (share of
-    /// all points 0.68 / 0.82 / 0.89); at the old 1000 per unit it read 5.4e11
-    /// (endowment 100k, share 0.999), against main's 4.75e8 (share 0.73). 30 -- 0.03 points
-    /// per unit -- puts the share back near main's.
-    int64_t industry_points_per_1000_treasury_units = 30;
+    /// (`history_sim_params::industry_points_per_1000_treasury_units`).
+    /// RULED (Ben, 2026-10-12): THE LOWEST RATE THAT KEEPS market_viability's
+    /// G1 AT TICK 50 AT OR ABOVE ITS 85% TARGET. The same-order rate (30,
+    /// treasury share ~0.73 like main's) cost G1 t50 its margin. LADDER (full
+    /// tier, par_seeds; endowment 300k world-share, levy 100) -- rate: G1 t50,
+    /// mean per-seed treasury share of all industry points:
+    ///   30: 83.8, 0.726 | 60: 86.2, 0.824 | 100: 85.1, 0.874 |
+    ///   200: 83.9, 0.919 | 400: 81.5, 0.948   (main: 87.7, ~0.73)
+    /// G1 t50 is NOT monotone in the rate (about +-1.5 between rungs), so the
+    /// line is a reading on this ladder, not a smooth threshold. 60 -- 0.06
+    /// points per unit -- is the lowest rung that holds the target.
+    int64_t industry_points_per_1000_treasury_units = 60;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
 

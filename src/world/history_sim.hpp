@@ -566,10 +566,12 @@ struct history_sim_params
     /// treasury now earns a standing levy and a summed endowment, so the
     /// capitals' Industrialisation surplus is several hundred times larger and
     /// at 1000 points per unit the treasury term swamped the scale term (share
-    /// ~0.999 of all points). The rate is re-sized by the SAME rule as below --
-    /// the treasury term the same order as the scale term -- measured with
-    /// `treasury_census` (INDUSTRY POINTS line); world_params records the
-    /// ladder and the chosen value.
+    /// ~0.999 of all points). The rate is re-sized TOWARD the rule below --
+    /// the treasury term the same order as the scale term -- and set at the
+    /// LOWEST rate that keeps market_viability's G1 at tick 50 at or above its
+    /// target (Ben, 2026-10-12: the same-order rate cost G1 t50 its margin).
+    /// world_params records the ladder (G1 t50 and treasury share per rung)
+    /// and the chosen value.
     ///
     /// The original reasoning, which still sets the rule: A
     /// UNIT CHOICE, NOT A FINDING, and it is what sets reading 8's
@@ -2279,6 +2281,19 @@ struct history_sim_params
     /// richest.) Off in the struct, so the fixtures that pin the mean form
     /// keep it; `exploration_sim_params` turns it on for both resumed spans.
     bool treasury_endowment_summed = false;
+
+    /// BL-1298 -- THE ENDOWMENT AS A SHARE OF THE WORLD (Ben, 2026-10-12,
+    /// NATION_GENERATION.md sec Pass 7: "a realm earns by the share of its
+    /// world's held ground it holds, so a small world's nations are not poorer
+    /// for the world being small"). When on, the endowment income a year is
+    /// `treasury_endowment_income_q` x (the realm's summed held endowment /
+    /// the world's summed held endowment) x (the living realms holding any
+    /// ground) -- a realm holding the world's AVERAGE share earns the rate, a
+    /// realm holding twice it earns twice. The share alone would hand a world
+    /// of 20 realms twice the per-realm income of a world of 40; the realm
+    /// count normalises that away. Supersedes the summed and mean forms where
+    /// on. Off in the struct; `exploration_sim_params` turns it on.
+    bool treasury_endowment_world_share = false;
 
     /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
     /// WOULD open (the marginal volume, both directions, every good --
