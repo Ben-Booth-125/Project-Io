@@ -74,8 +74,9 @@ void fill_history_pattern_tags(generation_report::body_entry& be)
     if (be.nation_polity.empty()) return;
     const history_pattern_reading reading = detect_history_patterns(
         be.prehistory_timelapse, be.exploration_timelapse, be.industrialisation_timelapse,
-        be.settlement, be.tiles.gw);
-    be.nation_pattern_tags = fold_history_pattern_tags(reading, be.nation_polity,
+        be.settlement, home_grid_width); // the cradle's settlement grid, not the tile pass's (`tiles.gw`)
+    be.nation_pattern_tags = fold_history_pattern_tags(reading, be.prehistory_timelapse, be.exploration_timelapse,
+                                                       be.industrialisation_timelapse, be.nation_polity,
                                                        be.nation_absorbed_first,
                                                        be.nation_absorbed_count, be.nation_absorbed);
 }
@@ -2465,7 +2466,6 @@ void run_tail(generation_cursor& c)
                 be.nation_absorbed_first = kepler_fold.absorbed_first;
                 be.nation_absorbed_count = kepler_fold.absorbed_count;
                 be.nation_absorbed       = kepler_fold.absorbed;
-                fill_history_pattern_tags(be); // BL-1286: record-only, reads the four records above
                 break;
             }
 
@@ -3690,6 +3690,15 @@ void run_tail(generation_cursor& c)
     // to. Move each into the corp's home market pool (PRODUCTION.md § Stockpile
     // and output flow).
     place_opening_stock(w);
+
+    // BL-1286: THE PATTERN TAGS, LAST. Derived from the report's records, so
+    // they are read here, once every one of them is final -- the settlement is
+    // re-copied onto the report well after the fold record, and a fill taken
+    // beside the fold read a settlement the load path never sees. The load
+    // (`r_body_entry`) re-derives from the same final records.
+    if (report != nullptr)
+        for (generation_report::body_entry& be : report->bodies)
+            if (be.id == kepler) { fill_history_pattern_tags(be); break; }
 }
 
 } // namespace

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <set>
@@ -94,7 +95,11 @@ void read_rise_and_fall(const era_timelapse& t, history_pattern_reading& r)
     r.rf_hit = r.rf_peak_year <= hp_rf_peak_by_year
             && r.rf_peak_q >= hp_rf_floor_q && r.rf_peak_q < hp_rf_hegemony_q
             && r.rf_fall_years >= 0 && r.rf_fall_years <= hp_rf_fall_window_y;
-    if (r.rf_hit) r.rf_polities.push_back(best);
+    if (r.rf_hit)
+    {
+        r.rf_polities.push_back(best);
+        r.grants.push_back({best, r.rf_peak_year, static_cast<uint8_t>(history_pattern::rise_and_fall)});
+    }
 }
 
 // --- late culture --------------------------------------------------------------
@@ -167,16 +172,23 @@ void read_late_culture(const era_timelapse& emp, const era_timelapse& exp, const
         if (cn > 0 && wn > 0 && ws > 0) r.lc_lag_x100 = static_cast<int>(cs * 100 * wn / (cn * ws));
     }
     // Colonised: a polity of the culture bound or bought by a polity of another.
-    std::vector<int32_t> bound;
+    std::vector<history_pattern_reading::grant> bound;
     for (const lapse_event& e : exp.events)
     {
         if (!(is(e, K::subject_bound) || is(e, K::province_bought))) continue;
         const auto nat = pc.find(e.polity), ovr = pc.find(e.other);
         const int nc = nat == pc.end() ? -1 : nat->second, oc = ovr == pc.end() ? -2 : ovr->second;
-        if (nc == c && oc != c) { ++r.lc_bound; bound.push_back(static_cast<int32_t>(e.polity)); }
+        if (nc == c && oc != c)
+        {
+            ++r.lc_bound;
+            bound.push_back({static_cast<int32_t>(e.polity), e.year,
+                             static_cast<uint8_t>(history_pattern::late_culture)});
+        }
     }
     r.lc_hit = r.lc_bound > 0 && r.lc_lag_x100 >= 0 && r.lc_lag_x100 <= hp_lc_lag_x100;
-    if (r.lc_hit) { r.lc_polities = bound; sorted_unique(r.lc_polities); }
+    if (r.lc_hit)
+        for (const auto& g : bound) { r.lc_polities.push_back(g.polity); r.grants.push_back(g); }
+    sorted_unique(r.lc_polities);
 }
 
 // --- world war -----------------------------------------------------------------
@@ -199,19 +211,24 @@ void read_world_war(const era_timelapse& t, history_pattern_reading& r)
         return a.first != b.first ? a.first > b.first : a.second < b.second; });
     std::set<int> top;
     for (std::size_t i = 0; i < pops.size() && i < static_cast<std::size_t>(hp_ww_top_k); ++i) top.insert(pops[i].second);
-    std::set<int> touched;
+    std::map<int, int> touched; // polity -> its first conflict moment's year
     for (const lapse_event& e : t.events)
     {
         if (e.year < hp_ww_window_start || e.year > hp_ww_window_end) continue;
         if (!(is(e, K::seat_captured) || is(e, K::realm_ended) || is(e, K::sea_leg_campaign) || is(e, K::treaty_broken)))
             continue;
         ++r.ww_moments;
-        if (top.count(e.polity)) touched.insert(e.polity);
-        if (top.count(e.other))  touched.insert(e.other);
+        if (top.count(e.polity)) touched.emplace(e.polity, e.year);
+        if (top.count(e.other))  touched.emplace(e.other, e.year);
     }
     r.ww_belligerents = static_cast<int>(touched.size());
     r.ww_hit = r.ww_belligerents >= hp_ww_min_belligerents;
-    if (r.ww_hit) for (const int p : touched) r.ww_polities.push_back(p);
+    if (r.ww_hit)
+        for (const auto& kv : touched)
+        {
+            r.ww_polities.push_back(kv.first);
+            r.grants.push_back({kv.first, kv.second, static_cast<uint8_t>(history_pattern::world_war)});
+        }
 }
 
 // --- civil war / revolution ----------------------------------------------------
@@ -235,7 +252,8 @@ int regions_after(const era_timelapse& t, int polity, int year)
 /// Splits followed by their halves fighting. @p must_take_parent reads the
 /// revolution proxy (the successor takes a seat of, or ends, its parent; no
 /// size test). Returns (fights, splits); the fighting pairs go to @p named.
-std::pair<int, int> read_split_wars(const era_timelapse& t, bool must_take_parent, std::vector<int32_t>* named)
+std::pair<int, int> read_split_wars(const era_timelapse& t, bool must_take_parent,
+                                    std::vector<history_pattern_reading::grant>* named)
 {
     int fights = 0, splits = 0;
     for (std::size_t i = 0; i < t.events.size(); ++i)
@@ -253,9 +271,11 @@ std::pair<int, int> read_split_wars(const era_timelapse& t, bool must_take_paren
         }
         ++splits;
         bool fought = false;
+        int  fought_year = s.year;
         for (std::size_t j = i + 1; j < t.events.size() && !fought; ++j)
         {
             const lapse_event& e = t.events[j];
+            fought_year = e.year;
             if (e.year > s.year + hp_cw_window_y) break;
             // seat_captured: polity = the taker, other = the loser.
             // realm_ended:   polity = the DEAD,  other = the killer.
@@ -270,7 +290,12 @@ std::pair<int, int> read_split_wars(const era_timelapse& t, bool must_take_paren
         if (fought)
         {
             ++fights;
-            if (named != nullptr) { named->push_back(s.polity); named->push_back(s.other); }
+            if (named != nullptr)
+            {
+                const uint8_t cw = static_cast<uint8_t>(history_pattern::civil_war);
+                named->push_back({s.polity, fought_year, cw});
+                named->push_back({s.other, fought_year, cw});
+            }
         }
     }
     return {fights, splits};
@@ -289,8 +314,10 @@ history_pattern_reading detect_history_patterns(const era_timelapse& empires,
     read_rise_and_fall(empires, r);
     read_late_culture(empires, exploration, settlement, gw, pc, r);
     read_world_war(industrialisation, r);
-    const auto cw = read_split_wars(empires, false, &r.cw_polities);
+    std::vector<history_pattern_reading::grant> cw_named;
+    const auto cw = read_split_wars(empires, false, &cw_named);
     r.cw_count = cw.first; r.cw_splits = cw.second;
+    for (const auto& g : cw_named) { r.cw_polities.push_back(g.polity); r.grants.push_back(g); }
     sorted_unique(r.cw_polities);
     // REVOLUTION: "the takeover is recorded as a revolution event" — and no
     // such event kind exists on the record yet (BL-1289 owns it), so the
@@ -301,32 +328,61 @@ history_pattern_reading detect_history_patterns(const era_timelapse& empires,
 }
 
 std::vector<uint8_t> fold_history_pattern_tags(const history_pattern_reading& reading,
+                                               const era_timelapse& empires,
+                                               const era_timelapse& exploration,
+                                               const era_timelapse& industrialisation,
                                                const std::vector<int32_t>& nation_polity,
                                                const std::vector<int32_t>& absorbed_first,
                                                const std::vector<int32_t>& absorbed_count,
                                                const std::vector<int32_t>& absorbed,
                                                int* unfolded)
 {
-    // Polity -> tag mask, from every pattern's named polities.
-    std::map<int32_t, uint8_t> tags;
-    const auto add = [&](const std::vector<int32_t>& ps, history_pattern p) {
-        for (const int32_t q : ps) if (q >= 0) tags[q] |= history_pattern_bit(p);
+    // The grants in date order (stable: ties keep the detectors' order, which
+    // is itself fixed), applied before the first event dated after them.
+    std::vector<history_pattern_reading::grant> grants = reading.grants;
+    std::stable_sort(grants.begin(), grants.end(),
+                     [](const history_pattern_reading::grant& x, const history_pattern_reading::grant& y) {
+                         return x.year < y.year; });
+    std::map<int32_t, uint8_t> tags;   // polity -> the tags it holds now
+    std::map<int32_t, uint8_t> passed; // polity -> the tags it handed on (to a killer or a successor)
+    std::size_t gi = 0;
+    const auto grant_through = [&](int64_t year) {
+        for (; gi < grants.size() && grants[gi].year <= year; ++gi)
+            if (grants[gi].polity >= 0)
+                tags[grants[gi].polity] |= history_pattern_bit(static_cast<history_pattern>(grants[gi].pattern));
     };
-    add(reading.rf_polities, history_pattern::rise_and_fall);
-    add(reading.lc_polities, history_pattern::late_culture);
-    add(reading.ww_polities, history_pattern::world_war);
-    add(reading.cw_polities, history_pattern::civil_war);
-    add(reading.rv_polities, history_pattern::revolution);
+    const auto hand_on = [&](int32_t from, int32_t to) {
+        if (from < 0 || to < 0 || from == to) return;
+        const auto it = tags.find(from);
+        if (it == tags.end() || it->second == 0) return;
+        const uint8_t m = it->second; // copied before `tags[to]` may rehash the map
+        tags[to] |= m;
+        passed[from] |= m;
+    };
+    for (const era_timelapse* t : {&empires, &exploration, &industrialisation})
+        for (const lapse_event& e : t->events)
+        {
+            grant_through(e.year);
+            const int32_t pol = e.polity == lapse_event_none ? -1 : static_cast<int32_t>(e.polity);
+            const int32_t oth = e.other  == lapse_event_none ? -1 : static_cast<int32_t>(e.other);
+            // A successor carries its parent line's tags: polity = successor, other = parent.
+            if (is(e, K::broke_away) || is(e, K::schism) || is(e, K::seceded_at_close))
+                hand_on(oth, pol);
+            // A realm that ends passes its tags to whoever ended it: polity = the dead,
+            // other = the killer (realm_ended) or the absorber (absorbed_at_close).
+            else if (is(e, K::realm_ended) || is(e, K::absorbed_at_close))
+                hand_on(pol, oth);
+        }
+    grant_through(INT64_MAX);
 
     const std::size_t n = nation_polity.size();
     std::vector<uint8_t> out(n, 0);
     std::set<int32_t> folded;
     const auto take = [&](int32_t q, std::size_t k) {
         if (q < 0) return;
-        const auto it = tags.find(q);
-        if (it == tags.end()) return;
-        out[k] |= it->second;
         folded.insert(q);
+        const auto it = tags.find(q);
+        if (it != tags.end()) out[k] |= it->second;
     };
     for (std::size_t k = 0; k < n; ++k)
     {
@@ -338,11 +394,17 @@ std::vector<uint8_t> fold_history_pattern_tags(const history_pattern_reading& re
     }
     if (unfolded != nullptr)
     {
+        // A tag is lost only where its holder is no nation, was folded into
+        // none, and handed it to nobody -- a realm that ended with no killer.
         int miss = 0;
         for (const auto& kv : tags)
-            if (!folded.count(kv.first))
-                for (int b = 0; b < static_cast<int>(history_pattern::count); ++b)
-                    miss += (kv.second >> b) & 1;
+        {
+            if (folded.count(kv.first)) continue;
+            const auto pit = passed.find(kv.first);
+            const uint8_t lost = static_cast<uint8_t>(kv.second & ~(pit == passed.end() ? 0 : pit->second));
+            for (int b = 0; b < static_cast<int>(history_pattern::count); ++b)
+                miss += (lost >> b) & 1;
+        }
         *unfolded = miss;
     }
     return out;

@@ -151,7 +151,7 @@ int main(int argc, char** argv)
                     ind.steps.size(), ind.events.size());
         // THE ONE IMPLEMENTATION (BL-1286): the src module's detectors, over
         // the same records the report carries and the nation card reads.
-        r.pr = detect_history_patterns(emp, exp, ind, home->settlement, home->tiles.gw);
+        r.pr = detect_history_patterns(emp, exp, ind, home->settlement, home_grid_width); // the settlement grid (fill_history_pattern_tags reads the same)
         if (!emp.steps.empty())
         {
             const timelapse_step& last = emp.steps.back();
@@ -160,7 +160,7 @@ int main(int argc, char** argv)
         }
         // The tags as the report carries them, against the module's fold re-run here.
         const std::vector<uint8_t> refold = fold_history_pattern_tags(
-            r.pr, home->nation_polity, home->nation_absorbed_first, home->nation_absorbed_count,
+            r.pr, emp, exp, ind, home->nation_polity, home->nation_absorbed_first, home->nation_absorbed_count,
             home->nation_absorbed, &r.unfolded);
         r.tags_agree = refold == home->nation_pattern_tags;
         for (const uint8_t m : home->nation_pattern_tags)

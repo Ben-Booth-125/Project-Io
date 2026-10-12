@@ -117,6 +117,15 @@ struct history_pattern_reading
     int  rv_count = 0;          ///< takeovers recorded (no revolution event kind exists yet: always 0)
     int  rv_proxy = 0;          ///< READING ONLY: Industrialisation successors that took or ended their parent
     std::vector<int32_t> rv_polities;
+
+    /// Every (polity, pattern) a hit names, DATED: the year the pattern touched
+    /// that polity (rise and fall: its peak; late culture: the binding; world
+    /// war: the polity's first conflict moment in the window; civil war: the
+    /// fight that made it one). The tag fold replays the record's endings and
+    /// splits after these dates (`fold_history_pattern_tags`), so a tag passes
+    /// only to realms that inherit or end its holder AFTER it was earned.
+    struct grant { int32_t polity = -1; int32_t year = 0; uint8_t pattern = 0; };
+    std::vector<grant> grants;
 };
 
 /// Run all five detectors over one body's records. @p gw is the settlement
@@ -127,13 +136,28 @@ history_pattern_reading detect_history_patterns(const era_timelapse& empires,
                                                 const settlement_state& settlement,
                                                 int gw);
 
-/// THE FOLD (NATION_GENERATION.md sec Pass 2d): each nation's tag mask is the
-/// union of the tags its own realm (`nation_polity[n]`) and every realm the
-/// size floor folded into it (`nation_absorbed[first[n] .. first[n]+count[n])`)
-/// carried. Parallel to `nation_polity`. @p unfolded, when given, receives the
-/// number of (polity, pattern) tags that reached no nation — a realm that ended
-/// before the fold — so a tag is never dropped silently. Pure.
+/// THE FOLD (NATION_GENERATION.md sec Pass 2d; GENERATION_STRATEGY.md sec
+/// History patterns, Ben 2026-10-12: "a realm that ends passes its tags to
+/// whoever ended it, and a successor carries its parent line's").
+///
+/// First the tags TRAVEL, replaying the three records in order (Empires, then
+/// Exploration, then Industrialisation, each in its own event order), with
+/// every grant applied before the first event dated after it:
+///   - a SPLIT (`broke_away`, `schism`, `seceded_at_close`): the successor
+///     takes its parent's tags as they stand at the split;
+///   - an END (`realm_ended` with a killer; `absorbed_at_close` with an
+///     absorber): the killer / absorber takes the dead realm's tags.
+/// Then each nation's mask is the union of the tags its own realm
+/// (`nation_polity[n]`) and every realm the size floor folded into it
+/// (`nation_absorbed[first[n] .. first[n]+count[n])`) holds at the end.
+/// Parallel to `nation_polity`. @p unfolded, when given, receives the number
+/// of (polity, pattern) tags held by a realm that is no nation, was folded
+/// into none, and passed them to nobody (a realm that ended with no killer) —
+/// counted, never dropped silently. Pure and deterministic.
 std::vector<uint8_t> fold_history_pattern_tags(const history_pattern_reading& reading,
+                                               const era_timelapse& empires,
+                                               const era_timelapse& exploration,
+                                               const era_timelapse& industrialisation,
                                                const std::vector<int32_t>& nation_polity,
                                                const std::vector<int32_t>& absorbed_first,
                                                const std::vector<int32_t>& absorbed_count,
