@@ -2761,7 +2761,11 @@ struct history_sim_params
     /// its garrison thins: per level, per round, this many per mille of its
     /// army goes home to the capital (conserved).
     int fall_far_supply_q     = 500;
-    int fall_thin_per_level_q = 100;
+    int fall_thin_per_level_q = 400;
+    /// BARE (Ben, 2026-10-13): an outer-march holding of the falling realm
+    /// whose army stands below this many per mille of its garrison target
+    /// relays no supply onward in that realm's reach walk.
+    int fall_bare_share_q     = 250;
     /// The fall's level ceiling.
     int fall_max_level        = 12;
     /// The share (per mille of held regions) at which the rise stops being
@@ -4835,6 +4839,7 @@ struct history_sim_state
     int64_t     rise_fall_roads_decayed   = 0; ///< REPORT-ONLY: corridor-rounds the fall decayed a road on
     int64_t     rise_fall_works_decayed   = 0; ///< REPORT-ONLY: region-rounds the fall decayed reach relief on
     int64_t     rise_fall_heads_sent_home = 0; ///< REPORT-ONLY: far-garrison heads the fall sent home to the capital
+    int64_t     rise_fall_bare_region_rounds = 0; ///< REPORT-ONLY: region-rounds the falling realm's ground stood bare
     int64_t     rise_fall_rally_heads     = 0; ///< REPORT-ONLY: heads the rise's rally marched to a defence
     int64_t     rise_fall_rally_home      = 0; ///< REPORT-ONLY: rallied survivors of a lost defence sent home
     bool        rise_fall_missed      = false;

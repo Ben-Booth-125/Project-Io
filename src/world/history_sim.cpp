@@ -3918,6 +3918,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ...and the round each polity last measured its own ground (its turn
     // reached the supply reading), so a turn that ended early secedes nothing.
     std::vector<int64_t> supply_read_year;
+
+    // BL-1287 (Ben, 2026-10-13, CIVILISATION.md sec How an empire actually
+    // falls) -- BARE GROUND RELAYS NO SUPPLY, FOR THE FALLING REALM ONLY. The
+    // regions of `rf_relay_realm` marked here are reached by its reach walk
+    // but relay nothing onward (`rebuild_reach`), so a thinned outer march
+    // cuts the network and the ground beyond it secedes by BL-896. Filled at
+    // that realm's turn (below), empty for every other realm and phase.
+    std::vector<char> rf_relay_bare;
+    int               rf_relay_realm = -1;
+    bool              rf_relay_dirty = false;
     const auto note_taken = [&](std::size_t i) {
         if (taken_year.size() <= i) taken_year.resize(i + 1, INT64_MIN);
         taken_year[i] = event_year;
@@ -4339,6 +4349,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 done[static_cast<std::size_t>(best)] = true;
             }
 
+            // BL-1287: bare outer ground of the falling realm is reached but
+            // relays nothing onward (its garrison has left the march).
+            if (qid == rf_relay_realm && static_cast<std::size_t>(best) < rf_relay_bare.size()
+                && rf_relay_bare[static_cast<std::size_t>(best)])
+                continue;
             const region& bp = ss.regions[static_cast<std::size_t>(best)];
             // THE REBATE. A fraction of what it COST to get here, never a
             // credit against nothing -- the capital sits at `best_c == 0` and
@@ -6579,46 +6594,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
-            // This polity's own slot, grown on demand: `id` is an index into
-            // `out.polities`, and nothing appends a polity mid-run, but sizing
-            // here rather than up front keeps the two facts independent.
-            if (reach_by_polity.size() <= static_cast<std::size_t>(q.id))
-                reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
-            reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
-
-            if (rc.capital != q.capital
-             || rc.roads_version != roads_version // BL-837: a road crossed a tier
-             || rc.owner_version != owner_version_of(q.id) // BL-922: ground changed hands
-             || (params.centre_chain_reach
-              && rc.centres_version != centres_version)) // BL-887: a relay moved
-                rebuild_reach(rc, q.capital, q.id);
-            else if (rc.cost.size() != ss.regions.size())
-                // BL-922: a region founded by SOMEONE ELSE since the last
-                // build. Not held here, so never expanded here: the vector
-                // grows with the sentinel and the rest of it stands. A region
-                // founded by THIS polity bumped `owner_version` and took the
-                // branch above.
-                rc.cost.resize(ss.regions.size(), 1 << 28);
-            const std::vector<int>& reach = rc.cost;
-
-            // THE TERRAIN PRICE OF THIS REALM'S REACH, read by every supply
-            // reading below (holding, campaign, organise, the supply purchase).
-            // The leaned price, times BL-1287's factor -- exactly 1000 for every
-            // realm the rise and fall does not press, so the product divides
-            // back to the leaned price digit for digit.
-            const int reach_cost_q = static_cast<int>(
-                (static_cast<int64_t>(leaned_terrain_reach_cost_q(params)) * rf_reach_factor_q(q.id)) / 1000);
-            // BL-1287: the rising realm's two further leans -- its seat keeps
-            // its guard, and its ascendancy draws in peoples it would once
-            // have counted strangers (the opposition Organise reads, cut a
-            // level at a time). Off the target both are the identity.
-            const bool rf_rising_here = rf_on && q.id == rf_realm && rf_phase == 1;
-            const bool rf_guard_seat  = rf_rising_here;
-            const auto rf_kin_q = [&](int op) -> int {
-                if (!rf_rising_here) return op;
-                return (op * std::max(0, 1000 - rf_rise_level * clampi(params.rise_kin_step_q, 0, 1000))) / 1000;
-            };
-
             // ---- BL-1287: THE FALL ACTS ON THE MAP (Ben, 2026-10-12) --------
             //
             // The overextended realm pays no private price: what presses its
@@ -6710,6 +6685,83 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     out.rise_fall_heads_sent_home += sent_home;
                 }
             }
+
+            // BL-1287 (Ben, 2026-10-13) -- WHICH OF THE FALLING REALM'S GROUND
+            // IS LEFT BARE: a holding of its outer marches (`rf_far_flag`,
+            // set by the thinning above), not its seat, whose army now stands
+            // below `fall_bare_share_q` per mille of its garrison target. That
+            // ground relays no supply onward in this realm's reach walk; its
+            // capital and garrisoned core relay as before. Read after the
+            // thinning, before the reach is (re)built; region-index order.
+            if (rf_on && q.id == rf_realm)
+            {
+                std::vector<char> bare;
+                if (rf_phase == 2)
+                {
+                    bare.assign(ss.regions.size(), 0);
+                    for (int hi : held)
+                    {
+                        const std::size_t h = static_cast<std::size_t>(hi);
+                        if (hi == q.capital || h >= rf_far_flag.size() || !rf_far_flag[h]) continue;
+                        const int64_t target = garrison_target(ss.regions[h], params.garrison_fraction_q);
+                        if (ss.regions[h].army_stock * 1000 < target * clampi(params.fall_bare_share_q, 0, 1000))
+                        {
+                            bare[h] = 1;
+                            ++out.rise_fall_bare_region_rounds;
+                        }
+                    }
+                }
+                if (rf_relay_realm != q.id || bare != rf_relay_bare)
+                {
+                    rf_relay_bare.swap(bare);
+                    rf_relay_realm = q.id;
+                    rf_relay_dirty = true;
+                }
+            }
+
+            // This polity's own slot, grown on demand: `id` is an index into
+            // `out.polities`, and nothing appends a polity mid-run, but sizing
+            // here rather than up front keeps the two facts independent.
+            if (reach_by_polity.size() <= static_cast<std::size_t>(q.id))
+                reach_by_polity.resize(static_cast<std::size_t>(q.id) + 1);
+            reach_cache& rc = reach_by_polity[static_cast<std::size_t>(q.id)];
+
+            if (rc.capital != q.capital
+             || rc.roads_version != roads_version // BL-837: a road crossed a tier
+             || rc.owner_version != owner_version_of(q.id) // BL-922: ground changed hands
+             || (params.centre_chain_reach
+              && rc.centres_version != centres_version) // BL-887: a relay moved
+             || (rf_relay_dirty && q.id == rf_relay_realm)) // BL-1287: bare ground changed
+            {
+                rebuild_reach(rc, q.capital, q.id);
+                if (q.id == rf_relay_realm) rf_relay_dirty = false;
+            }
+            else if (rc.cost.size() != ss.regions.size())
+                // BL-922: a region founded by SOMEONE ELSE since the last
+                // build. Not held here, so never expanded here: the vector
+                // grows with the sentinel and the rest of it stands. A region
+                // founded by THIS polity bumped `owner_version` and took the
+                // branch above.
+                rc.cost.resize(ss.regions.size(), 1 << 28);
+            const std::vector<int>& reach = rc.cost;
+
+            // THE TERRAIN PRICE OF THIS REALM'S REACH, read by every supply
+            // reading below (holding, campaign, organise, the supply purchase).
+            // The leaned price, times BL-1287's factor -- exactly 1000 for every
+            // realm the rise and fall does not press, so the product divides
+            // back to the leaned price digit for digit.
+            const int reach_cost_q = static_cast<int>(
+                (static_cast<int64_t>(leaned_terrain_reach_cost_q(params)) * rf_reach_factor_q(q.id)) / 1000);
+            // BL-1287: the rising realm's two further leans -- its seat keeps
+            // its guard, and its ascendancy draws in peoples it would once
+            // have counted strangers (the opposition Organise reads, cut a
+            // level at a time). Off the target both are the identity.
+            const bool rf_rising_here = rf_on && q.id == rf_realm && rf_phase == 1;
+            const bool rf_guard_seat  = rf_rising_here;
+            const auto rf_kin_q = [&](int op) -> int {
+                if (!rf_rising_here) return op;
+                return (op * std::max(0, 1000 - rf_rise_level * clampi(params.rise_kin_step_q, 0, 1000))) / 1000;
+            };
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
             //
