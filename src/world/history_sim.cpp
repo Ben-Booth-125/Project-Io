@@ -3915,6 +3915,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // this round, which does not secede in its birth round. The year each
     // region last changed hands by conquest; local, never saved.
     std::vector<int64_t> taken_year(ss.regions.size(), INT64_MIN);
+    // ...and the round each polity last measured its own ground (its turn
+    // reached the supply reading), so a turn that ended early secedes nothing.
+    std::vector<int64_t> supply_read_year;
     const auto note_taken = [&](std::size_t i) {
         if (taken_year.size() <= i) taken_year.resize(i + 1, INT64_MIN);
         taken_year[i] = event_year;
@@ -4615,9 +4618,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
     //              attack (the BL-921 gather from the defender's side, read
     //              by the attacker's scorer too) while its seat keeps its
     //              guard; COHESION: each of its conquests steadies it;
-    //   falling -- OVEREXTENSION: the terrain price of its reach raised and
-    //              its works' reach relief no longer kept up, so ground far
-    //              from its seat reads cut off and secedes (BL-896).
+    //   falling -- OVEREXTENSION, ON THE MAP (Ben, 2026-10-12): no private
+    //              price; its roads and works decay on the ground itself
+    //              (`region::work_reach_mod`, read by anyone, kept by the
+    //              next holder) and its far garrisons go home to the
+    //              capital, so ground far from its seat reads cut off and
+    //              secedes (BL-896).
     //
     // The level rises one bounded step at a time, read at the recorded steps'
     // cadence off the same counts the record samples (so the backstop and
@@ -4642,24 +4648,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // The years successors (secession or schism) left it, for the verdict's
     // count between its peak and its fall.
     std::vector<int64_t> rf_breakaway_years;
+    // The overextended realm's outer marches as its last turn read them: the
+    // yearly muster raises no garrison there (the fall acts on the map).
+    std::vector<char>    rf_far_flag;
     std::vector<int>     rf_pre_peak_pm;
     std::vector<int64_t> rf_pre_peak_year;
     // The terrain price of reach for polity @p pid, per mille of the leaned
-    // price: 1000 for every realm but the targeted one, and for it outside
-    // the two pressed phases -- so a run without the target is digit-identical.
+    // price: the RISE's recorded lean (its network carries further), 1000 for
+    // every realm but the rising one -- so a run without the target is
+    // digit-identical. THE FALL PAYS NO PRIVATE PRICE (Ben, 2026-10-12, "the
+    // fall acts on the map"): once the realm turns, its price is everyone's,
+    // and what presses it is on the ground (`rf_overextend`, below).
     const auto rf_reach_factor_q = [&](int pid) -> int {
-        if (!rf_on || pid != rf_realm) return 1000;
-        if (rf_phase == 1)
-            return std::max(200, 1000 - rf_rise_level * clampi(params.rise_reach_step_q, 0, 1000));
-        if (rf_phase == 2)
-            return 1000 + rf_fall_level * clampi(params.fall_reach_step_q, 0, 1000);
-        return 1000;
-    };
-    // The share of its works' reach relief an overextended realm still
-    // keeps up, per mille: its roads and waystations decay a level at a time.
-    const auto rf_relief_factor_q = [&](int pid) -> int {
-        if (!rf_on || pid != rf_realm || rf_phase != 2) return 1000;
-        return std::max(0, 1000 - rf_fall_level * clampi(params.fall_relief_step_q, 0, 1000));
+        if (!rf_on || pid != rf_realm || rf_phase != 1) return 1000;
+        return std::max(200, 1000 - rf_rise_level * clampi(params.rise_reach_step_q, 0, 1000));
     };
     const auto rf_note_level = [&](bool rising, int level, int64_t y_now) {
         const polity& rq = out.polities[static_cast<std::size_t>(rf_realm)];
@@ -4675,10 +4677,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                       + ": new roads reach its frontiers, and its victories steady it";
         else
             line = level <= 1
-                ? who + " has overreached: " + seat
-                      + " can no longer carry its rule to its far provinces"
-                : "The overreach of " + who + " deepens: more of its far ground slips beyond "
-                      + seat + "'s reach";
+                ? who + " has overreached: its roads and works fall into disrepair, and " + seat
+                      + " calls its far garrisons home"
+                : "The overreach of " + who + " deepens: its roads decay further, and more of its far ground "
+                      "is left bare of soldiers beyond " + seat + "'s reach";
         out.history.push_back(history_event{
             years_from_calendar_year(y_now), chain_stage::legacy, line, std::string{}});
         note_event(rising ? lapse_event_kind::rise_pressed : lapse_event_kind::overextended,
@@ -5182,8 +5184,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region a TEMPORARY state: a region stripped by a march away, or
             // by a garrison broken in battle, is rebuilding from the year after
             // it happened, at the pace its own people can pay for.
-            muster_garrison(ss.regions[i], params.garrison_fraction_q,
-                            params.garrison_muster_q, params.garrison_disband_q);
+            // BL-1287 -- AN OVEREXTENDED REALM RAISES NO GARRISON IN ITS OUTER
+            // MARCHES (the fall acts on the map): the holdings its last turn
+            // called home stay bare until it turns, or until another holds them.
+            const bool rf_unraised = rf_on && rf_phase == 2 && i < rf_far_flag.size() && rf_far_flag[i]
+                                  && i < owner.size() && owner[i] == rf_realm;
+            if (!rf_unraised)
+                muster_garrison(ss.regions[i], params.garrison_fraction_q,
+                                params.garrison_muster_q, params.garrison_disband_q);
             total_pop += ss.regions[i].population;
 
             // BL-867 — INDUSTRY FLOWS TO THE SEAT, EVERY REGION, EVERY YEAR.
@@ -6600,9 +6608,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // back to the leaned price digit for digit.
             const int reach_cost_q = static_cast<int>(
                 (static_cast<int64_t>(leaned_terrain_reach_cost_q(params)) * rf_reach_factor_q(q.id)) / 1000);
-            // And what is left of its works' reach relief (roads and waystations
-            // a realm can no longer keep up): 1000 but for an overextended realm.
-            const int relief_factor_q = rf_relief_factor_q(q.id);
             // BL-1287: the rising realm's two further leans -- its seat keeps
             // its guard, and its ascendancy draws in peoples it would once
             // have counted strangers (the opposition Organise reads, cut a
@@ -6613,6 +6618,98 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (!rf_rising_here) return op;
                 return (op * std::max(0, 1000 - rf_rise_level * clampi(params.rise_kin_step_q, 0, 1000))) / 1000;
             };
+
+            // ---- BL-1287: THE FALL ACTS ON THE MAP (Ben, 2026-10-12) --------
+            //
+            // The overextended realm pays no private price: what presses its
+            // breakdown is changed on the ground, where anyone can read it and
+            // where it stays for whoever holds that ground next.
+            //   ITS ROADS AND WORKS DECAY -- every region it holds loses reach
+            //   relief (`region::work_reach_mod`, the roads and waystations
+            //   its works bought) at `fall_works_decay_per_year_q` x the level
+            //   a year, so the supply every reader prices from that ground
+            //   (holding, campaign, the purchase scorer, secession) falls by
+            //   the one rule (BL-318: one price);
+            //   ITS FAR GARRISONS THIN -- a holding in its outer half by its
+            //   last supply reading (or at or under `fall_far_supply_q`) sends
+            //   `fall_thin_per_level_q`
+            //   x the level per mille of its army home to the capital each
+            //   round: the heads are conserved, the far ground is left bare.
+            // Run here, before this turn's supply is read, so the reading the
+            // secession walk uses is the decayed ground's.
+            if (rf_on && q.id == rf_realm && rf_phase == 2 && rf_fall_level > 0)
+            {
+                const int decay = rf_fall_level * clampi(params.fall_works_decay_per_year_q, 0, 1000) * step_years;
+                const int thin_q = std::min(1000, rf_fall_level * clampi(params.fall_thin_per_level_q, 0, 1000));
+                // FAR is the realm's OUTER HALF by its own last supply reading
+                // (lowest first, ties to the lower index), the seat excepted --
+                // plus any holding at or under `fall_far_supply_q` -- so even a
+                // compact realm calls in the garrisons of its outer marches.
+                std::vector<int> far_regions;
+                {
+                    std::vector<std::pair<int, int>> by_supply;
+                    for (int hi : held)
+                        if (hi != q.capital)
+                            by_supply.push_back({ ss.regions[static_cast<std::size_t>(hi)].network_supply_q, hi });
+                    std::sort(by_supply.begin(), by_supply.end());
+                    const std::size_t half = (by_supply.size() + 1) / 2;
+                    for (std::size_t k = 0; k < by_supply.size(); ++k)
+                        if (k < half || by_supply[k].first <= params.fall_far_supply_q)
+                            far_regions.push_back(by_supply[k].second);
+                    std::sort(far_regions.begin(), far_regions.end());
+                }
+                rf_far_flag.assign(ss.regions.size(), 0);
+                for (int r : far_regions) rf_far_flag[static_cast<std::size_t>(r)] = 1;
+                int64_t sent_home = 0;
+                for (int hi : held)
+                {
+                    region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                    if (hp.work_reach_mod > 0)
+                    {
+                        hp.work_reach_mod = std::max(0, hp.work_reach_mod - decay);
+                        ++out.rise_fall_works_decayed;
+                    }
+                    if (hi == q.capital || hp.army_stock <= 0) continue;
+                    if (!std::binary_search(far_regions.begin(), far_regions.end(), hi)) continue;
+                    const int64_t take = (hp.army_stock * thin_q) / 1000;
+                    if (take <= 0) continue;
+                    draw_army_with_standing(hp, take);
+                    sent_home += take;
+                }
+                // ITS ROADS DECAY TOO: every walked corridor its own ground
+                // carries (the live use count `rebuild_reach` discounts by)
+                // loses `fall_road_decay_q` x the level per mille of its uses a
+                // round, at least one, so a Road falls back to a Track and a
+                // Track to a path. On the shared record: the close writes each
+                // corridor's tier off this live count, so the next span (and
+                // whoever holds the ground) inherits the decayed rung. Edges
+                // are walked off its held regions in index order, each once.
+                {
+                    const int road_q = std::min(1000, rf_fall_level * clampi(params.fall_road_decay_q, 0, 1000));
+                    bool tier_moved = false;
+                    for (int hi : held)
+                    {
+                        for (int nb : supply_neighbours[static_cast<std::size_t>(hi)])
+                        {
+                            if (owner[static_cast<std::size_t>(nb)] == q.id && nb < hi) continue; // once per edge
+                            const auto it = road_uses_live.find(edge_key(hi, nb));
+                            if (it == road_uses_live.end() || it->second <= 0) continue;
+                            const int before = road_tier_for_uses(it->second);
+                            const int cut = std::max(1, (it->second * road_q) / 1000);
+                            it->second = std::max(0, it->second - cut);
+                            ++out.rise_fall_roads_decayed;
+                            if (road_tier_for_uses(it->second) != before) tier_moved = true;
+                        }
+                    }
+                    if (tier_moved) ++roads_version;
+                }
+                if (sent_home > 0 && q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                {
+                    region& home_seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                    home_seat.army_stock = clampi64(home_seat.army_stock + sent_home, 0, int64_t{1} << 40);
+                    out.rise_fall_heads_sent_home += sent_home;
+                }
+            }
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
             //
@@ -6678,8 +6775,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const std::size_t hidx = static_cast<std::size_t>(hi);
                 const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
                                       ? reach[hidx] : (1 << 27);
-                const int hub_reach_q = (clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q)
-                                         * relief_factor_q) / 1000; // BL-1287: 1000 off the target
+                const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
                 // 64-BIT ON PURPOSE (BL-922): the unreachable sentinel is
                 // 1 << 27, and sentinel x cost overflowed `int` at any cost
                 // above ~15 -- cut-off ground then read as FULLY supplied
@@ -6702,6 +6798,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     scale_standing_army(hp, stock_before); // BL-955
                 }
             }
+            // BL-1287: this realm's ground was measured this round (the
+            // secession walk reads only ground its holder has measured).
+            if (supply_read_year.size() <= static_cast<std::size_t>(q.id))
+                supply_read_year.resize(static_cast<std::size_t>(q.id) + 1, INT64_MIN);
+            supply_read_year[static_cast<std::size_t>(q.id)] = y;
 
             // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
             //
@@ -6807,7 +6908,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         + static_cast<int64_t>(edge_step(hub, static_cast<int>(ti))) * sea_cost_q
                     : static_cast<int64_t>(1 << 27) * 1000;
                 const int hub_reach_q = (hub >= 0)
-                    ? (clampi(ss.regions[hs].work_reach_mod, 0, params.work_reach_relief_cap_q) * relief_factor_q) / 1000
+                    ? clampi(ss.regions[hs].work_reach_mod, 0, params.work_reach_relief_cap_q)
                     : 0;
                 // 64-bit for the same reason as the holdings loop above: the
                 // sentinel times the cost does not fit an `int`.
@@ -7020,31 +7121,48 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (r.army_stock <= 0) return 0;
                 return (r.army_stock * clampi(r.network_supply_q, 0, 1000)) / 1000;
             };
+            // THE RALLY RESPECTS REACH (review fix). The attacked region must
+            // be on the realm's supplied network (its own `network_supply_q`
+            // above zero -- the capital reaches it over held ground, the test
+            // a gather's hub passes), and a contributor whose line to it
+            // crosses sea marches only where it could land a force by the
+            // attacker's own water gate (BL-778: it can field a naval row at
+            // its band; with BL-1152's fleet rule on, its realm's fleet must
+            // also lift someone). The seat keeps its guard.
             const auto rf_rally = [&](std::size_t ti, bool commit) -> int64_t {
                 if (!rf_on || rf_phase != 1 || rf_realm < 0) return 0;
-                const int seat = out.polities[static_cast<std::size_t>(rf_realm)].capital;
+                if (ti >= ss.regions.size() || owner[ti] != rf_realm) return 0;
+                if (ss.regions[ti].network_supply_q <= 0) return 0;
+                const polity& rq = out.polities[static_cast<std::size_t>(rf_realm)];
+                const int seat = rq.capital;
+                const roster_band rq_band = roster_band_for_capacity(
+                    clampi(rq.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+                const bool rq_lifts = !fleet_rule_on || params.fleet_men_per_hull <= 0
+                                   || fleet_lift_capacity(rq.navy_stock, params.fleet_men_per_hull) > 0;
                 int64_t total = 0;
                 for (std::size_t i = 0; i < owner.size() && i < ss.regions.size(); ++i)
                 {
                     if (owner[i] != rf_realm || i == ti || static_cast<int>(i) == seat) continue;
                     const int64_t take = rf_rally_term(i);
                     if (take <= 0) continue;
+                    if (line_crosses_sea(ss.regions[i], ss.regions[ti], terrain, gw, gh, params.neighbour_radius)
+                     && !(rq_lifts && can_field_naval(ss.regions[i], rq_band)))
+                        continue;
                     total += take;
                     if (commit) draw_army_with_standing(ss.regions[i], take);
                 }
                 return total;
             };
-            // The scorer's read of the same rally: the pool taken once per turn
-            // (nothing an attacker's own scoring does moves another realm's
-            // garrisons), less the target's own term -- exactly what `rf_rally`
-            // would return for it at that moment.
-            int64_t rf_rally_pool = -1;
+            // The scorer's read of the same rally: the very function, asked
+            // without committing, once per target per turn (nothing an
+            // attacker's own scoring does moves another realm's garrisons).
+            std::vector<std::pair<std::size_t, int64_t>> rf_rally_seen;
             const auto rf_rally_estimate = [&](std::size_t ti) -> int64_t {
                 if (!rf_on || rf_phase != 1 || rf_realm < 0 || q.id == rf_realm) return 0;
-                if (rf_rally_pool < 0) rf_rally_pool = rf_rally(static_cast<std::size_t>(-1), false);
-                const int seat = out.polities[static_cast<std::size_t>(rf_realm)].capital;
-                const int64_t own = (owner[ti] == rf_realm && static_cast<int>(ti) != seat) ? rf_rally_term(ti) : 0;
-                return std::max<int64_t>(0, rf_rally_pool - own);
+                for (const auto& kv : rf_rally_seen) if (kv.first == ti) return kv.second;
+                const int64_t v = rf_rally(ti, false);
+                rf_rally_seen.push_back({ ti, v });
+                return v;
             };
 
             // The staging holding reaches the target overland (or over its own
@@ -8583,10 +8701,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // network its own levy gathers along (BL-921), and stand with
                 // the garrison they came to relieve. The scorer read the same
                 // rally (`rf_rally_estimate`), so an attacker saw what it faced.
+                int64_t rf_rallied = 0; // the rallied share of the defence, for a lost field below
                 if (rf_on && rf_phase == 1 && dq != nullptr && dq->id == rf_realm)
                 {
-                    const int64_t rallied = rf_rally(ti, /*commit=*/true);
-                    tgt.army_stock = clampi64(tgt.army_stock + rallied, 0, int64_t{1} << 40);
+                    rf_rallied = rf_rally(ti, /*commit=*/true);
+                    tgt.army_stock = clampi64(tgt.army_stock + rf_rallied, 0, int64_t{1} << 40);
+                    out.rise_fall_rally_heads += rf_rallied;
                 }
 
                 // THE DEFENDER FIELDS WHAT IS STANDING THERE, all of
@@ -8796,6 +8916,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // holding a forward province with an uncovered rear. That
                     // is question A in the shape the item asks for — not "can I
                     // take this" but "can I keep an army there".
+                    // BL-1287 (review fix) -- A LOST DEFENCE DOES NOT ERASE THE
+                    // RALLY. The garrison is dispersed with its province as
+                    // always; the rallied men who survived the battle (their
+                    // share of the defenders' survivors, `tgt.army_stock` as the
+                    // battle left it) march home to their realm's seat -- or,
+                    // where the seat is the ground just lost, to its lowest-index
+                    // other holding -- rather than being overwritten. The
+                    // battle's casualties are the only heads that die.
+                    const int loser_id_rf = dq != nullptr ? dq->id : -1;
+                    if (rf_rallied > 0 && def_men > 0 && loser_id_rf >= 0)
+                    {
+                        const int64_t back = (tgt.army_stock * std::min(rf_rallied, def_men)) / def_men;
+                        int home_r = out.polities[static_cast<std::size_t>(loser_id_rf)].capital;
+                        if (home_r == static_cast<int>(ti) || home_r < 0
+                         || static_cast<std::size_t>(home_r) >= owner.size() || owner[static_cast<std::size_t>(home_r)] != loser_id_rf)
+                        {
+                            home_r = -1;
+                            for (std::size_t ri = 0; ri < owner.size() && ri < ss.regions.size(); ++ri)
+                                if (owner[ri] == loser_id_rf && ri != ti) { home_r = static_cast<int>(ri); break; }
+                        }
+                        if (back > 0 && home_r >= 0)
+                        {
+                            region& hr = ss.regions[static_cast<std::size_t>(home_r)];
+                            hr.army_stock = clampi64(hr.army_stock + back, 0, int64_t{1} << 40);
+                            out.rise_fall_rally_home += back;
+                        }
+                    }
                     tgt.army_stock = atk_survivors;
                     // BL-955: the defender's paid men are gone with the ground;
                     // the conqueror's paid survivors garrison it as its own.
@@ -9299,6 +9446,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 owner[ti]  = q.id;
                 tgt.nation = q.id;
                 void_stale_standing_army(tgt); // BL-955
+                note_taken(ti); // BL-1287: organised this round, unmeasured by its holder yet
                 touch_owner(q.id); // BL-922: this polity's held-only reach is now stale.
 
                 // A CENTRE ORGANISED ABOVE THE CITY-STATE THRESHOLD IS ITS
@@ -9465,6 +9613,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (!out.polities[pi].alive) continue;
                 const int qid  = out.polities[pi].id;
                 const int qcap = out.polities[pi].capital;
+                // BL-1287 (review fix): a realm whose turn ended before it
+                // measured its ground this round reads its holders' old
+                // readings; nothing of it secedes until it has measured.
+                if (params.secession_waits_for_holder
+                    && (static_cast<std::size_t>(qid) >= supply_read_year.size()
+                        || supply_read_year[static_cast<std::size_t>(qid)] != y))
+                    continue;
 
                 // The cut-off set, in region-index order. The capital is never
                 // in it: a seat is by construction at zero distance from itself
@@ -10229,7 +10384,30 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else if (rf_phase == 1 || rf_phase == 2 || rf_phase == 3)
             {
                 const int s = share_pm(rf_realm);
-                if (rec && s > rf_peak_pm) { rf_peak_pm = s; rf_peak_year = y; }
+                // THE SIM READS THE DETECTOR'S PREDICATE, BY CONSTRUCTION (review
+                // fix): the peak is the largest share at ANY read of the span,
+                // whatever the phase; a read above it after the realm fell
+                // re-opens the fall (the halving is measured from the peak that
+                // stands), exactly as `history_pattern_detectors` measures it.
+                if (rec && s > rf_peak_pm)
+                {
+                    rf_peak_pm = s; rf_peak_year = y;
+                    if (rf_phase == 3)
+                    {
+                        rf_phase = 2;
+                        out.rise_fall_fall_year = 0;
+                        out.rise_fall_fall_pm   = -1;
+                    }
+                }
+
+                // A REALM THAT HALVES BEFORE IT TURNS has fallen all the same
+                // (the detector reads any later step at or under half the peak).
+                if (rf_phase == 1 && rec && rf_peak_pm >= rise_fall_floor_pm && s * 2 <= rf_peak_pm)
+                {
+                    rf_phase = 3;
+                    out.rise_fall_fall_year = static_cast<int32_t>(y);
+                    out.rise_fall_fall_pm   = s;
+                }
 
                 if (rf_phase == 1)
                 {
@@ -10332,6 +10510,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else if (rf_peak_pm < rise_fall_floor_pm)           out.rise_fall_why = "its peak fell short of the floor";
             else if (rf_peak_pm >= rise_fall_hegemony_pm)       out.rise_fall_why = "its peak reached hegemony";
             else if (out.rise_fall_fall_year == 0)              out.rise_fall_why = "its share never halved";
+            else if (out.rise_fall_fall_year - rf_peak_year > rise_fall_window_years)
+                                                                out.rise_fall_why = "its share halved only after the window";
             else if (out.rise_fall_breakaways < 1)              out.rise_fall_why = "nothing broke away from it in its fall";
         }
         out.rise_fall_missed = !out.rise_fall_why.empty();

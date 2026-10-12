@@ -2710,9 +2710,9 @@ struct history_sim_params
     /// further (the terrain price of reach and the burden of breadth relieved)
     /// and rallying its armies to its own ground under attack while its seat
     /// keeps its guard, its victories steadying it (cohesion) -- until it
-    /// peaks; then the same
-    /// network is overextended (the terrain price of reach raised, its works'
-    /// reach relief no longer kept up) so that its
+    /// peaks; then it is overextended ON THE MAP -- its roads and works decay
+    /// on the ground (`region::work_reach_mod`) and its far garrisons go home
+    /// to its capital, no private price -- so that its
     /// far ground falls under `secession_supply_floor_q` and secedes by the
     /// BL-896 mechanism until its share halves. Each lean is a LEVEL; the
     /// backstop raises a level, one bounded step at a time, whenever a recorded
@@ -2721,10 +2721,11 @@ struct history_sim_params
     /// isolating fixture keeps its meaning and the later spans never lean.
     bool rise_fall_target = false;
 
-    /// BL-1287 (a defect the rise exposed): ground conquered this round is
-    /// not walked by the secession block until its new holder has measured
-    /// it (its next turn) -- `network_supply_q` still carries the old
-    /// holder's reading. ON on generation's Empires round beside the target;
+    /// BL-1287 (a defect the rise exposed): ground conquered or organised this
+    /// round is not walked by the secession block until its new holder has
+    /// measured it (its next turn) -- `network_supply_q` still carries the old
+    /// holder's reading -- and a realm whose turn ended before it measured its
+    /// ground this round secedes nothing that round. ON on generation's Empires round beside the target;
     /// struct-default OFF so every isolating fixture keeps its meaning.
     bool secession_waits_for_holder = false;
 
@@ -2749,13 +2750,19 @@ struct history_sim_params
     int rise_cohesion_step_q  = 40;
     /// The rise's level ceiling: the backstop never presses past it.
     int rise_max_level        = 12;
-    /// Per level, per mille: what overextension adds to the realm's terrain
-    /// price of reach after its peak, and the fall's level ceiling.
-    int fall_reach_step_q     = 400;
-    /// Per level, per mille: the share of its works' reach relief (roads
-    /// and waystations, `region::work_reach_mod`) the overextended realm no
-    /// longer keeps up.
-    int fall_relief_step_q    = 150;
+    /// THE FALL ACTS ON THE MAP (Ben, 2026-10-12). Per level, per year: the
+    /// reach relief (`region::work_reach_mod`) every region of the
+    /// overextended realm loses on the ground -- its roads and works decay.
+    int fall_works_decay_per_year_q = 5;
+    /// Per level, per round, per mille of a walked corridor's live uses: its
+    /// roads decay (at least one use a round), on the ground's own record.
+    int fall_road_decay_q     = 40;
+    /// A holding whose last supply reading is at or under this is FAR, and
+    /// its garrison thins: per level, per round, this many per mille of its
+    /// army goes home to the capital (conserved).
+    int fall_far_supply_q     = 500;
+    int fall_thin_per_level_q = 100;
+    /// The fall's level ceiling.
     int fall_max_level        = 12;
     /// The share (per mille of held regions) at which the rise stops being
     /// pressed, below the hegemony cap so a hegemon still fails (BL-224); and
@@ -4825,6 +4832,11 @@ struct history_sim_state
     int32_t     rise_fall_room_total   = 0; ///< Held regions in the world at the pick (the floor is read against these).
     int32_t     rise_fall_boxed_realm  = -1; ///< The realm largest at the pick, when it was boxed and the rise gave way (-1: it did not).
     int32_t     rise_fall_boxed_room   = 0;  ///< That boxed realm's reachable ground, in regions.
+    int64_t     rise_fall_roads_decayed   = 0; ///< REPORT-ONLY: corridor-rounds the fall decayed a road on
+    int64_t     rise_fall_works_decayed   = 0; ///< REPORT-ONLY: region-rounds the fall decayed reach relief on
+    int64_t     rise_fall_heads_sent_home = 0; ///< REPORT-ONLY: far-garrison heads the fall sent home to the capital
+    int64_t     rise_fall_rally_heads     = 0; ///< REPORT-ONLY: heads the rise's rally marched to a defence
+    int64_t     rise_fall_rally_home      = 0; ///< REPORT-ONLY: rallied survivors of a lost defence sent home
     bool        rise_fall_missed      = false;
     std::string rise_fall_why;              ///< Which clause missed, when it did.
 };

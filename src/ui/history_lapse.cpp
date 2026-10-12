@@ -5171,13 +5171,13 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
                           polity_name_of(h, e.polity), R);
         break;
     case lapse_event_kind::overextended:
-        // BL-1287: after its peak, the same realm's reach is overextended one
-        // level further, and its far provinces slip beyond its seat.
+        // BL-1287: after its peak, the same realm's roads and works decay and its
+        // far garrisons thin, one level further (the fall acts on the map).
         if (e.other <= 1)
-            std::snprintf(buf, sizeof buf, "%s has overreached: %s can no longer rule its far provinces.",
+            std::snprintf(buf, sizeof buf, "%s has overreached: its roads decay, and %s calls its far garrisons home.",
                           polity_name_of(h, e.polity), R);
         else
-            std::snprintf(buf, sizeof buf, "The overreach of %s deepens; more of its ground slips from %s.",
+            std::snprintf(buf, sizeof buf, "The overreach of %s deepens; its roads decay further from %s.",
                           polity_name_of(h, e.polity), R);
         break;
     case lapse_event_kind::civil_war_famine:
