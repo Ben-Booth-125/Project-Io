@@ -101,7 +101,10 @@ each is reconciled where it can be read:
 - **A champion the reconciliation must charter may take any land tile of its nation (Ben,
   2026-10-12).** Where no placement window of the minor's centres holds ground, the champion is
   placed on any land tile its nation holds, so the major target is hit; it may open with weaker
-  holdings. Ordinary chartering keeps its windows.
+  holdings. Ordinary chartering keeps its windows. **Where the nation has no free land tile at
+  all** — its own background firms hold every one — the state charter founds the champion by
+  **consolidating those firms**: they merge into it with their holdings, recorded in the same
+  state-charter event, and nothing is destroyed (Ben, 2026-10-12).
 - **The target outranks the floor (Ben, 2026-10-11).** Where no secession can leave both sides
   above the minimum territory, the closing rounds still split a province, choosing the split that
   leaves the smallest shortfall, so the total is always hit. A nation below the floor is the cost of
@@ -519,7 +522,11 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   stores every round** — a standing levy on what its own ground produces, swept into the chest as
   the 1200 consolidation once swept it, but every round rather than once — and **endowment income
   is rescaled** so a small realm earns too. Not a larger conversion rate, not a reserve granted at
-  the handoff. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
+  the handoff. **The endowment is summed over the ground a realm holds, not averaged (Ben,
+  2026-10-12)**, so a larger realm earns more and the inherited order holds: a flat per-realm
+  endowment reached the band but scrambled which realms were richest. With real chests, the
+  treasury's conversion into industry points (`industry_points_per_treasury_unit`) is re-sized so
+  the treasury term is again the same order as the scale term. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
   the library, so it is not where the money goes.)
 - **Measured before the ruling** (`tools/verify/treasury_census.cpp`, 16 library seeds): 99.6% of
   every chest is the one-time 1200 fold of the seats' stores; the ongoing earn after it is about
