@@ -41,7 +41,7 @@ failed gate, as its serial run does).
 
 ## Rules
 
-- **One heavy parallel run per machine at a time.** A shard set already uses
+- **One heavy parallel run per machine at a time — enforced:** the runner queues on a lock in the main checkout. A shard set already uses
   every core; two at once only slow each other. Queue them.
 - Not for the fixed-fixture harnesses (`world_determinism`,
   `history_sim_harness`, `exploration_sim_harness`, `realm_names_check`) — they
