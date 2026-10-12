@@ -853,6 +853,10 @@ and the acceptance row "never all, never none" are overturned.
 - **A fixed late window, 1900 to 1930.** The war is fought inside it, leaving the last thirty years
   of the span to redevelop. It is the second sanctioned window after the rise and fall's; how the
   war forms inside it is still the mutual-defence spread below.
+- **What starts it when nothing does (Ben, 2026-10-12).** If the treaty graph sparks no general war
+  by the window, **a contest for a subject between the two largest powers** fires inside it, and
+  mutual defence spreads it. If the lean still misses, it escalates in bounded, recorded steps until
+  the detector passes, as every always-hit pattern does.
 - **Razing falls only on ground fought over.** A region the war contests loses works
   (`region::industry_points`) and port stock (`region::port_stock_q`), and every road through it
   is demoted one tier. Regions the war never reaches are untouched.
@@ -865,7 +869,9 @@ and the acceptance row "never all, never none" are overturned.
 **A LEAN (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns).** The disparity between a
 nation's cities is read after Exploration; where it is wide, a splinter can rise in this span and take
 the whole nation. It overturns, for this span, the Empires rule that no regime resets while the map
-stands still (`CIVILISATION.md`). A revolution is a lean and promises nothing.
+stands still (`CIVILISATION.md`). A revolution is a lean and promises nothing. **What a takeover
+changes (Ben, 2026-10-12):** the polity and its ground stay; it takes **a new regime and a newly
+coined name**, and the takeover is recorded as a revolution event.
 
 #### A world war is permitted, never forced (the 2026-09-15 ruling, superseded in part above)
 

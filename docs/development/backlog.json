@@ -820,7 +820,7 @@
    "design": "DESIGNED (Ben, 2026-10-10): GENERATION_STRATEGY.md § History patterns. One predicate per pattern over the history record (lapse_event + span records), naming the polities it touched; emits pattern tags carried polity -> nation (NATION_GENERATION's fold). FIRST: measure how often each pattern already happens across the 16 library seeds, unforced - it sets each lean's size and whether reconciliation has much to do. The detectors are also the gates of BL-1287, BL-1288, BL-1289. MEASURED (2026-10-11, tools/verify/history_patterns.cpp over the 16 library seeds, provisional thresholds, main 54d462a0): rise and fall 0/16 (largest realm peaks at 7.6-22.6% of held regions, none near the 50% hegemony cap; 9/16 peak in the second half of Empires; none halves with a successor breaking from it); late culture 0/16 (the most isolated founding culture has no living realm at the Empires close on 8/16 seeds and is never bound in Exploration; Exploration binds 0-5 of 28-75 cultures); world war 0/16 (at most 3 of the six most populous realms touched by conflict in any 30-year window; total population never falls in the span); civil war 16/16 under the loose reading (a successor with a quarter of its parent fights it within 50 years: 4-175 per seed - the existing secession already makes it, minus the civilian famine/displacement mechanism); revolution 0/16 (the Industrialisation span records no split at all). BL-1278 reading: nations 20-69 (9/16 over 40), living polities 37-95, nations with a planned specialist 3-11 (3/16 over 6). The src/ detectors and tags remain this item's build. RULED (Ben, 2026-10-11): the detectors take the readings written into CIVILISATION.md (rise size floor, civil war reading) and EXPLORATION.md (late culture at the Culture close)."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 53,
    "written": "2026-10-10",
@@ -840,10 +840,10 @@
     "src/world/history_sim.cpp"
    ],
    "title": "The rise and fall: one realm grows largest through successive victories early in Empires and breaks down within a window, every world",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS TARGETED). Overturns 'never scheduled' for one realm's window only; the fall is still breakdown + secession. OPEN: the window's span and how 'early' is read; lean then reconciliation verbs; the non-hegemony cap (NR-1034). RULED (Ben, 2026-10-11): peak at a floor of 25-35% of held regions (set in band by measurement), under the 50% cap; region share is the measure (CIVILISATION.md). Unforced peak 8-23%."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS TARGETED). Overturns 'never scheduled' for one realm's window only; the fall is still breakdown + secession. OPEN: the window's span and how 'early' is read; lean then reconciliation verbs; the non-hegemony cap (NR-1034). RULED (Ben, 2026-10-11): peak at a floor of 25-35% of held regions (set in band by measurement), under the 50% cap; region share is the measure (CIVILISATION.md). Unforced peak 8-23%. RULED (Ben, 2026-10-12): the realm largest at 200 BCE rises; peaks by 400 CE; its share halves within 300 years of the peak; backstop = the lean escalates in bounded recorded steps until the detector passes (CIVILISATION.md)."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 53,
    "written": "2026-10-10",
@@ -863,10 +863,10 @@
     "src/world/history_sim.cpp"
    ],
    "title": "The late culture: one distant culture develops slower from its isolation and is colonised in Exploration, every world",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): EXPLORATION.md § A colony is a subject (THE LATE CULTURE IS TARGETED). A development lag read from remoteness, carried from the Culture round; bound by the ordinary subjection verbs. OPEN: the lag mechanism (no development-lag mechanism exists today), which culture is chosen (NR-1034), reconciliation if the lean misses. RULED (Ben, 2026-10-11): chosen at the Culture close (most remote by reach); the same isolation that lags its development slows its conquest, so it reaches Exploration holding a realm (EXPLORATION.md). Unforced, that culture has no realm by 1200 on 8/16 seeds. RULED (Ben, 2026-10-11): the lag is development diffusing by contact in proportion to reach; every culture feels it, the most remote receives least (EXPLORATION.md)."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): EXPLORATION.md § A colony is a subject (THE LATE CULTURE IS TARGETED). A development lag read from remoteness, carried from the Culture round; bound by the ordinary subjection verbs. OPEN: the lag mechanism (no development-lag mechanism exists today), which culture is chosen (NR-1034), reconciliation if the lean misses. RULED (Ben, 2026-10-11): chosen at the Culture close (most remote by reach); the same isolation that lags its development slows its conquest, so it reaches Exploration holding a realm (EXPLORATION.md). Unforced, that culture has no realm by 1200 on 8/16 seeds. RULED (Ben, 2026-10-11): the lag is development diffusing by contact in proportion to reach; every culture feels it, the most remote receives least (EXPLORATION.md). RULED (Ben, 2026-10-12): backstop for every target pattern = the lean escalates in bounded recorded steps until the detector passes (GENERATION_STRATEGY.md)."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 53,
    "written": "2026-10-10",
@@ -886,10 +886,10 @@
     "src/world/history_sim.cpp"
    ],
    "title": "A world war in every world: population, industry, roads and ports, and treasuries lost, and the world redevelops before 1960",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § A world war in every world. Overturns 'permitted, never forced'. Builds on the PROPOSED mutual-defence spread (the clause exists in code; no world-war, conscript or refugee code exists). OPEN: razing industry and capital is not designed; war debt; redevelopment pace so 1960 opens on a recovery; Alarm interplay. Moves the 1960 economy: re-bless with Ben's go. RULED (Ben, 2026-10-11): fought inside a fixed 1900-1930 window; razing only on regions fought over (industry_points, port_stock_q cut, roads through them demoted a tier); treasuries drained to no lower than zero, no debt carried into 1960 (INDUSTRIALISATION.md § A world war in every world)."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § A world war in every world. Overturns 'permitted, never forced'. Builds on the PROPOSED mutual-defence spread (the clause exists in code; no world-war, conscript or refugee code exists). OPEN: razing industry and capital is not designed; war debt; redevelopment pace so 1960 opens on a recovery; Alarm interplay. Moves the 1960 economy: re-bless with Ben's go. RULED (Ben, 2026-10-11): fought inside a fixed 1900-1930 window; razing only on regions fought over (industry_points, port_stock_q cut, roads through them demoted a tier); treasuries drained to no lower than zero, no debt carried into 1960 (INDUSTRIALISATION.md § A world war in every world). RULED (Ben, 2026-10-12): if nothing sparks a general war by the window, a contest for a subject between the two largest powers fires inside it and mutual defence spreads it; backstop escalates in bounded recorded steps (INDUSTRIALISATION.md)."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 53,
    "written": "2026-10-10",
@@ -909,10 +909,10 @@
     "src/world/history_sim.cpp"
    ],
    "title": "Civil war as a lean: a splitting realm's halves fight; soldiers die, and a famine and displacement mechanism takes civilians",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md and MILITARY_HISTORY.md § Armies are distinct from population. Secession gains a fighting step; civilian deaths only via a separately authored famine/displacement mechanism (the door the 2026-09-09 ruling left open). OPEN: the mechanism itself; guard against the empty-region failure. RULED (Ben, 2026-10-11): the loose reading counts and is already met 16/16 (successor >= 1/4 of parent, fighting within 50 y; CIVILISATION.md). The build is ONLY the civilian famine/displacement mechanism."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md and MILITARY_HISTORY.md § Armies are distinct from population. Secession gains a fighting step; civilian deaths only via a separately authored famine/displacement mechanism (the door the 2026-09-09 ruling left open). OPEN: the mechanism itself; guard against the empty-region failure. RULED (Ben, 2026-10-11): the loose reading counts and is already met 16/16 (successor >= 1/4 of parent, fighting within 50 y; CIVILISATION.md). The build is ONLY the civilian famine/displacement mechanism. RULED (Ben, 2026-10-12): contested regions lose a famine share while fought over; a further share flees to safe regions of the same people (conserved); bounded per year, recorded (MILITARY_HISTORY.md)."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 53,
    "written": "2026-10-10",
@@ -932,7 +932,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "Revolution as a lean in Industrialisation: post-Exploration disparity between a nation's cities breeds a splinter that can take the whole nation",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § Revolution. Off the post-Exploration city disparity (inequality stays between nations and cities, never households). Overturns 'no regime reset' for this span. OPEN: the splinter verb, what a takeover changes (regime field, name, polity id), its tag."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § Revolution. Off the post-Exploration city disparity (inequality stays between nations and cities, never households). Overturns 'no regime reset' for this span. OPEN: the splinter verb, what a takeover changes (regime field, name, polity id), its tag. RULED (Ben, 2026-10-12): a takeover keeps the polity and ground; a new regime and a newly coined name; recorded as a revolution event (INDUSTRIALISATION.md)."
   },
   {
    "status": "designed",

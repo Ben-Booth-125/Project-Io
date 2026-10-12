@@ -100,6 +100,22 @@ for ((i = 0; i < N; ++i)); do
     SHARD[$k]="${SHARD[$k]:+${SHARD[$k]},}${SEED_ARR[$i]}"
 done
 
+# ONE HEAVY RUN PER MACHINE (BL-1299). A shard set already uses every core, so
+# two at once only slow each other. The lock lives in the MAIN checkout (found
+# through git's common dir), so every worktree's runner queues on the same one.
+# mkdir is atomic; a lock older than 6 h is a crashed run and is broken.
+COMMON="$(git rev-parse --git-common-dir 2>/dev/null)"
+LOCK="$(cd "$(dirname "${COMMON:-.git}")" && pwd)/build_gen/verify/out/par_seeds.lock"
+mkdir -p "$(dirname "$LOCK")"
+WAITED=0
+until mkdir "$LOCK" 2>/dev/null; do
+    if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +360 2>/dev/null)" ]; then rm -rf "$LOCK"; continue; fi
+    [ "$WAITED" = 0 ] && echo "par_seeds: another heavy run holds the machine ($(cat "$LOCK/owner" 2>/dev/null)); queued"
+    WAITED=1; sleep 15
+done
+echo "$H pid $$ $(date +%T) $ROOT" > "$LOCK/owner"
+trap 'rm -rf "$LOCK"' EXIT
+
 echo "par_seeds: $H over $N seed(s) in $JOBS shard(s) [${TIER}${RANGE:+, range $RANGE}]  args: ${HARGS[*]:-(none)}"
 T0=$(date +%s)
 for ((k = 0; k < JOBS; ++k)); do

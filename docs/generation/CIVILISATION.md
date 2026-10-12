@@ -776,7 +776,19 @@ before.
 holds at least a **floor of 25 to 35 percent of the world's held regions** — the exact floor is set
 inside that band by measurement — and stays **under the 50 percent non-hegemony cap**, which is not
 overturned: a hegemon still fails the handoff. Region share, not population share, is the measure.
-The unforced worlds fall well short of the floor: their largest realm peaks at 8 to 23 percent. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
+The unforced worlds fall well short of the floor: their largest realm peaks at 8 to 23 percent.
+
+**When, and which realm (Ben, 2026-10-12).** The realm that rises is **the one already largest at
+200 BCE** — the lean backs the front-runner, so the rise reads as a lead pressed home. It **peaks by
+400 CE**, the first half of the span, and its share **halves within 300 years of the peak**. The lean
+presses its victories on the way up; the fall comes by this section's mechanism — supply fails and
+regions secede — with the breakdown pressed after the peak. **If the lean misses, it escalates
+in-world in bounded steps until the detector passes, each step a recorded cause** — the same shape as
+the nation totals' closing rounds (`NATION_GENERATION.md` § The nation count is a target).
+**A boxed front-runner gives way (Ben, 2026-10-12).** Where the realm largest at 200 BCE cannot reach
+the floor — an island, or a realm already holding its whole landmass — the rise falls to the largest
+realm at 200 BCE whose reachable ground can hold the floor. The floor is **25 percent** (measured:
+peaks of 25 to 41 percent across the library). **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
 only walking away; the deaths are soldiers', plus the famine and displacement mechanism
 `MILITARY_HISTORY.md` owns. **What counts as one (Ben, 2026-10-11):** a successor that breaks away
 holding at least a quarter of what its parent kept, and then takes a seat from or ends its parent (or

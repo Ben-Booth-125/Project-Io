@@ -524,9 +524,12 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   is rescaled** so a small realm earns too. Not a larger conversion rate, not a reserve granted at
   the handoff. **The endowment is summed over the ground a realm holds, not averaged (Ben,
   2026-10-12)**, so a larger realm earns more and the inherited order holds: a flat per-realm
-  endowment reached the band but scrambled which realms were richest. With real chests, the
-  treasury's conversion into industry points (`industry_points_per_1000_treasury_units`, per thousand units since the rate fell below one point a unit) is re-sized so
-  the treasury term is again the same order as the scale term. ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
+  endowment reached the band but scrambled which realms were richest. **It is read as a share of the
+  world's ground (Ben, 2026-10-12)**: a realm earns by the share of its world's held ground it holds,
+  so a small world's nations are not poorer for the world being small and every world's median lands
+  near the band. With real chests, the treasury's conversion into industry points (`industry_points_per_1000_treasury_units`, per thousand units since the rate fell below one point a unit) is re-sized toward
+  the scale term — **at the lowest rate that keeps market_viability's G1 at tick 50 at or above its
+  target** (Ben, 2026-10-12; the same-order rate cost it 2.8 points). ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
   the library, so it is not where the money goes.)
 - **Measured before the ruling** (`tools/verify/treasury_census.cpp`, 16 library seeds): 99.6% of
   every chest is the one-time 1200 fold of the seats' stores; the ongoing earn after it is about

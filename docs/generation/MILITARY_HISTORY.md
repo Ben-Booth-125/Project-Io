@@ -223,7 +223,11 @@ A civil war in Empires kills soldiers in its battles as any war does, and kills 
 a **famine and displacement mechanism** authored for it and visible as such — never a coefficient in
 a battle. The empty-region accounting this section replaced stays replaced. The fighting already
 happens (`CIVILISATION.md` § How an empire actually falls holds the reading); the famine and
-displacement mechanism is the whole of what civil war adds (Ben, 2026-10-11).
+displacement mechanism is the whole of what civil war adds (Ben, 2026-10-11). **Its shape (Ben,
+2026-10-12):** while a region is fought over in a civil war it loses a share of its people to
+**famine**, and a further share **flees to safe regions of the same people** — the flight conserves
+people, the famine does not. Both are bounded per year so no region is emptied, and both are
+recorded as named moments.
 
 **Industrialisation takes that exception, and only by that route (Ben, 2026-09-15):** *"we really need
 to ensure that people die when wars happen."* Industrial war kills through named, visible
