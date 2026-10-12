@@ -339,7 +339,7 @@ rule), so a rival's structure draws exactly as the player's.
 `(type, target)`, `placement_rules::stack_members` — placed by a fixed in-tile layout,
 the dominant (lowest-id) stack largest and in front, **up to three**; a fourth stack and
 beyond adds nothing to the ground. Two buildings of one stack are one structure: the art
-says *what stands here*; the Selection element's Production section says *how many*
+says *what stands here*; the Selection element's tile card says *how many*, on the stack's button
 (SELECTION.md § The tile element's layout).
 
 **Settlements are structures too.** A population centre bakes as a settlement whose

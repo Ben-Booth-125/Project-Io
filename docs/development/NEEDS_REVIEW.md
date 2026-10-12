@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*25 entries — 25 open, 0 resolved.*
+*26 entries — 26 open, 0 resolved.*
 
 ---
 
@@ -230,6 +230,20 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 > **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
+
+### NR-1044 — Sprint 54 tile card: five calls taken filling gaps in Ben's 2026-10-13 form
+*decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1300 tile card split)*
+
+Written into SELECTION.md: (1) Selecting a building by any route keeps selected_entity on the building and draws the host tile's card with that stack expanded - so canvas presses, the repeat-click Building rung and ledger rows keep working unchanged. (2) The expanded building card is one card: a status line (running state + reason, or construction ETA) over the profitability charts; a rival's is the status line + owner + private. (3) The capacity tooltip names the ceiling's four sustain inputs (area, infrastructure, habitability, population) with their shares. (4) The table's 'Resource' column is the province's summed deposit of that good, richest first. (5) Only the tile drops the header row; body, market, nation/corporation, unit and battle keep it, since their go-to is not a no-op.
+
+**Why it matters.** Each fills a gap the form did not cover; (1) decides whether a building can still be selected at all, and (5) decides whether the header removal reaches every selection kind.
+
+- Accept all five
+- Overturn any by number
+
+> **Recommendation:** Accept. Also note the tile card is ~260 px wide at 1720x1080, so the expanded profitability charts get about 60% of their old width; the live click will show whether that reads.
+
+*Files: `docs/ui/SELECTION.md`*
 
 ---
 

@@ -134,119 +134,89 @@ non-spatial entities (nation, corporation) open the relevant ledger.
 ### The tile element's layout
 
 A selected **Tile** takes a dedicated layout (`draw_tile_selection`,
-`src/ui/selection_panel.cpp`) running **left to right** across the band's three
-horizontal columns (Ben, 2026-07-28):
+`src/ui/selection_panel.cpp`) running **left to right** across the band in four columns
+(Ben, 2026-10-13, the sprint 54 tile pass; it supersedes the 2026-07-28 three-column layout
+and the 2026-08-24 six-section nav):
 
-1. **Left quarter — zoomed hex neighbourhood.** A bordered render of the selected tile and its
-   immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — the
-   actual terrain render, not a placeholder image.
-2. **Centre half — a SECTION TOP NAV over six sections**, in this order
-   (`ui_state::card_tile_view` holds which is showing):
+> **Preview → Province → Tile → Actions**
 
-   > **Production → Buildings → Deposits → Resources → Population → Terrain**
+**The tile element draws no header row.** The shared `[icon] Tile [x, y] · type  [>]` row
+spent a line of the band on a name the canvas already shows and a 'go to' that is a no-op for
+a tile (§ Action + Facts). The whole band height goes to the four columns. Kinds that are not
+a tile keep the shared header (§ Layout & chrome).
 
-   **The order is the argument, not a shuffle.** It opens on what is *happening* here — what
-   the tile makes and what that fetches where it sells (Ben, 2026-10-08, the sprint 51
-   visibility pass: the initial market conditions, read from the ground the player is looking
-   at) — then runs from what the player can *act on* — what can still be built here — through
-   what is there to be taken (the stock, its yield, the workforce that would take it) to what
-   the ground merely *is*. The reading you can do nothing about is last.
+1. **Preview — the zoomed hex neighbourhood.** A bordered render of the selected tile and its
+   immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out, drawn
+   from the **baked neighbourhood page** — the same ground, structures and grade the canvas
+   draws. **Until that page is ready for this tile, the box shows a loading bar**, not flat
+   per-hex colour fills. The fills read as a second, strategic-looking map of the same ground,
+   which is a claim about what the tile looks like that the bake then contradicts a moment
+   later. A bar says the true thing: the picture is coming.
+2. **Province — one titled card**, province grain throughout, the selected tile serving only
+   to name which province is meant. No pager: everything the province answers fits one card.
+   Top to bottom:
+   - **Capacity** — the province's building count against its **province building ceiling**
+     (`../economy/PRODUCTION.md` § The province building ceiling), drawn as a **bar**. Hovering
+     the bar opens a tooltip naming **where the capacity is granted** — the ceiling's four
+     sustain inputs (area, infrastructure, habitability, population), each with its share, the
+     same terms `province_building_ceiling` computes from. A ceiling of `-1` is UNKNOWN and the
+     bar says so rather than drawing room.
+   - **The resource table** — one row per workable resource in the province, three columns:
+     **Built** (extraction sites in the province targeting it), **Max** (the province's placement
+     capacity for it — summed `stack_capacity` over member tiles that would accept an extraction
+     site, through the same `can_place_in_world` the placement seam uses, so the table cannot
+     disagree with the build button) and **Resource** (the province's deposit of it, **summed**
+     across member tiles — a deposit is a stock, so several tiles each holding a little iron *is*
+     one province holding that much). Richest deposit first. This one table replaces the former
+     separate Buildings and Deposits sections: they were two readings of the same rows.
+   - **Population** — the province total in thousands, then each population centre by name
+     with its scale word (Outpost / Settlement / Town / City / Metropolis, POPULATION.md
+     § Scale bonus model), headcount and habitability, largest first; a centre standing on the
+     *selected tile itself* is marked. Province grain because the data model is.
 
-   **The nav is one row, and the section below it takes the whole body.** Ben, 2026-08-24:
-   *"a topnav left and right chevron, with a full canvas expansion button… straddle left and
-   right buttons across the entire span, excepting the expand chevron. And our open accordion
-   element title should be centred."*
+   On unpartitioned ground (ocean) the card says there is no province and falls back to the
+   tile's own deposits.
+3. **Tile — one titled card: the buildings on this tile.** Tile grain, because a building
+   stands on a tile. **Buildings only** — no market or price rows; what the tile's goods fetch
+   is the Market ledger's question.
+   - **A grid of building buttons, three across**, one button per **stack** (grouped by type,
+     what it makes, and owner — `placement_rules::stack_members`; a rival's stacks group by
+     type and owner only, since splitting them by recipe would itself reveal the recipes). Each
+     button carries the **type glyph** (`icons::building`, with the stack's count when above
+     one), the **building name**, and its **net profit per quarter** (`estimate_building_profit`,
+     the figure the Profitability page charts), coloured by sign. A **rival's** button shows
+     glyph and name, with profit reading *private* (DISCOVERY.md, the competitor-visibility
+     rule). A stack still under construction shows its ETA in place of profit.
+   - Running state (Understaffed, Idle and its reason) is **not** on the button. It is read on
+     the building's own Status page, one press away, and in the building hover card.
+   - **An unbuilt tile states *Nothing built here* positively.**
+   - **Pressing a button expands that building in place** — § The building element's layout.
+     The province card and the preview stay where they are; only the tile card and the action
+     grid change.
+4. **Actions — a 2×3 button grid** (2 columns × 3 rows). For the tile: **Construct Buildings**
+   (opens the **tile construction ledger** — `draw_construction_ledger`, see below; drawn with
+   a "primed" accent ring when something is placeable and nothing is under way), **History**
+   and **Supply** (both drawn disabled — History has no surface; supply routing is the Supply
+   lens's subject, LENSES.md), and reserved slots so the grid's shape never changes. There is
+   no **Manage Buildings** button: the building grid *is* the tile's buildings. **While a
+   building is expanded, the grid retargets to that building's actions** (§ The building
+   element's layout).
 
-   - **The chevrons straddle the span** — hard left, hard right — rather than clustering
-     around the title, so the two presses sit the largest possible distance apart.
-   - **The title is centred on the run between them**, with an `i/N` count that says how many
-     readings exist. That count is what an accordion's stack of headers was buying, at one row
-     instead of five.
-   - **The full-canvas control keeps the rightmost slot** and is excepted from the straddle —
-     the same two-control disclosure idiom every other surface uses, and `disclosure_controls`
-     owns its glyph. `in_place` is false here: a section is already the whole body, so the only
-     larger state is the canvas.
-   - **The nav wraps** in both directions, so six presses of either chevron return to where
-     you started.
+**What retired, and why** (Ben, 2026-10-13):
 
-   *A vertical accordion was built first, on Ben's earlier ruling the same day, and ruled out
-   on sight. The measurement is why: five stacked headers spent **169 of the band's 258 px** on
-   chrome to leave the open section **89**. The nav spends one frame height.*
-
-   - **Production** — **tile grain**, the one section that is (Ben, 2026-10-08; owner BL-1239,
-     tile production section): a building
-     stands on a tile and a market's catchment is tile-keyed, so a province sum would blur the
-     two things this section exists to join. Two parts, top to bottom:
-     - **What stands here and what it makes.** One row per **stack** on the tile — grouped by
-       type, what it makes (extraction target or active recipe) and owner, so two recipes or two
-       owners on one tile are two rows; a rival's rows group by type and owner only, since splitting
-       them by recipe would itself reveal the recipes — carrying the type glyph and count (this is where the retired `+N` badge's count
-       is read), the good it makes, its output per tick, and its **running state**: *Running*,
-       *Understaffed* (labour short), *Partial* (staffed but an input short), *Idle* or
-       *Mothballed*, or *Under construction* with its ETA. An idle, partial or understaffed row
-       **says why** — labour short, or an input short, naming the input and its
-       cause (none on the shelf, posted over the fair-price ceiling, no producer in reach). The
-       state and its reason come from the one function the building hover card reads
-       (`hover_building_detail`'s classification), so the two surfaces cannot disagree. This
-       section is where running state lives now that the canvas draws none (RENDERING.md
-       § Installations, the art is static). A **rival's** stack row shows type, count and owner;
-       output and running state read *private* (DISCOVERY.md, the competitor-visibility rule).
-     - **What it fetches here.** The **market whose catchment holds this tile**, named, then one
-       row per good — every good this tile's stacks make, then every good deposited on the tile
-       — with that market's price and its state (*short*, *balanced*, *surplus*), read from the
-       public market aggregates. A row is a drill-through door to the Market ledger aimed at
-       that market and good (DRILL_THROUGH.md), not a control.
-
-     **An unbuilt tile still opens here.** The first part states *Nothing built here*
-     positively, and the second still lists the deposited goods at their market — on a fresh
-     campaign that is the initial market conditions, which is the read this section was added
-     for. A water tile takes its own centre column (§ A water tile is selectable) and has no
-     Production section.
-   - **Buildings** — a table **per province throughout** (Ben, 2026-08-22), the selected tile
-     serving only to name which province is meant: the province's total building count against
-     its ceiling (`-1` is UNKNOWN and is said, never rendered as room), then one row per
-     workable resource with **Built** (extraction sites in the province targeting it) and
-     **Max** (the province's placement capacity for it — summed `stack_capacity` over member
-     tiles that would accept an extraction site, computed through the same `can_place_in_world`
-     the placement seam uses so the table cannot disagree with the build button). No chart: the
-     question is a comparison of small integers.
-   - **Deposits** — the province's deposits **summed** across its member tiles, richest first.
-     Summing is the right reduction because a deposit is a **stock**: for a player deciding
-     whether a locality is worth a mine, several tiles each holding a little iron *is* one
-     province holding that much iron. On unpartitioned ground (ocean) the section falls back to
-     the tile's own deposits and says so, rather than reading as "nothing here".
-   - **Resources** — one chart per resource **deposited on the selected tile**, chosen through
-     a **dropdown** rather than paged (reading the seventh deposit must not cost six presses):
-     this tile's hazard-adjusted production vs. the top-decile tile for that resource, a
-     **clustered column pair** sharing a baseline — "Tile" green, "Top 10%" muted, nice
-     1/2/5-rounded ceiling, dotted gridlines. `ui_state::card_resource_page` selects the
-     resource. Only these charts are click-drillable into a time-series history (BL-196,
-     resource drill-down). Deposits *sums* where Resources *charts*: the two ask different
-     questions of the same ground, which is why both earn a section.
-   - **Population** — the population centres standing in the tile's province: the province
-     total in thousands, then each centre by name with its scale word (Outpost / Settlement /
-     Town / City / Metropolis, POPULATION.md § Scale bonus model), headcount and habitability,
-     largest first; a centre standing on the *selected tile itself* is marked. This section is
-     province-grain because the **data model** is — population lives on population centres, not
-     on arbitrary tiles — so a per-tile version would have to invent a number.
-   - **Terrain** — the tile's own **Habitability** and **Hazard** scalars, each charted against
-     this body's average ("Body avg" muted), so a barren tile still has something to read.
-     Chosen through the same dropdown Resources uses; they carry no per-tile history, so their
-     chart is not a click target.
-
-   Resources and Terrain draw through one `tile_metrics` list — the full-canvas fold charts the
-   same pages by index, so the split is a filter, not a second builder — and share one chart
-   body, so the drill and the disclosure control cannot come to differ between them.
-
-   Atmospheric pollution is **not modelled** and so has no section.
-3. **Right quarter — a 2×3 action button grid** (2 columns × 3 rows — the quarter-width
-   column is too narrow for 3-across to read as bigger than an icon strip): **Construct
-   Buildings** (opens the **tile construction ledger** — `draw_construction_ledger`, see below;
-   drawn with a "primed" accent ring when something is placeable and nothing is under way),
-   **Manage Buildings** (disabled unless a building occupies the tile; routes to the
-   management surface), **History** and **Supply** (both drawn disabled — History has no
-   surface; supply routing is the Supply lens's subject, LENSES.md), plus **two reserved
-   slots** so the grid's shape never changes when a fifth or sixth action arrives.
+- **The Resources section** (a per-deposit chart of this tile's yield against the top decile)
+  and **the Terrain section** (habitability and hazard against the body average). Neither
+  changed what the player does next, and both are reachable elsewhere — the hover card reads
+  terrain and habitability, and the lenses read the field. The Resources charts were the
+  resource history's click target (BL-196, resource drill-down); that door goes with them.
+- **"What it fetches here"** — the market and per-good price rows under Production. **This
+  REVERSES the 2026-10-08 ruling** (the sprint 51 visibility pass) that added them as the
+  initial-market-conditions read; newest-dated wins. The reading itself survives in the Market
+  ledger.
+- **The six-section nav** (Production → Buildings → Deposits → Resources → Population →
+  Terrain). With two sections retired and Buildings, Deposits and Population merged into one
+  province card, each side holds one page, and a pager over one page is chrome with nothing to
+  page.
 
 ### A water tile is selectable, and its selection answers ownership (Ben, 2026-09-06)
 
@@ -286,26 +256,24 @@ unpromised.
 
 A tile can carry a heterogeneous set — several extraction stacks against different deposits,
 several processors, plus infrastructure (only extraction carries a capacity rule). Three
-consequences, settled 2026-08-11:
+consequences (settled 2026-08-11; the drill and click model re-ruled Ben, 2026-10-13):
 
 - **Grouped by stack, not a flat list.** `placement_rules::stack_members` groups a tile's
-  buildings by `(type, target)`; the management surface (`draw_selected_section`,
-  `src/ui/construction_panel.cpp`) mirrors that grouping. A tile with more than one stack (or
-  one stack with more than one member) shows a list — one row per stack, e.g. *"Extraction:
-  Iron Ore x3"*, *"Processing: Steel Mill x2"* — before the single-building detail. A tile with
-  exactly one building routes straight to its detail, zero extra clicks for the common case.
-- **Click model: the tile selects the aggregate; drilling into a row selects that stack.**
-  A press lands on the hex, whatever structures stand on it — for exactly one building the
-  click lands on that installation directly (Ben, 2026-07-22: the whole hex belongs to the
-  installation); for more than one it falls through to the **tile**,
-  whose Manage Buildings action opens the grouped list. Selecting a row there sets the same
-  `selected_entity` a canvas press on a single-building tile would, so a single-building tile and a
-  drilled-into stack reach the identical detail view either way. A **"‹ this tile's buildings"**
-  back link on that detail view returns to the list when the tile carries siblings.
+  buildings by `(type, target)`; the tile card's building grid and the management surface
+  (`draw_selected_section`, `src/ui/construction_panel.cpp`) both read that grouping, one
+  button or row per stack.
+- **Selecting a building IS selecting its tile, with that building expanded.** There is no
+  separate building element. Every route that selects a building — a canvas press on a
+  single-building hex (Ben, 2026-07-22: the whole hex belongs to the installation), the
+  repeat-click cycle's Building rung, a ledger row — sets `selected_entity` to the building,
+  and the band draws the **host tile's** card with that building's stack expanded in the tile
+  column. A press on a building button in the grid does the same. So a single-building tile
+  and a drilled-into stack reach the identical view either way, and every existing selecting
+  surface keeps working unchanged. A **"‹ this tile's buildings"** back control on the
+  expanded card selects the tile again and returns to the grid.
 - **On the canvas: a cluster, no marker.** A built tile draws no glyph and no count badge; it
   stands a cluster of up to three structures, one per stack, baked into the ground
-  (RENDERING.md § Installations). The count and each stack's running state are read in the
-  tile element's **Production** section, one row per stack.
+  (RENDERING.md § Installations). The count is read on the stack's button in the tile card.
 
 ### The tile construction ledger
 
@@ -363,27 +331,23 @@ would rescue only the reason line.
 
 ### The building element's layout
 
-A selected **Building** — player-owned or rival — takes the **same 3-column band shape as the
-tile element** at different proportions (`draw_building_selection_body`,
-`src/ui/selection_panel.cpp`), reached through the Selection element's shared header
-(icon/title/kind/'go to' — unlike the tile element, the building does not draw its own
-header):
+A building is **not a layout of its own** (Ben, 2026-10-13): it is the tile card with one
+stack **expanded in place** (§ Multi-building tiles). Player-owned and rival buildings alike.
+The preview and the province card do not move; two columns change.
 
-1. **Left quarter — a generic placeholder image, keyed by building type** (Ben: generic per
-   building type, not one flat image for everything). Draws `ui::icons::building` — the SAME
-   type-keyed glyph vocabulary the construction ledger uses — enlarged
-   to fill the panel. Identity (which named silhouette a `processing_facility` draws) resolves
-   the same way the canvas's structure stamp does (RENDERING.md § Installations): the active recipe's
-   primary output, falling back to `target_resource` for extraction sites and infrastructure
-   types the glyph ignores. Drawn for a rival building too — the type is public
-   (DISCOVERY.md, the competitor-visibility rule).
-2. **Centre 5/12 — a paged accordion** (‹ Name (i/N) › pager, the same `disclosure_controls`
-   full-canvas hook as the tile element's, `detail_surface::building_metric`).
-   `building_pages()` builds the list per building, in order:
-   - **Profitability** (`building_page_kind::profitability`, wrapping `draw_building_profit`) —
-     **chart-based**, no title line, laid out to **one screen** with no scrollbar: the vertical
-     budget is `ImGui::GetContentRegionAvail().y` at the top of the function (the accordion
-     page body's real remaining height; NR-250 records the clamp numbers). Three elements:
+1. **The tile column becomes the building's card** — one titled card, no pager, headed by the
+   building name and a **"‹ this tile's buildings"** back control. A status line first: the
+   building's **running state with its reason** (*Running*; *Idle — input short: Steel, over
+   the fair-price ceiling*), or its construction rate and ETA while it is still building —
+   never a bare "Operating.". Below it, for the player's own completed building with profit
+   data, the **Profitability** charts. A **rival's** card is the status line plus owner name
+   and an explicit `private` row for production (DISCOVERY.md, the competitor-visibility rule;
+   there is no stockpile row — no corporation holds one, `../economy/MARKETS.md` § The shelf
+   economy).
+
+   The **Profitability** charts (`draw_building_profit`) are laid out to the card's height with
+   no scrollbar (the vertical budget is `ImGui::GetContentRegionAvail().y`; NR-250 records the
+   clamp numbers):
      - **Left third — Revenue vs a SEGMENTED Expenses bar** (`draw_revenue_expense_bars`,
        hand-drawn since `ui::charts::draw_bars` has no stacked-column notion). Revenue is one
        plain bar; Expenses stacks `input_cost` / `maintenance` / `wages` as three shaded
@@ -396,20 +360,12 @@ header):
        recipe's input quantities as bars, with a **hover tooltip** naming each input resource
        rather than a permanent legend. Absent for a building with no recipe
        (`extraction_site`), in which case the row above takes the full page height.
-     Included only once the building is complete (`ticks_remaining <= 0`) **and**
-     `estimate_building_profit` reports `has_data`; a still-building building has nothing here
-     (its **Status** page covers it).
-   - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
-     still-building building; otherwise its **running state with its reason**, in the
-     Production section's words (*Running*; *Idle — input short: Steel, over the fair-price
-     ceiling*), never a bare "Operating.". **Rival buildings get ONLY this page** —
-     the public building type plus (via `draw_rival_building_summary`) owner name, tile, and
-     an explicit `private` row for production (there is no stockpile row: no corporation holds
-     one, `../economy/MARKETS.md` § The shelf economy); `building_pages()` short-circuits to a
-     single Status page for any non-player-owned building rather than testing each page's
-     guard against data it must not show.
+   The charts are drawn only once the building is complete (`ticks_remaining <= 0`) **and**
+   `estimate_building_profit` reports `has_data`; otherwise the status line is the card. A
+   rival's card never tests those guards: it short-circuits to the status line, rather than
+   testing each guard against data it must not show.
 
-   **Method and Workforce are NOT pages of this accordion.** Their whole content was a control,
+   **Method and Workforce are NOT on this card.** Their whole content was a control,
    and the centre presents data (§ The centre presents; it does not operate). They are drawn by
    the **Construction ledger's Buildings view** — the same `draw_production_method_section` and
    `draw_building_workforce_page` bodies, called from `construction_panel.cpp`, never a second
@@ -417,13 +373,10 @@ header):
    `ui_state::selected_entity`, so a building selected on the map and a building selected from
    that view's own roster reach the same levers: the two selectors compose.
 
-   `building_pages()` / `draw_building_page()` are the shared list+dispatch pair the in-band
-   accordion and the full-canvas takeover (`draw_building_page_expanded`, `selection_card.cpp`)
-   both read — the same precedent as the tile element's `tile_metrics` / `draw_tile_metric_chart`.
-   Removing a page changes both surfaces at once, which is the point of the pair.
-3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. This is the
-   element's designated place to ACT; the centre is where it presents. Four building-level
-   actions:
+2. **The action grid retargets to the building** — the same 2×3 cell layout, now holding
+   four building-level actions. This is the element's designated place to ACT; the cards are
+   where it presents. The back control (or any selection elsewhere) returns the grid to the
+   tile's actions.
    - **Mothball** (`glyph_mothball`, a box with a line through it) — flips `decommissioned`
      (reversible — no output, no wages while closed) and invalidates the logistics anchor
      cache. A **toggle button** per the standing Toggle rule — its own active state
@@ -454,9 +407,6 @@ header):
    is the player's estate, so a rival building has no row for the button to aim at. Its cell
    falls back to `glyph_reserved`, so the grid keeps its shape and nothing reflows. **Two slots
    are reserved** (`glyph_reserved`).
-
-`ui_state::selection_building_page` is the pager index, reset to 0 alongside
-`card_resource_page` on every new selection (`app.cpp`).
 
 ### The unit element's layout
 
@@ -493,10 +443,10 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
 > we just use a longer accordion."*
 
 A province is **not** a kind the Selection element can be. Selecting a tile *is* selecting its
-province: the tile element's accordion carries the province readings — **Buildings** (its
-placement capacity), **Deposits** (its stock, summed) and **Population** (its centres) — resolved
-from the selected tile at the draw site. The three tile-grain readings and the three
-province-grain ones sit in **one** list because they are answers about **one piece of ground**,
+province: the tile element's **Province card** carries the province readings — capacity, the
+Built / Max / Resource table and population — resolved from the selected tile at the draw site.
+The province card and the tile card sit side by side in **one** element because they are
+answers about **one piece of ground** (the side-by-side split is Ben, 2026-10-13),
 and splitting them across two elements made the player choose which grain to ask at before
 knowing what they wanted to know.
 
@@ -730,7 +680,8 @@ the screen, rather than floating with the cursor."* The band is:
   the minimap — "discordant", Ben's word — with the main canvas practically blocked.
 - **One dispatcher.** `draw_selection_content` (selection_panel.cpp) is the shared per-kind
   dispatcher; the container frames it.
-- **Header row:** a small coloured **kind icon** (`draw_selection_icon` — circle for body,
+- **Header row** (every kind but the tile, which draws none — § The tile element's layout):
+  a small coloured **kind icon** (`draw_selection_icon` — circle for body,
   square for building, outlined square for tile, pentagon otherwise), then the title line
   (name · type), then a right-aligned **`[>]`** ('go to') button. There is no close button
   (see § Always open).

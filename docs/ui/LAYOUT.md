@@ -185,9 +185,10 @@ compete for the same space.
 
 It is an **action surface**, not a stat block: a header row (`[kind icon] Name · type` on
 the left, a **go-to** `>` button on the right; no close button — the band is always open)
-over the kind's content. Per selection kind: a **tile**, a **building**, a **unit**, a
-**province** and a **battle** each use the purpose-built three-column band layout (left
-image, centre accordion, right 2×3 action grid — § SELECTION.md); the remaining kinds
+over the kind's content — except a **tile**, which draws no header and gives the band's whole
+height to four columns (preview, province card, tile card, action grid; a building is that
+card with one stack expanded in place). A **unit** and a **battle** use the purpose-built
+three-column band layout (left image, centre accordion, right 2×3 action grid — § SELECTION.md); the remaining kinds
 (body, market, nation/corporation) use an action|facts split — a **body** offers *Dispatch
 Survey* or *Go to surface* beside its commercial-activity pulse.
 

@@ -255,7 +255,9 @@ is in the same invented register as every other body name.
 
 The minimap box's geometry, with the chrome accounted for:
 
-- `mm_w = max(336, 0.28 × min(window width, height))`; `mm_h = mm_w × 0.75` (4:3)
+- `mm_w = max(336, 0.28 × min(window width, height)) + 27`; `mm_h = mm_w × 0.75` (4:3). The
+  `+ 27` gives the whole bottom strip ~20 px more height at the same aspect, paid for by the
+  Selection band's width (Ben, 2026-10-13)
   governs the minimap box; the title bar and lens mode bar each take a
   fixed-height strip (top and bottom respectively) and the inset canvas fills
   the remaining height between them.

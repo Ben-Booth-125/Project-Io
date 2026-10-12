@@ -374,6 +374,25 @@
     "src/world/placement_rules.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1044",
+   "title": "Sprint 54 tile card: five calls taken filling gaps in Ben's 2026-10-13 form",
+   "raised": "2026-10-13",
+   "kind": "decision",
+   "status": "open",
+   "source": "Sprint 54 UI design session, 2026-10-13 (BL-1300 tile card split)",
+   "what": "Written into SELECTION.md: (1) Selecting a building by any route keeps selected_entity on the building and draws the host tile's card with that stack expanded - so canvas presses, the repeat-click Building rung and ledger rows keep working unchanged. (2) The expanded building card is one card: a status line (running state + reason, or construction ETA) over the profitability charts; a rival's is the status line + owner + private. (3) The capacity tooltip names the ceiling's four sustain inputs (area, infrastructure, habitability, population) with their shares. (4) The table's 'Resource' column is the province's summed deposit of that good, richest first. (5) Only the tile drops the header row; body, market, nation/corporation, unit and battle keep it, since their go-to is not a no-op.",
+   "why_it_matters": "Each fills a gap the form did not cover; (1) decides whether a building can still be selected at all, and (5) decides whether the header removal reaches every selection kind.",
+   "options": [
+    "Accept all five",
+    "Overturn any by number"
+   ],
+   "recommendation": "Accept. Also note the tile card is ~260 px wide at 1720x1080, so the expanded profitability charts get about 60% of their old width; the live click will show whether that reads.",
+   "files": [
+    "docs/ui/SELECTION.md"
+   ],
+   "resolution": null
   }
  ]
 }
