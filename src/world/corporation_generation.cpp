@@ -7439,6 +7439,112 @@ void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
 /// only ever made AFTER every insertion, so their place is already fixed).
 entity_id charter_row_key(const charter_record& r) { return r.corp; }
 
+/// BL-1278 (Ben, 2026-10-12) — THE CONSOLIDATION: a champion the
+/// reconciliation must charter, in a nation with no free land tile because its
+/// own background firms hold every one, is founded by MERGING THOSE FIRMS into
+/// it. WHICH FIRMS: every background firm whose home is the nation and which
+/// holds a building on the centre's body, ascending corporation id — ALL of
+/// them, not "as many as needed": "those firms" are the ones that hold the
+/// nation's ground, and a partial merge would need a rule for which firms stay
+/// out that the ruling never gave. Each merges through the buy-out's own path
+/// (`major_absorb_specialist`: holdings, units, cash, opening stock; no dangling
+/// id; the seat-unarmed rule), and its charter row is kept with `corp` null and
+/// `absorbed_into` the champion, so no founding year shifts. The champion is a
+/// new corporation whose character, name and charter capital are drawn exactly
+/// as `charter_specialist_at` draws a specialist's at this centre (the same
+/// salted streams); its opening stock is seeded from that capital, as every
+/// specialist's is. Its HQ is designated over the merged holdings. A GENERATION
+/// EVENT: no verb, no AI grant — the merged firms simply cease to be separate
+/// corporations. Returns the champion, its holdings in @p assets_out (ascending
+/// building id), or null when the nation has no such firm.
+entity_id consolidate_champion(world& w, charter_centre& cc, const settlement_state* settle,
+                               std::uint32_t seed, charter_spend_report& charter,
+                               std::vector<entity_id>& assets_out)
+{
+    std::vector<entity_id> firms;
+    for (const auto& [cid, c] : w.corporations)
+    {
+        if (!c.is_background || c.home_nation != cc.nation)
+            continue;
+        for (const entity_id bid : c.assets)
+        {
+            const auto b = w.buildings.find(bid);
+            if (b == w.buildings.end())
+                continue;
+            const auto t = w.tiles.find(b->second.tile);
+            if (t != w.tiles.end() && t->second.body == cc.body)
+            {
+                firms.push_back(cid);
+                break;
+            }
+        }
+    }
+    std::sort(firms.begin(), firms.end());
+    if (firms.empty())
+        return null_entity;
+
+    const nation_component& nc = w.nations.at(cc.nation);
+    const corporation_params capital_params;
+    industrial_focus focus;
+    ownership_class  own;
+    if (settle != nullptr && cc.character_region_idx >= 0)
+    {
+        const region& rg = settle->regions[static_cast<std::size_t>(cc.character_region_idx)];
+        focus = focus_from_region(rg, settle->median_industrial_year);
+        own   = ownership_from_region(rg, settle->charter, nc.politics);
+    }
+    else
+    {
+        focus = static_cast<industrial_focus>(static_cast<uint8_t>(nc.focus));
+        own   = ownership_from_character(nc.politics);
+    }
+    std::mt19937 capital_rng = charter_stream(seed, k_charter_salt_spec_capital, cc.centre);
+    const float capital = compute_capital(capital_params.base_capital,
+                                          capital_params.wealth_variance, focus, capital_rng);
+    std::mt19937 name_rng = charter_stream(seed, k_charter_salt_spec_name, cc.centre);
+
+    corporation_component corp;
+    corp.name             = make_corp_name(nc.name, name_rng);
+    corp.home_nation      = cc.nation;
+    corp.focus            = focus;
+    corp.ownership_class  = own;
+    corp.starting_capital = capital;
+    corp.balance          = capital;
+    corp.origin_region    = cc.origin_region_idx;
+    const entity_id champ = w.create_entity();
+    w.corporations[champ] = std::move(corp);
+
+    for (const entity_id f : firms)
+    {
+        const int32_t origin = w.corporations.at(f).origin_region;
+        major_absorb_specialist(w, champ, f);
+        for (charter_record& cr : charter.charters)
+            if (cr.corp == f)
+            {
+                cr.absorbed_into   = champ;
+                cr.absorbed_origin = origin;
+                cr.corp            = null_entity;
+            }
+        charter.firms.erase(std::remove(charter.firms.begin(), charter.firms.end(), f),
+                            charter.firms.end());
+    }
+
+    corporation_component& c = w.corporations.at(champ);
+    std::sort(c.assets.begin(), c.assets.end());
+    const entity_id home_body = corp_home_body(w, c.assets);
+    const hq_designation hq   = designate_hq(w, c.assets, home_body);
+    c.hq_building     = hq.building;
+    c.influence_range = hq.range;
+    assets_out = c.assets;
+
+    std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
+    const auto stock = generate_starting_stockpile(focus, capital, capital_params.base_capital,
+                                                   stock_rng);
+    if (home_body != null_entity)
+        seed_opening_stock(w, champ, stock);
+    return champ;
+}
+
 } // namespace
 
 major_reconciliation_report reconcile_majors(world& w, const recipe_registry& reg,
@@ -7551,7 +7657,10 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         // its richest centre first (`charter_specialist_at`'s nation-wide
         // fallback) — so the target is hit, and ordinary chartering keeps its
         // windows.
-        for (int pass = 0; pass < 2; ++pass)
+        // A THIRD PASS (Ben, 2026-10-12): a minor still without ground anywhere —
+        // its own background firms hold every land tile — founds its champion
+        // by CONSOLIDATING those firms (`consolidate_champion`).
+        for (int pass = 0; pass < 3; ++pass)
         for (const entity_id n : minors)
         {
             if (static_cast<int>(majors.size()) >= major_target)
@@ -7576,13 +7685,25 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 charter_rung rung = charter_rung::centre_window;
                 charter_unspent_reason why = charter_unspent_reason::window_exhausted;
                 std::vector<entity_id> assets;
-                const entity_id corp = charter_specialist_at(w, reg, cc, settle, spend, seed,
-                                                             occupied, chain, &want, rung, why,
-                                                             assets, /*nation_wide=*/pass == 1);
+                entity_id corp = null_entity;
+                if (pass < 2)
+                    corp = charter_specialist_at(w, reg, cc, settle, spend, seed, occupied, chain,
+                                                 &want, rung, why, assets,
+                                                 /*nation_wide=*/pass == 1);
+                else
+                {
+                    corp = consolidate_champion(w, cc, settle, seed, charter, assets);
+                    if (corp != null_entity)
+                    {
+                        rung = charter_rung::consolidated;
+                        for (const entity_id bid : assets)   // the merged holdings stand
+                            occupied.insert(w.buildings.at(bid).tile);
+                    }
+                }
                 if (corp == null_entity)
                 {
-                    if (pass == 1)
-                        break;      // the nation holds no free land at all: the next minor
+                    if (pass >= 1)
+                        break;      // nothing at this nation's richest centre: the next minor
                     continue;       // no ground here: the nation's next centre
                 }
 
@@ -7648,8 +7769,11 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 // CONSERVED: the champion opens on what paid for it — the
                 // centre's share plus what the treasury actually paid. A short
                 // treasury opens a poorer champion; nothing is minted to cover it.
-                champ.starting_capital = from_centre + rec.credits_moved;
-                champ.balance          = champ.starting_capital;
+                // The balance moves by the same amount: a consolidated champion
+                // also holds the cash of the firms it merged (conserved there).
+                const float opened = from_centre + rec.credits_moved;
+                champ.balance         += opened - champ.starting_capital;
+                champ.starting_capital = opened;
 
                 // The charter report stays true: one more specialist.
                 charter_record cr;
