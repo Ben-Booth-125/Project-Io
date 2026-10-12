@@ -20,9 +20,11 @@
 // ---------------------------------------------------------------------------
 
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 /// One culture's phonology: the sounds it builds every proper noun from.
@@ -137,6 +139,38 @@ tongue_lexicon coin_lexicon(const tongue& t);
 /// own id and founding seat; the same realm coins the same name on replay.
 /// Empty when the tongue cannot coin (the caller falls back to its seat's name).
 std::string coin_realm_name(const tongue& t, uint64_t salt);
+
+/// THE REALM-NAME CAP (BL-1306; NATION_GENERATION.md sec Pass 5, "A realm's
+/// name is length-capped"; NR-1045), in Unicode code points. A nation's full
+/// name must fit the lists that print it — the Market ledger's nation list,
+/// at 3/5 of the fold-out column, is the binding one.
+///
+/// The BARE name always fits: `tongue_word` builds at most three syllables of
+/// onset (<= 2 chars) + vowel (<= 2) + coda (<= 2), so <= 18 code points
+/// (`roll_tongue`'s pools are all ASCII). The static_assert below pins that
+/// against the cap; only an ornamented form (epithet + name, name + realm
+/// word, up to 18 + 1 + 12 = 31) can exceed it.
+constexpr std::size_t k_realm_name_cap = 20;
+constexpr std::size_t k_bare_name_max  = 3 * (2 + 2 + 2);
+static_assert(k_bare_name_max <= k_realm_name_cap,
+              "a bare realm name must always fit the realm-name cap");
+
+/// Length of @p s in code points (UTF-8 lead bytes), the unit the cap counts.
+inline std::size_t name_code_points(const std::string& s)
+{
+    std::size_t n = 0;
+    for (const char c : s)
+        if ((static_cast<unsigned char>(c) & 0xC0u) != 0x80u) ++n;
+    return n;
+}
+
+/// Apply the cap: @p formed (the form the coiner chose) when it fits, else
+/// @p bare. Draws nothing — the caller has already made every draw its chosen
+/// form takes, so capping a name moves no stream and no digest.
+inline std::string cap_realm_name(std::string formed, std::string bare)
+{
+    return name_code_points(formed) <= k_realm_name_cap ? std::move(formed) : std::move(bare);
+}
 
 /// Lower-case @p w, for use as a suffix morpheme inside a longer name.
 std::string tongue_lower(const std::string& w);

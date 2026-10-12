@@ -89,18 +89,25 @@ std::string coin_realm_name(const tongue& t, uint64_t salt)
     std::string name = tongue_word(r, t, 2 + r.pick(2));
     if (name.empty()) return name;
 
+    // BL-1306: the chosen form if it is within `k_realm_name_cap`, else the
+    // bare name (which always is). The ornamented forms' draws are made either
+    // way, so the stream — local to this call regardless — is untouched.
     switch (form)
     {
         case 0:
             return name;
         case 1:
             if (lex.qualifier.empty()) return name;
-            return lex.qualifier[static_cast<std::size_t>(r.pick(static_cast<int>(lex.qualifier.size())))]
-                 + " " + name;
+            return cap_realm_name(
+                lex.qualifier[static_cast<std::size_t>(r.pick(static_cast<int>(lex.qualifier.size())))]
+                    + " " + name,
+                name);
         default:
             if (lex.polity.empty()) return name;
-            return name + " "
-                 + lex.polity[static_cast<std::size_t>(r.pick(static_cast<int>(lex.polity.size())))];
+            return cap_realm_name(
+                name + " "
+                    + lex.polity[static_cast<std::size_t>(r.pick(static_cast<int>(lex.polity.size())))],
+                name);
     }
 }
 

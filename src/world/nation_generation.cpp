@@ -853,14 +853,19 @@ std::string make_nation_name(std::mt19937& rng, const tongue& t, const tongue_le
     {
         case 0:
             return name;
+        // BL-1306: capped as a realm's name is (tongue.hpp `cap_realm_name`).
+        // The epithet / realm-word draw is made before the cap is read, so
+        // `name_rng` advances exactly as it did uncapped.
         case 1:
             if (lex.qualifier.empty()) return name;
-            return lex.qualifier[static_cast<std::size_t>(pick.pick(
-                       static_cast<int>(lex.qualifier.size())))] + " " + name;
+            return cap_realm_name(lex.qualifier[static_cast<std::size_t>(pick.pick(
+                                      static_cast<int>(lex.qualifier.size())))] + " " + name,
+                                  name);
         default: // 2
             if (lex.polity.empty()) return name;
-            return name + " " + lex.polity[static_cast<std::size_t>(pick.pick(
-                       static_cast<int>(lex.polity.size())))];
+            return cap_realm_name(name + " " + lex.polity[static_cast<std::size_t>(pick.pick(
+                                      static_cast<int>(lex.polity.size())))],
+                                  name);
     }
 }
 
