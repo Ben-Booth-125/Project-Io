@@ -48,23 +48,153 @@ std::vector<entity_id> markets_on_body(const world& w, entity_id body)
 
 } // namespace
 
+// --- Market names (BL-1303) ----------------------------------------------------
+// MARKETS.md § Market centres and seeding: a market is named for the LARGEST
+// population centre whose tile clears to it (`market_for_tile`), by scale, then
+// headcount, then lowest id; a market with no named centre in its catchment reads
+// "<body> market N", N by ascending market id among that body's unnamed markets,
+// and never the bare body name.
+//
+// THE OLD RULE MATCHED THE WRONG TILE. It looked for a centre standing ON
+// `market_component::centre_tile`, but generation sets that tile to
+// `trade_flow_proxy_site(...)` (the richest site near the seeding centre) or a
+// capital shell's `anchor_tile` (nearest land to the polity's region anchor),
+// which is rarely a centre's own tile. The lookup missed and fell back to the
+// body's name: on seed 0, 12 of Huhaidar's 26 markets read "Huhaidar".
+//
+// The scan is every centre once (`market_for_tile` is the catchment raster, O(1)
+// a call), cached against the econ tick and the market and centre counts — a
+// centre's scale and headcount move only on an econ tick, and a market emerging
+// or a centre founded changes a count.
+namespace {
+
+struct market_name_cache
+{
+    const world* w           = nullptr;
+    int          econ_tick   = -1;
+    std::size_t  n_markets   = 0;
+    std::size_t  n_centres   = 0;
+    std::size_t  n_names     = 0;
+    std::vector<std::pair<entity_id, entity_id>> market_to_centre; ///< sorted by market
+    std::vector<std::pair<entity_id, std::string>> fallback;      ///< sorted by market
+};
+
+const market_name_cache& market_names(const world& w)
+{
+    static market_name_cache c;
+    if (c.w == &w && c.econ_tick == w.current_econ_tick && c.n_markets == w.markets.size()
+        && c.n_centres == w.population_centres.size() && c.n_names == w.population_centre_name.size())
+        return c;
+    c.w         = &w;
+    c.econ_tick = w.current_econ_tick;
+    c.n_markets = w.markets.size();
+    c.n_centres = w.population_centres.size();
+    c.n_names   = w.population_centre_name.size();
+    c.market_to_centre.clear();
+    c.fallback.clear();
+
+    // Best centre per market. The comparison is a total order, so the result does
+    // not depend on the unordered store's walk order.
+    struct best { entity_id centre; int scale; int pop; };
+    std::vector<std::pair<entity_id, best>> picks;
+    const auto beats = [](const population_centre_component& pc, entity_id id, const best& b) {
+        if (pc.scale != b.scale)      return pc.scale > b.scale;
+        if (pc.population != b.pop)   return pc.population > b.pop;
+        return id < b.centre;
+    };
+    for (const auto& [cid, pc] : w.population_centres)
+    {
+        const auto nit = w.population_centre_name.find(cid);
+        if (nit == w.population_centre_name.end() || nit->second.empty())
+            continue;
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        const entity_id m = market_for_tile(w, tit->second);
+        if (m == null_entity)
+            continue;
+        auto it = std::find_if(picks.begin(), picks.end(),
+                               [m](const auto& p) { return p.first == m; });
+        if (it == picks.end())
+            picks.push_back({ m, { cid, pc.scale, pc.population } });
+        else if (beats(pc, cid, it->second))
+            it->second = { cid, pc.scale, pc.population };
+    }
+    for (const auto& [m, b] : picks)
+        c.market_to_centre.push_back({ m, b.centre });
+    std::sort(c.market_to_centre.begin(), c.market_to_centre.end());
+
+    // "<body> market N" for the rest, N by ascending market id per body.
+    std::vector<entity_id> unnamed;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        if (!std::binary_search(c.market_to_centre.begin(), c.market_to_centre.end(),
+                                std::make_pair(mid, entity_id{0}),
+                                [](const auto& a, const auto& b) { return a.first < b.first; }))
+            unnamed.push_back(mid);
+    }
+    std::sort(unnamed.begin(), unnamed.end());
+    std::vector<std::pair<entity_id, int>> per_body;
+    for (const entity_id mid : unnamed)
+    {
+        const entity_id body = w.markets.at(mid).body;
+        auto it = std::find_if(per_body.begin(), per_body.end(),
+                               [body](const auto& p) { return p.first == body; });
+        if (it == per_body.end())
+        {
+            per_body.push_back({ body, 0 });
+            it = per_body.end() - 1;
+        }
+        ++it->second;
+        c.fallback.push_back({ mid, body_label(w, body) + " market " + std::to_string(it->second) });
+    }
+    return c;
+}
+
+template <typename V>
+auto find_by_first(const V& v, entity_id key)
+{
+    const auto it = std::lower_bound(v.begin(), v.end(), key,
+                                     [](const auto& p, entity_id k) { return p.first < k; });
+    return (it != v.end() && it->first == key) ? it : v.end();
+}
+
+} // namespace
+
+entity_id market_naming_centre(const world& w, entity_id mid)
+{
+    const market_name_cache& c = market_names(w);
+    const auto it = find_by_first(c.market_to_centre, mid);
+    return it != c.market_to_centre.end() ? it->second : null_entity;
+}
+
+entity_id centre_named_market(const world& w, entity_id centre)
+{
+    const market_name_cache& c = market_names(w);
+    for (const auto& [m, cid] : c.market_to_centre)
+        if (cid == centre)
+            return m;
+    return null_entity;
+}
+
 std::string market_city_name(const world& w, entity_id mid)
 {
     const auto mit = w.markets.find(mid);
     if (mit == w.markets.end())
         return "Market #" + std::to_string(mid);
-    const market_component& mc = mit->second;
-    // Resolve the population centre anchoring the market's centre tile → its city name.
-    if (mc.centre_tile != null_entity)
-        for (const auto& [cid, tid] : w.population_centre_tile)
-            if (tid == mc.centre_tile)
-            {
-                const auto nit = w.population_centre_name.find(cid);
-                if (nit != w.population_centre_name.end() && !nit->second.empty())
-                    return nit->second;
-                break;
-            }
-    return body_label(w, mc.body); // unanchored / unnamed fallback
+    const market_name_cache& c = market_names(w);
+    const auto it = find_by_first(c.market_to_centre, mid);
+    if (it != c.market_to_centre.end())
+    {
+        const auto nit = w.population_centre_name.find(it->second);
+        if (nit != w.population_centre_name.end())
+            return nit->second;
+    }
+    const auto fit = find_by_first(c.fallback, mid);
+    if (fit != c.fallback.end())
+        return fit->second;
+    return body_label(w, mit->second.body) + " market"; // unreachable: every market is one or the other
 }
 
 namespace {

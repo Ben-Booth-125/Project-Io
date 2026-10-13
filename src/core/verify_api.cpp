@@ -3045,6 +3045,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1303: a market's display name, as every surface shows it
+    // (`ui::market_city_name`) — so a script can count distinct names per body.
+    v.set_function("market_name", [this](entity_id mid) -> std::string {
+        return ui::market_city_name(m_world, mid);
+    });
+
     // Read 2 — every manual trade touching the selected market, whoever owns
     // it. `open` is the GATE (the player owns a building on that body), and it
     // is reported separately because a shut gate and an empty book are different

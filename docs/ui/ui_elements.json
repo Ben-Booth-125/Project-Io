@@ -1381,7 +1381,8 @@
     "market_ledger",
     "lens_structure_pivot",
     "goods_table",
-    "lens_ledger_pairs"
+    "lens_ledger_pairs",
+    "market_names"
    ]
   },
   {

@@ -218,10 +218,22 @@ const std::vector<exchange_row_record>& exchange_rows();
 /// The market the Trades tab last drew for (`null_entity` if it was not on screen).
 entity_id trades_market();
 
-/// The city name of a market — the population centre anchoring its `centre_tile`
-/// (`world::population_centre_name`), or the body name as a fallback when the market is
-/// unanchored / unnamed. This is the market/city identity shown in the ledger's second
-/// selector and emitted by the CSV export. See generation city naming.
+/// The name of a market (BL-1303; MARKETS.md § Market centres and seeding): the
+/// name of the largest population centre — by scale, then headcount, then lowest
+/// id — whose tile clears to it (`market_for_tile`); a market with no named centre
+/// in its catchment reads "<body> market N", N by ascending market id among the
+/// body's unnamed markets. Never the bare body name, so two markets on one body
+/// never share a name. Shown in the ledger's selector, every surface that names a
+/// market, and the CSV export. Cached against the econ tick.
 std::string market_city_name(const world& w, entity_id market_id);
+
+/// The population centre that names @p market_id (`market_city_name`'s rule), or
+/// `null_entity` when the market reads "<body> market N".
+entity_id market_naming_centre(const world& w, entity_id market_id);
+
+/// The reverse: the market @p centre names, or `null_entity` if it names none.
+/// The Planetary canvas marks such a centre's label with the market glyph
+/// (BL-1304; PLANETARY.md § Market labels).
+entity_id centre_named_market(const world& w, entity_id centre);
 
 } // namespace ui
