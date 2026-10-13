@@ -186,6 +186,10 @@
    "Minimap lens bar, Planetary rung, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
   ],
   [
+   "lens.nations",
+   "Minimap lens strip, Planetary rung, last slot (the shield glyph, icons::country)."
+  ],
+  [
    "lens.company",
    "Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square."
   ],

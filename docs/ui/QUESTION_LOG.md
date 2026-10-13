@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
+**65 surfaces** — 7 settled, 58 awaiting Ben's wording.
 
 ---
 
@@ -249,6 +249,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as plain-canvas chrome instead: a hard edge only - an inset stroke in the nation's muted colour on its side of each boundary, with no wash inside the territory (Ben, 2026-10-10: 'a lot of visual clutter when many nations border each other ... removing shading inside national borders, and just go with the hard edges') - so a nation reads as a bordered region and the whole territory stays free for the ground. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.
 
 *Demanded by BL-601 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `docs/ui/PLANETARY.md` · id `national_border_band`*
+
+### Nations lens — every nation-owned tile filled in its identity colour (Planetary strip)
+
+**Answers:** Whose ground is this — every nation's whole territory, at once?
+
+**Because:** The always-on border band says whose ground lies either side of one edge; reading the whole political map from it means tracing every border by eye. A lens costs no permanent space — it is chosen, so it does not take every other reading from the player, which is why the 2026-08-24 retirement of the Country lens's default fill still holds (Ben, 2026-10-14). It is also the strictest reader of the identity colour rule: a fill makes two similar neighbours one blob, so the bordering-colour pass exists for it as much as for the band.
+
+*Demanded by BL-1311 · `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/presentation.cpp`, `src/ui/startup_screens.cpp`, `scripts/verify/nations_lens.lua` · id `nations_lens`*
 
 ### Nav rail
 

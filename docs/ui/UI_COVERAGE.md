@@ -8,16 +8,16 @@
 
 ## Headline
 
-**109 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**110 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**58 of 109 elements can be changed without any check going red.**
+**58 of 110 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 48 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 49 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 15 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 35 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (48)
+## ASSERTED (49)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -72,6 +72,7 @@ and so is the safety net.
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
 | `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
+| `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |

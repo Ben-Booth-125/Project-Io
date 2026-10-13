@@ -3,6 +3,8 @@
 #include "world/polity_identity.hpp" // polity_slot_offsets, polity_slot_family (BL-1087)
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,6 +21,22 @@ namespace {
 // search, and never hashed on an id.
 std::vector<std::pair<entity_id, ImU32>> g_nation_colours;
 std::vector<uint32_t>                    g_realm_colours; ///< By polity id; 0 = no entry.
+std::vector<std::pair<entity_id, entity_id>> g_nation_border_pairs; ///< BL-1311, for the verify hook.
+
+constexpr ImU32 k_nation_table[palette::nation_slot_count] = {
+    IM_COL32(213,  94,   0, 255), // vermillion
+    IM_COL32(230, 159,   0, 255), // orange
+    IM_COL32(240, 228,  66, 255), // yellow
+    IM_COL32(  0, 158, 115, 255), // bluish green
+    IM_COL32( 86, 180, 233, 255), // sky blue
+    IM_COL32(  0, 114, 178, 255), // blue
+    IM_COL32(204, 121, 167, 255), // reddish purple
+    IM_COL32(150, 150, 150, 255), // neutral grey (stands in for Okabe-Ito black — pure black would vanish on the dark canvas)
+    IM_COL32(140,  60,   0, 255), // vermillion, shaded
+    IM_COL32(150, 210, 180, 255), // bluish green, tinted
+    IM_COL32(150, 180, 220, 255), // blue, tinted
+    IM_COL32(150,  80, 110, 255), // reddish purple, shaded
+};
 
 const ImU32* pinned_nation_colour(entity_id id)
 {
@@ -398,27 +416,15 @@ ImU32 nation_colour(entity_id id)
     // Okabe-Ito colourblind-safe hues with four lightness-shifted variants of the
     // same safe hues (rather than new hues), since varying lightness within a
     // safe hue family is the standard way to extend a small CVD-safe palette.
-    static constexpr ImU32 nation_table[nation_slot_count] = {
-        IM_COL32(213,  94,   0, 255), // vermillion
-        IM_COL32(230, 159,   0, 255), // orange
-        IM_COL32(240, 228,  66, 255), // yellow
-        IM_COL32(  0, 158, 115, 255), // bluish green
-        IM_COL32( 86, 180, 233, 255), // sky blue
-        IM_COL32(  0, 114, 178, 255), // blue
-        IM_COL32(204, 121, 167, 255), // reddish purple
-        IM_COL32(150, 150, 150, 255), // neutral grey (stands in for Okabe-Ito black — pure black would vanish on the dark canvas)
-        IM_COL32(140,  60,   0, 255), // vermillion, shaded
-        IM_COL32(150, 210, 180, 255), // bluish green, tinted
-        IM_COL32(150, 180, 220, 255), // blue, tinted
-        IM_COL32(150,  80, 110, 255), // reddish purple, shaded
-    };
+    // The table itself sits at file scope (k_nation_table) since BL-1311, so the
+    // bordering-colour pass can offer its slots as re-slot candidates.
     // BL-1089: the per-world table first — a nation's colour is its realm's,
     // pinned at Begin/load from the saved report. The hash is the fallback.
     if (const ImU32* pinned = pinned_nation_colour(id)) return *pinned;
     // Knuth multiplicative hash so consecutive nation ids (the common case) land
     // on well-separated palette slots rather than adjacent hues.
     const uint32_t h = static_cast<uint32_t>(id) * 2654435761u;
-    return nation_table[h % nation_slot_count];
+    return k_nation_table[h % nation_slot_count];
 }
 
 void set_nation_colour_table(const std::vector<std::pair<entity_id, ImU32>>& table)
@@ -432,11 +438,149 @@ void clear_nation_colour_table()
 {
     g_nation_colours.clear();
     g_realm_colours.clear();
+    g_nation_border_pairs.clear();
 }
 
 bool nation_colour_pinned(entity_id id)
 {
     return pinned_nation_colour(id) != nullptr;
+}
+
+float colour_distance(ImU32 a, ImU32 b)
+{
+    const auto lab = [](ImU32 c, float out[3]) {
+        const auto lin = [](float v) {
+            return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
+        };
+        const float r = lin(static_cast<float>((c >> IM_COL32_R_SHIFT) & 0xFF) / 255.0f);
+        const float g = lin(static_cast<float>((c >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f);
+        const float bb = lin(static_cast<float>((c >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f);
+        const float x = (0.4124f * r + 0.3576f * g + 0.1805f * bb) / 0.95047f;
+        const float y = (0.2126f * r + 0.7152f * g + 0.0722f * bb);
+        const float z = (0.0193f * r + 0.1192f * g + 0.9505f * bb) / 1.08883f;
+        const auto f = [](float t) {
+            return t > 0.008856f ? std::cbrt(t) : (7.787f * t + 16.0f / 116.0f);
+        };
+        const float fx = f(x), fy = f(y), fz = f(z);
+        out[0] = 116.0f * fy - 16.0f;
+        out[1] = 500.0f * (fx - fy);
+        out[2] = 200.0f * (fy - fz);
+    };
+    float la[3], lb[3];
+    lab(a, la);
+    lab(b, lb);
+    const float d0 = la[0] - lb[0], d1 = la[1] - lb[1], d2 = la[2] - lb[2];
+    return std::sqrt(d0 * d0 + d1 * d1 + d2 * d2);
+}
+
+namespace {
+// Smallest bordering-pair distance and the count under the threshold.
+void measure_bordering(const std::vector<ImU32>& colour,
+                       const std::vector<std::vector<int32_t>>& nbrs,
+                       double& min_d, int& clashes)
+{
+    min_d = 0.0;
+    clashes = 0;
+    bool any = false;
+    for (std::size_t a = 0; a < colour.size() && a < nbrs.size(); ++a)
+        for (const int32_t b : nbrs[a])
+        {
+            if (b <= static_cast<int32_t>(a) || static_cast<std::size_t>(b) >= colour.size()) continue;
+            if (colour[a] == 0u || colour[static_cast<std::size_t>(b)] == 0u) continue;
+            const double d = colour_distance(colour[a], colour[static_cast<std::size_t>(b)]);
+            if (!any || d < min_d) min_d = d;
+            any = true;
+            if (d < nation_min_colour_distance) ++clashes;
+        }
+}
+} // namespace
+
+nation_separation_result separate_bordering_nation_colours(
+    std::vector<ImU32>& colour,
+    const std::vector<std::vector<int32_t>>& nbrs,
+    const std::vector<int>& territory)
+{
+    nation_separation_result r;
+    measure_bordering(colour, nbrs, r.min_before, r.clashes_before);
+
+    // Candidates: the twelve nation slots, then the twenty fallback slots.
+    std::vector<ImU32> candidates;
+    for (int i = 0; i < nation_slot_count; ++i) candidates.push_back(k_nation_table[i]);
+    for (int i = 0; i < lapse_polity_slot_count; ++i) candidates.push_back(lapse_polity_colour(i));
+
+    const auto size_of = [&](std::size_t n) {
+        return n < territory.size() ? territory[n] : 0;
+    };
+    constexpr int k_max_rounds = 8; // bounded: a round that moves nothing ends it sooner
+    const std::size_t nn = std::min(colour.size(), nbrs.size());
+    for (int round = 0; round < k_max_rounds; ++round)
+    {
+        ++r.rounds;
+        int moved = 0;
+        for (std::size_t n = 0; n < nn; ++n)
+        {
+            if (colour[n] == 0u) continue;
+            // Does n lose a clash to some neighbour (n is the smaller, or ties and
+            // n is the higher index)? Then n is the one that moves.
+            bool must_move = false;
+            for (const int32_t b : nbrs[n])
+            {
+                if (b < 0 || static_cast<std::size_t>(b) >= colour.size()) continue;
+                const std::size_t bi = static_cast<std::size_t>(b);
+                if (bi == n || colour[bi] == 0u) continue;
+                if (colour_distance(colour[n], colour[bi]) >= nation_min_colour_distance) continue;
+                const int sn = size_of(n), sb = size_of(bi);
+                if (sn < sb || (sn == sb && n > bi)) { must_move = true; break; }
+            }
+            if (!must_move) continue;
+            // Nearest candidate clearing EVERY neighbour.
+            ImU32 best = 0u;
+            float best_d = std::numeric_limits<float>::max();
+            for (const ImU32 c : candidates)
+            {
+                bool clears = true;
+                for (const int32_t b : nbrs[n])
+                {
+                    if (b < 0 || static_cast<std::size_t>(b) >= colour.size()) continue;
+                    const std::size_t bi = static_cast<std::size_t>(b);
+                    if (bi == n || colour[bi] == 0u) continue;
+                    if (colour_distance(c, colour[bi]) < nation_min_colour_distance) { clears = false; break; }
+                }
+                if (!clears) continue;
+                const float d = colour_distance(c, colour[n]);
+                if (d < best_d) { best_d = d; best = c; }
+            }
+            if (best == 0u || best == colour[n]) continue; // no slot clears: keep, logged as a residual clash
+            colour[n] = best;
+            ++moved;
+            ++r.reslotted;
+        }
+        if (moved == 0) break;
+    }
+    measure_bordering(colour, nbrs, r.min_after, r.clashes_after);
+    return r;
+}
+
+void set_nation_border_pairs(const std::vector<std::pair<entity_id, entity_id>>& pairs)
+{
+    g_nation_border_pairs = pairs;
+}
+
+int nation_colour_clashes(double* min_distance, int* pair_count)
+{
+    int clashes = 0;
+    double min_d = 0.0;
+    bool any = false;
+    for (const auto& [a, b] : g_nation_border_pairs)
+    {
+        const double d = colour_distance(nation_colour(a), nation_colour(b));
+        if (!any || d < min_d) min_d = d;
+        any = true;
+        if (d < nation_min_colour_distance) ++clashes;
+    }
+    if (min_distance) *min_distance = min_d;
+    if (pair_count) *pair_count = static_cast<int>(g_nation_border_pairs.size());
+    return clashes;
 }
 
 void set_realm_colour_table(const std::vector<uint32_t>& colour_by_polity)

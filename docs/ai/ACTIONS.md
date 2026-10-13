@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*159 entries — 31 gameplay · 25 canvas · 19 lens · 48 ledger · 36 chrome.*
+*160 entries — 31 gameplay · 25 canvas · 20 lens · 48 ledger · 36 chrome.*
 
 ---
 
@@ -935,7 +935,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - A bar lens must currently be active — with no lens active there is no highlighted glyph and this press does not exist.
 - Selecting a different lens is an ordinary switch, not a clear; only re-clicking the active one clears.
-- Every built lens has a glyph on at least one rung's strip (Ben, 2026-10-07). The minimap lens strip is keyed on the canvas rung (LENSES.md § The strip rotates with the rung): Planetary carries Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow; Circumplanetary Market, Scarcity, Supply; Solar Supply, Reach, Supply-routes. Opportunity, Production and Country were strip lenses until retired; a press on any of them no longer exists.
+- Every built lens has a glyph on at least one rung's strip (Ben, 2026-10-07). The minimap lens strip is keyed on the canvas rung (LENSES.md § The strip rotates with the rung): Planetary carries Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow, Nations; Circumplanetary Market, Scarcity, Supply; Solar Supply, Reach, Supply-routes. Opportunity, Production and Country were strip lenses until retired; a press on any of them no longer exists.
 
 **Expected output.** The canvas returns to plain terrain (overlay_mode::none) — the state the campaign opens in. All lens tints, marks, and keys disappear. Always-on chrome survives, now at FULL strength rather than the 0.45 a lens attenuates it to (BL-520): the substrate grain and cover pattern that texture the ground, the player-identity tile wash and outline (the home-cluster ring), selection outlines, and unit markers are not lens-dependent. No HQ star and no market-centre marker draw on this canvas (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs'). Pointer clicks revert to resolving the lowest drawn entity (marker, else tile), routing to the Tile Ledger.
 
@@ -953,6 +953,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Each tectonic plate tints a categorical colour from a dedicated ten-colour earthy table at 0.80 opacity (deliberately not the nation wheel — plates are substrate, not identity). Boundary tiles — any neighbour on another plate — get a separate white lift at 0.45, so plate seams read pale. The key explains that pale tiles are boundaries and reports the plate count; a stagnant-lid body says 'one immobile plate' rather than drawing a meaningless single tint. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. HOVER AND SELECTION (BL-660, 2026-08-28): hovering lights the whole tectonic PLATE under the pointer, and clicking selects it and opens the History Ledger. Like the deposit, a plate is not an entity — it travels in ui_state::selected_plate. The History ledger's dedicated tectonic section, describing that plate's convergent (collision) and divergent (rift) boundaries, is BL-660's second half and is NOT yet built: the click currently opens the ledger without aiming it. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Why is the land shaped like that? Shows the plates that drifted the terrain into place, and above all where they meet — the seams the mountain ranges, rifts, and boundary-formed deposits came from. Honestly informational/orientational: it explains the map rather than driving an economic decision.
+
+### `lens.nations` — Minimap lens strip, Planetary rung, last slot (the shield glyph, icons::country).
+
+**Press.** Single left-click on the Nations (shield) glyph in the lens strip, or cycle with L / Shift+L until Nations is active.
+
+**Valid when:**
+- The app is in-game on a body surface; the glyph is on the Planetary strip only.
+- Re-clicking while active clears the lens (see lens.clear).
+
+**Expected output.** Every tile a nation owns (world::tile_to_nation) is filled in that nation's identity colour (palette::nation_colour) — the one pinned per-world table the national border band, the seat map and every nation swatch also read. Unowned ground and open ocean take no fill. No two bordering nations share a similar colour: at Begin and on load a deterministic pass re-slots the smaller of any two bordering nations closer than palette::nation_min_colour_distance (CIE76 delta-E 20). The national border band is suppressed under this lens like every lens; the plain map keeps it. The key lists each nation holding ground on the active body with its swatch. SELECTION: a press anywhere on a nation's territory selects that nation (structure_kind::nation — the same selection a press on its border band makes on the plain map); a press on unowned ground or ocean selects nothing.
+
+**Reason to select.** Whose ground is this, all of it at once — the map-wide answer the border band gives one edge at a time. Use it to read the political map before expanding, trading across a border, or choosing whom to court.
 
 ### `lens.company` — Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square.
 

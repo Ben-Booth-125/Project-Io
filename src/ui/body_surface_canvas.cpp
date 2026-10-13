@@ -1245,6 +1245,33 @@ void draw_market_key(const world& w, ui_state& state,
                          "Market catchments", rows, "No markets", &state, state);
 }
 
+/// The Nations lens key (BL-1311): one swatch per nation holding ground on this
+/// body, in ascending id, read from the one pinned table — so the key is the
+/// fill's own colours. Same scroll-list shape as the Market key.
+void draw_nations_key(const world& w, ui_state& state, const std::vector<entity_id>& raster)
+{
+    std::vector<entity_id> ids;
+    for (const entity_id t : raster)
+    {
+        const auto it = w.tile_to_nation.find(t);
+        if (it != w.tile_to_nation.end() && it->second != null_entity)
+            ids.push_back(it->second);
+    }
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    std::vector<key_row> rows;
+    rows.reserve(ids.size());
+    for (const entity_id nid : ids)
+    {
+        const auto nit = w.nations.find(nid);
+        std::string name = (nit != w.nations.end() && !nit->second.name.empty())
+                               ? nit->second.name : std::string("Nation");
+        rows.push_back({ palette::nation_colour(nid), IM_COL32(220, 220, 220, 255), std::move(name),
+                         key_marker::swatch, 0.0f });
+    }
+    draw_scroll_list_key("##lens_key_nations", "Nations", rows, "No nations", nullptr, state);
+}
+
 // The Country lens's per-nation key (BL-133, draw_country_key) RETIRED with the
 // lens (BL-601). A scroll-list of every nation on the body was the legend for a
 // territory-wide tint — it answered "which colour is whose?" for a wash that no
@@ -1816,6 +1843,20 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
 
     switch (state.overlay)
     {
+    case overlay_mode::nations:
+    {
+        // BL-1311: under the Nations lens the ground IS the nation, so a press
+        // anywhere on its territory resolves to it (SELECTION.md § A lens
+        // collapses selection to ONE TIER) — the same kind the border band
+        // produces, so the click path and its ledger routing are the band's.
+        const auto nit = w.tile_to_nation.find(tile);
+        if (nit == w.tile_to_nation.end() || nit->second == null_entity
+            || w.nations.find(nit->second) == w.nations.end())
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = nit->second;
+        return structure_kind::nation;
+    }
     case overlay_mode::market:
     case overlay_mode::scarcity:
     {
@@ -3400,6 +3441,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
+        // Nations lens (BL-1311; LENSES.md § The Nations lens): every tile a
+        // nation owns takes that nation's identity colour — the one pinned table,
+        // so the fill, the band and every swatch agree. Unowned ground and open
+        // ocean (absent from tile_to_nation) keep their terrain hue.
+        else if (state.overlay == overlay_mode::nations)
+        {
+            const auto nit = w.tile_to_nation.find(id);
+            if (nit != w.tile_to_nation.end() && nit->second != null_entity)
+                fill = lerp_colour(fill, palette::nation_colour(nit->second), 0.7f);
+        }
         // Population (Workforce) lens (BL-135, recut to a HEATMAP 2026-08-28 on
         // Ben's instruction: "rework the workforce efficiency lens to be a
         // heatmap, akin to throughput").
@@ -3691,6 +3742,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const auto col_it = market_catchment_colour.find(market_of(id, tile));
             return col_it != market_catchment_colour.end()
                        ? with_alpha(col_it->second, k_lens_wash_categorical) : 0u;
+        }
+        if (ov == overlay_mode::nations)
+        {
+            const auto nit = w.tile_to_nation.find(id);
+            return (nit != w.tile_to_nation.end() && nit->second != null_entity)
+                       ? with_alpha(palette::nation_colour(nit->second), k_lens_wash_categorical) : 0u;
         }
         if (ov == overlay_mode::population)
         {
@@ -5861,6 +5918,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_industry_key(dl, state);
     else if (state.overlay == overlay_mode::continent)
         draw_continent_key(dl, state, plates);
+    else if (state.overlay == overlay_mode::nations)
+        draw_nations_key(w, state, raster);
     // BL-606's key joins the same one chrome home. It was authored against the
     // old flush-left anchor and needed the FOREGROUND draw list plus an opaque
     // fill to float over the always-open Selection band; Sprint 17b's minimap-

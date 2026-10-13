@@ -108,6 +108,8 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "supply_routes") return overlay_mode::supply_routes;
     if (s == "throughput")  return overlay_mode::throughput;
     if (s == "trade_flow")  return overlay_mode::trade_flow;
+    // BL-1311: a new name, not the retired "country" (see above).
+    if (s == "nations")     return overlay_mode::nations;
     return overlay_mode::none;
 }
 
@@ -132,6 +134,7 @@ const char* overlay_script_name(overlay_mode m)
         case overlay_mode::supply_routes: return "supply_routes";
         case overlay_mode::throughput:    return "throughput";
         case overlay_mode::trade_flow:    return "trade_flow";
+        case overlay_mode::nations:       return "nations";
         default:                          return "none";
     }
 }
@@ -955,6 +958,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
+    });
+    // BL-1311: the bordering-colour rule, checked against the LIVE table every
+    // surface reads. Returns { clashes, min_distance, pairs, threshold }.
+    v.set_function("nation_colour_clashes", [this]() {
+        double min_d = 0.0;
+        int pairs = 0;
+        const int clashes = ui::palette::nation_colour_clashes(&min_d, &pairs);
+        sol::table t = m_lua.state().create_table();
+        t["clashes"]      = clashes;
+        t["min_distance"] = min_d;
+        t["pairs"]        = pairs;
+        t["threshold"]    = static_cast<double>(ui::palette::nation_min_colour_distance);
+        return t;
     });
     // BL-732: bare-ground judgement captures — hide the national border band
     // (verify-only; the band's weight over painterly ground is BL-734's call).
