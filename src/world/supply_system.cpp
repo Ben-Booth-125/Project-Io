@@ -3,6 +3,7 @@
 #include "law.hpp" // the import tariff at arrival: any_import_tariff_enacted / nation_tariff_rate
 #include "logistics.hpp"
 #include "market_clearing.hpp" // processor_reservation (BL-995)
+#include "nation_tech.hpp"     // nation_scalar: logistics_cost (BL-1274)
 #include "orbital_system.hpp"
 #include "stance.hpp"
 
@@ -654,7 +655,12 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
 /// The priced tail every intra-body route shares: each leg's rate x distance x qty x
 /// (1 - its discount), plus handling x ports x qty. A single land leg is exactly the
 /// pre-BL-1186 expression (0 + x is x), so a land route prices to the same bits.
-convoy_leg finish_route(const intra_route& route, float qty, float handling)
+/// @p haul maps the HAUL part of the cost (the legs, before port handling) to
+/// what is charged — BL-1274's logistics_cost modifiers fold in there and never
+/// into handling, which a node of its own may move later without a
+/// double-discount. The identity for a market's own leg.
+template <typename Haul>
+convoy_leg finish_route(const intra_route& route, float qty, float handling, Haul&& haul)
 {
     convoy_leg leg;
     float cost = 0.0f;
@@ -663,6 +669,7 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling)
         const route_leg& l = route.legs[static_cast<std::size_t>(i)];
         cost += l.unit_cost * l.dist * qty * (1.0f - l.discount);
     }
+    cost = haul(cost);
     if (route.ports > 0)
         cost += handling * static_cast<float>(route.ports) * qty;
     // A cost that is not a finite, non-negative number is not a price. Reached
@@ -697,6 +704,37 @@ convoy_leg finish_leg(convoy_mode mode, float unit_cost, float dist, float qty,
     leg.mode         = mode;
     leg.cost         = cost;
     leg.travel_ticks = travel_ticks < 1 ? 1 : travel_ticks;
+    return leg;
+}
+
+/// The intra-body market-to-market leg, with @p haul mapping its HAUL part
+/// (finish_route). `price_market_leg` passes the identity; a corporation's trade
+/// passes its home nation's logistics_cost modifiers (BL-1274), so both price
+/// the same route and differ only by the trader's held nodes.
+template <typename Haul>
+convoy_leg market_leg_with_haul(world& w, const recipe_registry& reg,
+                                const logistics_nodes& nodes, entity_id src_market,
+                                entity_id dest_market, float qty, Haul&& haul)
+{
+    if (src_market == dest_market || !std::isfinite(qty) || !(qty > 0.0f))
+        return convoy_leg{};
+    const auto sit = w.markets.find(src_market);
+    const auto dit = w.markets.find(dest_market);
+    if (sit == w.markets.end() || dit == w.markets.end())
+        return convoy_leg{};
+    const entity_id body = sit->second.body;
+    if (body == null_entity || dit->second.body != body)
+        return convoy_leg{}; // same body only: a space lane is the trader's (pad, propellant)
+    // The haul leaves from the market's own centre — where the shelf stands.
+    // Unanchored: no road to leave by. BL-1186: the same router every leg takes
+    // (route_intra_body), so a pair this answers viable for is one a convoy can
+    // actually run.
+    intra_route route;
+    if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
+                          dit->second.centre_tile, route))
+        return convoy_leg{};
+    convoy_leg leg = finish_route(route, qty, reg.port_handling(), haul);
+    leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
     return leg;
 }
 
@@ -781,14 +819,26 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     const market_component&      dest_market = mit->second;
     const entity_id              dest_body   = dest_market.body;
 
+    // BL-1274: the corp's home nation's held-node logistics_cost modifiers
+    // (scope "all" or the cargo good), folded into the HAUL part of the priced
+    // leg at this one seam — never into port handling — so the dispatcher, the
+    // player's verb and the rival scorer all pay the same figure. A nation
+    // holding nothing gets the cost back untouched.
+    const auto nation_haul = [&](float haul) {
+        effect_target at;
+        at.resource = static_cast<int>(ri);
+        return nation_scalar(w, corp.home_nation, modifier_subject::logistics_cost, at, haul);
+    };
+
     if (src_body == dest_body)
     {
         // Intra-body (BL-077, BL-1186): the source shelf's goods leave from its
         // market's centre for the destination market's centre — overland, or
         // land -> port -> sea -> port -> land where that route is cheaper or the
-        // only one (route_intra_body). Corporation-independent: the same leg
-        // `price_market_leg` prices.
-        leg = price_market_leg(w, reg, nodes, src_market, dest_market_id, qty);
+        // only one (route_intra_body). The same route `price_market_leg` prices;
+        // only the haul part carries the trader's nation's logistics_cost
+        // modifiers (BL-1274) — identity for a nation holding none.
+        leg = market_leg_with_haul(w, reg, nodes, src_market, dest_market_id, qty, nation_haul);
         return leg;
     }
 
@@ -807,39 +857,30 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
                 && launch_shelf_available(w, reg, src_market, dr, ri, qty) < launch_draw[dr])
                 return leg;
     }
+    // ROCKETRY GATES LAUNCH (Ben, 2026-10-10; ERAS.md § Era 2 -> Era 3 gate,
+    // "Rocketry research purchased"): the pad operates only for a corp whose
+    // home nation holds Rocketry's `space_dispatch` mechanic.
+    if (!nation_mechanic(w, corp.home_nation, "space_dispatch"))
+        return leg;
     // BL-354: evaluated at the tick-pure angle, so sourcing, pricing and
     // convoy speed are a pure function of tick, never of frame rate.
     const float dist      = body_distance_au(w, src_body, dest_body, w.current_day_tick);
     const float unit_cost = reg.logistics_cost(convoy_mode::space);
     // The space lane keeps its own calibration — roughly one econ tick per AU.
     const int travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
-    return finish_leg(convoy_mode::space, unit_cost, dist, qty, 0.0f, travel_ticks);
+    // A space lane is all haul (no port handling): BL-1274's modifiers take the whole cost.
+    convoy_leg space = finish_leg(convoy_mode::space, unit_cost, dist, qty, 0.0f, travel_ticks);
+    if (space.viable)
+        space.cost = nation_haul(space.cost);
+    return space;
 }
 
 convoy_leg price_market_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id src_market,
                             entity_id dest_market, float qty)
 {
-    if (src_market == dest_market || !std::isfinite(qty) || !(qty > 0.0f))
-        return convoy_leg{};
-    const auto sit = w.markets.find(src_market);
-    const auto dit = w.markets.find(dest_market);
-    if (sit == w.markets.end() || dit == w.markets.end())
-        return convoy_leg{};
-    const entity_id body = sit->second.body;
-    if (body == null_entity || dit->second.body != body)
-        return convoy_leg{}; // same body only: a space lane is the trader's (pad, propellant)
-    // The haul leaves from the market's own centre — where the shelf stands.
-    // Unanchored: no road to leave by. BL-1186: the same router every leg takes
-    // (route_intra_body), so a pair this answers viable for is one a convoy can
-    // actually run.
-    intra_route route;
-    if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
-                          dit->second.centre_tile, route))
-        return convoy_leg{};
-    convoy_leg leg = finish_route(route, qty, reg.port_handling());
-    leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
-    return leg;
+    return market_leg_with_haul(w, reg, nodes, src_market, dest_market, qty,
+                                [](float c) { return c; });
 }
 
 namespace {

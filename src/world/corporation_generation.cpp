@@ -497,10 +497,10 @@ entity_id author_building(world& w,
     // assets (an unstaffed building produces nothing). Ports take no production
     // action in L3, so they stay unstaffed; military_base is passive muster
     // infrastructure (BL-325) and produces nothing either, so it matches — see
-    // construction.cpp's own zero-staff condition, which lists both.
+    // construction.cpp's own zero-staff condition, which lists both. A research
+    // institute is staffed like the University (Ben, 2026-10-10; PRODUCTION.md).
     bc.workforce_assigned =
-        (btype == building_type::port || btype == building_type::military_base
-         || btype == building_type::research_institute) ? 0.0f : 0.5f; // BL-332: passive, like military_base
+        (btype == building_type::port || btype == building_type::military_base) ? 0.0f : 0.5f;
 
     if (btype == building_type::extraction_site)
     {
