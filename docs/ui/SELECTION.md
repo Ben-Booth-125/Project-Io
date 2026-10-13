@@ -360,7 +360,7 @@ The preview and the province card do not move; two columns change.
      revenue against stacked expenses and the Inputs bar chart are retired: one number says
      what the column pair said, in a fraction of the height.
    - **The workforce row** — the building's workforce target as a **read-only bar** with the
-     percentage to its right (0–100 %). The game sets it, one 25 % step a quarter toward the
+     percentage of full employment to its right (0–100 %, the internal target ÷ 2). The game sets it, one 25 % step a quarter toward the
      most profitable level (`../economy/PRODUCTION.md` § Workforce target and the auto-solver);
      the slider and the Auto control are retired (Ben, 2026-10-13).
 

@@ -1662,7 +1662,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
 
   **Amended 2026-10-13 (Ben): the dial is no longer opt-out.** The player's workforce is set
-  by the game alone — one 25 % step a quarter toward the solver's best target, capped at 100 %
+  by the game alone — one 25 % step a quarter (shown; 50 internal) toward the solver's best target, up to full employment — shown as 100 %, the internal 200
   (`../economy/PRODUCTION.md` § Workforce target and the auto-solver). The slider, the Auto
   control and the player's `set_workforce` / `set_workforce_auto` verbs are retired. The grant
   is the same single dial under the same constraints — pure, seeded, deterministic, never a
