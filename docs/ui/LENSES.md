@@ -101,6 +101,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
 | **Industry** *(keyboard-cycle only)* | — | — | background-firm plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
+| **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
 | **Throughput** | — | — | reach-cost field + per-anchor active-LP ring + key |

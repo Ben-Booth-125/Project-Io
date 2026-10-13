@@ -819,6 +819,7 @@ validates the structure also routes it.
 | **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, aimed at that resource |
 | **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
 | **Continent** | the **plate** | History ledger, at its tectonic record |
+| **Nations** | the **nation** whose territory is under the pointer | wherever a press on its border band goes — the same `structure_kind::nation` selection |
 | **Population** / **Industry** / **Throughput** | nothing — inert | — |
 | **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 

@@ -3249,12 +3249,14 @@ void app::pin_nation_colours_from_report()
     // whose colour no nation adjacent to it on the carve already wears —
     // the greedy walk the realms had, over the world's own tile ownership.
     // In ascending nation-index order, so the walk is deterministic.
-    if (!ownerless_idx.empty())
+    // The carve's nation adjacency is computed for EVERY nation, not only when
+    // ownerless ground needs a slot: the bordering-colour pass below (BL-1311)
+    // reads it too.
+    std::vector<int32_t> tile_nation; // raster -> nation index, -1 none
+    std::vector<std::vector<int32_t>> nbrs(home->nation_ids.size());
     {
         const int gw = home_grid_width, gh = home_grid_height; // the world's grid, as above
         const std::vector<entity_id>& grid = body_tile_grid(m_world, home->id);
-        std::vector<int32_t> tile_nation; // raster -> nation index, -1 none
-        std::vector<std::vector<int32_t>> nbrs(home->nation_ids.size());
         if (gw > 0 && gh > 0 && grid.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
         {
             std::vector<std::pair<entity_id, int32_t>> by_id;
@@ -3275,6 +3277,9 @@ void app::pin_nation_colours_from_report()
             }
             nbrs = region_adjacency(tile_nation, gw, gh, home->nation_ids.size());
         }
+    }
+    if (!ownerless_idx.empty())
+    {
         // Colour by nation index, for the adjacency test (realms already pinned).
         std::vector<ImU32> colour_of(home->nation_ids.size(), 0u);
         for (const auto& [id, c] : table)
@@ -3299,6 +3304,41 @@ void app::pin_nation_colours_from_report()
             colour_of[n] = chosen;
             table.emplace_back(home->nation_ids[n], chosen);
         }
+    }
+    // BORDERING NATIONS NEVER SHARE A SIMILAR COLOUR (BL-1311; LENSES.md
+    // § The Country lens has retired, the identity colour rule). Run on the
+    // finished table, here, so Begin and load take the SAME pass over the SAME
+    // inputs: the table is not saved — a load re-derives it from the saved
+    // report — so re-running the deterministic pass after the derivation is
+    // what keeps the two equal, with no save-format change. Colour only:
+    // nothing simulated reads this table.
+    {
+        const std::size_t nn = home->nation_ids.size();
+        std::vector<ImU32> colour(nn, 0u);
+        std::vector<int>   territory(nn, 0);
+        for (const auto& [id, c] : table)
+            for (std::size_t n = 0; n < nn; ++n)
+                if (home->nation_ids[n] == id) { colour[n] = c; break; }
+        for (const int32_t t : tile_nation)
+            if (t >= 0 && static_cast<std::size_t>(t) < nn) ++territory[static_cast<std::size_t>(t)];
+        // Pairs (lower index first) of nations sharing a border on the carve.
+        std::vector<std::pair<entity_id, entity_id>> border_pairs;
+        for (std::size_t a = 0; a < nn && a < nbrs.size(); ++a)
+            for (const int32_t b : nbrs[a])
+                if (b > static_cast<int32_t>(a) && static_cast<std::size_t>(b) < nn)
+                    border_pairs.emplace_back(home->nation_ids[a],
+                                              home->nation_ids[static_cast<std::size_t>(b)]);
+        const ui::palette::nation_separation_result r =
+            ui::palette::separate_bordering_nation_colours(colour, nbrs, territory);
+        table.clear();
+        for (std::size_t n = 0; n < nn; ++n)
+            if (colour[n] != 0u) table.emplace_back(home->nation_ids[n], colour[n]);
+        ui::palette::set_nation_border_pairs(border_pairs);
+        std::printf("[identity] bordering-colour pass: %zu bordering pairs; min distance %.1f -> %.1f "
+                    "(threshold %.1f); %d clashes -> %d; %d nations re-slotted in %d rounds\n",
+                    border_pairs.size(), r.min_before, r.min_after,
+                    static_cast<double>(ui::palette::nation_min_colour_distance),
+                    r.clashes_before, r.clashes_after, r.reslotted, r.rounds);
     }
     ui::palette::set_nation_colour_table(table);
     std::printf("[identity] nation colours pinned from the realms: %d of %zu nations, %d of ownerless ground\n",

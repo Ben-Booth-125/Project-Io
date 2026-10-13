@@ -1657,6 +1657,21 @@
    ]
   },
   {
+   "id": "UI-122",
+   "name": "Nations lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § The Nations lens"
+   ],
+   "summary": "Fills every nation-owned tile in its nation's identity colour from the one pinned table; unowned ground and ocean unfilled; a press resolves to the nation. Bordering nations are kept a minimum colour distance apart by a deterministic re-slot pass at Begin and load.",
+   "interesting_question": "The Country lens was retired for filling territory — why does a territory fill come back?",
+   "resolution": "As a lens rather than the default view (LENSES.md § The Nations lens): the band stays on the plain map, and the fill returns only when chosen, so the retirement's argument — territory must not cost every other reading — still holds.",
+   "checks": [
+    "nations_lens"
+   ]
+  },
+  {
    "id": "UI-099",
    "name": "Star-map inset (Solar minimap)",
    "kind": "sub-element",

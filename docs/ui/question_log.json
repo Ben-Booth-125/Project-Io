@@ -981,6 +981,21 @@
     "src/ui/market_ledger.cpp"
    ],
    "status": "drafted"
+  },
+  "nations_lens": {
+   "surface": "Nations lens — every nation-owned tile filled in its identity colour (Planetary strip)",
+   "answers": "Whose ground is this — every nation's whole territory, at once?",
+   "because": "The always-on border band says whose ground lies either side of one edge; reading the whole political map from it means tracing every border by eye. A lens costs no permanent space — it is chosen, so it does not take every other reading from the player, which is why the 2026-08-24 retirement of the Country lens's default fill still holds (Ben, 2026-10-14). It is also the strictest reader of the identity colour rule: a fill makes two similar neighbours one blob, so the bordering-colour pass exists for it as much as for the band.",
+   "status": "drafted",
+   "backlog_item": "BL-1311",
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/overlay.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/presentation.cpp",
+    "src/ui/startup_screens.cpp",
+    "scripts/verify/nations_lens.lua"
+   ]
   }
  }
 }
