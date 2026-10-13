@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <set>
 #include <vector>
 
 namespace {
@@ -154,6 +155,33 @@ int main(int argc, char** argv)
     std::printf("charter spend: %zu specialists, %zu firms, budgeted %lld spent %lld unspent %lld\n",
                 rep.specialists.size(), rep.firms.size(), (long long)rep.points_budgeted,
                 (long long)rep.points_spent, (long long)rep.points_unspent);
+    std::printf("  champions: %d passed over (no processor-capable market), %d fallen back down their nation\n",
+                rep.champions_passed_over, rep.champions_fallen_back);
+    {
+        // Nations holding an affording budgeted centre (the walk's champion set)
+        // but no specialist after the settle: a champion lost on the way.
+        std::map<entity_id, int> affording;
+        for (const auto& [cid, pts] : out.land.stockpile.budget.points())
+        {
+            const auto t = w.population_centre_tile.find(cid);
+            if (t == w.population_centre_tile.end()) continue;
+            const auto own = w.tile_to_nation.find(t->second);
+            if (own == w.tile_to_nation.end()) continue;
+            if (static_cast<int64_t>(pts) >= out.land.stockpile_spend.specialist_price_of(cid))
+                ++affording[own->second];
+        }
+        std::set<entity_id> with_spec;
+        for (const entity_id id : specs) with_spec.insert(w.corporations.at(id).home_nation);
+        int lost = 0;
+        for (const auto& [n, c] : affording)
+            if (!with_spec.count(n))
+            {
+                ++lost;
+                std::printf("  nation %llu: %d affording centre(s) but no specialist\n", (unsigned long long)n, c);
+            }
+        std::printf("  nations with an affording centre %zu, with a specialist %zu, lost %d\n",
+                    affording.size(), with_spec.size(), lost);
+    }
     for (const charter_body_record& br : rep.bodies)
         std::printf("  body %llu: firms %d, density ceiling %d, per-good cap %d, goods in G %d, firm charters %lld\n",
                     (unsigned long long)br.body, br.firms, br.density_ceiling, br.per_good_cap, br.goods_in_g,
