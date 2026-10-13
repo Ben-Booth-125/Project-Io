@@ -1289,6 +1289,28 @@
    ],
    "title": "Realm (and so nation) names are length-capped so a full name fits a list",
    "design": "DESIGNED (Ben, 2026-10-13): NATION_GENERATION.md § Pass 5. coin_realm_name returns the first of its three forms within the cap, else the bare name. Measure first: the name-length distribution over the 16 library seeds (realm_names_check or a small harness). Cap value pending NR-1045 (recommended 20 chars). Must move no digest: run world_determinism and history_sim_harness before and after."
+  },
+  {
+   "status": "proposed",
+   "glyph": "",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 54 UI session, found verifying), 2026-10-13",
+   "requires": [],
+   "id": "BL-1307",
+   "short_name": "FIXTURE_BASE_STALL",
+   "category": "Verification",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "scripts/verify/lib.lua",
+    "src/world/construction.cpp"
+   ],
+   "title": "stage_ui_fixture fails on every run: the player muster base never completes within 40 ticks, blocking 12 verify scripts",
+   "design": "DEFECT. scripts/verify/lib.lua raise_player_force places a military_base near the player works and waits 40 econ ticks; it never completes (lib.lua:242 error). Seen 2026-10-13 on 7fbb199f (no sprint 54 code) and on the sprint 54 branch, after the Debug stack-overflow at startup (fixed in 8972f540) had hidden every --verify run. 12 scripts call stage_ui_fixture. Find whether construction stalls (materials on the catchment shelf, capacity, the tech gate) or the bound is wrong; BL-1066 was the previous instance. Check against sprint 53 main before fixing - a world mover there may already change it."
   }
  ]
 }
