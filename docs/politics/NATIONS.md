@@ -88,7 +88,18 @@ steel works and a private one run the same recipe under the same rules.
   (`../ai/AI_OPPONENT.md` § 11).
 
 This overturns, for a major's state industry only, the rule that a nation owns tiles and never
-buildings. How generation hands a major its state buildings is open design.
+buildings.
+
+**How it comes to be, and how it runs (Ben, 2026-10-13):**
+- **Handed over at the fold.** The strategic-sector buildings that background firms placed on a
+  major's ground pass to the nation; the firms keep their other holdings. The champion's buildings
+  stay the champion's, whatever their sector — only background firms' strategic buildings pass.
+- **A losing building idles.** When its costs exceed what the treasury can pay, a state building
+  stops producing and paying until the treasury can pay again. The state never runs into debt.
+- **The player's controls** over a state building are a corporation's building verbs — build,
+  recipe, workforce dial, sell — paid from the treasury.
+- **Rail and stations** are state industry too (`../economy/LOGISTICS.md` § 4c). Laying track costs
+  the treasury per tile, plus steel per tile, with upkeep per tile.
 
 That table is the whole of this document in miniature. A nation has the two faculties a
 corporation lacks — territory and legislative authority — and it touches the market for two things

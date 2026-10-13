@@ -450,7 +450,8 @@ building that moves nothing.
   § State industry — transport infrastructure is a strategic sector) and background firms' in a
   minor.
 - **Generation lays it** in Industrialisation (`../generation/INDUSTRIALISATION.md`); the player
-  builds stations and lays track in play as its nation's verbs.
+  builds stations and lays track in play as its nation's verbs. **Track costs the treasury per tile,
+  plus steel per tile, with upkeep per tile (Ben, 2026-10-13).**
 - **Interdiction** cuts a rail line as it cuts a road (§ 7); a cut line strands the stations beyond it.
 
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
