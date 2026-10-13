@@ -6,8 +6,8 @@
 -- the BL-431 follow-on and the construction panel is queue-only now (view 0), so
 -- the call still ran but set an int nobody dispatches on — the capture no longer
 -- showed what the script's own comment claimed it verified. The management shell
--- lives on the building Selection card's pager, reached by selecting a building
--- and folding to `building_metric`.
+-- now lives on the expanded building card (BL-1300) and, for the levers, in the
+-- Construction ledger's Buildings view.
 --
 -- Run: ProjectIo --verify scripts/verify/building_management_shell.lua
 verify.econ_step(6)                       -- populate run states + market prices
@@ -29,17 +29,13 @@ local target = processor or player
 assert(target, "building_management_shell.lua: no player building on the home body")
 verify.select_building(target.x, target.y)
 
--- One capture per page, so a layout regression on any single page is visible
--- rather than averaged away. Page order per building_pages() as of the
--- 2026-08-15 playtest rework: Profitability / Method / Workforce.
---
--- verify.building_page (not verify.fold) is what moves the pager: fold's second
--- argument is the drill KEY, so folding alone left every capture on page 1.
-verify.building_page(0)
-verify.capture("building_management_profitability")
-
-verify.building_page(1)
-verify.capture("building_management_method")
-
-verify.building_page(2)
-verify.capture("building_management_workforce")
+-- BL-1300 (tile card split): the building card's pager is gone. Selecting a
+-- building draws its host tile's card with the stack EXPANDED in the tile
+-- column — status line over the Profitability charts — and the action grid
+-- retargeted to the building. Method and Workforce live in the Construction
+-- ledger's Buildings view (2026-08-29), so one capture is the whole card.
+verify.frames(3)
+local c = verify.tile_card()
+verify.expect(c.drawn and c.is_expanded, "selecting a building draws its tile with the stack expanded")
+verify.expect(c.player, "the expanded building is the player's")
+verify.capture("building_management_expanded")

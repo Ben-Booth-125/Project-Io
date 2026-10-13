@@ -1,7 +1,6 @@
 #include "selection_card.hpp"
 
 #include "charts.hpp"           // draw_time_series — the drill-down chart
-#include "detail_level.hpp"     // the fold overlay (BL-214)
 #include "presentation.hpp"     // presentation_of — resource name / colour
 #include "selection.hpp"        // selection_kind_of — the open/kind gate
 #include "selection_panel.hpp"  // draw_selection_content — the card body
@@ -150,59 +149,6 @@ void draw_resource_drill(const world& w, const resource_history_view& hist, ui_s
     }
 }
 
-// The expanded view of one tile metric (BL-214): the same page the band's accordion
-// rests on, given the whole screen. Nothing is withheld in the band — Ben's call was
-// that a fixed 260 px rect opens showing its chart — so what the overlay adds is
-// ROOM: a chart eight times taller and the reference legend unsquashed.
-//
-// A drilled frame (BL-196) takes the overlay instead when one is open, so the two
-// axes compose: expand then drill, or drill then expand, and either order reads.
-void draw_metric_expanded(const world& w, const resource_history_view& hist, ui_state& ui)
-{
-    if (!ui.card_stack.empty())
-    {
-        draw_resource_drill(w, hist, ui);
-        return;
-    }
-
-    const std::vector<tile_metric> pages = tile_metrics(w, ui.selected_entity);
-    if (pages.empty())
-    {
-        ImGui::TextDisabled("\xe2\x80\x94");
-        return;
-    }
-    const int page = std::clamp(ui.card_resource_page, 0, static_cast<int>(pages.size()) - 1);
-    const tile_metric& mp = pages[static_cast<std::size_t>(page)];
-
-    // The chart takes the room it was always short of — but CAPPED. Given the whole
-    // screen height it drew two 580 px ribbons, which is not more legible than the
-    // band's version, only bigger. 380 px is roughly where a two-column comparison
-    // stops gaining from height; the width is what this view was actually short of.
-    const ImVec2 p  = ImGui::GetCursorScreenPos();
-    // A two-column comparison does not grow more legible past ~560 px either —
-    // draw_bars caps the columns at 34 px, so extra width is empty plot, not a
-    // bigger chart. What the expanded view actually buys here is the axis room.
-    const float  cw = std::min(560.0f, ImGui::GetContentRegionAvail().x);
-    const float  gh = std::min(380.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y
-                                                            - ImGui::GetFrameHeight() * 4.0f));
-    const bool   drillable = mp.resource_index >= 0;
-    if (drillable)
-    {
-        if (ImGui::InvisibleButton("##res_chart_full", {cw, gh}))
-        {
-            ui.card_stack.push_back({ui.selected_entity, mp.resource_index});
-            ui.card_track_tile = ui.selected_entity;
-        }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Click for its history over time.");
-    }
-    else
-    {
-        ImGui::Dummy({cw, gh});
-    }
-    draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
-}
-
 } // namespace
 
 void draw_selection_band(world& w, const recipe_registry& reg,
@@ -259,7 +205,7 @@ void draw_selection_band(world& w, const recipe_registry& reg,
         {
             // The content function draws ui.selected_entity, so the resting
             // substitution is applied for the draw and restored after — unless the
-            // content itself re-pointed the selection (e.g. the Manage button).
+            // content itself re-pointed the selection (e.g. a tile card building button, BL-1300).
             const entity_id real_sel = ui.selected_entity;
             ui.selected_entity       = sel;
             draw_selection_content(w, reg, report, ui);
@@ -272,54 +218,6 @@ void draw_selection_band(world& w, const recipe_registry& reg,
     ImGui::End();
 
     ImGui::PopStyleVar(2);
-
-    // ── The expanded (full-screen) view of the band's metric card (BL-214) ──
-    // Drawn AFTER the band so it z-orders over it, and outside the band's style
-    // scope so it takes the ordinary window padding rather than the band's tighter
-    // one. Only a tile selection has a metric card, so nothing else can expand here.
-    //
-    // The `expanded.surface` test comes FIRST and is not merely a tidy guard:
-    // tile_metrics runs a top-decile scan over every tile on the body per deposited
-    // resource, so computing it here unconditionally would triple that cost every
-    // frame (band + this title + the overlay body) for a view that is closed almost
-    // always. The frame budget is 8 ms average (BL-249); this is the kind of
-    // regression a clean build and a passing golden both sail straight past.
-    if (ui.expanded.surface == detail_surface::selection_metric &&
-        selection_kind_of(w, sel) == selection_kind::tile)
-    {
-        const std::vector<tile_metric> pages = tile_metrics(w, sel);
-        const int page = pages.empty()
-            ? 0 : std::clamp(ui.card_resource_page, 0, static_cast<int>(pages.size()) - 1);
-
-        char title[96];
-        std::snprintf(title, sizeof title, "%s",
-                      pages.empty() ? "Tile" : pages[static_cast<std::size_t>(page)].label.c_str());
-
-        if (fold_overlay_begin(ui, detail_surface::selection_metric, page, title))
-        {
-            draw_metric_expanded(w, history, ui);
-            fold_overlay_end(ui);
-        }
-    }
-
-    // The building card's accordion pages take the same takeover (this rework)
-    // — no per-page scan cost worth guarding here (building_pages walks one
-    // building's own state, not every tile on the body), so unlike the tile
-    // branch above this reads unconditionally rather than behind the surface
-    // check first.
-    if (ui.expanded.surface == detail_surface::building_metric &&
-        selection_kind_of(w, sel) == selection_kind::building)
-    {
-        const entity_id real_sel = ui.selected_entity;
-        ui.selected_entity       = sel;
-        if (fold_overlay_begin(ui, detail_surface::building_metric, ui.expanded.key,
-                               building_type_name(w.buildings.at(sel).type)))
-        {
-            draw_building_page_expanded(w, reg, report, ui);
-            fold_overlay_end(ui);
-        }
-        ui.selected_entity = real_sel;
-    }
 
     // NB: Esc is handled by app.cpp (it must take precedence over the system-menu
     // toggle, and unwind the drill stack one level in BL-196). The band does not

@@ -1584,9 +1584,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_tech_tree)           panel = "tech_tree";
             out["open_panel"] = std::string(panel);
         }
-        // Which section of the tile Selection element's top nav is showing, so a
-        // check can assert the chevrons MOVED it rather than assuming they did.
-        out["selection_section"] = m_ui.card_tile_view;
         out["hover_card"]        = (m_ui.hover_card_entity != null_entity);
         out["hover_card_stuck"]  = m_ui.hover_card_stuck;
         out["x"]                 = m_pointer_x;
@@ -2824,9 +2821,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         const std::string& n = *name;
         detail_surface s = detail_surface::none;
-        if      (n == "selection_metric") s = detail_surface::selection_metric;
-        else if (n == "building_metric")  s = detail_surface::building_metric;
-        else if (n == "history_story")    s = detail_surface::history_story;
+        if      (n == "history_story")    s = detail_surface::history_story;
         else if (n == "history_chain")    s = detail_surface::history_chain;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
@@ -2834,15 +2829,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (s == detail_surface::none) ui::fold(m_ui);
         else                           ui::expand(m_ui, s, key.value_or(0));
     });
-
-    // Park the building Selection card's pager on one of its pages (NR-246,
-    // 2026-08-16). `fold("building_metric", k)` sets the drill KEY, not the page,
-    // so before this a script had no way to reach the Method or Workforce page and
-    // every capture showed page 1 — which is exactly how the old
-    // building_management_shell.lua came to claim it verified a surface it never
-    // photographed. The page index is clamped by building_pages() at draw time, so
-    // an out-of-range value parks on the last page rather than drawing nothing.
-    v.set_function("building_page", [this](int page) { m_ui.selection_building_page = page; });
 
     // How many Goods rows fill the Market ledger's column height (BL-686). The
     // row height is the open measurement Ben asked to compare at 8 / 10 / 12, so
@@ -4423,54 +4409,63 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return false;
     });
 
-    // The building Selection card's accordion PAGE LABELS for the current selection,
-    // read from `building_pages` — the one list both the in-band accordion and the
-    // full-canvas takeover dispatch on.
+    // BL-1300 (tile card split): the tile element AS DRAWN last frame — the
+    // tile card's building buttons ({label, detail, good, open, count, first, x,
+    // y}), the expanded building card (expanded, player, status, charts, the back
+    // control's position), the province card (capacity standing / ceiling and the
+    // bar's position, the resource table's row order) and the four column widths.
+    // `drawn` is false when the tile element did not draw.
     //
-    // It exists to make two properties assertable rather than eyeballed. First, that a
-    // RIVAL building gets Status and nothing else: `building_pages` short-circuits for
-    // a non-player building without testing any player page's guard, and that
-    // short-circuit is a competitor-visibility guarantee, not a convenience. Second,
-    // that the two pages whose whole content was a control are GONE from the card
-    // (2026-08-29) — an absence a capture cannot prove, since a missing page just
-    // renumbers the pager.
-    v.set_function("building_pages", [this]() {
+    // It exists to make two properties assertable rather than eyeballed. First,
+    // that a RIVAL button and card WITHHOLD (DISCOVERY.md § The operational fog):
+    // no recipe group name, no good, profit "private", no running state and no
+    // charts — absences a capture cannot prove. Second, that the button and back
+    // presses are reachable: the positions are published by the draw itself, so
+    // a script presses the real control rather than a coordinate guessed from a
+    // capture.
+    v.set_function("tile_card", [this]() {
         sol::state& st  = m_lua.state();
         sol::table  out = st.create_table();
-        sol::table  labels = st.create_table();
+        const ui_state::tile_card_readout& c = m_ui.tile_card;
+        out["drawn"]             = c.drawn;
+        out["tile"]              = static_cast<unsigned>(c.tile);
+        out["expanded"]          = static_cast<unsigned>(c.expanded);
+        out["is_expanded"]       = (c.expanded != null_entity);
+        out["player"]            = c.expanded_player;
+        out["charts"]            = c.charts;
+        out["status"]            = c.status;
+        out["back_x"]            = c.back_x;
+        out["back_y"]            = c.back_y;
+        out["province_standing"] = c.province_standing;
+        out["province_ceiling"]  = c.province_ceiling;
+        out["capacity_x"]        = c.capacity_x;
+        out["capacity_y"]        = c.capacity_y;
+        out["preview_w"]         = c.preview_w;
+        out["province_w"]        = c.province_w;
+        out["tile_w"]            = c.tile_w;
+        out["actions_w"]         = c.actions_w;
+        out["height"]            = c.height;
+        sol::table rows = st.create_table();
         int n = 0;
-        for (const ui::building_page& bp :
-             ui::building_pages(m_world, m_registry, m_last_econ_report, m_ui.selected_entity,
-                                m_ui.spectating && m_ui.god_view))
-            labels[++n] = bp.label;
-        out["labels"] = labels;
-        out["count"]  = n;
-        out["player"] = (m_ui.selected_entity != null_entity &&
-                         m_world.buildings.count(m_ui.selected_entity) > 0 &&
-                         is_player_owned(m_world, m_ui.selected_entity));
-        return out;
-    });
-
-    // BL-1239 fix round: the tile element's Production section AS DRAWN last
-    // frame — one entry per stack row ({stack=true, label, detail, good, open})
-    // then one per good row ({stack=false, label, detail="made"|"deposited"}).
-    // Empty when the section did not draw. Exists to make a RIVAL row's
-    // withholding assertable (DISCOVERY.md § The operational fog: no recipe
-    // group name, no good, nothing "made here") — an absence no capture proves.
-    v.set_function("tile_production_rows", [this]() {
-        sol::state& st  = m_lua.state();
-        sol::table  out = st.create_table();
-        int n = 0;
-        for (const ui_state::tile_production_row& r : m_ui.tile_production_rows)
+        for (const std::string& r : c.province_rows)
+            rows[++n] = r;
+        out["province_rows"] = rows;
+        sol::table buttons = st.create_table();
+        n = 0;
+        for (const ui_state::tile_card_button& b : c.buttons)
         {
             sol::table row = st.create_table();
-            row["stack"]  = r.stack;
-            row["label"]  = r.label;
-            row["detail"] = r.detail;
-            row["good"]   = r.good;
-            row["open"]   = r.open;
-            out[++n] = row;
+            row["label"]  = b.label;
+            row["detail"] = b.detail;
+            row["good"]   = b.good;
+            row["open"]   = b.open;
+            row["count"]  = b.count;
+            row["first"]  = static_cast<unsigned>(b.first);
+            row["x"]      = b.x;
+            row["y"]      = b.y;
+            buttons[++n] = row;
         }
+        out["buttons"] = buttons;
         return out;
     });
 

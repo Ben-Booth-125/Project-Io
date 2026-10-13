@@ -207,27 +207,18 @@ if map_pick then
 end
 
 -- ===========================================================================
--- C7 — Method and Workforce have left the card; Profitability/Status remain
+-- C7 — Method and Workforce are not on the card; status + Profitability remain
 -- ===========================================================================
 if map_pick then
-    local pages = verify.building_pages()
-    verify.expect(pages.player, "C7 the staged card is a player building's")
-    local has_method, has_workforce, has_report = false, false, false
-    for _, label in ipairs(pages.labels) do
-        if label == "Method"    then has_method    = true end
-        if label == "Workforce" then has_workforce = true end
-        if label == "Profitability" or label == "Status" then has_report = true end
-    end
-    verify.expect(not has_method, "C7 Method has left the Selection card's centre")
-    verify.expect(not has_workforce, "C7 Workforce has left the Selection card's centre")
-    verify.expect(has_report, string.format(
-        "C7 the centre still PRESENTS: %d page(s) remain", pages.count))
+    -- BL-1300: the card is the host tile's, with this building's stack expanded:
+    -- a status line over the Profitability charts. Method and Workforce are
+    -- nowhere on it (they were pages, and the pager is gone with them).
+    verify.frames(2)
+    local card = verify.tile_card()
+    verify.expect(card.is_expanded and card.player, "C7 the staged card is a player building's, expanded")
+    verify.expect(card.status ~= "", "C7 the centre still PRESENTS: a status line")
     if map_pick.profit_known then
-        local has_profit = false
-        for _, label in ipairs(pages.labels) do
-            if label == "Profitability" then has_profit = true end
-        end
-        verify.expect(has_profit,
+        verify.expect(card.charts,
             "C7 Profitability survived the move - it reports, so it stays")
     end
 
@@ -266,7 +257,7 @@ if map_pick then
 end
 
 -- ===========================================================================
--- C6 — a rival building: Status only, and no open-in-ledger button
+-- C6 — a rival building: no charts, and no open-in-ledger button
 -- ===========================================================================
 if rival then
     close_column()
@@ -274,11 +265,9 @@ if rival then
     verify.select_building(rival.x, rival.y)
     verify.frames(3)
 
-    local pages = verify.building_pages()
-    verify.expect(not pages.player, "C6 the staged card is a rival's")
-    verify.expect(pages.count == 1 and pages.labels[1] == "Status", string.format(
-        "C6 a rival building's card is Status ONLY: %d page(s), first='%s'",
-        pages.count, tostring(pages.labels[1])))
+    local card = verify.tile_card()
+    verify.expect(card.is_expanded and not card.player, "C6 the staged card is a rival's")
+    verify.expect(not card.charts, "C6 a rival building's card draws no Profitability charts")
 
     local cr = verify.construction_controls()
     verify.expect(not cr.open_ledger_ok,
