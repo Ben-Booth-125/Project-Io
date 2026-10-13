@@ -2928,6 +2928,60 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 world_sold += static_cast<double>(e.quantity) * static_cast<double>(e.unit_price);
         }
         out["world_sold_here"] = world_sold;
+
+        // BL-1308: Traded in / Traded out as drawn, the one-line layout's
+        // baselines, and an INDEPENDENT walk of Traded out. The walk does not
+        // read the trade value record: a convoy still at progress 0 left this
+        // tick (advance_convoys moves it at the next tick's start), and a
+        // trade's purchase is billed at the posted price, which the exchange
+        // record's purchase row for (market, good, quarter) carries as its unit
+        // price (every shelf draw of that good there that tick pays the same
+        // posted price, so the volume-weighted row price is that price).
+        out["traded_in"]  = t.traded_in;
+        out["traded_out"] = t.traded_out;
+        {
+            sol::table ly = m_lua.state().create_table();
+            sol::table fy = m_lua.state().create_table();
+            sol::table fa = m_lua.state().create_table();
+            sol::table fw = m_lua.state().create_table();
+            for (int k = 0; k < 3; ++k)
+            {
+                ly[k + 1] = t.metric_label_y[k];
+                fy[k + 1] = t.metric_figure_y[k];
+                fa[k + 1] = t.metric_figure_avail[k];
+                fw[k + 1] = t.metric_figure_w[k];
+            }
+            out["metric_label_y"]      = ly;
+            out["metric_figure_y"]     = fy;
+            out["metric_figure_avail"] = fa;
+            out["metric_figure_w"]     = fw;
+        }
+        double world_out = 0.0;
+        int    fresh     = 0;
+        int    unpriced  = 0;
+        for (const convoy_component& c : m_world.convoys)
+        {
+            if (c.source_market != t.market || c.corp == null_entity || c.progress != 0.0f)
+                continue;
+            ++fresh;
+            bool found = false;
+            for (std::size_t k = 0; k < n && !found; ++k)
+            {
+                const exchange_record& e = m_world.exchanges.oldest_first(n - 1 - k);
+                if (e.tick != t.quarter)
+                    break; // newest quarter only (chronological ring)
+                if (e.market == t.market && e.side == 1 && e.resource == c.cargo_resource)
+                {
+                    world_out += static_cast<double>(c.cargo_qty) * static_cast<double>(e.unit_price);
+                    found = true;
+                }
+            }
+            if (!found)
+                ++unpriced;
+        }
+        out["world_traded_out"]    = world_out;
+        out["fresh_convoys"]       = fresh;
+        out["fresh_unpriced"]      = unpriced;
         return out;
     });
 

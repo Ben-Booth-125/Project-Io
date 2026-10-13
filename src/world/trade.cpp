@@ -274,6 +274,18 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             else
                 ++out.manual_shipments;
             out.units_shipped += sent;
+            // BL-1308 (TRADE.md § The trade value record): Traded out — the
+            // units bought here x the source's POSTED price, the price
+            // commit_trade_shipment bills the purchase at (`posted_price`;
+            // `price` is rewritten only at the end of clear_markets, so it is
+            // the same figure here as inside the commit). Every corporation's
+            // trades count. Write-only: nothing in the sim reads it.
+            {
+                market_component& src_m = w.markets.at(a);
+                const float v = sent * posted_price(src_m, ri);
+                if (std::isfinite(v) && v > 0.0f)
+                    src_m.traded_out_accum += v;
+            }
             if (corp == w.player_entity)
             {
                 tf.shipments.push_back({a, b, static_cast<std::uint16_t>(ri), sent,

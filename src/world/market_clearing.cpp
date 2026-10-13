@@ -1572,6 +1572,29 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // the tick from what households leave (Ben, 2026-10-05: households come
     // before the nation — MARKETS.md step 12).
     flush_exchanges(); // NR-1021: the tick's aggregated exchange rows
+
+    // BL-1308 (TRADE.md § The trade value record): PUBLISH the quarter's trade
+    // value, here, beside the flush that writes this quarter's exchange rows.
+    // An econ tick is a calendar quarter, and its order is advance convoys ->
+    // credit arrivals (Traded in) -> economy -> run_trades (Traded out) -> this
+    // clear (campaign_settle.cpp). So the accumulators hold exactly this tick's
+    // landings and dispatches when the clear writes this tick's exchange rows:
+    // publishing here makes "Traded in/out" and "Sold here" (the newest
+    // exchange tick) describe the same quarter. Placed in clear_markets rather
+    // than run_settle_tick so every caller of the clear (the app, the settle,
+    // main.cpp's loops, the harnesses) rolls it alike. Each market rolls only
+    // its own fields, so the unordered walk cannot order anything. Write-only:
+    // nothing in the sim reads these fields.
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.traded_out_last   = mc.traded_out_accum;
+        mc.traded_in_last    = mc.traded_in_accum;
+        mc.traded_out_accum  = 0.0f;
+        mc.traded_in_accum   = 0.0f;
+        mc.trade_value_known = true;
+    }
+
     draw_household_basket(w);
 
     // BL-1217 lever D: the background basket draws what the households left,

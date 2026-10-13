@@ -86,8 +86,21 @@ struct market_top_record
     bool      sold_known   = false;
     float     sold_here    = 0.0f;
     int       quarter      = -1;    ///< The econ tick the figure is for.
-    /// Traded in / Traded out have no record behind them and draw "—".
+    /// Traded in / Traded out: the market's trade value record for the last
+    /// completed quarter (BL-1308; TRADE.md § The trade value record).
+    /// `traded_known` is false until a quarter completes (a loaded game), and
+    /// both draw "—" with the reason.
     bool      traded_known = false;
+    float     traded_in    = 0.0f;
+    float     traded_out   = 0.0f;
+    /// The three metrics as laid out (market.md § 2: label and figure on ONE
+    /// line each): the screen y of each label and of its figure.
+    float     metric_label_y[3]  = {0.0f, 0.0f, 0.0f};
+    float     metric_figure_y[3] = {0.0f, 0.0f, 0.0f};
+    /// The px each figure had beside its label, and the px it needed: a figure
+    /// wider than its room overruns the section's right edge.
+    float     metric_figure_avail[3] = {0.0f, 0.0f, 0.0f};
+    float     metric_figure_w[3]     = {0.0f, 0.0f, 0.0f};
     float     column_h     = 0.0f;  ///< The column's content height.
     float     top_h        = 0.0f;  ///< The section's height (~2/7 of column_h).
     float     legacy_row_h = 0.0f;  ///< What a ten-rows-to-the-view row took before the section.

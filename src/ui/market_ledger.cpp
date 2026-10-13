@@ -1193,20 +1193,21 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
 //   that exists (ICONS.md § 2b). A name that overruns elides with its tooltip
 //   (the generation-side name cap is BL-1306's).
 //
-//   RIGHT 2/5 — "How much moves through it?" Three stacked label-over-figure
-//   metrics, VALUES per quarter (a ton of ore and a ton of electronics do not
-//   add). Each figure is read from a record or shown as "—" with the reason:
+//   RIGHT 2/5 — "How much moves through it?" Three stacked metrics, each a
+//   LABEL AND ITS FIGURE ON ONE LINE (Ben, 2026-10-13: label-over-figure overran
+//   the section at 1280x720), VALUES per quarter (a ton of ore and a ton of
+//   electronics do not add). Each figure is read from a record or shown as "—"
+//   with the reason:
 //
 //   * Sold here — the exchange record (MARKETS.md § The exchange record): the
 //     newest quarter's SALE rows on this market (`side == 0`, a landing sold to
 //     the shelf at the clearing price), quantity x unit price summed over goods.
-//   * Traded in / Traded out — NO RECORD HOLDS THEM. A trade's goods travel as a
-//     convoy that is erased on arrival, and its purchase (a shelf draw at the
-//     source) and its landing (a sale at the destination) fold into the exchange
-//     record's per-(market, good, side, tick) rows beside every other draw and
-//     landing, so the value moved by trades cannot be told apart from the rest.
-//     `player_trade_flow` covers the player's shipments only. Shown as "—" with
-//     that reason rather than derived from something that is not the figure.
+//   * Traded in / Traded out — the market's trade value record (BL-1308; TRADE.md
+//     § The trade value record): every corporation's trade cargo landed here
+//     (x the last resolved price) and bought here for dispatch (x the posted
+//     price), published by the clear that writes the same quarter's exchange
+//     rows. Not saved, so a loaded game shows "—" until its first quarter
+//     completes, rather than a false zero.
 
 /// The nations operating in `mid`, by ascending entity id (deterministic).
 ///
@@ -1261,14 +1262,27 @@ void sold_here(const world& w, entity_id mid, market_top_record& rec)
     }
 }
 
-void draw_metric(const char* label, bool known, float value, const char* why)
+/// One metric: its label and its figure on ONE line (market.md § 2). The figure
+/// is right-aligned to the column's edge when it fits beside the label; `slot`
+/// records both baselines and whether the figure fitted, for the verify read.
+void draw_metric(int slot, const char* label, bool known, float value, const char* why)
 {
+    g_market_top.metric_label_y[slot] = ImGui::GetCursorScreenPos().y;
     ImGui::TextDisabled("%s", label);
+    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.x * 0.5f);
+    g_market_top.metric_figure_y[slot] = ImGui::GetCursorScreenPos().y;
+    const std::string figure = known ? fmt::credits(value) : std::string{"\xE2\x80\x94"};
+    const float avail = ImGui::GetContentRegionAvail().x;
+    const float fig_w = ImGui::CalcTextSize(figure.c_str()).x;
+    g_market_top.metric_figure_avail[slot] = avail;
+    g_market_top.metric_figure_w[slot]     = fig_w;
+    if (fig_w <= avail)
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - fig_w));
     if (known)
-        ImGui::TextUnformatted(fmt::credits(value).c_str());
+        ImGui::TextUnformatted(figure.c_str());
     else
     {
-        ImGui::TextUnformatted("\xE2\x80\x94"); // em dash: no figure
+        ImGui::TextUnformatted(figure.c_str()); // em dash: no figure
         if (ImGui::BeginItemTooltip())
         {
             ImGui::PushTextWrapPos(ImGui::GetFontSize() * 22.0f);
@@ -1287,6 +1301,12 @@ void draw_market_top_section(const world& w, entity_id mid, float top_h)
     g_market_top.market = mid;
     g_market_top.top_h  = top_h;
     sold_here(w, mid, g_market_top);
+    if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+    {
+        g_market_top.traded_known = mit->second.trade_value_known;
+        g_market_top.traded_in    = mit->second.traded_in_last;
+        g_market_top.traded_out   = mit->second.traded_out_last;
+    }
 
     const float full_w = ImGui::GetContentRegionAvail().x;
     const float left_w = std::floor(full_w * 0.6f);
@@ -1322,20 +1342,20 @@ void draw_market_top_section(const world& w, entity_id mid, float top_h)
 
     ImGui::SameLine();
 
-    // RIGHT 2/5 — the metrics, stacked, label over figure.
+    // RIGHT 2/5 — the metrics, stacked, each label and figure on one line.
     if (ImGui::BeginChild("##market_metrics", {0.0f, top_h}, false))
     {
-        draw_metric("Sold here", g_market_top.sold_known, g_market_top.sold_here,
+        draw_metric(0, "Sold here", g_market_top.sold_known, g_market_top.sold_here,
                     "Nothing has cleared yet: the exchange record holds no quarter.");
         ImGui::Spacing();
-        static constexpr const char* k_no_trade_record =
-            "No record holds this yet. A trade's goods travel as a convoy that is "
-            "erased on arrival, and its purchase and landing fold into the exchange "
-            "record beside every other shelf draw and landing, so the value trades "
-            "moved cannot be told apart from the rest.";
-        draw_metric("Traded in", false, 0.0f, k_no_trade_record);
+        // BL-1308: the trade value record, last completed quarter. Not saved,
+        // so before a quarter completes there is no figure, not a zero.
+        static constexpr const char* k_no_quarter = "No quarter completed yet";
+        draw_metric(1, "Traded in", g_market_top.traded_known, g_market_top.traded_in,
+                    k_no_quarter);
         ImGui::Spacing();
-        draw_metric("Traded out", false, 0.0f, k_no_trade_record);
+        draw_metric(2, "Traded out", g_market_top.traded_known, g_market_top.traded_out,
+                    k_no_quarter);
     }
     ImGui::EndChild();
 }

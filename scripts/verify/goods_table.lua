@@ -9,6 +9,26 @@
 -- verdict comes from the assertions.
 
 verify.goto_surface("home")
+
+-- 0. BEFORE ANY QUARTER (BL-1308). The verify world is built inline by
+--    setup_world, UNSETTLED (app.cpp, load_economy: "unsearched and unsettled"),
+--    so unlike a campaign — whose twelve warm-up quarters run run_settle_tick ->
+--    clear_markets and publish the trade value record before play opens — no
+--    quarter has completed here. That is the one state the ledger must show "—"
+--    in, not a false zero: the same state a loaded save opens in.
+verify.show_panel("market", true)
+verify.panel_view("market", 0)
+verify.frames(2)
+do
+    local t0 = verify.market_top()
+    print(string.format("MEASURED before any econ step: drawn %s, sold_known %s, traded_known %s",
+                        tostring(t0.drawn), tostring(t0.sold_known), tostring(t0.traded_known)))
+    verify.expect(t0.drawn and not t0.traded_known,
+        "before any quarter completes, Traded in / out draw no figure (the unsettled verify world)")
+end
+verify.show_panel("market", false)
+verify.frames(1)
+
 -- Enough ticks that the price series have more than the 8-quarter window in them,
 -- so "the graph plots at most 8" is a real constraint and not vacuously true.
 verify.econ_step(16)
@@ -165,7 +185,60 @@ if top.sold_known then
                       top.sold_here, top.world_sold_here, top.quarter))
 end
 verify.expect(#nations > 0, "the busiest market lists at least one nation")
-verify.expect(not top.traded_known, "Traded in / out draw no figure: no record holds them")
+
+-- 4d. TRADED IN / TRADED OUT (BL-1308; TRADE.md § The trade value record). After
+--     16 econ steps a quarter has completed, so both carry a figure, not a dash.
+local function finite(x) return x == x and x ~= math.huge and x ~= -math.huge end
+print(string.format("MEASURED busiest market Traded in %.2f, Traded out %.2f (known %s)",
+                    top.traded_in, top.traded_out, tostring(top.traded_known)))
+verify.expect(top.traded_known, "Traded in / out carry a figure once a quarter has completed")
+verify.expect(finite(top.traded_in) and top.traded_in >= 0.0,
+    string.format("Traded in is finite and non-negative (%.2f)", top.traded_in))
+verify.expect(finite(top.traded_out) and top.traded_out >= 0.0,
+    string.format("Traded out is finite and non-negative (%.2f)", top.traded_out))
+
+-- ONE LINE EACH (market.md § 2, Ben 2026-10-13): every metric's figure sits on
+-- its label's line, and the three lines stack downward.
+local ly, fy = top.metric_label_y, top.metric_figure_y
+local off_line = 0
+for k = 1, 3 do if math.abs(ly[k] - fy[k]) > 0.5 then off_line = off_line + 1 end end
+verify.expect(off_line == 0,
+    string.format("each metric's label and figure share one line (%d off; y %.1f/%.1f, %.1f/%.1f, %.1f/%.1f)",
+                  off_line, ly[1], fy[1], ly[2], fy[2], ly[3], fy[3]))
+verify.expect(ly[1] < ly[2] and ly[2] < ly[3], "the three metrics stack top to bottom")
+
+-- Traded out against an INDEPENDENT WALK: the convoys that left this market this
+-- quarter (still at progress 0) x the posted price the exchange record's purchase
+-- row carries. Aimed at the market on this body with the most Traded out, so the
+-- comparison is not vacuous; a body with no trade at all reports and skips.
+local tbest, tbest_out = nil, -1.0
+local ibest, ibest_in = nil, -1.0
+for _, mid in ipairs(verify.markets_on_body(verify.market_bodies()[1].body)) do
+    verify.select_market(mid)
+    verify.frames(2)
+    local t = verify.market_top()
+    if t.traded_out > tbest_out then tbest, tbest_out = mid, t.traded_out end
+    if t.traded_in > ibest_in then ibest, ibest_in = mid, t.traded_in end
+end
+print(string.format("MEASURED most Traded in on this body: %s (%d), %.2f",
+                    verify.market_name(ibest), ibest, ibest_in))
+verify.select_market(tbest)
+verify.frames(2)
+local tt = verify.market_top()
+print(string.format(
+    "MEASURED busiest trade market: %s (%d), Traded in %.2f, Traded out %.2f, walk %.2f over %d fresh convoy(s), %d unpriced",
+    verify.market_name(tbest), tbest, tt.traded_in, tt.traded_out, tt.world_traded_out,
+    tt.fresh_convoys, tt.fresh_unpriced))
+if tt.traded_out > 0.0 then
+    verify.expect(tt.fresh_unpriced == 0, "every fresh trade convoy has its purchase row in the exchange record")
+    verify.expect(math.abs(tt.traded_out - tt.world_traded_out) <= 1e-3 * math.max(1.0, tt.world_traded_out),
+        string.format("Traded out matches an independent walk of this quarter's convoys (%.2f drawn vs %.2f walked)",
+                      tt.traded_out, tt.world_traded_out))
+else
+    print("MEASURED no market on this body traded out this quarter: the walk comparison is vacuous")
+end
+verify.select_market(best)
+verify.frames(2)
 
 -- 5. ROW HEIGHT (Ben, 2026-10-13, closing the 8/10/12/15-row comparison): 0.4 x
 --    the ten-rows-to-the-view row of the layout before the top section existed,
@@ -178,6 +251,15 @@ local function rows_at(w, h)
     print(string.format(
         "MEASURED %dx%d: column %.1f px, top section %.1f px (%.3f of column), legacy row %.1f px, goods row %.1f px (frame %.1f)",
         w, h, t.column_h, t.top_h, t.top_h / math.max(1.0, t.column_h), t.legacy_row_h, t.goods_row_h, t.frame_h))
+    local names = {"Sold here", "Traded in", "Traded out"}
+    local overrun = 0
+    for k = 1, 3 do
+        local a, fw = t.metric_figure_avail[k], t.metric_figure_w[k]
+        if fw > a + 0.5 then overrun = overrun + 1 end
+        print(string.format("MEASURED %dx%d metric %s: figure %.1f px in %.1f px%s",
+                            w, h, names[k], fw, a, (fw > a + 0.5) and " (OVERRUNS)" or ""))
+    end
+    t.metric_overrun = overrun
     local want = math.max(t.frame_h, 0.4 * t.legacy_row_h)
     verify.expect(math.abs(t.goods_row_h - want) < 0.01,
         string.format("%dx%d goods row is max(frame, 0.4 x legacy) (%.2f vs %.2f)", w, h, t.goods_row_h, want))
