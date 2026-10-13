@@ -4,8 +4,9 @@
 --   * a placeholder image box + [x, y] coordinate caption at the top;
 --   * the tile's deposits drawn as vertical bar charts (world-max-relative), each
 --     with a dotted-gridline axis, in a scrollable list;
---   * a 2x2 action button grid at the bottom (Construct Buildings, Manage Buildings,
---     History, Supply) — History/Supply are stubs.
+--   * since BL-1300 (tile card split): no header row; preview | province card |
+--     tile card (buildings, three across) | 2x3 action grid (Construct, History,
+--     Supply) — History/Supply are stubs, Manage Buildings is gone.
 -- Run with: ProjectIo --verify scripts/verify/selection_tile_layout.lua
 
 verify.econ_step(4)                    -- populate live building / market state
@@ -16,8 +17,7 @@ verify.goto_surface("home")            -- Kepler: fully surveyed, deposits visib
 verify.select_tile(66, 6)
 verify.capture("selection_tile_layout")
 
--- A land tile that hosts a player building: exercises the multi-deposit bar list
--- and the enabled "Manage Buildings" button (a building occupies the tile).
+-- A land tile that hosts a player building: the tile card's building buttons.
 local player
 for _, b in ipairs(verify.buildings()) do
     if b.player then player = b; break end

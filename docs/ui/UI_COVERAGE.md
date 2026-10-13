@@ -8,16 +8,16 @@
 
 ## Headline
 
-**110 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**109 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**58 of 110 elements can be changed without any check going red.**
+**58 of 109 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 49 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 48 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 15 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 35 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (49)
+## ASSERTED (48)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -39,7 +39,7 @@ and so is the safety net.
 | `UI-019` Planetary Canvas > Home-cluster ring | sub-element | `corporate_reach`, `player_presence` | 6 | 0 | 2 |
 | `UI-020` Planetary Canvas > Corporate borders (reach rings) | sub-element | `corp_lens_border`, `corporate_reach`, `border_band` | 10 | 0 | 4 |
 | `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch` | 4 | 0 | 0 |
-| `UI-022` Planetary Canvas > Activity/vision fog layers (permanent pockets, corridors, convoy beam) | sub-element | `commercial_fog`, `intrabody_fog`, `visibility`, `proximity_glimpse`, `sea_lane` | 23 | 0 | 0 |
+| `UI-022` Planetary Canvas > Activity/vision fog layers (permanent pockets, corridors, convoy beam) | sub-element | `commercial_fog`, `intrabody_fog`, `visibility`, `proximity_glimpse`, `sea_lane` | 25 | 0 | 0 |
 | `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-028` Minimap > Lens legend fold-out | sub-element | `lens_legend`, `lens_strip_and_fields` | 5 | 0 | 3 |
 | `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 6 | 0 | 2 |
@@ -54,21 +54,20 @@ and so is the safety net.
 | `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 28 | 1 | 3 |
 | `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 60 | 0 | 7 |
-| `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
+| `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 29 | 1 | 2 |
 | `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
-| `UI-047` Selection band > Building selection action/facts | sub-element | `building_element`, `sticky_card`, `construction_ledger_tabs` | 32 | 1 | 7 |
-| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 56 | 1 | 7 |
+| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `construction_ledger_tabs`, `building_management_shell` | 57 | 2 | 9 |
+| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 54 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 29 | 0 | 4 |
 | `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 38 | 0 | 3 |
-| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 32 | 1 | 7 |
+| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 30 | 1 | 7 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate` | 25 | 0 | 0 |
-| `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 33 | 0 | 0 |
-| `UI-077` Construction Ledger > Sell Orders view | view | `sell_order` | 3 | 0 | 0 |
+| `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 35 | 0 | 0 |
 | `UI-078` Corporation ledger (rail slot 8, Diplomacy) | ledger | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-079` Corporation ledger (rail slot 8, Diplomacy) > Stance groups and the row action strip | view | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs` | 20 | 1 | 5 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 8 | 1 | 0 |
-| `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab`, `order_close_notice` | 33 | 1 | 0 |
+| `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 49 | 1 | 2 |
 | `UI-092` New World wizard | view | `planetology_generation`, `history_lapse_press` | 38 | 0 | 11 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
@@ -121,7 +120,7 @@ and so is the safety net.
 | `UI-024` Planetary Canvas > Construction placement ghost | sub-element | `construction_panel`, `build_walkthrough` | 0 | 0 | 0 |
 | `UI-046` Selection band > Body selection action/facts | sub-element | `descend_into_selection`, `selection_go_to` | 0 | 0 | 0 |
 | `UI-052` Header Panel > Balance figure | sub-element | `header`, `debt_interest` | 0 | 0 | 0 |
-| `UI-053` Header Panel > Stockpile valuation figure | sub-element | `header` | 0 | 0 | 0 |
+| `UI-053` Header Panel > Cargo valuation figure | sub-element | `header` | 0 | 0 | 0 |
 | `UI-054` Header Panel > Net + trend sparkline | sub-element | `header` | 0 | 0 | 0 |
 | `UI-056` Header Panel > Debt flag | sub-element | `debt_interest` | 0 | 0 | 0 |
 | `UI-060` Fold-out ledger column | element | `foldout_shell`, `drill_through_fold` | 0 | 0 | 0 |
@@ -199,7 +198,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `routes_and_splits` (10 captures, 16 expects) — BL-1092 -- ROUTES AND SPLITS ON THE MAP: the migration shows its roads
 - `seat_pick` (4 captures, 24 expects) — The corporation selection canvas, and the pick as a reproducible game act
 - `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
-- `tile_production` (4 captures, 18 expects) — The tile Selection element's PRODUCTION section (BL-1239, tile production
 - `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
 - `trade_flow_lens` (8 captures, 5 expects) — Visual verification for the Trade-flow lens (overlay_mode::trade_flow, BL-1222).
 - `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.

@@ -15,7 +15,7 @@
   ],
   [
    "gameplay.demolish",
-   "Selection band, player-owned building layout, bottom action row."
+   "Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Dismantle' (a simple X glyph)."
   ],
   [
    "gameplay.hire_unit",
@@ -23,7 +23,7 @@
   ],
   [
    "gameplay.idle",
-   "The 'Idle' button on the Selection band's building layout, bottom row (paired with Demolish). The Building panel's inline detail carries a one-way 'Decommission' button with the same effect; Resume lives only on the band."
+   "Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Mothball' (a box with a line through it). A toggle: the same button reads 'Reopen' once mothballed."
   ],
   [
    "gameplay.place_road",
@@ -43,7 +43,7 @@
   ],
   [
    "gameplay.resume",
-   "The 'Resume' button on the Selection band's building layout — it renders in place of 'Idle' when the building is idled."
+   "Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): the 'Mothball' button, which reads 'Reopen' (an open-box glyph) while the building is mothballed - pressing it again undoes the mothball (Toggle rule)."
   ],
   [
    "gameplay.set_recipe",
@@ -55,7 +55,7 @@
   ],
   [
    "gameplay.set_workforce_auto",
-   "The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid. Also a corp_verb."
+   "Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Auto' (an open circular-arrow glyph), in Mothball's column one row down; an accent ring marks it while on. Also a corp_verb."
   ],
   [
    "gameplay.survey",
@@ -383,23 +383,11 @@
   ],
   [
    "ledger.selection_close",
-   "Selection band header (all kinds, including the tile card), 'x' button"
+   "Selection band header (kinds that keep the header; the tile element has none), 'x' button"
   ],
   [
    "ledger.selection_construct_open",
-   "Selection band, tile card's right-hand 2x3 action grid, Construct (hammer) button"
-  ],
-  [
-   "ledger.selection_drill_back",
-   "Selection band, resource drill view, '<' button at the left of its header"
-  ],
-  [
-   "ledger.selection_drill_close",
-   "Selection band, resource drill view, 'x' button at the right of its header"
-  ],
-  [
-   "ledger.selection_drill_scroll",
-   "Selection band, resource drill view, horizontal slider under the chart"
+   "Selection band, tile element's right-hand 2x3 action grid (shown while no building is expanded), Construct (hammer) button"
   ],
   [
    "ledger.selection_goto",
@@ -408,26 +396,6 @@
   [
    "ledger.selection_locate",
    "Selection band, market/unit kind's action column, 'Go to' button"
-  ],
-  [
-   "ledger.selection_manage_building",
-   "Selection band, tile card's action grid, Manage (gear) button"
-  ],
-  [
-   "ledger.selection_metric_drill",
-   "Selection band, tile card's metric chart (in-band or expanded)"
-  ],
-  [
-   "ledger.selection_metric_expand",
-   "Selection band, tile card's metric accordion, fold chevron at the right of the pager row"
-  ],
-  [
-   "ledger.selection_section_toggle",
-   "The Selection band's tile element — a six-section top nav in the centre column (left/right chevrons straddling the span, title and i/6 count centred between them), ordered Production, Buildings, Deposits, Resources, Population, Terrain. The province is a SECTION here, not a selection of its own (BL-598); Production leads (BL-1239)."
-  ],
-  [
-   "ledger.tile_production_market_door",
-   "Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)"
   ],
   [
    "chrome.esc",
@@ -440,6 +408,14 @@
   [
    "chrome.f11_frame_hud",
    "Keyboard; works on every screen (menu, wizard, and in game)"
+  ],
+  [
+   "ledger.selection_tile_building",
+   "Selection band, tile element, the TILE CARD (third column): a grid of building buttons, three across, one per stack on the tile (grouped by type, what it makes and owner; a rival's by type and owner only). Each button carries the type glyph with the stack's count, the building's name, and its net profit per quarter coloured by sign - 'private' on a rival's, an ETA while the stack is still under construction."
+  ],
+  [
+   "ledger.selection_building_back",
+   "Selection band, tile element, the expanded building card's header: the '‹ this tile's buildings' control at its left"
   ],
   [
    "chrome.f12_capture",
@@ -659,7 +635,7 @@
   ],
   [
    "ledger.selection_open_in_buildings",
-   "Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)"
+   "Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Open in ledger' (a panel outline with one row picked out)"
   ]
  ]
 }

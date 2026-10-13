@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*165 entries — 31 gameplay · 25 canvas · 19 lens · 54 ledger · 36 chrome.*
+*159 entries — 31 gameplay · 25 canvas · 19 lens · 48 ledger · 36 chrome.*
 
 ---
 
@@ -90,9 +90,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Cut a commitment whose remaining payments cost more than the goods are now worth to you — a price collapse, a chain you have abandoned, or cash needed elsewhere this quarter. The cost is deliberately two-sided and the second side is the one to reason about: the forfeited deposit is a one-off you can price, but the reputation move is persistent and compounds with decay rather than being permanent — each cancellation stacks on whatever earlier ones have not yet decayed away, and it is checked at request_quote time. Spacing cancellations further apart than the nine-tick half-life keeps the relationship recoverable; bunching them does not. A policy that cancels freely will find its supplier list shrinking for reasons that surface much later, as rejected_reputation on a supplier it had been relying on.
 
-### `gameplay.demolish` — Selection band, player-owned building layout, bottom action row.
+### `gameplay.demolish` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Dismantle' (a simple X glyph).
 
-**Press.** Select the owned building, click 'Demolish', then confirm 'Demolish' in the popup (the popup exists because the act is irreversible; 'Cancel' backs out).
+**Press.** Select the owned building (or press its stack button in the tile card), click 'Dismantle', then confirm 'Dismantle' in the popup ('Keep' backs out). The popup exists because the act is irreversible.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -127,9 +127,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** You want force in the field, and this is currently the only verb that creates any. Two honest caveats an agent should weigh. First, it is gated behind infrastructure: you need a completed military_base on the tile (open to every nation since BL-1273 retired its tech gate), so hiring is the END of a chain rather than a quick move. Second — and this is the one that should hold most policies back — the 1960 campaign has NO CONSUMER for units. resolve_battle's only caller is the Era -1 history simulation, and the two condition subjects that read w.units (military_units, military_strength) have no authored producers. A hired unit today is an entity that costs money, sits on a tile, and does nothing. Raise them to satisfy a condition_set that counts them, or because a future conflict layer will want them; do not raise them expecting to fight.
 
-### `gameplay.idle` — The 'Idle' button on the Selection band's building layout, bottom row (paired with Demolish). The Building panel's inline detail carries a one-way 'Decommission' button with the same effect; Resume lives only on the band.
+### `gameplay.idle` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Mothball' (a box with a line through it). A toggle: the same button reads 'Reopen' once mothballed.
 
-**Press.** Select the owned, running building, click 'Idle'. No confirmation — the act is reversible.
+**Press.** Select the owned, running building, click 'Mothball'. No confirmation - the act is reversible.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -210,9 +210,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no price and no lead time, so twenty suppliers who all say yes are indistinguishable, and the only way to learn what you agreed to is to accept and difference your cash. Until BL-390 lands, treat `applied` as 'this supplier is willing' and nothing more.
 
-### `gameplay.resume` — The 'Resume' button on the Selection band's building layout — it renders in place of 'Idle' when the building is idled.
+### `gameplay.resume` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): the 'Mothball' button, which reads 'Reopen' (an open-box glyph) while the building is mothballed - pressing it again undoes the mothball (Toggle rule).
 
-**Press.** Select the owned, idled building, click 'Resume'.
+**Press.** Select the owned, mothballed building, click the Mothball/Reopen button.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -268,9 +268,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Trades wage bill against output when the solver's profit-max answer is not what is wanted — throttle to cut losses without idling, staff to 0 to park a building cheaply, or overdrive past 100% to feed a downstream chain even at a per-building loss. Also the deliberate press for taking manual control away from the auto-solver.
 
-### `gameplay.set_workforce_auto` — The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid. Also a corp_verb.
+### `gameplay.set_workforce_auto` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Auto' (an open circular-arrow glyph), in Mothball's column one row down; an accent ring marks it while on. Also a corp_verb.
 
-**Press.** Select the owned building, click the Auto checkbox (band) or the Auto button (panel). Clicking while already on is a plain re-assert on the checkbox; the button simply sets it on. At the command seam, re-asserting is rejected_state rather than a silent success.
+**Press.** Select the owned building, click 'Auto'. One-way: pressing it while already on does nothing (a manual edit of the workforce slider in the Construction ledger's Buildings view is what clears it). At the command seam, re-asserting is rejected_state rather than a silent success.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1639,7 +1639,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Surveying is done; the move now is to look at the ground - tiles, deposits, and rival footprints.
 
-### `ledger.selection_close` — Selection band header (all kinds, including the tile card), 'x' button
+### `ledger.selection_close` — Selection band header (kinds that keep the header; the tile element has none), 'x' button
 
 **Press.** Click the 'x' button at the right of the band's header row
 
@@ -1650,7 +1650,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Clears the bottom band to see the canvas; costs nothing since any click re-summons it.
 
-### `ledger.selection_construct_open` — Selection band, tile card's right-hand 2x3 action grid, Construct (hammer) button
+### `ledger.selection_construct_open` — Selection band, tile element's right-hand 2x3 action grid (shown while no building is expanded), Construct (hammer) button
 
 **Press.** Click the hammer icon button
 
@@ -1662,51 +1662,13 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** The front door to building on a specific tile - answers 'what could I put here and what would it earn?' before committing.
 
-### `ledger.selection_drill_back` — Selection band, resource drill view, '<' button at the left of its header
-
-**Press.** Click the '<' (Back) button
-
-**Valid when:**
-- A resource drill is open (drill stack non-empty)
-
-**Expected output.** Pops one drill frame, returning to the previous view (usually the tile's metric accordion).
-
-**Reason to select.** Done with the history; back to comparing the tile's other metrics.
-
-### `ledger.selection_drill_close` — Selection band, resource drill view, 'x' button at the right of its header
-
-**Press.** Click the 'x' (Close) button
-
-**Valid when:**
-- A resource drill is open
-
-**Expected output.** Clears the entire drill stack AND hides the whole Selection band (unlike Back, which unwinds one level). The next selection reopens the band at its root.
-
-**Reason to select.** Abandon the whole inspection in one press rather than backing out level by level.
-
-### `ledger.selection_drill_scroll` — Selection band, resource drill view, horizontal slider under the chart
-
-**Press.** Drag the slider left (older) or right (most recent)
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `window_start` | `int` | Left edge of the 8-quarter viewing window within the recorded history |
-
-**Valid when:**
-- A resource drill is open
-- More history is recorded than the 8-quarter window (otherwise no slider draws)
-
-**Expected output.** Scrolls the 8-quarter window through the recorded series. Until dragged, the window tracks the most recent data as time advances; dragging pins it to the chosen position.
-
-**Reason to select.** Reads earlier eras of the tile's output - was it always this productive, or is the deposit running down?
-
 ### `ledger.selection_goto` — Selection band header, '>' (go-to) button
 
 **Press.** Click the '>' button at the right of the band's header row
 
 **Valid when:**
 - Something is selected and the band is visible
-- Selection kind is not a tile (the tile layout carries no go-to; a tile's go-to is a no-op today)
+- Selection kind is not a tile or a building: the tile element (which also draws a selected building, expanded) carries NO header row and so no go-to (BL-1300; a tile's go-to was a no-op)
 
 **Expected output.** Navigates to the selection - exactly equivalent to double-clicking it: a spatial entity (body, building, market, unit) moves the canvas (a body descends to its planetary surface); a non-spatial entity (nation, corporation) opens its ledger instead. The band itself stays; an open fold-out ledger is untouched.
 
@@ -1723,76 +1685,31 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Places the abstract row on the map - where IS this market or unit, and what surrounds it?
 
-### `ledger.selection_manage_building` — Selection band, tile card's action grid, Manage (gear) button
+### `ledger.selection_tile_building` — Selection band, tile element, the TILE CARD (third column): a grid of building buttons, three across, one per stack on the tile (grouped by type, what it makes and owner; a rival's by type and owner only). Each button carries the type glyph with the stack's count, the building's name, and its net profit per quarter coloured by sign - 'private' on a rival's, an ETA while the stack is still under construction.
 
-**Press.** Click the gear icon button
-
-**Valid when:**
-- A tile is selected
-- A building occupies the tile (otherwise disabled: 'No building here')
-
-**Expected output.** Switches the selection to the occupying building: next frame the band shows the building's own layout (profitability, its operating controls). Pure re-selection - nothing in the world changes.
-
-**Reason to select.** The route from ground to operator: 'there is a building here - show me its numbers and controls.'
-
-### `ledger.selection_metric_drill` — Selection band, tile card's metric chart (in-band or expanded)
-
-**Press.** Click anywhere on a deposited-resource chart
+**Press.** Click a building button.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `resource` | `resource` | Implicit - the resource of the page currently shown |
+| `stack` | `entity_id` | Implicit - the button's stack; the press selects its oldest member |
 
 **Valid when:**
-- A tile is selected
-- The current page is a deposited resource (Habitability/Hazard pages are NOT drillable - no per-tile history is tracked for them; their tooltip says so)
+- A tile is selected and no building is expanded (an unbuilt tile reads 'Nothing built here' and has no buttons)
 
-**Expected output.** Drills into that resource's time-series history: the band (or overlay) replaces the comparison chart with the body's total as columns plus this tile's own series as a line, over a shared day axis. Hover tooltip announces 'Click for its history over time'. Pushes a frame onto the drill stack (max depth 20).
+**Expected output.** Selects a building of that stack. The band redraws the SAME tile's card with that stack EXPANDED in the tile column - its name, a '‹ this tile's buildings' back control, a status line (running state with its reason, or construction ETA), then the Profitability charts for the player's own completed building with data; a rival's shows owner and 'private' - and the action grid retargets to the building's Mothball / Dismantle / Auto / Open in ledger. Selecting the building any other way (a canvas press, the repeat-click cycle, a ledger row) reaches the identical view. Pure re-selection - nothing in the world changes.
 
-**Reason to select.** Moves from 'how good is this tile now?' to 'how has it produced over time?' - depletion and trend, the fact a long-term siting decision needs.
+**Reason to select.** The route from ground to operator: read what each stack on this tile earns at a glance, then open the one that needs attention.
 
-### `ledger.selection_metric_expand` — Selection band, tile card's metric accordion, fold chevron at the right of the pager row
+### `ledger.selection_building_back` — Selection band, tile element, the expanded building card's header: the '‹ this tile's buildings' control at its left
 
-**Press.** Click the chevron
-
-**Valid when:**
-- A tile is selected
-
-**Expected output.** Opens the current metric page as a full-screen overlay - the band rests expanded-in-place (its fixed rect cannot shrink), so the chevron means 'give this the whole screen', not 'fold'. Re-clicking (or Esc) closes the overlay back to the band. If a resource drill is open, the overlay shows the drilled time series instead.
-
-**Reason to select.** The band's chart is 260 px tall; the overlay gives it the axis room and legend space to actually compare values.
-
-### `ledger.selection_section_toggle` — The Selection band's tile element — a six-section top nav in the centre column (left/right chevrons straddling the span, title and i/6 count centred between them), ordered Production, Buildings, Deposits, Resources, Population, Terrain. The province is a SECTION here, not a selection of its own (BL-598); Production leads (BL-1239).
-
-**Press.** Click the left or right chevron to step to the previous or next section.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `direction` | `enum` | 'previous' or 'next' section |
+**Press.** Click '‹ this tile's buildings'.
 
 **Valid when:**
-- A land tile is selected. A water tile takes its own facts column and has no section nav.
-- One section shows at a time; the nav wraps in both directions, so six presses of either chevron return to the start. A newly selected tile opens on Production.
+- A building is selected (its tile's card is drawn with the building expanded)
 
-**Expected output.** The next or previous section takes the whole centre body. Production reads THIS tile (what stands here, its running state and reason, and what its goods fetch at the catchment market); Buildings, Deposits and Population read the PROVINCE of the selected tile; Resources and Terrain chart this tile against the field.
+**Expected output.** Selects the host tile again: the tile card returns to its grid of building buttons and the action grid to the tile's actions. The preview and province card do not change. Nothing in the world changes.
 
-**Reason to select.** To read a different question of the same ground. The order is the argument (Ben, 2026-08-24, and 2026-10-08 for Production): it opens on what is happening here, then runs from what the player can act on to what the ground merely is.
-
-### `ledger.tile_production_market_door` — Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)
-
-**Press.** Click a good row. A second press on the currently aimed row CLOSES the Market ledger (the Toggle rule). Only goods made by the viewer's own stacks are listed as made on this tile; a rival stack names no good (its recipe is private).
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `good` | `resource` | The row's good — one made by a stack on this tile or deposited in it. |
-
-**Valid when:**
-- A land tile is selected, its Production section is showing, and a market's catchment holds the tile.
-- The tile carries at least one good, made or deposited.
-
-**Expected output.** Any open fold-out ledger closes and the Market ledger opens on its Goods view, its Body and Market combos jumped to the tile's catchment market, the pressed good's row washed and scrolled into view. The tile stays selected behind the door.
-
-**Reason to select.** To read the good's full price board — its 8-quarter history and its price against base — at the market that actually prices this ground, without first finding that market and good by hand.
+**Reason to select.** Done with this building; back to comparing the tile's other stacks, or to building something else here.
 
 ### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
 
@@ -1921,7 +1838,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Reaches a building's operating controls by name rather than by hunting it on the map.
 
-### `ledger.selection_open_in_buildings` — Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)
+### `ledger.selection_open_in_buildings` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Open in ledger' (a panel outline with one row picked out)
 
 **Press.** Click the icon button
 

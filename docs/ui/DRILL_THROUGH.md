@@ -83,9 +83,10 @@ is what "take the main stage" means on that screen. `takeover_rect` in
    reading preference — both are view state, never serialised.
 5. **A fixed-rect container does not fold to one line, and has no `⌄`.** The Selection band's
    rect is a *derived* 260 px (`selection_band_height`) that cannot shrink, so folding its
-   metric card would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest
+   cards would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest
    **expanded in place already** (Ben, 2026-08-01, asked with the measurements) — there is no
-   in-place state left to reach, so they take the `›` control alone. The same holds for a
+   in-place state left to reach. The band's cards fit it whole (SELECTION.md § The tile
+   element's layout), so the band offers no `›` either; elsewhere such a surface takes `›` alone. The same holds for a
    single-block view that already shows its content in the column (History Story).
    Folded-by-default governs **scrolling** containers, where a fold buys real room back.
 6. **Drill-through adds no eleventh container.** The ten kinds in [LAYOUT.md](LAYOUT.md)
@@ -164,7 +165,6 @@ On the ladder, with what each one's takeover shows:
 
 | Surface | `⌄` in place | `›` full canvas |
 |---|---|---|
-| Selection band's metric card | — (rests expanded, invariant 5) | that metric's chart, on the canvas |
 | History ledger — Story | — (already shown in the column) | the whole biography, on the canvas |
 | History ledger — Chain (per stage) | that stage's title, explainer and charts | the **whole round** — every stage open, scrolled |
 | New World wizard — chain stages | that stage's title, explainer and charts | the **whole round**, scrolled (window-wide; no shell yet) |

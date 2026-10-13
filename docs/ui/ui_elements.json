@@ -778,14 +778,15 @@
    "kind": "sub-element",
    "parent": "UI-043",
    "source": [
-    "docs/ui/SELECTION.md § The tile element's layout (BL-123, reshaped BL-213)"
+    "docs/ui/SELECTION.md § The tile element's layout",
+    "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "A dedicated three-column layout for a selected tile (zoomed hex neighbourhood | paged metric accordion | 2x3 action grid), superseding the generic action/facts split used by every other selection kind.",
-   "interesting_question": "Atmospheric pollution and per-tile population have no accordion page at all — is that an intentional scope boundary or a gap the doc itself flags?",
-   "resolution": "Named as a real content gap: SELECTION.md states these are 'not modelled today (population lives on population centres, not arbitrary tiles) and so have no page — a real content gap, not an oversight.'",
+   "summary": "A dedicated four-column layout for a selected tile, with NO header row (Ben, 2026-10-13, BL-1300): zoomed hex neighbourhood | Province card (capacity bar with a where-granted tooltip, one Built / Max / Resource table, population) | Tile card (the tile's buildings, one button per stack, three across: glyph + count, name, net profit per quarter) | 2x3 action grid. A selected building draws the same element for its host tile with that stack expanded in the tile column and the action grid retargeted to it.",
+   "interesting_question": "The province card and the tile card split the former centre half at ~265 px each at 1720x1080 - does the expanded building's Profitability chart still read at that width?",
+   "resolution": "Open: NR-1044 records the width (about 60% of the charts' former width); the BL-1300 live click is where it is judged.",
    "checks": [
     "selection_tile_layout",
-    "selection_accordion",
+    "tile_card",
     "ui_shell_fixture"
    ]
   },
@@ -824,19 +825,21 @@
   },
   {
    "id": "UI-047",
-   "name": "Building selection action/facts",
+   "name": "Building selection (expanded tile card)",
    "kind": "sub-element",
    "parent": "UI-043",
    "source": [
-    "docs/ui/SELECTION.md § The building element's fact is a profitability readout (BL-074)"
+    "docs/ui/SELECTION.md § The building element's layout",
+    "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "A player building's hero action opens the Construction panel's management surface; its fact column shows a four-line profitability estimate (Revenue/Inputs/Wages/Maintenance/Net); a rival building shows owner-only, production explicitly marked private.",
-   "interesting_question": "The doc itself asks whether Manage's controls should migrate fully into this Selection element instead of routing to the Construction panel, given both currently read/write the same selected entity in the same shared column.",
-   "resolution": "Open — flagged verbatim in the ledger design Q&A: docs/ui/ledgers/construction.md § Open questions asks 'Should selecting a building auto-open Construction/Manage instead of the Selection card, or should Manage's controls migrate into the Selection element' with no resolution recorded.",
+   "summary": "Selecting a building draws its host tile's element with that building's stack expanded in the tile column: a '‹ this tile's buildings' back control, a status line (running state with its reason, or construction ETA), then the Profitability charts for the player's own completed building with data; a rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Auto / Open in ledger (absent on a rival's).",
+   "interesting_question": "With the standalone building layout gone, is there any route that selects a building WITHOUT showing its tile?",
+   "resolution": "No, by design (BL-1300): every route that sets selected_entity to a building draws the host tile's card expanded, so a single-building tile and a drilled-into stack reach the identical view.",
    "checks": [
     "building_element",
-    "sticky_card",
-    "construction_ledger_tabs"
+    "tile_card",
+    "construction_ledger_tabs",
+    "building_management_shell"
    ]
   },
   {

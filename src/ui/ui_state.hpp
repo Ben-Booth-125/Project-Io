@@ -499,21 +499,6 @@ struct ui_state
     int trade_flow_arrows  = 0;
     int trade_flow_markers = 0;
     int trade_flow_passes  = 0;
-    /// Which section of the tile Selection nav stands OPEN: 0 Production
-    /// (BL-1239), 1 Buildings, 2 Deposits, 3 Resources, 4 Population, 5 Terrain
-    /// — or -1 for none open
-    /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed
-    /// ~280 px tall, so five open bodies would each get a sliver.
-    ///
-    /// -1 is REACHABLE, and it has to be: a section header shows its own open
-    /// state, which makes it a toggle under the standing Toggle rule, so
-    /// pressing the open header closes it. The five names run from what the
-    /// player can act on to what the ground merely is; the province is a
-    /// SECTION here rather than a selection of its own.
-    ///
-    /// card_resource_page still selects WHICH resource inside the Resources
-    /// section, through a dropdown.
-    int card_tile_view = 0;
     /// The time panel's measured height, published each frame by time_panel so
     /// the rest of the right chrome column knows where its own ceiling is.
     /// It is computed from font metrics inside time_panel and was previously
@@ -771,19 +756,8 @@ struct ui_state
     /// decision_feed_corp — canvas selection never clears it.
     entity_id strategy_readout_corp = null_entity;
 
-    // --- Building Selection card accordion (supersedes BL-431's three toggles) ---
-    // The building card now takes the tile card's 3-column band shape: Profitability /
-    // Method / Chain / Depth (whichever apply) each get a PAGE rather than a
-    // stack of independently-toggled sections, so one pager index replaces the
-    // former selection_method_open / selection_chain_open / selection_chain_target /
-    // selection_depth_open quartet — a page is always fully rendered while shown,
-    // there is nothing left to hide-and-reveal within it. Not clamped to the
-    // current building's page count here (that vector is rebuilt per-frame); the
-    // draw site clamps against it, same as the tile card's card_resource_page.
-    int selection_building_page = 0;
 
-    /// Unit Selection card accordion page index (mirrors selection_building_page's
-    /// role for the new Soldier card) — Strength / Roster, whichever apply.
+    /// Unit Selection card accordion page index — Strength / Roster, whichever apply.
     int selection_unit_page = 0;
 
     /// The province the CURRENT SELECTION stands in, or 0 when the selection is
@@ -936,8 +910,8 @@ struct ui_state
     // Which tile the loop is currently anchored to, and which of the four fixed
     // stages the selection currently sits on. A click on hovered_tile ==
     // selection_cycle_tile advances the stage (skipping stages with nothing
-    // there); a click elsewhere reseeds both. Mirrors card_resource_page's
-    // per-selection reset idiom rather than adding a separate "is this a repeat
+    // there); a click elsewhere reseeds both. Uses a per-selection reset
+    // idiom rather than adding a separate "is this a repeat
     // click" flag.
     ///
     /// Stage numbering: **0 = battle, 1 = unit, 2 = building, 3 = tile.**
@@ -1101,21 +1075,40 @@ struct ui_state
     /// shut on a second press) only when its own market is this one.
     entity_id market_ledger_aimed_market = null_entity;
 
-    /// Verify-only readout of the tile Production section AS DRAWN last frame
-    /// (BL-1239 fix round): one entry per Part 1 stack row and per Part 2 good
-    /// row. Cleared by the Selection dispatcher every frame, so it is empty
-    /// whenever the section did not draw. Exists so a script can assert what a
-    /// RIVAL row withholds (DISCOVERY.md, the operational fog) — an absence a
-    /// capture cannot prove. No player surface reads it.
-    struct tile_production_row
+    /// Verify-only readout of the tile element AS DRAWN last frame (BL-1300,
+    /// tile card split). Reset by the Selection dispatcher every frame, so
+    /// `drawn` is false whenever the tile element did not draw. Exists so a script
+    /// can press the tile card's building buttons and back control at their real
+    /// positions, and assert what a RIVAL button and card withhold (DISCOVERY.md,
+    /// the operational fog) — an absence a capture cannot prove. No player
+    /// surface reads it.
+    struct tile_card_button
     {
-        bool        stack = true;  ///< true: a Part 1 stack row; false: a Part 2 good row.
-        std::string label;         ///< Stack: line one as drawn. Good: the good's name.
-        std::string detail;        ///< Stack: line two as drawn. Good: "made" / "deposited".
-        std::string good;          ///< Stack: the good named on line one, "" when none shown.
-        bool        open  = false; ///< Stack: output and state shown (own, or god view).
+        std::string label;                 ///< Name as drawn, with " ×N" for a stack above one.
+        std::string detail;                ///< The third line: profit / "private" / ETA.
+        std::string good;                  ///< The good the stack makes, "" when not shown.
+        bool        open  = false;         ///< Internals shown (own, or god view).
+        int         count = 1;
+        entity_id   first = null_entity;   ///< The member a press selects.
+        float       x = -1.0f, y = -1.0f;  ///< Button centre, screen px.
     };
-    std::vector<tile_production_row> tile_production_rows;
+    struct tile_card_readout
+    {
+        bool        drawn    = false;
+        entity_id   tile     = null_entity;
+        entity_id   expanded = null_entity; ///< The expanded building, null when the grid shows.
+        bool        expanded_player = false;
+        bool        charts   = false;       ///< The Profitability charts drew.
+        std::string status;                 ///< The expanded card's status line, "" when none.
+        float       back_x = -1.0f, back_y = -1.0f;         ///< The back control's centre.
+        int         province_standing = 0;
+        int         province_ceiling  = -1;
+        float       capacity_x = -1.0f, capacity_y = -1.0f; ///< The capacity bar's centre.
+        std::vector<std::string> province_rows;             ///< Resource names, table order.
+        std::vector<tile_card_button> buttons;
+        float       preview_w = 0.0f, province_w = 0.0f, tile_w = 0.0f, actions_w = 0.0f, height = 0.0f;
+    };
+    tile_card_readout tile_card;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
     /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics
@@ -1382,11 +1375,6 @@ struct ui_state
     };
     std::vector<card_drill> card_stack;   ///< Drill frames over the root selection; empty = root.
 
-    /// Which deposited resource the tile card's bottom-third accordion currently
-    /// shows (Ben's 2026-07-23: page left/right through the tile's resources rather
-    /// than infinite-scroll). An index into the tile's *deposited* resources (not the
-    /// raw resource enum); clamped to that list each frame, reset to 0 on a new selection.
-    int card_resource_page = 0;
 
     /// Per-frame request from the card: begin recording this tile's per-resource
     /// deposit series (BL-198 lazy tracking). app drains it into its tracked-tile
