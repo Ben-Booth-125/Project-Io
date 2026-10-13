@@ -563,10 +563,12 @@ int main()
         // RE-PINNED 2026-10-12 (BL-1290, civil-war famine and flight in Empires; Ben's standing rule to
         // re-pin at Empires-moving merges): the span resumes from a different 1200 close (polities 255 -> 375).
         // 24/21/114, 1, 0, 1, 265, 0, 656 -> 246/147/131, 1, 0, 0, 479, 0, 860.
-        check(ex1.battles == 246 && ex1.conquests == 147 && ex1.foundings == 131
+        // RE-PINNED 2026-10-13 (BL-1287, the rise and fall reshapes the Empires close; standing rule):
+        // 246/147/131, 1, 0, 0, 479, 0, 860 -> 14/11/142, 1, 0, 3331882, 240, 0, 730.
+        check(ex1.battles == 14 && ex1.conquests == 11 && ex1.foundings == 142
            && ex1.subjections_formed == 1 && ex1.subjections_freed == 0
-           && ex1.tribute_remitted == 0 && ex1.treaties_formed == 479
-           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 860,
+           && ex1.tribute_remitted == 3331882 && ex1.treaties_formed == 240
+           && ex1.treaties_broken == 0 && ex1.owner_changes.size() == 730,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -653,10 +655,11 @@ int main()
             // afloat has a hull, R3b's cause): subjections 5 -> 1, tribute
             // 37154178 -> 1.
             // RE-PINNED 2026-10-12 (BL-1290, R3b's cause): -> 246/147/131, 1, 0, 0, 479, 0, 860.
-            check(off.battles == 246 && off.conquests == 147 && off.foundings == 131
+            // RE-PINNED 2026-10-13 (BL-1287, R3b's cause): -> 14/11/142, 1, 0, 918015, 240, 0, 730.
+            check(off.battles == 14 && off.conquests == 11 && off.foundings == 142
                && off.subjections_formed == 1 && off.subjections_freed == 0
-               && off.tribute_remitted == 0 && off.treaties_formed == 479
-               && off.treaties_broken == 0 && off.owner_changes.size() == 860,
+               && off.tribute_remitted == 918015 && off.treaties_formed == 240
+               && off.treaties_broken == 0 && off.owner_changes.size() == 730,
                   "R3d.1 CONTROL: the fork-off span matches its pinned counters exactly (battles, "
                   "conquests, foundings, subjections, tribute, treaties, owner record)");
             std::printf("      control (purchase off): battles=%lld conquests=%lld foundings=%lld "
