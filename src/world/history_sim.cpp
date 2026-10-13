@@ -10,11 +10,13 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <climits>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <map>
 #include <queue>
+#include <set>
 #include <unordered_map>
 
 // ---------------------------------------------------------------------------
@@ -4965,6 +4967,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
         r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
     };
 
+    // ---- BL-1289 (the world war) ----------------------------------------------
+    //
+    // INDUSTRIALISATION.md sec A world war in every world; the state the war
+    // block at the end of each decision round reads and writes (the block says
+    // what it does). Here only what the battle site must see: this round's
+    // battles inside the spark's grace (`world_war_spark_deadline`), so the
+    // block can ask whether the treaty graph sparked the war on its own.
+    const bool ww_on = params.world_war_target;
+    int  ww_phase    = 0;     // 0 waiting, 1 at war, 2 peace made
+    bool ww_top_read = false;
+    std::vector<int>     ww_top;   // the top powers at the window's open, largest first
+    std::vector<int8_t>  ww_side;  // polity -> 0 none, 1 the side that opened the war, 2 the other
+    std::vector<int64_t> ww_chest; // polity -> the chest it entered with
+    std::vector<int64_t> ww_years; // polity -> years it has fought
+    std::vector<int64_t> ww_dead;  // polity -> its people the war killed (conscripts and famine)
+    std::vector<int64_t> ww_fled;  // polity -> its people the war displaced
+    std::vector<int64_t> ww_spent; // polity -> treasury the war spent
+    std::vector<char>    ww_razed; // region -> razed in the war
+    std::set<uint64_t>   ww_demoted_edges; // corridors demoted (once each in the war); membership only
+    struct ww_battle { int attacker; int defender; int region; };
+    std::vector<ww_battle> ww_round_battles;
+    const auto ww_note_battle = [&](int ti, int attacker, int defender, int64_t yr) {
+        if (!ww_on || ww_phase != 0) return;
+        if (yr < world_war_window_start || yr >= world_war_spark_deadline) return;
+        if (ti < 0 || attacker < 0 || defender < 0 || attacker == defender) return;
+        ww_round_battles.push_back({attacker, defender, ti});
+    };
+
     // BL-953 -- THE ROUND'S LIVE CULTURAL PREFERENCE (EXPLORATION.md sec
     // Preference is read LIVE). Derived AT MOST ONCE per decision round, from
     // that round's own regions/contacts/polities, and read by every campaign
@@ -8964,6 +8994,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // fight was over. A no-op for every other battle (it only
                 // marks the target, which the flight's "safe" test reads).
                 strike_civil_war(static_cast<int>(ti), q.id, dq ? dq->id : -1, y, step_years);
+                // BL-1289: and the world war's block asks, at the round's end,
+                // whether this battle was the treaty graph's own spark.
+                ww_note_battle(static_cast<int>(ti), q.id, dq ? dq->id : -1, y);
 
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
                 //
@@ -10672,6 +10705,524 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
         }
+
+        // ---- BL-1289: THE WORLD WAR (INDUSTRIALISATION.md sec A world war in ----
+        // every world, sec War kills people; GENERATION_STRATEGY.md sec History
+        // patterns; Ben 2026-09-15, 2026-10-10/11/12).
+        //
+        // AT THE ROUND'S END, after the recorded step, so the top powers are
+        // read off exactly the counts the step at the window's open samples
+        // (population summed over held regions, living realms only, ties to
+        // the lower id) -- the set `history_patterns`' detector judges.
+        //
+        // HOW IT FORMS. Inside the spark's grace, a battle this round between
+        // living realms, a top power on either side, whose defender holds a
+        // living mutual-defence partner not bound by non-aggression to the
+        // attacker, is the treaty graph's own spark. With none by
+        // `world_war_spark_deadline`, the CONTEST FOR A SUBJECT fires: the two
+        // largest powers fight over the subject of one of them nearest the
+        // other's seat (else the province of the smaller nearest the larger's
+        // seat). Either way the war then SPREADS by mutual defence, layer by
+        // layer (a subject stands with its overlord), and where fewer than
+        // `world_war_min_engaged` of the top powers stand in it, it ESCALATES
+        // one recorded step a round: the largest unengaged top power enters
+        // against the side it holds the deeper grudge against, else against
+        // the nearer leader -- the war on its doorstep.
+        //
+        // WHAT IT COSTS, every round it stands (the params' block says each):
+        // the fronts razed once and their people starved and displaced, the
+        // belligerents' conscripts dead across their ground, their treasuries
+        // spent down to no lower than zero. Peace when a side has spent its war
+        // chests (and the top powers are in), at the latest in the window's
+        // last round. Integer throughout; every walk in index order.
+        if (ww_on && ww_phase <= 1)
+        {
+            const std::size_t np    = out.polities.size();
+            const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+            if (ww_side.size() < np)
+            {
+                ww_side.resize(np, 0);
+                ww_chest.resize(np, 0);
+                ww_years.resize(np, 0);
+                ww_dead.resize(np, 0);
+                ww_fled.resize(np, 0);
+                ww_spent.resize(np, 0);
+            }
+            if (ww_razed.size() < n_reg) ww_razed.resize(n_reg, 0);
+            std::vector<int64_t> ww_pop(np, 0);
+            std::vector<int32_t> ww_nreg(np, 0);
+            for (std::size_t i = 0; i < n_reg; ++i)
+            {
+                const int o = owner[i];
+                if (o < 0 || static_cast<std::size_t>(o) >= np) continue;
+                ww_pop[static_cast<std::size_t>(o)] += ss.regions[i].population;
+                ++ww_nreg[static_cast<std::size_t>(o)];
+            }
+            const auto standing = [&](int p) {
+                return p >= 0 && static_cast<std::size_t>(p) < np && out.polities[static_cast<std::size_t>(p)].alive
+                    && ww_nreg[static_cast<std::size_t>(p)] > 0;
+            };
+            const auto in_top = [&](int p) {
+                return std::find(ww_top.begin(), ww_top.end(), p) != ww_top.end();
+            };
+            const auto ww_name = [&](int pid) -> std::string {
+                if (pid < 0 || static_cast<std::size_t>(pid) >= np) return std::string("a realm");
+                const polity& q = out.polities[static_cast<std::size_t>(pid)];
+                if (!q.name.empty()) return q.name;
+                if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                    return ss.regions[static_cast<std::size_t>(q.capital)].name;
+                return std::string("a realm");
+            };
+            const auto ww_line = [&](const std::string& line) {
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy, line, std::string{}});
+            };
+            const auto md_partners = [&](int p) {
+                std::vector<int> v;
+                for (const dated_object& o : out.dated_objects)
+                {
+                    if (o.kind != static_cast<int32_t>(treaty_clause::mutual_defence)) continue;
+                    if (o.a == p) v.push_back(o.b);
+                    else if (o.b == p) v.push_back(o.a);
+                }
+                std::sort(v.begin(), v.end());
+                v.erase(std::unique(v.begin(), v.end()), v.end());
+                return v;
+            };
+            const auto leader_of = [&](int side) {
+                return side == 1 ? out.world_war_side_a : out.world_war_side_b;
+            };
+            // A realm ENTERS on @p side: its chest is the treasury it entered with.
+            const auto enter = [&](int p, int side) {
+                ww_side[static_cast<std::size_t>(p)] = static_cast<int8_t>(side);
+                const int cap = out.polities[static_cast<std::size_t>(p)].capital;
+                ww_chest[static_cast<std::size_t>(p)] =
+                    (cap >= 0 && static_cast<std::size_t>(cap) < ss.regions.size())
+                        ? std::max<int64_t>(0, ss.regions[static_cast<std::size_t>(cap)].treasury) : 0;
+                ++out.world_war_belligerents;
+            };
+            const auto join = [&](int p, int side, int ally, const std::string& line) {
+                enter(p, side);
+                note_event(lapse_event_kind::war_joined, out.polities[static_cast<std::size_t>(p)].capital, p, ally);
+                ww_line(line);
+            };
+            // THE SPREAD: layer by layer, each engaged realm's living partners
+            // enter on its side (the first side to reach a realm takes it),
+            // unless bound by non-aggression to the other side's leader.
+            const auto spread = [&]() {
+                for (;;)
+                {
+                    std::vector<std::pair<int, int>> layer; // (partner, the engaged realm it answers)
+                    std::vector<char> taken(np, 0);
+                    for (std::size_t p = 0; p < np; ++p)
+                    {
+                        if (ww_side[p] == 0 || !standing(static_cast<int>(p))) continue;
+                        const int enemy = leader_of(ww_side[p] == 1 ? 2 : 1);
+                        for (const int m : md_partners(static_cast<int>(p)))
+                        {
+                            if (!standing(m) || ww_side[static_cast<std::size_t>(m)] != 0
+                                || taken[static_cast<std::size_t>(m)]) continue;
+                            if (enemy >= 0 && has_treaty_clause(out, m, enemy, treaty_clause::non_aggression)) continue;
+                            taken[static_cast<std::size_t>(m)] = 1;
+                            layer.push_back({m, static_cast<int>(p)});
+                        }
+                    }
+                    if (layer.empty()) return;
+                    for (const auto& [m, p] : layer)
+                    {
+                        const int side = ww_side[static_cast<std::size_t>(p)];
+                        join(m, side, p, ww_name(m) + " honours its defence pact with " + ww_name(p)
+                                             + " and enters the war against " + ww_name(leader_of(side == 1 ? 2 : 1)));
+                    }
+                }
+            };
+            const auto top_engaged = [&]() {
+                int n = 0;
+                for (const int p : ww_top)
+                    if (static_cast<std::size_t>(p) < np && ww_side[static_cast<std::size_t>(p)] != 0) ++n;
+                return n;
+            };
+
+            // THE TOP POWERS, read once, at the round the window's step is taken.
+            if (!ww_top_read && y >= world_war_window_start
+                && (!params.record_playback || last_record_year == y))
+            {
+                ww_top_read = true;
+                std::vector<std::pair<int64_t, int>> by_pop;
+                for (std::size_t p = 0; p < np; ++p)
+                    if (ww_nreg[p] > 0) by_pop.push_back({ww_pop[p], static_cast<int>(p)});
+                std::sort(by_pop.begin(), by_pop.end(), [](const auto& a, const auto& b) {
+                    return a.first != b.first ? a.first > b.first : a.second < b.second; });
+                for (std::size_t k = 0; k < by_pop.size() && k < static_cast<std::size_t>(world_war_top_k); ++k)
+                    ww_top.push_back(by_pop[k].second);
+            }
+
+            // THE SPARK.
+            if (ww_top_read && ww_phase == 0 && y <= world_war_window_end)
+            {
+                int a = -1, b = -1, ground = -1, kind = 0;
+                for (const ww_battle& bt : ww_round_battles)
+                {
+                    if (!standing(bt.attacker) || !standing(bt.defender)) continue;
+                    if (!in_top(bt.attacker) && !in_top(bt.defender)) continue;
+                    bool drawn = false;
+                    for (const int m : md_partners(bt.defender))
+                        if (m != bt.attacker && standing(m)
+                            && !has_treaty_clause(out, m, bt.attacker, treaty_clause::non_aggression))
+                        { drawn = true; break; }
+                    if (!drawn) continue;
+                    a = bt.attacker; b = bt.defender; ground = bt.region; kind = 1;
+                    break;
+                }
+                int subject = -1;
+                if (kind == 0 && y >= world_war_spark_deadline)
+                {
+                    // THE CONTEST FOR A SUBJECT between the two largest powers.
+                    std::vector<int> great;
+                    for (const int p : ww_top)
+                        if (standing(p)) great.push_back(p);
+                    if (great.size() >= 2)
+                    {
+                        const int l1 = great[0], l2 = great[1];
+                        const auto seat_of = [&](int p) -> const region* {
+                            const int c = out.polities[static_cast<std::size_t>(p)].capital;
+                            return (c >= 0 && static_cast<std::size_t>(c) < ss.regions.size())
+                                       ? &ss.regions[static_cast<std::size_t>(c)] : nullptr;
+                        };
+                        int best_d = INT_MAX;
+                        for (std::size_t s = 0; s < np; ++s)
+                        {
+                            const int ov = out.polities[s].overlord;
+                            if ((ov != l1 && ov != l2) || !standing(static_cast<int>(s))) continue;
+                            const region* ss_seat = seat_of(static_cast<int>(s));
+                            const region* rival   = seat_of(ov == l1 ? l2 : l1);
+                            if (ss_seat == nullptr || rival == nullptr) continue;
+                            const int d = region_distance(*ss_seat, *rival, gw);
+                            if (d < best_d) { best_d = d; subject = static_cast<int>(s); }
+                        }
+                        if (subject >= 0)
+                        {
+                            const int ov = out.polities[static_cast<std::size_t>(subject)].overlord;
+                            a = ov == l1 ? l2 : l1; // the power that wants it, or wants it freed
+                            b = ov;
+                            ground = out.polities[static_cast<std::size_t>(subject)].capital;
+                        }
+                        else
+                        {
+                            // No subject between them: the smaller's province
+                            // nearest the larger's seat is what they contest.
+                            a = l1; b = l2;
+                            const region* rival = seat_of(l1);
+                            for (std::size_t i = 0; i < n_reg && rival != nullptr; ++i)
+                            {
+                                if (owner[i] != l2) continue;
+                                const int d = region_distance(ss.regions[i], *rival, gw);
+                                if (d < best_d) { best_d = d; ground = static_cast<int>(i); }
+                            }
+                        }
+                        kind = 2;
+                    }
+                }
+                if (kind != 0)
+                {
+                    ww_phase = 1;
+                    out.world_war_year       = static_cast<int32_t>(y);
+                    out.world_war_spark      = kind;
+                    out.world_war_contested  = ground;
+                    out.world_war_side_a     = a;
+                    out.world_war_side_b     = b;
+                    enter(a, 1);
+                    enter(b, 2);
+                    const std::string where = (ground >= 0 && static_cast<std::size_t>(ground) < ss.regions.size())
+                                                ? ss.regions[static_cast<std::size_t>(ground)].name : std::string("its border");
+                    note_event(lapse_event_kind::war_joined, ground, a, b);
+                    if (kind == 1)
+                        ww_line(ww_name(a) + " marches on " + where + " against " + ww_name(b)
+                                + ", and the pacts that bind " + ww_name(b) + "'s friends turn a border war into a world war");
+                    else if (subject >= 0)
+                        ww_line(ww_name(a) + " and " + ww_name(b) + ", the two great powers of the age, go to war over "
+                                + ww_name(subject) + ", subject of " + ww_name(b));
+                    else
+                        ww_line(ww_name(a) + " and " + ww_name(b) + ", the two great powers of the age, go to war over "
+                                + where);
+                    if (subject >= 0 && ww_side[static_cast<std::size_t>(subject)] == 0)
+                        join(subject, 2, b, ww_name(subject) + " is drawn into the war beside its overlord " + ww_name(b));
+                    spread();
+                }
+            }
+            ww_round_battles.clear();
+
+            if (ww_phase == 1)
+            {
+                // THE BACKSTOP: one recorded step a round while too few of the
+                // top powers stand in the war.
+                if (top_engaged() < world_war_min_engaged)
+                {
+                    int c = -1;
+                    for (const int p : ww_top)
+                        if (standing(p) && ww_side[static_cast<std::size_t>(p)] == 0) { c = p; break; }
+                    if (c >= 0)
+                    {
+                        int ga = 0, gb = 0, gwho_a = -1, gwho_b = -1;
+                        for (std::size_t p = 0; p < np; ++p)
+                        {
+                            if (ww_side[p] == 0) continue;
+                            const int g = grudge_between(out, c, static_cast<int>(p));
+                            if (ww_side[p] == 1 && g > ga) { ga = g; gwho_a = static_cast<int>(p); }
+                            if (ww_side[p] == 2 && g > gb) { gb = g; gwho_b = static_cast<int>(p); }
+                        }
+                        int side = 0, foe = -1;
+                        if (ga != gb)
+                        {
+                            side = ga > gb ? 2 : 1;
+                            foe  = ga > gb ? gwho_a : gwho_b;
+                        }
+                        else
+                        {
+                            const int cc = out.polities[static_cast<std::size_t>(c)].capital;
+                            const int ca = out.polities[static_cast<std::size_t>(out.world_war_side_a)].capital;
+                            const int cb = out.polities[static_cast<std::size_t>(out.world_war_side_b)].capital;
+                            const auto dist_to = [&](int r) {
+                                return (cc >= 0 && r >= 0 && static_cast<std::size_t>(cc) < ss.regions.size()
+                                        && static_cast<std::size_t>(r) < ss.regions.size())
+                                           ? region_distance(ss.regions[static_cast<std::size_t>(cc)],
+                                                             ss.regions[static_cast<std::size_t>(r)], gw)
+                                           : INT_MAX;
+                            };
+                            side = dist_to(ca) < dist_to(cb) ? 2 : 1; // against the nearer leader; a tie, beside the defender
+                        }
+                        ++out.world_war_escalations;
+                        const int ally = leader_of(side);
+                        const std::string line = foe >= 0
+                            ? ww_name(c) + ", its grievance against " + ww_name(foe) + " unpaid, enters the war beside "
+                                  + ww_name(ally)
+                            : ww_name(c) + ", alarmed by " + ww_name(leader_of(side == 1 ? 2 : 1))
+                                  + "'s war on its doorstep, enters the war beside " + ww_name(ally);
+                        join(c, side, ally, line);
+                        spread();
+                    }
+                }
+
+                // THE COSTS of the round the war stands.
+                const int64_t yrs   = clampi64(step_years, 1, 1000);
+                const int     cap_q = clampi(params.world_war_round_cap_q, 0, 1000);
+                std::vector<std::vector<int>> held(np);
+                for (std::size_t i = 0; i < n_reg; ++i)
+                {
+                    const int o = owner[i];
+                    if (o < 0 || static_cast<std::size_t>(o) >= np || ww_side[static_cast<std::size_t>(o)] == 0) continue;
+                    if (ss.regions[i].domain != region_domain::land) continue;
+                    held[static_cast<std::size_t>(o)].push_back(static_cast<int>(i));
+                }
+                std::vector<int> side_a, side_b;
+                for (std::size_t p = 0; p < np; ++p)
+                {
+                    if (!standing(static_cast<int>(p)) || held[p].empty()) continue;
+                    if (ww_side[p] == 1) side_a.push_back(static_cast<int>(p));
+                    else if (ww_side[p] == 2) side_b.push_back(static_cast<int>(p));
+                }
+
+                // THE FRONTS: per opposing pair, each side's ground nearest the other.
+                const int reach = params.world_war_front_reach > 0 ? params.world_war_front_reach
+                                                                    : params.neighbour_radius;
+                const int per_pair = clampi(params.world_war_front_per_pair, 0, 64);
+                std::vector<int> front_enemy(n_reg, -1);
+                const auto nearest_of = [&](const std::vector<int>& mine, const std::vector<int>& theirs,
+                                            bool ports_only, std::vector<std::pair<int, int>>& outv) {
+                    outv.clear();
+                    for (const int i : mine)
+                    {
+                        const region& r = ss.regions[static_cast<std::size_t>(i)];
+                        if (ports_only && r.port_stock_q <= 0 && r.port_q <= 0) continue;
+                        int d = INT_MAX;
+                        for (const int j : theirs)
+                            d = std::min(d, region_distance(r, ss.regions[static_cast<std::size_t>(j)], gw));
+                        outv.push_back({d, i});
+                    }
+                    std::sort(outv.begin(), outv.end());
+                };
+                std::vector<std::pair<int, int>> da, db;
+                for (const int a : side_a)
+                    for (const int b : side_b)
+                    {
+                        const std::vector<int>& ha = held[static_cast<std::size_t>(a)];
+                        const std::vector<int>& hb = held[static_cast<std::size_t>(b)];
+                        nearest_of(ha, hb, false, da);
+                        if (da.empty()) continue;
+                        if (da.front().first <= reach)
+                        {
+                            nearest_of(hb, ha, false, db);
+                            for (int k = 0; k < per_pair && k < static_cast<int>(da.size()) && da[static_cast<std::size_t>(k)].first <= reach; ++k)
+                                if (front_enemy[static_cast<std::size_t>(da[static_cast<std::size_t>(k)].second)] < 0)
+                                    front_enemy[static_cast<std::size_t>(da[static_cast<std::size_t>(k)].second)] = b;
+                            for (int k = 0; k < per_pair && k < static_cast<int>(db.size()) && db[static_cast<std::size_t>(k)].first <= reach; ++k)
+                                if (front_enemy[static_cast<std::size_t>(db[static_cast<std::size_t>(k)].second)] < 0)
+                                    front_enemy[static_cast<std::size_t>(db[static_cast<std::size_t>(k)].second)] = a;
+                        }
+                        else if ((in_top(a) || in_top(b))
+                                 && (out.polities[static_cast<std::size_t>(a)].navy_stock > 0
+                                     || out.polities[static_cast<std::size_t>(b)].navy_stock > 0))
+                        {
+                            // Across water, where a top power is one of the pair
+                        // and either fields a navy: each side's nearest port, blockaded.
+                            nearest_of(ha, hb, true, da);
+                            nearest_of(hb, ha, true, db);
+                            if (!da.empty() && front_enemy[static_cast<std::size_t>(da.front().second)] < 0)
+                                front_enemy[static_cast<std::size_t>(da.front().second)] = b;
+                            if (!db.empty() && front_enemy[static_cast<std::size_t>(db.front().second)] < 0)
+                                front_enemy[static_cast<std::size_t>(db.front().second)] = a;
+                        }
+                    }
+
+                // GROUND FOUGHT OVER: razed once, starved and fled every round.
+                const auto tier_floor = [&](int t) -> int {
+                    return t <= 0 ? 0 : t == 1 ? params.road_tier1_uses
+                         : t == 2 ? params.road_tier2_uses : params.road_tier3_uses;
+                };
+                bool tier_moved = false;
+                const int famine_q = static_cast<int>(clampi64(params.world_war_famine_q * yrs, 0, cap_q));
+                const int flight_q = static_cast<int>(clampi64(params.world_war_flight_q * yrs, 0, cap_q));
+                for (std::size_t i = 0; i < n_reg; ++i)
+                {
+                    const int enemy = front_enemy[i];
+                    if (enemy < 0) continue;
+                    const int holder = owner[i];
+                    region& r = ss.regions[i];
+                    ++out.world_war_front_rounds;
+                    if (!ww_razed[i])
+                    {
+                        ww_razed[i] = 1;
+                        ++out.world_war_regions_razed;
+                        const int rq = clampi(params.world_war_raze_industry_q, 0, 1000);
+                        const int64_t cut_p = (r.industry_points / 1000) * rq + ((r.industry_points % 1000) * rq) / 1000;
+                        const int64_t cut_t = (r.industry_points_from_treasury / 1000) * rq
+                                            + ((r.industry_points_from_treasury % 1000) * rq) / 1000;
+                        r.industry_points               -= cut_p;
+                        r.industry_points_from_treasury -= cut_t;
+                        out.world_war_points_razed_scale    += cut_p - cut_t;
+                        out.world_war_points_razed_treasury += cut_t;
+                        const int pcut = (r.port_stock_q * clampi(params.world_war_raze_port_q, 0, 1000)) / 1000;
+                        r.port_stock_q -= pcut;
+                        out.world_war_port_razed_q += pcut;
+                        for (const int nb : supply_neighbours[i])
+                        {
+                            const uint64_t key = edge_key(static_cast<int>(i), nb);
+                            const auto it = road_uses_live.find(key);
+                            if (it == road_uses_live.end()) continue;
+                            const int tier = road_tier_for_uses(it->second);
+                            if (tier <= 0 || ww_demoted_edges.count(key)) continue;
+                            ww_demoted_edges.insert(key);
+                            it->second = std::max(0, tier_floor(tier) - 1);
+                            ++out.world_war_roads_demoted;
+                            tier_moved = true;
+                        }
+                        note_event(lapse_event_kind::ground_razed, static_cast<int>(i), holder, enemy);
+                    }
+                    if (r.population <= 0) continue;
+                    // BLOCKADE FAMINE: the front's supply interdicted while the war stands.
+                    const int64_t starved = remove_region_people(r, (r.population * famine_q) / 1000);
+                    out.world_war_famine_dead += starved;
+                    if (holder >= 0 && static_cast<std::size_t>(holder) < np) ww_dead[static_cast<std::size_t>(holder)] += starved;
+                    // DISPLACEMENT: to the nearest safe region of the realm that can feed them.
+                    int dest = -1, dest_d = INT_MAX;
+                    if (flight_q > 0 && holder >= 0)
+                        for (std::size_t j = 0; j < n_reg; ++j)
+                        {
+                            if (j == i || owner[j] != holder || front_enemy[j] >= 0) continue;
+                            const region& d = ss.regions[j];
+                            if (d.domain != region_domain::land || d.population <= 0) continue;
+                            if (refugee_room(d) <= 0) continue;
+                            const int dd = region_distance(r, d, gw);
+                            if (dd < dest_d) { dest_d = dd; dest = static_cast<int>(j); }
+                        }
+                    if (flight_q > 0 && dest < 0) ++out.world_war_no_refuge;
+                    if (dest >= 0)
+                    {
+                        const int64_t fled = settle_refugees(ss.regions[static_cast<std::size_t>(dest)],
+                                                             (r.population * flight_q) / 1000);
+                        if (fled > 0)
+                        {
+                            remove_region_people(r, fled);
+                            out.world_war_fled += fled;
+                            ww_fled[static_cast<std::size_t>(holder)] += fled;
+                        }
+                    }
+                    r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+                }
+                if (tier_moved) ++roads_version;
+
+                // CONSCRIPT DEAD, drawn back from the ground that raised them;
+                // and THE TREASURY, spent down from the chest the realm entered with.
+                const int conscript_q = static_cast<int>(clampi64(params.world_war_conscript_q * yrs, 0, cap_q));
+                const int exhaust_q   = clampi(params.world_war_exhaustion_q, 0, 1000);
+                for (const std::vector<int>* sv : {&side_a, &side_b})
+                    for (const int p : *sv)
+                    {
+                        const std::size_t pi = static_cast<std::size_t>(p);
+                        for (std::size_t i = 0; i < n_reg; ++i)
+                        {
+                            if (owner[i] != p) continue;
+                            region& r = ss.regions[i];
+                            if (r.population <= 0) continue;
+                            const int64_t dead = remove_region_people(r, (r.population * conscript_q) / 1000);
+                            out.world_war_conscript_dead += dead;
+                            ww_dead[pi] += dead;
+                            r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+                        }
+                        ww_years[pi] += yrs;
+                        const int cap = out.polities[pi].capital;
+                        if (cap < 0 || static_cast<std::size_t>(cap) >= ss.regions.size()) continue;
+                        region& seat = ss.regions[static_cast<std::size_t>(cap)];
+                        const int64_t chest = ww_chest[pi];
+                        const int64_t war_chest = (chest / 1000) * exhaust_q + ((chest % 1000) * exhaust_q) / 1000;
+                        const int64_t due = std::min<int64_t>(war_chest - ww_spent[pi],
+                            (chest / 1000) * params.world_war_cost_q * yrs
+                                + ((chest % 1000) * params.world_war_cost_q * yrs) / 1000);
+                        const int64_t pay = std::clamp<int64_t>(std::min(due, seat.treasury), 0, INT64_MAX);
+                        seat.treasury -= pay;
+                        ww_spent[pi] += pay;
+                        out.world_war_treasury_spent += pay;
+                    }
+
+                // PEACE: a side has spent its war chests (`world_war_exhaustion_q`
+                // of what each member entered with) and the top powers
+                // stand in (or no more can be drawn in) -- or the window closes.
+                const auto spent_out = [&](int side) {
+                    for (std::size_t p = 0; p < np; ++p)
+                        if (ww_side[p] == side && standing(static_cast<int>(p))
+                            && ww_years[p] * params.world_war_cost_q < exhaust_q)
+                            return false;
+                    return true;
+                };
+                bool none_left = true;
+                for (const int p : ww_top)
+                    if (standing(p) && ww_side[static_cast<std::size_t>(p)] == 0) none_left = false;
+                const bool drawn_in   = top_engaged() >= world_war_min_engaged || none_left;
+                const bool last_round = y + step_years > world_war_window_end;
+                if (last_round || (drawn_in && (spent_out(1) || spent_out(2))))
+                {
+                    ww_phase = 2;
+                    out.world_war_peace_year = static_cast<int32_t>(y);
+                    note_event(lapse_event_kind::war_peace, out.world_war_contested,
+                               out.world_war_side_a, out.world_war_side_b);
+                    ww_line("Peace ends the world war between " + ww_name(out.world_war_side_a) + " and "
+                            + ww_name(out.world_war_side_b) + ": " + std::to_string(out.world_war_conscript_dead)
+                            + " conscripts dead, " + std::to_string(out.world_war_famine_dead)
+                            + " starved under blockade, " + std::to_string(out.world_war_fled) + " fled the fronts, "
+                            + std::to_string(out.world_war_regions_razed) + " regions razed");
+                    // Each GREAT POWER that fought counts its own war (the
+                    // leaders and the top powers; the dozens of lesser
+                    // belligerents are in the totals above, not a line each).
+                    for (std::size_t p = 0; p < np; ++p)
+                        if (ww_side[p] != 0
+                            && (in_top(static_cast<int>(p)) || static_cast<int>(p) == out.world_war_side_a
+                                || static_cast<int>(p) == out.world_war_side_b))
+                            ww_line(ww_name(static_cast<int>(p)) + " counts its war: " + std::to_string(ww_dead[p])
+                                    + " of its people dead, " + std::to_string(ww_fled[p]) + " driven from their homes, "
+                                    + std::to_string(ww_spent[p]) + " spent from its treasury");
+                }
+            }
+        }
     }
 
     // BL-1287: THE VERDICT, clause for clause the detector's (history_patterns
@@ -10703,6 +11254,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else if (out.rise_fall_breakaways < 1)              out.rise_fall_why = "nothing broke away from it in its fall";
         }
         out.rise_fall_missed = !out.rise_fall_why.empty();
+    }
+
+    // BL-1289: THE WORLD WAR'S VERDICT, clause for clause the detector's
+    // (history_patterns WW). A miss is a defect the caller records.
+    if (ww_on)
+    {
+        int engaged = 0;
+        for (const int p : ww_top)
+            if (static_cast<std::size_t>(p) < ww_side.size() && ww_side[static_cast<std::size_t>(p)] != 0) ++engaged;
+        out.world_war_top_engaged = engaged;
+        // A span that closes before the window does is owed no war (a
+        // harness's short arc); one that runs past it is owed the whole war.
+        if (params.stop_year <= world_war_window_end)       out.world_war_why.clear();
+        else if (!ww_top_read)                              out.world_war_why = "the top powers were never read at the window";
+        else if (out.world_war_year == 0)                   out.world_war_why = "no war formed inside the window";
+        else if (engaged < world_war_min_engaged)           out.world_war_why = "too few of the top powers were drawn in";
+        else if (out.world_war_peace_year == 0)             out.world_war_why = "no peace was made inside the window";
+        out.world_war_missed = !out.world_war_why.empty();
     }
 
     // BL-1130 (review fix): the span closes on a measured record.

@@ -2,6 +2,7 @@
 
 #include "world/era_timelapse.hpp"
 #include "world/rise_fall_rules.hpp" // BL-1287: the RF constants, one place with the sim
+#include "world/world_war_rules.hpp" // BL-1289: the WW constants, one place with the sim
 
 #include <cstdint>
 #include <vector>
@@ -39,7 +40,9 @@ struct settlement_state;
 //                  culture most remote when the Culture round closes, lagging,
 //                  and bound in Exploration by a polity of another culture.
 //   world war      INDUSTRIALISATION.md sec A world war in every world (Ben,
-//                  2026-10-11): inside 1900-1930, the top powers drawn in.
+//                  2026-10-11): inside 1900-1930, the top powers drawn in --
+//                  read off the war's own record (BL-1289): the realms named
+//                  entering it, and its peace inside the window.
 //   civil war      CIVILISATION.md, "What counts as one" (Ben, 2026-10-11): a
 //                  successor breaking away with at least a quarter of what its
 //                  parent kept (3+ regions), and the two then taking seats from
@@ -76,10 +79,11 @@ inline constexpr int hp_rf_floor_q           = rise_fall_floor_pm;     ///< rule
 inline constexpr int hp_rf_hegemony_q        = rise_fall_hegemony_pm;  ///< the non-hegemony cap (BL-224), not overturned
 inline constexpr int hp_rf_fall_window_y     = rise_fall_window_years; ///< share halves within this many years of the peak
 inline constexpr int hp_lc_lag_x100          = 85;   ///< PROVISIONAL: materials mean <= 85% of the world's at the Empires close
-inline constexpr int hp_ww_window_start      = 1900;
-inline constexpr int hp_ww_window_end        = 1930; ///< inclusive
-inline constexpr int hp_ww_top_k             = 6;    ///< PROVISIONAL: "the top powers" = the six most populous at the window's open
-inline constexpr int hp_ww_min_belligerents  = 4;    ///< PROVISIONAL: of those six
+// The world war's constants ARE the sim's (`world_war_rules.hpp`, BL-1289).
+inline constexpr int hp_ww_window_start      = world_war_window_start;
+inline constexpr int hp_ww_window_end        = world_war_window_end;   ///< inclusive
+inline constexpr int hp_ww_top_k             = world_war_top_k;        ///< PROVISIONAL: "the top powers" = the six most populous at the window's open
+inline constexpr int hp_ww_min_belligerents  = world_war_min_engaged;  ///< PROVISIONAL: of those six
 inline constexpr int hp_cw_min_half_q        = 250;  ///< a quarter of what the parent kept
 inline constexpr int hp_cw_min_regions       = 3;
 inline constexpr int hp_cw_window_y          = 50;
@@ -117,8 +121,12 @@ struct history_pattern_reading
 
     // --- world war
     bool ww_hit = false;
-    int  ww_belligerents = 0;   ///< of the top-k at the window's open, how many a conflict moment touched
-    int  ww_moments = 0;        ///< conflict moments inside the window
+    int  ww_belligerents = 0;   ///< of the top-k at the window's open, how many the record names entering the war
+    int  ww_engaged = 0;        ///< every realm the record names entering it, both sides
+    int  ww_year = 0;           ///< the declaration's year (0: none in the window)
+    int  ww_peace_year = 0;     ///< the peace's year (0: none in the window)
+    int  ww_razed = 0;          ///< regions the record names razed
+    int  ww_moments = 0;        ///< the war's own moments inside the window (entries, razings, peace)
     std::vector<int32_t> ww_polities;
 
     // --- civil war
@@ -133,7 +141,7 @@ struct history_pattern_reading
 
     /// Every (polity, pattern) a hit names, DATED: the year the pattern touched
     /// that polity (rise and fall: its peak; late culture: the binding; world
-    /// war: the polity's first conflict moment in the window; civil war: the
+    /// war: the year the polity entered the war; civil war: the
     /// fight that made it one). The tag fold replays the record's endings and
     /// splits after these dates (`fold_history_pattern_tags`), so a tag passes
     /// only to realms that inherit or end its holder AFTER it was earned.

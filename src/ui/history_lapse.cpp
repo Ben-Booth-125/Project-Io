@@ -5193,6 +5193,38 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "Refugees flee the civil war at %s for %s.",
                       R, region_name_of(h, e.other));
         break;
+    case lapse_event_kind::war_joined:
+    {
+        // BL-1289 (INDUSTRIALISATION.md sec A world war in every world): the
+        // FIRST entry in the record is the declaration -- `polity` opened the
+        // war on `other` over the ground at `region`; every later one is a
+        // realm entering beside `other` (its pact partner, overlord or leader).
+        bool declaration = false;
+        for (const lapse_event& x : h.lapse.events)
+            if (x.kind == static_cast<uint8_t>(lapse_event_kind::war_joined))
+            {
+                declaration = x.year == e.year && x.region == e.region && x.polity == e.polity && x.other == e.other;
+                break;
+            }
+        if (declaration)
+            std::snprintf(buf, sizeof buf, "%s goes to war with %s over %s, and the world war begins.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other), R);
+        else
+            std::snprintf(buf, sizeof buf, "%s enters the world war beside %s.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    }
+    case lapse_event_kind::ground_razed:
+        // BL-1289: the ground the war is fought over -- works, port and roads
+        // razed, its people starved and driven out while the war stands.
+        std::snprintf(buf, sizeof buf, "The war with %s razes %s, in the realm of %s; famine and flight follow.",
+                      polity_name_of(h, e.other), R, polity_name_of(h, e.polity));
+        break;
+    case lapse_event_kind::war_peace:
+        // BL-1289: peace between the two realms that opened it.
+        std::snprintf(buf, sizeof buf, "Peace between %s and %s ends the world war.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5266,6 +5298,11 @@ int ticker_priority(const lapse_event& e)
     // BL-1290: the famine is the civil war's moment on the ticker (common
     // tier); the flight beside it names where the people went, and takes the
     // ticker only when the arc is quiet -- the map is its primary telling.
+    // BL-1289: the world war's peace is once a world; its entries come by the
+    // dozen in its opening round, so they take the common tier; its razings
+    // take the ticker only when the arc is quiet (the map pins them).
+    case lapse_event_kind::war_peace:            return 0;
+    case lapse_event_kind::ground_razed:         return 2;
     case lapse_event_kind::civil_war_flight:     return 2;
     default:                                     return 1;
     }

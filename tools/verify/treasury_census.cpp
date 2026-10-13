@@ -185,6 +185,7 @@ struct span_flows
     int64_t earn_endow = 0, earn_corr = 0, earn_trade = 0, consolidation = 0;
     int64_t tribute = 0, purchases = 0;
     int64_t army_bill = 0, navy_bill = 0, ports = 0, navies = 0, armies = 0, roads = 0, industry = 0;
+    int64_t war = 0; ///< BL-1289: the world war's stated cost
     int64_t kept_by_crowding = 0;
     int64_t levy = 0, disbanded = 0, sized_rounds = 0, ip_from_treasury = 0, army_steps = 0;
     void add(const span_flows& o)
@@ -194,11 +195,11 @@ struct span_flows
         earn_endow += o.earn_endow; earn_corr += o.earn_corr; earn_trade += o.earn_trade;
         consolidation += o.consolidation; tribute += o.tribute; purchases += o.purchases;
         army_bill += o.army_bill; navy_bill += o.navy_bill; ports += o.ports; navies += o.navies;
-        armies += o.armies; roads += o.roads; industry += o.industry; kept_by_crowding += o.kept_by_crowding;
+        armies += o.armies; roads += o.roads; industry += o.industry; war += o.war; kept_by_crowding += o.kept_by_crowding;
         levy += o.levy; disbanded += o.disbanded; sized_rounds += o.sized_rounds; ip_from_treasury += o.ip_from_treasury; army_steps += o.army_steps;
     }
     int64_t earned() const { return earn_endow + earn_corr + earn_trade + consolidation + levy; }
-    int64_t spent() const { return army_bill + navy_bill + ports + navies + armies + roads + industry; }
+    int64_t spent() const { return army_bill + navy_bill + ports + navies + armies + roads + industry + war; }
 };
 
 span_flows read_span(const history_sim_state& st, const std::vector<region>& open,
@@ -225,6 +226,7 @@ span_flows read_span(const history_sim_state& st, const std::vector<region>& ope
     f.armies        = st.treasury_spent_on_standing_armies;
     f.roads         = st.treasury_spent_on_roads;
     f.industry      = st.treasury_spent_on_industry;
+    f.war           = st.world_war_treasury_spent; // BL-1289
     f.kept_by_crowding = st.treasury_kept_by_crowding;
     f.levy             = st.treasury_earned_levy;       // BL-1298
     f.disbanded        = st.army_disbanded_by_earn;
@@ -255,8 +257,9 @@ void print_span(const char* name, const span_flows& f)
     std::printf("      spend army bill %9.0f (%4.1f%%)  navy bill %9.0f (%4.1f%%)  ports %8.0f (%4.1f%%)  navies %8.0f (%4.1f%%)  armies %8.0f (%4.1f%%)\n",
                 f.army_bill * kCr, sh(f.army_bill), f.navy_bill * kCr, sh(f.navy_bill),
                 f.ports * kCr, sh(f.ports), f.navies * kCr, sh(f.navies), f.armies * kCr, sh(f.armies));
-    std::printf("            post roads %8.0f (%4.1f%%)  treasury->industry %9.0f (%4.1f%%)  [kept by crowding %.0f]\n",
-                f.roads * kCr, sh(f.roads), f.industry * kCr, sh(f.industry), f.kept_by_crowding * kCr);
+    std::printf("            post roads %8.0f (%4.1f%%)  treasury->industry %9.0f (%4.1f%%)  world war %9.0f (%4.1f%%)  [kept by crowding %.0f]\n",
+                f.roads * kCr, sh(f.roads), f.industry * kCr, sh(f.industry), f.war * kCr, sh(f.war),
+                f.kept_by_crowding * kCr);
     std::printf("      moved tribute %9.0f (%4.1f%%)  purchases %9.0f (%4.1f%%)   (polity -> polity; zero-sum)\n",
                 f.tribute * kCr, sh(f.tribute), f.purchases * kCr, sh(f.purchases));
 }

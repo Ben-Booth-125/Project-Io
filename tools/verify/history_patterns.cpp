@@ -189,7 +189,7 @@ int main(int argc, char** argv)
         const history_pattern_reading& q = r.pr;
         std::printf("seed %-3u (%.0f s)  RF %s realm %d%s front %d‰ peak %d‰ at %d x%.2f, %d seats, fall %dy to %d‰, %d split%s%s, levels %d/%d  |"
                     "  LC %s culture %d gap %d (next %d) lag %d%% bound %d  |"
-                    "  WW %s %d/%d in %d-%d, %d moments  |  CW %d/%d  RV %d (proxy %d)  |"
+                    "  WW %s %d/%d top, %d realms, war %d-%d, %d razed, %d moments  |  CW %d/%d  RV %d (proxy %d)  |"
                     "  pop@1200 %lld  |  tags RF %d LC %d WW %d CW %d RV %d, unfolded %d%s  |"
                     "  nations %d, %d w/ specialist, polities %d\n",
                     seed, r.build_s, q.rf_hit ? "HIT " : "miss", q.rf_polity,
@@ -198,7 +198,7 @@ int main(int argc, char** argv)
                     q.rf_fall_years, q.rf_fall_q, q.rf_breakaways, q.rf_breakaways == 1 ? "" : "s",
                     q.rf_ended ? " ended" : "", q.rf_rise_level, q.rf_fall_level,
                     q.lc_hit ? "HIT " : "miss", q.lc_culture, q.lc_gap, q.lc_second_gap, q.lc_lag_x100, q.lc_bound,
-                    q.ww_hit ? "HIT " : "miss", q.ww_belligerents, hp_ww_top_k, hp_ww_window_start, hp_ww_window_end,
+                    q.ww_hit ? "HIT " : "miss", q.ww_belligerents, hp_ww_top_k, q.ww_engaged, q.ww_year, q.ww_peace_year, q.ww_razed,
                     q.ww_moments, q.cw_count, q.cw_splits, q.rv_count, q.rv_proxy,
                     static_cast<long long>(r.pop_1200),
                     r.tagged[0], r.tagged[1], r.tagged[2], r.tagged[3], r.tagged[4], r.unfolded,

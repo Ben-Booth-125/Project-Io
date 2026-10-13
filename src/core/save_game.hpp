@@ -294,6 +294,13 @@ inline constexpr uint32_t save_game_magic =
 /// 30-33 together (civil war 30-31, rise and fall 32-33). No field moves; the
 /// kind range check is the only reader that changes, and a build that
 /// predates them refuses such a stream on it.
+/// v23 ALSO admits three in the Industrialisation record, written by the world
+/// war (BL-1289): 36 `war_joined` (the first in a record is the declaration),
+/// 37 `ground_razed` and 38 `war_peace`. Numbered by lane: 34-35 are the late
+/// culture's (BL-1288) and 39 the revolution's (BL-1294), so `count` admits
+/// 34-35 under this version whether or not that lane has landed. No field
+/// moves, so no version bump; the kind range check is the only reader that
+/// changes, and a build that predates them refuses such a stream on it.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

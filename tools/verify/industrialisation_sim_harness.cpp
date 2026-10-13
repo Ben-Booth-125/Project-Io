@@ -3289,9 +3289,11 @@ int main(int argc, char** argv)
                     sum_s += S[i];
                     sum_t += T;
                 }
-                // The split must reproduce the span's own ledger exactly.
-                row.split_ok = ok && sum_s == dst.industry_points_from_scale
-                                  && sum_t == dst.industry_points_from_treasury;
+                // The split must reproduce the span's own ledger exactly -- less
+                // what the world war razed, its stated cost (BL-1289), each part
+                // on its own side of the split.
+                row.split_ok = ok && sum_s + dst.world_war_points_razed_scale == dst.industry_points_from_scale
+                                  && sum_t + dst.world_war_points_razed_treasury == dst.industry_points_from_treasury;
             }
 
             if (integral_stride > 0 && row.points_on && !row.points_rejected && !open_t.empty())
