@@ -22,6 +22,7 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <memory>
 #include <windows.h>
 #endif
 
@@ -531,7 +532,8 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--verify-all")
             {
-                app a;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
                 return a.run_verify_all(positional(i, "scripts/verify"), bless);
             }
@@ -541,7 +543,8 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--verify")
             {
-                app a;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
                 return a.run_verify(positional(i, "scripts/verify/corporation_lens.lua"), bless);
             }
@@ -700,7 +703,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-windowed")
             {
-                app a;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
@@ -718,7 +722,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-play")
             {
-                app a;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
@@ -734,7 +739,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-adopt")
             {
-                app a;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 if (epoch_set) a.set_epoch_year(epoch_year);
                 if (seat_set) a.set_seat_pick(seat_corp);
                 return a.run_autostart_adopt();
@@ -745,7 +751,8 @@ int main(int argc, char* argv[])
             {
                 // Review 2026-08-19 #9: this path used to ignore --host-agent
                 // silently; wire it like every sibling path.
-                app a;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
@@ -763,7 +770,8 @@ int main(int argc, char* argv[])
                 if (std::string(argv[i]) == "--load" && i + 1 < argc)
                     load_path = argv[i + 1];
 
-            app a;
+            auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+            app& a = *a_owner;
             a.host_agent(agent_port);
             if (spectate)
                 a.spectate_session();
