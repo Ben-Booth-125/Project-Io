@@ -138,6 +138,34 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, id);
                 fnv1a_f32(h, b.construction_paid);
             }
+            // BL-1296: a state building the treasury could not pay for —
+            // sparse, so a world with no idled state building hashes as before.
+            if (b.state_idle)
+            {
+                fnv1a_u32(h, 0x57A7E1u);
+                fnv1a_u32(h, id);
+            }
+        }
+    }
+
+    // BL-1296: state industry ownership — which nation owns which buildings
+    // outright, in stored order (the order the funding gate spends in). Folded
+    // only for a nation that holds any, ascending nation id, so a world with no
+    // state industry hashes exactly as it did before the field existed.
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : nations)
+            if (!nc.state_assets.empty())
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id nid : ids)
+        {
+            const std::vector<entity_id>& sa = nations.at(nid).state_assets;
+            fnv1a_u32(h, 0x57A7E2u);
+            fnv1a_u32(h, nid);
+            fnv1a_u32(h, static_cast<uint32_t>(sa.size()));
+            for (const entity_id bid : sa)
+                fnv1a_u32(h, bid);
         }
     }
 
@@ -392,6 +420,96 @@ bool is_player_owned(const world& w, entity_id building)
         return false;
     const auto it = w.corporations.find(corp);
     return it != w.corporations.end() && it->second.is_player;
+}
+
+building_owner building_owner_of(const world& w, entity_id building)
+{
+    building_owner out;
+    if (building == null_entity)
+        return out;
+    if (const entity_id corp = owner_corp_of(w, building); corp != null_entity)
+    {
+        out.kind = owner_kind::corporation;
+        out.id   = corp;
+        return out;
+    }
+    if (const entity_id nation = owner_nation_of(w, building); nation != null_entity)
+    {
+        out.kind = owner_kind::nation;
+        out.id   = nation;
+    }
+    return out;
+}
+
+entity_id owner_nation_of(const world& w, entity_id building)
+{
+    if (building == null_entity)
+        return null_entity;
+    for (const auto& [nid, nc] : w.nations)
+        for (const entity_id a : nc.state_assets)
+            if (a == building)
+                return nid;
+    return null_entity;
+}
+
+const std::vector<entity_id>* assets_of(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return &cit->second.assets;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return &nit->second.state_assets;
+    return nullptr;
+}
+
+std::vector<entity_id> economic_owner_ids(const world& w)
+{
+    std::vector<entity_id> ids;
+    ids.reserve(w.corporations.size());
+    for (const auto& kv : w.corporations)
+        ids.push_back(kv.first);
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.state_assets.empty())
+            ids.push_back(nid);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+entity_id owner_home_nation(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return cit->second.home_nation;
+    if (w.nations.find(owner) != w.nations.end())
+        return owner;
+    return null_entity;
+}
+
+entity_id champion_of(const world& w, entity_id nation)
+{
+    if (nation == null_entity)
+        return null_entity;
+    // The seat IS its nation's champion (the player plays a major and operates
+    // its champion — CONCEPT.md § Player identity), so a seated specialist is
+    // named first; otherwise the lowest-id specialist at home.
+    if (const auto pit = w.corporations.find(w.player_entity);
+        pit != w.corporations.end() && !pit->second.is_background
+        && pit->second.home_nation == nation)
+        return w.player_entity;
+    entity_id best = null_entity;
+    for (const auto& [cid, cc] : w.corporations)
+        if (!cc.is_background && cc.home_nation == nation && (best == null_entity || cid < best))
+            best = cid;
+    return best;
+}
+
+bool is_major_nation(const world& w, entity_id nation)
+{
+    return champion_of(w, nation) != null_entity;
+}
+
+entity_id player_nation(const world& w)
+{
+    const auto cit = w.corporations.find(w.player_entity);
+    return cit != w.corporations.end() ? cit->second.home_nation : null_entity;
 }
 
 entity_id body_of_market(const world& w, entity_id market)

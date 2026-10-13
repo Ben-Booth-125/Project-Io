@@ -451,7 +451,7 @@ void rows_r3()
                 && it->second.pool_milli == st.pool_milli && it->second.queue == st.queue;
         }
     check(same, "R3b held set, pool (milli-RP, the in-progress remainder) and queue, exactly");
-    check(world_save_version == 47u, "R3c at world_save_version 47");
+    check(world_save_version >= 47u, "R3c at world_save_version 47 or later (48: BL-1296 state industry)");
 
     auto refused = [&](void (*corrupt)(world&, const fixture&), const char* what) {
         world bad = f.w;

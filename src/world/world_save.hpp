@@ -406,7 +406,21 @@ inline constexpr uint32_t world_save_magic =
 /// v47 carries both changes: the two branches claimed 46 and 47 in parallel and
 /// met at the 2026-10-10 merge onto main. Every change is refused whole on the
 /// strict-equality contract, no migration.
-inline constexpr uint32_t world_save_version = 47;
+/// Bumped to 48 by BL-1296 (state industry; NATIONS.md § State industry, Ben
+/// 2026-10-11/13): a TRAILING SECTION after the fold map -- each nation holding
+/// state buildings (ascending id) with its `state_assets` in stored order, then
+/// the ids of the buildings the funding gate idled (`state_idle`). Nothing else
+/// in the stream moves, so v47 is a STRICT PREFIX of v48 and is the one older
+/// version still read (`k_world_save_version_pre_state`, the envelope's
+/// `save_game_version_prefix_compatible` precedent): a v47 world loads with no
+/// state industry -- every major's strategic plants stay with the firms that
+/// held them -- and its next save is a v48 stream with an empty section. Every
+/// other version is refused whole.
+inline constexpr uint32_t world_save_version = 48;
+
+/// BL-1296: the one predecessor `read_world_snapshot` still accepts -- v47, a
+/// strict prefix of v48 (the state-industry section is v48's only addition).
+inline constexpr uint32_t k_world_save_version_pre_state = 47;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -258,6 +258,9 @@ void hover_building_rival(const world& w, const recipe_registry* reg,
         ImGui::SameLine();
         ImGui::Text("Owner: %s", cit->second.name.c_str());
     }
+    // BL-1296: a state building's owner is its nation (state industry, public).
+    else if (const auto nit = w.nations.find(owner_nation_of(w, eid)); nit != w.nations.end())
+        ImGui::Text("Owner: %s (state industry)", nit->second.name.c_str());
     else
         ImGui::TextDisabled("Owner: unknown");
 

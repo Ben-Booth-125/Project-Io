@@ -2606,6 +2606,19 @@ int seat_release_dial_idled(world& w, entity_id corp)
         b->second.workforce_auto = true;
         ++released;
     }
+    // BL-1296: the seat runs its nation's state industry too, and the scorer
+    // stops acting on that as well — so the same release reaches the nation's
+    // dial-idled state buildings when the seat is its champion.
+    if (const auto nit = w.nations.find(cit->second.home_nation);
+        nit != w.nations.end() && champion_of(w, nit->first) == corp)
+        for (const entity_id bid : nit->second.state_assets)
+        {
+            const auto b = w.buildings.find(bid);
+            if (b == w.buildings.end() || !dial_idled(b->second))
+                continue;
+            b->second.workforce_auto = true;
+            ++released;
+        }
     return released;
 }
 

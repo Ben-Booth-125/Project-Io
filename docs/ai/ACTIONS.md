@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*164 entries — 34 gameplay · 25 canvas · 19 lens · 55 ledger · 31 chrome.*
+*165 entries — 35 gameplay · 25 canvas · 19 lens · 55 ledger · 31 chrome.*
 
 ---
 
@@ -67,6 +67,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - The building type is UNLOCKED for the acting corporation's nation, AND, if a recipe is stated, that RECIPE is separately unlocked. Technology is held by the NATION (BL-1273, RESEARCH.md): a node of the Digitisation tree that unlocks a structure or recipe gates it for every corporation of a nation that does not hold it. No node carries a machine unlock effect yet, so today NOTHING is tech-locked -- the four old per-corp gates (military_base, Toolmaker, Bessemer Converter, refined_copper) retired with BL-1273 (NR-1022) and are open to every nation. When a node does lock something, the two locks show two different ways: a locked STRUCTURE still appears as a row, showing "Locked - the technology that permits this has not been researched" in place of the Build button, while a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: "the door not showing what the gate would refuse", the same treatment era_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.
 - The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market, times the tile's site multiplier (landform x reach x stack, rounded to whole ticks — a hard site draws more; PRODUCTION.md § Construction site time) (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short.
 - A processing recipe — stated, or the default a recipe-less processor is seeded with — must run on the tile body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body (atmosphere none or thin), propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; construction_result::wrong_air). The ledger never offers a row this refuses.
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).
 
@@ -102,6 +103,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The acting corporation exists (rejected_no_corp otherwise).
 - The building entity exists (rejected_invalid otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** Enqueued at confirm; executed against the mutable world after the draw. The building's components are erased, its id is removed from the corporation's assets, and the tile slot is freed for something else. NO refund — the build cost is not returned; demolition destroys the asset outright. A rejected attempt changes nothing and shows nothing beyond the world staying identical.
 
@@ -139,6 +141,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The building is not already idled (rejected_state — a no-op in current state).
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** decommissioned := true immediately. From the next economy tick production stops and wages stop; material upkeep CONTINUES, and the building keeps occupying its tile. Status surfaces read 'Decommissioned' / 'Idled - producing nothing'. Fully reversible via resume. Rejected attempts change nothing.
 
@@ -222,6 +225,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The building is currently idled (rejected_state otherwise — resuming a running building is a no-op).
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** decommissioned := false immediately; production and wages restart on the next economy tick at the building's existing workforce target and recipe. Rejected attempts change nothing.
 
@@ -243,6 +247,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
 - The building is a processing facility (nothing else has a method to choose; the section draws nothing for other types).
 - The recipe runs on the building's body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body, propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; try_switch_recipe returns wrong_air). The Method grid never offers a wrong-air row.
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing. A Switch press the seam still refuses (funds, tech, cooldown) is said in a status line under the grid rather than discarded.
 
@@ -263,6 +268,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The value is inside [0, 200] (rejected_invalid otherwise).
 - Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
 - The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op - it takes control away from the solver, which is a real change.
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Since BL-293 the command seam clears workforce_auto exactly as the press does — before that it set the target and left the flag, so an agent's target was silently re-solved on the next tick. Setting a value already held on an already-pinned dial is a no-op (rejected_state).
 
@@ -282,10 +288,33 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The corporation owns the building (rejected_not_owner otherwise).
 - The building is not ALREADY on auto (rejected_state otherwise — a genuine no-op).
 - Construction is complete (the UI hides the controls until then; the seam does not itself gate on this).
+- BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
 
 **Expected output.** workforce_auto := true. Each economy tick the solver sets this building's workforce_target to the profit-maximising value; the panel's Auto button displays the currently solved percentage. This is the only sanctioned auto-action on the player's corporation — it moves one dial and never places, relocates, retargets, or decommissions anything. Any later manual target clears it again, from the slider, the tier grid, OR the set_workforce verb.
 
 **Reason to select.** Removes one micromanagement dial per building. The right press whenever 'maximise this building's own profit' is exactly the intent — freshly built buildings start with it on, so this mostly exists to undo an earlier manual pin.
+
+### `gameplay.state_industry_command` — The command seam only (--serve / MCP `issue_command` with `nation`, and the verify API's `corp_command{as_nation=...}`). No ledger or card control yet: a state building's card names its nation as owner ("Owner: <nation> (state industry)") and offers no levers.
+
+**Press.** Issue one of a corporation's building verbs — build (0), demolish (1), set_recipe (2), set_workforce (3), idle (4), resume (5), set_workforce_auto (11) — with `corp` = your corporation and `nation` = your corporation's home nation. The champion's blackboard lists the nation's `treasury` and every state building (`state_building_*` facts, including `state_building_idle`).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (wire key `nation`; corp_command::as_nation)` | The nation whose state industry the command acts on. 0 / omitted = the corporation's own book (every other command). |
+| `verb args` | `as the underlying verb` | subject / workforce / recipe exactly as the corporation verb reads them; build reads tile, type (must be 2, processing_facility) and recipe (must be NAMED and strategic). |
+
+**Valid when:**
+- Wire: `nation` parses as an entity id (rejected_invalid otherwise); unless the session runs `--as any`, it must equal the session corporation's home nation (rejected_not_owner otherwise) — actor authority reaches the session's nation and no other.
+- The nation exists (rejected_invalid) and the acting corporation is its CHAMPION — the seated corporation for the player's nation, else the nation's lowest-id specialist (rejected_not_owner).
+- The verb is one of the seven building verbs (rejected_invalid otherwise — no survey, trade, unit or stance verb acts for a state).
+- A named building exists (rejected_invalid) and is in the nation's state industry (rejected_not_owner).
+- build: type processing_facility on a recipe the state runs — one making steel, power, refined fuel, ordnance, spacecraft components or propellant (rejected_invalid otherwise); on a tile of the nation's own territory, plus every ordinary placement, era, tech and air gate (rejected_placement / rejected_tech_locked / rejected_wrong_air); its whole capex within the treasury's UNCOMMITTED part — the treasury less what this tick's funded state buildings are owed (rejected_funds).
+- set_recipe: the new recipe must also be one the state runs (state stays state: rejected_invalid), plus the ordinary group, cooldown, tech and air gates; the switch cost comes from the treasury's uncommitted part (rejected_funds).
+- A rejection mutates nothing.
+
+**Expected output.** The underlying verb's effect on a STATE building: a build joins the nation's state_assets and is paid for tick by tick from the treasury; a dial, retool, idle or resume changes the state building exactly as it would a corporation's. Each tick the funding gate runs first: a state building whose whole cost this tick (maintenance, wages at full staffing, a full run of inputs, upkeep goods, construction) does not fit in what is left of the treasury IDLES for the tick — it produces, draws and pays nothing — so the treasury never goes below zero. A running state building's sales land in the treasury at the clearing price and its inputs, wages and maintenance are paid from it.
+
+**Reason to select.** The player runs its nation's strategic sectors — steel, energy, arms, space — beside its champion's private book (NATIONS.md § State industry). Build a state plant where the nation needs strategic capacity its firms will not supply; dial or idle one whose costs the treasury should not carry; demolish one to dispose of it (there is no privatisation verb).
 
 ### `gameplay.survey` — The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey).
 

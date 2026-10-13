@@ -680,11 +680,34 @@ int main()
             // at the integration merge, which makes the check the thing that gets
             // re-blessed. `world_save_version - 1` is true of whatever number the
             // stack settles on -- and it is why this merge cost no assertion.
+            //
+            // BL-1296 (v48): v47 is a STRICT PREFIX of v48 — state industry is
+            // v48's trailing section and nothing else moved — so v47 is the one
+            // predecessor still read (`k_world_save_version_pre_state`; the
+            // envelope's prefix-compatible precedent). The newest REFUSED prior
+            // format is therefore the one before it; P20b reads the v47 prefix.
             std::string bad = bytes_once;
-            const uint32_t prev = world_save_version - 1u;
+            const uint32_t prev = k_world_save_version_pre_state - 1u;
             std::memcpy(&bad[4], &prev, sizeof prev);
             check(!from_bytes(bad, victim),
-                  "P20 a stream at world_save_version - 1 is refused");
+                  "P20 a stream at the newest unread prior version is refused");
+        }
+        {
+            // P20b (BL-1296) -- the v47 stream: this v48 stream less its
+            // state-industry section (a world with none writes two empty
+            // counts, 8 bytes), stamped 47. It reads, as a world with no state
+            // industry. Its own destination, so P3's untouched victim stays so.
+            std::string v47 = bytes_once.substr(0, bytes_once.size() - 2 * sizeof(uint32_t));
+            const uint32_t pre = k_world_save_version_pre_state;
+            std::memcpy(&v47[4], &pre, sizeof pre);
+            world old;
+            bool none = true;
+            for (const auto& [nid, nc] : w.nations) // the fixture holds none (8-byte section)
+                none = none && nc.state_assets.empty();
+            none = none && from_bytes(v47, old);
+            for (const auto& [nid, nc] : old.nations)
+                none = none && nc.state_assets.empty();
+            check(none, "P20b a v47 stream (the v48 prefix) reads, with no state industry");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

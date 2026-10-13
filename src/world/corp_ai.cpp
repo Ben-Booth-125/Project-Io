@@ -15,6 +15,7 @@
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
+#include "state_industry.hpp"  // BL-1296: state_runs (state dials stay strategic)
 #include "trade.hpp"           // BL-1267: rank_trade_routes, corp_trade_markets (the shared route estimate)
 #include "unit_roster.hpp"
 #include "world.hpp"
@@ -1239,13 +1240,32 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             input_reach_invalidate(*reach_ctx);
         standing_ctx.reset(); // BL-1183: likewise the standing construction draw
 
-        // This corp is evaluating: tick down its buildings' dial cooldowns.
+        // BL-1296 (AI_OPPONENT.md § 11, the 2026-10-11 grant): the nation whose
+        // STATE industry this evaluation also dials — this corp's home nation,
+        // when this corp is its champion and it holds any. Null otherwise. The
+        // player's corp never reaches here in a played session, so the player's
+        // nation's state industry is never scored.
+        entity_id state_nation = null_entity;
+        if (cc.home_nation != null_entity && champion_of(w, cc.home_nation) == corp)
+            if (const auto sn = w.nations.find(cc.home_nation);
+                sn != w.nations.end() && !sn->second.state_assets.empty())
+                state_nation = cc.home_nation;
+
+        // This corp is evaluating: tick down its buildings' dial cooldowns
+        // (and its nation's state buildings', which it dials too).
         for (const entity_id bid : cc.assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit != w.buildings.end() && bit->second.ai_cooldown > 0)
                 --bit->second.ai_cooldown;
         }
+        if (state_nation != null_entity)
+            for (const entity_id bid : w.nations.at(state_nation).state_assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit != w.buildings.end() && bit->second.ai_cooldown > 0)
+                    --bit->second.ai_cooldown;
+            }
 
         const float jitter  = corp_personality_jitter(corp, p.personality_seed);
         const float floor_  = corp_reserve_floor(w, reg, corp, p);
@@ -1959,7 +1979,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         }
 
         // ---- Dial candidates: per owned, operating, off-cooldown building --
-        for (const entity_id bid : cc.assets)
+        // BL-1296 (AI_OPPONENT.md § 11, the 2026-10-11 grant): the same
+        // per-building decisions are taken over the corp's own buildings
+        // and, for a rival major's CHAMPION, over its nation's state
+        // buildings — the same estimators, the same verbs, issued with
+        // `as_nation` so the seam pays them from the treasury. In a played
+        // session the player's nation is never reached: its champion is the
+        // player's corp, which the guard at the top of this loop skips (only
+        // spectate — no human seat — lifts that guard, for both books alike).
+        const auto emit_dials = [&](const std::vector<entity_id>& dial_assets,
+                                    entity_id dial_nation) {
+        for (const entity_id bid : dial_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -1967,6 +1997,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const building_component& b = bit->second;
             if (b.ticks_remaining > 0)
                 continue;
+            if (b.state_idle)
+                continue; // BL-1296: unfunded this tick — nothing ran to judge
             // BL-1235 (dial hold outlasts reflex): the hold on a plant the dial
             // zeroed ends the moment that plant's own forecast recovers — the
             // solver, asked exactly as the dial candidate below asks it, would
@@ -2094,7 +2126,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (gain > margin_gate)
                     {
                         candidate c;
-                        c.cmd.tick = tick; c.cmd.corp = corp;
+                        c.cmd.tick = tick; c.cmd.corp = corp; c.cmd.as_nation = dial_nation;
                         c.cmd.verb = corp_verb::resume; c.cmd.subject = bid;
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_resume;
@@ -2123,7 +2155,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (gain > margin_gate)
                 {
                     candidate c;
-                    c.cmd.tick = tick; c.cmd.corp = corp;
+                    c.cmd.tick = tick; c.cmd.corp = corp; c.cmd.as_nation = dial_nation;
                     c.cmd.verb = corp_verb::idle; c.cmd.subject = bid;
                     c.score = gain * jitter;
                     c.reason = corp_decision_reason::dial_idle;
@@ -2152,7 +2184,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (gain > margin_gate)
                     {
                         candidate c;
-                        c.cmd.tick = tick; c.cmd.corp = corp;
+                        c.cmd.tick = tick; c.cmd.corp = corp; c.cmd.as_nation = dial_nation;
                         c.cmd.verb = corp_verb::set_workforce; c.cmd.subject = bid;
                         c.cmd.workforce = proposed;
                         c.score = gain * jitter;
@@ -2243,6 +2275,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // one, above.
                     if (rc.group != cur_rc->group)
                         continue;
+                    // BL-1296: a state building stays state industry — the seam
+                    // refuses a retool onto a recipe the state does not run.
+                    if (dial_nation != null_entity
+                        && !state_runs(reg, building_type::processing_facility, rid))
+                        continue;
                     if (rid == b.recipe)
                         continue; // the incumbent is best_m's starting point
                     if (!recipe_runs_at_tile(w, rc, b.tile))
@@ -2270,9 +2307,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (gain > margin_gate)
                     {
                         candidate c;
-                        c.cmd.tick = tick; c.cmd.corp = corp;
+                        c.cmd.tick = tick; c.cmd.corp = corp; c.cmd.as_nation = dial_nation;
                         c.cmd.verb = corp_verb::set_recipe; c.cmd.subject = bid;
                         c.cmd.recipe = best_id;
+                        // BL-1296 fix round: a state retool's switch cost is
+                        // the TREASURY's spend, gated against it below.
+                        if (dial_nation != null_entity)
+                            c.spend = reg.recipe_switch().switch_cost;
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_recipe;
                         c.bucket = bucket_for_reason(c.reason);
@@ -2281,6 +2322,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
             }
         }
+        };
+        emit_dials(cc.assets, null_entity);
+        if (state_nation != null_entity)
+            emit_dials(w.nations.at(state_nation).state_assets, state_nation);
 
         // ---- Survey candidates: paid discovery, bodies sorted ---------------
         {
@@ -2862,6 +2907,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         // ---- Greedy selection under the action budget + solvency gate -------
         int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0, dispatches = 0;
+        // BL-1296: the state industry's dials have their own `max_dials`, so a
+        // champion's own book and its nation's are each dialled as fully as a
+        // corporation's book alone was — neither starves the other.
+        int   state_dials = 0;
+        float state_spent = 0.0f; // BL-1296: this evaluation's treasury spend
+
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
 
@@ -3008,7 +3059,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // A budget-capped candidate is the purest case of the thing the
             // field is for: the corp wanted it and had no slot left.
             if (is_build  && builds  >= p.max_builds) { forgo(c); continue; }
-            if (is_dial   && dials   >= p.max_dials)  { forgo(c); continue; }
+            const bool is_state_dial = is_dial && c.cmd.as_nation != null_entity;
+            if (is_dial && (is_state_dial ? state_dials : dials) >= p.max_dials) { forgo(c); continue; }
             if (is_survey && surveys >= 1)            { forgo(c); continue; }
             // One hire per evaluation, same cadence as survey — a rival corp
             // hiring every tick would out-hire the player by pure frequency.
@@ -3040,6 +3092,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // themselves); only Nice-to-Have (build/survey) spend is checked,
             // and against the STRICTER should-have-aware floor — the "a lower
             // bucket may never starve a higher one" rule, concretely enforced.
+            // BL-1296 fix round: a STATE command's spend is the treasury's,
+            // gated against what the treasury has uncommitted (less what this
+            // evaluation already spent from it) — never the corp's balance.
+            if (c.cmd.as_nation != null_entity)
+            {
+                if (c.spend > 0.0f
+                    && state_uncommitted_treasury(w, c.cmd.as_nation) - state_spent - c.spend < 0.0f)
+                {
+                    forgo(c);
+                    continue;
+                }
+            }
+            else
+            {
             const float required_floor =
                 (c.bucket == corp_priority_bucket::nice_to_have) ? nice_to_have_floor : floor_;
             if (c.spend > 0.0f &&
@@ -3066,6 +3132,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
                 continue;
             }
+            } // BL-1296: the corporation's own solvency gate
 
             // Resolve the log's body tag BEFORE the command mutates the world —
             // a demolish erases its subject from w.buildings, so resolving
@@ -3126,9 +3193,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             //
             // Nothing asserts this ordering. Reordering these lines, or moving the
             // increments above the apply, reintroduces that starvation silently.
-            committed += c.spend;
+            if (c.cmd.as_nation != null_entity)
+                state_spent += c.spend;
+            else
+                committed += c.spend;
             if (is_build)  ++builds;
-            if (is_dial)   ++dials;
+            if (is_dial)   ++(is_state_dial ? state_dials : dials);
+
             if (is_survey) ++surveys;
             if (is_hire)   ++hires;
             if (is_trade && !is_reserve) ++trades;
@@ -3355,6 +3426,32 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
             add_fact(bb, tick, bid, "building_workforce_target", b.workforce_target, 1.0f, fact_provenance::own_asset);
             add_fact(bb, tick, bid, "building_decommissioned", b.decommissioned ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
         }
+        // BL-1296: a CHAMPION operates its nation's state industry (corp_command
+        // `as_nation`), so its own view carries that book too — the treasury the
+        // verbs spend, and each state building in full, as own assets.
+        if (cc.home_nation != null_entity && champion_of(w, cc.home_nation) == corp)
+            if (const auto nit = w.nations.find(cc.home_nation); nit != w.nations.end())
+            {
+                add_fact(bb, tick, cc.home_nation, "treasury", nit->second.treasury, 1.0f,
+                         fact_provenance::own_asset);
+                std::vector<entity_id> state = nit->second.state_assets;
+                std::sort(state.begin(), state.end());
+                for (const entity_id bid : state)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit == w.buildings.end())
+                        continue;
+                    const building_component& b = bit->second;
+                    add_fact(bb, tick, bid, "state_building_nation", static_cast<double>(cc.home_nation), 1.0f, fact_provenance::own_asset);
+                    add_fact(bb, tick, bid, "state_building_type", static_cast<double>(b.type), 1.0f, fact_provenance::own_asset);
+                    add_fact(bb, tick, bid, "state_building_tile", static_cast<double>(b.tile), 1.0f, fact_provenance::own_asset);
+                    add_fact(bb, tick, bid, "state_building_recipe", static_cast<double>(b.recipe), 1.0f, fact_provenance::own_asset);
+                    add_fact(bb, tick, bid, "state_building_workforce_target", b.workforce_target, 1.0f, fact_provenance::own_asset);
+                    add_fact(bb, tick, bid, "state_building_decommissioned", b.decommissioned ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
+                    add_fact(bb, tick, bid, "state_building_idle", b.state_idle ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
+                }
+            }
+
         // BL-1265 / BL-1266: no pools (the corporation holds no stock); its own
         // TRADE state instead — the points it made, its reserve, and each of its
         // manual trades as a fact on the trade's source market whose predicate
@@ -3458,7 +3555,32 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
                          static_cast<double>(rc), 1.0f, fact_provenance::rival_visible);
             }
         }
+        // BL-1296: other nations' STATE buildings, on the same public terms —
+        // existence, type, tile and owner (the owner here is a NATION id).
+        std::vector<entity_id> state_nations;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.state_assets.empty() && nid != cc.home_nation)
+                state_nations.push_back(nid);
+        std::sort(state_nations.begin(), state_nations.end());
+        for (const entity_id nid : state_nations)
+        {
+            std::vector<entity_id> theirs = w.nations.at(nid).state_assets;
+            std::sort(theirs.begin(), theirs.end());
+            for (const entity_id bid : theirs)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                add_fact(bb, tick, bid, "rival_building_type",
+                         static_cast<double>(bit->second.type), 1.0f, fact_provenance::rival_visible);
+                add_fact(bb, tick, bid, "rival_building_tile",
+                         static_cast<double>(bit->second.tile), 1.0f, fact_provenance::rival_visible);
+                add_fact(bb, tick, bid, "rival_building_owner",
+                         static_cast<double>(nid), 1.0f, fact_provenance::rival_visible);
+            }
+        }
     }
+
 
     // Section 3 — tile deposits for SURVEYED regions only (geographic fog).
     // Fog design call (header): the world survey state applies uniformly per

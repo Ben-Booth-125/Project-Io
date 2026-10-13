@@ -90,7 +90,7 @@ namespace {
 //           target=<resource_type>
 //           recipe=<id> workforce=<n> road_tier=<n> unit_type=<n>
 //           quantity=<f> floor_price=<f> order=<n> counterparty=<id>
-//           province=<province::id>
+//           province=<province::id> nation=<id>   (BL-1296: state industry)
 //                                                   -> apply_corp_command
 //   SHUTDOWN                                        -> BYE, then exit
 //
