@@ -54,9 +54,9 @@ namespace {
 
 // Builds the "Input cost" segment's tooltip suffix: the recipe's non-zero
 // input resources, NAMES ONLY (2026-08-15, folding the former standalone
-// Inputs chart into the Expenses bar's hover — Ben's call was names, not
+// Inputs chart into the expenses hover — Ben's call was names, not
 // quantities, since the segment already shows the aggregate credit figure).
-// Shared by draw_revenue_expense_bars below; @p ri may be null (extraction
+// Read by the expenses hover (draw_building_profit); @p ri may be null (extraction
 // sites have no recipe), in which case the tooltip is just the plain cost.
 std::string input_basket_names(const recipe* ri)
 {
@@ -72,55 +72,6 @@ std::string input_basket_names(const recipe* ri)
         names += resource_name(static_cast<resource_type>(in));
     }
     return names;
-}
-
-// Revenue vs a labelled, SEGMENTED Expenses bar (NR-248 playtest note, 2026-08-15
-// reflow): input_cost / maintenance / wages stacked in one column, each segment
-// its own shade and its own hover tooltip. This is the finest real split
-// building_profit.hpp supports (no revenue sub-breakdown exists to chart
-// separately, logged docs/development/NEEDS_REVIEW.json).
-//
-// THE DRAWING ITSELF NOW LIVES IN ui::charts (BL-691). The Corporation ledger's
-// Balance card is the same chart over `corp_budget` instead of `building_profit`,
-// so this became an ADAPTER — it decides what the BUILDING's two columns are and
-// hands them over — rather than a second implementation of the same arithmetic.
-// The corp grain's wider expense set and its variable segment count are the
-// shared drawer's business, not a fork of it.
-//
-// @p input_recipe: the building's active recipe (null for extraction sites) —
-// folded in from the former standalone Inputs chart (2026-08-15): the "Input
-// cost" segment's tooltip now also lists the basket's resource NAMES, so that
-// chart's content survives without its own vertical-space budget.
-void draw_revenue_expense_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const building_profit& p,
-                               const recipe* input_recipe)
-{
-    // Held for the whole call: `stack_segment::detail` is a BORROWED pointer and
-    // the drawer reads it while building the hover.
-    std::string input_detail;
-    if (input_recipe != nullptr)
-    {
-        // The input-cost segment ALSO names the recipe's input basket (names
-        // only, no quantities — Ben's call): the former standalone Inputs
-        // chart's content, folded into this hover.
-        const std::string names = input_basket_names(input_recipe);
-        if (!names.empty())
-            input_detail = "Inputs: " + names;
-    }
-
-    const charts::stack_segment revenue[1] = {
-        {p.revenue, palette::positive, "Revenue", nullptr},
-    };
-    const charts::stack_segment expenses[3] = {
-        {p.input_cost,  IM_COL32(205, 120, 95, 255),  "Input cost",
-         input_detail.empty() ? nullptr : input_detail.c_str()},
-        {p.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance", nullptr},
-        {p.wages,       IM_COL32(160, 115, 200, 255), "Wages",       nullptr},
-    };
-    // 44 px columns and NO baseline captions, which is what keeps this card's
-    // geometry exactly where it was: the chart sits in the left third of a
-    // building page under its own "Revenue / Expenses" title, and its column
-    // width was fixed by the mockup it was drawn from.
-    charts::draw_stacked_columns(dl, mn, mx, revenue, 1, expenses, 3, /*bar_cap=*/44.0f);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -495,14 +446,20 @@ province_build_table province_builds(const world& w, entity_id tile_id)
 
 } // namespace
 
-// Per-building profitability readout (BL-074, chart-based since the 2026-08-15
-// playtest rework): the selected player building's estimated per-tick economics,
-// now charted rather than printed as text — Ben's call was "the charts should
-// speak for themselves", so the former "Profitability (est. / qtr)" title line
-// is gone. Realised last-tick figures; revenue/inputs are estimates (the pooled
-// market resists exact per-building attribution — see building_profit.hpp).
+// The expanded building card's PROFIT ROW (BL-1300 round 2; SELECTION.md § The
+// building element's layout, item 1 — Ben, 2026-10-13). LEFT, a short "Net, 6 mo."
+// line chart; RIGHT, the net profit per quarter as one figure coloured by sign,
+// with expenses per quarter below it as one figure whose hover splits it into
+// input cost / maintenance / wages (NR-248). The revenue-against-stacked-expenses
+// column chart retired: one number says what the column pair said, in a fraction
+// of the height. A Tick is a quarter (BL-095), so the per-tick estimate IS the
+// per-quarter figure. Realised last-tick figures; revenue/inputs are estimates
+// (the pooled market resists exact per-building attribution — building_profit.hpp).
+//
+// @p net_out / @p exp_out (optional): the two figures as drawn, for the verify readout.
 void draw_building_profit(const world& w, const recipe_registry& reg,
-                          const economy_report& report, entity_id id)
+                          const economy_report& report, entity_id id,
+                          std::string* net_out, std::string* exp_out)
 {
     const building_profit p = estimate_building_profit(w, reg, report, id);
     if (!p.has_data)
@@ -511,70 +468,68 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
         return;
     }
 
-    ImDrawList* dl      = ImGui::GetWindowDrawList();
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const float box_w   = ImGui::GetContentRegionAvail().x;
+    const ImGuiStyle& style  = ImGui::GetStyle();
+    const float       box_w  = ImGui::GetContentRegionAvail().x;
+    const float       line_h = ImGui::GetTextLineHeight();
+    // The row is two text lines tall: the chart matches the two figures beside it.
+    const float       row_h  = line_h * 2.0f + style.ItemSpacing.y;
+    const float       net    = p.net();
+    const float       exp    = p.input_cost + p.maintenance + p.wages;
 
-    // The recipe whose input basket the Expenses bar's "Input cost" segment
-    // names on hover (extraction_site has no recipe, so this stays null there).
-    const recipe* input_recipe = nullptr;
-    if (const auto bit = w.buildings.find(id);
-        bit != w.buildings.end() && bit->second.type == building_type::processing_facility)
-        input_recipe = reg.get_recipe(bit->second.recipe);
+    const std::string net_s = fmt::rate(net, "qtr");
+    const std::string exp_s = fmt::credits(exp) + " / qtr";
+    const float fig_w  = std::max(ImGui::CalcTextSize(net_s.c_str()).x,
+                                  ImGui::CalcTextSize(("Exp " + exp_s).c_str()).x);
+    const float chart_w = std::max(40.0f, box_w - fig_w - style.ItemSpacing.x);
 
-    // Vertical budget (2026-08-15 playtest reflow — "everything on one screen,
-    // no scrollbar"; the standalone Inputs strip folded into the Expenses
-    // hover the same session, freeing its budget back to the bars+line row).
-    // GetContentRegionAvail().y here IS the expanded building card's remaining
-    // height (draw_expanded_building_card's ##building_charts child), so
-    // this is the real budget — but budgeting the FULL amount left the page's
-    // own content occasionally a few px taller than its scroll-child (font
-    // metrics/padding rounding), which was enough to pop a scrollbar back in
-    // for content that otherwise fit. Budgeting 90% of it leaves deliberate
-    // slack so that never happens (Ben's playtest call: no scrollbar, ever).
-    const float total_h  = ImGui::GetContentRegionAvail().y * 0.90f;
-    const float label_h  = ImGui::GetTextLineHeightWithSpacing();
-    const float chart_h  = std::max(40.0f, total_h - label_h);
-
-    // Top row: Revenue/Expenses bars take the LEFT THIRD, the 6-month net-profit
-    // line takes the RIGHT TWO-THIRDS — side by side, not stacked (Ben's
-    // playtest call: the vertical stack needed scrolling to see it all).
-    const float left_w  = box_w / 3.0f - style.ItemSpacing.x * 0.5f;
-    const float right_w = box_w - left_w - style.ItemSpacing.x;
-
+    // No per-building profit HISTORY is tracked (the pooled market attribution
+    // problem means nothing to reconstruct a past series from), so this is the
+    // honest placeholder (NR-249): a smooth deterministic series anchored to the
+    // live net estimate, 6 points for "6 months".
+    constexpr int N = 6;
+    float         series[N];
+    for (int i = 0; i < N; ++i)
     {
-        ImGui::BeginGroup();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Revenue / Expenses");
-        const ImVec2 mn = ImGui::GetCursorScreenPos();
-        const ImVec2 mx = {mn.x + left_w, mn.y + chart_h};
-        draw_revenue_expense_bars(dl, mn, mx, p, input_recipe);
-        ImGui::Dummy({left_w, chart_h});
-        ImGui::EndGroup();
+        const float t   = static_cast<float>(i) / (N - 1);
+        const float dip = -0.15f * std::fabs(net) * std::sin(t * 3.14159265f * 1.4f);
+        series[i]       = net + dip;
     }
+    ImGui::PlotLines("##net_profit", series, N, 0, "Net, 6 mo.", FLT_MAX, FLT_MAX, {chart_w, row_h});
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Net over the last six months - a placeholder curve through\n"
+                          "the live estimate; no per-building history is recorded yet.");
     ImGui::SameLine();
-    {
-        ImGui::BeginGroup();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Net, 6 mo.");
 
-        // No per-building profit HISTORY is tracked (the pooled market
-        // attribution problem means nothing to reconstruct a past series
-        // from), so — same honest-placeholder idiom
-        // draw_building_workforce_page's trend graph already used before
-        // this rework — a smooth deterministic series anchored to the live
-        // net estimate. 6 points for "6 months" (a Tick is ~3 months, so 6
-        // points read as the last two Ticks' worth stretched to the span).
-        constexpr int N = 6;
-        float         series[N];
-        const float   net = p.net();
-        for (int i = 0; i < N; ++i)
-        {
-            const float t   = static_cast<float>(i) / (N - 1);
-            const float dip = -0.15f * std::fabs(net) * std::sin(t * 3.14159265f * 1.4f);
-            series[i]       = net + dip;
-        }
-        ImGui::PlotLines("##net_profit", series, N, 0, nullptr, FLT_MAX, FLT_MAX, {right_w, chart_h});
-        ImGui::EndGroup();
+    ImGui::BeginGroup();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::value_colour(static_cast<double>(net))),
+                       "%s", net_s.c_str());
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Net profit per quarter: revenue %s less expenses %s.",
+                          fmt::credits(p.revenue).c_str(), fmt::credits(exp).c_str());
+    ImGui::TextDisabled("Exp %s", exp_s.c_str());
+    if (ImGui::IsItemHovered())
+    {
+        // The input basket's NAMES ride on the input-cost line (Ben, 2026-08-15:
+        // names, not quantities). Extraction sites have no recipe.
+        const recipe* ri = nullptr;
+        if (const auto bit = w.buildings.find(id);
+            bit != w.buildings.end() && bit->second.type == building_type::processing_facility)
+            ri = reg.get_recipe(bit->second.recipe);
+        const std::string names = input_basket_names(ri);
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted("Expenses per quarter");
+        ImGui::Separator();
+        ImGui::Text("Input cost   %s", fmt::credits(p.input_cost).c_str());
+        if (!names.empty())
+            ImGui::TextDisabled("  Inputs: %s", names.c_str());
+        ImGui::Text("Maintenance  %s", fmt::credits(p.maintenance).c_str());
+        ImGui::Text("Wages        %s", fmt::credits(p.wages).c_str());
+        ImGui::EndTooltip();
     }
+    ImGui::EndGroup();
+
+    if (net_out) *net_out = net_s;
+    if (exp_out) *exp_out = exp_s;
 }
 
 namespace {
@@ -1398,13 +1353,36 @@ void draw_building_workforce_page(building_component& b)
     // replacement keeps the id stable ("##bld_auto") and shows the percentage
     // as separate adjacent text, never inside the id string.
 
-    int target = b.workforce_target;
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    if (ImGui::SliderInt("##wf_slider", &target, 0, 100, "%d%%"))
+    draw_workforce_slider(b);
+}
+
+// The ONE writer of a building's workforce target from the UI (BL-1300 round 2).
+// The Construction ledger's Buildings view (through draw_building_workforce_page)
+// and the expanded building card on the Selection band both call this body, so
+// there is one control writing `workforce_target`, never two that could come to
+// disagree. A manual edit pins the target and clears Auto. The current
+// percentage reads to the slider's RIGHT (Ben, 2026-10-13), never inside an
+// id-bearing label.
+bool draw_workforce_slider(building_component& b)
+{
+    int         target = b.workforce_target;
+    char        pct[16];
+    std::snprintf(pct, sizeof pct, "%d%%", target);
+    const float pct_w = ImGui::CalcTextSize("100%").x;
+    ImGui::SetNextItemWidth(std::max(40.0f, ImGui::GetContentRegionAvail().x - pct_w
+                                                - ImGui::GetStyle().ItemSpacing.x));
+    bool changed = false;
+    if (ImGui::SliderInt("##wf_slider", &target, 0, 100, ""))
     {
         b.workforce_target = target;
         b.workforce_auto   = false; // manual edit pins the target, same as a tier press used to
+        changed = true;
     }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Workforce target. A manual edit turns Auto off.");
+    ImGui::SameLine();
+    ImGui::Text("%d%%", b.workforce_target);
+    return changed;
 }
 
 // --- Unit (Soldier) Selection card: 3-column band, same family as building/tile ---
@@ -2488,32 +2466,37 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
 }
 
 /// The tile column with one stack EXPANDED (SELECTION.md § The building
-/// element's layout, item 1): the building's name and a back control, a status
-/// line, then — for the player's own completed building with data — the
-/// Profitability charts. A rival's card is the status line (construction only)
-/// plus owner and an explicit `private` production row; under spectator god view
-/// it opens into the real rows and the charts (BL-408), same as every rival card.
-void draw_expanded_building_card(const world& w, const recipe_registry& reg,
+/// element's layout, item 1; round 2, Ben 2026-10-13). Top to bottom, laid out to
+/// the card's height with no scrollbar:
+///   - the header row: an unlabelled back control, the building name, the
+///     stack's count (×N);
+///   - the production method (the active recipe; an extraction site names its
+///     good), then the status line;
+///   - the profit row (draw_building_profit): a short net chart beside net and
+///     expenses per quarter;
+///   - the workforce row: the shared slider (draw_workforce_slider).
+/// The profit and workforce rows need the player's own COMPLETED building with
+/// profit data. A rival's card is the header, owner and an explicit `private`
+/// row; under spectator god view it opens the method, real rows and profit row
+/// (BL-408), but never the slider — god view grants sight, never hands.
+void draw_expanded_building_card(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui, entity_id tile_id,
                                  entity_id bid, const std::vector<production_stack>& stacks)
 {
-    const building_component& b    = w.buildings.at(bid);
-    const bool                god  = ui.spectating && ui.god_view;
-    const bool                mine = is_player_owned(w, bid);
-    const bool                open = mine || god;
+    building_component& b    = w.buildings.at(bid); // mutable: the workforce slider writes it
+    const bool          god  = ui.spectating && ui.god_view;
+    const bool          mine = is_player_owned(w, bid);
+    const bool          open = mine || god;
 
-    int count = 1, index = 1;
+    int count = 1;
     for (const production_stack& st : stacks)
-        for (std::size_t k = 0; k < st.members.size(); ++k)
-            if (st.members[k] == bid)
-            {
+        for (const entity_id m : st.members)
+            if (m == bid)
                 count = static_cast<int>(st.members.size());
-                index = static_cast<int>(k) + 1;
-            }
+    ui.tile_card.count = count;
 
-    // Header row: the back control first, then the building's name — read as a
-    // breadcrumb ("‹ this tile's buildings  Steel foundry").
-    if (ImGui::SmallButton("\xe2\x80\xb9 this tile's buildings"))
+    // ── Header row: back, name, ×N ──
+    if (ImGui::SmallButton("\xe2\x80\xb9##tile_back"))
         ui.selected_entity = tile_id; // the tile again: the grid returns
     {
         const ImVec2 mn = ImGui::GetItemRectMin();
@@ -2525,16 +2508,43 @@ void draw_expanded_building_card(const world& w, const recipe_registry& reg,
         ImGui::SetTooltip("Back to the buildings on this tile");
     ImGui::SameLine();
     {
-        std::string title = open ? building_group_name(w, reg, b) : std::string(building_type_name(b.type));
+        const std::string name = open ? building_group_name(w, reg, b) : std::string(building_type_name(b.type));
+        char cnt[16] = "";
         if (count > 1)
-            title += " (" + std::to_string(index) + " of " + std::to_string(count) + ")";
+            std::snprintf(cnt, sizeof cnt, " \xc3\x97%d", count);
+        const float cnt_w = cnt[0] ? ImGui::CalcTextSize(cnt).x : 0.0f;
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::selection));
-        fit_text(text_box::table_cell, "selection.building.title", title.c_str(),
-                 std::max(24.0f, ImGui::GetContentRegionAvail().x));
+        fit_text(text_box::table_cell, "selection.building.title", name.c_str(),
+                 std::max(24.0f, ImGui::GetContentRegionAvail().x - cnt_w));
         ImGui::PopStyleColor();
+        if (cnt[0])
+        {
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::TextDisabled("%s", cnt);
+        }
+        ui.tile_card.title = name + cnt;
     }
     ImGui::Separator();
 
+    // ── The production method, then the status line ──
+    // Open only: a rival's recipe is private (DISCOVERY.md § The operational fog).
+    if (open)
+    {
+        std::string method;
+        if (b.type == building_type::extraction_site)
+            method = std::string("Extracting ") + resource_name(b.target_resource);
+        else if (b.type == building_type::processing_facility)
+        {
+            if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
+                method = rc->display_name;
+        }
+        if (!method.empty())
+        {
+            fit_text(text_box::table_cell, "selection.building.method", method.c_str(),
+                     std::max(24.0f, ImGui::GetContentRegionAvail().x));
+            ui.tile_card.method = method;
+        }
+    }
     ui.tile_card.expanded_player = mine;
     ui.tile_card.status = draw_building_status_line(w, reg, report, bid, open);
 
@@ -2549,18 +2559,24 @@ void draw_expanded_building_card(const world& w, const recipe_registry& reg,
             return;
     }
 
-    if (b.ticks_remaining <= 0)
+    if (b.ticks_remaining > 0)
+        return; // still building: header, method and status are the card
+    const building_profit p = estimate_building_profit(w, reg, report, bid);
+    if (!p.has_data)
+        return;
+
+    // ── The profit row ──
+    ui.tile_card.charts = true;
+    ImGui::Spacing();
+    draw_building_profit(w, reg, report, bid, &ui.tile_card.net, &ui.tile_card.expenses);
+
+    // ── The workforce row: the player's own building only ──
+    if (mine)
     {
-        const building_profit p = estimate_building_profit(w, reg, report, bid);
-        if (p.has_data)
-        {
-            ui.tile_card.charts = true;
-            ImGui::Spacing();
-            ImGui::BeginChild("##building_charts", {0.0f, 0.0f}, false,
-                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-            draw_building_profit(w, reg, report, bid);
-            ImGui::EndChild();
-        }
+        ImGui::TextDisabled("Workforce");
+        ImGui::SameLine();
+        draw_workforce_slider(b);
+        ui.tile_card.slider = true;
     }
 }
 
@@ -2721,10 +2737,45 @@ void draw_capacity_tooltip(const world& w, entity_id tile_id)
     ImGui::EndTooltip();
 }
 
+// The population figure's hover: each population centre in the province by
+// name, scale word, headcount and habitability, largest first; the centre on the
+// SELECTED tile is marked. Moved off the card into the hover (round 2) so the
+// resource table can have the card's height.
+void draw_population_tooltip(const province_pop_table& pt)
+{
+    ImGui::BeginTooltip();
+    ImGui::Text("Province population  %d thousand", pt.total);
+    ImGui::TextDisabled("Scale drives the agglomeration bonus and the labour pool.");
+    ImGui::Separator();
+    if (pt.rows.empty())
+        ImGui::TextDisabled("Uninhabited.");
+    for (const province_pop_row& r : pt.rows)
+    {
+        if (r.here)
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", "\xe2\x80\xa2");
+        else
+            ImGui::TextUnformatted(" ");
+        ImGui::SameLine();
+        ImGui::Text("%s", (r.name[0] != '\0') ? r.name : "Unnamed");
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s \xc2\xb7 %d k \xc2\xb7 hab %.2f",
+                            population_scale_name(r.scale), r.population,
+                            static_cast<double>(r.habitability));
+    }
+    ImGui::EndTooltip();
+}
+
+// The province card (round 2, Ben 2026-10-13): ONE header row — title, the
+// capacity bar narrowed to share it, the population figure right-aligned — then
+// the resource table taking the rest of the height and scrolling INSIDE itself.
+// The card's own window never scrolls (NoScrollbar | NoScrollWithMouse), and its
+// scroll range is published so a check can hold it to zero.
 void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float card_w, float total_h)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::BeginChild("##province_card", {card_w, total_h}, true, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::BeginChild("##province_card", {card_w, total_h}, true,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+                      ImGuiWindowFlags_NoScrollWithMouse);
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Province");
 
     const province_build_table pb = province_builds(w, tile_id);
@@ -2736,23 +2787,35 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
         ImGui::SameLine();
         ImGui::TextDisabled("none");
         ImGui::Separator();
-        ImGui::TextDisabled("This tile belongs to no province. Its own deposits:");
+        ImGui::TextDisabled("No province. This tile's own deposits:");
         const std::vector<province_deposit_row> rows = province_deposits(w, tile_id);
         if (rows.empty())
             ImGui::TextDisabled("none");
         for (const province_deposit_row& r : rows)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(presentation_of(r.resource).colour),
                                "%s  %.1f", resource_name(r.resource), static_cast<double>(r.amount));
+        ui.tile_card.province_scroll_max = ImGui::GetScrollMaxY();
         ImGui::EndChild();
         return;
     }
 
-    // ── Capacity: standing buildings against the province building ceiling ──
-    // -1 is UNKNOWN by the BL-513 contract and is said, never drawn as room.
+    // ── The header row: title | capacity bar | population ──
+    const province_pop_table pt = province_population(w, tile_id);
+    ui.tile_card.population = pt.total;
+    char pop[32];
+    std::snprintf(pop, sizeof pop, "%d k", pt.total);
+    const float pop_w   = ImGui::CalcTextSize(pop).x;
+    const float row_x   = ImGui::GetCursorPosX();     // after the title, on its line
+    ImGui::SameLine();
+    const float bar_x   = ImGui::GetCursorPosX();
+    const float right_x = ImGui::GetWindowContentRegionMax().x;
+    const float bar_w   = std::max(24.0f, right_x - bar_x - pop_w - style.ItemSpacing.x);
+    (void)row_x;
+
+    // Capacity: standing buildings against the province building ceiling. -1 is
+    // UNKNOWN by the BL-513 contract and is said, never drawn as room.
     ui.tile_card.province_standing = pb.standing;
     ui.tile_card.province_ceiling  = pb.ceiling;
-    ImGui::SameLine();
-    ImGui::TextDisabled("capacity");
     if (pb.ceiling >= 0)
     {
         const bool  full = pb.standing >= pb.ceiling;
@@ -2760,10 +2823,10 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
                                ? std::clamp(static_cast<float>(pb.standing) / static_cast<float>(pb.ceiling), 0.0f, 1.0f)
                                : 1.0f;
         char ov[48];
-        std::snprintf(ov, sizeof ov, full ? "%d / %d  full" : "%d / %d", pb.standing, pb.ceiling);
+        std::snprintf(ov, sizeof ov, full ? "%d/%d full" : "%d/%d", pb.standing, pb.ceiling);
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
                               ImGui::ColorConvertU32ToFloat4(full ? palette::negative : palette::positive));
-        ImGui::ProgressBar(frac, {-FLT_MIN, 0.0f}, ov);
+        ImGui::ProgressBar(frac, {bar_w, ImGui::GetTextLineHeight()}, ov);
         ImGui::PopStyleColor();
         const ImVec2 mn = ImGui::GetItemRectMin();
         const ImVec2 mx = ImGui::GetItemRectMax();
@@ -2774,19 +2837,34 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
     }
     else
     {
-        ImGui::TextDisabled("Capacity unknown.");
+        fit_text(text_box::table_cell, "selection.province.capacity", "capacity unknown", bar_w, true);
     }
+    ImGui::SameLine(right_x - pop_w);
+    ImGui::TextUnformatted(pop);
+    {
+        const ImVec2 mn = ImGui::GetItemRectMin();
+        const ImVec2 mx = ImGui::GetItemRectMax();
+        ui.tile_card.population_x = (mn.x + mx.x) * 0.5f;
+        ui.tile_card.population_y = (mn.y + mx.y) * 0.5f;
+    }
+    if (ImGui::IsItemHovered())
+        draw_population_tooltip(pt);
     ImGui::Separator();
 
-    // ── The resource table: Built / Max / Resource, richest deposit first ──
+    // ── The resource table: Built / Max / Resource, richest deposit first, ──
+    // taking the rest of the card and scrolling inside its own rows.
     if (pb.rows.empty())
     {
         ImGui::TextDisabled("No workable deposits in this province.");
     }
     else if (ImGui::BeginTable("##prov_resources", 4,
-                               ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+                               ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit |
+                               ImGuiTableFlags_ScrollY,
+                               {0.0f, std::max(ImGui::GetFrameHeight(),
+                                               ImGui::GetContentRegionAvail().y)}))
     {
         const float cpad = style.CellPadding.x * 2.0f;
+        ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("##good",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn("Built",    ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Built").x + cpad);
         ImGui::TableSetupColumn("Max",      ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Max").x + cpad);
@@ -2818,42 +2896,8 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
         }
         ImGui::EndTable();
     }
-    ImGui::Separator();
 
-    // ── Population — province grain, because the data model is ──
-    // Population lives on population CENTRES (POPULATION.md), so there is no
-    // per-tile headcount to show. The centre standing on the selected tile, if
-    // one does, is marked.
-    const province_pop_table pt = province_population(w, tile_id);
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Population");
-    ImGui::SameLine();
-    ImGui::Text("%d thousand", pt.total);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Summed over every population centre in this province.\n"
-                          "Scale drives the agglomeration bonus and the labour pool.");
-    if (pt.rows.empty())
-        ImGui::TextDisabled("Uninhabited.");
-    // TWO LINES PER CENTRE, name over stats: one line overran the column.
-    for (const province_pop_row& r : pt.rows)
-    {
-        if (r.here)
-        {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", "\xe2\x80\xa2");
-            ImGui::SameLine();
-        }
-        else
-        {
-            ImGui::Dummy({ImGui::GetTextLineHeight() * 0.5f, 1.0f});
-            ImGui::SameLine();
-        }
-        ImGui::Text("%s", (r.name[0] != '\0') ? r.name : "Unnamed");
-        ImGui::Dummy({ImGui::GetTextLineHeight(), 1.0f});
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s \xc2\xb7 %d k \xc2\xb7 hab %.2f",
-                            population_scale_name(r.scale), r.population,
-                            static_cast<double>(r.habitability));
-    }
-
+    ui.tile_card.province_scroll_max = ImGui::GetScrollMaxY();
     ImGui::EndChild();
 }
 

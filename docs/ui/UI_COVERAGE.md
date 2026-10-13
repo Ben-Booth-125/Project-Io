@@ -54,9 +54,9 @@ and so is the safety net.
 | `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 28 | 1 | 3 |
 | `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 60 | 0 | 7 |
-| `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 29 | 1 | 2 |
+| `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 40 | 1 | 3 |
 | `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
-| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `construction_ledger_tabs`, `building_management_shell` | 57 | 2 | 9 |
+| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `construction_ledger_tabs`, `building_management_shell` | 68 | 2 | 10 |
 | `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 54 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 29 | 0 | 4 |
 | `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 38 | 0 | 3 |
@@ -65,7 +65,7 @@ and so is the safety net.
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 35 | 0 | 0 |
 | `UI-078` Corporation ledger (rail slot 8, Diplomacy) | ledger | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-079` Corporation ledger (rail slot 8, Diplomacy) > Stance groups and the row action strip | view | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
-| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs` | 20 | 1 | 5 |
+| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs` | 20 | 1 | 7 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 8 | 1 | 0 |
 | `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 49 | 1 | 2 |
 | `UI-092` New World wizard | view | `planetology_generation`, `history_lapse_press` | 38 | 0 | 11 |

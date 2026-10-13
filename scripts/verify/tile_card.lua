@@ -10,6 +10,12 @@
 --                          table and population.
 --   tile_card_capacity_tip the capacity bar hovered: where the ceiling is granted
 --                          (area, habitability, infrastructure, population).
+--   tile_card_population_tip  the header's population figure hovered: the
+--                          province's centres (round 2: the list left the card).
+--   tile_card_single_press a REAL canvas press on a single-building hex: the
+--                          tile's grid, never the building (round 2).
+--   (round 2 also asserts the province card's own window never scrolls, and the
+--    expanded card's header count, method, net / expenses figures and slider)
 --   tile_card_built        a player tile: one button per stack, three across,
 --                          glyph + count, name, net profit per quarter.
 --   tile_card_stacked      a tile carrying two or more buildings.
@@ -86,7 +92,14 @@ do
     local c = show_tile(unbuilt.x, unbuilt.y)
     verify.expect(#c.buttons == 0, "an unbuilt tile has no building buttons")
     verify.expect(#c.province_rows > 0, "the province card lists its workable resources")
+    verify.expect(c.province_scroll_max == 0,
+                  "the province card's own window does not scroll (range "
+                  .. tostring(c.province_scroll_max) .. ")")
     verify.capture("tile_card_unbuilt")
+    if c.population_x >= 0 then
+        verify.hover(c.population_x, c.population_y, 3)
+        verify.capture("tile_card_population_tip")
+    end
     if c.capacity_x >= 0 then
         verify.hover(c.capacity_x, c.capacity_y, 3)
         verify.capture("tile_card_capacity_tip")
@@ -95,8 +108,67 @@ do
     end
 end
 
+-- A canvas PRESS on a single-building hex selects the TILE, opening its grid
+-- (BL-1300 round 2): never the building. A real press through click_tile.
+do
+    local single = nil
+    for _, t in ipairs(order) do
+        if by_tile[t].n == 1 then single = by_tile[t]; break end
+    end
+    if single then
+        verify.clear_selection()
+        frame_tile(single.x, single.y, 18)
+        verify.frames(2)
+        verify.expect(verify.click_tile(single.x, single.y), "the press on a single-building hex landed")
+        verify.frames(3)
+        local c = card()
+        verify.expect(c.drawn and not c.is_expanded,
+                      "a canvas press on a single-building hex shows the tile's GRID, not the building")
+        verify.expect(#c.buttons == 1, "...with that building's one button")
+        verify.hover(860, 300, 2)
+        verify.capture("tile_card_single_press")
+    else
+        print("tile_card: no single-building tile found; the tile-first press check was skipped")
+    end
+end
+
 -- A built player tile.
+-- A PRODUCING building by preference (extraction or processing), so the
+-- expanded card has a method, a profit row and a slider to show; any
+-- completed player building otherwise (a port names no method).
 local player_site = nil
+for _, b in ipairs(verify.buildings()) do
+    if b.player and b.complete and not player_site
+       and (b.type == "Extraction Site" or b.type == "Processing Facility") then
+        player_site = b
+    end
+end
+if not player_site then
+    -- The seeded player corp may own only a Port. Raise a producing site the
+    -- way the Build door would, on a deposit the find helper names, and run
+    -- quarters until it finishes (construction is material-gated, BL-095).
+    local opening = verify.player_balance()
+    verify.set_balance(opening + 1000000)
+    for _, g in ipairs({ "agricultural_produce", "iron_ore" }) do
+        local d = verify.find_deposit_tile(g)
+        if d.ok then
+            verify.place_mode("extraction", g)
+            if verify.build_at(d.x, d.y) == "placed" then
+                print("tile_card: raised a " .. g .. " site at [" .. d.x .. ", " .. d.y .. "]")
+                break
+            end
+        end
+    end
+    verify.set_balance(opening)
+    verify.econ_step(24)
+    for _, b in ipairs(verify.buildings()) do
+        if b.player and b.complete and not player_site
+           and (b.type == "Extraction Site" or b.type == "Processing Facility") then
+            player_site = b
+        end
+    end
+    by_tile, order = group()
+end
 for _, b in ipairs(verify.buildings()) do
     if b.player and b.complete and not player_site then player_site = b end
 end
@@ -104,6 +176,7 @@ assert(player_site, "tile_card.lua: no completed player building on the home bod
 do
     local c = show_tile(player_site.x, player_site.y)
     verify.expect(#c.buttons > 0, "a built tile shows at least one building button")
+    verify.expect(c.province_scroll_max == 0, "built tile: the province card's own window does not scroll")
     for _, b in ipairs(c.buttons) do
         verify.expect(b.detail ~= "", "every button carries its third line: " .. b.label)
     end
@@ -134,7 +207,10 @@ end
 do
     local c = show_tile(player_site.x, player_site.y)
     local mine = nil
-    for _, b in ipairs(c.buttons) do if b.open then mine = b; break end end
+    for _, b in ipairs(c.buttons) do if b.open and b.first == player_site.id then mine = b; break end end
+    if not mine then
+        for _, b in ipairs(c.buttons) do if b.open then mine = b; break end end
+    end
     verify.expect(mine ~= nil, "the player's tile has an open (own) button")
     if mine then
         verify.click(mine.x, mine.y)
@@ -144,6 +220,23 @@ do
         verify.expect(e.tile == c.tile, "the expanded card is the SAME tile's card")
         verify.expect(e.player, "the expanded building is the player's")
         verify.expect(e.status ~= "", "the expanded card carries a status line")
+        verify.expect(e.title:find("this tile", 1, true) == nil,
+                      "the header carries no 'this tile's buildings' text: '" .. e.title .. "'")
+        verify.expect(e.count == mine.count, "the header's count is the stack's (" .. tostring(e.count) .. ")")
+        if e.count > 1 then
+            verify.expect(e.title:find(utf8.char(215) .. tostring(e.count), 1, true) ~= nil,
+                          "the header shows the stack count: '" .. e.title .. "'")
+        end
+        if player_site.type == "Extraction Site" or player_site.type == "Processing Facility" then
+            verify.expect(e.method ~= "", "the expanded card names its production method: '" .. e.method .. "'")
+        end
+        if e.charts then
+            verify.expect(e.net ~= "" and e.expenses ~= "",
+                          "the profit row shows net and expenses: '" .. e.net .. "' / '" .. e.expenses .. "'")
+            verify.expect(e.slider, "the player's completed building carries the workforce slider")
+        else
+            print("tile_card: the pressed building has no profit data yet - profit/slider asserts skipped")
+        end
         verify.expect(#e.buttons == 0, "the grid gives way to the expanded card")
         local cc = verify.construction_controls()
         verify.expect(cc.open_ledger_ok, "the action grid retargets: Open in ledger is on it")
