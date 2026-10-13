@@ -251,7 +251,7 @@ local function rows_at(w, h)
     print(string.format(
         "MEASURED %dx%d: column %.1f px, top section %.1f px (%.3f of column), legacy row %.1f px, goods row %.1f px (frame %.1f)",
         w, h, t.column_h, t.top_h, t.top_h / math.max(1.0, t.column_h), t.legacy_row_h, t.goods_row_h, t.frame_h))
-    local names = {"Sold here", "Traded in", "Traded out"}
+    local names = {"Sold", "In", "Out"}
     local overrun = 0
     for k = 1, 3 do
         local a, fw = t.metric_figure_avail[k], t.metric_figure_w[k]
@@ -260,6 +260,8 @@ local function rows_at(w, h)
                             w, h, names[k], fw, a, (fw > a + 0.5) and " (OVERRUNS)" or ""))
     end
     t.metric_overrun = overrun
+    -- Short labels so every figure fits beside its label (Ben, 2026-10-13, option A).
+    verify.expect(overrun == 0, string.format("%dx%d every metric figure fits beside its label (%d overrun)", w, h, overrun))
     local want = math.max(t.frame_h, 0.4 * t.legacy_row_h)
     verify.expect(math.abs(t.goods_row_h - want) < 0.01,
         string.format("%dx%d goods row is max(frame, 0.4 x legacy) (%.2f vs %.2f)", w, h, t.goods_row_h, want))

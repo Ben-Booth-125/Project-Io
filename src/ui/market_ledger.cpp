@@ -1345,16 +1345,16 @@ void draw_market_top_section(const world& w, entity_id mid, float top_h)
     // RIGHT 2/5 — the metrics, stacked, each label and figure on one line.
     if (ImGui::BeginChild("##market_metrics", {0.0f, top_h}, false))
     {
-        draw_metric(0, "Sold here", g_market_top.sold_known, g_market_top.sold_here,
+        draw_metric(0, "Sold", g_market_top.sold_known, g_market_top.sold_here,
                     "Nothing has cleared yet: the exchange record holds no quarter.");
         ImGui::Spacing();
         // BL-1308: the trade value record, last completed quarter. Not saved,
         // so before a quarter completes there is no figure, not a zero.
         static constexpr const char* k_no_quarter = "No quarter completed yet";
-        draw_metric(1, "Traded in", g_market_top.traded_known, g_market_top.traded_in,
+        draw_metric(1, "In", g_market_top.traded_known, g_market_top.traded_in,
                     k_no_quarter);
         ImGui::Spacing();
-        draw_metric(2, "Traded out", g_market_top.traded_known, g_market_top.traded_out,
+        draw_metric(2, "Out", g_market_top.traded_known, g_market_top.traded_out,
                     k_no_quarter);
     }
     ImGui::EndChild();
