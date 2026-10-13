@@ -176,6 +176,33 @@ effects.forEach((e, k) => {
 });
 lines.push('}};');
 lines.push('');
+// BL-1276 (the research panel): the trees' and branches' display names and each quest's
+// next-age key. ADDITIVE, in arrays of their own beside `nodes` rather than as `node` fields, so
+// a generator change that grows `node` (the effect pass) merges without touching these lines.
+const branchRows = [];
+for (const t of store.trees) for (const b of t.branches) branchRows.push({ t, b });
+lines.push('/// One branch of the ring, in store order (tree by tree, Production / Network / State). The');
+lines.push('/// research panel labels and its angular layout read this; nothing in the sim does.');
+lines.push('struct branch_info');
+lines.push('{');
+lines.push('    const char* key;       ///< "PR-EX" etc.; what `node::branch` names.');
+lines.push('    const char* name;      ///< "Extraction".');
+lines.push('    const char* tree;      ///< "PR".');
+lines.push('    const char* tree_name; ///< "Production".');
+lines.push('};');
+lines.push('');
+lines.push(`inline constexpr int branch_count = ${branchRows.length};`);
+lines.push('inline constexpr std::array<branch_info, branch_count> branches = {{');
+for (const { t, b } of branchRows)
+  lines.push(`    {${cstr(b.key)}, ${cstr(b.name)}, ${cstr(t.key)}, ${cstr(t.name)}},`);
+lines.push('}};');
+lines.push('');
+lines.push('/// The branch of the NEXT age tree a quest keys (RESEARCH.md, Quests key the next age), by');
+lines.push('/// node index; "" for every node that is not a quest.');
+lines.push('inline constexpr std::array<const char*, node_count> keys_next_branch = {{');
+nodes.forEach((n, i) => lines.push(`    /* ${String(i).padStart(3)} */ ${cstr(n.keys_next_branch || '')},`));
+lines.push('}};');
+lines.push('');
 lines.push('/// The index of the node with store id @p id, or -1. Linear over 160 nodes: a lookup, not a hot path.');
 lines.push('constexpr int find_node(std::string_view id)');
 lines.push('{');

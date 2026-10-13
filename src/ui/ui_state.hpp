@@ -1125,18 +1125,43 @@ struct ui_state
     int  ages_year    = 0;
     bool ages_playing = false;
 
-    /// F9 mock tech-tree viewer: one era per view — 0=Era -1 Antiquity (placeholder),
-    /// 1=Era 0, 2=Era 1, 3=Standing lines. Defaults to Era 0, the campaign's era.
-    int  tech_tree_view = 1;
+    /// UNREAD. The research panel has no views: hover reads a node and SHIFT +
+    /// left click queues it (Ben, 2026-10-10, retiring BL-1276's Inspect/Plan
+    /// strip). Kept so `verify.panel_view("tech_tree", n)` in older scripts
+    /// stays a harmless write.
+    int  tech_tree_view = 0;
 
-    /// Radial constellation canvas (BL-310) — views 1/2 only. Pan offset of the
-    /// web centre from the canvas centre (screen px) and scroll-wheel zoom,
-    /// same idiom as planetary_pan_x/planetary_zoom (body_surface_canvas.cpp).
-    /// Kept per-view-agnostic (one camera for both era tabs) since switching
-    /// tabs is a content change, not a navigation the player needs to retain.
+    /// The ring's camera: pan offset of the ring's centre from the canvas
+    /// centre (screen px) and scroll-wheel zoom, the planetary_pan_x /
+    /// planetary_zoom idiom (body_surface_canvas.cpp). View state, not saved.
     float tech_tree_pan_x = 0.0f;
     float tech_tree_pan_y = 0.0f;
     float tech_tree_zoom  = 1.0f;
+
+    /// The node under the cursor and the shared hover card's glance-then-stick
+    /// state for it (TOOLTIP.md § The model). -1 = none. View state only.
+    int   tech_tree_hover_node  = -1;
+    float tech_tree_hover_secs  = 0.0f;
+    bool  tech_tree_hover_stuck = false;
+    float tech_tree_card_anchor_x = 0.0f, tech_tree_card_anchor_y = 0.0f;
+    float tech_tree_card_min_x = 0.0f, tech_tree_card_min_y = 0.0f;
+    float tech_tree_card_max_x = 0.0f, tech_tree_card_max_y = 0.0f;
+
+    /// Each node's screen centre as last drawn, (x, y) per `io::dg` index;
+    /// empty when the ring is not on screen. Published for the verify API
+    /// (`verify.tech_tree_node`), which aims its hover and press at a node by
+    /// id rather than re-deriving the ring's layout in Lua.
+    std::vector<float> tech_tree_node_screen;
+
+    /// Research-queue presses from the panel (queue a node, remove the last,
+    /// clear), applied by `app::render` through `apply_corp_command` — the
+    /// panel holds a const world. Drained in order each frame.
+    std::vector<corp_command> pending_research_commands;
+
+    /// The last research press's outcome, shown under the queue: the refusal
+    /// reason when a press was refused ("Mass Surveillance is closed: its pair,
+    /// Mass Television, is queued"), or what a press queued.
+    std::string research_message;
 
     // --- drill-through disclosure (BL-214, revised BL-265) ---
     // The one idiom every dense surface obeys. BL-214's model was BINARY — folded, or

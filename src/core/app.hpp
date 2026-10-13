@@ -1233,6 +1233,7 @@ private:
     float m_pointer_y = 0.0f;
     int   m_inject_button = -1;       ///< Button whose state change is pending for the next frame; -1 = none. Consumed (reset) by pump_injected_input.
     bool  m_inject_down = false;      ///< Down/up for the pending m_inject_button.
+    int   m_inject_shift = -1;        ///< BL-1276: a pending Shift key state (1 down, 0 up) for the next frame; -1 = none.
 
     bool        m_capture_requested = false;  ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).
