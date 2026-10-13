@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 27 open, 4 resolved.*
+*33 entries — 29 open, 4 resolved.*
 
 ---
 
@@ -259,6 +259,28 @@ To land the total inside the history, the carve was pulled out of generate_natio
 > **Recommendation:** Accept, and have NATION_GENERATION.md § Pass 2c/2d describe the closing rounds and the shared carve (D1 follow-through).
 
 *Files: `src/world/closing_rounds.cpp`, `src/world/nation_generation.cpp`*
+
+### NR-1042 — NOVEL WORK: five extra levers BL-1287 (rise and fall) needed to make a rise possible
+*novel-work · raised 2026-10-12 · from BL-1287 build, 2026-10-12*
+
+Appetite and cohesion/supply alone could not lift any realm. The build added, each fixing a measured cause: (1) a defensive network rally - the rising realm's armies march to its own attacked region (BL-921 gather run from the defender's side); (2) the seat keeps its guard; (3) the lean also strengthens Organise, with cultural opposition cut per level; (4) no press at a creed fault line (reasserted alien ground excluded - seeds looped conquest/schism 27-52 times); (5) a stale-reading fix behind secession_waits_for_holder (Empires only): a region conquered this round carried its old holder's supply reading and re-seceded the same round.
+
+**Why it matters.** Each is new Empires behaviour beyond the ruled levers; (5) is a defect fix that may matter beyond the rise.
+
+> **Recommendation:** Accept all five and write them into CIVILISATION.md with the rise; consider (5) for every realm, not only behind its flag.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`*
+
+### NR-1043 — DECISION TAKEN: civil-war refugees do not carry their region's ceiling; flight is bounded by the destination's room
+*decision · raised 2026-10-12 · from BL-1290 build, 2026-10-12*
+
+The first build followed the NR-958 stream rule (migrants carry their ceiling), which permanently lowered war-torn regions' ceilings and compounded (seed 9: a struck region ended at 8 per mille of its farmland ceiling). Replaced: flight lands at most the destination's room, exactly that many leave, ceilings unmoved (seed 9 minimum now 134 per mille). 417 of 2,695 strikes found no refuge and moved nobody (counted).
+
+**Why it matters.** It diverges from NR-958 for civil-war flight only.
+
+> **Recommendation:** Accept: a war that evicts people should not shrink the ground forever.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/MILITARY_HISTORY.md`*
 
 ---
 

@@ -788,7 +788,16 @@ the nation totals' closing rounds (`NATION_GENERATION.md` § The nation count is
 **A boxed front-runner gives way (Ben, 2026-10-12).** Where the realm largest at 200 BCE cannot reach
 the floor — an island, or a realm already holding its whole landmass — the rise falls to the largest
 realm at 200 BCE whose reachable ground can hold the floor. The floor is **25 percent** (measured:
-peaks of 25 to 41 percent across the library). **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
+peaks of 25 to 41 percent across the library).
+**The fall acts on the map (Ben, 2026-10-12).** The breakdown is pressed by changes a player can see:
+the overextended realm's roads and works decay — their reach relief falls on the ground itself — and
+its far garrisons thin, so the supply that fails and the regions that secede have a visible cause.
+No private price is paid by this realm alone. **Bare ground relays no supply for the falling realm
+(Ben, 2026-10-13):** held ground its garrisons have left carries no supply onward in its reach walk,
+so a thinned outer march really cuts the network and the ground beyond it secedes. Decay alone left
+compact realms supplied (8 of 16 seeds halved), because supply falls with reach steps, not with roads. The rise keeps its recorded lean — appetite, the
+defensive rally, cohesion on conquest — as the sanctioned exception the targeted pattern is, each step
+a recorded event. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
 only walking away; the deaths are soldiers', plus the famine and displacement mechanism
 `MILITARY_HISTORY.md` owns. **What counts as one (Ben, 2026-10-11):** a successor that breaks away
 holding at least a quarter of what its parent kept, and then takes a seat from or ends its parent (or
