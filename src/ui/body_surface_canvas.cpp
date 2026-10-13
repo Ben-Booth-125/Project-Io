@@ -5494,6 +5494,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     //
     // What remains here is the NAME: only City+ centres (scale >= 4, not razed)
     // carry a label, placed where the old skyline's edge stood.
+    //
+    // MARKET LABELS (BL-1304; PLANETARY.md § Market labels). A market is named for
+    // a city (market_city_name's rule, BL-1303), and that city's label IS the
+    // market's label: the market glyph drawn before the name. So a centre that
+    // names a market is labelled whatever its scale -- a market's naming centre can
+    // be a town (the carve admits scale 2 at a trade junction), and without the
+    // label the market's name would be drawn nowhere on the map. Same layer, same
+    // vertical culling and horizontal wrap as every other settlement label.
     if (!w.population_centres.empty())
     {
         const float visible_top    = grid_area_origin.y - hit_r;
@@ -5501,11 +5509,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
         // Sorted gather: the store is an unordered_map, and overlapping labels
         // must overdraw in one deterministic order for the capture harness.
-        struct pop_centre { int col; int row; int scale; entity_id centre; };
+        struct pop_centre { int col; int row; int scale; entity_id centre; bool market; };
         std::vector<pop_centre> pcs;
         for (const auto& [pid, pc] : w.population_centres)
         {
-            if (pc.scale < 4 || pc.razed)
+            if (pc.razed)
+                continue;
+            const bool names_market = centre_named_market(w, pid) != null_entity;
+            if (pc.scale < 4 && !names_market)
                 continue;
             const auto tit = w.population_centre_tile.find(pid);
             if (tit == w.population_centre_tile.end())
@@ -5514,7 +5525,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (til == w.tiles.end() || til->second.body != state.active_body)
                 continue;
             pcs.push_back({ til->second.grid_x, til->second.grid_y,
-                            std::clamp(pc.scale, 1, 5), pid });
+                            std::clamp(pc.scale, 1, 5), pid, names_market });
         }
         std::sort(pcs.begin(), pcs.end(),
                   [](const pop_centre& a, const pop_centre& b) { return a.centre < b.centre; });
@@ -5546,7 +5557,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
-                const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                if (a.market)
+                {
+                    // The market glyph sits on the name's line, its own width
+                    // ahead of it, shadowed as the name is so it reads on any ground.
+                    const float  gr = ImGui::GetFontSize() * 0.40f;
+                    const ImVec2 gc{ tp.x + gr, tp.y + ImGui::GetFontSize() * 0.5f };
+                    icons::market(dl, { gc.x + 1.0f, gc.y + 1.0f }, gr, IM_COL32(20, 22, 28, 200));
+                    icons::market(dl, gc, gr, IM_COL32(236, 230, 214, 255));
+                    tp.x += 2.0f * gr + 3.0f;
+                }
                 dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
                 dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
             }

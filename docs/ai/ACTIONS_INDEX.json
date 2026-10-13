@@ -342,8 +342,8 @@
    "Market Ledger, 'Market' combo"
   ],
   [
-   "ledger.market_nation_chip",
-   "Market Ledger, nation presence row (below the Body/Market selectors, above the tab strip)"
+   "ledger.market_top_section",
+   "Market Ledger, the market's top section (below the Body/Market selectors, above the tab strip; ~2/7 of the column)"
   ],
   [
    "ledger.market_view_tab",

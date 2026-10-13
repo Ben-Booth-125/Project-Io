@@ -7,7 +7,7 @@
 #include "presentation.hpp"
 #include "text_fit.hpp"
 
-#include "world/market_clearing.hpp" // market_for_tile — the nation presence row
+#include "world/market_clearing.hpp" // market_for_tile — the nation list, market names
 #include "world/corp_command.hpp"   // max_trade_points — the form's and reserve's range
 #include "world/supply_system.hpp"  // collect_logistics_nodes — the node set the ranking prices against
 #include "world/trade.hpp"          // rank_trade_routes — read 3 is the trade pass's own ranking
@@ -15,7 +15,6 @@
 #include <imgui.h>
 
 #include <algorithm>
-#include <cctype>  // std::toupper — the nation chip's initials
 #include <cmath>
 #include <cstdio>  // std::snprintf
 #include <cstdint>
@@ -48,23 +47,153 @@ std::vector<entity_id> markets_on_body(const world& w, entity_id body)
 
 } // namespace
 
+// --- Market names (BL-1303) ----------------------------------------------------
+// MARKETS.md § Market centres and seeding: a market is named for the LARGEST
+// population centre whose tile clears to it (`market_for_tile`), by scale, then
+// headcount, then lowest id; a market with no named centre in its catchment reads
+// "<body> market N", N by ascending market id among that body's unnamed markets,
+// and never the bare body name.
+//
+// THE OLD RULE MATCHED THE WRONG TILE. It looked for a centre standing ON
+// `market_component::centre_tile`, but generation sets that tile to
+// `trade_flow_proxy_site(...)` (the richest site near the seeding centre) or a
+// capital shell's `anchor_tile` (nearest land to the polity's region anchor),
+// which is rarely a centre's own tile. The lookup missed and fell back to the
+// body's name: on seed 0, 12 of Huhaidar's 26 markets read "Huhaidar".
+//
+// The scan is every centre once (`market_for_tile` is the catchment raster, O(1)
+// a call), cached against the econ tick and the market and centre counts — a
+// centre's scale and headcount move only on an econ tick, and a market emerging
+// or a centre founded changes a count.
+namespace {
+
+struct market_name_cache
+{
+    const world* w           = nullptr;
+    int          econ_tick   = -1;
+    std::size_t  n_markets   = 0;
+    std::size_t  n_centres   = 0;
+    std::size_t  n_names     = 0;
+    std::vector<std::pair<entity_id, entity_id>> market_to_centre; ///< sorted by market
+    std::vector<std::pair<entity_id, std::string>> fallback;      ///< sorted by market
+};
+
+const market_name_cache& market_names(const world& w)
+{
+    static market_name_cache c;
+    if (c.w == &w && c.econ_tick == w.current_econ_tick && c.n_markets == w.markets.size()
+        && c.n_centres == w.population_centres.size() && c.n_names == w.population_centre_name.size())
+        return c;
+    c.w         = &w;
+    c.econ_tick = w.current_econ_tick;
+    c.n_markets = w.markets.size();
+    c.n_centres = w.population_centres.size();
+    c.n_names   = w.population_centre_name.size();
+    c.market_to_centre.clear();
+    c.fallback.clear();
+
+    // Best centre per market. The comparison is a total order, so the result does
+    // not depend on the unordered store's walk order.
+    struct best { entity_id centre; int scale; int pop; };
+    std::vector<std::pair<entity_id, best>> picks;
+    const auto beats = [](const population_centre_component& pc, entity_id id, const best& b) {
+        if (pc.scale != b.scale)      return pc.scale > b.scale;
+        if (pc.population != b.pop)   return pc.population > b.pop;
+        return id < b.centre;
+    };
+    for (const auto& [cid, pc] : w.population_centres)
+    {
+        const auto nit = w.population_centre_name.find(cid);
+        if (nit == w.population_centre_name.end() || nit->second.empty())
+            continue;
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        const entity_id m = market_for_tile(w, tit->second);
+        if (m == null_entity)
+            continue;
+        auto it = std::find_if(picks.begin(), picks.end(),
+                               [m](const auto& p) { return p.first == m; });
+        if (it == picks.end())
+            picks.push_back({ m, { cid, pc.scale, pc.population } });
+        else if (beats(pc, cid, it->second))
+            it->second = { cid, pc.scale, pc.population };
+    }
+    for (const auto& [m, b] : picks)
+        c.market_to_centre.push_back({ m, b.centre });
+    std::sort(c.market_to_centre.begin(), c.market_to_centre.end());
+
+    // "<body> market N" for the rest, N by ascending market id per body.
+    std::vector<entity_id> unnamed;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        if (!std::binary_search(c.market_to_centre.begin(), c.market_to_centre.end(),
+                                std::make_pair(mid, entity_id{0}),
+                                [](const auto& a, const auto& b) { return a.first < b.first; }))
+            unnamed.push_back(mid);
+    }
+    std::sort(unnamed.begin(), unnamed.end());
+    std::vector<std::pair<entity_id, int>> per_body;
+    for (const entity_id mid : unnamed)
+    {
+        const entity_id body = w.markets.at(mid).body;
+        auto it = std::find_if(per_body.begin(), per_body.end(),
+                               [body](const auto& p) { return p.first == body; });
+        if (it == per_body.end())
+        {
+            per_body.push_back({ body, 0 });
+            it = per_body.end() - 1;
+        }
+        ++it->second;
+        c.fallback.push_back({ mid, body_label(w, body) + " market " + std::to_string(it->second) });
+    }
+    return c;
+}
+
+template <typename V>
+auto find_by_first(const V& v, entity_id key)
+{
+    const auto it = std::lower_bound(v.begin(), v.end(), key,
+                                     [](const auto& p, entity_id k) { return p.first < k; });
+    return (it != v.end() && it->first == key) ? it : v.end();
+}
+
+} // namespace
+
+entity_id market_naming_centre(const world& w, entity_id mid)
+{
+    const market_name_cache& c = market_names(w);
+    const auto it = find_by_first(c.market_to_centre, mid);
+    return it != c.market_to_centre.end() ? it->second : null_entity;
+}
+
+entity_id centre_named_market(const world& w, entity_id centre)
+{
+    const market_name_cache& c = market_names(w);
+    for (const auto& [m, cid] : c.market_to_centre)
+        if (cid == centre)
+            return m;
+    return null_entity;
+}
+
 std::string market_city_name(const world& w, entity_id mid)
 {
     const auto mit = w.markets.find(mid);
     if (mit == w.markets.end())
         return "Market #" + std::to_string(mid);
-    const market_component& mc = mit->second;
-    // Resolve the population centre anchoring the market's centre tile → its city name.
-    if (mc.centre_tile != null_entity)
-        for (const auto& [cid, tid] : w.population_centre_tile)
-            if (tid == mc.centre_tile)
-            {
-                const auto nit = w.population_centre_name.find(cid);
-                if (nit != w.population_centre_name.end() && !nit->second.empty())
-                    return nit->second;
-                break;
-            }
-    return body_label(w, mc.body); // unanchored / unnamed fallback
+    const market_name_cache& c = market_names(w);
+    const auto it = find_by_first(c.market_to_centre, mid);
+    if (it != c.market_to_centre.end())
+    {
+        const auto nit = w.population_centre_name.find(it->second);
+        if (nit != w.population_centre_name.end())
+            return nit->second;
+    }
+    const auto fit = find_by_first(c.fallback, mid);
+    if (fit != c.fallback.end())
+        return fit->second;
+    return body_label(w, mit->second.body) + " market"; // unreachable: every market is one or the other
 }
 
 namespace {
@@ -1053,21 +1182,31 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     ImGui::EndChild();
 }
 
-// --- The nation presence row (BL-688) ----------------------------------------
-// "Which nations operate in this market?" — a wrapped row of one chip per
-// nation, sitting BELOW the Body/Market combos and ABOVE the tab strip, which is
-// where Ben placed it (2026-08-29) and is part of the spec rather than a layout
-// convenience: it qualifies the market the selectors just chose, before the tabs
-// ask a question about it.
+// --- The market's top section (BL-1305; ledgers/market.md § 2) --------------
+// Below the Body/Market combos, above the tab strip, about 2/7 of the column's
+// height, split left and right (Ben, 2026-10-13, superseding BL-688's chip row):
 //
-// THESE ARE NOT FLAGS, and the distinction is deliberate. `nation_colour` is a
-// palette entry and is ALL that exists — corporations carry an emblem tag,
-// nations do not. Real per-nation emblem artwork would be a generated identity
-// system, a feature in its own right, so a single stubbed glyph standing in for
-// one would teach a vocabulary the game does not have. A colour chip carrying
-// the nation's initials is honest about being an identity mark and nothing more
-// (ICONS.md § 2b), and it is a PLACEHOLDER even at that (Ben, 2026-08-29: flags
-// and glyphs are a later sprint).
+//   LEFT 3/5 — "Which nations operate in this market?" One row per nation, a
+//   `nation_colour` swatch and the nation's FULL NAME, scrolling inside the
+//   section. The initials chips asked the player to decode an identity a list can
+//   simply state. Still no flags: `nation_colour` is a palette entry and is all
+//   that exists (ICONS.md § 2b). A name that overruns elides with its tooltip
+//   (the generation-side name cap is BL-1306's).
+//
+//   RIGHT 2/5 — "How much moves through it?" Three stacked label-over-figure
+//   metrics, VALUES per quarter (a ton of ore and a ton of electronics do not
+//   add). Each figure is read from a record or shown as "—" with the reason:
+//
+//   * Sold here — the exchange record (MARKETS.md § The exchange record): the
+//     newest quarter's SALE rows on this market (`side == 0`, a landing sold to
+//     the shelf at the clearing price), quantity x unit price summed over goods.
+//   * Traded in / Traded out — NO RECORD HOLDS THEM. A trade's goods travel as a
+//     convoy that is erased on arrival, and its purchase (a shelf draw at the
+//     source) and its landing (a sale at the destination) fold into the exchange
+//     record's per-(market, good, side, tick) rows beside every other draw and
+//     landing, so the value moved by trades cannot be told apart from the rest.
+//     `player_trade_flow` covers the player's shipments only. Shown as "—" with
+//     that reason rather than derived from something that is not the figure.
 
 /// The nations operating in `mid`, by ascending entity id (deterministic).
 ///
@@ -1099,124 +1238,106 @@ std::vector<entity_id> nations_in_market(const world& w, entity_id mid)
     return out;
 }
 
-/// Up to two initials for a nation name — "Kua Sua" -> "KS", "Huhaidar" -> "HU".
-/// Two characters is what fits a chip at this column width; a single letter
-/// collides far too often across a generated roster.
-void nation_initials(const world& w, entity_id nid, char* out, std::size_t n)
+std::vector<nation_row_record> g_nation_rows;
+market_top_record              g_market_top;
+
+/// Sold here: the newest quarter's sale rows on @p mid in the exchange record.
+/// `known` is false only when the record holds no quarter at all yet.
+void sold_here(const world& w, entity_id mid, market_top_record& rec)
 {
-    out[0] = '\0';
-    const auto it = w.nations.find(nid);
-    if (it == w.nations.end() || it->second.name.empty())
-    {
-        std::snprintf(out, n, "??");
+    const std::size_t n = w.exchanges.size();
+    if (n == 0)
         return;
-    }
-    const std::string& name = it->second.name;
-    char a = '\0', b = '\0';
-    bool at_word_start = true;
-    for (const char c : name)
+    const int quarter = w.exchanges.oldest_first(n - 1).tick;
+    rec.sold_known = true;
+    rec.quarter    = quarter;
+    for (std::size_t k = 0; k < n; ++k)
     {
-        if (c == ' ' || c == '-' || c == '\'') { at_word_start = true; continue; }
-        if (at_word_start)
-        {
-            if (a == '\0')      a = c;
-            else if (b == '\0') { b = c; break; }
-            at_word_start = false;
-        }
+        const exchange_record& e = w.exchanges.oldest_first(n - 1 - k); // newest first
+        if (e.tick != quarter)
+            break; // chronological ring: an older tick ends the newest quarter
+        if (e.market == mid && e.side == 0)
+            rec.sold_here += e.quantity * e.unit_price;
     }
-    // A single-word name gives its first TWO letters rather than one, so
-    // "Huhaidar" reads "HU" and not "H".
-    if (a != '\0' && b == '\0' && name.size() > 1)
-        for (const char c : name)
-            if (c != a && c != ' ') { b = c; break; }
-    if (a == '\0') { std::snprintf(out, n, "??"); return; }
-    const char up_a = static_cast<char>(std::toupper(static_cast<unsigned char>(a)));
-    if (b != '\0')
-    {
-        const char up_b = static_cast<char>(std::toupper(static_cast<unsigned char>(b)));
-        std::snprintf(out, n, "%c%c", up_a, up_b);
-    }
-    else
-        std::snprintf(out, n, "%c", up_a);
 }
 
-std::vector<nation_chip_record> g_nation_chips;
-
-void draw_nation_presence_row(const world& w, entity_id mid)
+void draw_metric(const char* label, bool known, float value, const char* why)
 {
-    const std::vector<entity_id> nations = nations_in_market(w, mid);
-    g_nation_chips.clear();
-    for (const entity_id nid : nations)
+    ImGui::TextDisabled("%s", label);
+    if (known)
+        ImGui::TextUnformatted(fmt::credits(value).c_str());
+    else
     {
-        nation_chip_record rec;
-        rec.nation = nid;
-        const auto nit = w.nations.find(nid);
-        rec.name = (nit != w.nations.end()) ? nit->second.name : std::string{};
-        char ini[8];
-        nation_initials(w, nid, ini, sizeof ini);
-        rec.initials = ini;
-        g_nation_chips.push_back(rec);
-    }
-    if (nations.empty())
-    {
-        ImGui::TextDisabled("No national presence.");
-        return;
-    }
-
-    const float avail   = ImGui::GetContentRegionAvail().x;
-    const float start_x = ImGui::GetCursorPosX();
-    const float chip_w  = ImGui::GetFontSize() * 2.0f;
-    const float chip_h  = ImGui::GetFontSize() + 4.0f;
-    const float gap     = 4.0f;
-
-    for (std::size_t i = 0; i < nations.size(); ++i)
-    {
-        // Wrap to a second or third row when the run reaches the column edge —
-        // "wrapping to 2 or 3 rows if needed" (Ben). At the current nation count
-        // that is unlikely to trigger, but the row must not be the surface that
-        // clips when a denser world does trigger it (NR-709's family).
-        if (i > 0)
-        {
-            const float next_x = ImGui::GetCursorPosX() + chip_w + gap;
-            if (next_x - start_x <= avail)
-                ImGui::SameLine(0.0f, gap);
-        }
-
-        const entity_id nid = nations[i];
-        char ini[8];
-        nation_initials(w, nid, ini, sizeof ini);
-
-        const ImU32  col = palette::nation_colour(nid);
-        const ImVec2 p0  = ImGui::GetCursorScreenPos();
-        ImDrawList*  dl  = ImGui::GetWindowDrawList();
-        dl->AddRectFilled(p0, {p0.x + chip_w, p0.y + chip_h}, col, 3.0f);
-
-        // Initials in whichever of black/white actually reads on this chip —
-        // the nation palette spans light and dark, so one fixed ink would be
-        // illegible on roughly half the roster.
-        const unsigned cr = (col >> IM_COL32_R_SHIFT) & 0xFFu;
-        const unsigned cg = (col >> IM_COL32_G_SHIFT) & 0xFFu;
-        const unsigned cb = (col >> IM_COL32_B_SHIFT) & 0xFFu;
-        const float lum = (0.299f * static_cast<float>(cr) + 0.587f * static_cast<float>(cg)
-                           + 0.114f * static_cast<float>(cb)) / 255.0f;
-        const ImU32 ink = (lum > 0.55f) ? IM_COL32(20, 22, 28, 255) : IM_COL32(245, 247, 250, 255);
-
-        const ImVec2 ts = ImGui::CalcTextSize(ini);
-        dl->AddText({p0.x + (chip_w - ts.x) * 0.5f, p0.y + (chip_h - ts.y) * 0.5f}, ink, ini);
-
-        // The chip is an InvisibleButton so the NAME is one hover away. A
-        // two-letter mark is not self-explanatory and is not meant to be; the
-        // tooltip is where the identity actually lives.
-        const std::string chip_id = "##nat" + std::to_string(nid);
-        ImGui::InvisibleButton(chip_id.c_str(), {chip_w, chip_h});
+        ImGui::TextUnformatted("\xE2\x80\x94"); // em dash: no figure
         if (ImGui::BeginItemTooltip())
         {
-            const auto nit = w.nations.find(nid);
-            ImGui::TextUnformatted(nit != w.nations.end() && !nit->second.name.empty()
-                                   ? nit->second.name.c_str() : "Unknown nation");
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 22.0f);
+            ImGui::TextUnformatted(why);
+            ImGui::PopTextWrapPos();
             ImGui::EndTooltip();
         }
     }
+}
+
+void draw_market_top_section(const world& w, entity_id mid, float top_h)
+{
+    g_nation_rows.clear();
+    g_market_top        = market_top_record{};
+    g_market_top.drawn  = true;
+    g_market_top.market = mid;
+    g_market_top.top_h  = top_h;
+    sold_here(w, mid, g_market_top);
+
+    const float full_w = ImGui::GetContentRegionAvail().x;
+    const float left_w = std::floor(full_w * 0.6f);
+
+    // LEFT 3/5 — the nations, by full name, scrolling inside the section.
+    if (ImGui::BeginChild("##market_nations", {left_w, top_h}, false))
+    {
+        const std::vector<entity_id> nations = nations_in_market(w, mid);
+        if (nations.empty())
+            ImGui::TextDisabled("No national presence.");
+        const float sw = ImGui::GetFontSize() * 0.8f;
+        for (const entity_id nid : nations)
+        {
+            nation_row_record rec;
+            rec.nation = nid;
+            const auto nit = w.nations.find(nid);
+            rec.name = (nit != w.nations.end() && !nit->second.name.empty())
+                     ? nit->second.name : std::string{"Unknown nation"};
+
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            const float  dy = (ImGui::GetTextLineHeight() - sw) * 0.5f;
+            ImGui::GetWindowDrawList()->AddRectFilled({p0.x, p0.y + dy}, {p0.x + sw, p0.y + dy + sw},
+                                                      palette::nation_colour(nid), 2.0f);
+            ImGui::Dummy({sw, ImGui::GetTextLineHeight()});
+            ImGui::SameLine();
+            const float name_w = ImGui::GetContentRegionAvail().x;
+            rec.name_avail = name_w;
+            rec.elided = fit_text(text_box::table_cell, "market.nation_row", rec.name.c_str(), name_w);
+            g_nation_rows.push_back(std::move(rec));
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+
+    // RIGHT 2/5 — the metrics, stacked, label over figure.
+    if (ImGui::BeginChild("##market_metrics", {0.0f, top_h}, false))
+    {
+        draw_metric("Sold here", g_market_top.sold_known, g_market_top.sold_here,
+                    "Nothing has cleared yet: the exchange record holds no quarter.");
+        ImGui::Spacing();
+        static constexpr const char* k_no_trade_record =
+            "No record holds this yet. A trade's goods travel as a convoy that is "
+            "erased on arrival, and its purchase and landing fold into the exchange "
+            "record beside every other shelf draw and landing, so the value trades "
+            "moved cannot be told apart from the rest.";
+        draw_metric("Traded in", false, 0.0f, k_no_trade_record);
+        ImGui::Spacing();
+        draw_metric("Traded out", false, 0.0f, k_no_trade_record);
+    }
+    ImGui::EndChild();
 }
 
 // --- The Goods table (BL-686) -------------------------------------------------
@@ -1377,7 +1498,7 @@ entity_id                     g_goods_market = null_entity;
 
 void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                     entity_id mid, const market_component& mc,
-                    const market_plot_history& history)
+                    const market_plot_history& history, float legacy_extra_h)
 {
     const auto hist_it = history.find(mid);
 
@@ -1395,15 +1516,18 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
             s.market_ledger_aim_scroll = false;
     }
 
-    // ROW HEIGHT IS THE OPEN MEASUREMENT (Ben, 2026-08-29: "let's compare this at
-    // 8 rows, 10 rows, and 12 rows"). It is a ui_state dial rather than a
-    // constant so the three variants are one capture script and not three builds,
-    // and so the answer can be set without a recompile.
-    const int   rows_target = (s.market_goods_rows > 0) ? s.market_goods_rows : 10;
-    const float avail_h     = ImGui::GetContentRegionAvail().y;
-    const float row_h       = (avail_h > 0.0f)
-                            ? avail_h / static_cast<float>(rows_target)
-                            : ImGui::GetFrameHeight();
+    // ROW HEIGHT (Ben, 2026-10-13, closing the 2026-08-29 8/10/12-row comparison;
+    // ledgers/market.md § 2): 0.4 x what a ten-rows-to-the-view row took BEFORE the
+    // top section existed, at the same window, floored at one frame height so the
+    // name and price stay legible. The old view's height is this view's plus what
+    // the top section took beyond the one chip row it replaced
+    // (`legacy_extra_h`), so the row is a function of the window and nothing else.
+    const float avail_h   = ImGui::GetContentRegionAvail().y;
+    const float legacy_h  = avail_h + legacy_extra_h;
+    const float legacy_row = (legacy_h > 0.0f) ? legacy_h / 10.0f : ImGui::GetFrameHeight();
+    const float row_h     = std::max(ImGui::GetFrameHeight(), 0.4f * legacy_row);
+    g_market_top.legacy_row_h = legacy_row;
+    g_market_top.goods_row_h  = row_h;
 
     // THE SHARED VERTICAL SPAN — SYMMETRIC ABOUT BASE, AND ZOOMED (Ben,
     // 2026-08-29: "we can fix it by centring on the body base price, and zooming
@@ -1599,7 +1723,8 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
 
 const std::vector<goods_row_record>&   goods_rows()   { return g_goods_rows; }
 entity_id                              goods_market() { return g_goods_market; }
-const std::vector<nation_chip_record>& nation_chips() { return g_nation_chips; }
+const std::vector<nation_row_record>&  nation_rows()  { return g_nation_rows; }
+const market_top_record&               market_top()   { return g_market_top; }
 
 const std::vector<trade_row_record>&       my_trades()          { return g_my_trades; }
 const std::vector<trade_row_record>&       market_trades()      { return g_market_trades; }
@@ -1627,6 +1752,9 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
         ui::foldout_end();
         return;
     }
+    // The column's whole content height, measured before anything is drawn —
+    // the top section's 2/7 is a share of this (BL-1305).
+    const float column_h = ImGui::GetContentRegionAvail().y;
 
     if (w.markets.empty())
     {
@@ -1759,12 +1887,17 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
     }
     const market_component& mc = w.markets.at(selected_market);
 
-    // --- The nation presence row (BL-688) -----------------------------------
-    // BELOW the selectors, ABOVE the tab strip — Ben's placement, and part of the
-    // spec: it qualifies the market the combos just chose, before the tabs ask a
-    // question about it.
-    draw_nation_presence_row(w, selected_market);
+    // --- The market's top section (BL-1305) ---------------------------------
+    // BELOW the selectors, ABOVE the tab strip: it qualifies the market the
+    // combos just chose, before the tabs ask a question about it. About 2/7 of
+    // the column's height; the tabs take the rest.
+    const float top_h = std::floor(column_h * 2.0f / 7.0f);
+    draw_market_top_section(w, selected_market, top_h);
+    g_market_top.column_h = column_h;
     ImGui::Separator();
+    // What the section took beyond the one chip row it replaced (a chip was
+    // font + 4 px high); the Goods rows are sized against the view as it was.
+    const float legacy_extra_h = top_h - (ImGui::GetFontSize() + 4.0f);
 
     // --- View tabs -----------------------------------------------------------
     // GOODS (the reworked Prices view, BL-686) and TRADES. Convoys has LEFT for
@@ -1805,7 +1938,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
     // The Trades tab was not on screen; its records must not read as this frame's.
     clear_trade_records();
 
-    draw_goods_tab(w, s, selected_body, selected_market, mc, history);
+    draw_goods_tab(w, s, selected_body, selected_market, mc, history, legacy_extra_h);
 
     ui::foldout_end();
 }

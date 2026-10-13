@@ -65,8 +65,8 @@ and so is the safety net.
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 35 | 0 | 0 |
 | `UI-078` Corporation ledger (rail slot 8, Diplomacy) | ledger | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-079` Corporation ledger (rail slot 8, Diplomacy) > Stance groups and the row action strip | view | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
-| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs` | 20 | 1 | 5 |
-| `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 8 | 1 | 0 |
+| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 25 | 1 | 7 |
+| `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 13 | 1 | 0 |
 | `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 49 | 1 | 2 |
 | `UI-092` New World wizard | view | `planetology_generation`, `history_lapse_press` | 38 | 0 | 11 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
@@ -75,7 +75,7 @@ and so is the safety net.
 | `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
-| `UI-112` Market Ledger > Nation presence row | sub-element | `goods_table` | 8 | 1 | 0 |
+| `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 13 | 1 | 0 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
 | `UI-114` Nav rail slot fit | chrome | `nav_rail_fit`, `shell_pass` | 3 | 1 | 1 |
 | `UI-118` New World wizard > Wizard lapse-round time-lapse map (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press`, `sea_lanes`, `roads_carried` | 48 | 1 | 11 |
@@ -115,7 +115,7 @@ and so is the safety net.
 | `UI-014` Planetary Canvas > Hex tile grid render | sub-element | `tile_texture`, `province_render`, `zoom_ladder` | 0 | 0 | 0 |
 | `UI-015` Planetary Canvas > Terrain channels (composition hue + landform relief/glyph) | sub-element | `landform_relief`, `tile_texture`, `continents_terrain` | 0 | 0 | 0 |
 | `UI-017` Planetary Canvas > Road network render | sub-element | `roads` | 0 | 0 | 0 |
-| `UI-018` Planetary Canvas > Settlement markers (civic chrome) | sub-element | `settlement_labels`, `pop_markers` | 0 | 0 | 0 |
+| `UI-018` Planetary Canvas > Settlement markers (civic chrome) | sub-element | `settlement_labels`, `pop_markers`, `market_labels` | 0 | 0 | 0 |
 | `UI-023` Planetary Canvas > Placement-suitability surface | sub-element | `build_legibility`, `tile_build_ledger` | 0 | 0 | 0 |
 | `UI-024` Planetary Canvas > Construction placement ghost | sub-element | `construction_panel`, `build_walkthrough` | 0 | 0 | 0 |
 | `UI-046` Selection band > Body selection action/facts | sub-element | `descend_into_selection`, `selection_go_to` | 0 | 0 | 0 |

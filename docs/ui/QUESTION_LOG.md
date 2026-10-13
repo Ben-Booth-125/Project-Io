@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**63 surfaces** — 7 settled, 56 awaiting Ben's wording.
+**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
 
 ---
 
@@ -220,13 +220,13 @@ alphabetical order.
 
 *Demanded by BL-452, BL-453, BL-689 · `src/ui/convoys_ledger.cpp` · id `market_ledger_convoys`*
 
-### Market Ledger - nation presence row
+### Market Ledger - the market's top section (nation list + metrics)
 
-**Answers:** Which nations operate in this market?
+**Answers:** Which nations operate in this market, and how much moves through it each quarter?
 
-**Because:** The Body and Market combos name a place but say nothing about who is IN it, and a price is not readable without knowing whose ground feeds it -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things. It earns the space between the selectors and the tabs because it qualifies the market the combos just chose, before the tabs ask a question about it, and it costs one wrapped row. THESE ARE COLOUR CHIPS WITH INITIALS, NOT FLAGS, and that is deliberate: nation_colour is a palette entry and is all that exists -- corporations carry an emblem tag, nations do not -- so real per-nation emblem artwork would be a generated identity system, a feature of its own, and a single stubbed glyph would teach a vocabulary the game does not have. Placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is DERIVED, since no store answers it: a building sits on a tile, market_for_tile resolves that tile's catchment market (the same routing clear_markets uses), and tile_to_nation gives the owner -- so a nation appears exactly when its ground really clears here.
+**Because:** The Body and Market combos name a place but say nothing about who is IN it or how busy it is, and a price is not readable without both -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things, and so do a quiet board and a busy one. It earns ~2/7 of the column, between the selectors and the tabs, because it qualifies the market the combos just chose before the tabs ask a question about it (Ben, 2026-10-13, superseding the 2026-08-29 chip row). LEFT 3/5: one row per nation, its nation_colour swatch and FULL NAME, scrolling inside the section -- the initials chips asked the player to decode an identity a list can simply state; still no flags, since nation_colour is all that exists. Presence is DERIVED (no store answers it): a building sits on a tile, market_for_tile resolves its catchment market, tile_to_nation its owner, so a nation appears exactly when its ground clears here. RIGHT 2/5: Sold here, Traded in, Traded out, label over figure, VALUES per quarter because goods of different kinds do not add. Sold here is the exchange record's newest quarter of sale rows on this market (quantity x clearing price). Traded in and Traded out draw an em dash, its tooltip saying why: no record holds the value trades moved. A trade's goods travel as a convoy erased on arrival, and its purchase and landing fold into the exchange record beside every other shelf draw and landing, so the trade share cannot be told apart.
 
-*Demanded by BL-688 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
+*Demanded by BL-688, BL-1305 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
 
 ### Market Ledger - Trades tab (and the market Selection card's 'Trades' door onto it)
 
@@ -281,6 +281,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** The four dramatic landforms are the <=1.5% of land whose movement cost is x1.3 or worse, so an invisible one is an expensive surprise; a river is an edge that discounts travel one way and gates wells and farms. Both used to be vector chrome laid over the painted ground -- a stroke-only glyph on the hex centre, a straight centre-to-centre stroke with chevrons -- and read as annotation on a painting (Ben, 2026-10-08, the sprint 51 form: mountains and rivers blend into the render). Baked, the same facts read as terrain: a contiguous run is one range, one cut, one fissure; a river is one smooth course whose width says which way it flows, so the chevrons have nothing left to say. The hover card still names the landform and its cost.
 
 *Demanded by BL-1242 · `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp` · id `planetary_landforms_rivers`*
+
+### Planetary canvas - market labels (the market glyph on a market city's settlement label)
+
+**Answers:** Where is each market, and what is it called?
+
+**Because:** A market is named for the largest city in its catchment (MARKETS.md, BL-1303), but before this the only place that name could be read was the Market ledger's combo, which says nothing about WHERE the market is. The canvas already labels cities, so the market label IS that city's label marked with the market glyph (the three ascending bars the Market lens and the ledger's rail slot already draw) -- no second label, no new layer, same LOD and culling. A centre that names a market is labelled whatever its scale, since a market's naming city can be a town and its name would otherwise be drawn nowhere on the map.
+
+*Demanded by BL-1303, BL-1304 · `src/ui/body_surface_canvas.cpp`, `src/ui/market_ledger.cpp` · id `planetary_market_labels`*
 
 ### Roads and sea lanes (Planetary canvas, always-on: painted into the ground at every rung; drawn as strokes only under the Throughput lens)
 

@@ -67,16 +67,38 @@ struct goods_row_record
     float         name_needed = 0.0f;  ///< Px the full name needed at this font.
 };
 
-/// One chip of the nation presence row (BL-688), as drawn.
-struct nation_chip_record
+/// One row of the market top section's nation list (BL-1305; superseding BL-688's chips).
+struct nation_row_record
 {
-    entity_id   nation = null_entity;
-    std::string name;
-    std::string initials;
+    entity_id   nation     = null_entity;
+    std::string name;               ///< The nation's full name, as listed.
+    float       name_avail = 0.0f;  ///< Px the name column offered.
+    bool        elided     = false; ///< The name overran and was elided (tooltip carries it).
 };
 
-/// The nation presence row's chips as last drawn, in draw order.
-const std::vector<nation_chip_record>& nation_chips();
+/// The market's top section (BL-1305; ledgers/market.md § 2), as last drawn.
+struct market_top_record
+{
+    bool      drawn        = false;
+    entity_id market       = null_entity;
+    /// Sold here: value of the newest quarter's sale rows on this market in the
+    /// exchange record. `sold_known` is false only when the record is empty.
+    bool      sold_known   = false;
+    float     sold_here    = 0.0f;
+    int       quarter      = -1;    ///< The econ tick the figure is for.
+    /// Traded in / Traded out have no record behind them and draw "—".
+    bool      traded_known = false;
+    float     column_h     = 0.0f;  ///< The column's content height.
+    float     top_h        = 0.0f;  ///< The section's height (~2/7 of column_h).
+    float     legacy_row_h = 0.0f;  ///< What a ten-rows-to-the-view row took before the section.
+    float     goods_row_h  = 0.0f;  ///< The Goods row as drawn: max(frame, 0.4 x legacy).
+};
+
+/// The top section's nation list as last drawn, in draw order.
+const std::vector<nation_row_record>& nation_rows();
+
+/// The top section's metrics and layout as last drawn.
+const market_top_record& market_top();
 
 /// The Goods table's rows as last drawn, in draw order. Empty when the Goods view
 /// was not on screen.
@@ -218,10 +240,22 @@ const std::vector<exchange_row_record>& exchange_rows();
 /// The market the Trades tab last drew for (`null_entity` if it was not on screen).
 entity_id trades_market();
 
-/// The city name of a market — the population centre anchoring its `centre_tile`
-/// (`world::population_centre_name`), or the body name as a fallback when the market is
-/// unanchored / unnamed. This is the market/city identity shown in the ledger's second
-/// selector and emitted by the CSV export. See generation city naming.
+/// The name of a market (BL-1303; MARKETS.md § Market centres and seeding): the
+/// name of the largest population centre — by scale, then headcount, then lowest
+/// id — whose tile clears to it (`market_for_tile`); a market with no named centre
+/// in its catchment reads "<body> market N", N by ascending market id among the
+/// body's unnamed markets. Never the bare body name, so two markets on one body
+/// never share a name. Shown in the ledger's selector, every surface that names a
+/// market, and the CSV export. Cached against the econ tick.
 std::string market_city_name(const world& w, entity_id market_id);
+
+/// The population centre that names @p market_id (`market_city_name`'s rule), or
+/// `null_entity` when the market reads "<body> market N".
+entity_id market_naming_centre(const world& w, entity_id market_id);
+
+/// The reverse: the market @p centre names, or `null_entity` if it names none.
+/// The Planetary canvas marks such a centre's label with the market glyph
+/// (BL-1304; PLANETARY.md § Market labels).
+entity_id centre_named_market(const world& w, entity_id centre);
 
 } // namespace ui
