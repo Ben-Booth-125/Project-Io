@@ -616,6 +616,10 @@ bool app::same_world_params(const world_params& a, const world_params& b)
         && a.standing_army_sized_to_earn == b.standing_army_sized_to_earn
         && a.industry_points_per_1000_treasury_units == b.industry_points_per_1000_treasury_units
         && a.body_count == b.body_count
+        // BL-1279: the setup round's nation targets steer the history's lean
+        // and its reconciliation, so a world built under others is another world.
+        && a.nation_total_target == b.nation_total_target
+        && a.major_target == b.major_target
         && x.star == y.star && x.world_size == y.world_size && x.interior == y.interior
         && x.metal == y.metal && x.ocean == y.ocean && x.oxygen_story == y.oxygen_story
         && x.coal_basins == y.coal_basins && x.drawdown == y.drawdown

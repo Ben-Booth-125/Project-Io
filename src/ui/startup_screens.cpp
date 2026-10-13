@@ -121,11 +121,11 @@ void app::drop_wizard_slots(const char* why)
 const char* app::wizard_next_wait_reason(int round) const
 {
     if (!m_golden_dir.empty()) return nullptr; // --verify: every round adopts at once
-    if (round == wizard_planetology_round_count - 1)
+    if (round == wizard_life_round)
         return (m_wiz_surface_future.valid() || m_wiz_slot[0] == nullptr)
             ? "Waiting for the Life round's world to finish building."
             : nullptr;
-    const int i = round - wizard_planetology_round_count;
+    const int i = round - wizard_first_pass_round;
     if (i < 0 || i >= wizard_lapse_round_count - 1) return nullptr; // System; round 6 has Begin
     if (m_wiz_record_landed[i] && !m_wiz_history_future[i].valid()) return nullptr;
     static const char* const k_building[wizard_lapse_round_count - 1] = {
@@ -143,6 +143,8 @@ void app::open_new_world_wizard()
 {
     // Nothing is generated yet — the wizard runs on a throwaway preview and only
     // commits when the player reaches its last round and presses "Begin".
+    prime_wizard_setup();
+    m_wiz_quick_start = false;
     m_wiz_round = 0;
     m_wiz_dirty = true;
     m_screen    = app_screen::generating;
@@ -179,10 +181,176 @@ void app::open_new_world_wizard()
     m_pending_world_params.prehistory_years = 400;
 }
 
+void app::prime_wizard_setup()
+{
+    world_params& wp = m_pending_world_params;
+
+    // THE WIZARD OPENS ON A ROLLED SEED (BL-890; Ben, 2026-09-10). The
+    // default of 0 made every new game the same reference world unless the
+    // player thought to press Roll, which turns rerolling into a thing you
+    // must know to do rather than the ordinary way in. STARTUP.md carries
+    // the ruling.
+    //
+    // ROLLED ONCE, ON THE FIRST ENTRY INTO THE WIZARD (BL-1279 moved the seed
+    // off the menu onto the setup round; BL-890 rolled it on the menu's first
+    // draw). The latch keeps a seed the player typed, pasted or Rolled on the
+    // setup round across a trip back to the menu and in again. Rolled before
+    // the System round draws, because the System round's preview is already
+    // a function of the seed.
+    //
+    // THE ENTROPY STOPS HERE, exactly as the Roll button's does. world/*
+    // stays a pure function of the seed, so save, replay and the multiplayer
+    // argument are untouched; seed 0 still names the reference world.
+    //
+    // NOT UNDER --verify: a rolled seed would make each scripted run a
+    // different world. `m_golden_dir` non-empty is this file's own test for
+    // "a harness is driving".
+    if (!m_seed_rolled)
+    {
+        m_seed_rolled = true;
+        if (m_golden_dir.empty())
+        {
+            std::random_device rd_seed;
+            wp.seed = static_cast<uint32_t>(rd_seed());
+        }
+    }
+
+    // THE WIZARD ALWAYS SETS BOTH NATION TARGETS (BL-1279; STARTUP.md
+    // § Rounds; NATION_GENERATION.md § The nation count is a target). A field
+    // left 0 (unset) takes the wizard's default; a value the player already
+    // chose survives a trip back to the menu. Majors never exceed the total,
+    // so the pair is legal by construction rather than clamped afterwards.
+    if (wp.nation_total_target == 0)
+        wp.nation_total_target = wizard_default_nation_total;
+    if (wp.major_target == 0)
+        wp.major_target = std::min(wizard_default_major_target, wp.nation_total_target);
+}
+
+void app::open_quick_start()
+{
+    // QUICK START OPENS THE SETUP ROUND ALONE (BL-1279; STARTUP.md § Rounds,
+    // Ben 2026-10-13): the one place the world-wide inputs are set stays the
+    // only place, and Quick Start still skips every other round. Its Begin
+    // calls `quick_start`, the cold build.
+    prime_wizard_setup();
+    m_wiz_quick_start = true;
+    m_wiz_round       = wizard_setup_round;
+    m_wiz_dirty       = true;
+    m_screen          = app_screen::generating;
+    m_pending_world_params.prehistory_years = 400;
+}
+
+bool app::draw_wizard_setup_controls()
+{
+    world_params& wp = m_pending_world_params;
+    // A wizard entered without `prime_wizard_setup` (a verify script parking
+    // here directly) still shows a legal, set pair: the setup round is where
+    // both targets are always set. The seed latch is held so a draw never
+    // rolls a seed.
+    if (wp.nation_total_target == 0 || wp.major_target == 0)
+    {
+        const bool seed_was_rolled = m_seed_rolled;
+        m_seed_rolled = true;
+        prime_wizard_setup();
+        m_seed_rolled = seed_was_rolled;
+    }
+    bool changed = false;
+    const float w = ImGui::GetContentRegionAvail().x;
+
+    // ── The nation targets (NATION_GENERATION.md § The nation count is a
+    //    target): both always hit, by the history's own verbs. ──
+    ImGui::SeparatorText("Nations");
+    // CONSTRAINED, NEVER CLAMPED AFTER (nation_targets_valid): each slider's
+    // range is cut by the other, so no reachable position makes an illegal
+    // pair. AlwaysClamp holds a Ctrl+click typed value inside the same range.
+    {
+        int total = wp.nation_total_target;
+        const int lo = std::max(1, wp.major_target);
+        ImGui::TextUnformatted("Total");
+        ImGui::SetNextItemWidth(w);
+        if (ImGui::SliderInt("##setup_total", &total, lo, nation_total_target_max,
+                             "%d nations", ImGuiSliderFlags_AlwaysClamp))
+        {
+            wp.nation_total_target = total;
+            changed = true;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Nations alive on the homeworld when generation ends.\n"
+                              "At least the majors, at most %d.", nation_total_target_max);
+    }
+    {
+        int majors = wp.major_target;
+        const int hi = std::min(major_target_max, wp.nation_total_target);
+        ImGui::TextUnformatted("Majors");
+        ImGui::SetNextItemWidth(w);
+        if (ImGui::SliderInt("##setup_majors", &majors, 1, hi,
+                             "%d major nations", ImGuiSliderFlags_AlwaysClamp))
+        {
+            wp.major_target = majors;
+            changed = true;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Nations holding a champion when generation ends.\n"
+                              "1 to %d, and never more than the total.", major_target_max);
+    }
+    IM_ASSERT(nation_targets_valid(wp));
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
+        ImGui::TextWrapped("Both are always hit: the history reaches them by conquest, "
+                           "secession and the chartering of champions, never by fiat.");
+        ImGui::PopStyleColor();
+    }
+
+    // ── The seed — hex entry + a one-shot randomise. The random_device draw
+    //    feeds ONLY the seed value; no entropy ever enters world generation,
+    //    which stays a pure function of this seed (same seed + knobs ->
+    //    identical world). Moved here from the menu (Ben, 2026-10-11). ──
+    ImGui::SeparatorText("Seed");
+    {
+        const float roll_w = 64.0f;
+        ImGui::SetNextItemWidth(std::max(80.0f, w - roll_w - ImGui::GetStyle().ItemSpacing.x));
+        if (ImGui::InputScalar("##seed", ImGuiDataType_U32, &wp.seed, nullptr, nullptr,
+                               "%08X", ImGuiInputTextFlags_CharsHexadecimal))
+            changed = true;
+        ImGui::SameLine();
+        if (ImGui::Button("Roll##seedroll", {roll_w, 0.0f}))
+        {
+            std::random_device rd;
+            wp.seed = static_cast<uint32_t>(rd());
+            changed = true;
+        }
+        // Copyable readout of the reproducible key.
+        char seedhex[16];
+        std::snprintf(seedhex, sizeof seedhex, "%08X", wp.seed);
+        if (ImGui::Button("Copy seed##seedcopy", {w, 0.0f}))
+            ImGui::SetClipboardText(seedhex);
+    }
+
+    // ── Resource abundance — Earth-like 'Standard' is the ceiling; the leaner
+    //    tiers step down (GENERATION_STRATEGY.md § The resource ceiling). ──
+    ImGui::SeparatorText("Resources");
+    {
+        int ab = static_cast<int>(wp.abundance);
+        const int before = ab;
+        ImGui::RadioButton("Sparse##ab",   &ab, static_cast<int>(abundance_level::sparse));
+        ImGui::SameLine();
+        ImGui::RadioButton("Lean##ab",     &ab, static_cast<int>(abundance_level::lean));
+        ImGui::SameLine();
+        ImGui::RadioButton("Standard##ab", &ab, static_cast<int>(abundance_level::standard));
+        if (ab != before)
+        {
+            wp.abundance = static_cast<abundance_level>(ab);
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 void app::quick_start()
 {
-    // QUICK START (STARTUP.md § Main menu; Ben, 2026-10-08): the menu's seed
-    // and resources, straight through with no wizard round drawn. It is NOT a
+    // QUICK START (STARTUP.md § Main menu; Ben, 2026-10-08): the setup round's
+    // seed, resources and nation targets (BL-1279), straight through with no
+    // other wizard round drawn. It is NOT a
     // second generation path: it is Begin with no wizard behind it, so
     // begin_new_game takes its cold case (launch_cold_build --
     // make_hard_coded_world, then finish_campaign_world, the call round 6
@@ -193,8 +361,11 @@ void app::quick_start()
     // The wizard's one write on the way in is made here too, so the
     // parameters Begin consumes are the ones the wizard would have handed it.
     m_pending_world_params.prehistory_years = 400;
-    std::printf("[quick start] seed %08X: building cold, no wizard rounds\n",
-                m_pending_world_params.seed);
+    m_wiz_quick_start = false;
+    std::printf("[quick start] seed %08X, targets %d nations / %d majors: building cold, "
+                "no other wizard rounds\n",
+                m_pending_world_params.seed, m_pending_world_params.nation_total_target,
+                m_pending_world_params.major_target);
     std::fflush(stdout);
     begin_new_game();
 }
@@ -571,7 +742,7 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
     if (!adopt && wizard_any_round_running())
     {
         std::printf("[wizard] round %d waits: another round's run is still in flight\n",
-                    lapse_index + wizard_planetology_round_count + 1);
+                    lapse_index + wizard_first_pass_round + 1);
         std::fflush(stdout);
         return;
     }
@@ -610,7 +781,7 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         // partial, and the landing re-pins this round from the whole.
         if (m_wiz_record_landed[lapse_index - 1])
             derive_lapse_for_handover(m_wiz_history[lapse_index - 1],
-                                      lapse_index - 1 + wizard_planetology_round_count + 1,
+                                      lapse_index - 1 + wizard_first_pass_round + 1,
                                       m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& prev = m_wiz_history[lapse_index - 1];
         if (prev.empty()) return;
@@ -732,7 +903,7 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         start_from = "a replay from the held Life gate";
     }
     std::printf("[wizard] round %d starts from %s\n",
-                lapse_index + wizard_planetology_round_count + 1, start_from);
+                lapse_index + wizard_first_pass_round + 1, start_from);
     std::fflush(stdout);
 
     // A replay from the params needs the parsed config; Lua and the works table
@@ -793,7 +964,7 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         const auto stopped = [&]() {
             if (!cancel->load(std::memory_order_relaxed)) return false;
             std::printf("[wizard] round %d's superseded run stops at a stage boundary\n",
-                        lapse_index + wizard_planetology_round_count + 1);
+                        lapse_index + wizard_first_pass_round + 1);
             std::fflush(stdout);
             return true;
         };
@@ -997,7 +1168,7 @@ void app::reroll_wizard_pass_round(int pass_index)
     // own page with its own run and reroll.
     ++m_wiz_pass_roll[pass_index];
     m_wiz_pass_current[pass_index] = false; // re-run, not yet accepted
-    invalidate_wizard_rounds_below(wizard_planetology_round_count + pass_index);
+    invalidate_wizard_rounds_below(wizard_first_pass_round + pass_index);
     // A lapse round rerolls by RE-RUNNING its pass, not by re-drawing
     // a cached one (STARTUP.md § Each pass round is rerollable) —
     // which is the whole reason the wait had to be worth watching
@@ -1020,7 +1191,7 @@ void app::reroll_wizard_pass_round(int pass_index)
             if (m_wiz_run_cancel[lapse_index])
                 m_wiz_run_cancel[lapse_index]->store(true, std::memory_order_relaxed);
             std::printf("[wizard] round %d rerolled mid-run: its run is superseded and reruns "
-                        "once it lands\n", lapse_index + wizard_planetology_round_count + 1);
+                        "once it lands\n", lapse_index + wizard_first_pass_round + 1);
             std::fflush(stdout);
         }
         // A DIFFERENT AGE OVER THE SAME GROUND (Ben, 2026-09-09:
@@ -1216,7 +1387,7 @@ void app::poll_wizard_history()
             m_wiz_record_landed[i]   = false;
             m_wiz_history_playing[i] = false;
             std::printf("[wizard world] round %d's run went stale mid-run: record and world "
-                        "dropped on landing\n", i + wizard_planetology_round_count + 1);
+                        "dropped on landing\n", i + wizard_first_pass_round + 1);
             std::fflush(stdout);
             continue;
         }
@@ -1226,7 +1397,7 @@ void app::poll_wizard_history()
             // after it starts from, and what Back returns to.
             m_wiz_slot[i + 1] = std::move(landed.slot);
             std::printf("[wizard world] round %d landed; its closing world is held (slot %d)\n",
-                        i + wizard_planetology_round_count + 1, i + 1);
+                        i + wizard_first_pass_round + 1, i + 1);
             std::fflush(stdout);
             // BL-1246: A ROUND BOUNDARY. The worker has returned and the slot
             // is the main thread's (the next round will copy it, never write
@@ -1236,7 +1407,7 @@ void app::poll_wizard_history()
             {
                 char what[64];
                 std::snprintf(what, sizeof what, "round %d landed",
-                              i + wizard_planetology_round_count + 1);
+                              i + wizard_first_pass_round + 1);
                 ground_round_boundary(m_wiz_slot[i + 1]->cursor.w, what);
             }
             land_wizard_record(i, std::move(landed.record));
@@ -1276,12 +1447,12 @@ void app::poll_wizard_history()
     // wizard would.
     if ((m_golden_dir.empty() || m_wiz_live_verify) && m_screen == app_screen::generating)
     {
-        const int cur = m_wiz_round - wizard_planetology_round_count;
+        const int cur = m_wiz_round - wizard_first_pass_round;
         if (cur >= 0 && cur < wizard_lapse_round_count && !m_wiz_record_landed[cur]
             && !wizard_any_round_running() && !m_wiz_surface_future.valid())
         {
             std::printf("[wizard] starting round %d now that nothing else is building\n",
-                        cur + wizard_planetology_round_count + 1);
+                        cur + wizard_first_pass_round + 1);
             std::fflush(stdout);
             launch_wizard_history_run(cur, m_wiz_live_verify);
         }
@@ -1315,7 +1486,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
         // record. Only a LANDED predecessor — a running one is partial.
         if (m_wiz_record_landed[i - 1])
             derive_lapse_for_handover(m_wiz_history[i - 1],
-                                      i - 1 + wizard_planetology_round_count + 1,
+                                      i - 1 + wizard_first_pass_round + 1,
                                       m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& prev = m_wiz_history[i - 1];
         const int prev_end = prev.lapse.start_year + prev.lapse.years;
@@ -1379,7 +1550,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
     if (i + 1 < wizard_lapse_round_count
         && !m_wiz_history[i].owners_are_cultures)
     {
-        derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+        derive_lapse_for_handover(m_wiz_history[i], i + wizard_first_pass_round + 1,
                                   m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& prev = m_wiz_history[i];
         ui::history_lapse&       nxt  = m_wiz_history[i + 1];
@@ -1391,7 +1562,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
         nxt.lane_carry = ui::lapse_lanes_at_close(prev); // and the sea lanes
         nxt.tile_region.clear();
         std::printf("[identity] round %d re-pinned from round %d's landing (it was already open)\n",
-                    i + 1 + wizard_planetology_round_count + 1, i + wizard_planetology_round_count + 1);
+                    i + 1 + wizard_first_pass_round + 1, i + wizard_first_pass_round + 1);
         std::fflush(stdout);
     }
 
@@ -1561,81 +1732,16 @@ void app::draw_main_menu()
         centre_text(tag,   IM_COL32(120, 128, 145, 255));
         ImGui::Dummy({0.0f, 18.0f});
 
-        // --- New World setup (BL-114). Every widget edits m_pending_world_params,
-        //     which the wizard continues to edit and start_new_game() finally
-        //     consumes; each carries a unique ##id so it never collides with the
-        //     centred buttons below. ---
-        world_params& wp = m_pending_world_params;
+        // --- New World (BL-114). The menu sets no world input any more: every
+        //     one is set in the wizard, which edits m_pending_world_params and
+        //     start_new_game() finally consumes. ---
         ImGui::SeparatorText("New World");
 
-        // THE MENU OPENS ON A ROLLED SEED (BL-890; Ben, 2026-09-10). The
-        // default of 0 made every new game the same reference world unless the
-        // player thought to press Roll, which turns rerolling into a thing you
-        // must know to do rather than the ordinary way in. STARTUP.md carries
-        // the ruling.
-        //
-        // ROLLED HERE, AND ONCE, FOR TWO REASONS THE LIVE CHECK FOUND. Rolling
-        // per frame would make the field impossible to type into. Rolling when
-        // the WIZARD opens -- the first place this was tried -- silently threw
-        // away a seed the player had just typed or pasted into this very field,
-        // because New Game runs that path on the way out of this screen. The
-        // latch keeps the draw idempotent: the number is fresh on arrival and
-        // is then the player's.
-        //
-        // THE ENTROPY STOPS HERE, exactly as the Roll button's below already
-        // does. world/* stays a pure function of the seed, so save, replay and
-        // the multiplayer argument are untouched; seed 0 still names the
-        // reference world, it is simply no longer what you get by accident.
-        //
-        // NOT UNDER --verify. Every scripted capture reaches this menu, and a
-        // rolled seed would make each run a different world and turn the visual
-        // suite non-deterministic. `m_golden_dir` non-empty is this file's own
-        // test for "a harness is driving".
-        if (!m_seed_rolled)
-        {
-            m_seed_rolled = true;
-            if (m_golden_dir.empty())
-            {
-                std::random_device rd_seed;
-                wp.seed = static_cast<uint32_t>(rd_seed());
-            }
-        }
-
-        // Seed — hex entry + a one-shot randomise. The random_device draw feeds ONLY
-        // the seed value; no entropy ever enters world generation, which stays a pure
-        // function of this seed (same seed + knobs -> identical world).
-        ImGui::TextUnformatted("Seed");
-        ImGui::SetNextItemWidth(210.0f);
-        ImGui::InputScalar("##seed", ImGuiDataType_U32, &wp.seed, nullptr, nullptr,
-                           "%08X", ImGuiInputTextFlags_CharsHexadecimal);
-        ImGui::SameLine();
-        if (ImGui::Button("Roll##seedroll", {64.0f, 0.0f}))
-        {
-            std::random_device rd;
-            wp.seed = static_cast<uint32_t>(rd());
-        }
-        {
-            // Copyable readout of the reproducible key.
-            char seedhex[16];
-            std::snprintf(seedhex, sizeof seedhex, "%08X", wp.seed);
-            if (ImGui::Button("Copy seed##seedcopy", {280.0f, 0.0f}))
-                ImGui::SetClipboardText(seedhex);
-        }
-
-        // Resource abundance — Earth-like 'Standard' is the ceiling; the leaner tiers
-        // step down (GENERATION_STRATEGY.md § The resource ceiling).
-        ImGui::TextUnformatted("Resources");
-        int ab = static_cast<int>(wp.abundance);
-        ImGui::RadioButton("Sparse##ab",   &ab, static_cast<int>(abundance_level::sparse));
-        ImGui::SameLine();
-        ImGui::RadioButton("Lean##ab",     &ab, static_cast<int>(abundance_level::lean));
-        ImGui::SameLine();
-        ImGui::RadioButton("Standard##ab", &ab, static_cast<int>(abundance_level::standard));
-        wp.abundance = static_cast<abundance_level>(ab);
-
-        // No nation knob: the number of nations on the home body is a consequence of
-        // its landmass and the minimum-viable-territory floor, not a pre-set target
-        // (docs/generation/NATION_GENERATION.md § Pass 1 / Pass 2c).
+        // THE SEED AND THE ABUNDANCE MOVED TO THE WIZARD'S SETUP ROUND
+        // (BL-1279; Ben, 2026-10-11; STARTUP.md § Rounds), with the nation
+        // targets: the inputs that shape the whole world are set in one place,
+        // and New Game and Quick Start both pass through it. The seed's
+        // once-only roll moved with it (`prime_wizard_setup`).
 
         // Bodies — the count knob is phased to a later update; shown disabled so the
         // intent reads without implying it works yet.
@@ -1666,10 +1772,10 @@ void app::draw_main_menu()
             open_new_world_wizard();
         ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quick Start", btn))
-            quick_start();
+            open_quick_start();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Build this seed's world straight through, past the rounds,\n"
-                              "and choose your corporation.");
+            ImGui::SetTooltip("Set the nations, seed and resources, then build the world\n"
+                              "straight through, past the rounds, and choose your corporation.");
         ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quit", btn))
             m_quit_requested = true;
@@ -1723,6 +1829,12 @@ namespace {
 constexpr int planetology_rounds = 2;  // System, Life (BL-863)
 constexpr int pass_rounds        = 4;  // Culture, Empires, Exploration, Industrialisation (BL-946)
 constexpr int lapse_rounds       = 4;  // every pass round replays a real record (BL-1068)
+// BL-1279: the setup round sits between System and Life, so Life is wizard
+// round 2 and the pass rounds start at 3.
+constexpr int setup_round        = 1;
+constexpr int life_round         = 2;
+constexpr int first_pass_round   = 3;
+constexpr int empires_round      = first_pass_round + 1;
 
 /// Empires' historical-turbulence caption, shared between the layout-height
 /// estimate below and the actual draw call in the round switch, so the two
@@ -1749,13 +1861,13 @@ constexpr const char* kTurbulenceCaption =
 int round_pref_count(int r)
 {
     if (r == 0) return 4;
-    if (r == 1) return 4;
-    if (r == 3) return 1;
-    return 0;
+    if (r == life_round) return 4;
+    if (r == empires_round) return 1;
+    return 0; // the setup round draws its controls in the charts child
 }
 int round_note_lines(int r)
 {
-    if (r == 1) return 3; ///< B carries the iron/coal caption.
+    if (r == life_round) return 3; ///< B carries the iron/coal caption.
     if (r == 0) return 1;
     // Empires' turbulence caption is far longer than a fixed line count can
     // safely predict, so its height is measured directly against
@@ -1775,11 +1887,15 @@ struct wizard_round_head
 
 wizard_round_head wizard_round_head_at(int r)
 {
-    if (r < planetology_rounds)
+    if (r == 0 || r == life_round)
     {
-        const ui::chain_round& cr = ui::chain_round_at(r);
+        const ui::chain_round& cr = ui::chain_round_at(r == life_round ? 1 : 0);
         return { cr.name, cr.question };
     }
+    // BL-1279: THE SETUP ROUND (STARTUP.md § Rounds, Ben 2026-10-10/11) --
+    // the inputs that shape the whole world rather than one round's subject.
+    if (r == setup_round)
+        return { "Setup", "How many nations will this world hold, and from which seed?" };
     static const wizard_round_head passes[pass_rounds] = {
         // THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). Round 4 used to fuse
         // the peopling of the world with the empires that followed, and that cut
@@ -1817,7 +1933,7 @@ wizard_round_head wizard_round_head_at(int r)
           // (docs/generation/INDUSTRIALISATION.md).
           "What does that ground produce, and who trades it?" },
     };
-    int i = r - planetology_rounds;
+    int i = r - first_pass_round;
     if (i < 0)             i = 0;
     if (i >= pass_rounds)  i = pass_rounds - 1;
     return passes[i];
@@ -1927,6 +2043,8 @@ void app::draw_generation_screen()
     // Clamp first — Back/Continue and verify.generation_stage all write this.
     if (m_wiz_round < 0)                   m_wiz_round = 0;
     if (m_wiz_round >= wizard_round_count) m_wiz_round = wizard_round_count - 1;
+    // BL-1279: Quick Start draws the setup round alone (STARTUP.md § Rounds).
+    if (m_wiz_quick_start) m_wiz_round = wizard_setup_round;
 
     // Recompute only when a control moved. Resolution plus the chain is cheap but
     // not free, and a cached preview keeps the charts still while the player reads
@@ -1937,7 +2055,7 @@ void app::draw_generation_screen()
         m_wiz_dirty = false;
         // The planetology chain just moved, so both pass rounds are stale: the
         // history runs ON this world. Causality flows one way, downstream only.
-        invalidate_wizard_rounds_below(wizard_planetology_round_count - 1);
+        invalidate_wizard_rounds_below(wizard_life_round);
     }
     if (m_wiz_preview.empty())
         return; // defensive: the preview is the wizard's only data source
@@ -1967,19 +2085,28 @@ void app::draw_generation_screen()
     // hands to chain_round_at has an entry.
     static_assert(ui::chain_round_count >= wizard_planetology_round_count,
                   "the chart chain must cover at least the wizard's planetology rounds");
-    static_assert(wizard_planetology_round_count < wizard_round_count,
-                  "the planetology rounds are a strict prefix of the wizard's rounds");
+    static_assert(wizard_is_planetology(wizard_system_round)
+                      && wizard_is_planetology(wizard_life_round)
+                      && !wizard_is_planetology(wizard_setup_round)
+                      && wizard_life_round < wizard_first_pass_round
+                      && wizard_first_pass_round < wizard_round_count,
+                  "System, setup and Life precede the pass rounds (BL-1279)");
     static_assert(planetology_rounds == wizard_planetology_round_count
                       && pass_rounds == wizard_pass_round_count
                       && lapse_rounds == wizard_lapse_round_count,
                   "the file-local round-count mirrors must track app's constants");
+    static_assert(setup_round == wizard_setup_round && life_round == wizard_life_round
+                      && first_pass_round == wizard_first_pass_round,
+                  "the file-local round-index mirrors must track app's constants (BL-1279)");
     static_assert(wizard_lapse_round_count <= wizard_pass_round_count,
                   "the lapse rounds are a prefix of the pass rounds");
 
     // Which kind of round is on screen. The planetology rounds preview a pure chain
     // per keystroke; the pass rounds cannot (STARTUP.md § The wait, then the lapse).
-    const bool planetology_round = (m_wiz_round < wizard_planetology_round_count);
-    const int  pass_index        = m_wiz_round - wizard_planetology_round_count;
+    const bool planetology_round = wizard_is_planetology(m_wiz_round);
+    // BL-1279: the setup round -- neither planetology nor pass.
+    const bool setup_round       = (m_wiz_round == wizard_setup_round);
+    const int  pass_index        = m_wiz_round - wizard_first_pass_round;
 
     // ── A LAPSE ROUND'S playback, advanced once per frame and read TWICE — the
     //    board on the left and the map on the right must show the same instant, so
@@ -1987,7 +2114,8 @@ void app::draw_generation_screen()
     //    (Culture, Empires, Exploration, Industrialisation) are all lapse rounds
     //    and each owns its own record slot (BL-946, BL-1068). ──
     const bool lapse_round =
-        (!planetology_round && pass_index < wizard_lapse_round_count);
+        (!planetology_round && !setup_round && pass_index >= 0
+         && pass_index < wizard_lapse_round_count);
     const int  lapse_index = lapse_round ? pass_index : 0;
     // BL-914: pull whatever the round's own worker has published so far,
     // BEFORE the empty() check below — this is what turns "empty until the
@@ -2170,7 +2298,12 @@ void app::draw_generation_screen()
             // draw list rather than by swapping fonts (there is no second font).
             dl->AddText(ImGui::GetFont(), big, p, col_bright, wr.name); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
-            std::snprintf(buf, sizeof buf, "Round %d of %d", m_wiz_round + 1, wizard_round_count);
+            // BL-1279: Quick Start shows the setup round alone, so it counts
+            // no rounds -- it names the path it is on instead.
+            if (m_wiz_quick_start)
+                std::snprintf(buf, sizeof buf, "Quick Start");
+            else
+                std::snprintf(buf, sizeof buf, "Round %d of %d", m_wiz_round + 1, wizard_round_count);
             const ImVec2 ts = ImGui::CalcTextSize(buf);
             dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
@@ -2180,6 +2313,8 @@ void app::draw_generation_screen()
 
         // One pip per wizard round, the current one lit: past rounds filled dim,
         // future ones hollow. Drives off wizard_round_count, so it grew with it.
+        // None under Quick Start, which walks no rounds (BL-1279).
+        if (!m_wiz_quick_start)
         {
             ImDrawList*  dl = ImGui::GetWindowDrawList();
             const ImVec2 p  = ImGui::GetCursorScreenPos();
@@ -2214,7 +2349,7 @@ void app::draw_generation_screen()
         // measured rather than guessed (BL-904): it runs to five sentences,
         // well past what a fixed line count could safely predict at every
         // column width the wizard can be shown at.
-        if (m_wiz_round == 3)
+        if (m_wiz_round == empires_round)
             decide_h += ImGui::CalcTextSize(kTurbulenceCaption, nullptr, false,
                                              ImGui::GetContentRegionAvail().x).y
                       + style.ItemSpacing.y
@@ -2241,10 +2376,19 @@ void app::draw_generation_screen()
         // roll made interesting.
         if (planetology_round)
         {
-            const ui::chain_round& cr = ui::chain_round_at(m_wiz_round);
+            const ui::chain_round& cr = ui::chain_round_at(wizard_chain_round(m_wiz_round));
             for (int s = static_cast<int>(cr.first); s <= static_cast<int>(cr.last); ++s)
                 ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
                                     detail_surface::generation_stage);
+        }
+        else if (setup_round)
+        {
+            // BL-1279: the setup round's controls. A move here is a move of
+            // the world's inputs, so it takes the planetology's own dirty path
+            // -- the preview re-runs, the Life gate world rebuilds, and every
+            // pass round below is invalidated (rounds are causal downward).
+            if (draw_wizard_setup_controls())
+                m_wiz_dirty = true;
         }
         else if (lapse_round)
         {
@@ -2532,7 +2676,7 @@ void app::draw_generation_screen()
                              "Metal-poor", "Normal", "Metal-rich"))                  m_wiz_dirty = true;
                 break;
 
-            case 1:
+            case life_round:
                 if (lean_row("ocean", "Ocean", pf.ocean,
                              "Continental", "Balanced", "Oceanic"))                  m_wiz_dirty = true;
                 if (lean_row("oxygen", "Oxygen", pf.oxygen_story,
@@ -2567,7 +2711,7 @@ void app::draw_generation_screen()
             // names, targets or corrects a number of realms. A calm world that
             // fragments anyway is a correct calm world. See
             // `world/history_sim.hpp` sec THE HISTORICAL TURBULENCE LEAN.
-            case 3:
+            case empires_round:
                 if (turbulence_row(pf.history_turbulence))
                 {
                     // THE LEAN'S OWN DIRTY PATH (BL-1083; STARTUP.md § Each pass
@@ -2649,12 +2793,23 @@ void app::draw_generation_screen()
             dim_text("These peoples follow the ground. Reroll the Life round to change them.");
             ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
         }
+        // BL-1279: THE SETUP ROUND CARRIES NO REROLL EITHER. Its random draw is
+        // the seed's own Roll, above; a second button beside it would be the
+        // same press under another name. The row holds its height, as Culture's.
+        else if (setup_round)
+        {
+            const float row_y = ImGui::GetCursorPosY();
+            dim_text(m_wiz_quick_start
+                         ? "Begin builds this world straight through to the seat."
+                         : "A change here rebuilds every round from Life on.");
+            ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
+        }
         // Reroll full-width and first — it is the wizard's main verb now.
         else if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
         {
             if (planetology_round)
             {
-                ++pf.roll[m_wiz_round];
+                ++pf.roll[wizard_chain_round(m_wiz_round)];
                 m_wiz_dirty = true;
             }
             else
@@ -2668,8 +2823,10 @@ void app::draw_generation_screen()
         const float half = (bar_w - style.ItemSpacing.x) * 0.5f;
         if (ImGui::Button("Back##wizback", {half, 34.0f}))
         {
-            if (m_wiz_round == 0)
+            // BL-1279: Quick Start's one round steps straight back to the menu.
+            if (m_wiz_round == 0 || m_wiz_quick_start)
             {
+                m_wiz_quick_start = false;
                 m_screen = app_screen::menu;
                 // BL-1073: re-entering the wizard re-runs the chain and every
                 // round below it, so a held world can never be adopted from
@@ -2694,10 +2851,13 @@ void app::draw_generation_screen()
         // pass rounds ever build at once. Begin keeps its own rule -- pressed
         // while round 6 builds, it waits on that worker behind the loading
         // screen (STARTUP.md § Handoff).
-        const char* const next_waits = last ? nullptr : wizard_next_wait_reason(m_wiz_round);
+        // BL-1279: under Quick Start the setup round is the last round drawn,
+        // so its press is Begin, and Begin builds cold (STARTUP.md § Rounds).
+        const bool commits = last || m_wiz_quick_start;
+        const char* const next_waits = commits ? nullptr : wizard_next_wait_reason(m_wiz_round);
         if (next_waits != nullptr) ImGui::BeginDisabled();
         const bool next_pressed =
-            ImGui::Button(last ? "Begin##wizgo" : "Next##wizgo", {half, 34.0f});
+            ImGui::Button(commits ? "Begin##wizgo" : "Next##wizgo", {half, 34.0f});
         if (next_waits != nullptr)
         {
             ImGui::EndDisabled();
@@ -2706,7 +2866,9 @@ void app::draw_generation_screen()
         }
         if (next_pressed)
         {
-            if (last)
+            if (m_wiz_quick_start)
+                quick_start();
+            else if (last)
                 begin_new_game(); // async since 2026-08-12 — see app::begin_new_game
             else
             {
@@ -2727,7 +2889,7 @@ void app::draw_generation_screen()
                 // THAT round, so stepping Back and forward again does not throw
                 // away a finished record and re-run it (BL-1084: nor its world --
                 // Back then Next recomputes nothing).
-                const int arrived = m_wiz_round - wizard_planetology_round_count;
+                const int arrived = m_wiz_round - wizard_first_pass_round;
                 if (arrived >= 0 && arrived < wizard_lapse_round_count
                     && !m_wiz_record_landed[arrived]
                     && !m_wiz_history_future[arrived].valid())
@@ -2889,11 +3051,13 @@ void app::draw_generation_screen()
                 }
             }
         }
-        else if (m_wiz_round == 0)
+        else if (m_wiz_round == 0 || setup_round)
         {
             // Round 1, System: the drawing of the system -- star colour and size,
             // orbits, body sizes -- so the pane is never empty while there is no
-            // body yet (STARTUP.md § The Life map).
+            // body yet (STARTUP.md § The Life map). Round 2, Setup, keeps it
+            // (BL-1279): nothing is built before Life, and a new seed is seen
+            // here at once.
             std::vector<ui::preview_body> pv;
             pv.reserve(static_cast<std::size_t>(n_bodies));
             for (int i = 0; i < n_bodies; ++i)
@@ -2908,7 +3072,7 @@ void app::draw_generation_screen()
         }
         else
         {
-            // Round 2, Life: the homeworld as the 2D map, the primary view.
+            // Round 3, Life: the homeworld as the 2D map, the primary view.
             draw_life_map(home_name, std::string{});
         }
         ImGui::EndChild();
@@ -2937,10 +3101,10 @@ void app::draw_generation_screen()
             // gate world, and Next now waits for it -- rerolling on every dwell
             // would keep the gate building forever and the walk would never
             // leave the round.
-            if (m_wiz_round < wizard_planetology_round_count
+            if (wizard_is_planetology(m_wiz_round)
                 && m_autostart_rerolled_round != m_wiz_round)
             {
-                ++m_pending_world_params.preferences.roll[m_wiz_round];
+                ++m_pending_world_params.preferences.roll[wizard_chain_round(m_wiz_round)];
                 m_wiz_dirty = true;
                 m_autostart_rerolled_round = m_wiz_round;
             }
@@ -2972,7 +3136,7 @@ void app::draw_generation_screen()
             if (m_autostart_round_t0 == std::chrono::steady_clock::time_point{})
                 m_autostart_round_t0 = std::chrono::steady_clock::now();
             bool dwelling =
-                dwell_ms > 0 && m_wiz_round >= wizard_planetology_round_count
+                dwell_ms > 0 && m_wiz_round >= wizard_first_pass_round
                 && std::chrono::steady_clock::now() - m_autostart_round_t0
                        < std::chrono::milliseconds(dwell_ms);
             // IO_AUTOSTART_BEGIN_DWELL_MS: Begin is held this long after round
@@ -3005,13 +3169,13 @@ void app::draw_generation_screen()
                 // round); on a lapse round the Next press never dirties, and a
                 // dirty flag there re-runs the chain, which invalidates every
                 // lapse round below it and drops round 6's slot mid-build.
-                if (m_wiz_round < wizard_planetology_round_count)
+                if (m_wiz_round < wizard_first_pass_round)
                     m_wiz_dirty = true;
                 // ARRIVING ON A LAPSE ROUND STARTS ITS RUN, here as on the Next
                 // press above (BL-1085): the walk used to skip the handler, so
                 // no round ever ran and Begin always built cold -- the one
                 // path the item exists to retire. Same guard as the press.
-                const int arrived = m_wiz_round - wizard_planetology_round_count;
+                const int arrived = m_wiz_round - wizard_first_pass_round;
                 if (arrived >= 0 && arrived < wizard_lapse_round_count
                     && !m_wiz_record_landed[arrived]
                     && !m_wiz_history_future[arrived].valid())
@@ -3182,7 +3346,7 @@ bool app::pin_realm_colours_from_wizard(const generation_report* rep)
         if (!m_wiz_record_landed[i]) continue;
         // A landed round the player never drew is derived here as at the
         // hand-over: its slots are the derivation's.
-        derive_lapse_for_handover(m_wiz_history[i], i + wizard_planetology_round_count + 1,
+        derive_lapse_for_handover(m_wiz_history[i], i + wizard_first_pass_round + 1,
                                   m_wiz_surface, m_wiz_terrain);
         const ui::history_lapse& h = m_wiz_history[i];
         if (h.empty() || !h.derived() || h.owners_are_cultures || h.polity_slot.empty()) continue;
@@ -3200,7 +3364,7 @@ bool app::pin_realm_colours_from_wizard(const generation_report* rep)
             std::printf("[identity] the wizard's round %d record is not this world's "
                         "(start %d, %d years, %d regions, %zu realms named): its realm table "
                         "is not used; the report's own derivation stands\n",
-                        i + wizard_planetology_round_count + 1, h.lapse.start_year, h.lapse.years,
+                        i + wizard_first_pass_round + 1, h.lapse.start_year, h.lapse.years,
                         h.lapse.region_stride, h.lapse.polity_name.size());
             std::fflush(stdout);
             return false;
