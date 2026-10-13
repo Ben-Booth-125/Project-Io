@@ -649,6 +649,13 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // are the struct's (history_sim.hpp says what each costs).
     hp.world_war_target = true;
 
+    // BL-1294 (Ben, 2026-10-10/12; INDUSTRIALISATION.md sec Revolution): THE
+    // REVOLUTION LEAN, this span's alone -- it overturns, here and nowhere
+    // else, the Empires rule that no regime resets while the map stands still.
+    // The bar and the pressure are the struct's (history_sim.hpp says how
+    // each reads); a lean, so no backstop rides with it.
+    hp.revolution_lean = true;
+
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).
     return hp;

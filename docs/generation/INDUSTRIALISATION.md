@@ -611,12 +611,16 @@ every fuel read takes the survey, so every reader agrees about who has coal.
 
 | Sink | What it buys | Feeds |
 |---|---|---|
-| **Rail** | The road ladder's next rung, on corridors from the city | Property 7 — cheaper long hauls on land |
+| **Rail** | Track on the realm's busiest corridors from the city, a station at each city served — a network of its own, entered at stations (Ben, 2026-10-13, superseding "the road ladder's next rung"; `../economy/LOGISTICS.md` § 4c) | Property 7 — cheaper long hauls on land |
 | **Mechanised force** | Army and navy stock built from industry rather than treasury | Property 3 and beat 3's wars; property 6's garrisons |
 | **Works** | Raises the city's own yield next round | Concentration, which is what makes properties 5 and 7 uneven |
 
 **Spending and stockpiling are one choice: the state now, or firms later.** At 1960 each city's
 stockpile becomes its charter budget (property 1).
+
+**Who lays rail (Ben, 2026-10-13):** realms that lean into works spend treasury laying track on their
+busiest corridors from the city, with a station at each city a line serves; the track and stations
+pass to the nation at the fold as state industry (a major's) or to background firms (a minor's).
 
 **The works lean: some polities spend into rail and force, others stockpile and charter.** That is
 a derived disposition, not a flag, and it is why two equally industrial powers open the campaign
@@ -862,7 +866,12 @@ and the acceptance row "never all, never none" are overturned.
   is demoted one tier. Regions the war never reaches are untouched.
 - **Treasuries are drained, and no debt is carried.** Each belligerent's treasury is spent down by
   the war's cost and never goes below zero. Nothing is owed at 1960: the campaign opens on rebuilt
-  ground and refilled treasuries, not on a ledger of debt.
+  ground and refilled treasuries, not on a ledger of debt. **The war costs about half a belligerent's
+  chest (Ben, 2026-10-13)**: a whole chest could not be refilled in thirty years, and 1960 must still
+  open near the treasury band (`NATION_GENERATION.md` § Pass 7).
+- **Short, ruinous, and the borders stand (Ben, 2026-10-13).** The war is a few years early in the
+  window; peace returns the map as it was. It settles nothing on the map; its costs are the record.
+  War weariness and the extra Alarm it leaves are later work.
 
 #### Revolution
 
@@ -871,7 +880,8 @@ nation's cities is read after Exploration; where it is wide, a splinter can rise
 the whole nation. It overturns, for this span, the Empires rule that no regime resets while the map
 stands still (`CIVILISATION.md`). A revolution is a lean and promises nothing. **What a takeover
 changes (Ben, 2026-10-12):** the polity and its ground stay; it takes **a new regime and a newly
-coined name**, and the takeover is recorded as a revolution event.
+coined name**, and the takeover is recorded as a revolution event. **About a third of worlds see
+one (Ben, 2026-10-13)**: the lean is calibrated to fire on roughly a third of the library.
 
 #### A world war is permitted, never forced (the 2026-09-15 ruling, superseded in part above)
 
@@ -941,7 +951,7 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 | Scarcity signal per good per market | Starting price per market | Base price scaled by the signal, inside the band |
 | Culture preference × population shares | Household demand weight per market | Population-weighted preference over the catchment |
 | Culture shares on regions and centres | Province culture for the lens | Population-weighted blend (property 4) |
-| Corridor throughput and rail rung | Road tiers on tiles | The existing stamp, one rung higher |
+| Corridor throughput and rail | Road tiers on tiles; rail track and stations as state industry | The existing road stamp; rail as its own network (`../economy/LOGISTICS.md` § 4c) |
 | Held-and-worked duration, class, throughput | `tile_component::resource_remaining` | The depletion formula (§ Spend is estimated at the end) |
 | Standing wars and patron links | A war condition on provinces | Property 3 |
 | Works lean, army stock | Regime, garrisons | Property 6's stubs; no technology crosses (Ben, 2026-10-10) |
@@ -1049,7 +1059,7 @@ The epoch's handoff, and nothing else:
   (`scarcity × (500 + weight_q / 2) / 1000`), `in_g` the volume of `trade_flows` it buys of the
   good and `out_g` the volume it sells — what its people run short of, plus what it takes in,
   less what it sends out, averaged over the four goods.
-- **Road tiers** with the rail rung, stamped from corridors.
+- **Road tiers**, stamped from corridors, and **rail track with its stations**, a network of its own.
 - **Culture shares** per region and per centre, for the lens and for demand.
 - **Standing war conditions** on provinces, with their patrons.
 - **No tech state.** Every nation opens holding no technology and an empty research pool (Ben,

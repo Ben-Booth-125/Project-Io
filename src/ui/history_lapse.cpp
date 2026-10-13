@@ -5275,6 +5275,25 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "Peace between %s and %s ends the world war.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
         break;
+    case lapse_event_kind::revolution:
+    {
+        // BL-1294 (INDUSTRIALISATION.md sec Revolution): a splinter rose at
+        // `region` and took the whole realm -- same ground, a new regime and a
+        // newly coined name. The record's table carries the NEW name; the old
+        // one is the record before's entry for the same id
+        // (`former_polity_name`), named where the app filled it.
+        const char* now_name = polity_name_of(h, e.polity);
+        const std::string* was = (e.polity != lapse_event_none
+                                  && static_cast<std::size_t>(e.polity) < h.former_polity_name.size())
+                                     ? &h.former_polity_name[e.polity] : nullptr;
+        if (was != nullptr && !was->empty() && *was != now_name)
+            std::snprintf(buf, sizeof buf, "A splinter rises at %s and takes %s whole; the realm is %s now.",
+                          R, was->c_str(), now_name);
+        else
+            std::snprintf(buf, sizeof buf, "A splinter rises at %s and takes the realm whole; it is %s now.",
+                          R, now_name);
+        break;
+    }
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5332,6 +5351,8 @@ int ticker_priority(const lapse_event& e)
     // BL-1287: the rise and fall's levels, a handful per world, all one realm's.
     case lapse_event_kind::rise_pressed:
     case lapse_event_kind::overextended:         return 0;
+    // BL-1294: a revolution, a handful per world at most -- a realm renamed.
+    case lapse_event_kind::revolution:           return 0;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

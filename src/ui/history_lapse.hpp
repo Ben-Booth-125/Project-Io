@@ -447,6 +447,15 @@ struct history_lapse
     std::vector<int32_t>     region_row;
     std::vector<std::string> region_name;
 
+    /// BL-1294 (INDUSTRIALISATION.md sec Revolution): the realm name table OF
+    /// THE RECORD BEFORE this one, by polity id -- on the Industrialisation
+    /// round, the Exploration record's `polity_name`. A revolution gives a
+    /// realm a newly coined name, and this record's own table carries only the
+    /// new one; the `revolution` line names the old one from here. Filled by
+    /// the app at the record's construction sites; empty on every other round,
+    /// where the line names the new name alone.
+    std::vector<std::string> former_polity_name;
+
     /// Generation's own era counters, for the honest readout under the map.
     int64_t battles   = 0;
     int64_t conquests = 0;

@@ -19,9 +19,11 @@
 //       drawn in.
 //   CW  Civil war (Empires, lean): a successor with >= a quarter of what its
 //       parent kept (3+ regions), the two then fighting within 50 years.
-//   RV  Revolution (Industrialisation, lean): a recorded takeover — no
-//       revolution event exists yet, so 0 by reading; the old successor-takes-
-//       parent reading is printed beside it as a proxy, never a hit.
+//   RV  Revolution (Industrialisation, lean): a recorded takeover, the
+//       `revolution` event (BL-1294); the old successor-takes-parent reading
+//       is printed beside it as a proxy, never a hit. Per seed, the lean's own
+//       reading follows: realms read at the open, how wide their cities stood,
+//       and every takeover (realm, year, city, spread, old -> new name).
 //
 // Per seed it also prints the pooled population at 1200 (BL-1290's movement
 // reading), the nations carrying each pattern tag on the generation report, and
@@ -204,6 +206,24 @@ int main(int argc, char** argv)
                     r.tagged[0], r.tagged[1], r.tagged[2], r.tagged[3], r.tagged[4], r.unfolded,
                     r.tags_agree ? "" : "  TAGS DISAGREE",
                     r.nations, r.nations_with_specialist, r.living_polities);
+        // BL-1294: the revolution lean's own reading -- the realms read at the
+        // open, how wide their cities stood, and every takeover it raised.
+        {
+            const history_sim_state& is = fx.industrialisation_state;
+            std::vector<int32_t> d;
+            for (const int32_t v : is.revolution_disparity_pm) if (v >= 0) d.push_back(v);
+            std::sort(d.begin(), d.end());
+            const auto pct = [&](int k) { return d.empty() ? -1 : d[(d.size() - 1) * static_cast<std::size_t>(k) / 100]; };
+            std::printf("seed %u revolution: %d realms read, %d wide; spread p25 %d p50 %d p75 %d p90 %d max %d\n",
+                        seed, is.revolution_realms_read, is.revolution_realms_wide, pct(25), pct(50), pct(75),
+                        pct(90), d.empty() ? -1 : d.back());
+            for (const auto& rn : is.revolutions)
+                std::printf("seed %u REVOLUTION polity %d in %d at %s: spread %d over %d cities, regime %d, '%s' -> '%s'\n",
+                            seed, rn.polity, rn.year,
+                            (rn.region >= 0 && static_cast<std::size_t>(rn.region) < home->settlement.regions.size())
+                                ? home->settlement.regions[static_cast<std::size_t>(rn.region)].name.c_str() : "?",
+                            rn.disparity_pm, rn.cities, rn.regime, rn.old_name.c_str(), rn.new_name.c_str());
+        }
         if (rep.handoff_invalid)
             std::printf("seed %u: HANDOFF VIOLATION %s\n", seed, rep.handoff_violation.c_str());
         std::fflush(stdout);
