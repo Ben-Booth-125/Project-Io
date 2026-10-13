@@ -1044,17 +1044,6 @@ struct ui_state
     /// an exchange record the world does not keep yet.
     int  market_ledger_view = 0;
 
-    /// How many Goods rows should fill the Market ledger's column height.
-    ///
-    /// ROW HEIGHT IS THE OPEN MEASUREMENT (Ben, 2026-08-29: "let's compare this
-    /// at 8 rows, 10 rows, and 12 rows"). A dial rather than a constant so the
-    /// three variants are one capture script rather than three builds, and so
-    /// the answer can be set without a recompile once Ben has picked. The
-    /// density judgement is taken at 1920x1080 — the screen being reviewed —
-    /// because `shell_column_width` is effectively fixed across the common
-    /// range and what a resolution change moves is the column's HEIGHT.
-    int  market_goods_rows = 10;
-
     /// Whether the Goods table draws the `body average price` column.
     ///
     /// DEFAULTS OFF ON A MEASUREMENT, not a preference. The design nominated this

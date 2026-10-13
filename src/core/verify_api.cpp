@@ -2844,14 +2844,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // an out-of-range value parks on the last page rather than drawing nothing.
     v.set_function("building_page", [this](int page) { m_ui.selection_building_page = page; });
 
-    // How many Goods rows fill the Market ledger's column height (BL-686). The
-    // row height is the open measurement Ben asked to compare at 8 / 10 / 12, so
-    // it is a dial a capture script sets rather than three separate builds.
-    // Values <= 0 are ignored; the draw falls back to its own default.
-    v.set_function("goods_rows", [this](int rows) {
-        if (rows > 0) m_ui.market_goods_rows = rows;
-    });
-
     // The rows the Goods table actually DREW last frame, in draw order (BL-686),
     // each carrying a FRESH read of the same figure from `market_component`.
     //
@@ -2902,19 +2894,53 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.market_goods_show_body = on;
     });
 
-    // The nation presence row's chips as drawn (BL-688) — the surface has no
-    // other check, and "no national presence" is a legitimate state that must be
-    // distinguishable from "the row is broken".
-    v.set_function("nation_chips", [this]() {
+    // The market top section's nation list as drawn (BL-1305, superseding
+    // BL-688's chips) — "no national presence" is a legitimate state that must be
+    // distinguishable from "the list is broken", so each row carries the world's
+    // own name for the nation beside the one drawn.
+    v.set_function("nation_rows", [this]() {
         sol::table out = m_lua.state().create_table();
         int i = 1;
-        for (const ui::nation_chip_record& c : ui::nation_chips())
+        for (const ui::nation_row_record& c : ui::nation_rows())
         {
             sol::table row = m_lua.state().create_table();
-            row["name"]     = c.name;
-            row["initials"] = c.initials;
+            row["nation"]     = c.nation;
+            row["name"]       = c.name;
+            row["name_avail"] = c.name_avail;
+            row["elided"]     = c.elided;
+            const auto nit = m_world.nations.find(c.nation);
+            row["world_name"] = (nit != m_world.nations.end()) ? nit->second.name : std::string{};
             out[i++] = row;
         }
+        return out;
+    });
+
+    // The market top section's metrics and layout as drawn (BL-1305), with an
+    // independent read of Sold here off the exchange record, so a check compares
+    // two reads rather than restating one.
+    v.set_function("market_top", [this]() {
+        const ui::market_top_record& t = ui::market_top();
+        sol::table out = m_lua.state().create_table();
+        out["drawn"]        = t.drawn;
+        out["market"]       = t.market;
+        out["sold_known"]   = t.sold_known;
+        out["sold_here"]    = t.sold_here;
+        out["quarter"]      = t.quarter;
+        out["traded_known"] = t.traded_known;
+        out["column_h"]     = t.column_h;
+        out["top_h"]        = t.top_h;
+        out["legacy_row_h"] = t.legacy_row_h;
+        out["goods_row_h"]  = t.goods_row_h;
+        out["frame_h"]      = ImGui::GetFrameHeight();
+        double world_sold = 0.0;
+        const std::size_t n = m_world.exchanges.size();
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            const exchange_record& e = m_world.exchanges.oldest_first(k);
+            if (e.tick == t.quarter && e.market == t.market && e.side == 0)
+                world_sold += static_cast<double>(e.quantity) * static_cast<double>(e.unit_price);
+        }
+        out["world_sold_here"] = world_sold;
         return out;
     });
 

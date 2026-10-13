@@ -67,16 +67,38 @@ struct goods_row_record
     float         name_needed = 0.0f;  ///< Px the full name needed at this font.
 };
 
-/// One chip of the nation presence row (BL-688), as drawn.
-struct nation_chip_record
+/// One row of the market top section's nation list (BL-1305; superseding BL-688's chips).
+struct nation_row_record
 {
-    entity_id   nation = null_entity;
-    std::string name;
-    std::string initials;
+    entity_id   nation     = null_entity;
+    std::string name;               ///< The nation's full name, as listed.
+    float       name_avail = 0.0f;  ///< Px the name column offered.
+    bool        elided     = false; ///< The name overran and was elided (tooltip carries it).
 };
 
-/// The nation presence row's chips as last drawn, in draw order.
-const std::vector<nation_chip_record>& nation_chips();
+/// The market's top section (BL-1305; ledgers/market.md § 2), as last drawn.
+struct market_top_record
+{
+    bool      drawn        = false;
+    entity_id market       = null_entity;
+    /// Sold here: value of the newest quarter's sale rows on this market in the
+    /// exchange record. `sold_known` is false only when the record is empty.
+    bool      sold_known   = false;
+    float     sold_here    = 0.0f;
+    int       quarter      = -1;    ///< The econ tick the figure is for.
+    /// Traded in / Traded out have no record behind them and draw "—".
+    bool      traded_known = false;
+    float     column_h     = 0.0f;  ///< The column's content height.
+    float     top_h        = 0.0f;  ///< The section's height (~2/7 of column_h).
+    float     legacy_row_h = 0.0f;  ///< What a ten-rows-to-the-view row took before the section.
+    float     goods_row_h  = 0.0f;  ///< The Goods row as drawn: max(frame, 0.4 x legacy).
+};
+
+/// The top section's nation list as last drawn, in draw order.
+const std::vector<nation_row_record>& nation_rows();
+
+/// The top section's metrics and layout as last drawn.
+const market_top_record& market_top();
 
 /// The Goods table's rows as last drawn, in draw order. Empty when the Goods view
 /// was not on screen.

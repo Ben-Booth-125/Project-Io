@@ -1519,17 +1519,16 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** A body can host several market centres with different books; this picks the exact venue for a trade.
 
-### `ledger.market_nation_chip` — Market Ledger, nation presence row (below the Body/Market selectors, above the tab strip)
+### `ledger.market_top_section` — Market Ledger, the market's top section (below the Body/Market selectors, above the tab strip; ~2/7 of the column)
 
-**Press.** Hover a coloured chip to name the nation. The chips are not clickable.
+**Press.** Read-only. Scroll the left list (mouse wheel over it) when the nations overrun it; hover an elided nation name for the full name; hover a metric showing an em dash for why it has no figure.
 
 **Valid when:**
 - Market Ledger is open
-- At least one nation operates in the selected market (the row reads "No national presence." otherwise)
 
-**Expected output.** A wrapped row of one chip per nation operating in the selected market, in ascending nation id, wrapping to further rows if needed. Each chip is that nation's identity colour carrying up to two initials; hovering names it in full. THESE ARE NOT FLAGS -- nation_colour is a palette entry and is all that exists, so real per-nation emblem artwork would be a generated identity system rather than a glyph, and the chip is an explicit placeholder. Presence is derived: a nation appears when a building stands on a tile whose catchment market (market_for_tile) is this one.
+**Expected output.** Left 3/5: one row per nation operating in the selected market, ascending nation id, each a nation_colour swatch and the nation's full name ("No national presence." when none). Presence is derived: a nation appears when a building stands on a tile whose catchment market (market_for_tile) is this one. Right 2/5, stacked: Sold here (value of the newest quarter's sales onto this market's shelf, from the exchange record), Traded in and Traded out (an em dash: no record holds the value trades moved; the tooltip says why).
 
-**Reason to select.** Answers 'which nations operate in this market?'. A price is not readable without knowing whose ground feeds it: a market served by one nation and a market four nations compete over look identical on a price line and mean entirely different things for embargo risk, tariffs and stance.
+**Reason to select.** Answers "which nations operate in this market, and how much is sold here each quarter?". A price is not readable without knowing whose ground feeds it and how much clears there: a market served by one nation and a market four nations compete over look identical on a price line and mean entirely different things for embargo risk, tariffs and stance.
 
 ### `ledger.market_view_tab` — Market Ledger, view tab strip at the top
 
@@ -1612,7 +1611,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows one market on one body (chosen by the Body and Market selectors), a nation presence row of colour chips naming who operates there, and the Goods / Trades views.
+**Expected output.** Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows one market on one body (chosen by the Body and Market selectors), a top section listing the nations that operate there by full name beside its Sold here / Traded in / Traded out figures, and the Goods / Trades views.
 
 **Reason to select.** Answers 'what does this good trade for, where?' - the price signal behind every sell-order, extraction and routing decision.
 

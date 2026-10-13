@@ -1376,7 +1376,7 @@
     "docs/ui/MENU.md (slot 6)",
     "src/ui/market_ledger.cpp"
    ],
-   "summary": "Rail slot 6: the Goods table (one row per traded good with an inline 8-quarter graph) and Sell Orders, under Body and Market selectors and a nation presence row.",
+   "summary": "Rail slot 6: the Goods table (one row per traded good with an inline 8-quarter graph) and the Trades tab, under Body and Market selectors and the market's top section (nation list + Sold here / Traded in / Traded out).",
    "interesting_question": "The mock CSV exporter emits one row per market_component with no market_id/region column, so a body with 5 markets (Kepler) produces a 5x-inflated join in the Power BI mock — does that gap only affect the design mockup, or could the same ambiguity affect any future per-market export?",
    "resolution": "Named narrowly as an export-only gap, not a live-code bug: market.md states 'the gap is export-only, for the Power BI mock... Fix: add a market_id (and human region label...) column to the exporter' — the live in-app ledger reads w.markets directly and is unaffected.",
    "checks": [
@@ -1395,7 +1395,7 @@
    "source": [
     "docs/ui/ledgers/market.md § Sub-levels"
    ],
-   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction.",
+   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction. Row height is 0.4 x the ten-rows-to-the-view row of the layout before the top section, floored at one frame height (Ben, 2026-10-13).",
    "interesting_question": "The layout it replaces autoscaled every sparkline to its own range, so a good decaying 40% and a flat good drew the same shape — does a shared axis fit at 384 px once the graph is inline, and which column gives way if it does not?",
    "resolution": "It fits, but not with every column. Measured over the real 45-good roster: with the body-average column the name column is 42 px and 13 of 45 names fit; without it, 98 px and 36 of 45. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
    "checks": [
@@ -1807,16 +1807,17 @@
   },
   {
    "id": "UI-112",
-   "name": "Nation presence row",
+   "name": "Market top section",
    "kind": "sub-element",
    "parent": "UI-080",
    "source": [
-    "docs/ui/ledgers/market.md § Sub-levels",
+    "docs/ui/ledgers/market.md § 2",
+    "docs/economy/MARKETS.md § The exchange record",
     "src/ui/market_ledger.cpp"
    ],
-   "summary": "A wrapped row of one chip per nation operating in the selected market, between the Body/Market selectors and the tab strip. Each chip is the nation's identity colour carrying up to two initials, named on hover.",
-   "interesting_question": "The design asked for 'a wrapped row of flags for each nation' — but nations have no emblem artwork at all, only a palette colour. Is a stubbed glyph acceptable as a stand-in for a flag?",
-   "resolution": "No. nation_colour is a palette entry and is all that exists; corporations carry an emblem tag and nations do not, so per-nation emblems would be a generated identity system, a feature of its own. A single stubbed glyph would teach a vocabulary the game does not have, so the row is colour chips with initials — honest about being an identity mark and nothing more — and a placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is derived via market_for_tile + tile_to_nation, so a nation appears exactly when its ground really clears at this market.",
+   "summary": "About 2/7 of the column between the Body/Market selectors and the tab strip. Left 3/5: one row per nation operating in the selected market, a nation_colour swatch and the full name (elided with a tooltip if it overruns), scrolling inside the section. Right 2/5: Sold here, Traded in, Traded out, stacked label over figure, values per quarter.",
+   "interesting_question": "The metrics ask for the value goods moved by trades into and out of a market each quarter. Does any record hold that, or would the figure have to be derived from something that is not it?",
+   "resolution": "Sold here has a record: the exchange record's sale rows (side 0) on this market for the newest quarter, quantity x unit price. Traded in and Traded out draw an em dash, its tooltip saying why: no record holds the value trades moved. A trade's goods travel as a convoy erased on arrival, and its purchase and landing fold into the exchange record beside every other shelf draw and landing, so the trade share cannot be told apart. Shown as missing rather than approximated from convoys in flight, which is a different quantity.",
    "checks": [
     "goods_table"
    ]

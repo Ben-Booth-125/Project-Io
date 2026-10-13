@@ -424,11 +424,12 @@
    "status": "drafted"
   },
   "market_ledger_nation_row": {
-   "surface": "Market Ledger - nation presence row",
-   "answers": "Which nations operate in this market?",
-   "because": "The Body and Market combos name a place but say nothing about who is IN it, and a price is not readable without knowing whose ground feeds it -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things. It earns the space between the selectors and the tabs because it qualifies the market the combos just chose, before the tabs ask a question about it, and it costs one wrapped row. THESE ARE COLOUR CHIPS WITH INITIALS, NOT FLAGS, and that is deliberate: nation_colour is a palette entry and is all that exists -- corporations carry an emblem tag, nations do not -- so real per-nation emblem artwork would be a generated identity system, a feature of its own, and a single stubbed glyph would teach a vocabulary the game does not have. Placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is DERIVED, since no store answers it: a building sits on a tile, market_for_tile resolves that tile's catchment market (the same routing clear_markets uses), and tile_to_nation gives the owner -- so a nation appears exactly when its ground really clears here.",
+   "surface": "Market Ledger - the market's top section (nation list + metrics)",
+   "answers": "Which nations operate in this market, and how much moves through it each quarter?",
+   "because": "The Body and Market combos name a place but say nothing about who is IN it or how busy it is, and a price is not readable without both -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things, and so do a quiet board and a busy one. It earns ~2/7 of the column, between the selectors and the tabs, because it qualifies the market the combos just chose before the tabs ask a question about it (Ben, 2026-10-13, superseding the 2026-08-29 chip row). LEFT 3/5: one row per nation, its nation_colour swatch and FULL NAME, scrolling inside the section -- the initials chips asked the player to decode an identity a list can simply state; still no flags, since nation_colour is all that exists. Presence is DERIVED (no store answers it): a building sits on a tile, market_for_tile resolves its catchment market, tile_to_nation its owner, so a nation appears exactly when its ground clears here. RIGHT 2/5: Sold here, Traded in, Traded out, label over figure, VALUES per quarter because goods of different kinds do not add. Sold here is the exchange record's newest quarter of sale rows on this market (quantity x clearing price). Traded in and Traded out draw an em dash, its tooltip saying why: no record holds the value trades moved. A trade's goods travel as a convoy erased on arrival, and its purchase and landing fold into the exchange record beside every other shelf draw and landing, so the trade share cannot be told apart.",
    "backlog_item": [
-    "BL-688"
+    "BL-688",
+    "BL-1305"
    ],
    "files": [
     "src/ui/market_ledger.cpp"
