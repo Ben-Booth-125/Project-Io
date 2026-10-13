@@ -3205,8 +3205,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // and gated by `road_tier1_uses`/`road_tier2_uses` below. A plain
     // `unordered_map` is safe here (unlike the ownership/political state)
     // because nothing iterates it — every read is a point lookup on a key
-    // computed from region indices, never a walk in map order.
+    // computed from region indices, never a walk in map order. (Two readers
+    // walk it to COLLECT keys and then sort them before acting: `capture_state`
+    // and the world war's demotions, BL-1289.)
     std::unordered_map<uint64_t, int> road_uses_live;
+    // BL-1289 -- POST ROADS THE WORLD WAR DEMOTED. A Post Road is bought, never
+    // walked into existence (BL-940): once the war knocks one down to a Road,
+    // ordinary traffic must not walk it back up, so `note_corridor` holds these
+    // edges one use under `road_tier3_uses` until a purchase rebuilds them
+    // (`try_build_post_road` takes the edge out). Membership only.
+    std::set<uint64_t> ww_held_below_post;
 
     // BL-1097 -- THE SEA-LEG RECORD, on the road record's exact footing: a
     // raw (lo, hi) list appended as legs are crossed and folded into
@@ -3610,6 +3618,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         int& uses = road_uses_live[edge_key(a, b)];
         const int before = road_tier_for_uses(uses);
         ++uses;
+        // BL-1289: a demoted Post Road is not re-promoted by a walk.
+        if (before < 3 && uses >= params.road_tier3_uses && !ww_held_below_post.empty()
+            && ww_held_below_post.count(edge_key(a, b)))
+            uses = params.road_tier3_uses - 1;
         const int after = road_tier_for_uses(uses);
         if (after == before) return;
 
@@ -3811,6 +3823,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         seat.treasury -= params.post_road_treasury_cost;
         road_uses_live[edge_key(a, b)] = params.road_tier3_uses;
+        ww_held_below_post.erase(edge_key(a, b)); // BL-1289: bought back, it is a Post Road again
         ++roads_version;
         ++out.post_roads_built;
         out.treasury_spent_on_roads += params.post_road_treasury_cost;
@@ -4977,6 +4990,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     const bool ww_on = params.world_war_target;
     int  ww_phase    = 0;     // 0 waiting, 1 at war, 2 peace made
     bool ww_top_read = false;
+    int64_t ww_last_read = INT64_MIN; // the recorded steps' cadence, kept on its own clock
     std::vector<int>     ww_top;   // the top powers at the window's open, largest first
     std::vector<int8_t>  ww_side;  // polity -> 0 none, 1 the side that opened the war, 2 the other
     std::vector<int64_t> ww_chest; // polity -> the chest it entered with
@@ -10843,9 +10857,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 return n;
             };
 
-            // THE TOP POWERS, read once, at the round the window's step is taken.
-            if (!ww_top_read && y >= world_war_window_start
-                && (!params.record_playback || last_record_year == y))
+            // THE TOP POWERS, read once, at the round the window's step is
+            // taken. ON ITS OWN CLOCK, the record's cadence (`record_step`'s
+            // rule) kept here every round, so a run with the playback
+            // suppressed reads the same year as a recorded one, whatever year
+            // the span opens on -- the rise and fall's `rf_last_read` idiom.
+            const bool ww_rec = ww_last_read == INT64_MIN || y - ww_last_read >= record_interval;
+            if (ww_rec) ww_last_read = y;
+            if (!ww_top_read && y >= world_war_window_start && ww_rec)
             {
                 ww_top_read = true;
                 std::vector<std::pair<int64_t, int>> by_pop;
@@ -11080,6 +11099,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                          : t == 2 ? params.road_tier2_uses : params.road_tier3_uses;
                 };
                 bool tier_moved = false;
+                std::vector<char> newly_razed(n_reg, 0);
                 const int famine_q = static_cast<int>(clampi64(params.world_war_famine_q * yrs, 0, cap_q));
                 const int flight_q = static_cast<int>(clampi64(params.world_war_flight_q * yrs, 0, cap_q));
                 for (std::size_t i = 0; i < n_reg; ++i)
@@ -11104,18 +11124,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int pcut = (r.port_stock_q * clampi(params.world_war_raze_port_q, 0, 1000)) / 1000;
                         r.port_stock_q -= pcut;
                         out.world_war_port_razed_q += pcut;
-                        for (const int nb : supply_neighbours[i])
-                        {
-                            const uint64_t key = edge_key(static_cast<int>(i), nb);
-                            const auto it = road_uses_live.find(key);
-                            if (it == road_uses_live.end()) continue;
-                            const int tier = road_tier_for_uses(it->second);
-                            if (tier <= 0 || ww_demoted_edges.count(key)) continue;
-                            ww_demoted_edges.insert(key);
-                            it->second = std::max(0, tier_floor(tier) - 1);
-                            ++out.world_war_roads_demoted;
-                            tier_moved = true;
-                        }
+                        newly_razed[i] = 1;
                         note_event(lapse_event_kind::ground_razed, static_cast<int>(i), holder, enemy);
                     }
                     if (r.population <= 0) continue;
@@ -11148,6 +11157,43 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                     }
                     r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+                }
+                // EVERY ROAD THROUGH RAZED GROUND drops one tier, once in the
+                // war: every corridor the live map holds with an end on a
+                // region razed this round -- the walked network and the wet
+                // campaign corridors beyond the neighbour radius alike. The
+                // map is unordered, so its matching keys are collected and
+                // SORTED by (lo, hi) before anything moves; the order of the
+                // demotions and their events is a property of the integers.
+                // Each lands on the LOWER rung's floor, so the walks of a
+                // whole rung must come back before the road does, and each is
+                // recorded as a `road_promoted` event at the lower tier (0
+                // when a Track falls out of use) so the playback's network
+                // closes on the sim's tiers.
+                {
+                    std::vector<uint64_t> keys;
+                    for (const auto& kv : road_uses_live)
+                    {
+                        const std::size_t lo = static_cast<std::size_t>(kv.first >> 32);
+                        const std::size_t hi = static_cast<std::size_t>(kv.first & 0xFFFFFFFFu);
+                        if ((lo < n_reg && newly_razed[lo]) || (hi < n_reg && newly_razed[hi]))
+                            keys.push_back(kv.first);
+                    }
+                    std::sort(keys.begin(), keys.end());
+                    for (const uint64_t key : keys)
+                    {
+                        if (ww_demoted_edges.count(key)) continue;
+                        int& uses = road_uses_live[key];
+                        const int tier = road_tier_for_uses(uses);
+                        if (tier <= 0) continue;
+                        ww_demoted_edges.insert(key);
+                        uses = tier_floor(tier - 1);
+                        if (tier >= 3) ww_held_below_post.insert(key);
+                        ++out.world_war_roads_demoted;
+                        tier_moved = true;
+                        note_event(lapse_event_kind::road_promoted, static_cast<int>(key >> 32),
+                                   road_tier_for_uses(uses), static_cast<int>(key & 0xFFFFFFFFu));
+                    }
                 }
                 if (tier_moved) ++roads_version;
 

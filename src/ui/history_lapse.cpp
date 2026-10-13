@@ -370,6 +370,7 @@ void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelaps
                                [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
         if (it == segs.end())
         {
+            if (e.polity < 1) continue; // BL-1289: a Track falling out of use names no new corridor
             lapse_road_seg seg;
             seg.region_a   = a;
             seg.region_b   = b;
@@ -377,9 +378,29 @@ void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelaps
             segs.push_back(std::move(seg));
             it = std::prev(segs.end());
         }
+        // BL-1289: AN EVENT BELOW THE RUNG THE CORRIDOR STANDS ON IS A
+        // DEMOTION (the world war's razing): each rung above the event's tier
+        // ends at its year. Read before the promotion half, which only ever
+        // reaches the event's own tier.
+        {
+            constexpr int32_t unset = 0x7FFFFFFF;
+            const auto holds = [&](int32_t from, int32_t until) { return from <= e.year && until == unset; };
+            int stands = 0;
+            if (holds(it->year_track, it->year_track_end)) stands = 1;
+            if (it->year_road != unset && holds(it->year_road, it->year_road_end)) stands = 2;
+            if (it->year_post_road != unset && holds(it->year_post_road, it->year_post_road_end)) stands = 3;
+            if (static_cast<int>(e.polity) < stands)
+            {
+                if (e.polity < 3 && stands >= 3) it->year_post_road_end = e.year;
+                if (e.polity < 2 && stands >= 2) it->year_road_end      = e.year;
+                if (e.polity < 1)                it->year_track_end     = e.year;
+                continue;
+            }
+        }
         it->year_track = std::min(it->year_track, e.year);
-        if (e.polity >= 2) it->year_road      = std::min(it->year_road, e.year);      // BL-917
-        if (e.polity >= 3) it->year_post_road = std::min(it->year_post_road, e.year); // BL-940/BL-943
+        if (e.polity >= 1) it->year_track_end = 0x7FFFFFFF; // back on the rung (BL-1289)
+        if (e.polity >= 2) { it->year_road = std::min(it->year_road, e.year); it->year_road_end = 0x7FFFFFFF; }           // BL-917
+        if (e.polity >= 3) { it->year_post_road = std::min(it->year_post_road, e.year); it->year_post_road_end = 0x7FFFFFFF; } // BL-940/BL-943
         it->promoted_here = true;
     }
 }
@@ -1837,10 +1858,14 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h)
             return std::any_of(h.road_segs.begin(), h.road_segs.end(), pred);
         };
         const int window = lapse_marker_window_years(h);
+        // BL-1289: a rung ends where the world war demoted the corridor off it.
+        const auto end_of = [&](int32_t e) { return e == lapse_never ? never : int64_t{e}; };
         s.set(L::track, any_road([&](const lapse_road_seg& r) {
-            return shows(r.year_track, r.year_road == lapse_never ? never : r.year_road); }));
+            return shows(r.year_track, std::min(r.year_road == lapse_never ? never : int64_t{r.year_road},
+                                                end_of(r.year_track_end))); }));
         s.set(L::road, any_road([&](const lapse_road_seg& r) {
-            return r.year_road != lapse_never && shows(std::max(r.year_track, r.year_road), never); }));
+            return r.year_road != lapse_never
+                && shows(std::max(r.year_track, r.year_road), std::min(end_of(r.year_road_end), end_of(r.year_track_end))); }));
         // The Post Road the legend names is its PULSE (a steady Post Road is
         // drawn as a Road), so it is listed when a pulse falls in the span.
         s.set(L::post_road, any_road([&](const lapse_road_seg& r) {
@@ -2856,7 +2881,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     for (const lapse_road_seg& s : h.road_segs)
     {
         if (!lapse_road_drawn(s, year)) continue; // not promoted yet at this playhead
-        const bool at_road = year >= s.year_road;
+        const bool at_road = year >= s.year_road && year < s.year_road_end; // BL-1289: until the war demoted it
         const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
         const float shift   = s.c1 < 0.0f ? world_w : -world_w;
 
@@ -3009,6 +3034,11 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 auto it = std::find_if(h.road_segs.begin(), h.road_segs.end(),
                     [&](const lapse_road_seg& s) { return s.region_a == e.region && s.region_b == e.other; });
                 if (it == h.road_segs.end()) continue;
+                // BL-1289: a demotion (the event's tier below a rung that
+                // ended that year) is the war's razing, not throughput.
+                if ((e.polity < 3 && it->year_post_road_end == e.year)
+                    || (e.polity < 2 && it->year_road_end == e.year)
+                    || (e.polity < 1 && it->year_track_end == e.year)) continue;
                 mx = (it->c0 + it->c1) * 0.5f;
                 my = (it->r0 + it->r1) * 0.5f;
                 over_water = it->over_water;
@@ -4960,9 +4990,29 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
                       polity_name_of(h, e.polity), R);
         break;
     case lapse_event_kind::road_promoted:
-        std::snprintf(buf, sizeof buf, "A %s is laid between %s and %s.",
-                      e.polity >= 2 ? "road" : "track", R, region_name_of(h, e.other));
+    {
+        // BL-1289: the same kind, one tier DOWN, is the world war's demotion.
+        // The rung the corridor stood on is replayed from the carried network
+        // and this record's events before this one.
+        int stood = 0;
+        for (const lapse_road_seg& c : h.road_carry)
+            if (c.region_a == e.region && c.region_b == e.other)
+                stood = c.year_post_road != 0x7FFFFFFF ? 3 : c.year_road != 0x7FFFFFFF ? 2 : 1;
+        for (const lapse_event& x : h.lapse.events)
+        {
+            if (&x == &e) break;
+            if (x.kind == static_cast<uint8_t>(lapse_event_kind::road_promoted)
+                && x.region == e.region && x.other == e.other)
+                stood = x.polity;
+        }
+        if (static_cast<int>(e.polity) < stood)
+            std::snprintf(buf, sizeof buf, "War wrecks the %s between %s and %s.",
+                          stood >= 2 ? "road" : "track", R, region_name_of(h, e.other));
+        else
+            std::snprintf(buf, sizeof buf, "A %s is laid between %s and %s.",
+                          e.polity >= 2 ? "road" : "track", R, region_name_of(h, e.other));
         break;
+    }
     case lapse_event_kind::civilisation_formed:
         // BL-1106: `other` is the civilisation index; its coined name is on
         // the record's name table. The wording is the history log's own.

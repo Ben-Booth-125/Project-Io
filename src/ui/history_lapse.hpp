@@ -176,6 +176,14 @@ struct lapse_road_seg
     int32_t year_track = 0;
     int32_t year_road      = 0x7FFFFFFF; ///< The year it reached Road, or unset.
     int32_t year_post_road = 0x7FFFFFFF; ///< BL-940/BL-943: the year it reached Post Road, or unset.
+    /// BL-1289: the year the world war DEMOTED it off each rung (a
+    /// `road_promoted` event at a LOWER tier than it stood at), or unset. A
+    /// rung shows from its year up to its end; a later promotion back onto the
+    /// rung clears the end (the playback draws the rung through the gap), so
+    /// the network the record closes on is the sim's own at its close.
+    int32_t year_track_end     = 0x7FFFFFFF;
+    int32_t year_road_end      = 0x7FFFFFFF;
+    int32_t year_post_road_end = 0x7FFFFFFF;
 
     /// BL-943 — this corridor's straight line samples as majority water
     /// against the terrain band baked in `finish_history_lapse`. A road
@@ -1079,7 +1087,7 @@ std::vector<lapse_lane_seg> lapse_lanes_at_close(const history_lapse& h);
 /// BL-1134: is @p s drawn at @p year -- the road pass's own test, from the
 /// year the corridor first reached Track. One predicate for the pass and for
 /// `lapse_roads_drawn_at`, so the verify read counts what the map draws.
-inline bool lapse_road_drawn(const lapse_road_seg& s, int year) { return year >= s.year_track; }
+inline bool lapse_road_drawn(const lapse_road_seg& s, int year) { return year >= s.year_track && year < s.year_track_end; }
 
 /// BL-1134: the (region_a, region_b) pairs the road pass draws at @p year, in
 /// bake order. Empty before the record is derived. For the verify API.
