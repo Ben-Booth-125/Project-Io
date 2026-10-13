@@ -2133,8 +2133,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
 
             // Workforce dial: reuse the BL-181 solver as the estimator.
-            if (b.type == building_type::extraction_site ||
-                b.type == building_type::processing_facility)
+            // BL-1310: never on the player's corp — even when spectating (the
+            // settle, a spectate session), the economy tick's stepped solver is
+            // the only writer of the player's workforce, and the seam refuses
+            // set_workforce for it.
+            if (corp != w.player_entity &&
+                (b.type == building_type::extraction_site ||
+                 b.type == building_type::processing_facility))
             {
                 // The solver reports its own gain (BL-181 model, both endpoints).
                 // The previous estimate took its sign from `revenue − inputs − wages`

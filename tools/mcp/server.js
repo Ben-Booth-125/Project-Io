@@ -220,7 +220,7 @@ const TOOLS = [
         type: { type: 'integer', description: 'building_type (build only): 0 none, 1 extraction_site, 2 processing_facility, 3 port, 4 launchpad, 5 inland_logistics_hub, 6 military_base.' },
         target: { type: 'integer', description: 'resource_type index — the extracted good (build), the good offered (place_sell_order), the good sought (request_quote) or the cargo (dispatch_convoy). See docs/economy/RESOURCES.md.' },
         recipe: { type: 'integer', description: 'Recipe id (set_recipe, and build seed).' },
-        workforce: { type: 'integer', description: 'set_workforce value, 0-200.' },
+        workforce: { type: 'integer', description: 'set_workforce value, 0-100. A rival-only verb: refused for the player corporation (BL-1310).' },
         road_tier: { type: 'integer', description: 'place_road tier, 1-3.' },
         // Everything below was missing, which is why six of the fifteen verbs
         // could not be issued at all: the dispatch forwards args generically, so

@@ -54,19 +54,19 @@ and so is the safety net.
 | `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 28 | 1 | 3 |
 | `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 60 | 0 | 7 |
-| `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 40 | 1 | 3 |
+| `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 47 | 1 | 4 |
 | `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
-| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `construction_ledger_tabs`, `building_management_shell` | 68 | 2 | 10 |
+| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `workforce_step`, `construction_ledger_tabs`, `building_management_shell` | 80 | 2 | 11 |
 | `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 54 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 29 | 0 | 4 |
 | `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 38 | 0 | 3 |
 | `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 30 | 1 | 7 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate` | 25 | 0 | 0 |
-| `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 35 | 0 | 0 |
+| `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 36 | 0 | 0 |
 | `UI-078` Corporation ledger (rail slot 8, Diplomacy) | ledger | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-079` Corporation ledger (rail slot 8, Diplomacy) > Stance groups and the row action strip | view | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
-| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 25 | 1 | 7 |
-| `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 13 | 1 | 0 |
+| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 33 | 1 | 7 |
+| `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 21 | 1 | 0 |
 | `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 49 | 1 | 2 |
 | `UI-092` New World wizard | view | `planetology_generation`, `history_lapse_press` | 38 | 0 | 11 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
@@ -75,7 +75,7 @@ and so is the safety net.
 | `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
-| `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 13 | 1 | 0 |
+| `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 21 | 1 | 0 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
 | `UI-114` Nav rail slot fit | chrome | `nav_rail_fit`, `shell_pass` | 3 | 1 | 1 |
 | `UI-118` New World wizard > Wizard lapse-round time-lapse map (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press`, `sea_lanes`, `roads_carried` | 48 | 1 | 11 |

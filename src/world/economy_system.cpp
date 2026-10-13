@@ -928,8 +928,9 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
 // First-pass heuristic: contention is held at its current value; input-price response is
 // ignored (inputs valued at the current price); the search is over coarse tiers, so the
 // result can hunt by ±one tier. A finer model + hysteresis is future work (BL-181).
-// Deterministic — reads last tick's market state only. Player corp only, opt-out via the
-// building's `workforce_auto` flag (io-standing-rules.md § the player-corp exception).
+// Deterministic — reads last tick's market state only. Player corp: the target steps
+// toward this answer one 25 % step a quarter, with no opt-out (BL-1310; AI_OPPONENT.md
+// § 11, amended 2026-10-13). Rivals: the scorer's workforce dial reuses it.
 // BL-442: the band used to be two constexpr copies here, commented "mirror
 // market_clearing.cpp price band" — a hand-synchronised duplicate of the game's
 // most load-bearing economic tunable. It is now authored once in
@@ -1099,9 +1100,12 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
         return revenue - input_cost - opex.maintenance - opex.wages;
     };
 
+    // BL-1310 (PRODUCTION.md § Workforce target and the auto-solver, Ben
+    // 2026-10-13): the grid is 0, 25, 50, 75, 100 % — the maximum is 100 %, and
+    // the player's target moves one 25 % step a quarter toward this answer.
     int   best_wt  = 0;
     float best_net = -std::numeric_limits<float>::infinity();
-    for (int wt = 0; wt <= 200; wt += 10)
+    for (int wt = 0; wt <= workforce_target_max; wt += workforce_step)
     {
         const float net = net_at(wt);
         if (net > best_net) { best_net = net; best_wt = wt; }
@@ -1110,8 +1114,9 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
     if (out_gain)
     {
         // Price the incumbent through the same model. b.workforce_target is not
-        // necessarily on the step-10 grid (the player's set_workforce verb accepts
-        // any 0-200), so it is evaluated directly rather than looked up.
+        // necessarily on the 25-step grid (a rival's set_workforce accepts any
+        // 0-100, and an older save may hold any value), so it is evaluated
+        // directly rather than looked up.
         const float gain = best_net - net_at(b.workforce_target);
         // Floored, not clamped-for-noise: an off-grid incumbent can legitimately
         // beat every grid point, and a negative gain and a zero gain say the same
@@ -2250,8 +2255,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         return (it != stack_by_building.end()) ? it->second.rank : 1;
     };
 
-    // ── Pass 3: BL-181 workforce auto-solve, player corp only (opt-out via
-    //    workforce_auto; io-standing-rules.md § player-corp exception).
+    // ── Pass 3: BL-181 workforce auto-solve, player corp only; BL-1310 (Ben,
+    //    2026-10-13): STEPPED and without the opt-out — each tick the target
+    //    moves ONE 25 % step toward the solver's best (stays when equal), and
+    //    `workforce_auto` is no longer read for the player (the field stays in
+    //    the save and still records a rival's dial pin, `dial_idled`).
+    //    AI_OPPONENT.md § 11, amended 2026-10-13.
     //
     // Runs after contention (which reads workforce_assigned, not the target) and
     // ahead of the stack taper, rather than inline in the production loop where it
@@ -2270,18 +2279,17 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             building_component& b = bit->second; // mutable: the auto-solver sets the target
             if (b.decommissioned || b.ticks_remaining > 0)
                 continue;
-            if (!b.workforce_auto)
-                continue;
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue;
             // BL-613/BL-614: the solver optimises against the labour the
             // building can actually reach — its own per-building grant,
             // ordinary and qualified constraints folded.
-            b.workforce_target = solve_workforce_target(
+            const int best = solve_workforce_target(
                 w, reg, b,
                 labour_for(building_id, w.player_entity, building_body(w, b)),
                 rank_of(building_id));
+            b.workforce_target = step_workforce_target(b.workforce_target, best);
         }
     }
 

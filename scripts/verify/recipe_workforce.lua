@@ -1,8 +1,12 @@
 -- Recipe / workforce change acceptance (BL-113, US-007).
--- Proves a player can steer an existing building's PRODUCTION through the real
--- commit path: set its recipe and workforce target via the SAME writes the
--- construction panel's recipe combo + workforce slider perform, tick the sim, and
--- assert the output responds. This is the coverage the build/manage flow lacked:
+-- Proves an existing building's PRODUCTION follows its recipe and workforce
+-- target: set its recipe via the SAME write the construction panel's recipe combo
+-- performs, tick the sim, and assert the output responds. BL-1310 (Ben,
+-- 2026-10-13): the player no longer sets workforce - the game moves the target
+-- ONE 25 % step a quarter toward the most profitable level (PRODUCTION.md
+-- § Workforce target and the auto-solver). The workforce half stages a target
+-- with the verify fixture and asserts the game's steps: at most 25 a quarter,
+-- always in 0-100, and production runs at the target the game set. This is the coverage the build/manage flow lacked:
 -- no check exercised a recipe/workforce change end-to-end (arm -> commit -> tick ->
 -- effect), so a regression in how workforce_target or the active recipe reaches the
 -- economy could ship invisibly. Realises USER_STORIES.md US-007
@@ -42,28 +46,35 @@ if b.found then
     verify.expect(stocked > 0,
         "the active recipe's inputs are stocked in the building's pool (" .. tostring(stocked) .. " inputs)")
 
-    -- Set workforce to 0 %: the economy must honour the target and produce nothing,
-    -- inputs or no inputs.
+    -- BL-1310: stage the target at 0 % with the verify FIXTURE (no player
+    -- control writes it any more), then let the game step it. Each quarter the
+    -- economy tick moves it ONE 25 % step toward the solver's best, before
+    -- production, so the target read after a step is the one production ran at.
     local wf = verify.set_building_workforce(b.tile, 0)
-    verify.expect(wf == 0, "workforce target committed to 0% (got " .. wf .. ")")
+    verify.expect(wf == 0, "fixture staged the workforce target at 0% (got " .. wf .. ")")
 
-    verify.econ_step(1)
-    local out_idle = verify.building_output(b.tile)
-    verify.expect(out_idle <= 0.0,
-        "at 0% workforce the building produces nothing (out=" .. out_idle .. ")")
-
-    -- Raise workforce to full: output must now be positive — the target change
-    -- reached the economy through the real field the slider writes. The inputs
-    -- are topped up again: the 0 % tick may not consume, but nothing here should
-    -- depend on that.
-    verify.stock_building_inputs(b.tile, 1000)
-    local wf2 = verify.set_building_workforce(b.tile, 100)
-    verify.expect(wf2 == 100, "workforce target committed to 100% (got " .. wf2 .. ")")
-
-    verify.econ_step(1)
-    local out_full = verify.building_output(b.tile)
-    verify.expect(out_full > 0.0,
-        "at 100% workforce the building produces output (out=" .. out_full .. ")")
+    local prev, series = 0, "0"
+    for q = 1, 5 do
+        verify.stock_building_inputs(b.tile, 1000)
+        verify.econ_step(1)
+        local now = verify.first_processing_building().workforce
+        local out = verify.building_output(b.tile)
+        series = series .. " -> " .. tostring(now)
+        verify.expect(now >= 0 and now <= 100,
+            "quarter " .. q .. ": the target stays in 0-100 (got " .. now .. ")")
+        verify.expect(math.abs(now - prev) <= 25,
+            "quarter " .. q .. ": the game moves the target at most one 25% step ("
+            .. prev .. " -> " .. now .. ")")
+        if now == 0 then
+            verify.expect(out <= 0.0,
+                "quarter " .. q .. ": at 0% workforce the building produces nothing (out=" .. out .. ")")
+        else
+            verify.expect(out > 0.0,
+                "quarter " .. q .. ": at " .. now .. "% workforce the stocked building produces (out=" .. out .. ")")
+        end
+        prev = now
+    end
+    print("recipe_workforce: the game's targets by quarter from a staged 0%: " .. series)
 
     -- If the building type offers more than one recipe, prove the recipe selector
     -- commits: switching the active recipe writes a non-empty recipe name.

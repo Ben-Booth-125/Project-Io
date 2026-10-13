@@ -290,7 +290,8 @@ void draw_building_levers(world& w, const recipe_registry& reg, ui_state& ui)
     draw_production_method_section(w, reg, sel); // draws nothing for a non-processing type
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Workforce");
-    draw_building_workforce_page(bit->second);
+    // BL-1310: read-only — the game sets it (the slider retired).
+    (void)draw_workforce_bar(bit->second);
 }
 
 void draw_buildings_view(world& w, const recipe_registry& reg,

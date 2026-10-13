@@ -1,6 +1,6 @@
 -- Verify building management controls (BL-049 / building-management R1, R7).
 -- Runs economy ticks to show live building states, then opens the construction
--- panel showing a building's recipe selector and workforce slider.
+-- panel showing a building's recipe selector and its read-only workforce row (the slider retired, BL-1310).
 verify.econ_step(6)
 verify.show_panel("construction", true)
 

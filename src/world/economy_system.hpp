@@ -134,7 +134,7 @@ struct agency_event
         // --- BL-202 strategic-command kinds (the scored-utility layer) ---
         built,             ///< A new building was placed (`tile` set; `building` is the new id).
         demolished,        ///< An owned building was removed.
-        workforce_set,     ///< The workforce dial moved (`value` = new target, 0–200).
+        workforce_set,     ///< The workforce dial moved (`value` = new target, 0–100).
         resumed,           ///< An idled building was brought back online.
         road_placed,       ///< A road was laid (`tile` set; `value` = tier 1–3).
         survey_dispatched, ///< A survey was dispatched (`building` unused; `tile` = body id).
@@ -896,8 +896,26 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
                          const building_component& b, float contention,
                          entity_id corp = null_entity);
 
-/// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
-/// step 10) that maximises this building's estimated net this tick against the
+/// BL-1310 (PRODUCTION.md § Workforce target and the auto-solver, Ben 2026-10-13):
+/// every building's workforce target is 0–100 %, and the solver's grid and the
+/// player's quarterly step are both 25 %.
+inline constexpr int workforce_target_max = 100;
+inline constexpr int workforce_step       = 25;
+
+/// The player's target one quarter on: ONE `workforce_step` from @p current
+/// toward @p best, never past it; unchanged when they are equal. @p current is
+/// clamped into 0–100 first — the range is a ceiling, not a step — so an
+/// out-of-range value from an older save lands in range on its next quarter.
+inline int step_workforce_target(int current, int best)
+{
+    const int cur = current < 0 ? 0 : (current > workforce_target_max ? workforce_target_max : current);
+    if (best > cur) return (best - cur > workforce_step) ? cur + workforce_step : best;
+    if (best < cur) return (cur - best > workforce_step) ? cur - workforce_step : best;
+    return cur;
+}
+
+/// The BL-181 per-building workforce-dial solver: the workforce target (0–100,
+/// step 25) that maximises this building's estimated net this tick against the
 /// local market's price response. Exported (BL-202) so the strategic scorer can
 /// reuse it as the AI's `set_workforce` estimator — one solver, no drift.
 /// Deterministic; reads last tick's market state only.
@@ -913,8 +931,8 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                 units and from the same model that chose the target.
 ///
 ///                 Reported as >= 0, but NOT >= 0 by construction: the search
-///                 walks a step-10 grid while `b.workforce_target` may sit off
-///                 it (the player's `set_workforce` verb accepts any 0–200), so
+///                 walks a step-25 grid while `b.workforce_target` may sit off
+///                 it (a rival's `set_workforce` accepts any 0–100), so
 ///                 an off-grid incumbent can genuinely out-score every grid
 ///                 point. That case is a real "the solver's own answer is worse
 ///                 than where you already are", and it is floored at 0 rather

@@ -1088,7 +1088,7 @@ struct ui_state
         entity_id   expanded = null_entity; ///< The expanded building, null when the grid shows.
         bool        expanded_player = false;
         bool        charts   = false;       ///< The profit row drew.
-        bool        slider   = false;       ///< The workforce slider drew.
+        std::string workforce;              ///< The read-only workforce row as drawn ("75%"), "" when not drawn (BL-1310).
         int         count    = 1;           ///< The expanded stack's member count.
         std::string title;                  ///< The expanded header's name + " ×N" as drawn.
         std::string method;                 ///< The production method line, "" when none.

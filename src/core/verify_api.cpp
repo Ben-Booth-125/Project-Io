@@ -3663,14 +3663,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::string("");
     });
 
-    // Set a building's workforce target (0–200 %) via the SAME clamp+write the
-    // construction panel's workforce slider performs. Returns the applied value.
+    // A FIXTURE: set a building's workforce target (0–100 %) directly. Since
+    // BL-1310 no player control writes it (the game steps it each quarter), so
+    // this is the only way a script can stage a starting target; the next
+    // econ step moves a player building one 25 % step from here. Returns the
+    // applied value.
     v.set_function("set_building_workforce", [this](unsigned tile_u, int pct) -> int {
         const entity_id tile = static_cast<entity_id>(tile_u);
         for (auto& [bid, b] : m_world.buildings)
         {
             if (b.tile != tile) continue;
-            b.workforce_target = std::clamp(pct, 0, 200);
+            b.workforce_target = std::clamp(pct, 0, workforce_target_max);
             SDL_Log("verify.set_building_workforce: tile=%u target=%d",
                     tile_u, b.workforce_target);
             return b.workforce_target;
@@ -3769,7 +3772,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // Range-check BEFORE the narrowing cast, not after — a value that fits a
         // Lua number can still be outside the destination's domain.
         const int wf = t.get_or("workforce", 100);
-        if (wf < 0 || wf > 200) return "rejected_invalid";
+        if (wf < 0 || wf > workforce_target_max) return "rejected_invalid"; // BL-1310: 0-100
         cmd.workforce = wf;
 
         const auto r = apply_corp_command(m_world, m_registry, cmd);
@@ -4520,7 +4523,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["is_expanded"]       = (c.expanded != null_entity);
         out["player"]            = c.expanded_player;
         out["charts"]            = c.charts;
-        out["slider"]            = c.slider;
+        out["workforce"]         = c.workforce; // BL-1310: the read-only row ("75%"), "" when not drawn
         out["count"]             = c.count;
         out["title"]             = c.title;
         out["method"]            = c.method;
@@ -5376,6 +5379,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 // be able to wait for it rather than guess a tick count.
                 rec["tile"]   = static_cast<unsigned>(bld_it->second.tile);
                 rec["complete"] = (bld_it->second.ticks_remaining == 0);
+                // BL-1310: the workforce target, so a script can watch the game
+                // step the player's (workforce_step.lua). Ownership is public; the
+                // target is read by the script, never shown for a rival.
+                rec["workforce"] = bld_it->second.workforce_target;
                 // The building's own net per quarter, and the NAME the Buildings
                 // roster files it under. Both exist so a script can rebuild the
                 // roster's arithmetic FROM THE BUILDINGS and compare, rather than

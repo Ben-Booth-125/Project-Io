@@ -21,7 +21,7 @@
 //       as, a malformed lexeme — is rejected WHOLE with a typed reason, and
 //       the world state_hash before the rejection equals the hash after. No
 //       clamp, no truncation: the specific non-clamp case (workforce=250
-//       neither applies as 250 nor as a clamped 200) is asserted on the
+//       neither applies as 250 nor as a clamped 100) is asserted on the
 //       destination field itself.
 //
 // The scene is order_book_harness's shape: a hand-built registry + synthetic
@@ -357,7 +357,10 @@ int main()
              + " subject=" + std::to_string(bld)
              + " workforce=" + std::string(wf);
     };
-    const std::string c1 = line_set_wf(probe.corp, probe.bld, "150");
+    // BL-1310: the session acts as the PLAYER, whose set_workforce is refused
+    // (the game sets the player's workforce) - an in-range value, so the only
+    // reason it fails is the player rule, and it still rides the schedule.
+    const std::string c1 = line_set_wf(probe.corp, probe.bld, "50");
     const std::string c2 = "COMMAND corp=" + std::to_string(probe.corp)
                          + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                          + " quantity=20 floor_price=2.5";
@@ -401,8 +404,10 @@ int main()
 
         check(r.saw_bye, "R1.2 SHUTDOWN answers BYE (and only ends the session, not a process)");
         check(r.final_tick == 3, "R1.3 exactly the three requested ticks ran");
-        check(count_of(r.rx, "RESULT result=applied") == 4,
-              "R1.4 all four commands answer applied over the wire");
+        check(count_of(r.rx, "RESULT result=applied") == 3
+                  && count_of(r.rx, "RESULT result=rejected_invalid") == 1,
+              "R1.4 three commands answer applied over the wire; the player's set_workforce "
+              "answers rejected_invalid (BL-1310)");
         check(r.rx.find("OK tick=1") != std::string::npos
                   && r.rx.find("OK tick=2") != std::string::npos
                   && r.rx.find("OK tick=3") != std::string::npos,
@@ -423,8 +428,9 @@ int main()
 
         hash_socket = s.w.state_hash(r.final_tick);
         final_tick  = r.final_tick;
-        check(s.w.buildings.at(s.bld).workforce_target == 150,
-              "R1.8 the socket-delivered set_workforce actually landed");
+        check(!transcript.empty() && transcript[0].result == corp_command_result::rejected_invalid
+                  && s.w.buildings.at(s.bld).workforce_target != 50,
+              "R1.8 the socket-delivered set_workforce for the PLAYER was refused, not applied (BL-1310)");
     }
 
     // -----------------------------------------------------------------------
@@ -457,7 +463,7 @@ int main()
         };
 
         bool all_applied = true;
-        all_applied &= apply(corp_verb::set_workforce, 0, 0, 0, 150) == corp_command_result::applied;
+        all_applied &= apply(corp_verb::set_workforce, 0, 0, 0, 50) == corp_command_result::rejected_invalid; // BL-1310
         step_tick(s.w, reg, 1);
         all_applied &= apply(corp_verb::set_trade_reserve, 1, 20.0f, 2.5f) == corp_command_result::applied;
         all_applied &= apply(corp_verb::idle, 1) == corp_command_result::applied;
@@ -570,7 +576,7 @@ int main()
         check(count_of(rx, "ERR unknown op") == 1,
               "R2.5 an unknown opcode answers ERR, not silence");
         check(s.w.buildings.at(s.bld).workforce_target == 100,
-              "R2.6 workforce=250 neither applied nor CLAMPED to 200 (rejected whole)");
+              "R2.6 workforce=250 neither applied nor CLAMPED to 100 (rejected whole)");
         // BL-1266: the float rows ride set_trade_reserve, which APPLIES a 0 or
         // -0 reserve and ignores floor_price — so only the protocol layer stands
         // between 1e-60 / -1e-60 / floor_price=1e300|1e-60 and an applied command.

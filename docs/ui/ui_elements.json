@@ -834,12 +834,13 @@
     "docs/ui/SELECTION.md § The building element's layout",
     "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "Selecting a building (grid button, repeat-click Building rung, ledger row) draws its host tile's element with that stack expanded in the tile column: an unlabelled back control, the name and stack count; the production method and status line; for the player's own completed building with profit data a profit row (short net chart beside net and expenses per quarter, expenses split on hover) and a workforce slider sharing the Construction ledger's control body. A rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Auto / Open in ledger (absent on a rival's).",
+   "summary": "Selecting a building (grid button, repeat-click Building rung, ledger row) draws its host tile's element with that stack expanded in the tile column: an unlabelled back control, the name and stack count; the production method (a building with no recipe names what it does - a Port its trade points) and status line, always; for the player's own completed building a profit row (short net chart beside net and expenses per quarter, expenses split on hover; filled from the settle on a fresh campaign, BL-1309) and the workforce target as a read-only bar (the game sets it, BL-1310). A rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Open in ledger (absent on a rival's); Auto's former cell is Reserved.",
    "interesting_question": "With the standalone building layout gone, is there any route that selects a building WITHOUT showing its tile?",
    "resolution": "Yes, deliberately reversed in round 2 (Ben, 2026-10-13): a canvas press selects the TILE, so a building is reached from the tile card's grid, the repeat-click Building rung or a ledger row - each drawing the host tile's card expanded.",
    "checks": [
     "building_element",
     "tile_card",
+    "workforce_step",
     "construction_ledger_tabs",
     "building_management_shell"
    ]
@@ -1319,7 +1320,7 @@
     "docs/ui/ledgers/construction.md § Sub-levels",
     "docs/ui/SELECTION.md (Manage ▸ action)"
    ],
-   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a live workforce slider, recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
+   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a read-only workforce bar (BL-1310: the game sets workforce), the recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
    "interesting_question": "See UI-047 — this is the other half of the same unresolved Manage-vs-Selection column-ownership question.",
    "resolution": "See UI-047's resolution citation (docs/ui/ledgers/construction.md § Open questions, same finding).",
    "checks": [

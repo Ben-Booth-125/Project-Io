@@ -159,16 +159,11 @@ const char* method_grid_status(entity_id id);
 /// drawn frame, `null_entity` when it drew none. Read by the air_gate check.
 entity_id method_grid_status_drawn_for();
 
-/// The **Workforce** lever — the placeholder trend graph plus the 0-100 slider that
-/// writes `workforce_target` and clears `workforce_auto` (a manual edit pins the
-/// target). Relocated off the Selection card by the same 2026-08-29 ruling as
-/// `draw_production_method_section`, and shared for the same reason.
-void draw_building_workforce_page(building_component& b);
-
-/// The workforce SLIDER alone — the one UI writer of `workforce_target` (BL-1300
-/// round 2). Drawn by draw_building_workforce_page (the Construction ledger) and by
-/// the expanded building card on the Selection band. A manual edit clears
-/// `workforce_auto`. The percentage reads to the slider's right. Returns true on an edit.
-bool draw_workforce_slider(building_component& b);
+/// The WORKFORCE ROW, read-only (BL-1310, Ben 2026-10-13: the game sets the
+/// player's workforce, one 25 % step a quarter; the slider and Auto retired). A
+/// filled bar of `workforce_target` over 0-100 with the percentage to its right.
+/// Drawn by the expanded building card and the Construction ledger's Buildings
+/// view; writes nothing. Returns the percentage as drawn ("75%").
+std::string draw_workforce_bar(const building_component& b);
 
 } // namespace ui

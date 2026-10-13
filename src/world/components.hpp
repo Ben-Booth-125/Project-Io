@@ -904,18 +904,19 @@ struct building_component
     /// processing_facility. `no_recipe` means none assigned.
     uint16_t      recipe = no_recipe;
 
-    /// Player-authored workforce target as a percentage of nominal capacity.
-    /// Range [0, 200]; 100 = full nominal staffing. Scales actual output and
-    /// the labour portion of maintenance. Applied in economy_system and budget_system.
-    /// When `workforce_auto` is set, the economy tick overwrites this each tick with
-    /// the profit-maximising value (BL-181); a manual override clears the auto flag.
+    /// Workforce target as a percentage of nominal capacity. Range [0, 100]
+    /// (BL-1310, Ben 2026-10-13: the maximum is 100 %); 100 = full nominal
+    /// staffing. Scales actual output and the labour portion of maintenance.
+    /// Applied in economy_system and budget_system. On the PLAYER's buildings the
+    /// economy tick sets it — one 25 % step a quarter toward the solver's best
+    /// (BL-181/BL-1310); the player has no control over it. A rival's scorer sets
+    /// it through `set_workforce`.
     int  workforce_target = 100;
 
-    /// BL-181: when true (default), the economy tick auto-solves `workforce_target`
-    /// to maximise this building's estimated net profit (player corp only). A manual
-    /// workforce-target choice in the management UI clears this, pinning the target;
-    /// the "Auto" control re-enables it. Reconciles with the "never auto-act the
-    /// player's corp" rule as an opt-out convenience (see io-standing-rules.md).
+    /// Kept in the save and the state hash. Since BL-1310 it is NOT read for the
+    /// player's corp — the auto-solver steps every player producing building with
+    /// no opt-out. On a RIVAL it records that the workforce dial, not the solver,
+    /// holds the target (`set_workforce` clears it; `dial_idled` reads it).
     bool workforce_auto = true;
 
     /// When true the building produces nothing and is charged only material

@@ -382,7 +382,7 @@ The preview and the province card do not move; two columns change.
    the method and does not switch it.
 
 2. **The action grid retargets to the building** — the same 2×3 cell layout, now holding
-   four building-level actions. This is the element's designated place to ACT; the cards are
+   three building-level actions. This is the element's designated place to ACT; the cards are
    where it presents. The back control (or any selection elsewhere) returns the grid to the
    tile's actions.
    - **Mothball** (`glyph_mothball`, a box with a line through it) — flips `decommissioned`
@@ -394,15 +394,10 @@ The preview and the province card do not move; two columns change.
      then defers through `ui_state::construction.pending_demolish` for `app::render` to execute
      (`demolish_building`) — erasing mid-draw would dangle the `building_component&` the grid
      is reading.
-   - **Auto** (`glyph_auto`, an open circular-arrow "refresh" primitive), in Mothball's column
-     one row down: sets `b.workforce_auto = true` on press, one-way (a manual slider edit on
-     the Workforce page is what clears it). Active state (`workforce_auto == true`) is shown
-     with the same accent-ring idiom the tile card's "primed" Construct button uses, never
-     baked into the label text: the button's id (`"##bld_auto"`) is **stable** — a label that
-     carried the live percentage would change every tick while `solve_workforce_target`
-     re-solves, churning the ImGui ID and corrupting hover/active/focus state. The percentage
-     is read beside the workforce slider in the Buildings view, not here.
-   - **Open in ledger** (`glyph_roster`, a panel outline with one row picked out), beside Auto —
+   - **Reserved**, in Mothball's column one row down — the cell the Auto control held until
+     player workforce control retired (Ben, 2026-10-13; `../economy/PRODUCTION.md` § Workforce
+     target and the auto-solver). The game sets the target; the card reads it.
+   - **Open in ledger** (`glyph_roster`, a panel outline with one row picked out), beside that reserved cell —
      opens the Construction ledger's **Buildings** view **aimed** at this building: its type
      group expanded and the building selected, so the levers that left the centre are on screen
      in one press. It exists because the lever move would otherwise leave a building selected on
@@ -410,10 +405,10 @@ The preview and the province card do not move; two columns change.
      active state is not visible on the card, so a second press must not close what it opened —
      and it takes its own glyph rather than sharing a silhouette with the lit controls inches
      away (BL-174).
-   Mothball, Dismantle and Auto are all disabled with "Competitor building - intel only" for a
+   Mothball and Dismantle are both disabled with "Competitor building - intel only" for a
    rival. **Open in ledger is ABSENT on a rival's card**, not merely disabled: the Buildings view
    is the player's estate, so a rival building has no row for the button to aim at. Its cell
-   falls back to `glyph_reserved`, so the grid keeps its shape and nothing reflows. **Two slots
+   falls back to `glyph_reserved`, so the grid keeps its shape and nothing reflows. **Three slots
    are reserved** (`glyph_reserved`).
 
 ### The unit element's layout

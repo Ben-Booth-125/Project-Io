@@ -1037,11 +1037,10 @@ void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
         const char* state = b.ticks_remaining > 0 ? " \xc2\xb7 constructing"
                           : b.decommissioned      ? " \xc2\xb7 idled"
                                                   : "";
-        ImGui::Text("%s%s%s \xc2\xb7 wf %.0f%%%s%s",
+        ImGui::Text("%s%s%s \xc2\xb7 wf %.0f%%%s",
                     building_type_name(b.type),
                     *what ? " \xc2\xb7 " : "", what,
                     static_cast<double>(b.workforce_assigned) * 100.0,
-                    b.workforce_auto ? " (auto)" : "",
                     state);
     }
 }
@@ -1178,23 +1177,8 @@ void glyph_reopen(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddLine({c.x - r * 0.6f, c.y - r * 0.15f}, {c.x + r * 0.75f, c.y - r * 0.6f}, col, 2.2f);
 }
 
-// A circular refresh arrow — the building card's Auto (workforce autosolve)
-// toggle glyph (2026-08-15; relocated here from the Workforce page's old
-// text button). An open ring with one arrowhead reads as "recompute me each
-// tick" at a glance, matching the honest-primitive idiom of the other
-// action-grid glyphs (no second icon system for one button).
-void glyph_auto(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
-{
-    constexpr float start = -0.65f * kTwoPiLocal;
-    constexpr float end   = 0.15f * kTwoPiLocal;
-    dl->PathArcTo(c, r * 0.55f, start, end, 16);
-    dl->PathStroke(col, 0, 2.2f);
-    // Arrowhead at the arc's start, two short strokes fixed relative to the
-    // tip rather than a full tangent calc — a small icon, not a vector plot.
-    const ImVec2 tip{c.x + r * 0.55f * std::cos(start), c.y + r * 0.55f * std::sin(start)};
-    dl->AddLine(tip, {tip.x - r * 0.28f, tip.y - r * 0.05f}, col, 2.2f);
-    dl->AddLine(tip, {tip.x - r * 0.05f, tip.y + r * 0.28f}, col, 2.2f);
-}
+// (glyph_auto, the Auto toggle's circular arrow, retired with player workforce
+// control — BL-1310.)
 
 // A simple X — the building card's Dismantle glyph (2026-08-15; the
 // Lifecycle page's Dismantle moved onto the action grid under this name).
@@ -1319,71 +1303,29 @@ static std::string draw_building_status_line(const world& w, const recipe_regist
     return line;
 }
 
-// Workforce page (2026-08-15 playtest rework, trimmed). The "Workforce"
-// subheading and the 0/20/40/60/80/100 tier grid are gone — the tier grid was
-// tall enough to trigger the accordion's vertical scrollbar, which this page
-// alone didn't need. The placeholder trend graph is unchanged (no real
-// per-building history is recorded yet, same constraint as before); the tier
-// grid is replaced by a single horizontal 1% slider below the Auto button,
-// carrying the same "a manual edit pins the target and clears Auto" semantic
-// the tier buttons had.
-void draw_building_workforce_page(building_component& b)
+// The WORKFORCE ROW, read-only (BL-1310; SELECTION.md § The building element's
+// layout; PRODUCTION.md § Workforce target and the auto-solver, Ben 2026-10-13).
+// The game sets the player's workforce — one 25 % step a quarter toward the most
+// profitable level — so the slider and the Auto control retired with player
+// workforce control, and this bar is the only workforce surface: the target as a
+// filled bar, the percentage to its RIGHT. Drawn by the expanded building card
+// and the Construction ledger's Buildings view. Returns the percentage as drawn.
+std::string draw_workforce_bar(const building_component& b)
 {
-    constexpr int N       = 9;
-    const float   graph_w = ImGui::GetContentRegionAvail().x;
-
-    float wf_series[N];
-    const float wf = static_cast<float>(b.workforce_target);
-    for (int i = 0; i < N; ++i)
-    {
-        const float t   = static_cast<float>(i) / (N - 1);
-        const float dip = -20.0f * std::sin(t * 3.14159265f); // placeholder dip-and-recover
-        wf_series[i]    = std::clamp(wf + dip, 0.0f, 200.0f);
-    }
-
-    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
-
-    // Auto moved to the action grid (2026-08-15 playtest rework, below
-    // Mothball — draw_building_actions) — this page is trend chart +
-    // slider only now. Its OLD button here was the "game breaking bug": the
-    // label baked `workforce_target` straight into the id-bearing text
-    // (`"Auto  (%d%%)"`), and with no `##` separator ImGui derives a button's
-    // ID from its full label — so every tick solve_workforce_target changed
-    // the target, the button's ID churned too, corrupting ImGui's
-    // hover/active/focus identity for it frame over frame. The action-grid
-    // replacement keeps the id stable ("##bld_auto") and shows the percentage
-    // as separate adjacent text, never inside the id string.
-
-    draw_workforce_slider(b);
-}
-
-// The ONE writer of a building's workforce target from the UI (BL-1300 round 2).
-// The Construction ledger's Buildings view (through draw_building_workforce_page)
-// and the expanded building card on the Selection band both call this body, so
-// there is one control writing `workforce_target`, never two that could come to
-// disagree. A manual edit pins the target and clears Auto. The current
-// percentage reads to the slider's RIGHT (Ben, 2026-10-13), never inside an
-// id-bearing label.
-bool draw_workforce_slider(building_component& b)
-{
-    int         target = b.workforce_target;
+    const int   target = std::clamp(b.workforce_target, 0, workforce_target_max);
     char        pct[16];
     std::snprintf(pct, sizeof pct, "%d%%", target);
     const float pct_w = ImGui::CalcTextSize("100%").x;
-    ImGui::SetNextItemWidth(std::max(40.0f, ImGui::GetContentRegionAvail().x - pct_w
-                                                - ImGui::GetStyle().ItemSpacing.x));
-    bool changed = false;
-    if (ImGui::SliderInt("##wf_slider", &target, 0, 100, ""))
-    {
-        b.workforce_target = target;
-        b.workforce_auto   = false; // manual edit pins the target, same as a tier press used to
-        changed = true;
-    }
+    const float bar_w = std::max(40.0f, ImGui::GetContentRegionAvail().x - pct_w
+                                            - ImGui::GetStyle().ItemSpacing.x);
+    ImGui::ProgressBar(static_cast<float>(target) / static_cast<float>(workforce_target_max),
+                       {bar_w, ImGui::GetTextLineHeight()}, "");
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Workforce target. A manual edit turns Auto off.");
+        ImGui::SetTooltip("Workforce target, set by the game: each quarter it moves one\n"
+                          "25%% step toward the most profitable level (0-100%%).");
     ImGui::SameLine();
-    ImGui::Text("%d%%", b.workforce_target);
-    return changed;
+    ImGui::TextUnformatted(pct);
+    return pct;
 }
 
 // --- Unit (Soldier) Selection card: 3-column band, same family as building/tile ---
@@ -1697,7 +1639,6 @@ void draw_building_actions(world& w, const recipe_registry& reg, ui_state& ui, e
         return;
     building_component& building = bit->second; // mutable: Mothball flips decommissioned directly
     const ImGuiStyle&   style    = ImGui::GetStyle();
-    ImDrawList*         dl       = ImGui::GetWindowDrawList();
     const float         spacing  = style.ItemSpacing.x;
 
     ImGui::BeginChild("##building_actions", {right_w, total_h}, false,
@@ -1707,7 +1648,7 @@ void draw_building_actions(world& w, const recipe_registry& reg, ui_state& ui, e
     const ImVec2 bsz = {bw, bh};
 
     // Deliberately NOT lifted by spectator god view (BL-408): god view
-    // grants sight, never hands — a rival's Mothball/Dismantle/Auto stay
+    // grants sight, never hands — a rival's Mothball/Dismantle stay
     // disabled under it, so the lift stays strictly presentational.
     const bool owned = is_player_owned(w, sel);
 
@@ -1756,24 +1697,10 @@ void draw_building_actions(world& w, const recipe_registry& reg, ui_state& ui, e
         ImGui::EndPopup();
     }
 
-    // Auto (workforce autosolve), in Mothball's column one row down. One-way:
-    // a manual slider edit in the Buildings view is what clears it. The active
-    // state is the accent ring, never baked into the label — the id
-    // "##bld_auto" stays stable while solve_workforce_target re-solves.
-    {
-        const bool  auto_on = building.workforce_auto;
-        const char* tip     = !owned  ? "Competitor building - intel only"
-                             : auto_on ? "Auto - autosolving this building's workforce"
-                                       : "Auto - autosolve this building's workforce target";
-        if (auto_on)
-        {
-            const ImVec2 pmin = ImGui::GetCursorScreenPos();
-            dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
-                        palette::selection, 4.0f, 0, 2.0f);
-        }
-        if (tile_icon_button("##bld_auto", bsz, owned, tip, glyph_auto) && owned)
-            building.workforce_auto = true;
-    }
+    // Mothball's column one row down was Auto (workforce autosolve). BL-1310
+    // (Ben, 2026-10-13): the game sets the player's workforce with no opt-out,
+    // so Auto retired with the slider and its cell is Reserved.
+    tile_icon_button("##bld_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
     ImGui::SameLine();
 
     // Open in ledger — opens the Construction ledger's Buildings view AIMED at
@@ -2541,16 +2468,18 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
 ///     good), then the status line;
 ///   - the profit row (draw_building_profit): a short net chart beside net and
 ///     expenses per quarter;
-///   - the workforce row: the shared slider (draw_workforce_slider).
-/// The profit and workforce rows need the player's own COMPLETED building with
-/// profit data. A rival's card is the header, owner and an explicit `private`
-/// row; under spectator god view it opens the method, real rows and profit row
-/// (BL-408), but never the slider — god view grants sight, never hands.
+///   - the workforce row: a read-only bar and percentage (draw_workforce_bar,
+///     BL-1310 — the game sets it).
+/// The profit and workforce rows need the player's own COMPLETED building (the
+/// profit row also needs a reading — a fresh campaign has the settle's, BL-1309).
+/// A rival's card is the header, owner and an explicit `private` row; under
+/// spectator god view it opens the method, real rows and profit row (BL-408).
+/// The card holds no lever (BL-1310).
 void draw_expanded_building_card(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui, entity_id tile_id,
                                  entity_id bid, const std::vector<production_stack>& stacks)
 {
-    building_component& b    = w.buildings.at(bid); // mutable: the workforce slider writes it
+    const building_component& b = w.buildings.at(bid); // the card writes nothing (BL-1310)
     const bool          god  = ui.spectating && ui.god_view;
     const bool          mine = is_player_owned(w, bid);
     const bool          open = mine || god;
@@ -2623,22 +2552,22 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
     if (b.ticks_remaining > 0)
         return; // still building: header, method and status are the card
-    const building_profit p = estimate_building_reading(w, reg, report, bid);
-    if (!p.has_data)
-        return;
+    // ── The profit row ── (with data: a fresh campaign has the settle's)
+    if (const building_profit p = estimate_building_reading(w, reg, report, bid); p.has_data)
+    {
+        ui.tile_card.charts = true;
+        ImGui::Spacing();
+        draw_building_profit(w, reg, report, bid, &ui.tile_card.net, &ui.tile_card.expenses);
+    }
 
-    // ── The profit row ──
-    ui.tile_card.charts = true;
-    ImGui::Spacing();
-    draw_building_profit(w, reg, report, bid, &ui.tile_card.net, &ui.tile_card.expenses);
-
-    // ── The workforce row: the player's own building only ──
+    // ── The workforce row: the player's own building only, READ-ONLY ──
+    // (BL-1310: the game sets it; god view grants sight of a rival's profit row
+    // above, and nothing here was ever a rival's.)
     if (mine)
     {
         ImGui::TextDisabled("Workforce");
         ImGui::SameLine();
-        draw_workforce_slider(b);
-        ui.tile_card.slider = true;
+        ui.tile_card.workforce = draw_workforce_bar(b);
     }
 }
 

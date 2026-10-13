@@ -985,9 +985,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             const auto bit = w.buildings.find(cmd.subject);
             if (bit == w.buildings.end())
                 return corp_command_result::rejected_invalid;
+            // BL-1310 (PRODUCTION.md § Workforce target and the auto-solver;
+            // AI_OPPONENT.md § 11, amended 2026-10-13): the game sets the
+            // player's workforce, so the verb is a RIVAL's only. Refused whole
+            // for the player's corp, whoever issues it (the UI, --serve, the
+            // MCP server), mutating nothing.
+            if (cmd.corp == w.player_entity)
+                return corp_command_result::rejected_invalid;
             if (!owns(w, cmd.corp, cmd.subject))
                 return corp_command_result::rejected_not_owner;
-            if (cmd.workforce < 0 || cmd.workforce > 200)
+            if (cmd.workforce < 0 || cmd.workforce > workforce_target_max)
                 return corp_command_result::rejected_invalid;
             building_component& b = bit->second;
             // A manual target PINS the dial — the press has always cleared
@@ -1007,6 +1014,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::set_workforce_auto:
         {
+            // BL-1310: the opt-out this handed back is retired for the player.
+            if (cmd.corp == w.player_entity)
+                return corp_command_result::rejected_invalid;
             const auto bit = w.buildings.find(cmd.subject);
             if (bit == w.buildings.end())
                 return corp_command_result::rejected_invalid;

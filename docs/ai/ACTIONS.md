@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*160 entries — 31 gameplay · 25 canvas · 19 lens · 49 ledger · 36 chrome.*
+*159 entries — 31 gameplay · 25 canvas · 19 lens · 48 ledger · 36 chrome.*
 
 ---
 
@@ -248,29 +248,29 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one.
 
-### `gameplay.set_workforce` — The workforce slider, drawn by ONE control body (`draw_workforce_slider`) in two places: the Construction ledger's Buildings view (`draw_building_workforce_page`, below a placeholder trend graph) and the expanded building card on the Selection band (ledger.selection_building_workforce). The slider reaches 0-100% with the percentage to its right; the command seam reaches 200.
+### `gameplay.set_workforce` — No UI (BL-1310, Ben 2026-10-13: the player has no workforce control). The workforce slider on the expanded building card and in the Construction ledger's Buildings view is retired; both now show the target as a read-only bar. A RIVAL-ONLY corp_verb: the background scorer's workforce dial issues it under its grant (AI_OPPONENT.md § 11), and the command seam refuses it for the player's corporation.
 
-**Press.** Open the Construction ledger (nav rail slot 3, or the building card's 'Open in ledger' button), expand the building's type group, press the building, then drag the slider - or drag the same slider on the expanded building card in the Selection band. Selecting the building on the MAP drives the same lever. 'Auto' lives on the building card's action grid, and a manual drag here is what clears it.
+**Press.** None for the player. `COMMAND corp=<rival> verb=3 subject=<building> workforce=<0-100>` on the --serve line protocol reaches it only for a corporation that is not the player's; for the player's corporation it is rejected_invalid and mutates nothing.
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `building` | `entity_id` | The building whose staffing target changes. |
-| `workforce` | `int [0, 200]` | Target staffing as % of nominal. Above 100 pushes past nominal output; the panel grid only reaches 100, the slider and the command seam reach 200. |
+| `workforce` | `int [0, 100]` | Target staffing as % of nominal, 0-100 (Ben, 2026-10-13: the maximum is 100 %). |
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
+- The acting corporation is NOT the player's (rejected_invalid otherwise - the game sets the player's workforce, PRODUCTION.md § Workforce target and the auto-solver).
 - The corporation owns the building (rejected_not_owner otherwise).
-- The value is inside [0, 200] (rejected_invalid otherwise).
-- Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
-- The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op - it takes control away from the solver, which is a real change.
+- The value is inside [0, 100] (rejected_invalid otherwise; the whole command is refused, never clamped).
+- The building is not ALREADY at that target AND already pinned (rejected_state otherwise).
 
-**Expected output.** workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Since BL-293 the command seam clears workforce_auto exactly as the press does — before that it set the target and left the flag, so an agent's target was silently re-solved on the next tick. Setting a value already held on an already-pinned dial is a no-op (rejected_state).
+**Expected output.** A rival's workforce_target is set AND its workforce_auto flag is cleared (the flag records that the dial, not the solver, holds the value - `dial_idled` reads it). Actual staffing is the target mediated by body-level labour contention. Wages scale with assigned workforce; output scales with effective workforce. For the player's corporation the verb is refused and nothing changes: the economy tick moves each of the player's producing buildings one 25 % step a quarter toward the solver's most profitable target on the grid 0/25/50/75/100.
 
-**Reason to select.** Trades wage bill against output when the solver's profit-max answer is not what is wanted — throttle to cut losses without idling, staff to 0 to park a building cheaply, or overdrive past 100% to feed a downstream chain even at a per-building loss. Also the deliberate press for taking manual control away from the auto-solver.
+**Reason to select.** A rival's lever, scored by its workforce dial: throttle to cut losses without idling, or staff to 0 to park a building cheaply. Not a player action - the player's staffing follows the market one step a quarter.
 
-### `gameplay.set_workforce_auto` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Auto' (an open circular-arrow glyph), in Mothball's column one row down; an accent ring marks it while on. Also a corp_verb.
+### `gameplay.set_workforce_auto` — No UI (BL-1310, Ben 2026-10-13): the building card's Auto control is retired with player workforce control; its action-grid cell is Reserved. The corp_verb remains in the enum (append-only) and the command seam refuses it for the player's corporation.
 
-**Press.** Select the owned building, click 'Auto'. One-way: pressing it while already on does nothing (a manual edit of the workforce slider in the Construction ledger's Buildings view is what clears it). At the command seam, re-asserting is rejected_state rather than a silent success.
+**Press.** None for the player. On the --serve line protocol it is rejected_invalid for the player's corporation and mutates nothing; no scorer emits it.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -278,14 +278,14 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
+- The acting corporation is NOT the player's (rejected_invalid otherwise).
 - `subject` names a real building (rejected_invalid otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
-- The building is not ALREADY on auto (rejected_state otherwise — a genuine no-op).
-- Construction is complete (the UI hides the controls until then; the seam does not itself gate on this).
+- The building is not ALREADY on auto (rejected_state otherwise - a genuine no-op).
 
-**Expected output.** workforce_auto := true. Each economy tick the solver sets this building's workforce_target to the profit-maximising value; the panel's Auto button displays the currently solved percentage. This is the only sanctioned auto-action on the player's corporation — it moves one dial and never places, relocates, retargets, or decommissions anything. Any later manual target clears it again, from the slider, the tier grid, OR the set_workforce verb.
+**Expected output.** For a non-player corporation: workforce_auto := true, which only clears the dial-idled record (`dial_idled`); the auto-solver runs on the player's corporation alone. For the player's corporation: refused, nothing changes - the game sets the player's workforce every quarter regardless of the flag.
 
-**Reason to select.** Removes one micromanagement dial per building. The right press whenever 'maximise this building's own profit' is exactly the intent — freshly built buildings start with it on, so this mostly exists to undo an earlier manual pin.
+**Reason to select.** None for the player: the opt-out it undid is retired (AI_OPPONENT.md § 11, amended 2026-10-13).
 
 ### `gameplay.survey` — The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey).
 
@@ -456,7 +456,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `gameplay.march_unit` — The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** Select a unit, press 'March' — this ARMS province-picking mode (the button shows the same accent-ring 'primed' state the building card's Auto press uses; pressing March again while armed CANCELS the pick, per the standing toggle rule), then click a province on the Planetary canvas to send the unit there. A click that misses every province (open ocean, off-body) is ignored and the mode stays armed. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
+**Press.** Select a unit, press 'March' — this ARMS province-picking mode (the button shows the accent-ring 'primed' state the tile card's Construct press uses; pressing March again while armed CANCELS the pick, per the standing toggle rule), then click a province on the Planetary canvas to send the unit there. A click that misses every province (open ocean, off-body) is ignored and the mode stays armed. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1297,7 +1297,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - Balance Ledger is open
 
-**Expected output.** The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which is a real, separate control owned elsewhere.
+**Expected output.** The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which the game sets one 25% step a quarter (BL-1310) and no control writes.
 
 **Reason to select.** Will eventually set corporate wage policy; today it is display-only.
 
@@ -1695,7 +1695,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - A tile is selected and no building is expanded (an unbuilt tile reads 'Nothing built here' and has no buttons)
 
-**Expected output.** Selects a building of that stack. The band redraws the SAME tile's card with that stack EXPANDED in the tile column - a header of an unlabelled '‹' back control, the building name and the stack count (×N); the production method (active recipe, or the good an extraction site extracts) and a status line (running state with its reason, or construction ETA); then, for the player's own completed building with profit data, a profit row (a short 'Net, 6 mo.' chart beside net profit per quarter and expenses per quarter, expenses splitting into input cost / maintenance / wages on hover) and the workforce slider (ledger.selection_building_workforce). A rival's card shows owner and 'private'. The action grid retargets to the building's Mothball / Dismantle / Auto / Open in ledger. The repeat-click cycle's Building rung and a ledger row reach the identical view. Pure re-selection - nothing in the world changes.
+**Expected output.** Selects a building of that stack. The band redraws the SAME tile's card with that stack EXPANDED in the tile column - a header of an unlabelled '‹' back control, the building name and the stack count (×N); the production method (active recipe, or the good an extraction site extracts; a building with no recipe names what it does - a Port its trade points, a hub its haul discount) and a status line (running state with its reason, or construction ETA), always; then, for the player's own completed building, a profit row (a short 'Net, 6 mo.' chart beside net profit per quarter and expenses per quarter, expenses splitting into input cost / maintenance / wages on hover; a building with no output reads its negative net and expenses) and a READ-ONLY workforce bar with its percentage (the game sets it; BL-1310). A rival's card shows owner and 'private'. The action grid retargets to the building's Mothball / Dismantle / Open in ledger (Auto's cell is Reserved, BL-1310). The repeat-click cycle's Building rung and a ledger row reach the identical view. Pure re-selection - nothing in the world changes.
 
 **Reason to select.** The route from ground to operator: read what each stack on this tile earns at a glance, then open the one that needs attention.
 
@@ -1709,23 +1709,6 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Selects the host tile again: the tile card returns to its grid of building buttons and the action grid to the tile's actions. The preview and province card do not change. Nothing in the world changes.
 
 **Reason to select.** Done with this building; back to comparing the tile's other stacks, or to building something else here.
-
-### `ledger.selection_building_workforce` — Selection band, tile element, the expanded building card's workforce row: a horizontal slider with the current percentage to its right (the player's own completed building with profit data only).
-
-**Press.** Drag the slider (0-100%).
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `workforce` | `int [0, 100]` | Target staffing as % of nominal. |
-
-**Valid when:**
-- A player-owned building is selected (expanded in its tile's card)
-- Construction is complete and an economy quarter has reported the building (the profit row and the slider draw only then)
-- Not on a rival's card, not even under spectator god view - god view grants sight, never hands
-
-**Expected output.** Writes workforce_target and clears workforce_auto - the same control body (draw_workforce_slider) the Construction ledger's Buildings view draws, so there is one writer; the effect is gameplay.set_workforce's. A manual edit turns the action grid's Auto off (its accent ring goes out).
-
-**Reason to select.** Tune a building's staffing where you are already reading its profit, without a trip to the ledger: throttle a loss-maker or staff up a winner, then watch the net figure beside it on the next quarter.
 
 ### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
 
@@ -1850,7 +1833,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - Construction ledger is open on the Buildings view
 - A type group is expanded
 
-**Expected output.** Selects that building (the shared selection, so the Selection band follows it too) and draws its LEVERS below the roster: the production-method grid for a processing facility, and the workforce slider for any building. Pure re-selection - the levers themselves are separate presses (gameplay.set_recipe, gameplay.set_workforce).
+**Expected output.** Selects that building (the shared selection, so the Selection band follows it too) and draws its LEVERS below the roster: the production-method grid for a processing facility, and a read-only workforce bar for any building (the game sets workforce, BL-1310). Pure re-selection - the method lever is a separate press (gameplay.set_recipe).
 
 **Reason to select.** Reaches a building's operating controls by name rather than by hunting it on the map.
 
@@ -1862,7 +1845,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - A building is selected
 - The building is the PLAYER'S - the button is absent on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim
 
-**Expected output.** Opens the Construction ledger on its Buildings view AIMED at this building: its type group expanded and the building selected, so its levers (production method, workforce) are on screen in one press. A DOOR, not a toggle - a second press does not close it, because the button carries no visible active state. Nothing in the world changes.
+**Expected output.** Opens the Construction ledger on its Buildings view AIMED at this building: its type group expanded and the building selected, so its method lever and its workforce reading are on screen in one press. A DOOR, not a toggle - a second press does not close it, because the button carries no visible active state. Nothing in the world changes.
 
 **Reason to select.** The route from a building found on the MAP to its operating controls. The card's centre presents data and never holds levers, so this is how a map selection reaches them.
 
