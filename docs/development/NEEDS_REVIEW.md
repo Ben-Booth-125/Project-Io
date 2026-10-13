@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 29 open, 4 resolved.*
+*34 entries — 30 open, 4 resolved.*
 
 ---
 
@@ -281,6 +281,17 @@ The first build followed the NR-958 stream rule (migrants carry their ceiling), 
 > **Recommendation:** Accept: a war that evicts people should not shrink the ground forever.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/MILITARY_HISTORY.md`*
+
+### NR-1044 — DECISION TAKEN: revolution calibration - Gini city disparity 600, pressure 6000, 3+ cities; fires on 3 of 16 seeds
+*decision · raised 2026-10-13 · from BL-1294 build*
+
+The revolution lean's numbers were the builder's: a realm with 3+ cities whose urban Gini spread is at or above 600 per mille accumulates pressure (excess x years x (2000 - cohesion)/1000); at 6000 a splinter takes the nation (new regime, new coined name). Result: 5 revolutions on seeds 31, 32, 40. Old names are read from the Exploration record, so earlier Industrialisation events print the new name (a saved former-name table would need a version bump).
+
+**Why it matters.** How often revolutions happen, and whether the anachronistic name in earlier events matters on the seat card / ledger.
+
+> **Recommendation:** Accept 3/16 as the lean; revisit the former-name table only if the History ledger shows the anachronism.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
 
 ---
 

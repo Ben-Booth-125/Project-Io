@@ -517,6 +517,22 @@
     "docs/generation/MILITARY_HISTORY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1044",
+   "title": "DECISION TAKEN: revolution calibration - Gini city disparity 600, pressure 6000, 3+ cities; fires on 3 of 16 seeds",
+   "raised": "2026-10-13",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1294 build",
+   "what": "The revolution lean's numbers were the builder's: a realm with 3+ cities whose urban Gini spread is at or above 600 per mille accumulates pressure (excess x years x (2000 - cohesion)/1000); at 6000 a splinter takes the nation (new regime, new coined name). Result: 5 revolutions on seeds 31, 32, 40. Old names are read from the Exploration record, so earlier Industrialisation events print the new name (a saved former-name table would need a version bump).",
+   "why_it_matters": "How often revolutions happen, and whether the anachronistic name in earlier events matters on the seat card / ledger.",
+   "recommendation": "Accept 3/16 as the lean; revisit the former-name table only if the History ledger shows the anachronism.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/INDUSTRIALISATION.md"
+   ],
+   "resolution": null
   }
  ]
 }

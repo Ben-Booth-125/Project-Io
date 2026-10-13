@@ -932,7 +932,7 @@
     "src/world/history_sim.cpp"
    ],
    "title": "Revolution as a lean in Industrialisation: post-Exploration disparity between a nation's cities breeds a splinter that can take the whole nation",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § Revolution. Off the post-Exploration city disparity (inequality stays between nations and cities, never households). Overturns 'no regime reset' for this span. OPEN: the splinter verb, what a takeover changes (regime field, name, polity id), its tag. RULED (Ben, 2026-10-12): a takeover keeps the polity and ground; a new regime and a newly coined name; recorded as a revolution event (INDUSTRIALISATION.md)."
+   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § Revolution. Off the post-Exploration city disparity (inequality stays between nations and cities, never households). Overturns 'no regime reset' for this span. OPEN: the splinter verb, what a takeover changes (regime field, name, polity id), its tag. RULED (Ben, 2026-10-12): a takeover keeps the polity and ground; a new regime and a newly coined name; recorded as a revolution event (INDUSTRIALISATION.md). BUILT AND MERGED (06b115f8): Gini city-disparity bar 600 (3+ cities), pressure 6000, one takeover per realm per span; 3/16 seeds (5 revolutions). New name coined in the realm's tongue; old name read from the Exploration record (no saved former-name table - earlier Industrialisation events print the new name). polity::regime is a counter, not yet the nation's Political system field. Follow-ups: BL-1301 (a name moves the economy)."
   },
   {
    "status": "designed",
@@ -1250,6 +1250,27 @@
    ],
    "title": "Do ruined roads recover? A corridor the fall decayed below its traffic rung is never rebuilt unless traffic walks it",
    "design": "OPEN (design question for Ben). BL-1287's fall decays the falling realm's roads on the ground (Ben, 2026-10-12). Measured 2026-10-13 (tools/verify/rise_fall_roads.cpp): about 6 corridors per seed stay below the rung their own traffic earned from 1200 to 1960, because nothing rebuilds a corridor traffic does not walk and the resumed spans reopen it at the decayed tier. Works relief over-recovers (waystations buy it back). Small effect; not a cause of G1b. Options: ruins recover toward their earned rung over the following span; or ruins persist as a visible scar."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (from the BL-1294 build)",
+   "id": "BL-1301",
+   "short_name": "NAME_MOVES_ECONOMY",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 2,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "requires": [],
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "title": "A nation's NAME moves the campaign economy: renaming a realm (BL-1294) changes market_viability on that seed",
+   "design": "FOUND 2026-10-13 (BL-1294): with only the revolution rename switched off, seed 32 matches main exactly, so a coined name alone moves the 1960 economy. Likely route: corporation names derived from the nation name (make_corp_name) feeding a hash, seed or sort order. A display string must never steer the world (determinism-by-content). Trace the coupling and cut it; world_determinism and market_viability unchanged on non-renamed seeds after."
   }
  ]
 }
