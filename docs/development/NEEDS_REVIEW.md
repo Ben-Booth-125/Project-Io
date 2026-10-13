@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*34 entries — 30 open, 4 resolved.*
+*34 entries — 24 open, 10 resolved.*
 
 ---
 
@@ -220,79 +220,6 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
 
-### NR-1036 — Quick Start draws no setup round: what seed, abundance and nation targets does it build on?
-*question · raised 2026-10-11 · from Sprint 53 design form, 2026-10-11 (seed and abundance move to the setup round)*
-
-Quick Start built on the main menu's seed and resources. Both now live on the setup round, with the nation targets, and Quick Start draws no round.
-
-**Why it matters.** Quick Start needs every input the setup round holds; BL-1279 (wizard setup round) cannot move the controls without an answer.
-
-- Keep a compact seed/abundance/targets strip on the menu for Quick Start only
-- Quick Start rolls a seed and uses defaults (Standard abundance, default targets)
-- Quick Start opens the setup round alone, then builds straight through
-
-> **Recommendation:** The third: one place for the inputs, and Quick Start still skips every lapse.
-
-*Files: `docs/ui/STARTUP.md`*
-
-### NR-1040 — DECISION TAKEN: inside the history, a city state is a one-region realm with people and a centre on its ground
-*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
-
-The size floor now runs in the history, before campaign population centres exist. The old exemption tested a campaign centre in the realm's carve cell; inside the history the only reading is region::centres > 0 with population > 0 on its one anchored region. That reading spares a few more small realms: natural nation counts move 19..73 -> 20..76 (mean 46.1 -> 46.8); majors unchanged.
-
-**Why it matters.** It is the whole cause of the floor move's count movement on settled worlds with no targets set.
-
-- Keep the history-grain reading
-- Build a centre-placement oracle into the closing rounds so the count is preserved exactly (placement logic before the close; heavy)
-
-> **Recommendation:** Keep: the history-grain test is the doc's own wording, and the movement is about one nation a seed.
-
-*Files: `src/world/closing_rounds.cpp`, `docs/generation/NATION_GENERATION.md`*
-
-### NR-1041 — NOVEL WORK: the nation carve now crosses into the history sim as an oracle
-*novel-work · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
-
-To land the total inside the history, the carve was pulled out of generate_nations into a shared carve_from_seeds, and the history's closing rounds call a preview of it to predict the fold's count (with a drift guard in generation). No doc owns a carve that the history reads; NATION_GENERATION.md owns the ruling only.
-
-**Why it matters.** A new seam between the history sim and nation generation, which every later change to either must respect.
-
-> **Recommendation:** Accept, and have NATION_GENERATION.md § Pass 2c/2d describe the closing rounds and the shared carve (D1 follow-through).
-
-*Files: `src/world/closing_rounds.cpp`, `src/world/nation_generation.cpp`*
-
-### NR-1042 — NOVEL WORK: five extra levers BL-1287 (rise and fall) needed to make a rise possible
-*novel-work · raised 2026-10-12 · from BL-1287 build, 2026-10-12*
-
-Appetite and cohesion/supply alone could not lift any realm. The build added, each fixing a measured cause: (1) a defensive network rally - the rising realm's armies march to its own attacked region (BL-921 gather run from the defender's side); (2) the seat keeps its guard; (3) the lean also strengthens Organise, with cultural opposition cut per level; (4) no press at a creed fault line (reasserted alien ground excluded - seeds looped conquest/schism 27-52 times); (5) a stale-reading fix behind secession_waits_for_holder (Empires only): a region conquered this round carried its old holder's supply reading and re-seceded the same round.
-
-**Why it matters.** Each is new Empires behaviour beyond the ruled levers; (5) is a defect fix that may matter beyond the rise.
-
-> **Recommendation:** Accept all five and write them into CIVILISATION.md with the rise; consider (5) for every realm, not only behind its flag.
-
-*Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`*
-
-### NR-1043 — DECISION TAKEN: civil-war refugees do not carry their region's ceiling; flight is bounded by the destination's room
-*decision · raised 2026-10-12 · from BL-1290 build, 2026-10-12*
-
-The first build followed the NR-958 stream rule (migrants carry their ceiling), which permanently lowered war-torn regions' ceilings and compounded (seed 9: a struck region ended at 8 per mille of its farmland ceiling). Replaced: flight lands at most the destination's room, exactly that many leave, ceilings unmoved (seed 9 minimum now 134 per mille). 417 of 2,695 strikes found no refuge and moved nobody (counted).
-
-**Why it matters.** It diverges from NR-958 for civil-war flight only.
-
-> **Recommendation:** Accept: a war that evicts people should not shrink the ground forever.
-
-*Files: `src/world/history_sim.cpp`, `docs/generation/MILITARY_HISTORY.md`*
-
-### NR-1044 — DECISION TAKEN: revolution calibration - Gini city disparity 600, pressure 6000, 3+ cities; fires on 3 of 16 seeds
-*decision · raised 2026-10-13 · from BL-1294 build*
-
-The revolution lean's numbers were the builder's: a realm with 3+ cities whose urban Gini spread is at or above 600 per mille accumulates pressure (excess x years x (2000 - cohesion)/1000); at 6000 a splinter takes the nation (new regime, new coined name). Result: 5 revolutions on seeds 31, 32, 40. Old names are read from the Exploration record, so earlier Industrialisation events print the new name (a saved former-name table would need a version bump).
-
-**Why it matters.** How often revolutions happen, and whether the anachronistic name in earlier events matters on the seat card / ledger.
-
-> **Recommendation:** Accept 3/16 as the lean; revisit the former-name table only if the History ledger shows the anachronism.
-
-*Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
-
 ---
 
 ## Resolved
@@ -312,6 +239,23 @@ Two readings taken on your behalf. (a) 'Grows relatively large' is read as the l
 > **RESOLVED.** Ben, 2026-10-11 (sprint 53 form): (a) confirmed with a floor - the realm peaks at 25-35% of held regions, under the 50% cap; (b) confirmed - chosen at the Culture close, kept alive by the same isolation. Written: CIVILISATION.md, EXPLORATION.md.
 
 *Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/lore/HISTORY.md`*
+
+### NR-1036 — Quick Start draws no setup round: what seed, abundance and nation targets does it build on?
+*question · raised 2026-10-11 · from Sprint 53 design form, 2026-10-11 (seed and abundance move to the setup round)*
+
+Quick Start built on the main menu's seed and resources. Both now live on the setup round, with the nation targets, and Quick Start draws no round.
+
+**Why it matters.** Quick Start needs every input the setup round holds; BL-1279 (wizard setup round) cannot move the controls without an answer.
+
+- Keep a compact seed/abundance/targets strip on the menu for Quick Start only
+- Quick Start rolls a seed and uses defaults (Standard abundance, default targets)
+- Quick Start opens the setup round alone, then builds straight through
+
+> **Recommendation:** The third: one place for the inputs, and Quick Start still skips every lapse.
+
+> **RESOLVED.** Ben, 2026-10-13: Quick Start opens the setup round alone, then builds straight through (STARTUP.md).
+
+*Files: `docs/ui/STARTUP.md`*
 
 ### NR-1037 — The Drawdown lean no longer shows on the Life pane: does the 2D map need a cue for it?
 *question · raised 2026-10-11 · from BL-1280 (Life round 2D map) build, 2026-10-11*
@@ -357,4 +301,72 @@ Every earlier envelope bump refused the old version outright. v23 appends the tw
 > **RESOLVED.** Ben, 2026-10-11: keep - a v22 save loads with the targets unset.
 
 *Files: `src/core/save_game.cpp`, `tools/verify/save_envelope_roundtrip.cpp`*
+
+### NR-1040 — DECISION TAKEN: inside the history, a city state is a one-region realm with people and a centre on its ground
+*decision · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
+
+The size floor now runs in the history, before campaign population centres exist. The old exemption tested a campaign centre in the realm's carve cell; inside the history the only reading is region::centres > 0 with population > 0 on its one anchored region. That reading spares a few more small realms: natural nation counts move 19..73 -> 20..76 (mean 46.1 -> 46.8); majors unchanged.
+
+**Why it matters.** It is the whole cause of the floor move's count movement on settled worlds with no targets set.
+
+- Keep the history-grain reading
+- Build a centre-placement oracle into the closing rounds so the count is preserved exactly (placement logic before the close; heavy)
+
+> **Recommendation:** Keep: the history-grain test is the doc's own wording, and the movement is about one nation a seed.
+
+> **RESOLVED.** Ben, 2026-10-13: accepted.
+
+*Files: `src/world/closing_rounds.cpp`, `docs/generation/NATION_GENERATION.md`*
+
+### NR-1041 — NOVEL WORK: the nation carve now crosses into the history sim as an oracle
+*novel-work · raised 2026-10-11 · from BL-1278 (nation count targets) lane B, 2026-10-11*
+
+To land the total inside the history, the carve was pulled out of generate_nations into a shared carve_from_seeds, and the history's closing rounds call a preview of it to predict the fold's count (with a drift guard in generation). No doc owns a carve that the history reads; NATION_GENERATION.md owns the ruling only.
+
+**Why it matters.** A new seam between the history sim and nation generation, which every later change to either must respect.
+
+> **Recommendation:** Accept, and have NATION_GENERATION.md § Pass 2c/2d describe the closing rounds and the shared carve (D1 follow-through).
+
+> **RESOLVED.** Ben, 2026-10-13: accepted; NATION_GENERATION.md to describe the closing rounds and shared carve.
+
+*Files: `src/world/closing_rounds.cpp`, `src/world/nation_generation.cpp`*
+
+### NR-1042 — NOVEL WORK: five extra levers BL-1287 (rise and fall) needed to make a rise possible
+*novel-work · raised 2026-10-12 · from BL-1287 build, 2026-10-12*
+
+Appetite and cohesion/supply alone could not lift any realm. The build added, each fixing a measured cause: (1) a defensive network rally - the rising realm's armies march to its own attacked region (BL-921 gather run from the defender's side); (2) the seat keeps its guard; (3) the lean also strengthens Organise, with cultural opposition cut per level; (4) no press at a creed fault line (reasserted alien ground excluded - seeds looped conquest/schism 27-52 times); (5) a stale-reading fix behind secession_waits_for_holder (Empires only): a region conquered this round carried its old holder's supply reading and re-seceded the same round.
+
+**Why it matters.** Each is new Empires behaviour beyond the ruled levers; (5) is a defect fix that may matter beyond the rise.
+
+> **Recommendation:** Accept all five and write them into CIVILISATION.md with the rise; consider (5) for every realm, not only behind its flag.
+
+> **RESOLVED.** Ben, 2026-10-13: all five accepted; the stale-reading fix extends to every span (CIVILISATION.md; BL-1303).
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`*
+
+### NR-1043 — DECISION TAKEN: civil-war refugees do not carry their region's ceiling; flight is bounded by the destination's room
+*decision · raised 2026-10-12 · from BL-1290 build, 2026-10-12*
+
+The first build followed the NR-958 stream rule (migrants carry their ceiling), which permanently lowered war-torn regions' ceilings and compounded (seed 9: a struck region ended at 8 per mille of its farmland ceiling). Replaced: flight lands at most the destination's room, exactly that many leave, ceilings unmoved (seed 9 minimum now 134 per mille). 417 of 2,695 strikes found no refuge and moved nobody (counted).
+
+**Why it matters.** It diverges from NR-958 for civil-war flight only.
+
+> **Recommendation:** Accept: a war that evicts people should not shrink the ground forever.
+
+> **RESOLVED.** Ben, 2026-10-13: accepted.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/MILITARY_HISTORY.md`*
+
+### NR-1044 — DECISION TAKEN: revolution calibration - Gini city disparity 600, pressure 6000, 3+ cities; fires on 3 of 16 seeds
+*decision · raised 2026-10-13 · from BL-1294 build*
+
+The revolution lean's numbers were the builder's: a realm with 3+ cities whose urban Gini spread is at or above 600 per mille accumulates pressure (excess x years x (2000 - cohesion)/1000); at 6000 a splinter takes the nation (new regime, new coined name). Result: 5 revolutions on seeds 31, 32, 40. Old names are read from the Exploration record, so earlier Industrialisation events print the new name (a saved former-name table would need a version bump).
+
+**Why it matters.** How often revolutions happen, and whether the anachronistic name in earlier events matters on the seat card / ledger.
+
+> **Recommendation:** Accept 3/16 as the lean; revisit the former-name table only if the History ledger shows the anachronism.
+
+> **RESOLVED.** Ben, 2026-10-13: more often - about a third of seeds (INDUSTRIALISATION.md; BL-1304).
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
 

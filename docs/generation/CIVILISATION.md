@@ -797,7 +797,13 @@ No private price is paid by this realm alone. **Bare ground relays no supply for
 so a thinned outer march really cuts the network and the ground beyond it secedes. Decay alone left
 compact realms supplied (8 of 16 seeds halved), because supply falls with reach steps, not with roads. The rise keeps its recorded lean — appetite, the
 defensive rally, cohesion on conquest — as the sanctioned exception the targeted pattern is, each step
-a recorded event. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
+a recorded event.
+**The rise's levers (Ben, 2026-10-13, accepting NR-1042):** the lean presses appetite (Organise
+included), the rising realm's armies rally to its attacked ground over its supplied network, its seat
+keeps its guard, and no press falls at a creed fault line. **A region taken this round reads its new
+holder's supply before it may secede — in every span**, not only Empires: a stale reading made
+retaken seats re-secede in a loop. **Ruined roads persist as a visible scar (Ben, 2026-10-13):** a
+road the fall decayed is not rebuilt unless traffic walks it again. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
 only walking away; the deaths are soldiers', plus the famine and displacement mechanism
 `MILITARY_HISTORY.md` owns. **What counts as one (Ben, 2026-10-11):** a successor that breaks away
 holding at least a quarter of what its parent kept, and then takes a seat from or ends its parent (or

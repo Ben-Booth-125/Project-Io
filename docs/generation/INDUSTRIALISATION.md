@@ -862,7 +862,12 @@ and the acceptance row "never all, never none" are overturned.
   is demoted one tier. Regions the war never reaches are untouched.
 - **Treasuries are drained, and no debt is carried.** Each belligerent's treasury is spent down by
   the war's cost and never goes below zero. Nothing is owed at 1960: the campaign opens on rebuilt
-  ground and refilled treasuries, not on a ledger of debt.
+  ground and refilled treasuries, not on a ledger of debt. **The war costs about half a belligerent's
+  chest (Ben, 2026-10-13)**: a whole chest could not be refilled in thirty years, and 1960 must still
+  open near the treasury band (`NATION_GENERATION.md` § Pass 7).
+- **Short, ruinous, and the borders stand (Ben, 2026-10-13).** The war is a few years early in the
+  window; peace returns the map as it was. It settles nothing on the map; its costs are the record.
+  War weariness and the extra Alarm it leaves are later work.
 
 #### Revolution
 
@@ -871,7 +876,8 @@ nation's cities is read after Exploration; where it is wide, a splinter can rise
 the whole nation. It overturns, for this span, the Empires rule that no regime resets while the map
 stands still (`CIVILISATION.md`). A revolution is a lean and promises nothing. **What a takeover
 changes (Ben, 2026-10-12):** the polity and its ground stay; it takes **a new regime and a newly
-coined name**, and the takeover is recorded as a revolution event.
+coined name**, and the takeover is recorded as a revolution event. **About a third of worlds see
+one (Ben, 2026-10-13)**: the lean is calibrated to fire on roughly a third of the library.
 
 #### A world war is permitted, never forced (the 2026-09-15 ruling, superseded in part above)
 
