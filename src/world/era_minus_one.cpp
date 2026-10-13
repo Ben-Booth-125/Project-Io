@@ -403,6 +403,17 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.culture_profile_lack_max_q  = params.culture_profile_lack_max_q;
     hp.culture_profile_amenity_div = params.culture_profile_amenity_div;
 
+    // BL-1298 -- THE HISTORY BANKS MORE (NATION_GENERATION.md sec Pass 7;
+    // EXPLORATION.md sec Force persists now; Ben, 2026-10-11). Both resumed
+    // spans: the standing levy on the seats' stores every round after the
+    // 1200 fold, the rescaled endowment income, and the standing army sized
+    // to what the realm earns (the navy keeps NR-878).
+    hp.treasury_levy_per_mille_q   = params.treasury_levy_per_mille_q;
+    hp.treasury_endowment_income_q = params.treasury_endowment_income_q;
+    hp.standing_army_sized_to_earn = params.standing_army_sized_to_earn;
+    hp.treasury_endowment_summed   = true; // Ben, 2026-10-12: summed over held ground
+    hp.treasury_endowment_world_share = true; // Ben, 2026-10-12: as a share of the world
+
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration
     // ends long before 1200 — but the flag is a property of the WORLD's rule
@@ -627,6 +638,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // points (the treasury withheld stays in the purse). It loosens the
     // leader's grip on its own landmass; the top-landmass share stays ~0.89.
     hp.industry_points_crowding_k = 1000;
+
+    // BL-1298 (Ben, 2026-10-12): the exchange rate re-sized against the real
+    // chests the history now banks; history_sim.hpp says why.
+    hp.industry_points_per_1000_treasury_units = params.industry_points_per_1000_treasury_units;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

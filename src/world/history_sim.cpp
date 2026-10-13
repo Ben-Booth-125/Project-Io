@@ -1099,7 +1099,9 @@ exploration_spend_scores score_exploration_spend(const history_sim_params&     p
     // eligibility reads is the treasury AFTER upkeep) and the levy bound: a
     // step is a whole step of heads the seat's pool can actually lend.
     s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q
-                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1);
+                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1)
+                   // BL-1298: and the earn carries the step (`earn_room`, -1 = no bound).
+                   && (f.earn_room < 0 || f.earn_room >= std::max<int64_t>(p.standing_army_build_step_q, 1));
     s.army_q = (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
 
     // PORT and NAVY share the OUTWARD pull: expansion, and wants only water reaches.
@@ -1400,6 +1402,26 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         }
     }
 
+    // BL-1298 -- THE WORLD'S HELD GROUND, read once before any polity earns
+    // (NATION_GENERATION.md sec Pass 7, Ben 2026-10-12: "a realm earns by the
+    // share of its world's held ground it holds"). The summed endowment of
+    // every region a living polity holds, and how many living polities hold
+    // any. Only read under `treasury_endowment_world_share`.
+    int64_t world_held_endowment_q = 0;
+    int64_t world_holding_realms   = 0;
+    if (params.treasury_endowment_world_share)
+    {
+        std::vector<char> holds(polities.size(), 0);
+        for (const region& r : regions)
+        {
+            if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+            if (!polities[static_cast<std::size_t>(r.nation)].alive) continue;
+            world_held_endowment_q += (r.farm_q + r.ore_q + r.energy_q + r.port_q) / 4;
+            holds[static_cast<std::size_t>(r.nation)] = 1;
+        }
+        for (const char h : holds) world_holding_realms += h;
+    }
+
     // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
     // (EXPLORATION.md sec The engine is shared). PAY and INVEST beyond the
     // ordinary verb are still owed to a later item (BL-933's stocks).
@@ -1447,6 +1469,35 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // round's SURPLUS (earn less the army and navy bills) is read against.
         const int64_t purse_before_earn = seat.treasury;
 
+        // ---- BL-1298 -- THE STANDING LEVY: EVERY ROUND AFTER THE FOLD. ----
+        // NATION_GENERATION.md sec Pass 7 (Ben, 2026-10-11): "a realm taxes
+        // its seats' stores every round -- swept into the chest as the 1200
+        // consolidation once swept it, but every round rather than once." The
+        // ground read is the consolidation's (every held seat, plus the
+        // capital); the take is a per-mille share of each seat's stock,
+        // floored per seat. Earned after the purse's opening read, so it is
+        // part of the round's surplus and of what the realm's earn carries.
+        // Out of domain (outside 1-1000) it levies nothing.
+        int64_t levy_income = 0;
+        if (params.treasury_levy_per_mille_q > 0 && params.treasury_levy_per_mille_q <= 1000
+            && params.consolidation_year != INT64_MIN && year > params.consolidation_year)
+        {
+            const int64_t share = params.treasury_levy_per_mille_q;
+            for (std::size_t ri = 0; ri < regions.size(); ++ri)
+            {
+                region& r = regions[ri];
+                const bool is_cap = static_cast<int>(ri) == q.capital;
+                if (!is_cap && !(r.is_seat && r.nation == q.id)) continue;
+                if (r.material_stock <= 0) continue;
+                // material_stock <= 2^48 and share <= 1000: under 2^58.
+                const int64_t take = (r.material_stock * share) / 1000;
+                r.material_stock -= take;
+                levy_income      += take;
+            }
+            seat.treasury = clampi64(seat.treasury + levy_income, 0, 1LL << 48);
+            if (spend) spend->earn_levy += levy_income; // write-only
+        }
+
         // ---- ONGOING EARN: endowment, the inherited network, a market. ----
         // "Fed by what the polity already holds and already reaches" — read
         // fresh every round rather than cached, so ground lost or gained this
@@ -1471,9 +1522,26 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (a_held || b_held) ++corridor_touch;
         }
 
-        const int64_t endowment_income =
-            (endowment_mean_q * params.treasury_endowment_income_q / 1000)
+        // BL-1298 (Ben, 2026-10-12): summed over held ground where the span
+        // says so, so a larger realm earns more; the mean form otherwise.
+        // sum_q <= regions x 1000 and the rate is an int: far inside int64.
+        const int64_t endowment_base_q =
+            params.treasury_endowment_summed ? endowment_sum_q : endowment_mean_q;
+        int64_t endowment_income =
+            (endowment_base_q * params.treasury_endowment_income_q / 1000)
                 * std::max(step_years, 1);
+        // BL-1298 (Ben, 2026-10-12) -- AS A SHARE OF THE WORLD: the realm's
+        // share of its world's held endowment, times the realms holding any,
+        // so a realm holding the AVERAGE share earns
+        // `treasury_endowment_income_q` a year whatever the world's size.
+        // A larger realm still earns more (the order holds); a small world's
+        // realms are not poorer for the world being small. Products stay far
+        // inside int64: rate (int) x sum_q (<= regions x 1000) x realms.
+        if (params.treasury_endowment_world_share)
+            endowment_income = world_held_endowment_q > 0
+                ? ((static_cast<int64_t>(params.treasury_endowment_income_q) * endowment_sum_q
+                    * world_holding_realms) / world_held_endowment_q) * std::max(step_years, 1)
+                : 0;
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
         // BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING.
@@ -1512,10 +1580,72 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         const int64_t years_q = std::max(step_years, 1);
         const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
         const bool had_navy = q.navy_stock > 0; // the round's OPENING fleet, for the lapse record
+        int64_t earn_carry_cap = -1; // BL-1298: -1 = no bound (sizing off, or no bill)
         {
-            const int64_t heads = realm_paid[pi];
+            int64_t heads = realm_paid[pi];
             const int64_t rate  =
                 std::max<int64_t>(params.standing_army_upkeep_per_1000_heads_year_q, 0) * years_q;
+            // BL-1298: what the round's earn carries, read once -- the sizing
+            // below disbands down to it and the army step may not buy past it.
+            // It excludes the 1200 fold (a one-off windfall is not an earn the
+            // realm can pay a standing army from), by construction: the fold
+            // is credited above, before `purse_before_earn`, and is not in
+            // these terms.
+            if (params.standing_army_sized_to_earn && rate > 0)
+            {
+                const int64_t round_earn_all = std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                earn_carry_cap = round_earn_all >= (INT64_MAX / 1000) ? INT64_MAX
+                                                                      : (round_earn_all * 1000) / rate;
+            }
+            // ---- BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS. ----
+            // EXPLORATION.md sec Force persists now (Ben, 2026-10-11,
+            // overturning NR-878 for the standing army): "a realm keeps only
+            // the standing army its earn can carry". Where the round's bill
+            // exceeds the round's earn, every region carrying this realm's
+            // paid heads keeps the same per-mille share -- the share the earn
+            // carries -- and the rest go home to that ground's pool, capped
+            // at its ceiling, as the unpaid decay's men do. The bill below is
+            // then within the earn, so the chest is never drawn down by it.
+            if (params.standing_army_sized_to_earn && heads > 0 && rate > 0)
+            {
+                const int64_t round_earn = std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                // heads <= 2^48 and rate <= ~2^34 at any sane constant; the
+                // division form keeps the comparison free of the product.
+                const int64_t carried = std::min<int64_t>(heads,
+                    round_earn >= (INT64_MAX / 1000) ? heads : (round_earn * 1000) / rate);
+                if (carried < heads)
+                {
+                    // carried < heads <= 2^48, so carried * 1000 < 2^58.
+                    const int64_t keep_q = (carried * 1000) / heads; // 0..999
+                    int64_t kept_sum = 0, gone_sum = 0;
+                    for (region& r : regions)
+                    {
+                        if (r.nation != q.id) continue;
+                        const int64_t paid = standing_army_heads(r);
+                        if (paid <= 0) continue;
+                        const int64_t kept = (paid * keep_q) / 1000;
+                        const int64_t gone = paid - kept;
+                        r.standing_army = kept;
+                        r.army_stock    = std::max<int64_t>(r.army_stock - gone, 0);
+                        // Clamped at the pool's ceiling exactly as BL-972's
+                        // unpaid decay and `muster_garrison`'s disband are: a
+                        // head past the ceiling is not returned (known, kept).
+                        const int64_t ceiling = manpower_ceiling(r.population, r.work_manpower_mod);
+                        r.manpower_stock = clampi64(r.manpower_stock + gone, 0, ceiling);
+                        kept_sum += kept;
+                        gone_sum += gone;
+                    }
+                    heads = kept_sum;
+                    realm_paid[pi] = kept_sum;
+                    if (spend)
+                    {
+                        spend->army_disbanded_by_earn += gone_sum;
+                        ++spend->army_sized_rounds;
+                    }
+                }
+            }
             if (heads > 0 && rate > 0)
             {
                 const int64_t due = (heads * rate) / 1000;
@@ -1583,8 +1713,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // there is nowhere for its works to stand: no debit, no credit, and the
         // treasury keeps the round's share. (It used to land the whole credit on
         // the capital's region, townless ground no campaign centre can receive.)
-        // A treasury unit is `industry_points_per_treasury_unit` points (a
-        // unit choice, history_sim.hpp says why). Only inside the span (the switch,
+        // A thousand treasury units are `industry_points_per_1000_treasury_units`
+        // points (a unit choice, history_sim.hpp says why). Only inside the span (the switch,
         // from its open year) and only on in-domain constants; a conversion
         // that would carry ANY receiving region past `industry_points_ceiling`,
         // or whose heads leave the apportionment's domain, is refused whole and
@@ -1594,12 +1724,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             const int64_t surplus = std::max<int64_t>(seat.treasury - purse_before_earn, 0);
             // surplus <= 2^48 (the treasury's own clamp) and share <= 1000, so
-            // the product stays under 2^58; `paid_in` <= 2^48, and times the
-            // exchange rate (<= 10^4 < 2^14) the credit stays under 2^62.
+            // the product stays under 2^58; `paid_in` <= 2^48.
             const int64_t paid_in = (surplus * params.industry_points_treasury_share_q) / 1000;
             if (paid_in > 0)
             {
-                const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
+                const int64_t credit = industry_points_for_treasury_units(
+                    paid_in, params.industry_points_per_1000_treasury_units);
                 std::vector<std::pair<int, int64_t>> spread;
                 bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread, works);
                 // BL-1169 -- A CROWDED HEARTLAND CONVERTS AT A LOWER RATE
@@ -1614,7 +1744,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 {
                     const int64_t kept = industry_points_crowd_brake(
                         regions, spread, params.industry_points_crowding_k,
-                        params.industry_points_per_treasury_unit, works);
+                        params.industry_points_per_1000_treasury_units, works);
                     if (kept < 0) refuse = true; // out of the brake's domain: refused whole
                     else debit -= kept;
                 }
@@ -1684,6 +1814,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.levy_room           =
             (std::max<int64_t>(seat.manpower_stock, 0)
              * clampi(params.standing_army_levy_per_mille_q, 0, 1000)) / 1000;
+        // BL-1298: the earn's room, after the sizing (`realm_paid` is post-sizing).
+        facts.earn_room = earn_carry_cap < 0 ? -1
+                        : std::max<int64_t>(earn_carry_cap - realm_paid[pi], 0);
         const exploration_spend_scores pick_scores = score_exploration_spend(params, facts);
         const exploration_spend_option pick = choose_exploration_spend(pick_scores);
         if (spend != nullptr) // BL-1152 diagnosis, report only
@@ -5742,6 +5875,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_earned_corridor      += upkeep_spend.earn_corridor;        // write-only
             out.treasury_earned_trade         += upkeep_spend.earn_trade;
             out.treasury_from_consolidation   += upkeep_spend.consolidation_folded;
+            out.treasury_earned_levy          += upkeep_spend.earn_levy;
+            out.army_disbanded_by_earn        += upkeep_spend.army_disbanded_by_earn;
+            out.army_sized_rounds             += upkeep_spend.army_sized_rounds;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
@@ -11205,7 +11341,8 @@ bool industry_points_params_valid(const history_sim_params& p)
 {
     return p.industry_points_per_million_urban_heads_year >= 0
         && p.industry_points_per_million_urban_heads_year <= 1000000
-        && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
+        && p.industry_points_per_1000_treasury_units >= 1
+        && p.industry_points_per_1000_treasury_units <= industry_points_per_1000_units_max
         && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
         && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000
         && p.industry_points_crowding_k >= 0 && p.industry_points_crowding_k <= industry_points_crowding_k_max;
@@ -11366,10 +11503,11 @@ int64_t industry_points_crowding_q(const region& r, const works_registry* works)
 
 int64_t industry_points_crowd_brake(const std::vector<region>& regions,
                                     std::vector<std::pair<int, int64_t>>& spread,
-                                    int64_t k, int64_t points_per_unit,
+                                    int64_t k, int64_t points_per_1000_units,
                                     const works_registry* works)
 {
-    if (k < 1 || k > industry_points_crowding_k_max || points_per_unit < 1) return -1;
+    if (k < 1 || k > industry_points_crowding_k_max || points_per_1000_units < 1
+        || points_per_1000_units > industry_points_per_1000_units_max) return -1;
     // Each receiving region converts its share at f = K / (K + crowding),
     // held in parts per million (K <= 10^9, so K x 10^6 < 2^60), and the
     // share times f is staged (s / 10^6) x f + ((s % 10^6) x f) / 10^6.
@@ -11394,8 +11532,17 @@ int64_t industry_points_crowd_brake(const std::vector<region>& regions,
     // worth of points a round) still converts, on the least crowded receiver,
     // so every unit either stays or lands at the full exchange rate -- no
     // point is deleted.
-    const int64_t kept_units = kept_points / points_per_unit;
-    spread[best].second += kept_points - kept_units * points_per_unit;
+    // BL-1298: the rate is per THOUSAND units, staged so nothing overflows:
+    // kept_units = floor(kept_points x 1000 / rate), and the points those
+    // units are worth (`industry_points_for_treasury_units`) never exceed
+    // kept_points, so the residue is >= 0. At a rate divisible by 1000 this
+    // is the per-unit arithmetic it replaced, digit for digit.
+    // Below one unit's worth of points the residue still converts on the
+    // least crowded receiver (at most one unit's points a conversion; known,
+    // kept -- the same residue rule as before BL-1298).
+    const int64_t r = points_per_1000_units;
+    const int64_t kept_units = (kept_points / r) * 1000 + ((kept_points % r) * 1000) / r;
+    spread[best].second += kept_points - industry_points_for_treasury_units(kept_units, r);
     return kept_units;
 }
 

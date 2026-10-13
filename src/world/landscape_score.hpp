@@ -174,3 +174,22 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
 landscape_score score_landscape(world& w, const recipe_registry& reg,
                                 const std::array<resource_classification, resource_count>& cls,
                                 const landscape_score_params& p);
+
+/// THE ROSTER-AWARE CLOSURE, ONE MARKET (the `actual` term's own arithmetic,
+/// factored out so a second reader shares it -- BL-1298 / BL-1283, Ben
+/// 2026-10-13: the champion test and the seat's landscape floor read ONE
+/// closure). Seeded from @p have (the goods extraction buildings in the
+/// catchment really target), closed with only the processing recipes @p run
+/// (browse indices the catchment's processors really run), it returns how many
+/// of @p terms (the terminal set, `terminal_resources`) the closure reaches.
+/// Order-insensitive by construction.
+int close_market_terminals(const recipe_registry& reg, std::array<bool, resource_count> have,
+                           const std::vector<int>& run, const std::vector<std::size_t>& terms);
+
+/// `close_market_terminals` for @p market as the buildings stand now: the
+/// seed and the recipe list gathered exactly as `score_landscape` gathers
+/// them (a processor with no recipe, or one outside the era band, runs
+/// nothing; only an extraction site seeds a good). So a market scores
+/// `actual > 0` in the landscape score iff this returns > 0 on the same world.
+int market_terminals_closed(const world& w, const recipe_registry& reg,
+                            const std::vector<std::size_t>& terms, entity_id market);

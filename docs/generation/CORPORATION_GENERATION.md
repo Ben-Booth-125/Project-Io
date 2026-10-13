@@ -99,6 +99,18 @@ richest affording centre's champion cannot be placed, the nation's next affordin
 first, takes the champion. A nation that can afford one keeps it unless none of its affording centres
 finds ground. This narrows NR-911's report-and-skip rule for champions only; firms keep it.
 
+**A champion is chartered where it can process (Ben, 2026-10-13).** A nation's champion goes to its
+richest affording centre whose market can stand a processor — the chain-feasibility test (BL-1185)
+every processor placement already passes — and falls back down the nation's centres as above. So the
+player's company never opens on a dead-end islet: a region alone on a small landmass prices a
+specialist cheap (its reach is its whole stock), but a centre where no chain can close is passed
+over for the champion. Measured: islet champions left seeds 6 and 8 with no viable seat.
+**The test reads a chain that ends in a finished good (Ben, 2026-10-13, narrowing the same day's
+test).** Inputs reachable is not enough: a champion goes where its market can complete a chain to a
+final good — the same closure the seat's landscape floor reads — so the champion test and the seat
+floor agree by construction. A nation's champion is never lost to the test: where no centre passes,
+it is chartered back at its first passed-over centre.
+
 ### Pass 2 — Industrial focus assignment
 
 Each corporation receives a primary `industrial_focus`:

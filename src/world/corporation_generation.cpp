@@ -17,6 +17,8 @@
 #include "world/world_gen_config.hpp" // trade_retrofit_params (BL-1268)
 #include "world/input_reach.hpp"   // the one reach rule (BL-1185 / BL-1187)
 #include "world/spawn_seat.hpp"    // repoint_player — enforce_chain_feasible_roster's seat
+#include "world/landscape_score.hpp" // market_terminals_closed — the champion floor (BL-1298)
+#include "world/market_saturation.hpp" // classify_resources, measure_market_balance
 
 #include <algorithm>
 #include <cassert>
@@ -1975,6 +1977,100 @@ int chain_recipe_placeable(world& w, const recipe_registry& reg, chain_reach& cr
     if (!chain_recipe_sized(w, reg, cr, self, consumer_market, rc))
         return chain_tier_none;
     return chain_recipe_tier(w, reg, cr, self, consumer_market, rc, own);
+}
+
+/// BL-1298 / BL-1283 (Ben, 2026-10-13; CORPORATION_GENERATION.md § Pass 1, "A
+/// champion is chartered where it can process") — CAN THE MARKET AT @p tile
+/// STAND A PROCESSOR? True when some processing recipe that runs at @p tile and
+/// takes at least one input has, for EVERY input, a producer within reach of the
+/// tile's market — BL-1185's chain tier (`chain_input_tier`), read over the
+/// buildings standing now. A recipe with no inputs proves nothing about the
+/// market and is not counted. The champion test: a nation's champion is not
+/// chartered at a centre whose market cannot close a chain while a later
+/// affording centre of the nation might. Read-only on the economy; it warms
+/// the reach memo exactly as every placement read does.
+bool chain_market_can_process(world& w, const recipe_registry& reg, chain_reach& cr,
+                              entity_id tile)
+{
+    if (w.tiles.find(tile) == w.tiles.end())
+        return false;
+    const entity_id market = market_for_tile(w, tile);
+    if (market == null_entity)
+        return false;
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        if (!recipe_runs_at_tile(w, rc, tile))
+            continue;
+        bool any_input = false, feasible = true;
+        for (std::size_t r = 0; r < resource_count && feasible; ++r)
+        {
+            if (!(rc.inputs[r] > 0.0f))
+                continue;
+            any_input = true;
+            if (chain_input_tier(w, reg, cr, null_entity, market, r, nullptr) == chain_tier_none)
+                feasible = false;
+        }
+        if (any_input && feasible)
+            return true;
+    }
+    return false;
+}
+
+/// BL-1298 / BL-1283 (Ben, 2026-10-13, narrowing the same day's test;
+/// CORPORATION_GENERATION.md § Pass 1, "The test reads a chain that ends in a
+/// finished good") — THE CHAMPION FLOOR. The seat's landscape floor
+/// (`seat_landscape_score`, spawn_seat.cpp) is the mean over a specialist's
+/// sited holdings (a military base excepted) of its catchment market's
+/// `actual x balance`: above zero iff SOME holding's market both closes a chain
+/// to a terminal good (`actual > 0`) and balances some good (`balance > 0`).
+/// The champion test reads exactly that, on the champion's placed holdings and
+/// the buildings standing with them: `actual` through `market_terminals_closed`
+/// -- the landscape score's own closure, one function -- and `balance` through
+/// `measure_market_balance` at the landscape score's default band, the same
+/// call the score makes. Balance is a property of the ground and the
+/// structural want, not of the roster, so it is read once per walk.
+struct champion_floor
+{
+    std::vector<std::size_t>              terms;    ///< `terminal_resources`
+    std::unordered_map<entity_id, double> balance;  ///< market -> balanced fraction
+};
+
+champion_floor make_champion_floor(world& w, const recipe_registry& reg)
+{
+    champion_floor f;
+    const auto cls = classify_resources(w, reg);
+    f.terms = terminal_resources(cls);
+    for (const market_balance& b : measure_market_balance(w, reg, cls, k_balance_household_per_head,
+                                                          k_balance_sink_weight, k_balance_pin_ratio))
+        f.balance[b.market] = b.fraction;
+    return f;
+}
+
+/// True when the seat floor would read above zero for a corporation holding
+/// @p assets on the world as it stands (see `champion_floor`).
+bool champion_floor_holds(const world& w, const recipe_registry& reg, const champion_floor& f,
+                          const std::vector<entity_id>& assets)
+{
+    std::set<entity_id> tried;
+    for (const entity_id bid : assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end() || bit->second.type == building_type::military_base)
+            continue;
+        if (w.tiles.find(bit->second.tile) == w.tiles.end())
+            continue;
+        const entity_id m = market_for_tile(w, bit->second.tile);
+        if (m == null_entity || !tried.insert(m).second)
+            continue;
+        const auto bal = f.balance.find(m);
+        if (bal == f.balance.end() || !(bal->second > 0.0))
+            continue;
+        if (market_terminals_closed(w, reg, f.terms, m) > 0)
+            return true;
+    }
+    return false;
 }
 
 /// Browse indices of the in-band processing recipes that output @p good, in the
@@ -5758,8 +5854,18 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
                                 std::unordered_set<entity_id>& occupied, chain_reach& chain,
                                 const output_want* want, charter_rung& rung,
                                 charter_unspent_reason& why, std::vector<entity_id>& assets_out,
-                                bool nation_wide = false)
+                                bool nation_wide = false,
+                                const champion_floor* floor = nullptr,
+                                bool floor_sites = false)
 {
+    // BL-1298 / BL-1283 (Ben, 2026-10-13): @p floor_sites (with @p floor) skips
+    // the centre's windows and places on the nation's land in markets where the
+    // floor already holds -- they close a chain to a finished good and balance a
+    // good with the buildings standing now -- nearest the centre first. The
+    // restore's first try: a champion goes where its market can complete a
+    // chain. (Closure only grows as buildings are added, so the market still
+    // closes once the champion stands in it.)
+    floor_sites = floor_sites && floor != nullptr;
     const nation_component& nc = w.nations.at(cc.nation);
     const corporation_params capital_params;   // the draw: today's starting capital, 400 +/- 40%
     // Focus and ownership from the CHARACTER region, as Passes 2 and 2b
@@ -5785,14 +5891,16 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
     // recipe whose inputs are produced within reach, or are not placed
     // (Pass 3 "Chain-feasible") — the seat is one of these.
     bool chain_rejected = false;
-    std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
-                                                  settle, spend, /*by_province=*/nullptr,
-                                                  /*province_rungs=*/nullptr, rung, why,
-                                                  reg, &chain, /*serve=*/nullptr,
-                                                  chain_rejected, /*dig=*/nullptr,
-                                                  /*refused=*/nullptr, /*grids=*/nullptr,
-                                                  want);
-    if (assets.empty() && nation_wide)
+    std::vector<entity_id> assets;
+    if (!floor_sites)
+        assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
+                               settle, spend, /*by_province=*/nullptr,
+                               /*province_rungs=*/nullptr, rung, why,
+                               reg, &chain, /*serve=*/nullptr,
+                               chain_rejected, /*dig=*/nullptr,
+                               /*refused=*/nullptr, /*grids=*/nullptr,
+                               want);
+    if (assets.empty() && (nation_wide || floor_sites))
     {
         // BL-1278 (Ben, 2026-10-12): a champion the reconciliation MUST charter
         // may take ANY land tile of its nation when no window of the centre
@@ -5820,6 +5928,38 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
         window.reserve(ranked.size());
         for (const auto& r : ranked)
             window.push_back(r.second);
+        // BL-1298 / BL-1283: in `floor_sites` mode only ground whose market the
+        // floor already holds on stays in the window (one read per market).
+        if (floor_sites)
+        {
+            std::map<entity_id, bool> market_ok;
+            window.erase(std::remove_if(window.begin(), window.end(), [&](entity_id tid) {
+                const entity_id m = market_for_tile(w, tid);
+                auto it = market_ok.find(m);
+                if (it == market_ok.end())
+                {
+                    const auto bal = floor->balance.find(m);
+                    const bool ok = m != null_entity && bal != floor->balance.end() && bal->second > 0.0
+                                 && market_terminals_closed(w, reg, floor->terms, m) > 0;
+                    it = market_ok.emplace(m, ok).first;
+                }
+                return !it->second;
+            }), window.end());
+        }
+        // BL-1298 / BL-1283 (Ben, 2026-10-13): a chain-feasible site first —
+        // ground whose market can stand a processor, in the same nearest-first
+        // order, then the rest. One read per market (nothing is placed while
+        // the window is ordered).
+        {
+            std::map<entity_id, bool> market_ok;
+            std::stable_partition(window.begin(), window.end(), [&](entity_id tid) {
+                const entity_id m = market_for_tile(w, tid);
+                auto it = market_ok.find(m);
+                if (it == market_ok.end())
+                    it = market_ok.emplace(m, chain_market_can_process(w, reg, chain, tid)).first;
+                return it->second;
+            });
+        }
         // THE FOCUS FIRST, THEN THE OTHERS in enum order: a small nation can hold
         // no free deposit for an extraction anchor and still hold workable land
         // a processing or trading anchor stands on. The champion takes the
@@ -5861,6 +6001,20 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
     }
     if (assets.empty())
         return null_entity;
+
+    // BL-1298 / BL-1283 (Ben, 2026-10-13): WITH A FLOOR, THE CHAMPION STANDS
+    // ONLY WHERE THE SEAT FLOOR WOULD READ ABOVE ZERO -- a chain to a finished
+    // good in a balanced market among its holdings (`champion_floor_holds`).
+    // Otherwise everything this call placed is taken back up (no corporation
+    // was created yet: nothing else to undo) and the centre books the
+    // champion `chain_infeasible`, so the caller falls back.
+    if (floor != nullptr && !champion_floor_holds(w, reg, *floor, assets))
+    {
+        for (const entity_id bid : assets)
+            chain_unplace(w, bid, occupied);
+        why = charter_unspent_reason::chain_infeasible;
+        return null_entity;
+    }
 
     // THE CAPITAL IS TODAY'S DRAW (Ben, 2026-09-18): 400 +/- 40% with
     // the focus premium, CORPORATION_GENERATION.md Pass 4 as written.
@@ -5990,6 +6144,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // BL-1185 / BL-1188: the reach every charter's processors are checked
     // against (Pass 3 "Chain-feasible"), its node set read once, here.
     chain_reach chain = make_chain_reach(w, reg);
+    // BL-1298 / BL-1283: the champion floor's terminal set and per-market
+    // balance, read once (balance does not move with the roster).
+    const champion_floor champ_floor = make_champion_floor(w, reg);
 
     // BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per
     // grid, not per body", Ben 2026-10-07): power's gap is read per wired grid
@@ -6176,6 +6333,17 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         const auto pending_it  = pending_champion.find(cc.nation);
         const bool is_fallback = !is_champion && pending_it != pending_champion.end()
                                  && static_cast<int64_t>(cc.points) >= specialist_price;
+        // BL-1298 / BL-1283 (2026-10-13): the champion stands only where the
+        // seat floor would read above zero (`champion_floor`, applied inside
+        // `charter_specialist_at` on its placed holdings). A champion centre
+        // that fails books
+        // its set-aside `chain_infeasible` and leaves the fallback pending, as a
+        // no-ground champion does; a fallback that fails leaves the pending
+        // champion where it was; the restore after the walk keeps the nation's
+        // champion. (The body state the walk fixed before it -- B, the shares,
+        // the yards -- counted the champion on the pre-walk champion centre's
+        // body; a pass-over moves it within the nation, almost always on the
+        // same body. Known, kept.)
         if (is_champion || is_fallback)
         {
             const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
@@ -6203,7 +6371,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             std::vector<entity_id> assets;
             const entity_id corp_id = charter_specialist_at(w, reg, cc, settle, spend, seed,
                                                             occupied, chain, spec_want_p, rung,
-                                                            why, assets);
+                                                            why, assets, /*nation_wide=*/false,
+                                                            &champ_floor);
+            if (corp_id == null_entity && why == charter_unspent_reason::chain_infeasible)
+                ++rep.champions_passed_over;
             if (corp_id == null_entity)
             {
                 // No ground in either window. A CHAMPION centre's price stays
@@ -6892,6 +7063,63 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 opened.balance          = opened.starting_capital;
             }
         }
+    }
+
+    // --- BL-1298 / BL-1283: A NATION KEEPS ITS CHAMPION ----------------------
+    // The processing test (Ben, 2026-10-13) moves a champion; it never takes
+    // one away. A champion centre passed over for want of a processor-capable
+    // market whose nation no later centre gave a champion -- every fallback
+    // found no ground, or none could afford -- charters it back here, at that
+    // centre, on its own windows and then, as the must-charter reconciliation
+    // does, on any land tile of its nation nearest the centre
+    // (`charter_specialist_at`, nation_wide). Its set-aside, booked
+    // `chain_infeasible` when it was passed over, is spent on it: the booking
+    // moves from unspent to spent, so every balance holds. Nations in id order
+    // (the map's), so the pass is deterministic. A centre passed over for want
+    // of GROUND is not retried: that is the 2026-10-11 rule's own outcome.
+    for (const auto& [nation, pf] : pending_champion)
+    {
+        if (pf.why != charter_unspent_reason::chain_infeasible)
+            continue;
+        charter_centre& cc = centres[pf.centre_index];
+        const int32_t price = static_cast<int32_t>(pf.set_aside);
+        charter_rung rung = charter_rung::centre_window;
+        charter_unspent_reason why = charter_unspent_reason::window_exhausted;
+        output_want spec_want;
+        const output_want* spec_want_p = nullptr;
+        if (const auto bsit = bodies.find(cc.body); bsit != bodies.end())
+        {
+            const charter_body_state& sbs = bsit->second;
+            spec_want = measure_output_want(w, reg, cc.body, sbs.consumer_demand);
+            std::array<bool, resource_count> capped{};
+            for (std::size_t r = 0; r < resource_count; ++r)
+                capped[r] = sbs.per_good_cap >= 0 && sbs.firms_by_resource[r] >= sbs.per_good_cap;
+            raise_by_prospective(w, reg, chain, sbs.prospective, market_for_tile(w, cc.tile),
+                                 spec_want.want, spec_want.production, capped);
+            spec_want_p = &spec_want;
+        }
+        std::vector<entity_id> assets;
+        // First, a site where the floor holds: the nation's land in markets
+        // that already close a chain to a finished good and balance a good,
+        // nearest the centre first (`floor_sites`). Then, keeping the champion
+        // whatever, the centre's own windows and any land tile of the nation.
+        entity_id corp_id = charter_specialist_at(w, reg, cc, settle, spend, seed, occupied,
+                                                  chain, spec_want_p, rung, why, assets,
+                                                  /*nation_wide=*/false, &champ_floor,
+                                                  /*floor_sites=*/true);
+        if (corp_id == null_entity)
+        {
+            rung = charter_rung::centre_window;
+            why  = charter_unspent_reason::window_exhausted;
+            assets.clear();
+            corp_id = charter_specialist_at(w, reg, cc, settle, spend, seed, occupied, chain,
+                                            spec_want_p, rung, why, assets, /*nation_wide=*/true);
+        }
+        if (corp_id == null_entity)
+            continue;   // the nation holds no free land at all: booked as it stands
+        cc.unspent[static_cast<std::size_t>(charter_unspent_reason::chain_infeasible)] -= price;
+        record(corp_id, cc, /*specialist=*/true, rung, assets, price);
+        ++rep.champions_restored;
     }
 
     // --- NR-905: THE EVEN SHARE'S GAP ------------------------------------------
@@ -7650,6 +7878,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         for (const auto& kv : w.buildings)
             occupied.insert(kv.second.tile);
         chain_reach chain = make_chain_reach(w, reg);
+        const champion_floor champ_floor = make_champion_floor(w, reg); // BL-1298 / BL-1283
 
         // TWO PASSES (Ben, 2026-10-12). The first places as the walk does, in
         // each centre's windows; only when every minor's windows are spent does
@@ -7670,7 +7899,17 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
             const auto cit = centres_of.find(n);
             if (cit == centres_of.end())
                 continue;
-            for (const auto& [centre_pts, centre] : cit->second)
+            // BL-1298 / BL-1283 (Ben, 2026-10-13): PREFER A SITE WHERE THE SEAT
+            // FLOOR HOLDS. The windowed and the nation-wide passes each try the
+            // nation's centres first WITH the champion floor (a chain to a
+            // finished good in a balanced market among the holdings), then
+            // without it, as before; the nation-wide window also ranks
+            // processor-capable ground first. Consolidation merges the firms that
+            // stand and keeps their ground.
+            const std::vector<std::pair<std::int32_t, entity_id>>& centre_order = cit->second;
+            bool landed = false;
+            for (int attempt = 0; attempt < (pass < 2 ? 2 : 1) && !landed; ++attempt)
+            for (const auto& [centre_pts, centre] : centre_order)
             {
                 charter_centre cc;
                 cc.centre = centre;
@@ -7689,7 +7928,8 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 if (pass < 2)
                     corp = charter_specialist_at(w, reg, cc, settle, spend, seed, occupied, chain,
                                                  &want, rung, why, assets,
-                                                 /*nation_wide=*/pass == 1);
+                                                 /*nation_wide=*/pass == 1,
+                                                 attempt == 0 ? &champ_floor : nullptr);
                 else
                 {
                     corp = consolidate_champion(w, cc, settle, seed, charter, assets);
@@ -7795,6 +8035,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 arm_corporation(w, corp);   // a champion opens armed, as every rival does
                 majors[n].push_back(corp);
                 out.records.push_back(rec);
+                landed = true;
                 break;
             }
         }
