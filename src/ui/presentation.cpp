@@ -456,6 +456,22 @@ ImU32 realm_colour(int polity, bool* found)
     return lapse_polity_colour(polity < 0 ? 0 : polity);
 }
 
+ImU32 market_catchment_colour(int index)
+{
+    constexpr float golden = 0.6180339887f;
+    const int   i   = index < 0 ? 0 : index;
+    float       hue = 0.08f + golden * static_cast<float>(i);
+    hue -= static_cast<float>(static_cast<int>(hue));
+    constexpr float values[3] = { 0.92f, 0.72f, 0.54f };
+    const float v = values[i % 3];
+    const float s = 0.62f;
+    float r = 0.0f, g = 0.0f, b = 0.0f;
+    ImGui::ColorConvertHSVtoRGB(hue, s, v, r, g, b);
+    return IM_COL32(static_cast<int>(r * 255.0f + 0.5f),
+                    static_cast<int>(g * 255.0f + 0.5f),
+                    static_cast<int>(b * 255.0f + 0.5f), 255);
+}
+
 ImU32 lineage_colour(float hue, int depth)
 {
     // Saturation fixed, value stepping down by generation. Both ends were chosen

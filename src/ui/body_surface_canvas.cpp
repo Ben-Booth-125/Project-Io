@@ -2508,21 +2508,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // normalisation maxima — the only state the pass needs is the selected index.
 
     // Market lens pre-pass (BL-015): assign each market on the active body a
-    // distinct catchment colour (using corp palette slots, cycling if there are
-    // more markets than slots). Tiles are tinted by their catchment market.
-    // The old price-wash readout is relocated to the Market Ledger.
+    // DISTINCT catchment colour (palette::market_catchment_colour — no two indices
+    // share one; Ben, 2026-10-13), markets taken in ascending id so a market keeps
+    // its colour frame to frame. Tiles are tinted by their catchment market.
     std::unordered_map<entity_id, ImU32> market_catchment_colour;
     if (state.overlay == overlay_mode::market)
     {
-        int slot = 0;
+        std::vector<entity_id> body_markets;
         for (const auto& [mid, mk] : w.markets)
-        {
-            if (mk.body != state.active_body)
-                continue;
-            market_catchment_colour[mid] =
-                palette::corp_colour(slot % palette::corp_slot_count);
-            ++slot;
-        }
+            if (mk.body == state.active_body)
+                body_markets.push_back(mid);
+        std::sort(body_markets.begin(), body_markets.end());
+        for (std::size_t i = 0; i < body_markets.size(); ++i)
+            market_catchment_colour[body_markets[i]] =
+                palette::market_catchment_colour(static_cast<int>(i));
     }
 
     // Placement-suitability pre-pass (BL-010). A surface tied to *construction mode*,
@@ -5515,7 +5514,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             if (pc.razed)
                 continue;
-            const bool names_market = centre_named_market(w, pid) != null_entity;
+            // The market glyph, and a label for a town only because it names a
+            // market, show ONLY under the Market lens (Ben, 2026-10-13); off it a
+            // market city wears its plain label by the scale rule like any other.
+            const bool names_market = state.overlay == overlay_mode::market
+                                   && centre_named_market(w, pid) != null_entity;
             if (pc.scale < 4 && !names_market)
                 continue;
             const auto tit = w.population_centre_tile.find(pid);

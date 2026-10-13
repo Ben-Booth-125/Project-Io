@@ -679,8 +679,9 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         // settlement record exists (BL-290).
         mt_picker picker(name_rng);
         const tongue body_speech = roll_tongue(picker);
+        std::unordered_set<std::string> used; // unique per body (Ben, 2026-10-13)
         for (entity_id cid : ids)
-            w.population_centre_name[cid] = generate_city_name(name_rng, body_speech);
+            w.population_centre_name[cid] = generate_unique_city_name(name_rng, body_speech, used);
     }
 }
 

@@ -250,6 +250,14 @@ inline constexpr int nation_slot_count = 12;
 /// @return   The nation's identity colour.
 ImU32 nation_colour(entity_id id);
 
+/// The Market lens's catchment colour for the @p index-th market on a body (markets
+/// taken in ascending id). NO TWO INDICES SHARE A COLOUR (Ben, 2026-10-13: "it should
+/// not be possible for markets to share the same colour"): the hue steps by the golden
+/// ratio, which never revisits a hue, and value cycles through three levels so markets
+/// whose hues land close still differ in lightness. The corp palette this replaced has
+/// six slots and cycled, so a body with seven markets or more repeated colours.
+ImU32 market_catchment_colour(int index);
+
 /// One rung of a LINEAGE PALETTE (BL-919): the colour a culture is painted in
 /// on the New World wizard's Culture round, given its place on the hue wheel
 /// and its depth below its root cradle. The wheel rule lives here beside the

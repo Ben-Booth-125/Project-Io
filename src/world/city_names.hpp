@@ -6,6 +6,7 @@
 
 #include <random>
 #include <string>
+#include <unordered_set>
 
 struct settlement_state;
 
@@ -20,6 +21,15 @@ struct settlement_state;
 /// does not name its towns in another. Draws only from @p rng, so callers
 /// control determinism. Returns empty if @p t cannot coin a word.
 std::string generate_city_name(std::mt19937& rng, const tongue& t);
+
+/// A city name not already in @p used, which it is then added to. NO TWO CITIES ON
+/// ONE BODY SHARE A NAME (Ben, 2026-10-13: a market is named for its city, and two
+/// markets read the same when two cities did). Re-draws from @p rng — the naming
+/// pass's own stream, so only later names move — and, if a tongue's stock is too
+/// small to find a fresh name, lengthens the name by another root of the same tongue
+/// until it is fresh. Empty only when the tongue cannot coin at all.
+std::string generate_unique_city_name(std::mt19937& rng, const tongue& t,
+                                      std::unordered_set<std::string>& used);
 
 /// Re-name every population centre on @p body_id in the tongue of the culture
 /// that settled the ground under it (BL-290).

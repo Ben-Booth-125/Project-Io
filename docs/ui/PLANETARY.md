@@ -384,7 +384,7 @@ is reached: *"click the border itself."*
 
 ## Market labels
 
-**Every market's name is drawn on its market city** (Ben, 2026-10-13). A market is named for the
+**Under the Market lens, every market's name is drawn on its market city** (Ben, 2026-10-13; off the lens a market city wears its plain label by the scale rule, with no market glyph). A market is named for the
 city that anchors it (`../economy/MARKETS.md` § Market centres and seeding), and the canvas
 already labels cities, so the market label **is** that city's label, marked as a market: a small
 market glyph before the name, drawn on the settlement-label layer so it shares its LOD and
