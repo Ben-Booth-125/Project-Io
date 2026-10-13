@@ -1314,7 +1314,7 @@ std::string draw_workforce_bar(const building_component& b)
 {
     const int   target = std::clamp(b.workforce_target, 0, workforce_target_max);
     char        pct[16];
-    std::snprintf(pct, sizeof pct, "%d%%", target);
+    std::snprintf(pct, sizeof pct, "%d%%", target / 2); // shown as target/2: 200 internal = 100% (BL-1310)
     const float pct_w = ImGui::CalcTextSize("100%").x;
     const float bar_w = std::max(40.0f, ImGui::GetContentRegionAvail().x - pct_w
                                             - ImGui::GetStyle().ItemSpacing.x);
@@ -1322,7 +1322,7 @@ std::string draw_workforce_bar(const building_component& b)
                        {bar_w, ImGui::GetTextLineHeight()}, "");
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Workforce target, set by the game: each quarter it moves one\n"
-                          "25%% step toward the most profitable level (0-100%%).");
+                          "25%% step toward the most profitable level (100%% = full employment).");
     ImGui::SameLine();
     ImGui::TextUnformatted(pct);
     return pct;

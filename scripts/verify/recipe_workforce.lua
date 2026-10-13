@@ -60,10 +60,10 @@ if b.found then
         local now = verify.first_processing_building().workforce
         local out = verify.building_output(b.tile)
         series = series .. " -> " .. tostring(now)
-        verify.expect(now >= 0 and now <= 100,
-            "quarter " .. q .. ": the target stays in 0-100 (got " .. now .. ")")
-        verify.expect(math.abs(now - prev) <= 25,
-            "quarter " .. q .. ": the game moves the target at most one 25% step ("
+        verify.expect(now >= 0 and now <= 200,
+            "quarter " .. q .. ": the target stays in 0-200 internal (got " .. now .. ")")
+        verify.expect(math.abs(now - prev) <= 50,
+            "quarter " .. q .. ": the game moves the target at most one 50-internal step ("
             .. prev .. " -> " .. now .. ")")
         if now == 0 then
             verify.expect(out <= 0.0,

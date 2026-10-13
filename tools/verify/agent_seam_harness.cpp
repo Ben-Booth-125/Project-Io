@@ -21,7 +21,7 @@
 //       as, a malformed lexeme — is rejected WHOLE with a typed reason, and
 //       the world state_hash before the rejection equals the hash after. No
 //       clamp, no truncation: the specific non-clamp case (workforce=250
-//       neither applies as 250 nor as a clamped 100) is asserted on the
+//       neither applies as 250 nor as a clamped 200) is asserted on the
 //       destination field itself.
 //
 // The scene is order_book_harness's shape: a hand-built registry + synthetic
@@ -576,7 +576,7 @@ int main()
         check(count_of(rx, "ERR unknown op") == 1,
               "R2.5 an unknown opcode answers ERR, not silence");
         check(s.w.buildings.at(s.bld).workforce_target == 100,
-              "R2.6 workforce=250 neither applied nor CLAMPED to 100 (rejected whole)");
+              "R2.6 workforce=250 neither applied nor CLAMPED to 200 (rejected whole)");
         // BL-1266: the float rows ride set_trade_reserve, which APPLIES a 0 or
         // -0 reserve and ignores floor_price — so only the protocol layer stands
         // between 1e-60 / -1e-60 / floor_price=1e300|1e-60 and an applied command.

@@ -904,11 +904,11 @@ struct building_component
     /// processing_facility. `no_recipe` means none assigned.
     uint16_t      recipe = no_recipe;
 
-    /// Workforce target as a percentage of nominal capacity. Range [0, 100]
-    /// (BL-1310, Ben 2026-10-13: the maximum is 100 %); 100 = full nominal
+    /// Workforce target as a percentage of nominal capacity. Range [0, 200] internal,
+    /// SHOWN as target/2 % (BL-1310, Ben 2026-10-13: 100 % is the label for full employment = 200); 100 = nominal
     /// staffing. Scales actual output and the labour portion of maintenance.
     /// Applied in economy_system and budget_system. On the PLAYER's buildings the
-    /// economy tick sets it — one 25 % step a quarter toward the solver's best
+    /// economy tick sets it — one 50-internal step (25 % shown) a quarter toward the solver's best
     /// (BL-181/BL-1310); the player has no control over it. A rival's scorer sets
     /// it through `set_workforce`.
     int  workforce_target = 100;

@@ -160,8 +160,8 @@ const char* method_grid_status(entity_id id);
 entity_id method_grid_status_drawn_for();
 
 /// The WORKFORCE ROW, read-only (BL-1310, Ben 2026-10-13: the game sets the
-/// player's workforce, one 25 % step a quarter; the slider and Auto retired). A
-/// filled bar of `workforce_target` over 0-100 with the percentage to its right.
+/// player's workforce, one 25 % step a quarter (50 internal); the slider and Auto retired). A
+/// filled bar of `workforce_target` over 0-200 (full at 200) with target/2 as the percentage to its right.
 /// Drawn by the expanded building card and the Construction ledger's Buildings
 /// view; writes nothing. Returns the percentage as drawn ("75%").
 std::string draw_workforce_bar(const building_component& b);

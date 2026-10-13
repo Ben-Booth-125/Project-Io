@@ -958,7 +958,8 @@ float wf_target_price(float base, float supply, float demand,
 // (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank, float* out_gain, int bid_hold_ticks)
+                           int stack_rank, float* out_gain, int bid_hold_ticks,
+                           int grid_step)
 {
     if (out_gain)
         *out_gain = 0.0f; // every early return below is "no move, so no gain"
@@ -1105,7 +1106,7 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
     // the player's target moves one 25 % step a quarter toward this answer.
     int   best_wt  = 0;
     float best_net = -std::numeric_limits<float>::infinity();
-    for (int wt = 0; wt <= workforce_target_max; wt += workforce_step)
+    for (int wt = 0; wt <= workforce_target_max; wt += (grid_step > 0 ? grid_step : workforce_dial_grid))
     {
         const float net = net_at(wt);
         if (net > best_net) { best_net = net; best_wt = wt; }
@@ -2288,7 +2289,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const int best = solve_workforce_target(
                 w, reg, b,
                 labour_for(building_id, w.player_entity, building_body(w, b)),
-                rank_of(building_id));
+                rank_of(building_id), nullptr, -1, workforce_step); // the 50-grid
             b.workforce_target = step_workforce_target(b.workforce_target, best);
         }
     }

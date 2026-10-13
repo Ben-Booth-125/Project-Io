@@ -2,7 +2,7 @@
 --
 -- PRODUCTION.md § Workforce target and the auto-solver (Ben, 2026-10-13): each
 -- economy tick the target of every player producing building moves ONE 25 %
--- step toward the solver's most profitable level on the grid 0/25/50/75/100,
+-- step toward the solver's most profitable level on the internal grid 0/50/100/150/200 (shown as /2, 100% = 200),
 -- never further in one quarter; the player has no control over it.
 --
 -- The check: stage a player extraction site (alone on its tile, so the fixture
@@ -45,10 +45,10 @@ local function walk(from, label)
         verify.econ_step(1)
         local now = by_id(site.id).workforce
         series = series .. " -> " .. tostring(now)
-        verify.expect(now >= 0 and now <= 100 and now % 25 == 0,
-                      label .. " q" .. q .. ": the target is on the 0-100 25-grid (got " .. now .. ")")
-        verify.expect(math.abs(now - prev) <= 25,
-                      label .. " q" .. q .. ": at most one 25% step a quarter (" .. prev .. " -> " .. now .. ")")
+        verify.expect(now >= 0 and now <= 200 and now % 50 == 0,
+                      label .. " q" .. q .. ": the target is on the 0-200 50-grid (got " .. now .. ")")
+        verify.expect(math.abs(now - prev) <= 50,
+                      label .. " q" .. q .. ": at most one 50-internal (25% shown) step a quarter (" .. prev .. " -> " .. now .. ")")
         prev = now
     end
     print("workforce_step: " .. label .. " " .. series)
@@ -56,14 +56,14 @@ local function walk(from, label)
 end
 
 walk(0, "from 0%")
-local last = walk(100, "from 100%")
+local last = walk(200, "from 200 (100% shown)")
 
 -- The card reads the target, read-only.
 verify.select_building(site.x, site.y)
 verify.frames(3)
 local c = verify.tile_card()
 verify.expect(c.drawn and c.is_expanded and c.player, "the site's card is expanded and the player's")
-verify.expect(c.workforce == tostring(last) .. "%",
+verify.expect(c.workforce == tostring(last // 2) .. "%",
               "the card's workforce row reads the target the game set ('" .. c.workforce .. "' vs " .. last .. "%)")
 verify.hover(860, 300, 2)
 verify.frames(2)

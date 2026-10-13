@@ -3663,10 +3663,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::string("");
     });
 
-    // A FIXTURE: set a building's workforce target (0–100 %) directly. Since
+    // A FIXTURE: set a building's workforce target (0–200 internal; shown as target/2 %) directly. Since
     // BL-1310 no player control writes it (the game steps it each quarter), so
     // this is the only way a script can stage a starting target; the next
-    // econ step moves a player building one 25 % step from here. Returns the
+    // econ step moves a player building one 50-internal step (25 % shown) from here. Returns the
     // applied value.
     v.set_function("set_building_workforce", [this](unsigned tile_u, int pct) -> int {
         const entity_id tile = static_cast<entity_id>(tile_u);
@@ -3772,7 +3772,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // Range-check BEFORE the narrowing cast, not after — a value that fits a
         // Lua number can still be outside the destination's domain.
         const int wf = t.get_or("workforce", 100);
-        if (wf < 0 || wf > workforce_target_max) return "rejected_invalid"; // BL-1310: 0-100
+        if (wf < 0 || wf > workforce_target_max) return "rejected_invalid"; // 0-200 internal
         cmd.workforce = wf;
 
         const auto r = apply_corp_command(m_world, m_registry, cmd);

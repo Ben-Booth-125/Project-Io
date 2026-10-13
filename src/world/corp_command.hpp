@@ -32,7 +32,7 @@ enum class corp_verb : uint8_t
     build = 0,     ///< construct_building(type, tile, target, recipe) — durative, pay-as-you-build.
     demolish,      ///< demolish_building(building).
     set_recipe,    ///< building_component.recipe := recipe (BL-079 idiom, validated).
-    set_workforce, ///< building_component.workforce_target := value (0–100); clears workforce_auto. RIVALS ONLY: refused for the player corp (BL-1310).
+    set_workforce, ///< building_component.workforce_target := value (0–200 internal); clears workforce_auto. RIVALS ONLY: refused for the player corp (BL-1310).
     idle,          ///< building_component.decommissioned := true.
     resume,        ///< building_component.decommissioned := false.
     place_road,    ///< place_road(tile, tier).
