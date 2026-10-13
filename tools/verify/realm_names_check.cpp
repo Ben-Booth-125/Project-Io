@@ -12,7 +12,13 @@
 //       tongue that could not coin, and either is reported by count.
 //   N2  A shared polity id carries ONE name across prehistory -> exploration
 //       -> industrialisation: the resume carries the table by id and coins
-//       nothing (CIVILISATION.md § A realm's name). Zero renames.
+//       nothing (CIVILISATION.md § A realm's name). Zero renames -- SAVE the
+//       one sanctioned rename (BL-1294, INDUSTRIALISATION.md § Revolution): an
+//       id the later record's `revolution` event names may carry a new name
+//       there, and only such an id.
+//   N7  Every revolution carries both names: the event's realm is on both
+//       tables, its old name (the record before's) and its new one (the
+//       record's own) are coined, non-empty and different.
 //   N3  A resumed record opens with `inherited`, never a `founded` for the
 //       same realm in its opening year: nothing rises twice (BL-1088 R4).
 //   N4  The fold record is well-formed: as many ids as nations the world holds,
@@ -30,7 +36,12 @@
 // ownerless nations. Exits non-zero on any FAIL.
 //
 //   bash tools/verify/build_lua_harness.sh realm_names_check --run
-//   build_gen/verify/realm_names_check.exe [--seed N]
+//   build_gen/verify/realm_names_check.exe [--seed N] [--data]
+//
+// --data loads the shipped data layer first (scripts/world_gen.lua and
+// scripts/works.lua, in app order, as history_patterns does), so the world is
+// the one the app and the library sweeps build -- the one whose revolutions
+// (BL-1294) the N2/N7 rename checks are exercised on (seed 31 carries two).
 
 #include "harness_params.hpp"
 #include "world/components.hpp"
@@ -38,6 +49,9 @@
 #include "world/era_timelapse.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/world.hpp"
+#include "world/works_roster.hpp"
+#include "world/world_gen_config.hpp"
+#include "scripting/lua_state.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -66,9 +80,24 @@ const std::vector<std::string>& names_of(const era_timelapse& rec) { return rec.
 int main(int argc, char** argv)
 {
     uint32_t seed = 0;
+    bool     data = false;
     for (int i = 1; i < argc; ++i)
+    {
         if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc)
             seed = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10));
+        else if (std::strcmp(argv[i], "--data") == 0)
+            data = true;
+    }
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+    if (data)
+    {
+        lua.load("scripts/world_gen.lua");
+        cfg.load_from_lua(lua);
+        lua.load("scripts/works.lua");
+        works.load_from_lua(lua);
+    }
 
     world_params p = arc_params(world_arc::shipped);
     p.seed         = seed;
@@ -79,7 +108,8 @@ int main(int argc, char** argv)
     generation_report     rep{};
     era_minus_one_fixture fx{};
     const auto t0 = std::chrono::steady_clock::now();
-    world       w  = make_hard_coded_world(p, &rep, {}, nullptr, nullptr, &fx);
+    world       w  = data ? make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx)
+                          : make_hard_coded_world(p, &rep, {}, nullptr, nullptr, &fx);
     std::printf("  built in %.1f s\n",
                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
 
@@ -109,8 +139,14 @@ int main(int argc, char** argv)
     }
 
     // --- N2: one name per id across the seams -------------------------------
+    // BL-1294: the ids a record's `revolution` events name, per record.
+    std::set<uint16_t> revolted[3];
+    for (int r = 0; r < 3; ++r)
+        for (const lapse_event& e : records[r]->events)
+            if (e.kind == static_cast<uint8_t>(lapse_event_kind::revolution) && e.polity != lapse_event_none)
+                revolted[r].insert(e.polity);
     {
-        int renamed = 0, shared = 0;
+        int renamed = 0, shared = 0, by_revolution = 0;
         for (int r = 1; r < 3; ++r)
         {
             const std::vector<std::string>& a = names_of(*records[r - 1]);
@@ -119,7 +155,9 @@ int main(int argc, char** argv)
             for (std::size_t i = 0; i < n; ++i)
             {
                 ++shared;
-                if (a[i] != b[i]) ++renamed;
+                if (a[i] == b[i]) continue;
+                if (revolted[r].count(static_cast<uint16_t>(i))) ++by_revolution;
+                else ++renamed;
             }
             // A resumed table only ever GROWS: the successor holds every id the
             // predecessor did.
@@ -129,9 +167,34 @@ int main(int argc, char** argv)
             check(b.size() >= a.size(), buf);
         }
         char buf[160];
-        std::snprintf(buf, sizeof buf, "N2 a shared id carries one name across the seams (%d shared, %d renamed)",
-                      shared, renamed);
+        std::snprintf(buf, sizeof buf,
+                      "N2 a shared id carries one name across the seams, save by revolution "
+                      "(%d shared, %d renamed otherwise, %d by revolution)",
+                      shared, renamed, by_revolution);
         check(shared > 0 && renamed == 0, buf);
+    }
+
+    // --- N7: every revolution carries both names (BL-1294) ------------------
+    {
+        int revolutions = 0, both = 0;
+        for (int r = 1; r < 3; ++r)
+        {
+            const std::vector<std::string>& a = names_of(*records[r - 1]);
+            const std::vector<std::string>& b = names_of(*records[r]);
+            for (const uint16_t q : revolted[r])
+            {
+                ++revolutions;
+                const bool ok = q < a.size() && q < b.size() && !a[q].empty() && !b[q].empty() && a[q] != b[q];
+                if (ok) ++both;
+                std::printf("     revolution on the %s record: realm %u '%s' -> '%s'%s\n", record_names[r],
+                            static_cast<unsigned>(q), q < a.size() ? a[q].c_str() : "?",
+                            q < b.size() ? b[q].c_str() : "?", ok ? "" : "  (BOTH NAMES NOT CARRIED)");
+            }
+        }
+        check(revolted[0].empty(), "N7 no revolution on the Empires record (the lean is Industrialisation's)");
+        char buf[200];
+        std::snprintf(buf, sizeof buf, "N7 every revolution carries its old and new name (%d of %d)", both, revolutions);
+        check(both == revolutions, buf);
     }
 
     // --- N3: a resumed record inherits, it does not re-found ----------------

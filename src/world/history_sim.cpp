@@ -5124,6 +5124,61 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t next_decision = params.start_year;
     int     step_years    = step_for_year(params, params.start_year);
 
+    // ---- BL-1294 (revolution lean): THE DISPARITY, READ AT THE OPEN ----------
+    //
+    // INDUSTRIALISATION.md sec Revolution (Ben, 2026-10-10/12): the disparity
+    // between a realm's cities, read after Exploration -- here, on the map the
+    // span resumes from, before its first year runs. A CITY is a region the
+    // realm holds that carries a centre; the spread is the Gini of their urban
+    // heads, per mille: sum over city pairs of |a - b|, over (cities x heads),
+    // integer throughout. 0 where every city is the same size, near 1000 where
+    // one city holds everything. Walked in region-index order, realms in id
+    // order. Read once: the lean is the open's spread, the pressure below is
+    // what the span does with it.
+    const bool rv_on = params.revolution_lean;
+    std::vector<int32_t> rv_disparity_pm; // by polity id; -1 = not read (too few cities)
+    std::vector<int32_t> rv_cities;
+    std::vector<int64_t> rv_pressure;
+    std::vector<char>    rv_fired;
+    if (rv_on)
+    {
+        const std::size_t np = out.polities.size();
+        rv_disparity_pm.assign(np, -1);
+        rv_cities.assign(np, 0);
+        rv_pressure.assign(np, 0);
+        rv_fired.assign(np, 0);
+        std::vector<std::vector<int64_t>> heads(np);
+        for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+        {
+            const int o = owner[i];
+            if (o < 0 || static_cast<std::size_t>(o) >= np) continue;
+            const region& rg = ss.regions[i];
+            if (rg.centres <= 0 || rg.urban_population <= 0) continue;
+            heads[static_cast<std::size_t>(o)].push_back(rg.urban_population);
+        }
+        const int min_cities = std::max(2, params.revolution_min_cities);
+        for (std::size_t pi = 0; pi < np; ++pi)
+        {
+            const std::vector<int64_t>& h = heads[pi];
+            rv_cities[pi] = static_cast<int32_t>(h.size());
+            if (!out.polities[pi].alive || static_cast<int>(h.size()) < min_cities) continue;
+            int64_t sum = 0, pair_gap = 0;
+            for (std::size_t a = 0; a < h.size(); ++a)
+            {
+                sum += h[a];
+                for (std::size_t b = a + 1; b < h.size(); ++b)
+                    pair_gap += h[a] > h[b] ? h[a] - h[b] : h[b] - h[a];
+            }
+            if (sum <= 0) continue;
+            // pair_gap <= cities^2 x max heads; x1000 stays far inside int64.
+            rv_disparity_pm[pi] = static_cast<int32_t>(
+                (pair_gap * 1000) / (static_cast<int64_t>(h.size()) * sum));
+            ++out.revolution_realms_read;
+            if (rv_disparity_pm[pi] >= params.revolution_disparity_bar_pm) ++out.revolution_realms_wide;
+        }
+        out.revolution_disparity_pm = rv_disparity_pm;
+    }
+
     // ---- BL-1290 (civil war deaths) ------------------------------------------
     //
     // MILITARY_HISTORY.md sec Armies are distinct from population (Ben,
@@ -11201,6 +11256,98 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ++roads_version;
                     lc_note_level(y);
                 }
+            }
+        }
+
+        // ---- BL-1294 (revolution lean): THE PRESSURE, AND THE TAKEOVER -------
+        //
+        // INDUSTRIALISATION.md sec Revolution. Each decision round, every realm
+        // whose cities stood at or over the bar at the open accrues the excess
+        // x the round's years, weighed up as its cohesion falters. At the
+        // threshold a splinter rises in its largest city other than its capital
+        // (most urban heads now, ties to the lower region) and takes the whole
+        // nation: nothing on the map moves -- the polity id, its ground, its
+        // armies and treasury stay -- and the realm takes the next regime and a
+        // name newly coined in its own tongue (`coin_realm_name`, a pure
+        // function of the tongue and (id, the city, the year): no draw from the
+        // sim's stream, so the decision loop is unmoved). A tongue that coins
+        // nothing new raises no takeover. Once per realm per span; realms in
+        // id order. A lean: no backstop, no target, and a quiet span is a
+        // legitimate outcome.
+        if (rv_on)
+        {
+            const int64_t round_years = std::max<int64_t>(1, std::min<int64_t>(step_years, params.stop_year - y));
+            const std::size_t np = std::min(out.polities.size(), rv_disparity_pm.size());
+            for (std::size_t pi = 0; pi < np; ++pi)
+            {
+                polity& q = out.polities[pi];
+                if (rv_fired[pi] || !q.alive || rv_disparity_pm[pi] < params.revolution_disparity_bar_pm) continue;
+                const int64_t excess = rv_disparity_pm[pi] - params.revolution_disparity_bar_pm;
+                const int64_t strain = 2000 - clampi(q.cohesion_q, 0, 1000);
+                rv_pressure[pi] += (excess * round_years * strain) / 1000;
+                if (rv_pressure[pi] < params.revolution_pressure_q) continue;
+                if (cs == nullptr || q.culture < 0 || q.culture >= static_cast<int>(cs->cultures.size())) continue;
+
+                // The city the splinter rises in.
+                int     rise_at = -1;
+                int64_t rise_heads = 0;
+                for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+                {
+                    if (owner[i] != static_cast<int>(pi) || static_cast<int>(i) == q.capital) continue;
+                    const region& rg = ss.regions[i];
+                    if (rg.centres <= 0 || rg.urban_population <= rise_heads) continue;
+                    rise_at = static_cast<int>(i);
+                    rise_heads = rg.urban_population;
+                }
+                if (rise_at < 0) continue; // no provincial city left to rise in: the pressure waits
+
+                // The new name, coined in the realm's own tongue, never the old one.
+                const tongue& speech = cs->cultures[static_cast<std::size_t>(q.culture)].speech;
+                std::string coined;
+                for (uint64_t attempt = 0; attempt < 8; ++attempt)
+                {
+                    const uint64_t salt = (static_cast<uint64_t>(static_cast<uint32_t>(q.id)) << 20)
+                                        ^ static_cast<uint64_t>(static_cast<uint32_t>(rise_at))
+                                        ^ (static_cast<uint64_t>(static_cast<uint32_t>(y)) << 40)
+                                        ^ (0x2E701u + attempt * 0x9E3779B97F4A7C15ull);
+                    coined = coin_realm_name(speech, salt);
+                    if (!coined.empty() && coined != q.name) break;
+                    coined.clear();
+                }
+                if (coined.empty()) continue;
+
+                rv_fired[pi] = 1;
+                const std::string old_name = q.name;
+                const std::string city     = ss.regions[static_cast<std::size_t>(rise_at)].name;
+                const std::string seat     = (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                                               ? ss.regions[static_cast<std::size_t>(q.capital)].name : std::string{};
+                const std::string was      = old_name.empty() ? seat : old_name;
+                q.name = coined;
+                ++q.regime;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    "A splinter rises at " + city + " and takes " + was
+                        + " whole: its cities stood too far apart, and the realm is " + coined + " now",
+                    std::string{}});
+                note_event(lapse_event_kind::revolution, rise_at, static_cast<int>(pi), q.regime);
+                // The live tap's name table: the realm reads by its new name
+                // from here on (the record's own table is copied whole at the
+                // close, `as_timelapse`).
+                if (tap != nullptr && pi < tap_polity_name.size())
+                {
+                    tap_polity_name[pi] = coined;
+                    tap->restate_polity_name(pi, coined);
+                }
+                history_sim_state::revolution_note n;
+                n.polity       = static_cast<int32_t>(pi);
+                n.year         = static_cast<int32_t>(y);
+                n.region       = rise_at;
+                n.disparity_pm = rv_disparity_pm[pi];
+                n.cities       = rv_cities[pi];
+                n.regime       = q.regime;
+                n.old_name     = old_name;
+                n.new_name     = coined;
+                out.revolutions.push_back(std::move(n));
             }
         }
     }

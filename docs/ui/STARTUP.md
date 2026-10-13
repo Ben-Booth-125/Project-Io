@@ -71,8 +71,7 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
   later update. The nation targets are set on the setup round, not here (§ Rounds).
 - **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Quit**.
 - **Quick Start (Ben, 2026-10-08)** — generates the world straight through with no wizard rounds
-  drawn (its seed, abundance and nation targets, now that the setup round holds them, are open
-  design): the cold build behind one loading bar, then the **seat
+  drawn but the setup round, which it opens alone (§ Rounds): the cold build behind one loading bar, then the **seat
   screen**, so the player still chooses the corporation. It is the same world the wizard builds
   on the same settings (§ Handoff: a cold build and an adopted world open on one state hash), so
   it is a way past the rounds, not a different game.
@@ -164,7 +163,9 @@ setup round carries the two nation targets, the **seed** (hex entry, Roll, Copy 
 **abundance** radio — the inputs that shape the whole world rather than one round's subject. They
 move here from the main menu. Every round keeps its own leans: System's and Life's preferences, and
 each pass round's, stay where they are. The order is System, setup, Life, then the four pass rounds.
-What Quick Start builds on, with no setup round drawn, is open design.
+**Quick Start opens the setup round alone, then builds straight through (Ben, 2026-10-13)**: the one
+place the world-wide inputs are set stays the only place, and Quick Start still skips every other
+round.
 
 **INHERITANCE IS NOT A ROUND (Ben, 2026-09-09; held 2026-09-24).** The third planetology round —
 *Inheritance*, which asked what the era before you already took — is retired and is not revived:

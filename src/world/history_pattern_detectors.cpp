@@ -330,10 +330,19 @@ history_pattern_reading detect_history_patterns(const era_timelapse& empires,
     r.cw_count = cw.first; r.cw_splits = cw.second;
     for (const auto& g : cw_named) { r.cw_polities.push_back(g.polity); r.grants.push_back(g); }
     sorted_unique(r.cw_polities);
-    // REVOLUTION: "the takeover is recorded as a revolution event" — and no
-    // such event kind exists on the record yet (BL-1289 owns it), so the
-    // detector names nothing and `rv_count` is 0 by reading, not by fiat. The
-    // proxy below is a reading for the gate, never a hit.
+    // REVOLUTION: "the takeover is recorded as a revolution event"
+    // (INDUSTRIALISATION.md sec Revolution; BL-1294). Each `revolution` event
+    // on the Industrialisation record is one takeover; the realm it names
+    // carries the tag from that year. The successor-takes-parent proxy is kept
+    // beside it as a reading, never a hit.
+    for (const lapse_event& e : industrialisation.events)
+    {
+        if (!is(e, K::revolution) || e.polity == lapse_event_none) continue;
+        ++r.rv_count;
+        r.rv_polities.push_back(e.polity);
+        r.grants.push_back({static_cast<int32_t>(e.polity), e.year, static_cast<uint8_t>(history_pattern::revolution)});
+    }
+    sorted_unique(r.rv_polities);
     r.rv_proxy = read_split_wars(industrialisation, true, nullptr).first;
     return r;
 }
