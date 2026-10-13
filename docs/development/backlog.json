@@ -1227,6 +1227,29 @@
    "title": "A nation keeps the deed history its quests read, so a quest completes when its deed is met",
    "design": "DESIGNED: RESEARCH.md § Quests key the next age (a deed is read from state the game carries). Add the per-nation deed state the nine deeds need where the game already carries the quantity: streak counters over quarters, first-time latches, the national stock-and-demand cover, trade partners by nation; saved. Wire deed_met for every deed whose quantity exists; the rest (Alarm, unrest, war outcomes) stay declared unread with the system they wait on. Never a counter kept only to unlock a node: each reads an in-world quantity. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274.",
    "renumbered_from": "BL-1278 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where BL-1278 was already taken"
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (from the BL-1287 seed-13 diagnosis)",
+   "id": "BL-1300",
+   "short_name": "RUINED_ROADS_RECOVER",
+   "category": "Generation",
+   "priority": "C",
+   "difficulty": 2,
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "requires": [
+    "BL-1287"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "title": "Do ruined roads recover? A corridor the fall decayed below its traffic rung is never rebuilt unless traffic walks it",
+   "design": "OPEN (design question for Ben). BL-1287's fall decays the falling realm's roads on the ground (Ben, 2026-10-12). Measured 2026-10-13 (tools/verify/rise_fall_roads.cpp): about 6 corridors per seed stay below the rung their own traffic earned from 1200 to 1960, because nothing rebuilds a corridor traffic does not walk and the resumed spans reopen it at the decayed tier. Works relief over-recovers (waystations buy it back). Small effect; not a cause of G1b. Options: ruins recover toward their earned rung over the following span; or ruins persist as a visible scar."
   }
  ]
 }
