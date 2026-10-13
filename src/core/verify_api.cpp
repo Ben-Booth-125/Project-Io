@@ -653,13 +653,7 @@ void app::reset_verify_transients()
     m_expenditure_history.clear();
     m_market_history = {};
     m_building_rank_hist.clear();
-    m_body_resource_hist = {};
-    m_tile_resource_hist = {};
-    m_tracked_tiles.clear();
-    m_resource_hist_days.clear();
-    m_resource_sample_index = 0;
     m_strategy_readout = {};
-    m_prev_selection = null_entity;
     m_last_orbit_days = 0.0;
     m_last_survey_day = 0;
     // BL-521: the synthetic cursor is per-script state. Left held, a click at the
@@ -5040,31 +5034,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // gesture it stands in for, and a capture after it shows a stale card.
         m_ui.clear_battle_selection();
     });
-    v.set_function("card_drill", [this]() {
-        // Drive the Selection band's resource drill-down (BL-196) for the currently
-        // selected tile — the equivalent of clicking a resource graph, which
-        // BL-521's injection cannot reach without the graph's screen rect being
-        // published first (see its open question). Drills the tile's first deposited
-        // resource and requests lazy tracking of it (BL-198). Returns the resource
-        // index drilled, or -1 if the selection is not a deposit-bearing tile.
-        const entity_id sel = m_ui.selected_entity;
-        const auto tit = m_world.tiles.find(sel);
-        if (tit == m_world.tiles.end())
-            return -1;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (tit->second.resource_deposit[r] > 0.0f)
-            {
-                m_ui.card_stack.push_back({sel, static_cast<int>(r)});
-                m_ui.card_track_tile = sel;
-                // Acknowledge the selection so render()'s "new selection resets the
-                // drill" does not wipe the stack we just pushed. In live play the
-                // drill click happens frames after the select, so prev is already
-                // current; the harness sets both in one gap, so sync it here.
-                m_prev_selection = sel;
-                return static_cast<int>(r);
-            }
-        return -1;
-    });
     v.set_function("select_building", [this](int col, int row) {
         for (const auto& [bid, bc] : m_world.buildings)
         {
@@ -5088,10 +5057,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // otherwise opens on the queue view. UI state only.
     v.set_function("construction_view", [this](int view) {
         m_ui.construction.panel_view = view;
-        // Acknowledge the current selection so the new-selection panel-close (render()
-        // § "new selection takes the column") does not stomp the panel we're staging
-        // for capture. Harness-only convenience; the interactive path never needs it.
-        m_prev_selection = m_ui.selected_entity;
     });
 
     // Press the construction ledger's Build button on the CURRENT tile selection

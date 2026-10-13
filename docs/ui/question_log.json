@@ -530,7 +530,6 @@
    "answers": "Can I keep this detail on screen while I look at something else?",
    "because": "Comparison is impossible when every selection replaces the last. The card frame is what makes drill-through (BL-214) a shared idiom rather than a per-panel behaviour. Pairs existed here before BL-247's log was removed.",
    "backlog_item": [
-    "BL-196",
     "BL-213",
     "BL-214"
    ],

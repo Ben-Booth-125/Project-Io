@@ -1360,25 +1360,6 @@ struct ui_state
     ImVec2    hover_card_min    { 0.0f, 0.0f };   ///< Last drawn card rect (screen px) — hit-tested next frame to decide dismissal.
     ImVec2    hover_card_max    { 0.0f, 0.0f };
 
-    // --- selection band recursive drill-down (BL-196) ---
-    // One drilled frame: a resource time-series view opened from a tile card's
-    // per-resource graph. The card shows a STACK of these over the root selection
-    // (empty = the root). Esc / the card's back button pop one; at the root a
-    // dismiss hides the card. Acyclic + depth-capped (see selection_panel.cpp).
-    struct card_drill
-    {
-        entity_id tile     = null_entity; ///< The tile whose resource series this frame plots.
-        int       resource = -1;          ///< Resource index (into resource_deposit[]).
-        int       scroll   = -1;          ///< Left edge (sample index) of the visible 8-quarter window; -1 = rightmost (most recent). Set by the chart's horizontal scrollbar.
-    };
-    std::vector<card_drill> card_stack;   ///< Drill frames over the root selection; empty = root.
-
-
-    /// Per-frame request from the card: begin recording this tile's per-resource
-    /// deposit series (BL-198 lazy tracking). app drains it into its tracked-tile
-    /// set each frame; null_entity = no request. Idempotent — set while a resource
-    /// drill for the tile is open, so the tile stays tracked from first drill on.
-    entity_id card_track_tile = null_entity;
 
     // --- application-driven mouse (BL-061) ---
     // Canvases read this instead of ImGui::GetIO().MousePos so the cursor

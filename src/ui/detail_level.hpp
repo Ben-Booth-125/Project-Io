@@ -56,7 +56,7 @@ struct ui_state;
 //
 // Three axes, never conflated (the item's own framing):
 //   DEPTH   how much of this subject do I want   -> here
-//   SUBJECT what am I looking at                 -> ui_state::card_stack (BL-196)
+//   SUBJECT what am I looking at                 -> ui_state::selected_entity
 //   HOST    where does this properly live        -> ui::focus_on_entity, the [>] button
 //
 // Authority: docs/ui/DRILL_THROUGH.md.
