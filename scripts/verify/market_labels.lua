@@ -1,4 +1,5 @@
--- BL-1304 (MARKET_LABELS_ON_CANVAS): every market's name is drawn on its market
+-- BL-1304 (MARKET_LABELS_ON_CANVAS): under the Market lens, every market's name is drawn
+-- on its market city (off the lens: plain labels, no glyph; Ben, 2026-10-13). The market
 -- city (PLANETARY.md § Market labels). The city that names a market
 -- (market_city_name's rule, BL-1303) draws its settlement label with the market
 -- glyph (three ascending bars) before the name; a city that names no market keeps
@@ -11,7 +12,10 @@ verify.window(1920, 1080)
 verify.goto_surface("home")
 verify.econ_step(2)
 verify.frames(2)
-verify.capture("market_labels_home")
+verify.capture("market_labels_lens_off")   -- plain labels, no market glyph
+verify.set_overlay("market")
+verify.frames(2)
+verify.capture("market_labels_home")        -- glyphs, distinct catchment colours
 
 for _, z in ipairs({ 2.0, 3.0 }) do
     verify.set_zoom(z)
