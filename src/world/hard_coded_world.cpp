@@ -851,6 +851,24 @@ void record_handoff_violation(generation_cursor& c, const char* which, const std
     assert(false && "a handoff validator failed on the shipped path (BL-969)");
 }
 
+// A PATTERN OR TARGET MISSED (the history patterns, the nation-count targets)
+// is recorded exactly as a handoff violation is -- onto the report and one line
+// to stderr -- but it NEVER asserts (policy, 2026-10-13): an unlucky seed is a
+// defect to report, not a reason for a debug app to stop. The structural
+// validators above keep their assert; a broken fold is not a seed's luck.
+void record_pattern_miss(generation_cursor& c, const char* which, const std::string& why)
+{
+    generation_report* const report = c.report;
+    const std::string msg = std::string(which) + ": " + why;
+    if (report != nullptr)
+    {
+        report->handoff_invalid = true;
+        if (!report->handoff_violation.empty()) report->handoff_violation += "; ";
+        report->handoff_violation += msg;
+    }
+    std::fprintf(stderr, "make_hard_coded_world: pattern missed (recorded) -- %s\n", msg.c_str());
+}
+
 // ---------------------------------------------------------------------------
 // STAGE 1 -- THE LIFE GATE (bumps 0-5): the star, the system, the homeworld's
 // tiles with their deposits, its rivers. Created here, in this order: the
@@ -1601,10 +1619,16 @@ void run_empires(generation_cursor& c)
         // History patterns). A miss is a defect, recorded loudly as the
         // nation totals' is, never shipped as an outcome.
         if (hs.rise_fall_missed)
-            record_handoff_violation(c, "rise_and_fall",
+            record_pattern_miss(c, "rise_and_fall",
                                      "realm " + std::to_string(hs.rise_fall_realm) + " peaked at "
                                          + std::to_string(hs.rise_fall_peak_pm) + " per mille in "
                                          + std::to_string(hs.rise_fall_peak_year) + ": " + hs.rise_fall_why);
+        // BL-1288: THE LATE CULTURE IS ALWAYS HIT -- its Empires half (chosen,
+        // holding a realm at the close, lagging). A miss is a recorded defect.
+        if (hs.late_culture_missed)
+            record_pattern_miss(c, "late_culture",
+                                     "culture " + std::to_string(hs.late_culture) + " at the Empires close (level "
+                                         + std::to_string(hs.late_culture_level) + "): " + hs.late_culture_why);
 
         // BL-768/BL-911: the corridors the history walked, filtered to the
         // ones a surviving polity still holds an end of (§ The network is
@@ -1806,6 +1830,13 @@ void run_exploration(generation_cursor& c)
         // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
         // and the now-final `kepler_settlement` ownership are both
         // live, then let world setup read ITS grudges and corridors.
+        // BL-1288: ...and its Exploration half (colonised by another culture).
+        if (kepler_exploration_hs.late_culture_missed)
+            record_pattern_miss(c, "late_culture",
+                                     "culture " + std::to_string(kepler_exploration_hs.late_culture)
+                                         + " in Exploration (level " + std::to_string(kepler_exploration_hs.late_culture_level)
+                                         + "): " + kepler_exploration_hs.late_culture_why);
+
         c.exploration = make_exploration_output(
             kepler_settlement, kepler_exploration_hs, &kepler_creeds);
         const exploration_output& kepler_exploration = c.exploration;
@@ -2102,7 +2133,7 @@ void run_industrialisation(generation_cursor& c)
         // absorber, or no split that keeps both sides above the floor -- and
         // that is recorded loudly here rather than shipped off target.
         if (kepler_industrialisation_hs.closing_short_of_target)
-            record_handoff_violation(c, "closing_rounds",
+            record_pattern_miss(c, "closing_rounds",
                                      "the total target " + std::to_string(params.nation_total_target)
                                          + " was not reached: the closing rounds stopped at "
                                          + std::to_string(c.closing_predicted) + " nations");
@@ -2469,7 +2500,7 @@ void run_tail(generation_cursor& c)
     // means the preview and the carve have parted, and every target built on
     // it is then wrong without saying so -- so it is a handoff violation.
     if (c.closing_predicted >= 0 && static_cast<int>(kepler_nations.size()) != c.closing_predicted)
-        record_handoff_violation(c, "closing_rounds",
+        record_pattern_miss(c, "closing_rounds",
                                  "the fold made " + std::to_string(kepler_nations.size())
                                      + " nations; the closing rounds planned "
                                      + std::to_string(c.closing_predicted));

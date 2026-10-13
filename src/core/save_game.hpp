@@ -294,6 +294,13 @@ inline constexpr uint32_t save_game_magic =
 /// 30-33 together (civil war 30-31, rise and fall 32-33). No field moves; the
 /// kind range check is the only reader that changes, and a build that
 /// predates them refuses such a stream on it.
+/// v23 ALSO admits two more appended by the late culture (BL-1288): 34
+/// `late_culture_chosen` (Empires record, once: `polity` = the culture index,
+/// `other` = its remoteness by reach or none) and 35 `isolation_pressed` (the
+/// backstop's level, `polity` = the culture index; in the Empires and the
+/// Exploration record). No field moves, so no version bump; the range check
+/// is the only reader that changes. The detector reads the late culture off
+/// kind 34, so a stream written before it carries no late culture.
 /// v23 ALSO admits three in the Industrialisation record, written by the world
 /// war (BL-1289): 36 `war_joined` (the first in a record is the declaration),
 /// 37 `ground_razed` and 38 `war_peace`; a demoted road is a `road_promoted`
