@@ -520,8 +520,8 @@ struct history_sim_params
     //   polity's `capital` treasury: `industry_points_treasury_share_q` per
     //   mille of the round's SURPLUS -- the purse's net rise across the
     //   round's earn and its army and navy bills, floored at 0 -- leaves the
-    //   treasury and lands as points, `industry_points_per_treasury_unit` to
-    //   the unit. RULED a consequence (Ben, 2026-09-18): no polity scores it,
+    //   treasury and lands as points, `industry_points_per_1000_treasury_units`
+    //   to the thousand units. RULED a consequence (Ben, 2026-09-18): no polity scores it,
     //   so it is no verb. The points SPREAD over the polity's held regions
     //   that stand centres, by the heads their works employ (NR-964, amending
     //   NR-897's urban scale; `industry_points_apportion_by_scale`;
@@ -551,8 +551,29 @@ struct history_sim_params
     /// over the span. The treasury's exchange rate below is set against it.
     int64_t industry_points_per_million_urban_heads_year = 1000;
 
-    /// Points one TREASURY unit converts to (domain 1-10000, so a conversion
-    /// of up to the treasury's own 2^48 ceiling stays inside int64). 1000. A
+    /// Points a THOUSAND treasury units convert to (domain 1 -
+    /// `industry_points_per_1000_units_max`, staged by
+    /// `industry_points_for_treasury_units` so a conversion of up to the
+    /// treasury's own 2^48 ceiling stays inside int64). PER THOUSAND since
+    /// BL-1298: once the history banked real chests the right rate fell below
+    /// one point per unit, which a per-unit integer cannot say.
+    ///
+    /// The struct keeps 1,000,000 (= the old 1000 per unit) so every fixture
+    /// reads as before; GENERATION's value rides on
+    /// `world_params::industry_points_per_1000_treasury_units` (see below).
+    ///
+    /// BL-1298 RE-SIZE (Ben, 2026-10-12, NATION_GENERATION.md sec Pass 7): the
+    /// treasury now earns a standing levy and a summed endowment, so the
+    /// capitals' Industrialisation surplus is several hundred times larger and
+    /// at 1000 points per unit the treasury term swamped the scale term (share
+    /// ~0.999 of all points). The rate is re-sized TOWARD the rule below --
+    /// the treasury term the same order as the scale term -- and set at the
+    /// LOWEST rate that keeps market_viability's G1 at tick 50 at or above its
+    /// target (Ben, 2026-10-12: the same-order rate cost G1 t50 its margin).
+    /// world_params records the ladder (G1 t50 and treasury share per rung)
+    /// and the chosen value.
+    ///
+    /// The original reasoning, which still sets the rule: A
     /// UNIT CHOICE, NOT A FINDING, and it is what sets reading 8's
     /// treasury-paid share: sized so the treasury term and the scale term are
     /// the same order on the library's median world. MEASURED (BL-1041, the 16
@@ -564,7 +585,7 @@ struct history_sim_params
     /// At 1000 the treasury-paid share runs 0.16-0.82 (median 0.69): a
     /// property of each world (how its capitals' surplus ran against its
     /// cities), scaled as a whole by this constant.
-    int64_t industry_points_per_treasury_unit = 1000;
+    int64_t industry_points_per_1000_treasury_units = 1000000;
 
     /// The fuel factor's FLOOR, per mille (domain 0-1000). A city standing on
     /// no fuel at all still builds at this share of a coalfield city's rate,
@@ -2221,6 +2242,59 @@ struct history_sim_params
     /// round); neither moved reading 8, which consolidation dominates.
     int treasury_trade_income_q = 100;
 
+    /// BL-1298 -- THE STANDING LEVY (NATION_GENERATION.md sec Pass 7, Ben
+    /// 2026-10-11: "a realm taxes its seats' stores every round"). On every
+    /// decision round AFTER `consolidation_year` (the 1200 round itself folds
+    /// the whole stock, once), each living polity sweeps this per-mille of
+    /// the `material_stock` on every seat it holds -- and on its capital,
+    /// exactly the ground the consolidation reads -- into the capital's
+    /// `region::treasury`. A share PER ROUND (both resumed spans run a 4-year
+    /// band), floored per seat. It is EARN: it counts toward the round's
+    /// surplus and toward what the realm's earn can carry
+    /// (`standing_army_sized_to_earn`). Domain 0-1000; 0 = off (the struct
+    /// default, so every fixture and the Empires round is unmoved), and a
+    /// `consolidation_year` of INT64_MIN ("never") never levies either.
+    /// Generation's value rides on `world_params::treasury_levy_per_mille_q`.
+    int treasury_levy_per_mille_q = 0;
+
+    /// BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS (EXPLORATION.md
+    /// sec Force persists now, Ben 2026-10-11, overturning NR-878 for the
+    /// standing army only). When on, a polity whose army bill for the round
+    /// exceeds the round's EARN (levy + endowment + corridor + trade +
+    /// tribute) disbands, before the bill is paid, the paid standing heads
+    /// that earn cannot carry: every region carrying its paid heads keeps
+    /// the same per-mille share, and the disbanded men go home to that
+    /// ground's `manpower_stock` exactly as the unpaid decay's do. The bill
+    /// is then met out of the round's earn, so the army never draws the
+    /// chest down. A rule on the stock, not a term in the scorer: the spend
+    /// choice is untouched. The navy and the other stocks keep NR-878. Off
+    /// in the struct; `exploration_sim_params` turns it on (Industrialisation
+    /// inherits it).
+    bool standing_army_sized_to_earn = false;
+
+    /// BL-1298 -- THE ENDOWMENT IS SUMMED OVER HELD GROUND (NATION_GENERATION.md
+    /// sec Pass 7, Ben 2026-10-12). When on, `treasury_endowment_income_q` is
+    /// a per-mille of the SUM of the polity's held regions' endowment
+    /// (`(farm_q+ore_q+energy_q+port_q)/4` each), not their mean: a larger
+    /// realm earns more, so the order the 1200 chests set holds. (A flat
+    /// per-realm mean reached the band but scrambled which realms were
+    /// richest.) Off in the struct, so the fixtures that pin the mean form
+    /// keep it; `exploration_sim_params` turns it on for both resumed spans.
+    bool treasury_endowment_summed = false;
+
+    /// BL-1298 -- THE ENDOWMENT AS A SHARE OF THE WORLD (Ben, 2026-10-12,
+    /// NATION_GENERATION.md sec Pass 7: "a realm earns by the share of its
+    /// world's held ground it holds, so a small world's nations are not poorer
+    /// for the world being small"). When on, the endowment income a year is
+    /// `treasury_endowment_income_q` x (the realm's summed held endowment /
+    /// the world's summed held endowment) x (the living realms holding any
+    /// ground) -- a realm holding the world's AVERAGE share earns the rate, a
+    /// realm holding twice it earns twice. The share alone would hand a world
+    /// of 20 realms twice the per-realm income of a world of 40; the realm
+    /// count normalises that away. Supersedes the summed and mean forms where
+    /// on. Off in the struct; `exploration_sim_params` turns it on.
+    bool treasury_endowment_world_share = false;
+
     /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
     /// WOULD open (the marginal volume, both directions, every good --
     /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
@@ -2903,6 +2977,12 @@ struct exploration_upkeep_spend
     int64_t earn_corridor        = 0;
     int64_t earn_trade           = 0;
     int64_t consolidation_folded = 0;
+    /// BL-1298: the standing levy swept from seats this call, the paid heads
+    /// disbanded because the round's earn could not carry them, and the
+    /// polity-rounds on which that sizing bound. Write-only.
+    int64_t earn_levy            = 0;
+    int64_t army_disbanded_by_earn = 0;
+    int64_t army_sized_rounds    = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -3495,8 +3575,21 @@ int64_t industry_points_crowding_q(const region& r, const works_registry* works)
 /// 1..`industry_points_crowding_k_max`): the caller refuses the conversion.
 int64_t industry_points_crowd_brake(const std::vector<region>& regions,
                                     std::vector<std::pair<int, int64_t>>& spread,
-                                    int64_t k, int64_t points_per_unit,
+                                    int64_t k, int64_t points_per_1000_units,
                                     const works_registry* works);
+
+/// BL-1298: the largest `industry_points_per_1000_treasury_units` may be set
+/// to (10^7, i.e. 10^4 points per unit, the old per-unit domain's ceiling).
+inline constexpr int64_t industry_points_per_1000_units_max = 10000000LL;
+
+/// BL-1298: the points @p units treasury units convert to at @p per_1000
+/// points per thousand units, floored, staged so it cannot overflow for
+/// units <= 2^48 (a treasury's own clamp) and per_1000 <= the max above:
+/// (units / 1000) x rate + ((units % 1000) x rate) / 1000.
+inline int64_t industry_points_for_treasury_units(int64_t units, int64_t per_1000)
+{
+    return (units / 1000) * per_1000 + ((units % 1000) * per_1000) / 1000;
+}
 
 /// What one round's scale accrual did.
 struct industry_points_round
@@ -4540,6 +4633,11 @@ struct history_sim_state
     int64_t treasury_earned_corridor      = 0;
     int64_t treasury_earned_trade         = 0;
     int64_t treasury_from_consolidation   = 0;
+    /// BL-1298, write-only: the standing levy summed over the run, the paid
+    /// heads the earn-sized army disbanded, and the polity-rounds it bound.
+    int64_t treasury_earned_levy          = 0;
+    int64_t army_disbanded_by_earn        = 0;
+    int64_t army_sized_rounds             = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
     /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
@@ -4579,7 +4677,7 @@ struct history_sim_state
     /// open work filled at home, a conversion, not a move along a corridor).
     int64_t urbanisation_heads_within     = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
-    /// points above divided by `industry_points_per_treasury_unit`): the
+    /// points above at `industry_points_per_1000_treasury_units`): the
     /// observable for how hard paying in draws on the round's other spend.
     int64_t treasury_spent_on_industry    = 0;
     /// BL-1169: TREASURY UNITS the crowding brake left in capitals' purses
@@ -5251,6 +5349,14 @@ struct exploration_spend_facts
     /// (`manpower_stock * standing_army_levy_per_mille_q / 1000`). The army
     /// step is eligible only when this covers a whole step.
     int64_t levy_room           = 0;
+    /// BL-1298 (Ben, 2026-10-11: "a realm keeps only the standing army its earn
+    /// can carry") -- THE EARN'S ROOM: the paid heads this round's earn carries
+    /// (`earn x 1000 / the per-head bill`, the same `carried` the sizing reads)
+    /// less the paid heads standing after the sizing. An army step needs a
+    /// whole step of room, as it needs a whole step of levy: a budget limit in
+    /// the world, stated as the rule, so a realm never buys heads its earn
+    /// would disband the next round. -1 = unbounded (sizing off, or no bill).
+    int64_t earn_room           = -1;
 };
 
 /// Each option's score and whether it may be taken at all.

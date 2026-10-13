@@ -46,6 +46,7 @@
 #include "scripting/lua_state.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -59,6 +60,14 @@
 #include <vector>
 
 namespace {
+
+// BL-1298 calibration knobs (-1 = the shipped world_params default) and the
+// optional per-nation dump (seed, name, build credits, finish credits, major).
+int   g_levy  = -1;
+int   g_endow = -1;
+long long g_ipu = -1;   // --ipu N: industry points per treasury unit (-1 = shipped)
+bool  g_no_size = false; // --no-size: the army is NOT sized to the earn (the pre-ruling arm)
+FILE* g_dump  = nullptr;
 
 std::vector<uint32_t> library_seeds(const char* path)
 {
@@ -88,6 +97,53 @@ double pct(std::vector<double> v, int pm)
     std::sort(v.begin(), v.end());
     const std::size_t i = std::min(v.size() - 1, (v.size() * static_cast<std::size_t>(pm)) / 1000);
     return v[i];
+}
+
+double spearman_rho(const std::vector<std::pair<double, double>>& xy)
+{
+    const std::size_t n = xy.size();
+    if (n < 3) return 0.0;
+    auto ranks = [n](std::vector<double> v) {
+        std::vector<std::size_t> ord(n);
+        for (std::size_t i = 0; i < n; ++i) ord[i] = i;
+        std::sort(ord.begin(), ord.end(), [&](std::size_t a, std::size_t b) { return v[a] < v[b] || (v[a] == v[b] && a < b); });
+        std::vector<double> r(n);
+        for (std::size_t i = 0; i < n;)
+        {
+            std::size_t j = i;
+            while (j + 1 < n && v[ord[j + 1]] == v[ord[i]]) ++j;
+            for (std::size_t k = i; k <= j; ++k) r[ord[k]] = 0.5 * static_cast<double>(i + j);
+            i = j + 1;
+        }
+        return r;
+    };
+    std::vector<double> a(n), b(n);
+    for (std::size_t i = 0; i < n; ++i) { a[i] = xy[i].first; b[i] = xy[i].second; }
+    const std::vector<double> ra = ranks(a), rb = ranks(b);
+    double ma = 0, mb = 0;
+    for (std::size_t i = 0; i < n; ++i) { ma += ra[i]; mb += rb[i]; }
+    ma /= static_cast<double>(n); mb /= static_cast<double>(n);
+    double cov = 0, va = 0, vb = 0;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        cov += (ra[i] - ma) * (rb[i] - mb); va += (ra[i] - ma) * (ra[i] - ma); vb += (rb[i] - mb) * (rb[i] - mb);
+    }
+    return (va > 0 && vb > 0) ? cov / std::sqrt(va * vb) : 0.0;
+}
+
+/// How many of the three largest 1200 folds are among the three richest chests at the close.
+int top3_overlap(std::vector<std::pair<double, double>> xy)
+{
+    const std::size_t n = xy.size();
+    std::vector<std::size_t> by_fold(n), by_close(n);
+    for (std::size_t i = 0; i < n; ++i) by_fold[i] = by_close[i] = i;
+    std::sort(by_fold.begin(), by_fold.end(), [&](std::size_t a, std::size_t b) { return xy[a].first > xy[b].first || (xy[a].first == xy[b].first && a < b); });
+    std::sort(by_close.begin(), by_close.end(), [&](std::size_t a, std::size_t b) { return xy[a].second > xy[b].second || (xy[a].second == xy[b].second && a < b); });
+    int k = 0;
+    for (std::size_t i = 0; i < std::min<std::size_t>(3, n); ++i)
+        for (std::size_t j = 0; j < std::min<std::size_t>(3, n); ++j)
+            if (by_fold[i] == by_close[j]) ++k;
+    return k;
 }
 
 double median(std::vector<double> v)
@@ -130,6 +186,7 @@ struct span_flows
     int64_t tribute = 0, purchases = 0;
     int64_t army_bill = 0, navy_bill = 0, ports = 0, navies = 0, armies = 0, roads = 0, industry = 0;
     int64_t kept_by_crowding = 0;
+    int64_t levy = 0, disbanded = 0, sized_rounds = 0, ip_from_treasury = 0, army_steps = 0;
     void add(const span_flows& o)
     {
         ran = ran || o.ran;
@@ -138,8 +195,9 @@ struct span_flows
         consolidation += o.consolidation; tribute += o.tribute; purchases += o.purchases;
         army_bill += o.army_bill; navy_bill += o.navy_bill; ports += o.ports; navies += o.navies;
         armies += o.armies; roads += o.roads; industry += o.industry; kept_by_crowding += o.kept_by_crowding;
+        levy += o.levy; disbanded += o.disbanded; sized_rounds += o.sized_rounds; ip_from_treasury += o.ip_from_treasury; army_steps += o.army_steps;
     }
-    int64_t earned() const { return earn_endow + earn_corr + earn_trade + consolidation; }
+    int64_t earned() const { return earn_endow + earn_corr + earn_trade + consolidation + levy; }
     int64_t spent() const { return army_bill + navy_bill + ports + navies + armies + roads + industry; }
 };
 
@@ -168,6 +226,11 @@ span_flows read_span(const history_sim_state& st, const std::vector<region>& ope
     f.roads         = st.treasury_spent_on_roads;
     f.industry      = st.treasury_spent_on_industry;
     f.kept_by_crowding = st.treasury_kept_by_crowding;
+    f.levy             = st.treasury_earned_levy;       // BL-1298
+    f.disbanded        = st.army_disbanded_by_earn;
+    f.sized_rounds     = st.army_sized_rounds;
+    f.army_steps       = st.army_steps_bought;
+    f.ip_from_treasury = st.industry_points_from_treasury;
     return f;
 }
 
@@ -185,6 +248,10 @@ void print_span(const char* name, const span_flows& f)
     std::printf("      earn  endowment %9.0f (%4.1f%%)  corridor %9.0f (%4.1f%%)  trade %9.0f (%4.1f%%)  consolidation %9.0f (%4.1f%%)\n",
                 f.earn_endow * kCr, sh(f.earn_endow), f.earn_corr * kCr, sh(f.earn_corr),
                 f.earn_trade * kCr, sh(f.earn_trade), f.consolidation * kCr, sh(f.consolidation));
+    std::printf("      levy  %9.0f (%4.1f%%)  | army sized to earn: %lld polity-rounds, %lld heads disbanded; army steps bought %lld | industry points from treasury %lld\n",
+                f.levy * kCr, sh(f.levy), static_cast<long long>(f.sized_rounds),
+                static_cast<long long>(f.disbanded), static_cast<long long>(f.army_steps),
+                static_cast<long long>(f.ip_from_treasury));
     std::printf("      spend army bill %9.0f (%4.1f%%)  navy bill %9.0f (%4.1f%%)  ports %8.0f (%4.1f%%)  navies %8.0f (%4.1f%%)  armies %8.0f (%4.1f%%)\n",
                 f.army_bill * kCr, sh(f.army_bill), f.navy_bill * kCr, sh(f.navy_bill),
                 f.ports * kCr, sh(f.ports), f.navies * kCr, sh(f.navies), f.armies * kCr, sh(f.armies));
@@ -211,6 +278,17 @@ struct seed_out
     /// Per living polity at the close: the 1200 consolidation it took (its
     /// held seats' material stock at the span's open, credits), and its fate.
     std::vector<double> fold_1200;
+    /// Per living polity at the close, (its 1200 fold, its chest), credits:
+    /// the in-world reading of "keep the order" -- do the realms that
+    /// inherited empires' chests at 1200 still hold the richest at the close.
+    std::vector<std::pair<double, double>> fold_vs_close;
+    std::vector<double> order_rho; ///< per seed (pooled block only)
+    int top3_kept = 0, top3_seeds = 0;
+    /// Industry points standing at the 1960 close: all of them, and the
+    /// treasury-paid tally (`region::industry_points_from_treasury`); the
+    /// scale term is the difference. Per-seed treasury shares (pooled block).
+    double ip_total = 0, ip_treasury = 0;
+    std::vector<double> ip_share;
     int fate_never = 0;   ///< took < 1 cr at 1200
     int fate_drained = 0; ///< took >= 1 cr at 1200, holds < 1 cr at the close
     int fate_kept = 0;    ///< holds >= 1 cr at the close
@@ -235,6 +313,10 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
     o.seed = seed;
     world_params p = arc_params(world_arc::shipped);
     p.seed = seed;
+    if (g_levy  >= 0) p.treasury_levy_per_mille_q   = g_levy;
+    if (g_endow >= 0) p.treasury_endowment_income_q = g_endow;
+    if (g_no_size)    p.standing_army_sized_to_earn = false;
+    if (g_ipu >= 1)   p.industry_points_per_1000_treasury_units = g_ipu;
     generation_report     rep{};
     era_minus_one_fixture fx{};
     const auto t0 = std::chrono::steady_clock::now();
@@ -289,6 +371,7 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
                 if (rg[i].nation == q.id && (rg[i].is_seat || static_cast<int>(i) == cap)) folded += rg[i].material_stock;
             const double f = static_cast<double>(folded) * kCr;
             o.fold_1200.push_back(f);
+            o.fold_vs_close.emplace_back(f, c);
             if (f < 1.0) ++o.fate_never;
             else if (c < 1.0) { ++o.fate_drained; o.drained_cr += f; }
             else ++o.fate_kept;
@@ -305,6 +388,12 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
     for (const region& r : fx.pre_exploration_settlement.regions) o.empires_material_at_1200 += r.material_stock;
     if (fx.exploration_ran)
         o.exp = read_span(fx.exploration_state, fx.pre_exploration_settlement.regions, fx.exploration_handoff.regions);
+    if (fx.industrialisation_ran)
+        for (const region& r : fx.industrialisation_handoff.regions)
+        {
+            o.ip_total    += static_cast<double>(r.industry_points);
+            o.ip_treasury += static_cast<double>(r.industry_points_from_treasury);
+        }
     if (fx.industrialisation_ran)
         o.ind = read_span(fx.industrialisation_state, fx.industrialisation_open_regions,
                           fx.industrialisation_handoff.regions);
@@ -354,6 +443,9 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
             o.t1.push_back(b);
             (maj ? o.t1_major : o.t1_minor).push_back(b);
         }
+        if (g_dump)
+            std::fprintf(g_dump, "%u,%s,%.4f,%.4f,%d\n", seed, w.nations.at(id).name.c_str(), a,
+                         do_finish ? w.nations.at(id).treasury : 0.0, maj ? 1 : 0);
     }
     if (do_finish)
         for (std::size_t i = 0; i < ids.size(); ++i)
@@ -388,8 +480,18 @@ void print_seed_block(const seed_out& o, bool do_finish)
     print_dist("stood at 1200", o.chest_old);
     print_dist("rose after 1200", o.chest_new);
     print_dist("their 1200 fold", o.fold_1200);
+    if (o.order_rho.empty())
+        std::printf("    ORDER  rank(1200 fold) vs rank(close chest): spearman %.3f, top-3 folds among top-3 chests %d/3\n",
+                    spearman_rho(o.fold_vs_close), top3_overlap(o.fold_vs_close));
+    else
+        std::printf("    ORDER  per-seed spearman(1200 fold, close chest) median %.3f; top-3 folds among top-3 chests %d/%d\n",
+                    median(o.order_rho), o.top3_kept, 3 * o.top3_seeds);
     std::printf("    fate: took <1 cr at 1200 %d | took >=1 cr, <1 cr at close %d (they took %.0f cr) | >=1 cr at close %d\n",
                 o.fate_never, o.fate_drained, o.drained_cr, o.fate_kept);
+    if (o.ip_total > 0)
+        std::printf("  INDUSTRY POINTS at the close: %.4g total = scale %.4g + treasury %.4g (treasury share %.3f%s)\n",
+                    o.ip_total, o.ip_total - o.ip_treasury, o.ip_treasury, o.ip_treasury / o.ip_total,
+                    o.ip_share.empty() ? "" : (", per-seed median " + std::to_string(median(o.ip_share))).c_str());
     std::printf("  CONCENTRATION\n");
     print_conc("after build", o.t0);
     if (do_finish) print_conc("after finish", o.t1);
@@ -403,6 +505,11 @@ int main(int argc, char** argv)
     bool do_finish = true;
     for (int i = 1; i < argc; ++i)
     {
+        if (std::strcmp(argv[i], "--levy") == 0 && i + 1 < argc) { g_levy = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--ipu") == 0 && i + 1 < argc) { g_ipu = std::atoll(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--no-size") == 0) { g_no_size = true; continue; }
+        if (std::strcmp(argv[i], "--endow") == 0 && i + 1 < argc) { g_endow = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) { g_dump = std::fopen(argv[++i], "wb"); continue; }
         if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
         {
             std::stringstream ss(argv[++i]);
@@ -410,7 +517,7 @@ int main(int argc, char** argv)
             while (std::getline(ss, tok, ',')) if (!tok.empty()) seeds.push_back(static_cast<uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
         }
         else if (std::strcmp(argv[i], "--no-finish") == 0) do_finish = false;
-        else { std::printf("usage: treasury_census [--seeds a,b,c] [--no-finish]\n"); return 2; }
+        else { std::printf("usage: treasury_census [--seeds a,b,c] [--no-finish] [--levy N] [--endow N] [--dump file.csv]\n"); return 2; }
     }
     if (seeds.empty()) seeds = library_seeds("docs/generation/seed_library.json");
     if (seeds.empty()) { std::printf("FATAL  no seeds (docs/generation/seed_library.json)\n"); return 2; }
@@ -427,6 +534,7 @@ int main(int argc, char** argv)
         dl.reg.load_from_lua(dl.lua);
     }
 
+    std::printf("levy %d per mille, endowment %d, ipu %lld (-1 = shipped default)\n", g_levy, g_endow, g_ipu);
     std::printf("treasury_census: %zu seed(s)%s  (1 credit = 100,000 material, Pass 7's 0.01 per mille)\n",
                 seeds.size(), do_finish ? ", with finish_campaign_world" : ", build only");
     seed_out pooled;
@@ -453,6 +561,11 @@ int main(int argc, char** argv)
         cat(pooled.levy_q1, o.levy_q1); cat(pooled.levy_q12, o.levy_q12);
         cat(pooled.chest_old, o.chest_old); cat(pooled.chest_new, o.chest_new);
         cat(pooled.fold_1200, o.fold_1200);
+        pooled.order_rho.push_back(spearman_rho(o.fold_vs_close));
+        pooled.ip_total += o.ip_total; pooled.ip_treasury += o.ip_treasury;
+        if (o.ip_total > 0) pooled.ip_share.push_back(o.ip_treasury / o.ip_total);
+        pooled.top3_kept += top3_overlap(o.fold_vs_close);
+        ++pooled.top3_seeds;
         pooled.fate_never += o.fate_never; pooled.fate_drained += o.fate_drained;
         pooled.fate_kept += o.fate_kept; pooled.drained_cr += o.drained_cr;
         cat(pooled.quarters_t0, o.quarters_t0); cat(pooled.quarters_t1, o.quarters_t1);
@@ -482,5 +595,6 @@ int main(int argc, char** argv)
                 "Empires", pooled.empires_material_at_1200 * kCr);
     print_span("Exploration", pooled.exp);
     print_span("Industrialisation", pooled.ind);
+    if (g_dump) std::fclose(g_dump);
     return 0;
 }

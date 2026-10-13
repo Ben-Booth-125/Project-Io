@@ -527,7 +527,7 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   endowment reached the band but scrambled which realms were richest. **It is read as a share of the
   world's ground (Ben, 2026-10-12)**: a realm earns by the share of its world's held ground it holds,
   so a small world's nations are not poorer for the world being small and every world's median lands
-  near the band. With real chests, the treasury's conversion into industry points is re-sized toward
+  near the band. With real chests, the treasury's conversion into industry points (`industry_points_per_1000_treasury_units`, per thousand units since the rate fell below one point a unit) is re-sized toward
   the scale term — **at the lowest rate that keeps market_viability's G1 at tick 50 at or above its
   target** (Ben, 2026-10-12; the same-order rate cost it 2.8 points). ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
   the library, so it is not where the money goes.)
