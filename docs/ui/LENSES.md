@@ -347,6 +347,26 @@ distinct from the corporation mark (§ The strip rotates with the rung).
 
 ---
 
+## The Nations lens — the whole territory, in its nation's colour
+
+**A Nations lens paints every nation's whole territory in its identity colour** (Ben,
+2026-10-14). It answers *whose ground is this, all of it at once* — the reading the border band
+gives one edge at a time. It sits on the Planetary row of the lens bar like any other lens.
+
+- **The always-on border band stays** (§ The Country lens has retired, below): the plain map keeps
+  its national strokes. The lens is the deliberate, map-wide answer; the band is the context.
+  Under the lens the band is suppressed with every other lens, since the fill already says it.
+- **No two bordering nations share a similar colour** — the identity colour rule below, which the
+  lens is the strictest reader of.
+- **Selection is unchanged** (Ben, 2026-10-14): a press on the border band selects the nation,
+  on the plain map as before; under the lens a press resolves as any lens's does (§ A lens
+  collapses selection to ONE TIER), to the nation.
+- Unowned ground and open ocean take no fill.
+
+This reverses the 2026-08-24 retirement (BL-601) only in part: the band it created stays, and
+what returns is the fill as a lens, not as the default view — the argument below, that territory
+must not cost the player every other reading, still holds, because a lens is chosen.
+
 ## The Country lens has retired — national borders are chrome
 
 *(`overlay_mode::country` no longer exists, and since 2026-08-28 neither does its
@@ -381,6 +401,15 @@ border band, the seat map and the Ages view share that one table, so the realm
 the player watched grow through the rounds is met in the same colour at Begin:
 one mapping, never a hash of the nation id and never a second greedy assignment
 of its own.
+
+**Bordering nations never share a similar colour** (Ben, 2026-10-14: *"making sure we don't
+have similarly coloured nations bordering each other"*). At Begin, after the slots are pinned,
+one pass checks every pair of campaign nations that share a border: a pair whose colours sit
+closer than the palette's minimum distinguishable distance re-slots the nation with the smaller
+territory to the nearest free slot that clears every one of its neighbours. **This outranks
+lineage**: kin realms read as kin by hue (`STARTUP.md` § Round 3), except where kin border
+each other, where telling them apart wins. The pass is deterministic, saved in the same pinned
+table, and read by every surface — the band, the lens, the seat map, the swatches — so they agree.
 
 **Why a lens was the wrong home for it, in this system's own terms.** A lens is a
 *mode*: one is active at a time, and it re-skins the map to answer one question at

@@ -432,7 +432,7 @@ the span's start. An ownerless founding reads *"A people settle at X"*.
 
 **Colour is lineage, both ways.** A realm's hue is drawn from its founding culture family's
 wedge of the wheel — the lineage palette § Round 3 describes, built for every lapse round —
-with an offset inside the wedge chosen greedily, so kin realms read as kin; and beneath every
+with an offset inside the wedge chosen greedily, so kin realms read as kin — except where two nations border each other at Begin, where the colours must differ and the kin likeness yields (`LENSES.md` § The Country lens has retired, the identity colour rule; Ben, 2026-10-14); and beneath every
 polity fill on rounds 4–6 sits a dull culture base in the lineage hue of each region's
 plurality people, read from the record's culture changes. **Slots are pinned:** a realm's
 colour slot lives on the record from the round that seats it, the greedy table fills only the
