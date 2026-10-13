@@ -27,12 +27,12 @@ verify.frames(2)
 -- keeps the check independent of how many rounds sit above it; if the wizard is
 -- ever reordered, the round assertion below fails loudly rather than silently
 -- capturing the wrong screen.
-verify.generation_stage(3)
+verify.generation_stage(4) -- Empires (BL-1279: setup is round 1)
 verify.frames(4)
 
 local round, total = verify.wizard_round()
 print(string.format("BL-839: parked on wizard round %d of %d", round, total))
-verify.expect(round == 3, "T-UI-1 the wizard parks on the Empires round")
+verify.expect(round == 4, "T-UI-1 the wizard parks on the Empires round")
 
 verify.capture("turbulence_lean_00_empires_round")
 

@@ -22,7 +22,8 @@
   "save format but no verb and no surface, and the canvas/lens/ledger/chrome families are view",
   "controls that were never on the command seam by design.",
   "",
-  "THE PRE-GAME WIZARD IS OUT OF SCOPE (Ben, 2026-09-09, ruling on NR-804). The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family. The dictionary exists for an agent playing the game, and nobody plays the wizard; a startup family would be inventory with no reader. The \"any control change updates its entry\" rule above does not reach it. Stated rather than left silent because the silence is what made it a question."
+  "THE PRE-GAME WIZARD IS OUT OF SCOPE (Ben, 2026-09-09, ruling on NR-804). The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family. The dictionary exists for an agent playing the game, and nobody plays the wizard; a startup family would be inventory with no reader. The \"any control change updates its entry\" rule above does not reach it. Stated rather than left silent because the silence is what made it a question.",
+  "THE MENU'S SEED AND RESOURCES ENTRIES ARE RETIRED (BL-1279, 2026-10-13). chrome.menu_set_seed, chrome.menu_roll_seed, chrome.menu_copy_seed and chrome.menu_set_abundance named controls that moved from the main menu to the wizard's setup round with the nation targets (STARTUP.md section Rounds, Ben 2026-10-11). The pre-game wizard is out of scope here (the ruling above), so they are removed rather than re-homed, and no entry is added for the setup round's controls."
  ],
  "entries": [
   {
@@ -1928,18 +1929,6 @@
    "reason_to_select": "Mouse route to the session controls (Pause/Resume, Exit Game); Esc is the keyboard parity for the same popup."
   },
   {
-   "id": "chrome.menu_copy_seed",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Copy seed button",
-   "press": "Click Copy seed.",
-   "args": [],
-   "preconditions": [
-    "App is on the main menu screen."
-   ],
-   "expected_output": "The current seed, formatted as 8 hex digits, is placed on the system clipboard. Nothing else changes.",
-   "reason_to_select": "To record or share the reproducible key for the world about to be generated."
-  },
-  {
    "id": "chrome.menu_new_game",
    "family": "chrome",
    "surface": "Main menu, primary button column",
@@ -1948,8 +1937,8 @@
    "preconditions": [
     "App is on the main menu screen."
    ],
-   "expected_output": "The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 6 (System, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.",
-   "reason_to_select": "To start setting up a new world round by round, choosing the planetology and history leans."
+   "expected_output": "The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 7 (System, Setup, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.",
+   "reason_to_select": "To start setting up a new world round by round: the nation targets, seed and resources on the setup round, then the planetology and history leans."
   },
   {
    "id": "chrome.menu_quick_start",
@@ -1960,8 +1949,8 @@
    "preconditions": [
     "App is on the main menu screen."
    ],
-   "expected_output": "The world is built straight through on the menu's seed and resources with no wizard round drawn: the screen goes to the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then to the seat canvas (app_screen::choosing_seat), where the player picks the corporation. The same settings give the same world the wizard would have built.",
-   "reason_to_select": "To start play on a known seed and resource level without walking the wizard's rounds; the seat is still chosen."
+   "expected_output": "Opens the New World wizard on its setup round alone (STARTUP.md section Rounds, Ben 2026-10-13): the nation targets, the seed and the abundance, which the main menu no longer carries. The setup round's Begin then builds the world straight through with no other wizard round drawn: the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then the seat canvas (app_screen::choosing_seat), where the player picks the corporation. The same settings give the same world the wizard would have built. Back on that round returns to the menu.",
+   "reason_to_select": "To start play on chosen settings without walking the wizard's rounds; the seat is still chosen."
   },
   {
    "id": "chrome.menu_quit",
@@ -1974,54 +1963,6 @@
    ],
    "expected_output": "The application requests quit and exits. No confirmation is asked here (nothing exists to lose on the menu). Settings were already persisted to options.cfg as they changed.",
    "reason_to_select": "To leave the application from the entry screen."
-  },
-  {
-   "id": "chrome.menu_roll_seed",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Roll button beside the seed field",
-   "press": "Click Roll.",
-   "args": [],
-   "preconditions": [
-    "App is on the main menu screen."
-   ],
-   "expected_output": "The seed field is replaced with a fresh random draw (a one-shot random_device read; the only place entropy touches the pipeline). No world is generated yet.",
-   "reason_to_select": "To get a fresh world without caring which one; the seed shown remains the reproducible key."
-  },
-  {
-   "id": "chrome.menu_set_abundance",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Resources radio row",
-   "press": "Click one of the three radio buttons: Sparse, Lean, or Standard.",
-   "args": [
-    {
-     "name": "level",
-     "type": "enum: sparse | lean | standard",
-     "meaning": "Resource abundance tier. Standard is the Earth-like ceiling; Sparse and Lean step down from it. There is no tier above Standard."
-    }
-   ],
-   "preconditions": [
-    "App is on the main menu screen."
-   ],
-   "expected_output": "The pending world parameters carry the chosen abundance level, consumed at Begin. The Bodies slider next to this row is disabled (fixed at 5) and cannot be pressed.",
-   "reason_to_select": "To choose how resource-rich the generated world is; leaner tiers make extraction siting and trade tighter."
-  },
-  {
-   "id": "chrome.menu_set_seed",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Seed field",
-   "press": "Type an 8-digit hex value into the seed input box.",
-   "args": [
-    {
-     "name": "seed",
-     "type": "hex string (8 digits, u32)",
-     "meaning": "The world seed. Generation is a pure function of this value plus the knobs: same seed and knobs give an identical world."
-    }
-   ],
-   "preconditions": [
-    "App is on the main menu screen (app_screen::menu)."
-   ],
-   "expected_output": "The pending world parameters carry the typed seed. Nothing is generated; the seed is consumed only when the wizard's Begin is pressed.",
-   "reason_to_select": "To reproduce a specific known world, or to share/compare a world by its seed."
   },
   {
    "id": "chrome.options_close",
