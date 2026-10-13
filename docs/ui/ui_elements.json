@@ -1524,12 +1524,14 @@
    "source": [
     "docs/ui/STARTUP.md § Main menu — draw_main_menu"
    ],
-   "summary": "The app's opening screen (app_screen::menu): seed entry + Roll + Copy, a Sparse/Lean/Standard resource-abundance radio, a disabled bodies-count slider fixed at 5, New Game and Quit.",
+   "summary": "The app's opening screen (app_screen::menu): a disabled bodies-count slider fixed at 5, New Game, Quick Start and Quit. It carries no world input: the seed and the abundance moved to the wizard's setup round (BL-1279).",
    "interesting_question": "The bodies-count slider is present but disabled, fixed at 5 — why ship a visible-but-inert control rather than simply omitting it until the feature lands?",
    "resolution": "Named as a deliberate phasing choice: STARTUP.md states 'the count knob is phased to a later update,' presenting the slider now as a promise of future scope rather than an omission — though the doc does not explain why visibility-before-function was chosen over waiting to add the control.",
    "checks": [
     "main_menu",
     "planetology_generation",
+    "quick_start",
+    "setup_round",
     "shell_pass"
    ]
   },
@@ -1541,17 +1543,18 @@
    "source": [
     "docs/ui/STARTUP.md § New World wizard — draw_generation_screen (BL-167)"
    ],
-   "summary": "Six rounds: three thematic rounds over the ten-stage Planetology chain, then three PASS rounds (4 the migration, 5 the history, 6 the substrate). The planetology rounds re-run a throwaway preview on every control move (no world state touched) resolved against named preferences, not raw parameters; the pass rounds cannot be previewed per keystroke, so arriving on one runs its pass and the wait is the content. Only the last round commits.",
+   "summary": "Seven rounds: System, Setup, Life, then four PASS rounds (Culture, Empires, Exploration, Industrialisation). System and Life are the planetology rounds over the chart chain, re-running a throwaway preview on every control move resolved against named preferences, not raw parameters; Setup holds the world-wide inputs (nation targets, seed, abundance); the pass rounds cannot be previewed per keystroke, so arriving on one runs its pass and the wait is the content. Only the last round commits.",
    "interesting_question": "Rounds are stated to be causal — rerolling round A re-draws rounds B and C downstream — and Back is 'a plain revision with no per-round snapshot.' Does a player who liked round B's preview lose it irrecoverably by going back to tweak round A?",
    "resolution": "Confirmed as the accepted cost, not mitigated: STARTUP.md states this plainly — 'Rounds are causal... so Back is a plain revision with no per-round snapshot' — no undo/snapshot mechanism is described.",
    "checks": [
+    "history_lapse_press",
     "planetology_generation",
-    "history_lapse_press"
+    "setup_round"
    ]
   },
   {
    "id": "UI-093",
-   "name": "Wizard planetology round (one of three)",
+   "name": "Wizard planetology round (System or Life)",
    "kind": "sub-element",
    "parent": "UI-092",
    "source": [
@@ -1919,6 +1922,24 @@
    "checks": [
     "round_legends",
     "sea_lanes"
+   ]
+  },
+  {
+   "id": "UI-122",
+   "name": "Wizard setup round (round 2)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds (the SETUP ROUND rulings, 2026-10-10/11/13)",
+    "docs/generation/NATION_GENERATION.md § The nation count is a target",
+    "src/ui/startup_screens.cpp draw_wizard_setup_controls"
+   ],
+   "summary": "Between System and Life: the two nation targets as sliders (Total 1..40, Majors 1..6, each slider's range cut by the other so the pair is always legal), the seed (hex entry, Roll, Copy seed) and the Sparse/Lean/Standard abundance radio. Defaults 20 nations / 4 majors when unset. A change invalidates Life and every round below. No Reroll (the seed's Roll is the round's draw). The pane keeps System's drawing. Quick Start opens this round alone, its press reading Begin and building cold straight through to the seat.",
+   "interesting_question": "The seed is set on round 2 but round 1, System, is already drawn from it - is it honest for a later round to change what an earlier one showed?",
+   "resolution": "Open, and Ben's: STARTUP.md fixes the order System, setup, Life (2026-10-11) and puts the seed on the setup round, so a new seed re-draws the System preview while rounds stay causal downward for everything the world BUILDS (nothing is built before Life).",
+   "checks": [
+    "setup_round",
+    "quick_start"
    ]
   }
  ]

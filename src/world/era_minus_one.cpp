@@ -643,6 +643,12 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // chests the history now banks; history_sim.hpp says why.
     hp.industry_points_per_1000_treasury_units = params.industry_points_per_1000_treasury_units;
 
+    // BL-1289 (Ben, 2026-10-10/11/12; GENERATION_STRATEGY.md sec History
+    // patterns): THE WORLD WAR IS A TARGET, ALWAYS HIT, in this span alone --
+    // inside 1900-1930, so the world redevelops before 1960. The magnitudes
+    // are the struct's (history_sim.hpp says what each costs).
+    hp.world_war_target = true;
+
     // BL-1294 (Ben, 2026-10-10/12; INDUSTRIALISATION.md sec Revolution): THE
     // REVOLUTION LEAN, this span's alone -- it overturns, here and nowhere
     // else, the Empires rule that no regime resets while the map stands still.

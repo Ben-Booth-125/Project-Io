@@ -228,6 +228,11 @@ void read_late_culture(const era_timelapse& emp, const era_timelapse& exp, const
 }
 
 // --- world war -----------------------------------------------------------------
+// THE WAR'S OWN RECORD (BL-1289): the belligerents are the realms the record
+// names entering it (`war_joined`: the entrant and the side it took, so the
+// declaration names both its parties), the top powers are the most populous at
+// the window's open step, and the war is hit when enough of them fought in it
+// and peace (`war_peace`) was made inside the window.
 void read_world_war(const era_timelapse& t, history_pattern_reading& r)
 {
     if (t.steps.empty()) return;
@@ -247,20 +252,30 @@ void read_world_war(const era_timelapse& t, history_pattern_reading& r)
         return a.first != b.first ? a.first > b.first : a.second < b.second; });
     std::set<int> top;
     for (std::size_t i = 0; i < pops.size() && i < static_cast<std::size_t>(hp_ww_top_k); ++i) top.insert(pops[i].second);
-    std::map<int, int> touched; // polity -> its first conflict moment's year
+    std::map<int, int> engaged; // polity -> the year it entered
     for (const lapse_event& e : t.events)
     {
         if (e.year < hp_ww_window_start || e.year > hp_ww_window_end) continue;
-        if (!(is(e, K::seat_captured) || is(e, K::realm_ended) || is(e, K::sea_leg_campaign) || is(e, K::treaty_broken)))
-            continue;
-        ++r.ww_moments;
-        if (top.count(e.polity)) touched.emplace(e.polity, e.year);
-        if (top.count(e.other))  touched.emplace(e.other, e.year);
+        if (is(e, K::war_joined))
+        {
+            ++r.ww_moments;
+            if (r.ww_year == 0) r.ww_year = e.year;
+            if (e.polity != lapse_event_none) engaged.emplace(e.polity, e.year);
+            if (e.other  != lapse_event_none) engaged.emplace(e.other, e.year);
+        }
+        else if (is(e, K::ground_razed)) { ++r.ww_moments; ++r.ww_razed; }
+        else if (is(e, K::war_peace))
+        {
+            ++r.ww_moments;
+            if (r.ww_peace_year == 0) r.ww_peace_year = e.year;
+        }
     }
-    r.ww_belligerents = static_cast<int>(touched.size());
-    r.ww_hit = r.ww_belligerents >= hp_ww_min_belligerents;
+    r.ww_engaged = static_cast<int>(engaged.size());
+    for (const auto& kv : engaged)
+        if (top.count(kv.first)) ++r.ww_belligerents;
+    r.ww_hit = r.ww_belligerents >= hp_ww_min_belligerents && r.ww_peace_year != 0;
     if (r.ww_hit)
-        for (const auto& kv : touched)
+        for (const auto& kv : engaged)
         {
             r.ww_polities.push_back(kv.first);
             r.grants.push_back({kv.first, kv.second, static_cast<uint8_t>(history_pattern::world_war)});
