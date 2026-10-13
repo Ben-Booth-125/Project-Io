@@ -190,7 +190,7 @@ int main(int argc, char** argv)
 
         const history_pattern_reading& q = r.pr;
         std::printf("seed %-3u (%.0f s)  RF %s realm %d%s front %d‰ peak %d‰ at %d x%.2f, %d seats, fall %dy to %d‰, %d split%s%s, levels %d/%d  |"
-                    "  LC %s culture %d reach %d level %d lag %d%% bound %d  |"
+                    "  LC %s culture %d reach %d level %d lag %d%% of %d%s neighbours bound %d  |"
                     "  WW %s %d/%d in %d-%d, %d moments  |  CW %d/%d  RV %d (proxy %d)  |"
                     "  pop@1200 %lld  |  tags RF %d LC %d WW %d CW %d RV %d, unfolded %d%s  |"
                     "  nations %d, %d w/ specialist, polities %d\n",
@@ -199,7 +199,7 @@ int main(int argc, char** argv)
                     q.rf_front_q, q.rf_peak_q, q.rf_peak_year, q.rf_margin_x100 / 100.0, q.rf_captures,
                     q.rf_fall_years, q.rf_fall_q, q.rf_breakaways, q.rf_breakaways == 1 ? "" : "s",
                     q.rf_ended ? " ended" : "", q.rf_rise_level, q.rf_fall_level,
-                    q.lc_hit ? "HIT " : "miss", q.lc_culture, q.lc_reach, q.lc_level, q.lc_lag_x100, q.lc_bound,
+                    q.lc_hit ? "HIT " : "miss", q.lc_culture, q.lc_reach, q.lc_level, q.lc_lag_x100, q.lc_neighbours, q.lc_nearest ? " nearest" : "", q.lc_bound,
                     q.ww_hit ? "HIT " : "miss", q.ww_belligerents, hp_ww_top_k, hp_ww_window_start, hp_ww_window_end,
                     q.ww_moments, q.cw_count, q.cw_splits, q.rv_count, q.rv_proxy,
                     static_cast<long long>(r.pop_1200),

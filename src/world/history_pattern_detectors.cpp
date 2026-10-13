@@ -145,7 +145,7 @@ std::map<int, int> polity_cultures(const std::vector<const era_timelapse*>& recs
     return out;
 }
 
-void read_late_culture(const era_timelapse& emp, const era_timelapse& exp,
+void read_late_culture(const era_timelapse& emp, const era_timelapse& exp, const settlement_state& ss, int gw,
                        const std::map<int, int>& pc, history_pattern_reading& r)
 {
     // THE CHOICE IS THE RECORD'S (BL-1288): the sim names the culture most
@@ -167,19 +167,33 @@ void read_late_culture(const era_timelapse& emp, const era_timelapse& exp,
                 r.lc_level = std::max<int>(r.lc_level, e.other >= 100 ? e.other - 100 : e.other); // 100+: the contact press
     if (r.lc_culture < 0) return;
     const int c = r.lc_culture;
-    // Lag: the culture's polities' mean materials band at the Empires close vs the world's.
+    // Lag, against its neighbours (BL-1288, Ben 2026-10-13): the close's map
+    // replayed from the record's ownership changes, the bands off its closing step.
     if (!emp.steps.empty())
     {
         const timelapse_step& last = emp.steps.back();
-        int64_t cs = 0, cn = 0, ws = 0, wn = 0;
+        std::vector<int> owner(ss.regions.size(), -1);
+        for (const owner_change& oc : emp.changes)
+        {
+            if (oc.year > last.year || oc.region >= owner.size()) continue;
+            owner[oc.region] = oc.owner == owner_none ? -1 : static_cast<int>(oc.owner);
+        }
+        int max_pid = 0;
+        for (const owner_change& oc : emp.changes) if (oc.owner != owner_none) max_pid = std::max<int>(max_pid, oc.owner);
+        for (int i = 0; i < last.sample_count; ++i)
+            max_pid = std::max<int>(max_pid, emp.samples[static_cast<std::size_t>(last.first_sample + i)].polity);
+        std::vector<int> band(static_cast<std::size_t>(max_pid) + 1, 0), cult(static_cast<std::size_t>(max_pid) + 1, -1);
         for (int i = 0; i < last.sample_count; ++i)
         {
             const polity_sample& s = emp.samples[static_cast<std::size_t>(last.first_sample + i)];
-            ws += s.cap_materials; ++wn;
-            const auto it = pc.find(s.polity);
-            if (it != pc.end() && it->second == c) { cs += s.cap_materials; ++cn; }
+            band[s.polity] = s.cap_materials;
         }
-        if (cn > 0 && wn > 0 && ws > 0) r.lc_lag_x100 = static_cast<int>(cs * 100 * wn / (cn * ws));
+        for (const auto& kv : pc)
+            if (kv.first >= 0 && static_cast<std::size_t>(kv.first) < cult.size()) cult[static_cast<std::size_t>(kv.first)] = kv.second;
+        const late_culture_lag_reading lr = read_late_culture_lag(owner, ss.regions, gw, cult, band, c);
+        r.lc_lag_x100   = lr.lag_x100;
+        r.lc_neighbours = lr.neighbours;
+        r.lc_nearest    = lr.nearest;
     }
     // Colonised: a polity of the culture bound or bought by a polity of another.
     std::vector<history_pattern_reading::grant> bound;
@@ -313,17 +327,68 @@ std::pair<int, int> read_split_wars(const era_timelapse& t, bool must_take_paren
 
 } // namespace
 
+late_culture_lag_reading read_late_culture_lag(const std::vector<int>& owner, const std::vector<region>& regions,
+                                               int gw, const std::vector<int>& polity_culture,
+                                               const std::vector<int>& polity_band, int late_culture)
+{
+    late_culture_lag_reading out;
+    const std::size_t np = std::min(polity_culture.size(), polity_band.size());
+    const auto living = [&](int p) { return p >= 0 && static_cast<std::size_t>(p) < np && polity_band[static_cast<std::size_t>(p)] > 0; };
+    const auto ours   = [&](int p) { return polity_culture[static_cast<std::size_t>(p)] == late_culture; };
+    // Its ground, and the other peoples' held ground, region by region.
+    std::vector<int> lc_regions;
+    std::vector<char> lc_realm(np, 0);
+    const std::size_t nr = std::min(owner.size(), regions.size());
+    for (std::size_t i = 0; i < nr; ++i)
+        if (living(owner[i]) && ours(owner[i])) { lc_regions.push_back(static_cast<int>(i)); lc_realm[static_cast<std::size_t>(owner[i])] = 1; }
+    int64_t lc_sum = 0;
+    for (std::size_t p = 0; p < np; ++p) if (lc_realm[p]) { lc_sum += polity_band[p]; ++out.realms; }
+    if (out.realms == 0) return out;
+    // Each other living realm's nearest approach to its ground (grid distance squared).
+    std::vector<int64_t> near(np, INT64_MAX);
+    for (std::size_t i = 0; i < nr; ++i)
+    {
+        const int o = owner[i];
+        if (!living(o) || ours(o)) continue;
+        for (const int a : lc_regions)
+        {
+            const region& ra = regions[static_cast<std::size_t>(a)];
+            const region& rb = regions[i];
+            int dx = std::abs(ra.col - rb.col);
+            if (gw > 0 && dx > gw / 2) dx = gw - dx;
+            const int dy = ra.row - rb.row;
+            near[static_cast<std::size_t>(o)] = std::min<int64_t>(near[static_cast<std::size_t>(o)],
+                static_cast<int64_t>(dx) * dx + static_cast<int64_t>(dy) * dy);
+        }
+    }
+    const int64_t r2 = static_cast<int64_t>(late_culture_neighbour_tiles) * late_culture_neighbour_tiles;
+    int64_t nb_sum = 0;
+    for (std::size_t p = 0; p < np; ++p)
+        if (near[p] <= r2) { nb_sum += polity_band[p]; ++out.neighbours; }
+    if (out.neighbours == 0)
+    {
+        std::vector<std::pair<int64_t, int>> by; // (distance squared, id): nearest first, ties to the lower id
+        for (std::size_t p = 0; p < np; ++p) if (near[p] != INT64_MAX) by.push_back({near[p], static_cast<int>(p)});
+        std::sort(by.begin(), by.end());
+        for (std::size_t k = 0; k < by.size() && k < static_cast<std::size_t>(late_culture_nearest_peoples); ++k)
+        { nb_sum += polity_band[static_cast<std::size_t>(by[k].second)]; ++out.neighbours; }
+        out.nearest = true;
+    }
+    if (out.neighbours == 0 || nb_sum <= 0) return out;
+    out.lag_x100 = static_cast<int>(lc_sum * 100 * out.neighbours / (static_cast<int64_t>(out.realms) * nb_sum));
+    return out;
+}
+
 history_pattern_reading detect_history_patterns(const era_timelapse& empires,
                                                 const era_timelapse& exploration,
                                                 const era_timelapse& industrialisation,
                                                 const settlement_state& settlement,
                                                 int gw)
 {
-    (void)gw; // BL-1288: the late culture is read off the record now, not off the grid
     history_pattern_reading r;
     const std::map<int, int> pc = polity_cultures({&empires, &exploration, &industrialisation}, settlement);
     read_rise_and_fall(empires, r);
-    read_late_culture(empires, exploration, pc, r);
+    read_late_culture(empires, exploration, settlement, gw, pc, r);
     read_world_war(industrialisation, r);
     std::vector<history_pattern_reading::grant> cw_named;
     const auto cw = read_split_wars(empires, false, &cw_named);

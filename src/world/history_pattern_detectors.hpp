@@ -8,6 +8,7 @@
 #include <vector>
 
 struct settlement_state;
+struct region;
 
 // ---------------------------------------------------------------------------
 // history_pattern_detectors — the five history-pattern detectors (BL-1286)
@@ -114,7 +115,9 @@ struct history_pattern_reading
     int  lc_culture = -1;       ///< the most remote founding culture at the Culture close (the record's choice)
     int  lc_reach = -1;         ///< its remoteness by reach as the record names it (-1: the network joined it to nobody)
     int  lc_level = 0;          ///< the highest level the backstop pressed (`isolation_pressed`)
-    int  lc_lag_x100 = -1;      ///< its polities' materials mean over the world's at the Empires close; -1 none standing
+    int  lc_lag_x100 = -1;      ///< its realms' materials mean over its NEIGHBOURS' at the Empires close (BL-1288); -1 none
+    int  lc_neighbours = 0;     ///< the neighbourhood read (realms)
+    bool lc_nearest = false;    ///< no one stood around it: its nearest peoples were read
     int  lc_bound = 0;          ///< its polities bound or bought by another culture in Exploration
     std::vector<int32_t> lc_polities;
 
@@ -143,6 +146,23 @@ struct history_pattern_reading
     struct grant { int32_t polity = -1; int32_t year = 0; uint8_t pattern = 0; };
     std::vector<grant> grants;
 };
+
+/// BL-1288 -- THE LATE CULTURE'S LAG, AGAINST ITS NEIGHBOURS (one
+/// implementation: the detector reads it off the record, the sim's backstop off
+/// its live state). @p owner region -> holding polity at the Empires close (-1
+/// none); @p polity_culture polity -> its birth culture (-1 unknown);
+/// @p polity_band polity -> its materials band, 0 for a polity not living. The
+/// neighbourhood rule is `late_culture_rules.hpp`'s. Pure.
+struct late_culture_lag_reading
+{
+    int lag_x100   = -1;    ///< its realms' mean band over the neighbourhood's, x100; -1 no realm or no neighbour
+    int realms     = 0;     ///< its living realms
+    int neighbours = 0;     ///< realms in the neighbourhood
+    bool nearest   = false; ///< none stood within the tiles: the nearest peoples were read
+};
+late_culture_lag_reading read_late_culture_lag(const std::vector<int>& owner, const std::vector<region>& regions,
+                                               int gw, const std::vector<int>& polity_culture,
+                                               const std::vector<int>& polity_band, int late_culture);
 
 /// Run all five detectors over one body's records. @p gw is the settlement
 /// grid's width (columns wrap). Pure.

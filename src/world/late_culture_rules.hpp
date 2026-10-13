@@ -38,10 +38,23 @@
 // lower culture index. Recorded as `late_culture_chosen`, with that cheapest
 // walk as its remoteness.
 
-/// The lag the detector requires: the culture's polities' mean materials band
-/// at the Empires close at or under this share of the world's mean, x100.
-/// PROVISIONAL (the ruling leaves the number to measurement; BL-1286).
-inline constexpr int late_culture_lag_x100 = 85;
+/// THE LAG IS READ AGAINST ITS NEIGHBOURS (Ben, 2026-10-13, EXPLORATION.md sec
+/// A colony is a subject): the late culture lags the peoples in contact with
+/// it -- behind those around it -- not the world's mean. At the Empires close,
+/// its living realms' mean materials band at or under this share of its
+/// NEIGHBOURHOOD's mean band, x100. PROVISIONAL (the number is measurement's).
+///
+/// THE NEIGHBOURHOOD, read off the close's map alone (so the detector and the
+/// sim read one set, `read_late_culture_lag`): every living realm of another
+/// people holding a region within `late_culture_neighbour_tiles` (grid
+/// distance, columns wrapped) of a region the culture's realms hold -- the
+/// peoples around it. WHERE NONE STANDS THAT NEAR (an isolated people has no
+/// one around it), the `late_culture_nearest_peoples` living realms of other
+/// peoples nearest its ground, however far -- the first it would meet. Ties on
+/// the lower polity id. Unweighted means, realm by realm, as the old reading.
+inline constexpr int late_culture_lag_x100        = 85;
+inline constexpr int late_culture_neighbour_tiles = 18; ///< two campaign-neighbour radii (`neighbour_radius` 9)
+inline constexpr int late_culture_nearest_peoples = 3;
 
 /// The remoteness recorded for a culture the network joins to no foreign
 /// ground at the close (a reach sentinel above any walkable cost).

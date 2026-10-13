@@ -5,6 +5,7 @@
 
 #include "charter_price.hpp"  // BL-1099: the running charter price the works notes are read against
 #include "unit_roster.hpp"
+#include "history_pattern_detectors.hpp" // BL-1288: the late culture's lag, one reading with the detector
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
 #include <algorithm>
@@ -5072,23 +5073,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
             if (held[pi] > 0 && birth_culture(out.polities[pi]) == lc_culture) { ++realms; regions += held[pi]; }
     };
-    // Its living realms' mean materials band over the world's, x100 (-1 when
-    // it holds none) -- the detector's `cs * 100 * wn / (cn * ws)`.
-    const auto lc_lag_now = [&]() -> int {
-        std::vector<int32_t> held(out.polities.size(), 0);
+    // Its lag AGAINST ITS NEIGHBOURS (Ben, 2026-10-13), x100 (-1 when it
+    // holds no realm or no one is read) -- the detector's own reading
+    // (`read_late_culture_lag`, history_pattern_detectors), handed the live map.
+    const auto lc_lag_reading = [&]() -> late_culture_lag_reading {
+        const std::size_t pc = out.polities.size();
+        std::vector<int32_t> held(pc, 0);
         const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
         for (std::size_t i = 0; i < n_reg; ++i)
-            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < held.size()) ++held[static_cast<std::size_t>(owner[i])];
-        int64_t cs_ = 0, cn = 0, ws = 0, wn = 0;
-        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < pc) ++held[static_cast<std::size_t>(owner[i])];
+        std::vector<int> cult(pc, -1), band(pc, 0);
+        for (std::size_t pi = 0; pi < pc; ++pi)
         {
-            if (held[pi] <= 0) continue;
-            const int m = clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255);
-            ws += m; ++wn;
-            if (birth_culture(out.polities[pi]) == lc_culture) { cs_ += m; ++cn; }
+            cult[pi] = birth_culture(out.polities[pi]);
+            if (held[pi] > 0) band[pi] = clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255);
         }
-        return (cn > 0 && wn > 0 && ws > 0) ? static_cast<int>(cs_ * 100 * wn / (cn * ws)) : -1;
+        const std::vector<int> own(owner.begin(), owner.begin() + static_cast<std::ptrdiff_t>(n_reg));
+        return read_late_culture_lag(own, ss.regions, gw, cult, band, lc_culture);
     };
+    const auto lc_lag_now = [&]() -> int { return lc_lag_reading().lag_x100; };
     // The world's mean materials band over its living realms, x100.
     const auto lc_world_band_x100 = [&]() -> int {
         std::vector<char> live(out.polities.size(), 0);
@@ -11233,7 +11236,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int course = 100 - static_cast<int>((100 - late_culture_lag_course_x100) * done / span);
                 const bool losing = realms == 0 || regions * 2 < lc_peak_regions
                                  || (rec && lc_world_band_x100() >= 110 && lc_lag_now() > course);
-                if (losing && lc_level < late_culture_max_level)
+                // THE RISE IS PRESSED FIRST: no isolation level is raised while
+                // the rise and fall is still to pick or is rising (`rf_phase`
+                // 0-1). Measured 2026-10-13: any press in those years tipped the
+                // reference seed's rise under its floor (226 per mille against
+                // 301 unpressed); two always-patterns never press in the same years.
+                if (losing && lc_level < late_culture_max_level && !(rf_on && rf_phase <= 1))
                 {
                     ++lc_level;
                     ++roads_version; // every reach walk re-prices the steps the press moved
