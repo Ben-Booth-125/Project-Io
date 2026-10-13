@@ -2106,6 +2106,14 @@ void run_industrialisation(generation_cursor& c)
                                      "the total target " + std::to_string(params.nation_total_target)
                                          + " was not reached: the closing rounds stopped at "
                                          + std::to_string(c.closing_predicted) + " nations");
+        // BL-1289: THE WORLD WAR IS ALWAYS HIT (GENERATION_STRATEGY.md sec
+        // History patterns). A miss is a defect, recorded loudly, never an outcome.
+        if (kepler_industrialisation_hs.world_war_missed)
+            record_handoff_violation(c, "world_war",
+                                     "war " + std::to_string(kepler_industrialisation_hs.world_war_year) + "-"
+                                         + std::to_string(kepler_industrialisation_hs.world_war_peace_year) + ", "
+                                         + std::to_string(kepler_industrialisation_hs.world_war_top_engaged)
+                                         + " of the top powers engaged: " + kepler_industrialisation_hs.world_war_why);
         {
             std::string why;
             if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,

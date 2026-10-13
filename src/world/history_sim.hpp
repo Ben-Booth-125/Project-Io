@@ -56,6 +56,7 @@
 #include "settlement.hpp"
 #include "works_roster.hpp"
 #include "rise_fall_rules.hpp" // BL-1287: the ruled rise-and-fall predicate, shared with the detector
+#include "world_war_rules.hpp" // BL-1289: the ruled world-war predicate, shared with the detector
 
 #include <array>
 #include <atomic>
@@ -2883,6 +2884,55 @@ struct history_sim_params
     int civil_war_min_regions   = 3;
     int civil_war_window_years  = 50;
 
+    // --- BL-1289 (the world war) -----------------------------------------------
+    // INDUSTRIALISATION.md sec A world war in every world, sec War kills people
+    // (Ben, 2026-09-15, 2026-10-10/11/12). THE TARGET: inside the window
+    // (`world_war_rules.hpp`) a war forms by the mutual-defence spread -- the
+    // treaty graph's own spark, else the contest for a subject between the two
+    // largest powers -- and, where the spread leaves fewer than the ruled count
+    // of the top powers engaged, escalates one bounded, recorded step a round
+    // (the largest unengaged top power drawn in by its grudge, else by the war
+    // on its doorstep). While it stands, every round of it costs, each cost
+    // authored and recorded as itself, never a battle coefficient:
+    //   GROUND FOUGHT OVER -- each opposing pair's front (the regions of each
+    //     nearest the other, `world_war_front_per_pair` a side, within
+    //     `world_war_front_reach` of the enemy; across water, each side's
+    //     nearest port, where a top power is one of the pair and either
+    //     fields a navy) is RAZED once in the war:
+    //     `world_war_raze_industry_q` per mille of its `industry_points` and
+    //     `world_war_raze_port_q` of its `port_stock_q` gone, and every road
+    //     through it demoted one tier;
+    //   PEOPLE -- CONSCRIPT DEAD across each belligerent's ground in proportion
+    //     to what each region gave (its people), `world_war_conscript_q` per
+    //     mille a year; BLOCKADE FAMINE on the front while it stands,
+    //     `world_war_famine_q`; DISPLACEMENT of the front's people to the
+    //     nearest safe region of their own realm that can feed them,
+    //     `world_war_flight_q` (conserved). Each share capped per round at
+    //     `world_war_round_cap_q`, so no region is emptied;
+    //   TREASURIES -- each belligerent spends `world_war_cost_q` per mille a
+    //     year of the chest it entered with, from its capital, never below zero
+    //     and never owed, up to its WAR CHEST: `world_war_exhaustion_q` per
+    //     mille of that chest.
+    // Peace comes when one side has spent its war chests, at the latest in the
+    // window's last round. The war chest is about half the treasury, not all
+    // of it, so thirty years refill what the war drained (the ruling's
+    // "refilled treasuries"): measured on the quick seeds, a war spending the
+    // whole chest left the 1960 opening medians at 177-358 credits against
+    // 1252-4227 with no war -- thirty years of earnings cannot refill a chest
+    // three centuries filled. Struct-default OFF: every span but Industrialisation
+    // (industrialisation_sim_params) and every legacy fixture is byte-identical.
+    bool world_war_target          = false;
+    int  world_war_front_per_pair  = 1;
+    int  world_war_front_reach     = 0;   ///< 0: `neighbour_radius`
+    int  world_war_raze_industry_q = 500;
+    int  world_war_raze_port_q     = 500;
+    int  world_war_conscript_q     = 4;
+    int  world_war_famine_q        = 10;
+    int  world_war_flight_q        = 20;
+    int  world_war_round_cap_q     = 150;
+    int  world_war_cost_q          = 60;  ///< per mille of the entry chest a year: 480 over the 8 years to exhaustion
+    int  world_war_exhaustion_q    = 480;
+
     // --- BL-1294 (revolution lean) -------------------------------------------
     // INDUSTRIALISATION.md sec Revolution (Ben, 2026-10-10/12): A LEAN, which
     // promises nothing -- no backstop, no target. The DISPARITY BETWEEN A
@@ -5008,6 +5058,38 @@ struct history_sim_state
     int64_t     rise_fall_rally_home      = 0; ///< REPORT-ONLY: rallied survivors of a lost defence sent home
     bool        rise_fall_missed      = false;
     std::string rise_fall_why;              ///< Which clause missed, when it did.
+
+    /// BL-1289 — THE WORLD WAR'S OWN READING (all 0/-1/false on a run whose
+    /// params did not carry `world_war_target`). The top powers are read at
+    /// the first decision round at or after the window's open, after that
+    /// round's recorded step -- off the same counts the step samples, so the
+    /// backstop and `history_patterns`' detector judge one set. Report-only
+    /// beyond the war itself; `world_war_missed` is a DEFECT the caller
+    /// records as a violation. Not saved.
+    int32_t     world_war_year        = 0;  ///< The round the war began (0: never).
+    int32_t     world_war_peace_year  = 0;  ///< The round peace was made (0: never).
+    int32_t     world_war_spark       = 0;  ///< 1 the treaty graph's own spark, 2 the contest for a subject.
+    int32_t     world_war_contested   = -1; ///< The region the war began over.
+    int32_t     world_war_side_a      = -1; ///< The realm that opened the war.
+    int32_t     world_war_side_b      = -1; ///< The realm it opened on.
+    int32_t     world_war_belligerents = 0; ///< Realms engaged, both sides.
+    int32_t     world_war_top_engaged = 0;  ///< Of the top powers at the open, how many engaged.
+    int32_t     world_war_escalations = 0;  ///< Backstop steps taken (each one realm drawn in).
+    int64_t     world_war_regions_razed = 0;  ///< Regions razed (each once in the war).
+    int64_t     world_war_front_rounds  = 0;  ///< (region, round) pairs on a front.
+    int64_t     world_war_roads_demoted = 0;  ///< Corridors demoted one tier.
+    int64_t     world_war_post_roads_rebought   = 0; ///< Demoted Post Roads a purchase rebuilt (the only way back to tier 3).
+    int64_t     world_war_walks_held_below_post = 0; ///< Walks on a demoted Post Road held one use under tier 3.
+    int64_t     world_war_points_razed_scale    = 0; ///< `industry_points` razed, the scale part
+    int64_t     world_war_points_razed_treasury = 0; ///< ... and the treasury-paid part (`industry_points_from_treasury`)
+    int64_t     world_war_port_razed_q  = 0;  ///< Port stock razed, summed per mille.
+    int64_t     world_war_conscript_dead = 0;
+    int64_t     world_war_famine_dead   = 0;
+    int64_t     world_war_fled          = 0;
+    int64_t     world_war_no_refuge     = 0;  ///< Front strikes whose people had nowhere safe to flee (counted, never silent).
+    int64_t     world_war_treasury_spent = 0; ///< The war's stated cost: treasury spent, never owed.
+    bool        world_war_missed      = false;
+    std::string world_war_why;              ///< Which clause missed, when it did.
 };
 
 /// Sentinel for "no polity owns this region in this year slice".
