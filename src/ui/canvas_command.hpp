@@ -55,7 +55,7 @@ enum class canvas_command
     // UI toggles.
     help_toggle,///< Toggle the key-binding cheat-sheet overlay (F1).
     options_toggle,   ///< Toggle the display/options window (F10).
-    tech_tree_toggle, ///< Toggle the read-only mock tech-tree viewer (F9, BL-087 design aid).
+    tech_tree_toggle, ///< Toggle the research panel — the Digitisation ring and its queue (F9, BL-1276); the rail's Research slot is the same press.
 };
 
 /// Apply a canvas command to the shared UI state. Pure state mutation — no

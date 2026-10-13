@@ -102,6 +102,12 @@ int construction_build_ticks(const world& w, const recipe_registry& reg,
         duration * construction_site_multiplier(w, reg, tile, type, target))));
 }
 
+float construction_initial_workforce(building_type type)
+{
+    return (type == building_type::port || type == building_type::inland_logistics_hub
+            || type == building_type::military_base) ? 0.0f : 0.5f;
+}
+
 namespace {
 
 /// The one build door, for both owner kinds (BL-1296). @p corp is WHO the tech
@@ -202,11 +208,10 @@ construction_result construct_for(world& w, const recipe_registry& reg,
     bc.type               = type;
     // Staff producing buildings so they run; ports, logistics hubs and military
     // bases take no L3 production action (passive infrastructure), so they staff
-    // at zero.
-    bc.workforce_assigned =
-        (type == building_type::port || type == building_type::inland_logistics_hub
-         || type == building_type::military_base
-         || type == building_type::research_institute) ? 0.0f : 0.5f; // BL-332: passive, like military_base
+    // at zero. A research institute is staffed at construction like the
+    // University (Ben, 2026-10-10; PRODUCTION.md): it adds RP only while
+    // staffed (nation_tech.cpp, advance_research).
+    bc.workforce_assigned = construction_initial_workforce(type);
     // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
     // for its build ticks before economy_system lets it produce. BL-323 S3: that
     // duration depends on WHERE, not just WHAT (construction_build_ticks above),

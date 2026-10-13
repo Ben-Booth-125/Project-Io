@@ -130,7 +130,8 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // here is bit-for-bit what it was before the field existed.
     // BL-1198/BL-1199: a Well or a Fishing Wharf has no deposit; it runs at a
     // typical deposit's rate.
-    const float rich = placement_rules::is_depositless_site(w, b.tile, b.target_resource)
+    const bool  depositless = placement_rules::is_depositless_site(w, b.tile, b.target_resource);
+    const float rich = depositless
                      ? placement_rules::depositless_rate_scalar(b.target_resource)
                      : richness_rate_scalar(e, tc.resource_deposit[ri]);
     const float nominal = e.base_rate
@@ -139,13 +140,16 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
          * wt_scalar
          * building_supply_scalar(b)
          * (1.0f - tc.hazard_level);
-    // BL-1273: the owning corp's home nation's held-node extraction_rate
-    // multiplier, folded into the single definition of the draw (BL-479's
-    // per-corp read site before it). `nation_scalar` hands back `nominal`
-    // untouched — no arithmetic — until the effect pass (BL-1274) fills it.
+    // BL-1273/BL-1274: the owning corp's home nation's held-node
+    // extraction_rate modifiers (scoped to this site's resource, or "all"),
+    // folded into the single definition of the draw. A nation holding nothing
+    // gets `nominal` back untouched — no arithmetic.
     // BL-1296: a state building answers to its own nation (owner_home_nation).
     const entity_id nation = owner_home_nation(w, corp);
-    return nation_scalar(w, nation, modifier_subject::extraction_rate, nominal);
+    effect_target at;
+    at.resource = static_cast<int>(b.target_resource);
+    at.site     = extraction_site_name(b.target_resource, depositless); // "farm" is not a Fishing Wharf
+    return nation_scalar(w, nation, modifier_subject::extraction_rate, at, nominal);
 }
 
 // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared pro-rata",
@@ -503,6 +507,27 @@ bool market_wired(world& w, entity_id market)
     return rc >= 0.0f && std::isfinite(rc);
 }
 
+/// BL-1274: one output good of one run, as the owning corp's home nation's
+/// held processing_yield modifiers make it (scope "all", the good, the recipe or
+/// its group). A nation holding nothing gets @p outq back untouched. The ONE
+/// expression the credit and the store-ceiling run limit both read, so a run is
+/// never sized against a smaller output than it is credited.
+float processing_output(const world& w, entity_id corp, const recipe& rcp, std::size_t r, float outq)
+{
+    const auto      cit    = w.corporations.find(corp);
+    const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+    effect_target   at;
+    at.group    = rcp.group;
+    at.recipe   = rcp.name;
+    at.resource = static_cast<int>(r);
+    return nation_scalar(w, nation, modifier_subject::processing_yield, at, outq);
+}
+
+} // namespace
+
+// Exported (BL-1274): declared in economy_system.hpp so nation_tech_harness can
+// measure a processing_yield node at the one place output accrues. The
+// anonymous namespace re-opens below.
 /// Land one run's outputs on @p market under the BL-708 store ceiling. Returns
 /// what was produced. Shared by the draw and BL-1209's top-up.
 float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id corp,
@@ -526,6 +551,9 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
 
     std::array<float, resource_count> stock{};
     bool stock_read = false;
+    // BL-1274: the held-node processing_yield modifiers, per output good,
+    // applied where the output accrues (processing_output). The run's INPUTS
+    // are unchanged — a yield node makes more from the same draw.
     float produced = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -534,6 +562,7 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
             continue;
         if (grid.any() && grid.grid(r) && !market_wired(w, market))
             continue; // BL-708: no wire to sell it down
+        outq = processing_output(w, corp, rcp, r, outq);
         const float cap = grid.ceiling(r);
         if (cap > 0.0f)
         {
@@ -555,6 +584,8 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
     return produced;
 }
 
+namespace {
+
 /// BL-1265: does any of @p rcp's outputs carry a BL-708 store ceiling? Only
 /// then is the shelf stock read for `store_run_limit`.
 bool any_capped_output(const recipe_registry& reg, const recipe& rcp)
@@ -569,8 +600,11 @@ bool any_capped_output(const recipe_registry& reg, const recipe& rcp)
 /// BL-1209: the most extra run a processor's outputs can still be credited for
 /// under the BL-708 store ceiling. Infinite while any output is uncapped (a run
 /// still makes that output); else the largest run any capped output has room for.
-/// @p stock is the shelf as `shelf_stock_with_landings` reads it.
-float store_run_limit(const recipe_registry& reg, const recipe& rcp,
+/// @p stock is the shelf as `shelf_stock_with_landings` reads it. Sized with
+/// the output the run will actually be credited — BL-1274's yield modifiers
+/// included (processing_output) — so no input is drawn for output the
+/// ceiling then clamps away.
+float store_run_limit(const world& w, entity_id corp, const recipe_registry& reg, const recipe& rcp,
                       const std::array<float, resource_count>& stock, float batches_full)
 {
     const grid_goods_params& grid = reg.grid_goods();
@@ -578,9 +612,9 @@ float store_run_limit(const recipe_registry& reg, const recipe& rcp,
     bool any_output = false;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float outq = rcp.outputs[r] * batches_full;
-        if (!(outq > 0.0f))
+        if (!(rcp.outputs[r] * batches_full > 0.0f))
             continue;
+        const float outq = processing_output(w, corp, rcp, r, rcp.outputs[r] * batches_full);
         any_output = true;
         const float cap = grid.ceiling(r);
         if (!(cap > 0.0f))
@@ -799,7 +833,7 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
     if (!has_input)
         return false;
     if (any_capped_output(reg, *rcp))
-        extra = std::min(extra, store_run_limit(reg, *rcp, shelf_stock_with_landings(w, market_id), batches_full));
+        extra = std::min(extra, store_run_limit(w, corp, reg, *rcp, shelf_stock_with_landings(w, market_id), batches_full));
     const float new_run = std::min(1.0f, rep.run + extra);
     // A meaningful increment only: float dust left by the first turn is not a run.
     if (!(new_run >= reg.t_idle()) || !(new_run - rep.run > 1e-5f))
@@ -886,7 +920,7 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
         if (!std::isfinite(more))
             continue; // no inputs
         if (any_capped_output(reg, *rcp))
-            more = std::min(more, store_run_limit(reg, *rcp, shelf_stock_with_landings(w, mid), bf));
+            more = std::min(more, store_run_limit(w, rep.corp, reg, *rcp, shelf_stock_with_landings(w, mid), bf));
         const float could = std::min(1.0f, rep.run + more);
         if (!(could >= reg.t_idle()) || !(could - rep.run > 1e-4f))
             continue;

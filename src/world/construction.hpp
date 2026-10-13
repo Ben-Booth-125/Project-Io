@@ -31,6 +31,14 @@ enum class construction_result : uint8_t
 float construction_site_multiplier(const world& w, const recipe_registry& reg,
                                    entity_id tile, building_type type, resource_type target);
 
+/// The workforce a newly constructed building of @p type is staffed at — what
+/// `construct_building` sets `workforce_assigned` to. Passive infrastructure
+/// (port, inland logistics hub, military base) staffs at zero; everything else,
+/// the University and the research institute included (Ben, 2026-10-10;
+/// PRODUCTION.md), at 0.5. Exposed so a fixture staffs a building the way the
+/// build door does rather than inventing a state construction never makes.
+float construction_initial_workforce(building_type type);
+
 /// The economy ticks a build of `type`/`target` on `tile` takes at full rate: the
 /// authored duration times the site multiplier, rounded, floored at 1; 0 for an
 /// instant (undurationed) type. What `construct_building` sets `ticks_remaining` to.
