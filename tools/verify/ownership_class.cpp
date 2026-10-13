@@ -787,11 +787,14 @@ int main(int argc, char* argv[])
         // version in this wave, and a literal would need re-pinning at the merge.
         {
             std::string bad = bytes;
-            const uint32_t prev = world_save_version - 1;
+            // BL-1296: v47 is a strict prefix of v48 and still read
+            // (k_world_save_version_pre_state), so the first REFUSED prior
+            // version is the one before it.
+            const uint32_t prev = k_world_save_version_pre_state - 1;
             std::memcpy(&bad[4], &prev, sizeof prev);
             world victim;
             check(!from_bytes(bad, victim),
-                  "R5 the IMMEDIATELY-PRIOR version is refused whole (symbolic)");
+                  "R5 the newest UNREAD prior version is refused whole (symbolic)");
         }
         {
             std::string bad = bytes;

@@ -217,6 +217,8 @@ float seat_clean_slate(world& w, entity_id corp);
 /// target on the next economy step). Called by both ways a seat is taken at the
 /// handoff — the draw (`seat_player_corporation`) and the pick
 /// (`corp_verb::take_seat`) — and NOT by generation's provisional re-point.
+/// BL-1296: the seat's nation's dial-idled STATE buildings are released the
+/// same way when the seat is that nation's champion (it runs them now).
 /// Deterministic and draw-free. Returns the number of plants released.
 int seat_release_dial_idled(world& w, entity_id corp);
 void arm_rivals(world& w);

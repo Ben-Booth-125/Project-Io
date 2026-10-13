@@ -916,6 +916,10 @@ void clear_derived_state(world& w)
     w.ai_decisions.next  = 0;
     w.ai_decisions.total = 0;
 
+    // BL-1296: this tick's state ledger is transient (world.hpp): a loaded
+    // campaign opens with none, and the next tick's funding gate writes it.
+    w.state_ledger.clear();
+
     // Mirrored from the sim loop each frame by app; the envelope carries the
     // authoritative tick.
     w.current_day_tick  = 0;
@@ -1065,6 +1069,33 @@ void write_world_snapshot(const world& w, std::ostream& out)
 
     // BL-1265 (v46): the held opening stock (BL-1217 D5, v39) retired — the
     // opening stock is on the shelves before the first tick.
+
+    // BL-1296 (world_save_version 48): STATE INDUSTRY, its own trailing section.
+    // Each nation holding state buildings, ascending id, with its
+    // `state_assets` in STORED order (the order the funding gate spends in, so
+    // the sequence is state); then every building the gate idled this tick,
+    // ascending id. A trailing section rather than a field in the nation and
+    // building records, so a v47 stream — which ends before it — still reads,
+    // as a world with no state industry (read_world_snapshot).
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.state_assets.empty())
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            w_id(out, nid);
+            w_ids(out, w.nations.at(nid).state_assets);
+        }
+        std::vector<entity_id> idle;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.state_idle)
+                idle.push_back(bid);
+        std::sort(idle.begin(), idle.end());
+        w_ids(out, idle);
+    }
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1074,7 +1105,13 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false; // not a world snapshot at all
 
     uint32_t version = 0;
-    if (!r_u32(in, version) || version != world_save_version)
+    // BL-1296: v47 is the one older stream still read — it predates state
+    // industry, which lives wholly in v48's trailing section, so a v47 world
+    // loads byte-for-byte as before with no state buildings (no nation owns a
+    // building outright; every major's strategic plants stay with the firms
+    // that held them when it was saved). Every other version is refused whole.
+    if (!r_u32(in, version)
+        || (version != world_save_version && version != k_world_save_version_pre_state))
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1267,9 +1304,58 @@ bool read_world_snapshot(world& w, std::istream& in)
         if (tile == s.tiles.end() || tile->second.body != fm.body) return false;
     }
 
+    // BL-1296 (v48): the state-industry section. Untrusted on the ring's
+    // footing: every entry must name a nation in the stream and a building in
+    // the stream that no corporation and no other nation owns, at most once —
+    // the only state the handover and the state build door can write — and an
+    // idled building must be a state building. Refused whole otherwise. A v47
+    // stream ends before this section: no state industry.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        std::set<entity_id> owned;
+        for (const auto& [cid, cc] : s.corporations)
+            for (const entity_id bid : cc.assets)
+                owned.insert(bid);
+        std::set<entity_id> state_owned;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid) || nid <= prev)
+                return false; // ascending, distinct, never null
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            std::vector<entity_id> assets;
+            if (!r_ids(in, assets) || assets.empty())
+                return false;
+            for (const entity_id bid : assets)
+            {
+                if (s.buildings.count(bid) == 0 || owned.count(bid) != 0
+                    || !state_owned.insert(bid).second)
+                    return false;
+            }
+            nit->second.state_assets = std::move(assets);
+        }
+        std::vector<entity_id> idle;
+        if (!r_ids(in, idle))
+            return false;
+        for (const entity_id bid : idle)
+        {
+            if (state_owned.count(bid) == 0)
+                return false;
+            s.buildings.at(bid).state_idle = true;
+        }
+    }
+
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all
     // ids distinct — the only trades the seam can write. Refused whole.
+
     {
         std::set<uint32_t> ids;
         std::map<entity_id, std::size_t> per_owner;

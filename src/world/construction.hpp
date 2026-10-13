@@ -103,6 +103,27 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 ///                 @p corp does not own it.
 bool demolish_building(world& w, entity_id corp, entity_id building);
 
+/// BL-1296 (state industry; NATIONS.md § State industry, "The player's
+/// controls"): build a STATE processing facility running @p recipe on @p tile
+/// for @p nation — the corporation build door, owned by the nation and
+/// committed against its treasury. The same checks construct_building makes
+/// (era, tech, air, tile, placement), asked of the nation's champion (same home
+/// nation, same tree), plus: the nation is a major, @p recipe is one the state
+/// runs (`state_runs`, state_industry.hpp), and @p tile is the nation's own
+/// ground. Affordability is the treasury's UNCOMMITTED part
+/// (`state_uncommitted_treasury`) against the build's whole capex; payment is
+/// pay-as-you-build from the treasury (run_construction), and a tick the
+/// treasury cannot fund pauses the site. The building joins the nation's
+/// `state_assets`. Mutates only on `placed`.
+construction_result construct_state_building(world& w, const recipe_registry& reg,
+                                             entity_id nation, entity_id tile,
+                                             std::uint16_t recipe, entity_id& out_building);
+
+/// BL-1296: demolish a state building @p nation owns — demolish_building for
+/// the nation owner kind. No refund (the same rule). True on success; false if
+/// the building does not exist or @p nation does not own it.
+bool demolish_state_building(world& w, entity_id nation, entity_id building);
+
 /// Attempt to place a road of tier `tier` on `tile` for corporation `corp` (BL-147 core, BL-172
 /// tier ladder). A road is a per-tile mutation, not a building: on success it raises
 /// `tile_component.road_level` to `tier` (1=Track, 2=Road, 3=Highway), which lowers that tile's

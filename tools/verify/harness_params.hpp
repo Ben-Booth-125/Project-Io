@@ -167,6 +167,11 @@ struct harness_charter_input
     /// nothing) — the instrument's budget's, or on the shipped path the
     /// stockpile's. Untouched when the budget in force is empty.
     charter_spend_report* report = nullptr;
+    /// BL-1296 — leave the state-industry handover OUT of the mirror, so an
+    /// instrument can read the world just before it (state_industry_harness's
+    /// champion row runs `hand_over_state_industry` itself on that world).
+    /// False is the shipped sequence.
+    bool skip_state_handover = false;
 };
 
 struct shipped_landscape
@@ -191,6 +196,8 @@ struct shipped_landscape
     charter_spend_params    stockpile_spend{};
     /// BL-1268: the retrofit the mirror ran after the winner's apply.
     marketplace_retrofit_report retrofit;
+    /// BL-1296: the state-industry handover the mirror ran after the recipes.
+    state_handover_report   state;
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -288,6 +295,13 @@ inline shipped_landscape apply_shipped_landscape(
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
     assign_default_recipes(w, reg, "finish: after the winner");
+    // BL-1296: finish_campaign_world's state-industry handover, verbatim, at the
+    // same point (after the second recipe pass, before any tick).
+    if (!charter.skip_state_handover)
+    {
+        out.state = hand_over_state_industry(w, reg);
+        print_state_handover(out.state);
+    }
 
     std::vector<entity_id> after;
     after.reserve(w.corporations.size());

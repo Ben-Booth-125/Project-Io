@@ -246,6 +246,11 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
             kv, "order", 0, 0,
             static_cast<long long>(std::numeric_limits<uint32_t>::max()), &ok);
         const long long cp_v    = kv_get_checked(kv, "counterparty", 0, 0, id_max, &ok);
+        // BL-1296: the state industry the command acts for (`as_nation`); 0 =
+        // none, the corporation's own book. Gated against the entity domain like
+        // every id; whether it names a nation the session may act for is the
+        // actor gate below, and whether the corp is its champion the seam's.
+        const long long nat_v   = kv_get_checked(kv, "nation", 0, 0, id_max, &ok);
         // BL-511: march_unit's destination province. A province id is NOT an
         // entity_id — it is derived from (body rank | block | component)
         // (province.hpp) and lives in its own uint32 domain, so it is gated
@@ -310,6 +315,7 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         cmd.order        = static_cast<uint32_t>(order_v);
         cmd.counterparty = static_cast<entity_id>(cp_v);
         cmd.province     = static_cast<uint32_t>(prov_v);
+        cmd.as_nation    = static_cast<entity_id>(nat_v);
 
         // BL-387: refuse to act as a corp the session is not. Before this
         // gate the only validation of `corp` was that the corp EXISTS, so
@@ -317,7 +323,17 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // rival balances moved by tens of millions. The gate sits here and
         // not in apply_corp_command: the seam must stay permissive for the
         // in-process scorer, which legitimately commands every rival.
-        if (!s.as_any && cmd.corp != s.actor)
+        // BL-1296: actor authority reaches the session's NATION too — a state
+        // command may name only the session corp's own home nation (the seam
+        // then requires that corp to be its champion). Refused here, before the
+        // seam, on the same footing as the corp gate: nothing is mutated.
+        bool nation_ok = true;
+        if (!s.as_any && cmd.as_nation != null_entity)
+        {
+            const auto ait = w.corporations.find(s.actor);
+            nation_ok = ait != w.corporations.end() && ait->second.home_nation == cmd.as_nation;
+        }
+        if ((!s.as_any && cmd.corp != s.actor) || !nation_ok)
         {
             if (echo)
             {
@@ -328,6 +344,7 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
             out += "RESULT result=rejected_not_owner building=-1\n";
             return host_op::none;
         }
+
 
         // BL-1076: THE SEAT IS TAKEN BEFORE PLAY. Both hosts of this protocol
         // (--serve and the live agent seam) are IN-PLAY hosts — the seam opens

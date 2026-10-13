@@ -271,6 +271,21 @@ struct corp_command
     /// is what a stored command and a wire caller agree on; dropping it would
     /// re-interpret every command already recorded.
     std::array<entity_id, mercenary_contract_max_units> units{};
+
+    // --- BL-1296: state industry joins the seam (2026-10-13) ---
+    /// The STATE INDUSTRY this command acts for (NATIONS.md § State industry,
+    /// "The player's controls"; AI_OPPONENT.md § 11, the 2026-10-11 grant).
+    /// `null_entity` (the default) is every command there has ever been: `corp`
+    /// acts on its own book. Non-null, the command acts on that NATION's state
+    /// buildings, paid from its treasury, and `corp` must be the nation's
+    /// CHAMPION (`champion_of`) — a nation's state industry is operated from its
+    /// champion's seat, the player's from the player's, a rival major's from its
+    /// champion's scored layer. Only a corporation's building verbs are legal
+    /// (build, demolish, set_recipe, set_workforce, set_workforce_auto, idle,
+    /// resume); any other verb is `rejected_invalid`, and a building the nation
+    /// does not own is `rejected_not_owner`. Appended LAST so every older field
+    /// keeps its place in the record.
+    entity_id as_nation = null_entity;
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every

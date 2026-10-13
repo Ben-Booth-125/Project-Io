@@ -541,6 +541,34 @@ struct world
     /// `std::map`: the clear walks it in ascending (owner, market) order.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> landed_this_tick;
 
+    /// BL-1296 (state industry; NATIONS.md § State industry) — THIS TICK'S STATE
+    /// LEDGER per nation holding state industry. `plan_state_funding` opens a
+    /// row at the top of the tick (the treasury it found and the cost bound it
+    /// COMMITTED to the buildings it funded); `run_construction` adds the flat
+    /// construction it debited; `apply_budget` closes it (the market flows and
+    /// operating costs it settled, the treasury it left) and zeroes
+    /// `committed`. `committed` is what a treasury-paid command this tick may
+    /// NOT spend (a state build's commitment gate, a state recipe switch), so a
+    /// mid-tick command can never spend money the funded buildings will be
+    /// billed. TRANSIENT, like `landed_this_tick`: never saved, never hashed,
+    /// emptied on load (clear_derived_state). A `std::map`: ascending nation id.
+    struct state_tick_ledger
+    {
+        float treasury_open  = 0.0f; ///< treasury when the gate ran
+        float committed      = 0.0f; ///< summed cost bound of the funded buildings (0 once settled)
+        int   funded         = 0;    ///< state buildings the gate funded this tick
+        int   idled          = 0;    ///< state buildings the treasury could not pay for
+        float construction   = 0.0f; ///< flat construction debited by run_construction
+        float income         = 0.0f; ///< sales onto the shelf (clear_markets)
+        float expenditure    = 0.0f; ///< inputs, upkeep goods and materials bought off the shelf
+        float maintenance    = 0.0f; ///< operating maintenance
+        float wages          = 0.0f; ///< wages
+        float treasury_settle_from = 0.0f; ///< treasury as apply_budget's state pass found it
+        float treasury_close = 0.0f; ///< treasury after apply_budget settled it
+
+    };
+    std::map<entity_id, state_tick_ledger> state_ledger;
+
     /// Land @p qty of good @p r for @p owner on @p market this tick (see
     /// `landed_this_tick`). Non-positive or non-finite quantities are ignored.
     void land_goods(entity_id owner, entity_id market, std::size_t r, float qty)
@@ -1176,6 +1204,67 @@ entity_id owner_corp_of(const world& w, entity_id building);
 /// @param building Building entity id to test.
 /// @return         Whether the owning corporation has `is_player` set.
 bool is_player_owned(const world& w, entity_id building);
+
+// ---------------------------------------------------------------------------
+// BL-1296 — building ownership has two kinds (NATIONS.md § State industry)
+// ---------------------------------------------------------------------------
+// A building is owned by a CORPORATION (private industry, in its `assets`) or by
+// a major NATION outright (state industry, in its `state_assets`). Corporations
+// and nations draw their ids from the one entity allocator, so an owner id alone
+// names which; `building_owner_of` says so explicitly. Every economy flow keyed
+// by "owner" (landings, purchases, wants, labour pools, cash flows) takes a
+// nation id for a state building; money for a nation lands on its `treasury`.
+
+/// Which kind of actor owns a building.
+enum class owner_kind : std::uint8_t
+{
+    none        = 0, ///< Unowned (or the building does not exist).
+    corporation = 1, ///< Private industry: in a corporation's `assets`.
+    nation      = 2, ///< State industry: in a nation's `state_assets`.
+};
+
+/// A building's owner, as kind + id.
+struct building_owner
+{
+    owner_kind kind = owner_kind::none;
+    entity_id  id   = null_entity;
+};
+
+/// Resolve @p building's owner — a corporation or a nation. Linear in the
+/// owners' asset lists, like `owner_corp_of`.
+building_owner building_owner_of(const world& w, entity_id building);
+
+/// The nation that owns @p building as state industry, or null when a
+/// corporation (or nobody) owns it.
+entity_id owner_nation_of(const world& w, entity_id building);
+
+/// The asset list of @p owner — a corporation's `assets` or a nation's
+/// `state_assets` — or null when @p owner is neither.
+const std::vector<entity_id>* assets_of(const world& w, entity_id owner);
+
+/// Every economic owner in one ascending-id list: every corporation and every
+/// nation holding state industry, interleaved by id. The visit order of every per-owner
+/// walk in the economy step; with no state industry anywhere it is exactly the
+/// sorted corporation ids it replaced, so such a world ticks byte-identically.
+std::vector<entity_id> economic_owner_ids(const world& w);
+
+/// The nation an owner's buildings answer to for national effects (the tech
+/// tree's modifiers, the qualified pool): a corporation's home nation, or the
+/// nation itself for state industry. Null for anything else.
+entity_id owner_home_nation(const world& w, entity_id owner);
+
+/// A nation's CHAMPION: the player's corporation when it is a specialist of
+/// this nation (the seat is the champion), else the lowest-id specialist
+/// (non-background corporation) whose home nation it is; null for a minor
+/// (GLOSSARY.md § Major nation).
+entity_id champion_of(const world& w, entity_id nation);
+
+/// True iff @p nation holds a champion — a MAJOR nation.
+bool is_major_nation(const world& w, entity_id nation);
+
+/// The player's nation: the home nation of the player's corporation (the
+/// player plays a major and operates its champion). Null with no player.
+entity_id player_nation(const world& w);
 
 /// Resolve the body a market entity sits on. Collapses market-level identity to
 /// body-level for the trade-route / fog systems (a body may host several markets;

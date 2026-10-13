@@ -46,6 +46,7 @@
 #include "world/landscape_search.hpp"  // landscape_search_result, landscape_search_params
 #include "world/stockpile_budget.hpp"  // stockpile_budget
 #include "world/corporation_generation.hpp" // marketplace_retrofit_report (BL-1268)
+#include "world/state_industry.hpp"         // state_handover_report (BL-1296)
 
 #include <cstdint>
 #include <vector>
@@ -102,6 +103,8 @@ struct finish_campaign_result
     major_reconciliation_report majors;
     /// BL-1268: what the retrofit placed from the history's trade record.
     marketplace_retrofit_report retrofit;
+    /// BL-1296: what the state-industry handover passed to the majors.
+    state_handover_report   state;
     /// Wall clock of the search and of the settle, milliseconds -- REPORTED
     /// ONLY, on the BL-754 footing; the loading bar's weights are re-measured
     /// from these, never read from them at run time.

@@ -15,6 +15,7 @@
 // substrate, so placement_rules is still not a dependency of this file.
 #include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
+#include "state_industry.hpp" // BL-1296: state_runs (the state build/retool doors)
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
 #include "supply_system.hpp"
 #include "trade.hpp" // BL-1266: trade_is_valid (set_trade)
@@ -710,6 +711,133 @@ corp_command_result map_construction(construction_result r)
     return corp_command_result::rejected_invalid;
 }
 
+/// True iff @p nation owns @p building as state industry.
+bool nation_owns(const world& w, entity_id nation, entity_id building)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return false;
+    const auto& a = nit->second.state_assets;
+    return std::find(a.begin(), a.end(), building) != a.end();
+}
+
+/// BL-1296 — a command acting for a nation's STATE INDUSTRY (`cmd.as_nation`;
+/// NATIONS.md § State industry, "The player's controls": "a corporation's
+/// building verbs — build, recipe, workforce dial, sell — paid from the
+/// treasury"). `cmd.corp` exists (the caller checked). Every check is made
+/// before anything mutates, so a rejection mutates nothing:
+///   - the nation exists and is a MAJOR, and `cmd.corp` is its CHAMPION — a
+///     nation's state industry is operated from its champion's seat (the
+///     wire's actor gate has already pinned `cmd.corp` to the session's corp);
+///   - the verb is one of a corporation's building verbs ("sell" is
+///     `demolish`: the prototype has no salvage and no privatisation, so
+///     disposing of a building is the one sale there is);
+///   - a named building exists and is the nation's own.
+corp_command_result apply_state_command(world& w, const recipe_registry& reg,
+                                        const corp_command& cmd, entity_id* out_building)
+{
+    const entity_id nation = cmd.as_nation;
+    if (w.nations.find(nation) == w.nations.end())
+        return corp_command_result::rejected_invalid;
+    if (champion_of(w, nation) != cmd.corp)
+        return corp_command_result::rejected_not_owner;
+
+    switch (cmd.verb)
+    {
+        case corp_verb::build:
+        {
+            // A state building is a processing facility on a strategic recipe
+            // the state runs; the recipe must be NAMED (the sector is the recipe).
+            if (cmd.type != building_type::processing_facility || cmd.recipe == no_recipe
+                || reg.get_recipe(cmd.recipe) == nullptr
+                || !state_runs(reg, cmd.type, cmd.recipe))
+                return corp_command_result::rejected_invalid;
+            if (w.tiles.find(cmd.tile) == w.tiles.end())
+                return corp_command_result::rejected_invalid;
+            entity_id built = null_entity;
+            const construction_result r =
+                construct_state_building(w, reg, nation, cmd.tile, cmd.recipe, built);
+            if (r == construction_result::placed && out_building)
+                *out_building = built;
+            return map_construction(r);
+        }
+        case corp_verb::demolish:
+        case corp_verb::set_recipe:
+        case corp_verb::set_workforce:
+        case corp_verb::set_workforce_auto:
+        case corp_verb::idle:
+        case corp_verb::resume:
+            break;
+        default:
+            return corp_command_result::rejected_invalid; // not a building verb
+    }
+
+    const auto bit = w.buildings.find(cmd.subject);
+    if (bit == w.buildings.end())
+        return corp_command_result::rejected_invalid;
+    if (!nation_owns(w, nation, cmd.subject))
+        return corp_command_result::rejected_not_owner;
+    building_component& b = bit->second;
+
+    switch (cmd.verb)
+    {
+        case corp_verb::demolish:
+            return demolish_state_building(w, nation, cmd.subject)
+                       ? corp_command_result::applied
+                       : corp_command_result::rejected_invalid;
+        case corp_verb::set_recipe:
+        {
+            if (b.type != building_type::processing_facility)
+                return corp_command_result::rejected_invalid;
+            if (reg.get_recipe(cmd.recipe) == nullptr)
+                return corp_command_result::rejected_invalid;
+            if (b.recipe == cmd.recipe)
+                return corp_command_result::rejected_state;
+            // The shared retool gate, with the NATION as the payer (cost from
+            // the treasury's uncommitted part; the recipe must stay strategic).
+            switch (try_switch_recipe(w, reg, nation, b, cmd.recipe))
+            {
+                case recipe_switch_result::applied:            return corp_command_result::applied;
+                case recipe_switch_result::on_cooldown:         return corp_command_result::rejected_cooldown;
+                case recipe_switch_result::insufficient_funds:  return corp_command_result::rejected_funds;
+                case recipe_switch_result::invalid:             return corp_command_result::rejected_invalid;
+                case recipe_switch_result::cross_group:         return corp_command_result::rejected_invalid;
+                case recipe_switch_result::tech_locked:         return corp_command_result::rejected_tech_locked;
+                case recipe_switch_result::wrong_air:           return corp_command_result::rejected_wrong_air;
+            }
+            return corp_command_result::rejected_invalid;
+        }
+        case corp_verb::set_workforce:
+            if (cmd.workforce < 0 || cmd.workforce > 200)
+                return corp_command_result::rejected_invalid;
+            if (b.workforce_target == cmd.workforce && !b.workforce_auto)
+                return corp_command_result::rejected_state;
+            b.workforce_target = cmd.workforce;
+            b.workforce_auto   = false;
+            return corp_command_result::applied;
+        case corp_verb::set_workforce_auto:
+            if (b.workforce_auto)
+                return corp_command_result::rejected_state;
+            b.workforce_auto = true;
+            return corp_command_result::applied;
+        case corp_verb::idle:
+        case corp_verb::resume:
+        {
+            const bool want = (cmd.verb == corp_verb::idle);
+            if (b.decommissioned == want)
+                return corp_command_result::rejected_state;
+            b.decommissioned = want;
+            b.loss_streak    = 0;
+            if (building_affects_logistics(b.type))
+                invalidate_logistics_caches(w);
+            return corp_command_result::applied;
+        }
+        default:
+            break;
+    }
+    return corp_command_result::rejected_invalid;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -896,11 +1024,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
     if (w.corporations.find(cmd.corp) == w.corporations.end())
         return corp_command_result::rejected_no_corp;
 
+    // BL-1296: a command for a nation's state industry takes its own door.
+    if (cmd.as_nation != null_entity)
+        return apply_state_command(w, reg, cmd, out_building);
+
     switch (cmd.verb)
     {
         case corp_verb::build:
         {
             // BL-388: a stated recipe must reach the built processor — reject
+
             // rather than silently coerce. construct_building substitutes steel
             // for no_recipe (right for a caller with no opinion, wrong for one
             // that named a recipe), so before this forward every seam-built

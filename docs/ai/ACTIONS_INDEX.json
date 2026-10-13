@@ -58,6 +58,10 @@
    "The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid. Also a corp_verb."
   ],
   [
+   "gameplay.state_industry_command",
+   "The command seam only (--serve / MCP `issue_command` with `nation`, and the verify API's `corp_command{as_nation=...}`). No ledger or card control yet: a state building's card names its nation as owner (\"Owner: <nation> (state industry)\") and offers no levers."
+  ],
+  [
    "gameplay.survey",
    "The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey)."
   ],

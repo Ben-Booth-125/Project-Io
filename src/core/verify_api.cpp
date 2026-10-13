@@ -3698,6 +3698,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const int wf = t.get_or("workforce", 100);
         if (wf < 0 || wf > 200) return "rejected_invalid";
         cmd.workforce = wf;
+        // BL-1296: the state industry a command acts for (0 = the corp's own book).
+        cmd.as_nation = static_cast<entity_id>(t.get_or("as_nation", 0u));
+        if (const sol::optional<int> ty = t["type"]; ty)
+        {
+            if (*ty < 0 || *ty >= static_cast<int>(building_type_count)) return "rejected_invalid";
+            cmd.type = static_cast<building_type>(*ty);
+        }
 
         const auto r = apply_corp_command(m_world, m_registry, cmd);
         switch (r)

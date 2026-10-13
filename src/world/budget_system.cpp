@@ -441,6 +441,71 @@ void apply_budget(world& w,
         }
     }
 
+    // BL-1296 — THE STATE PASS (NATIONS.md § State industry; § 2, the second
+    // exception). A major's state buildings trade on the market with the
+    // treasury in place of a balance: what they landed was sold at the clear
+    // (`flows[nation].income`), what they drew off the shelf was billed there
+    // (`flows[nation].expenditure`), and their maintenance and wages are
+    // charged here by the same formula a corporation's are. Market flows, not
+    // transfers — the same standard a corporation's sales and costs meet.
+    //
+    // NEVER DEBT. A building the tick's funding gate could not pay for
+    // (`state_idle`) ran nothing and is charged NOTHING — not even the idle
+    // floor; every funded building's whole cost fit inside the treasury before
+    // anything was charged (`plan_state_funding`), so this settlement cannot
+    // take a treasury below zero. Ascending nation id, each nation's buildings
+    // in stored order: a fixed float order. No interest, no return: a treasury
+    // is not a corporation's balance sheet. No state industry: nothing runs.
+    {
+        std::vector<entity_id> state_nations;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.state_assets.empty())
+                state_nations.push_back(nid);
+        std::sort(state_nations.begin(), state_nations.end());
+        for (const entity_id nid : state_nations)
+        {
+            nation_component& nc = w.nations.at(nid);
+            world::state_tick_ledger& led = w.state_ledger[nid];
+            led.treasury_settle_from = nc.treasury;
+            float delta = 0.0f;
+
+            if (const auto fit = flows.find(nid); fit != flows.end())
+            {
+                led.income      = fit->second.income;
+                led.expenditure = fit->second.expenditure;
+                delta += fit->second.income - fit->second.expenditure;
+            }
+            for (const entity_id bid : nc.state_assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                const building_component& b = bit->second;
+                if (b.state_idle)
+                    continue; // unfunded: ran nothing, pays nothing
+                entity_id body = null_entity;
+                if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+                    body = tit->second.body;
+                float scalar = 1.0f;
+                if (const auto cit = contention.find(std::make_pair(nid, body)); cit != contention.end())
+                    scalar = cit->second;
+                if (building_labour != nullptr)
+                    if (const auto bl = building_labour->find(bid); bl != building_labour->end())
+                        scalar = bl->second;
+                const building_opex opex = compute_building_opex(b, reg.economics(b.type), scalar,
+                                                                 mean_hab_of(body),
+                                                                 reg.idle_maintenance_floor());
+                led.maintenance += opex.maintenance;
+                delta           -= opex.maintenance;
+                led.wages       += opex.wages;
+                delta           -= opex.wages;
+            }
+            nc.treasury       += delta;
+            led.treasury_close = nc.treasury;
+            led.committed      = 0.0f; // settled: nothing this tick is still owed
+        }
+    }
+
     // BL-626: file the returns. Ascending entity_id (the map's own order), one
     // row per corporation per tick, rolling retention of the last
     // `k_quarterly_return_retention` quarters with the oldest dropped first.

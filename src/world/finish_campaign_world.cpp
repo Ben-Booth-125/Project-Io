@@ -378,6 +378,14 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     //    reported as ordinary idleness. Idempotent; one map walk.
     //    BL-1217 D6: an unwanted default unplaces its processor instead.
     assign_default_recipes(w, reg, "finish: after the winner");
+    // BL-1296 -- THE HANDOVER (NATIONS.md § State industry, "Handed over at the
+    // fold", Ben 2026-10-13): the strategic buildings background firms placed
+    // on a major's ground pass to that nation as its state industry; the firms
+    // keep the rest and a champion keeps all its own. After the recipes are
+    // assigned (the sector is read off the recipe) and before the settle, so
+    // the opening position play receives was earned with the state running.
+    out.state = hand_over_state_industry(w, reg);
+    print_state_handover(out.state);
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

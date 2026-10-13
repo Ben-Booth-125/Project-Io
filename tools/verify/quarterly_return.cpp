@@ -435,7 +435,9 @@ void run_save_rows(const recipe_registry& reg)
     // P2 — a stream at the PRIOR version is refused whole, destination untouched.
     {
         std::string older = bytes;
-        const uint32_t prior = world_save_version - 1u; // symbolic; never a literal
+        // BL-1296: v47 is a strict prefix of v48 and still read, so the prior
+        // version refused is the one before the accepted predecessor.
+        const uint32_t prior = k_world_save_version_pre_state - 1u; // symbolic; never a literal
         // The header is magic then version, so the version u32 sits at offset 4.
         // The offset is asserted rather than searched for: a scan would happily
         // rewrite some unrelated field that happened to hold the same number and
@@ -455,7 +457,7 @@ void run_save_rows(const recipe_registry& reg)
         std::istringstream in(older, std::ios::binary);
         const bool read_ok = read_world_snapshot(sentinel, in);
         check(patched && !read_ok, "R5",
-              "a stream at world_save_version - 1 is REFUSED whole");
+              "a stream at the newest unread prior version is REFUSED whole");
         check(returns_image(sentinel) == before, "R5",
               "the refused read left the destination world untouched");
     }
