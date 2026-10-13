@@ -86,7 +86,13 @@ const VERBS = [
   'raze_centre',                                       // BL-616
   'buy_corporation',                                   // BL-628
   'take_seat',                                         // BL-1076 -- pre-play only: --serve refuses it (rejected_state)
+  'set_trade', 'clear_trade', 'set_trade_reserve',     // BL-1266 -- listed so the index stays the enum value; --serve validates the payload
+  'queue_research', 'unqueue_research', 'clear_research', // BL-1276 -- the seat's nation's research queue; order = node index
 ];
+
+// io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
+// docs/economy/tech/digitisation_tree.json): the research verbs' `order` range.
+const RESEARCH_NODE_COUNT = 160;
 
 // ---------------------------------------------------------------------------
 // The ProjectIo --serve child process
@@ -229,7 +235,7 @@ const TOOLS = [
         unit_type: { type: 'integer', description: 'hire_unit: index into unit_roster_table() (BL-324).' },
         quantity: { type: 'number', description: 'place_sell_order: max units offered per tick (> 0). request_quote: units sought. dispatch_convoy: units of cargo to haul (> 0, and no more than the source pool holds).' },
         floor_price: { type: 'number', description: 'place_sell_order: minimum unit price (>= 0; 0 means accept the market price).' },
-        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573).' },
+        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573). queue_research: the Digitisation node index (0..159). unqueue_research: the queued node to take off with every queued entry that needs it, or -1 / omitted for the last entry (BL-1276).' },
         counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market). Stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral): the other corporation (BL-448). withdraw_from_battle: the opposing corp, null for first-in-sorted-order (BL-467). accept_offer: the client NATION (BL-573 — the one verb whose counterparty is not a corp).' },
         province: { type: 'integer', description: 'march_unit: destination province id (BL-511 — unit position is province grain). withdraw_from_battle: the province the battle is in. raze_centre: unused. Province id 0 is a real province, never a sentinel.' },
         // NB no `units` arg: agent_protocol.cpp parses no such key, so
@@ -301,6 +307,18 @@ async function callTool(name, args) {
     const actor = await sessionActor();
     const wire = { ...args, verb: verbIdx };
     if (actor !== null) wire.corp = actor;
+    // BL-1276: the research verbs name a Digitisation node by index in `order`
+    // (0..RESEARCH_NODE_COUNT-1). unqueue_research also takes -1 = "the last
+    // entry", sent on the wire as uint32 max (the seam's sentinel). Anything
+    // else is refused HERE, whole, before the child sees it.
+    if (args.verb === 'queue_research' || args.verb === 'unqueue_research') {
+      const o = args.order;
+      const lastOk = args.verb === 'unqueue_research';
+      if (lastOk && (o === undefined || o === -1)) wire.order = 4294967295;
+      else if (!Number.isInteger(o) || o < 0 || o >= RESEARCH_NODE_COUNT)
+        throw new Error(`${args.verb}: order must be a node index 0..${RESEARCH_NODE_COUNT - 1}` +
+                        (lastOk ? ' or -1 (the last entry)' : '') + `, got ${o}`);
+    }
     // BL-412: a live (attached) session's clock is agent-gated and a COMMAND
     // resolves only at a tick boundary — so under --attach the command rides
     // its own TICK release, answering RESULT then OK as one exchange. The

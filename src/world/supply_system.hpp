@@ -196,11 +196,15 @@ struct convoy_leg
 
 /// Price one trade leg from @p src_market's shelf to @p dest_market_id for
 /// @p corp_id. A pure read of the world apart from the A* path cache, which is
-/// why `w` is non-const. Same body: `price_market_leg`, centre to centre,
-/// corporation-independent. Between bodies (TRADE.md § A trade, "Between
+/// why `w` is non-const. Same body: `price_market_leg`'s route, centre to
+/// centre, its haul part scaled by @p corp_id's home nation's held-node
+/// logistics_cost modifiers (BL-1274; identity for a nation holding none) —
+/// port handling never. Between bodies (TRADE.md § A trade, "Between
 /// bodies"): the space lane, viable only when @p corp_id holds a Launchpad on
-/// the source body AND the source shelf holds the launch's propellant
-/// (`launch_draw_per_convoy`) under the fair-price ceiling. Never viable for a
+/// the source body, its home nation holds Rocketry's `space_dispatch` mechanic
+/// (Ben, 2026-10-10), AND the source shelf holds the launch's propellant
+/// (`launch_draw_per_convoy`) under the fair-price ceiling; its whole cost is
+/// haul and takes the same modifiers. Never viable for a
 /// grid good (BL-708), a market to itself, an unknown market or corp, or a
 /// non-finite / non-positive @p qty.
 convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
