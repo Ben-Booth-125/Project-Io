@@ -467,6 +467,11 @@ no Construction Yard and no Power Plant recipe. Verified by
 
 ## Infrastructure buildings
 
+**The railway station (Ben, 2026-10-13).** A tile building on a city tile touching a rail line,
+like the port on land: zero staff, a build cost and upkeep. It is where goods board and leave the
+rail network (`LOGISTICS.md` § 4c); track is laid tile to tile beside it. Both are state industry
+in a major.
+
 Infrastructure buildings affect logistical or economic capacity rather than extraction or processing directly.
 
 | Building | Function | Era |

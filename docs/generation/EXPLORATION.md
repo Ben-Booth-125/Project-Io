@@ -274,6 +274,9 @@ that join them, and the cheaper the reach the faster it arrives. Every culture f
 the most remote culture simply receives the least, so it falls behind for a reason a player can read
 off the map — distance, water, a road never built. It is a systemic force, not a handicap on one
 culture; the late culture is lagging because it is isolated, never isolated because it is chosen.
+**The lag is read against its neighbours (Ben, 2026-10-13).** The late culture lags **the peoples in
+contact with it** — behind those around it — not the world's mean development. Read that way the
+isolation needs only a gentle press, which leaves the rise and fall's empire room to rise.
 
 
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
