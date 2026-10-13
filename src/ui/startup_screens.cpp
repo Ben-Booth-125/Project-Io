@@ -372,6 +372,8 @@ ui::history_lapse lapse_from_report(const generation_report& rep, int lapse_inde
     h.lapse  = industrialisation ? home->industrialisation_timelapse
              : exploration       ? home->exploration_timelapse
                                  : home->prehistory_timelapse;
+    // BL-1294: a revolution's old name is the record before's entry.
+    if (industrialisation) h.former_polity_name = home->exploration_timelapse.polity_name;
     h.grid_w = home_grid_width;
     h.grid_h = home_grid_height;
 
@@ -1471,6 +1473,10 @@ void app::poll_wizard_history_tap(int lapse_index)
         return; // Geometry has not been published yet — nothing drawable this poll.
 
     const bool first_populate = (rec.grid_w == 0);
+    // BL-1294: the live Industrialisation round names a revolution's old name
+    // from the Exploration round's table (landed before this round runs).
+    if (lapse_index == 3 && rec.former_polity_name.empty())
+        rec.former_polity_name = m_wiz_history[2].lapse.polity_name;
 
     rec.lapse.start_year    = start_year;
     rec.lapse.years         = std::max<int32_t>(0, year_reached - start_year);

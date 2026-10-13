@@ -2882,6 +2882,33 @@ struct history_sim_params
     int civil_war_min_share_q   = 250;
     int civil_war_min_regions   = 3;
     int civil_war_window_years  = 50;
+
+    // --- BL-1294 (revolution lean) -------------------------------------------
+    // INDUSTRIALISATION.md sec Revolution (Ben, 2026-10-10/12): A LEAN, which
+    // promises nothing -- no backstop, no target. The DISPARITY BETWEEN A
+    // REALM'S CITIES is read once, at the span's open (the Exploration close
+    // it resumes from): the Gini spread, per mille, of `region::urban_population`
+    // over the regions it holds that carry a centre (`centres > 0`) -- the
+    // inequality between cities the economic premise rules on, never between
+    // households (sec 5). A realm of fewer than `revolution_min_cities` cities
+    // has no spread to read. Where the spread is at or over
+    // `revolution_disparity_bar_pm`, a PRESSURE accrues each decision round:
+    // the excess over the bar x the round's years, weighed up by a faltering
+    // realm (x (2000 - cohesion) / 1000, so a realm at full cohesion accrues
+    // the excess alone and a broken one twice it). When the pressure reaches
+    // `revolution_pressure_q`, a SPLINTER rises in the realm's largest city
+    // other than its capital and takes the whole nation: the polity id and
+    // its ground stay, it takes a new regime (`polity::regime` + 1) and a name
+    // newly coined in its own tongue, and the takeover is recorded (a history
+    // line and `lapse_event_kind::revolution`). At most once per realm per
+    // span. It overturns, for this span alone, the Empires rule that no
+    // regime resets while the map stands still. Struct-default OFF, so every
+    // span but Industrialisation (`industrialisation_sim_params`) and every
+    // isolating fixture is byte-identical.
+    bool    revolution_lean               = false;
+    int     revolution_disparity_bar_pm   = 600;
+    int     revolution_min_cities         = 3;
+    int64_t revolution_pressure_q         = 6000;
 };
 
 // BL-1287 -- THE RULED PREDICATE lives in `rise_fall_rules.hpp` (included
@@ -3217,7 +3244,9 @@ struct polity
     /// culture's tongue (`coin_realm_name` over `culture::speech`, a pure
     /// function of the tongue and this realm — no draw from the sim's stream)
     /// and never changed after: not by a re-seating, not by losing the seat,
-    /// not by a span boundary (CIVILISATION.md sec A realm's name). Carried by
+    /// not by a span boundary (CIVILISATION.md sec A realm's name) -- save by
+    /// a revolution in the Industrialisation span (BL-1294), the one
+    /// sanctioned rename, which coins it anew in the same tongue. Carried by
     /// id across a resume with the rest of the table, and copied onto the
     /// record's `polity_name` by `as_timelapse` so the board, the ticker and
     /// Pass 5 print one name. READ BY NOTHING IN THE SIM: a string on the
@@ -3410,6 +3439,16 @@ struct polity
     /// readable by a third party without a second ledger: `treaty_value_q`
     /// reads the COUNTERPART's copy of this field, never the decider's own.
     int32_t treaties_broken = 0;
+
+    /// BL-1294 -- THE REGIME, as an ordinal: 0 is the regime the realm was
+    /// founded under, and each revolution (`history_sim_params::
+    /// revolution_lean`, INDUSTRIALISATION.md sec Revolution) gives it the
+    /// next. The Political system stub's one regime field (sec 6) is what this
+    /// grows into; until that stub names regimes, a regime is told apart from
+    /// the one before it and nothing more. Read by nothing in the sim; NOT
+    /// SERIALISED, same footing as `parent` -- the record carries the
+    /// takeover (`lapse_event_kind::revolution`, `other` = the new value).
+    int32_t regime = 0;
 
 };
 
@@ -4834,6 +4873,33 @@ struct history_sim_state
     int64_t civil_war_famine_dead  = 0;
     int64_t civil_war_fled         = 0;
     int64_t civil_war_no_refuge    = 0;
+
+    /// BL-1294 (revolution lean) -- REPORT-ONLY: every takeover the lean
+    /// raised this span, in the order it fired, with the reading that raised
+    /// it, so a harness can say which realm, when, how wide its cities stood
+    /// and what it was called before and after. The record's own telling is
+    /// the `revolution` lapse event; this is the gate's reading of it. Not
+    /// saved; read by nothing in the sim.
+    struct revolution_note
+    {
+        int32_t     polity        = -1;
+        int32_t     year          = 0;
+        int32_t     region        = -1; ///< The city the splinter rose in.
+        int32_t     disparity_pm  = 0;  ///< The realm's spread at the span's open.
+        int32_t     cities        = 0;  ///< Its cities then.
+        int32_t     regime        = 0;  ///< The new regime.
+        std::string old_name;
+        std::string new_name;
+    };
+    std::vector<revolution_note> revolutions;
+    /// BL-1294 -- REPORT-ONLY: realms read at the span's open (living, with at
+    /// least `revolution_min_cities` cities), and of those, how many stood at
+    /// or over the disparity bar. The denominator the firing rate is read on.
+    int32_t revolution_realms_read = 0;
+    int32_t revolution_realms_wide = 0;
+    /// BL-1294 -- REPORT-ONLY: each realm's spread at the open, per mille, by
+    /// polity id (-1 = not read: dead, or too few cities). For calibration.
+    std::vector<int32_t> revolution_disparity_pm;
 
     /// BL-869 — every civilisation mixing actually grew, in formation order.
     /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`
