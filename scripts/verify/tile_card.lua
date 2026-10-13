@@ -257,6 +257,48 @@ do
     end
 end
 
+-- BL-1309 (SELECTION.md § The building element's layout: "Every card shows its
+-- method and status line, always ... A building with no output still has
+-- costs"). A player PORT, expanded: it names the trade points it makes, and its
+-- profit row reads its (negative) net and expenses — a Port has no report row,
+-- so before BL-1309 its card stopped after the status line.
+do
+    local port = nil
+    for _, b in ipairs(verify.buildings()) do
+        if b.player and b.complete and b.type == "Port" and not port then port = b end
+    end
+    if port then
+        local c = show_tile(port.x, port.y)
+        local btn = nil
+        for _, b in ipairs(c.buttons) do
+            for _, bb in ipairs(verify.buildings()) do
+                if bb.id == b.first and bb.type == "Port" and b.open then btn = b end
+            end
+        end
+        verify.expect(btn ~= nil, "the port's tile shows the port's own button")
+        if btn then
+            verify.click(btn.x, btn.y)
+            verify.frames(3)
+            local e = card()
+            verify.expect(e.drawn and e.is_expanded, "the port's button expands its card")
+            verify.expect(e.method ~= "", "a Port's card names what it does: '" .. e.method .. "'")
+            verify.expect(e.method:find("trade points", 1, true) ~= nil,
+                          "...its trade points: '" .. e.method .. "'")
+            verify.expect(e.status ~= "", "a Port's card carries a status line: '" .. e.status .. "'")
+            verify.expect(e.charts, "a Port's card draws its profit row")
+            verify.expect(e.net ~= "" and e.expenses ~= "",
+                          "a Port's profit row reads net and expenses: '" .. e.net .. "' / '" .. e.expenses .. "'")
+            print(string.format("tile_card: port %d - method '%s', status '%s', net '%s', expenses '%s'",
+                                port.id, e.method, e.status, e.net, e.expenses))
+            verify.hover(860, 300, 2)
+            verify.frames(2)
+            verify.capture("tile_card_port_expanded")
+        end
+    else
+        print("tile_card: the player owns no completed Port on the home body; the Port card check was skipped")
+    end
+end
+
 -- A rival's tile: buttons withhold.
 local rival_site = nil
 for _, b in ipairs(verify.buildings()) do

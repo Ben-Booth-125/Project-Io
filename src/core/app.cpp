@@ -891,6 +891,8 @@ void app::poll_worldgen()
     m_generation_report      = std::move(built->report);
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
+    // BL-1309: the settle's readings, taken before the slot is spent.
+    settle_readings settle_reads = std::move(built->finish.readings);
     // BL-1246 (STARTUP.md § Handoff): the world is finished. On the wizard's
     // path the home master has been baking since the Life round, re-taking
     // its source at every round boundary; adoption is the last boundary (the
@@ -906,6 +908,7 @@ void app::poll_worldgen()
     m_ground_world_live = true;
     pin_nation_colours_from_report(); // BL-1089: the realms' colours, before the first frame
     start_new_game_prelude();
+    adopt_settle_readings(std::move(settle_reads));
     // BL-568: the cadence key continues from the settle's twelve steps, which
     // the worker stamped 0..11 (`run_settle`); the first live quarter is 12.
     m_econ_steps = static_cast<uint64_t>(k_campaign_settle_ticks);
@@ -1608,6 +1611,45 @@ void app::start_new_game_prelude()
     mark("economy_presentation");
 }
 
+void app::adopt_settle_readings(settle_readings&& r)
+{
+    // BL-1309 (STARTUP.md § Handoff, "Their READINGS do have a reader", Ben
+    // 2026-10-13): every per-quarter figure a surface shows opens on the last
+    // settle tick's value, never on a "no data yet" dash. The report feeds the
+    // building card's profit row, the header's net and every ledger that reads
+    // m_last_econ_report; the standings feed the Corporations panel; each settle
+    // tick's market sample is one point of the price series, sampled exactly as
+    // record_histories samples a live tick. PRESENTATION ONLY: these are copies
+    // the settle took off its own results, and nothing in the world reads them,
+    // so no simulated value moves. Calendar-dated records (comms, the deposit
+    // series' sample days, the rank history) still take nothing from the settle.
+    m_last_econ_report    = std::move(r.last.report);
+    m_last_corp_standings = std::move(r.last.standings);
+    m_market_history.clear();
+    for (const std::vector<settle_market_sample>& row : r.market_ticks)
+        for (const settle_market_sample& ms : row)
+        {
+            const auto mit = m_world.markets.find(ms.market);
+            if (mit == m_world.markets.end())
+                continue;
+            auto& mh = m_market_history[ms.market];
+            for (std::size_t res = 0; res < resource_count; ++res)
+            {
+                if (mit->second.base_price[res] <= 0.0f)
+                    continue; // resource not traded here (record_histories' rule)
+                ui::push_capped(mh[res].price,  ms.price[res]);
+                ui::push_capped(mh[res].supply, ms.supply[res]);
+                ui::push_capped(mh[res].demand, ms.demand[res]);
+            }
+        }
+    std::printf("[begin] settle readings handed to play: %s; %zu building rows, %zu corp budgets, "
+                "%zu standings, %zu quarter(s) of price series on %zu markets\n",
+                r.filled ? "filled" : "EMPTY (no settle ran)",
+                m_last_econ_report.buildings.size(), m_last_econ_report.budgets.size(),
+                m_last_corp_standings.size(), r.market_ticks.size(), m_market_history.size());
+    std::fflush(stdout);
+}
+
 void app::finish_new_game()
 {
     // BL-1246 (STARTUP.md § Handoff — the ground pre-bakes behind the
@@ -1658,9 +1700,9 @@ void app::finish_new_game()
     // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md
     // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
     // worker with no presentation half of their own -- no agency comms, no
-    // history samples, no last report (Ben's delegated reading, 2026-09-24:
-    // the ticks have no calendar and no seated corp, so nothing they emitted
-    // had a reader) -- so the header sparkline and the Budget ledger's profit
+    // calendar-dated history samples (the ticks have no calendar). Their
+    // READINGS are handed across at adoption (adopt_settle_readings, BL-1309:
+    // the last report, the standings, the price series) -- so the header sparkline and the Budget ledger's profit
     // chart are seeded HERE, from the seated corp's own filed returns: the
     // opening capital, then each settle quarter's closing balance, income and
     // expenditure, oldest first, exactly the samples the old validation run

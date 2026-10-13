@@ -34,6 +34,24 @@ struct building_profit
 building_profit estimate_building_profit(const world& w, const recipe_registry& reg,
                                          const economy_report& report, entity_id building_id);
 
+/// THE PRESENTATION READING of a built building's unit economics (BL-1309;
+/// SELECTION.md § The building element's layout: "A building with no output
+/// still has costs: its profit row reads its net (negative) and expenses").
+///
+/// `estimate_building_profit` when it has data. Otherwise, when the building is
+/// COMPLETED and the report is a real tick's — `apply_budget` filed a budget for
+/// the building's owner in it — the building ran that tick and produced nothing
+/// the production pass reports (a Port, a hub, any building with no recipe, a
+/// mothballed site): revenue and input cost are zero and its maintenance and
+/// wages come from the same shared formula, at the same scalar, apply_budget
+/// charged. Reads only; no simulated value moves.
+///
+/// FOR SURFACES ONLY. The scorer and the reflex keep `estimate_building_profit`,
+/// whose `has_data == false` they read as "nothing to judge" — widening it there
+/// would change what the AI does, and so the world.
+building_profit estimate_building_reading(const world& w, const recipe_registry& reg,
+                                          const economy_report& report, entity_id building_id);
+
 /// Expected per-tick unit economics of a building that does NOT yet exist, on `tile_id`
 /// (BL-162). Pure read of `world` + `registry` — no economy_report, no RNG, no caches.
 ///

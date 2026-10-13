@@ -350,7 +350,7 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
             arm_guard(const arm_guard&)            = delete;
             arm_guard& operator=(const arm_guard&) = delete;
         } armed{&tc.econ};
-        run_settle(w, reg, k_campaign_settle_ticks, &hooks, progress);
+        run_settle(w, reg, k_campaign_settle_ticks, &hooks, progress, &out.readings);
     }
     out.ms_settle = ms_between(t_settle, fin_clock::now());
     report_step_ms(progress, k_label_settle, out.ms_settle);

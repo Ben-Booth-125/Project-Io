@@ -101,6 +101,47 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
     return out;
 }
 
+building_profit estimate_building_reading(const world& w, const recipe_registry& reg,
+                                          const economy_report& report, entity_id building_id)
+{
+    building_profit out = estimate_building_profit(w, reg, report, building_id);
+    if (out.has_data)
+        return out;
+
+    const auto bit = w.buildings.find(building_id);
+    if (bit == w.buildings.end())
+        return out;
+    const building_component& b = bit->second;
+    if (b.ticks_remaining > 0)
+        return out; // still building: the card shows its ETA, not a profit row
+
+    // A real tick's report: apply_budget filed this owner's budget in it. A
+    // hand-built or empty report (before any tick) has none, and stays "no data".
+    const entity_id corp = owner_corp_of(w, building_id);
+    if (corp == null_entity || report.budgets.find(corp) == report.budgets.end())
+        return out;
+
+    entity_id body = null_entity;
+    if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+        body = tit->second.body;
+    // The scalar apply_budget charged: the (corp, body) contention, overridden
+    // by the building's own grant where the tick recorded one (BL-614).
+    float scalar = 1.0f;
+    if (const auto cit = report.workforce_contention.find(std::make_pair(corp, body));
+        cit != report.workforce_contention.end())
+        scalar = cit->second;
+    if (const auto bl = report.building_labour.find(building_id); bl != report.building_labour.end())
+        scalar = bl->second;
+
+    const building_opex opex = compute_building_opex(b, reg.economics(b.type), scalar,
+                                                     body_mean_habitability(w, body),
+                                                     reg.idle_maintenance_floor());
+    out.has_data    = true;
+    out.maintenance = opex.maintenance;
+    out.wages       = opex.wages;
+    return out; // revenue and input cost stay zero: it produced nothing to sell
+}
+
 // --- Prospective (pre-build) estimate (BL-162) -------------------------------
 // Lives here, beside the realised estimator, rather than in the construction ledger's
 // UI translation unit: this is world-layer economics, it is the figure that ranks the

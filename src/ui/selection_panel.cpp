@@ -31,6 +31,7 @@
 #include "world/settlement.hpp"      // BL-785: region_domain_of - the three-domain word for a water tile
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
+#include "world/trade.hpp"           // building_trade_points — a trade building's method line (BL-1309)
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
@@ -461,7 +462,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
                           const economy_report& report, entity_id id,
                           std::string* net_out, std::string* exp_out)
 {
-    const building_profit p = estimate_building_profit(w, reg, report, id);
+    const building_profit p = estimate_building_reading(w, reg, report, id);
     if (!p.has_data)
     {
         ImGui::TextDisabled("Run an economy quarter to estimate.");
@@ -2332,7 +2333,7 @@ stack_reading read_stack(const world& w, const recipe_registry& reg,
     {
         if (w.buildings.at(m).ticks_remaining > 0)
             continue;
-        const building_profit p = estimate_building_profit(w, reg, report, m);
+        const building_profit p = estimate_building_reading(w, reg, report, m);
         if (!p.has_data)
             continue;
         data = true;
@@ -2465,6 +2466,72 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
     }
 }
 
+/// What a building DOES, in one line (BL-1309; SELECTION.md § The building
+/// element's layout: "Every card shows its method and status line, always").
+/// A recipe building names its method; a building with no recipe names what it
+/// does instead, from the real fields that decide it — a trade building its
+/// trade points this quarter and the market it makes them for, a hub the haul
+/// discount it gives. Reads only; never an invented figure.
+std::string building_method_line(const world& w, const recipe_registry& reg,
+                                 const economy_report& report, entity_id bid,
+                                 const building_component& b, std::string* market_out = nullptr)
+{
+    char buf[160];
+    switch (b.type)
+    {
+        case building_type::extraction_site:
+            return std::string("Extracting ") + resource_name(b.target_resource);
+        case building_type::processing_facility:
+            if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
+                return rc->display_name;
+            return "No method set";
+        case building_type::port:
+        case building_type::planetary_marketplace:
+        {
+            const entity_id   mid    = market_for_tile(w, b.tile);
+            const std::string market = mid != null_entity ? market_city_name(w, mid)
+                                                          : std::string("no market");
+            if (b.decommissioned)
+                return "Mothballed: makes no trade points";
+            if (report.upkeep_unmet.count(bid) != 0)
+                return "No trade points this quarter: upkeep unmet";
+            // The figure `market_trade_points` sums for this building: its
+            // (owner, body) labour scalar this tick, 1 where the tick has none.
+            float contention = 1.0f;
+            const entity_id corp = owner_corp_of(w, bid);
+            if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+                if (const auto cit = report.workforce_contention.find({corp, tit->second.body});
+                    cit != report.workforce_contention.end())
+                    contention = cit->second;
+            // The market rides the hover (the card's column fits ~30 characters);
+            // the figure is the line.
+            const float pts = building_trade_points(reg, b, contention, /*upkeep_met=*/true);
+            if (pts > 0.0f)
+                std::snprintf(buf, sizeof buf, "Makes %.1f trade points / qtr", static_cast<double>(pts));
+            else
+                std::snprintf(buf, sizeof buf, "Makes trade points for %s", market.c_str());
+            if (market_out != nullptr)
+                *market_out = market;
+            return buf;
+        }
+        case building_type::inland_logistics_hub:
+            std::snprintf(buf, sizeof buf, "Cuts haul cost %.0f%% on routes through it",
+                          static_cast<double>(reg.logistics_nodes().hub_discount * 100.0f));
+            return buf;
+        case building_type::launchpad:
+            return "Launches convoys into space";
+        case building_type::military_base:
+            return "Musters units";
+        case building_type::research_institute:
+        case building_type::university:
+            return "Makes research points for its nation";
+        case building_type::schooling:
+            return "Schooling for the centre it stands in";
+        default:
+            return building_type_name(b.type);
+    }
+}
+
 /// The tile column with one stack EXPANDED (SELECTION.md § The building
 /// element's layout, item 1; round 2, Ben 2026-10-13). Top to bottom, laid out to
 /// the card's height with no scrollbar:
@@ -2528,22 +2595,17 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
     // ── The production method, then the status line ──
     // Open only: a rival's recipe is private (DISCOVERY.md § The operational fog).
+    // BL-1309: drawn always — before the first quarter and for a building with
+    // no recipe, which names what it does instead (building_method_line).
     if (open)
     {
-        std::string method;
-        if (b.type == building_type::extraction_site)
-            method = std::string("Extracting ") + resource_name(b.target_resource);
-        else if (b.type == building_type::processing_facility)
-        {
-            if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
-                method = rc->display_name;
-        }
-        if (!method.empty())
-        {
-            fit_text(text_box::table_cell, "selection.building.method", method.c_str(),
-                     std::max(24.0f, ImGui::GetContentRegionAvail().x));
-            ui.tile_card.method = method;
-        }
+        std::string       market;
+        const std::string method = building_method_line(w, reg, report, bid, b, &market);
+        fit_text(text_box::table_cell, "selection.building.method", method.c_str(),
+                 std::max(24.0f, ImGui::GetContentRegionAvail().x));
+        if (!market.empty() && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s\nFor the %s market.", method.c_str(), market.c_str());
+        ui.tile_card.method = method;
     }
     ui.tile_card.expanded_player = mine;
     ui.tile_card.status = draw_building_status_line(w, reg, report, bid, open);
@@ -2561,7 +2623,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
     if (b.ticks_remaining > 0)
         return; // still building: header, method and status are the card
-    const building_profit p = estimate_building_profit(w, reg, report, bid);
+    const building_profit p = estimate_building_reading(w, reg, report, bid);
     if (!p.has_data)
         return;
 
