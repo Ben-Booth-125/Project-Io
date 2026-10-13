@@ -34,6 +34,8 @@
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
+#include "ui/nation_history.hpp" // BL-1295: the seat card's history read
+#include "ui/tile_inspector.hpp"  // history_view_ages (the seat card's history link)
 #include "ui/presentation.hpp"
 #include "ui/selection.hpp"
 #include "ui/text_fit.hpp"
@@ -774,46 +776,14 @@ void app::inject_pointer(float x, float y, int button, int clicks)
     io.MouseDoubleClickTime = saved_double_time;
 }
 
-int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
+// The verified world's roster, laid as run_verify has always laid it -- the
+// charter budget spent on the seed candidate, or world-gen's roster made
+// chain-feasible with the background firms beside it. Shared with
+// `verify.new_world` (BL-1281): a rebuilt world that skipped it carried no
+// specialist at all, so the seat screen on it offered nothing (seat_pick.lua
+// S5 compared two empty rankings, and nation_select.lua had no majors).
+void app::verify_lay_roster()
 {
-    // BL-732: a capture must never race the ground cache's per-frame bake
-    // budget — every chunk bakes synchronously for the whole batch.
-    m_ground_bake_all = true;
-
-    // Deterministic, non-interactive setup: fixed window (resized to verify_w/
-    // verify_h below), seeded world, sim left paused so orbits and ticks never
-    // advance between captures. The script drives view/overlay state directly.
-    //
-    // Hide BEFORE the ~40 s synchronous generation, not after — hidden-after
-    // meant the window sat on the desktop for exactly the generation, which is
-    // both the annoyance and the hang-ghost exposure window.
-    SDL_HideWindow(m_window);
-
-    // Setup runs ONCE for the whole batch (BL-423) — make_hard_coded_world costs
-    // ~38 s on the Debug build, which is the entire reason batch mode exists. The
-    // pristine snapshot taken after setup is what makes once safe: it is restored
-    // before every script, so script order cannot leak state.
-    setup_world(fresh_world_params());
-    load_economy();
-
-    // BL-365's background firms belong in the verified world too (added 2026-08-13).
-    //
-    // Without this the harness renders a world with NO background corporations,
-    // which is not the game — and it made the re-pointed Industry lens (BL-373)
-    // capture a picture of an EMPTY map that a golden would then have blessed as
-    // correct. A check that renders nothing still writes a PNG and still passes.
-    //
-    // Same ordering as start_new_game: after load_economy, because the firms' stop
-    // condition reads real recipe outputs. The seed fold matches the interactive
-    // path so the verified world is the world the player would get. NOT warmed up —
-    // run_verify stays deterministically cold, as its own comment below says.
-    // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
-    // 2026-09-21, NR-909). This path does not search. The Industrialisation span
-    // runs by default, so its world carries a stockpile budget, and a non-empty
-    // one is spent as the harness's unsearched apply spends it — the search's
-    // seed candidate, the budget world minus the search. An EMPTY budget (a
-    // world the span did not run on, or a rejected one) lays exactly the call
-    // below, byte for byte.
     const seed_candidate_spend scs = spend_stockpile_on_seed_candidate(
         m_world, m_registry, m_active_world_params.seed, m_worldgen_cfg.corporation_count);
     if (!scs.spent)
@@ -879,6 +849,49 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                     : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
                                            : "");
     }
+}
+
+int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
+{
+    // BL-732: a capture must never race the ground cache's per-frame bake
+    // budget — every chunk bakes synchronously for the whole batch.
+    m_ground_bake_all = true;
+
+    // Deterministic, non-interactive setup: fixed window (resized to verify_w/
+    // verify_h below), seeded world, sim left paused so orbits and ticks never
+    // advance between captures. The script drives view/overlay state directly.
+    //
+    // Hide BEFORE the ~40 s synchronous generation, not after — hidden-after
+    // meant the window sat on the desktop for exactly the generation, which is
+    // both the annoyance and the hang-ghost exposure window.
+    SDL_HideWindow(m_window);
+
+    // Setup runs ONCE for the whole batch (BL-423) — make_hard_coded_world costs
+    // ~38 s on the Debug build, which is the entire reason batch mode exists. The
+    // pristine snapshot taken after setup is what makes once safe: it is restored
+    // before every script, so script order cannot leak state.
+    setup_world(fresh_world_params());
+    load_economy();
+
+    // BL-365's background firms belong in the verified world too (added 2026-08-13).
+    //
+    // Without this the harness renders a world with NO background corporations,
+    // which is not the game — and it made the re-pointed Industry lens (BL-373)
+    // capture a picture of an EMPTY map that a golden would then have blessed as
+    // correct. A check that renders nothing still writes a PNG and still passes.
+    //
+    // Same ordering as start_new_game: after load_economy, because the firms' stop
+    // condition reads real recipe outputs. The seed fold matches the interactive
+    // path so the verified world is the world the player would get. NOT warmed up —
+    // run_verify stays deterministically cold, as its own comment below says.
+    // BL-1044 — THE CHARTER BUDGET, SPENT ON THE SEED CANDIDATE (Ben,
+    // 2026-09-21, NR-909). This path does not search. The Industrialisation span
+    // runs by default, so its world carries a stockpile budget, and a non-empty
+    // one is spent as the harness's unsearched apply spends it — the search's
+    // seed candidate, the budget world minus the search. An EMPTY budget (a
+    // world the span did not run on, or a rejected one) lays exactly the call
+    // below, byte for byte.
+    verify_lay_roster();
 
     m_sim_loop.set_speed(0);
 
@@ -1688,6 +1701,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_world = world{};
         setup_world(p);
         load_economy();
+        verify_lay_roster(); // BL-1281: the roster run_verify lays, so the seat has majors
         m_pending_world_params = p;
         m_wiz_dirty            = true;
     });
@@ -1714,18 +1728,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         open_seat_screen();
         m_seat_ui.from_verify = true;
     });
-    // Point the canvas at candidate row @p row (0-based, rank order): the map
-    // highlight and the card follow it, exactly as a mouse hover does.
+    // BL-1281: THE ROWS ARE MAJORS (seat_majors, the champions' rank order).
+    // Point the screen at major row @p row (0-based): the map highlight and the
+    // card follow it, exactly as a mouse hover does.
     v.set_function("seat_hover", [this](int row) {
-        if (row >= 0 && row < static_cast<int>(m_seat_result.candidates.size()))
+        if (row >= 0 && row < static_cast<int>(seat_majors().size()))
             m_seat_ui.hovered = row;
     });
-    // Press row @p row: opens that firm's briefing (the first of the two presses).
+    // Press row @p row: opens that nation's briefing (the first of the two presses).
     v.set_function("seat_brief", [this](int row) {
-        if (row >= 0 && row < static_cast<int>(m_seat_result.candidates.size()))
+        const std::vector<seat_major> majors = seat_majors();
+        if (row >= 0 && row < static_cast<int>(majors.size()))
         {
             m_seat_ui.hovered  = row;
-            m_seat_ui.briefing = m_seat_result.candidates[static_cast<std::size_t>(row)].corp;
+            m_seat_ui.briefing = majors[static_cast<std::size_t>(row)].nation;
         }
     });
     v.set_function("seat_back", [this]() { m_seat_ui.briefing = null_entity; });
@@ -1735,28 +1751,46 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             return "no_briefing";
         const corp_command_result r = take_seat_pick(m_seat_ui.briefing);
         if (r == corp_command_result::applied)
+        {
+            if (m_seat_ui.history_open) m_ui.show_tile_ledger = false;
+            m_seat_ui.history_open     = false;
+            m_ui.history_nation_filter = null_entity;
             m_screen = app_screen::in_game;
+        }
         return r == corp_command_result::applied    ? "applied"
              : r == corp_command_result::rejected_no_corp ? "rejected_no_corp"
                                                     : "rejected_invalid";
     });
-    // (open, candidate count, shortlisted count, hovered row, briefing corp, player)
+    // (open, major count, majors whose champion clears the floor, hovered row,
+    //  briefing nation, player corporation)
     v.set_function("seat_state", [this]() {
+        const std::vector<seat_major> majors = seat_majors();
+        int clear = 0;
+        for (const seat_major& m : majors)
+            if (m_seat_result.candidates[static_cast<std::size_t>(m.candidate)].shortlisted) ++clear;
         return std::make_tuple(m_screen == app_screen::choosing_seat,
-                               static_cast<int>(m_seat_result.candidates.size()),
-                               m_seat_result.shortlist_size, m_seat_ui.hovered,
+                               static_cast<int>(majors.size()), clear, m_seat_ui.hovered,
                                static_cast<long long>(m_seat_ui.briefing),
                                static_cast<long long>(m_world.player_entity));
     });
-    // Candidate @p row's corporation id and whether the floor marked it.
+    // Major row @p row's NATION id and whether the floor marked its champion.
     v.set_function("seat_candidate", [this](int row) {
-        if (row < 0 || row >= static_cast<int>(m_seat_result.candidates.size()))
+        const std::vector<seat_major> majors = seat_majors();
+        if (row < 0 || row >= static_cast<int>(majors.size()))
             return std::make_tuple(-1LL, false);
-        const spawn_seat_candidate& c = m_seat_result.candidates[static_cast<std::size_t>(row)];
-        return std::make_tuple(static_cast<long long>(c.corp), !c.shortlisted);
+        const seat_major& m = majors[static_cast<std::size_t>(row)];
+        return std::make_tuple(static_cast<long long>(m.nation),
+                               !m_seat_result.candidates[static_cast<std::size_t>(m.candidate)].shortlisted);
+    });
+    // Major row @p row's CHAMPION -- the corporation a pick of it seats -- or -1.
+    v.set_function("seat_champion", [this](int row) -> long long {
+        const std::vector<seat_major> majors = seat_majors();
+        if (row < 0 || row >= static_cast<int>(majors.size()))
+            return -1;
+        return static_cast<long long>(majors[static_cast<std::size_t>(row)].champion);
     });
     // The lowest-id background firm (a company), or 0 — the id a script offers
-    // take_seat to prove a company is never a seat.
+    // take_seat to prove a corporation id is never a seat.
     v.set_function("seat_background_firm", [this]() -> long long {
         entity_id best = null_entity;
         for (const auto& [id, cc] : m_world.corporations)
@@ -1764,8 +1798,96 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 best = id;
         return static_cast<long long>(best);
     });
-    // The pre-play pick, as `--seat` makes it: rank, then take_seat_pick. Validated as untrusted (the id is range-checked here, the
-    // ranking check is take_seat_pick's). Returns the result name.
+    // BL-1281: the lowest-id MINOR nation (no champion), or 0 — the id a script
+    // offers take_seat to prove a minor cannot be played.
+    v.set_function("seat_minor_nation", [this]() -> long long {
+        if (m_seat_result.candidates.empty())
+            m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
+        const std::vector<seat_major> majors = seat_majors();
+        entity_id best = null_entity;
+        for (const auto& [id, nat] : m_world.nations)
+        {
+            (void)nat;
+            bool major = false;
+            for (const seat_major& m : majors) if (m.nation == id) major = true;
+            if (!major && (best == null_entity || id < best))
+                best = id;
+        }
+        return static_cast<long long>(best);
+    });
+    // BL-1295: the card's history link, pressed for the shown nation (the open
+    // briefing's, else the hovered row's) -- exactly the press: a toggle that
+    // opens the History ledger on Ages filtered to the nation. Returns
+    // (ledger open, filter nation).
+    v.set_function("seat_history_link", [this]() {
+        const std::vector<seat_major> majors = seat_majors();
+        entity_id shown = null_entity;
+        if (m_seat_ui.briefing != null_entity)
+            shown = m_seat_ui.briefing;
+        else if (m_seat_ui.hovered >= 0 && m_seat_ui.hovered < static_cast<int>(majors.size()))
+            shown = majors[static_cast<std::size_t>(m_seat_ui.hovered)].nation;
+        if (shown != null_entity)
+        {
+            if (m_seat_ui.history_open && m_ui.history_nation_filter == shown)
+            {
+                m_seat_ui.history_open = false;
+                m_ui.show_tile_ledger  = false;
+            }
+            else
+            {
+                m_seat_ui.history_open     = true;
+                m_ui.show_tile_ledger      = true;
+                m_ui.history_view          = ui::history_view_ages;
+                m_ui.history_nation_filter = shown;
+            }
+        }
+        return std::make_tuple(m_seat_ui.history_open && m_ui.show_tile_ledger,
+                               static_cast<long long>(m_ui.history_nation_filter));
+    });
+    // BL-1295: the nation card's history read, for a script to assert on:
+    // (pattern tags text, timeline row count, lineage size) for major row @p row.
+    v.set_function("seat_history", [this](int row) {
+        const std::vector<seat_major> majors = seat_majors();
+        const generation_report::body_entry* home = ui::homeworld_entry(m_generation_report);
+        if (home == nullptr || row < 0 || row >= static_cast<int>(majors.size()))
+            return std::make_tuple(std::string(), 0, 0);
+        const entity_id n = majors[static_cast<std::size_t>(row)].nation;
+        return std::make_tuple(ui::nation_pattern_tags_text(*home, n),
+                               static_cast<int>(ui::nation_timeline(*home, n, 8).size()),
+                               static_cast<int>(ui::nation_lineage(*home, n).size()));
+    });
+    // BL-1295: the world's REVOLUTIONS, for a script that wants a card showing
+    // one: (revolution events in the homeworld's Industrialisation record, the
+    // major ROW whose lineage holds the first such realm or -1, the nation id
+    // whose lineage holds it or 0). A revolution in a minor's line has no row:
+    // the screen offers majors only.
+    v.set_function("seat_revolutions", [this]() {
+        const generation_report::body_entry* home = ui::homeworld_entry(m_generation_report);
+        if (home == nullptr)
+            return std::make_tuple(0, -1, 0LL);
+        int count = 0;
+        long long holder = 0;
+        int row = -1;
+        const std::vector<seat_major> majors = seat_majors();
+        for (const lapse_event& e : home->industrialisation_timelapse.events)
+        {
+            if (e.kind != static_cast<uint8_t>(lapse_event_kind::revolution)) continue;
+            ++count;
+            for (std::size_t n = 0; n < home->nation_ids.size(); ++n)
+            {
+                const std::vector<uint16_t> line = ui::nation_lineage(*home, home->nation_ids[n]);
+                if (!std::binary_search(line.begin(), line.end(), e.polity)) continue;
+                for (int r = 0; r < static_cast<int>(majors.size()); ++r)
+                    if (majors[static_cast<std::size_t>(r)].nation == home->nation_ids[n] && row < 0)
+                        row = r;
+                if (holder == 0) holder = static_cast<long long>(home->nation_ids[n]);
+            }
+        }
+        return std::make_tuple(count, row, holder);
+    });
+    // The pre-play pick, as `--seat` makes it: rank, then take_seat_pick on a
+    // MAJOR NATION id (BL-1281). Validated as untrusted (the id is range-checked
+    // here, the major check is take_seat_pick's). Returns the result name.
     v.set_function("take_seat", [this](double id) -> std::string {
         if (!(id >= 1.0) || id > static_cast<double>(std::numeric_limits<entity_id>::max())
             || id != static_cast<double>(static_cast<long long>(id)))

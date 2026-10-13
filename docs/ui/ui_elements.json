@@ -1920,6 +1920,38 @@
     "round_legends",
     "sea_lanes"
    ]
+  },
+  {
+   "id": "UI-122",
+   "name": "Nation selection screen (Begin, before play)",
+   "kind": "view",
+   "source": [
+    "docs/ui/STARTUP.md § The seat"
+   ],
+   "summary": "The pre-play screen that answers which nation am I: a list of the MAJOR nations only (each holding one champion; rows ordered by the champion's static landscape score, a champion below the viability floor marked and its nation still pickable) beside a map of the home body lighting the shown nation's territory with its champion's HQ, works and home market, and the seven-part nation card below the map. A press opens the nation's briefing; Confirm issues take_seat naming the major and seats its champion; Back changes nothing. Shaped for up to six humans, seats one.",
+   "interesting_question": "The card shows neighbours' readings as derived sentiment because no nation-to-nation stance table exists before play - is the derived Trust a faithful enough stand-in for the \"stances and grudges\" the design names?",
+   "resolution": "Open: the derived reading is what the world carries at the seat; a declared nation stance would be new state, which the screen may not add.",
+   "checks": [
+    "nation_select",
+    "seat_pick",
+    "quick_start"
+   ]
+  },
+  {
+   "id": "UI-123",
+   "name": "Nation card (seven parts)",
+   "kind": "sub-element",
+   "parent": "UI-122",
+   "source": [
+    "docs/ui/STARTUP.md § The seat",
+    "docs/generation/GENERATION_STRATEGY.md § History patterns"
+   ],
+   "summary": "Two columns under the map. Left: territory (tile count, lit on the map), population and GDP (last cleared quarter, per head), treasury and budget weights, richest deposits, and land-border neighbours with their reading both ways and any grudge. Right: the champion (the firm card unchanged in content) and the history - the nation's pattern tags, its fold line, a timeline of up to eight key events of its lineage, and a toggle link that opens the History ledger's Ages view filtered to the nation.",
+   "interesting_question": "A timeline capped at eight rows keeps foundings, secessions, charters and the revolution first and lets conquests fill the rest - does an old, warlike lineage lose the conquests that made it?",
+   "resolution": "Accepted as drafted; the full record is one press away in the filtered History ledger.",
+   "checks": [
+    "nation_select"
+   ]
   }
  ]
 }
