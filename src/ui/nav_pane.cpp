@@ -102,6 +102,21 @@ bool any_panel_open(const ui_state& state)
 
 void draw_nav_pane(ui_state& state, float top_offset)
 {
+    // A PAIRED LEDGER DISARMS ITS LENS ON CLOSE (Ben, 2026-10-13: "when the market
+    // ledger closes, this should also deactivate the lens", then "they should match
+    // the market" for Convoys and History). Taken on the edge, so every route that
+    // closes the ledger is covered, and only while the lens is still the one the
+    // ledger arms — a lens the player picked meanwhile, or the one a newly opened
+    // ledger just armed, is left alone. LENSES.md § The other direction.
+    const auto disarm_on_close = [&state](bool& was_open, bool open, overlay_mode lens) {
+        if (was_open && !open && state.overlay == lens)
+            state.overlay = overlay_mode::none;
+        was_open = open;
+    };
+    disarm_on_close(state.market_ledger_was_open,  state.show_market_ledger,  overlay_mode::market);
+    disarm_on_close(state.convoys_ledger_was_open, state.show_convoys_ledger, overlay_mode::supply_routes);
+    disarm_on_close(state.tile_ledger_was_open,    state.show_tile_ledger,    overlay_mode::continent);
+
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
 
     ImGui::SetNextWindowPos({0.0f, top_offset});
@@ -297,9 +312,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 //
                 // Fixed across both views, not sub-view-following: Goods and
                 // Trades are both single-market reads the wash reinforces. Armed
-                // only on OPEN, and never disarmed on close — slot 7's rule,
-                // followed deliberately rather than re-decided (NR-722 is still
-                // the open question about what that rule SHOULD be).
+                // on OPEN here; disarmed on CLOSE at the top of draw_nav_pane.
                 if (state.show_market_ledger)
                     state.overlay = overlay_mode::market;
             }
@@ -314,9 +327,8 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 // lens answer the same question in two registers, and this
                 // pairing is the argument for the split: a tab strip arms one
                 // lens for every tab, so hosting Convoys in the Market ledger
-                // armed the price wash instead. Armed only on OPEN — closing the
-                // ledger leaves the player's lens where they left it rather than
-                // yanking the canvas back.
+                // armed the price wash instead. Armed on OPEN here; disarmed on
+                // CLOSE at the top of draw_nav_pane.
                 if (state.show_convoys_ledger)
                     state.overlay = overlay_mode::supply_routes;
             }

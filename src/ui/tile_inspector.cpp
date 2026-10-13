@@ -167,8 +167,8 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // routes in: pressing the tab, and opening the ledger onto a parked Tectonics
     // (the reset above is what makes the second one an edge).
     //
-    // Closing the ledger does NOT disarm, which is the one thing this shares with
-    // slots 6 and 7 - see LENSES.md, and NR-722 for what is still unowned.
+    // Closing the ledger DISARMS it (Ben, 2026-10-13), as slots 6 and 7 do - the
+    // close edge is taken in draw_nav_pane. See LENSES.md.
     if (view == view_tectonics && last_drawn_view != view_tectonics)
         s.overlay = overlay_mode::continent;
     last_drawn_view = view;

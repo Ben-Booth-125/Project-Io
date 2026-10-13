@@ -512,9 +512,13 @@ that view. This is asserted rather than assumed — `lens_ledger_pairs.lua` chec
 opening History on Story arms nothing, that entering Tectonics arms `continent`, and
 that a lens chosen afterwards survives.
 
-**The semantics, which are `nav_pane.cpp`'s and are still formally unowned (NR-722):**
-arm on **open** only, and **never disarm on close**. A player who closes a ledger keeps
-the canvas they are looking at rather than having it yanked back. What is undecided is
+**The semantics:** arm on **open** (History: on entering Tectonics); **disarm on close**, for
+every pair. Ben, 2026-10-13: *"When the market ledger closes, this should also deactivate the
+lens"*, then for Convoys and History, *"They should match the market."* The disarm is taken on the
+ledger's close edge, whatever closed it, and only while the lens is still the one the ledger arms
+— a lens the player picked meanwhile, or one a newly opened ledger just armed, is left alone. This
+answers NR-722's close half; whether opening a ledger should override a lens the player chose
+deliberately is still open. What is undecided is
 the rest — whether opening a second ledger should re-arm to that one's lens, and whether
 a lens the player *deliberately* chose should be overridden by opening a ledger at all.
 

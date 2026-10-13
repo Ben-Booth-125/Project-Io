@@ -26,13 +26,16 @@
 
 verify.window(1920, 1080)
 
-local staged = stage_ui_fixture()
+-- No stage_ui_fixture: this check presses rail slots and reads the overlay, and
+-- needs neither the unit nor the twelve ticks that fixture stages.
+verify.goto_surface("home")
+verify.frames(3)
 print("LENSPAIRS state_hash=" .. verify.state_hash())
 
 local fails = 0
 
 --- Press rail slot `slot`, and assert the overlay it should arm.
-local function pair(slot, label, want, shot)
+local function pair(slot, label, want, shot, disarms)
     verify.set_overlay("none")
     verify.frames(2)
 
@@ -55,11 +58,19 @@ local function pair(slot, label, want, shot)
     end
     if shot then verify.capture(shot) end
 
-    -- Close. The lens must SURVIVE - the half of the rule that is a behaviour.
+    -- Close. The lens must SURVIVE - except on the Market slot, which disarms the
+    -- lens it armed (Ben, 2026-10-13).
     verify.click(x, y)
     verify.frames(3)
     local after = verify.overlay_name()
-    if after ~= want then
+    if disarms then
+        if after ~= "none" then
+            print(string.format("FAIL %s: closing kept the lens ('%s'), expected 'none'", label, after))
+            fails = fails + 1
+        else
+            print(string.format("PASS %s: closed -> lens disarmed", label))
+        end
+    elseif after ~= want then
         print(string.format("FAIL %s: closing disarmed the lens ('%s' -> '%s')", label, want, after))
         fails = fails + 1
     else
@@ -68,11 +79,11 @@ local function pair(slot, label, want, shot)
 end
 
 -- Slot 6, Market ledger -> the price/catchment wash. Ben, 2026-08-30.
-pair(6, "market ledger", "market", "lenspair_market")
+pair(6, "market ledger", "market", "lenspair_market", true)
 
 -- Slot 7, Convoys ledger -> the lane overlay. Landed with BL-689 and, for the
 -- reason in this file's header, has never been asserted until now.
-pair(7, "convoys ledger", "supply_routes", "lenspair_convoys")
+pair(7, "convoys ledger", "supply_routes", "lenspair_convoys", true)
 
 -- Slot 10, History -> the Continent lens, but ON ENTERING THE TECTONICS VIEW
 -- rather than on opening the ledger (Ben's ruling on NR-742). A different rule
@@ -127,8 +138,30 @@ local function tectonics_pair()
         print("PASS history: a deliberate lens survives while on Tectonics")
     end
 
+    -- 4. Closing keeps a lens the player chose (Ben, 2026-10-13: the disarm takes
+    -- only the lens the ledger armed).
     verify.click(x, y)                -- close
-    verify.frames(2)
+    verify.frames(3)
+    local after_choice = verify.overlay_name()
+    if after_choice ~= "population" then
+        print(string.format("FAIL history: closing replaced a chosen lens ('%s')", after_choice))
+        fails = fails + 1
+    else
+        print("PASS history: closing keeps a chosen lens")
+    end
+
+    -- 5. Reopening onto the parked Tectonics arms continent; closing disarms it.
+    verify.click(x, y)                -- reopen
+    verify.frames(3)
+    verify.click(x, y)                -- close
+    verify.frames(3)
+    local after_close = verify.overlay_name()
+    if after_close ~= "none" then
+        print(string.format("FAIL history: closing kept the lens ('%s'), expected 'none'", after_close))
+        fails = fails + 1
+    else
+        print("PASS history: closed -> lens disarmed")
+    end
 end
 
 tectonics_pair()

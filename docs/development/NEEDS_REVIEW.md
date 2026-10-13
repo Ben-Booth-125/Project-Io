@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*27 entries — 27 open, 0 resolved.*
+*27 entries — 25 open, 2 resolved.*
 
 ---
 
@@ -231,6 +231,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-1044 — Sprint 54 tile card: five calls taken filling gaps in Ben's 2026-10-13 form
 *decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1300 tile card split)*
 
@@ -242,6 +249,8 @@ Written into SELECTION.md: (1) Selecting a building by any route keeps selected_
 - Overturn any by number
 
 > **Recommendation:** Accept. Also note the tile card is ~260 px wide at 1720x1080, so the expanded profitability charts get about 60% of their old width; the live click will show whether that reads.
+
+> **RESOLVED.** Accepted, all five (Ben, 2026-10-13).
 
 *Files: `docs/ui/SELECTION.md`*
 
@@ -258,12 +267,7 @@ Written into SELECTION.md: (1) Selecting a building by any route keeps selected_
 
 > **Recommendation:** Accept, cap 20 — revisit after BL-1306's measurement if it shortens more than a quarter of names.
 
+> **RESOLVED.** Accepted, all five; cap 20 characters (Ben, 2026-10-13).
+
 *Files: `docs/ui/ledgers/market.md`, `docs/generation/NATION_GENERATION.md`, `docs/economy/MARKETS.md`, `docs/ui/PLANETARY.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

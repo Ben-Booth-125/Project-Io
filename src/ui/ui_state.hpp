@@ -535,6 +535,12 @@ struct ui_state
     /// so the two doors cannot show two different build bars.
     bool show_construction_panel = false;
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
+    /// Last frame's open state of each lens-paired ledger (Market, Convoys, History),
+    /// so the nav pane sees the CLOSE edge whatever closed it (rail re-click, another
+    /// slot, Esc, the ledger's own close) and disarms the lens the ledger armed.
+    bool market_ledger_was_open  = false;
+    bool convoys_ledger_was_open = false;
+    bool tile_ledger_was_open    = false;
 
     /// Whether the Convoys ledger is open (BL-689). Nav-rail slot 7, directly
     /// after Market. It was the Market ledger's third tab until the Goods
