@@ -302,7 +302,7 @@ on the rail. Reserved slots stay `BeginDisabled`.
 | Glyph | Function | Shape | Colour | Lens |
 |---|---|---|---|---|
 | **Supply** | `supply(…, colour)` | Two parallel horizontal lines (route shorthand) | Caller stroke | `overlay_mode::supply` |
-| **Market** | `market(…, colour)` | Three ascending bars (price chart), outlined | Caller stroke | `overlay_mode::market` |
+| **Market** | `market(…, colour)` | Three ascending bars (price chart), outlined | Caller stroke | `overlay_mode::market`; also the **market label** on the Planetary canvas — drawn before the name of the city a market is named for, in the settlement label's ink with its shadow (`PLANETARY.md` § Market labels) |
 | **Country** | `country(…, colour)` | Downward-pointing shield silhouette + dark outline | Caller fill | `overlay_mode::country` |
 | **Corporation** | `corporation(…, colour)` | Filled square + dark inner dot ("seal") | Caller fill | `overlay_mode::corporation` |
 | **Resource** | `resource(…, colour)` | Three stacked horizontal strata, widening + deepening top-to-bottom (gradient / density motif) | Caller fill (per-stratum alpha) | `overlay_mode::resource` |

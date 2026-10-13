@@ -983,6 +983,20 @@
     "src/ui/body_surface_canvas.cpp"
    ],
    "status": "drafted"
+  },
+  "planetary_market_labels": {
+   "surface": "Planetary canvas - market labels (the market glyph on a market city's settlement label)",
+   "answers": "Where is each market, and what is it called?",
+   "because": "A market is named for the largest city in its catchment (MARKETS.md, BL-1303), but before this the only place that name could be read was the Market ledger's combo, which says nothing about WHERE the market is. The canvas already labels cities, so the market label IS that city's label marked with the market glyph (the three ascending bars the Market lens and the ledger's rail slot already draw) -- no second label, no new layer, same LOD and culling. A centre that names a market is labelled whatever its scale, since a market's naming city can be a town and its name would otherwise be drawn nowhere on the map.",
+   "backlog_item": [
+    "BL-1303",
+    "BL-1304"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/market_ledger.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

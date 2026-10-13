@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
+**65 surfaces** — 7 settled, 58 awaiting Ben's wording.
 
 ---
 
@@ -281,6 +281,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** The four dramatic landforms are the <=1.5% of land whose movement cost is x1.3 or worse, so an invisible one is an expensive surprise; a river is an edge that discounts travel one way and gates wells and farms. Both used to be vector chrome laid over the painted ground -- a stroke-only glyph on the hex centre, a straight centre-to-centre stroke with chevrons -- and read as annotation on a painting (Ben, 2026-10-08, the sprint 51 form: mountains and rivers blend into the render). Baked, the same facts read as terrain: a contiguous run is one range, one cut, one fissure; a river is one smooth course whose width says which way it flows, so the chevrons have nothing left to say. The hover card still names the landform and its cost.
 
 *Demanded by BL-1242 · `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp` · id `planetary_landforms_rivers`*
+
+### Planetary canvas - market labels (the market glyph on a market city's settlement label)
+
+**Answers:** Where is each market, and what is it called?
+
+**Because:** A market is named for the largest city in its catchment (MARKETS.md, BL-1303), but before this the only place that name could be read was the Market ledger's combo, which says nothing about WHERE the market is. The canvas already labels cities, so the market label IS that city's label marked with the market glyph (the three ascending bars the Market lens and the ledger's rail slot already draw) -- no second label, no new layer, same LOD and culling. A centre that names a market is labelled whatever its scale, since a market's naming city can be a town and its name would otherwise be drawn nowhere on the map.
+
+*Demanded by BL-1303, BL-1304 · `src/ui/body_surface_canvas.cpp`, `src/ui/market_ledger.cpp` · id `planetary_market_labels`*
 
 ### Roads and sea lanes (Planetary canvas, always-on: painted into the ground at every rung; drawn as strokes only under the Throughput lens)
 

@@ -353,14 +353,16 @@
    "parent": "UI-013",
    "source": [
     "docs/ui/PLANETARY.md § Visual elements (Settlement markers row)",
-    "docs/ui/ICONS.md § settlement glyph"
+    "docs/ui/ICONS.md § settlement glyph",
+    "docs/ui/PLANETARY.md § Market labels"
    ],
-   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier ≥ 4).",
+   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier >= 4). A centre that names a market (BL-1303's rule) is named whatever its tier, its label led by the market glyph (BL-1304; PLANETARY.md § Market labels).",
    "interesting_question": "Colour is deliberately civic-neutral except under the Country lens — why keep tier (size) always visible but ownership colour lens-gated rather than always shown?",
    "resolution": "Settled as a legibility choice: PLANETARY.md states colour applying only under Country is so 'tier stays carried by size, keeping colour out of ownership' — i.e. two orthogonal signals (scale vs. political ownership) are kept on separate channels deliberately.",
    "checks": [
     "settlement_labels",
-    "pop_markers"
+    "pop_markers",
+    "market_labels"
    ]
   },
   {
