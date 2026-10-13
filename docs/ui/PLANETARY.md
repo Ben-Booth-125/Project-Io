@@ -388,7 +388,9 @@ is reached: *"click the border itself."*
 city that anchors it (`../economy/MARKETS.md` § Market centres and seeding), and the canvas
 already labels cities, so the market label **is** that city's label, marked as a market: a small
 market glyph before the name, drawn on the settlement-label layer so it shares its LOD and
-culling. A city that anchors no market keeps its plain label. Without this the only place a
+culling. A centre that names a market is labelled **whatever its scale** (Ben, 2026-10-13): a
+market named for a town must still show its name on the map. A centre that names no market keeps
+the plain label and its scale rule. Without this the only place a
 market's name could be read was the Market ledger's combo, which says nothing about where the
 market is.
 

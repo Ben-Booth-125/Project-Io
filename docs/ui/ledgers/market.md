@@ -44,10 +44,12 @@ Goods and Trades tabs**, and splits left and right:
   the list can simply state. A full name fits because nation names are length-capped at generation
   (`../../generation/NATION_GENERATION.md` § Pass 5 — Naming). Still no flags — `nation_colour`
   is all that exists (`ICONS.md` § 2b).
-- **Right 2/5 — market metrics, stacked vertically**, each a label over a figure, per quarter:
+- **Right 2/5 — market metrics, stacked vertically**, each a **label and its figure on one line**
+  (Ben, 2026-10-13: the label-over-figure pairs overran the section at 1280x720), per quarter:
   **Sold here** — the value of goods sold onto this market's shelf (quantity cleared x clearing
   price, summed over goods); **Traded in** and **Traded out** — the value of goods moved into and
-  out of this market by trades to and from other markets (`../../economy/TRADE.md` § A trade).
+  out of this market by trades to and from other markets, for the last completed quarter
+  (`../../economy/TRADE.md` § The trade value record).
   Values, not quantities, because a ton of ore and a ton of electronics do not add.
 
 **Default on open:** **Goods**.

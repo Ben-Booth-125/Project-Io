@@ -1313,13 +1313,13 @@
    "design": "DEFECT. scripts/verify/lib.lua raise_player_force places a military_base near the player works and waits 40 econ ticks; it never completes (lib.lua:242 error). Seen 2026-10-13 on 7fbb199f (no sprint 54 code) and on the sprint 54 branch, after the Debug stack-overflow at startup (fixed in 8972f540) had hidden every --verify run. 12 scripts call stage_ui_fixture. Find whether construction stalls (materials on the catchment shelf, capacity, the tech gate) or the bound is wrong; BL-1066 was the previous instance. Check against sprint 53 main before fixing - a world mover there may already change it."
   },
   {
-   "status": "proposed",
-   "glyph": "",
+   "status": "designed",
+   "glyph": "✓",
    "sprint": 54,
    "written": "2026-10-13",
    "parked": false,
    "blocked_on": null,
-   "author": "Claude (sprint 54, from the BL-1305 build), 2026-10-13",
+   "author": "Ben (2026-10-13: build it this sprint); filed by Claude",
    "requires": [],
    "id": "BL-1308",
    "short_name": "MARKET_TRADE_VALUE_RECORD",
@@ -1333,7 +1333,7 @@
     "src/ui/market_ledger.cpp"
    ],
    "title": "A per-market, per-quarter record of trade value in and out, so the Market ledger can show Traded in / Traded out",
-   "design": "GAP found building BL-1305 (market ledger top section): no store answers \"value moved into / out of this market by trades\". Trade cargo travels as convoys deleted on arrival; a trade's purchase and landing merge into the exchange record with every other shelf draw and landing; player_trade_flow covers the player only. The ledger shows \"—\" with a tooltip until this exists. Needs: a per-market accumulator of trade value bought here for export and landed here from elsewhere, per quarter, written where run_trades settles. Touches the economy and possibly the save format - Full mode, design call on whether it is saved or rebuilt."
+   "design": "DESIGNED (Ben, 2026-10-13): TRADE.md § The trade value record. Per market, traded_out (units bought at dispatch x the source posted price) and traded_in (units landed x the destination last resolved price, the tariff price), every corporation, accumulated through the quarter and published at its end; a report never read by the sim; NOT saved (zero until the first quarter of a loaded game). market_ledger.cpp shows them, label and figure on one line. Must move no digest: world_determinism, player_seed_sweep --digest-check and market_viability unchanged."
   }
  ]
 }
