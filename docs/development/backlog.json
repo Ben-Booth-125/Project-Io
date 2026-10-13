@@ -1334,6 +1334,30 @@
    ],
    "title": "A per-market, per-quarter record of trade value in and out, so the Market ledger can show Traded in / Traded out",
    "design": "DESIGNED (Ben, 2026-10-13): TRADE.md § The trade value record. Per market, traded_out (units bought at dispatch x the source posted price) and traded_in (units landed x the destination last resolved price, the tariff price), every corporation, accumulated through the quarter and published at its end; a report never read by the sim; NOT saved (zero until the first quarter of a loaded game). market_ledger.cpp shows them, label and figure on one line. Must move no digest: world_determinism, player_seed_sweep --digest-check and market_viability unchanged."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-13); filed by Claude",
+   "requires": [],
+   "id": "BL-1309",
+   "short_name": "SETTLE_TICKS_FEED_READINGS",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/core/app.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/header_panel.cpp",
+    "src/ui/market_ledger.cpp"
+   ],
+   "title": "A fresh campaign opens on the settle ticks' readings: no per-quarter surface shows 'no data yet' at Begin",
+   "design": "DESIGNED (Ben, 2026-10-13): STARTUP.md § Handoff, the paragraph after the twelve pre-game ticks. Sweep every surface that waits on an economy tick (building profit '— / qtr' - seen on a Port in the BL-1300 captures -, the header net and sparkline, market Sold here / Traded in / Traded out, price series, balance series) and make each read the settle's last values at Begin. BL-1308 (market trade value record) does its own figures. Change no simulated value: the settle runs as now; only what the presentation keeps from it changes. Live click at Begin."
   }
  ]
 }
