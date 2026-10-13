@@ -33,8 +33,8 @@
 -- `shell_column_width` is 0.20 * disp_x clamped to [380, 460] — 380 px at 1280,
 -- 384 px at 1920, four pixels across the whole common range. But the chrome above
 -- and below the column is FIXED: the profile tile, and a bottom band whose height
--- derives from `minimap_width` = max(336, 0.28 * min(disp_x, disp_y)), which is
--- 336 at BOTH. So every one of the extra 360 rows at 1080p lands in the ledger's
+-- derives from `minimap_width` = max(336, 0.28 * min(disp_x, disp_y)) + 27, which is
+-- 363 at BOTH. So every one of the extra 360 rows at 1080p lands in the ledger's
 -- own content height.
 --
 -- Measured on this surface: the Market price list shows 3.5 goods at 720p and 9

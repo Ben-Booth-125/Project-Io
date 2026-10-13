@@ -503,7 +503,7 @@ struct ui_state
     /// (BL-1239), 1 Buildings, 2 Deposits, 3 Resources, 4 Population, 5 Terrain
     /// — or -1 for none open
     /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed
-    /// ~260 px tall, so five open bodies would each get a sliver.
+    /// ~280 px tall, so five open bodies would each get a sliver.
     ///
     /// -1 is REACHABLE, and it has to be: a section header shows its own open
     /// state, which makes it a toggle under the standing Toggle rule, so

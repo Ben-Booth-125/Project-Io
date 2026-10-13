@@ -111,7 +111,7 @@ verify.capture("hover_single_no_lens")
 --
 -- Ten lenses at Planetary (every sub-body read), three at each of the other two.
 -- Captured per rung because the claim is about what is ON the bar, and the bar is
--- 336 px — whether ten glyphs FIT is exactly the question the old hand-kept
+-- 363 px — whether ten glyphs FIT is exactly the question the old hand-kept
 -- array of six was answering by omission.
 -- ---------------------------------------------------------------------------
 verify.set_overlay("none")
