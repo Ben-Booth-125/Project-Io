@@ -19,7 +19,8 @@ namespace ui {
 /// the SAME builder the Selection band uses, rather than re-deriving the same sums
 /// a second time and letting the two answers drift.
 void draw_building_profit(const world& w, const recipe_registry& reg,
-                          const economy_report& report, entity_id id);
+                          const economy_report& report, entity_id id,
+                          std::string* net_out = nullptr, std::string* exp_out = nullptr);
 
 /// One page of the unit Selection card's accordion — the pager the building card
 /// once had (retired BL-1300), kept for the Soldier card (placeholder, BL-393 notes units are largely
@@ -163,5 +164,11 @@ entity_id method_grid_status_drawn_for();
 /// target). Relocated off the Selection card by the same 2026-08-29 ruling as
 /// `draw_production_method_section`, and shared for the same reason.
 void draw_building_workforce_page(building_component& b);
+
+/// The workforce SLIDER alone — the one UI writer of `workforce_target` (BL-1300
+/// round 2). Drawn by draw_building_workforce_page (the Construction ledger) and by
+/// the expanded building card on the Selection band. A manual edit clears
+/// `workforce_auto`. The percentage reads to the slider's right. Returns true on an edit.
+bool draw_workforce_slider(building_component& b);
 
 } // namespace ui

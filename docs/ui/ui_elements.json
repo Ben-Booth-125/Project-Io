@@ -783,7 +783,7 @@
     "docs/ui/SELECTION.md § The tile element's layout",
     "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "A dedicated four-column layout for a selected tile, with NO header row (Ben, 2026-10-13, BL-1300): zoomed hex neighbourhood | Province card (capacity bar with a where-granted tooltip, one Built / Max / Resource table, population) | Tile card (the tile's buildings, one button per stack, three across: glyph + count, name, net profit per quarter) | 2x3 action grid. A selected building draws the same element for its host tile with that stack expanded in the tile column and the action grid retargeted to it.",
+   "summary": "A dedicated four-column layout for a selected tile, with NO header row (Ben, 2026-10-13, BL-1300): zoomed hex neighbourhood | Province card (one header row - title, narrowed capacity bar with a where-granted tooltip, population count right-aligned with the centre list on hover - then a Built / Max / Resource table that scrolls inside itself; the card never scrolls) | Tile card (the tile's buildings, one button per stack, three across) | 2x3 action grid. A canvas press on a built hex selects the tile (round 2). A selected building draws the same element for its host tile with that stack expanded in the tile column and the action grid retargeted to it.",
    "interesting_question": "The province card and the tile card split the former centre half at ~265 px each at 1720x1080 - does the expanded building's Profitability chart still read at that width?",
    "resolution": "Open: NR-1044 records the width (about 60% of the charts' former width); the BL-1300 live click is where it is judged.",
    "checks": [
@@ -834,9 +834,9 @@
     "docs/ui/SELECTION.md § The building element's layout",
     "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "Selecting a building draws its host tile's element with that building's stack expanded in the tile column: a '‹ this tile's buildings' back control, a status line (running state with its reason, or construction ETA), then the Profitability charts for the player's own completed building with data; a rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Auto / Open in ledger (absent on a rival's).",
+   "summary": "Selecting a building (grid button, repeat-click Building rung, ledger row) draws its host tile's element with that stack expanded in the tile column: an unlabelled back control, the name and stack count; the production method and status line; for the player's own completed building with profit data a profit row (short net chart beside net and expenses per quarter, expenses split on hover) and a workforce slider sharing the Construction ledger's control body. A rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Auto / Open in ledger (absent on a rival's).",
    "interesting_question": "With the standalone building layout gone, is there any route that selects a building WITHOUT showing its tile?",
-   "resolution": "No, by design (BL-1300): every route that sets selected_entity to a building draws the host tile's card expanded, so a single-building tile and a drilled-into stack reach the identical view.",
+   "resolution": "Yes, deliberately reversed in round 2 (Ben, 2026-10-13): a canvas press selects the TILE, so a building is reached from the tile card's grid, the repeat-click Building rung or a ledger row - each drawing the host tile's card expanded.",
    "checks": [
     "building_element",
     "tile_card",

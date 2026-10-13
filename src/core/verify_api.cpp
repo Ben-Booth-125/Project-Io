@@ -4466,6 +4466,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["is_expanded"]       = (c.expanded != null_entity);
         out["player"]            = c.expanded_player;
         out["charts"]            = c.charts;
+        out["slider"]            = c.slider;
+        out["count"]             = c.count;
+        out["title"]             = c.title;
+        out["method"]            = c.method;
+        out["net"]               = c.net;
+        out["expenses"]          = c.expenses;
+        out["population"]        = c.population;
+        out["population_x"]      = c.population_x;
+        out["population_y"]      = c.population_y;
+        out["province_scroll_max"] = c.province_scroll_max;
         out["status"]            = c.status;
         out["back_x"]            = c.back_x;
         out["back_y"]            = c.back_y;

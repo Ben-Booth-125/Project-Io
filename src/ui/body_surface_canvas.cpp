@@ -6210,24 +6210,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 lensed ? null_entity
                        : resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
 
-            // A SINGLE BUILDING OWNS ITS WHOLE HEX (SELECTION.md § Multi-building
-            // tiles; BL-1241). With the structures baked there is no glyph to aim
-            // at — the hex is the press area — so on a tile carrying exactly one
-            // building the building is resolved HERE, before the border band's
-            // corridor gets a say: a press anywhere on that hex, edge included,
-            // lands on the installation. A unit marker still outranks it (a unit
-            // standing on a built tile must stay reachable on the first press).
-            // A stacked tile is unchanged — it falls through to the tile view —
-            // and so is every lensed press (the lens branch never reaches here).
-            if (!lensed && hovered_tile != null_entity
-                && (marker_hit == null_entity || !w.units.count(marker_hit)))
-            {
-                const auto cnt_it = tile_bld_count.find(hovered_tile);
-                const auto tb     = tile_to_bld.find(hovered_tile);
-                if (cnt_it != tile_bld_count.end() && cnt_it->second == 1
-                    && tb != tile_to_bld.end())
-                    marker_hit = tb->second;
-            }
+            // A CANVAS PRESS SELECTS THE TILE (BL-1300 round 2; SELECTION.md
+            // § Multi-building tiles — Ben, 2026-10-13: "default tile selection
+            // to the list of buildings rather than any individual building").
+            // This REVERSES the 2026-07-22 rule that a press on a single-building
+            // hex lands on the installation: a building marker resolves to the
+            // tile it stands on, so the band opens the tile's building grid, one
+            // press from any building on it. A unit marker still outranks the
+            // tile (a unit standing on built ground stays reachable on the first
+            // press). The repeat-click cycle's Building rung, ledger rows and the
+            // grid's own buttons still select a building. Hover is untouched: it
+            // reads the same zones and still names the installation.
+            if (marker_hit != null_entity && w.buildings.count(marker_hit) != 0)
+                marker_hit = null_entity; // the press falls through to the tile below
+            else if (marker_hit != null_entity && w.tiles.count(marker_hit) != 0)
+                marker_hit = null_entity; // a stacked hex's zone carries its tile: same fall-through
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
             // tile/province fallback. With no lens a marker is a specific thing
@@ -6501,15 +6498,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else
             {
 
-            // Falling through to the tile means the click missed every marker glyph.
-            // On a BUILT tile that still selects the building: the whole hex belongs to
-            // the installation, so the tile element is unreachable there (Ben's
-            // 2026-07-22 call). The tile element is the prospecting view for UNBUILT
-            // ground — routing a built tile to it offers a Construct button that the
-            // placement rules then refuse, which is the bug this closes.
-            // BL-367: that "whole hex is one installation" assumption only holds for
-            // exactly one building — once BL-366 lets a tile stack several, the hex
-            // stays reachable as the grouped-by-stack tile view instead.
+            // Falling through to the tile means the click hit no unit marker. A
+            // built tile selects the TILE too (BL-1300 round 2, reversing the
+            // 2026-07-22 whole-hex-is-the-installation call): the tile element
+            // opens on its building grid.
             //
             // BL-511 made the fallback the hovered tile's PROVINCE rather than
             // the tile; BL-598 puts it back on the tile. The province folded
@@ -6520,15 +6512,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // as the MIRROR (`selected_province`) the province outline reads.
             const uint32_t hovered_prov = (hovered_tile != null_entity)
                                           ? w.provinces.province_of(hovered_tile) : 0u;
-            entity_id fallback = hovered_tile;
-            if (hovered_tile != null_entity)
-            {
-                const auto tb = tile_to_bld.find(hovered_tile);
-                const auto cnt_it = tile_bld_count.find(hovered_tile);
-                const int  count = (cnt_it != tile_bld_count.end()) ? cnt_it->second : 0;
-                if (tb != tile_to_bld.end() && count <= 1)
-                    fallback = tb->second;
-            }
+            // BL-1300 round 2: the fallback is ALWAYS the tile — a built hex
+            // opens on its building grid, never on a lone building.
+            const entity_id fallback = hovered_tile;
 
             // Placeholder unit-cycle scaffolding: a REPEAT click on the same tile the
             // selection already sits on cycles Soldier -> Building -> Tile -> Soldier
@@ -6561,9 +6547,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // tile rung reaches it and a rung of its own selected the same
                 // ground twice.
                 //
-                // This is the CYCLE order only. The hit-test above is unchanged
-                // and still resolves most-specific-first, so a building is still
-                // reachable on the FIRST click.
+                // This is the CYCLE order only. The first press lands on the tile
+                // (BL-1300 round 2); the building rung is reached by the repeat
+                // press or by the tile card's own building buttons.
                 //
                 // Rungs 1..3 are entities, so a null check is their liveness test.
                 // Rung 0 is not — a battle has no entity id — so `stage_live`
@@ -6643,10 +6629,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // "the cycle does not fire", which is how NR-504 was found.)
                     // The fallback is the tile itself since BL-598, so a plain
                     // click on ground seeds the TILE rung.
+                    // A building marker never survives to here (BL-1300 round 2:
+                    // the press lands on the tile), so the only marker rung is the
+                    // unit; everything else seeds the TILE rung, and a repeat
+                    // click advances to the battle / unit / building rungs.
+                    (void)building_here;
                     state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 1
-                                                 : (marker_hit != null_entity) ? 2   // a building marker
-                                                 : (building_here != null_entity && fallback == building_here) ? 2
-                                                                               : 3;  // plain ground = the tile
+                                                                               : 3;  // the tile
                 }
                 else
                 {

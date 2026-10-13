@@ -607,7 +607,9 @@ to cycle to.
 
 A click on a **different** tile (or the first click anywhere) goes through the marker-hit precedence
 (`resolve_marker_hit`: unit > building, nearest-wins within a kind) and only
-additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. Unit
+additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. A
+building hit lands on its **tile**, never the building (§ Multi-building tiles, round 2), so the
+first click seeds the Tile rung and the Building rung is reached by the repeat click. Unit
 was raised above building by BL-575 (unit marker and march UI) to match this section's own cycle
 order, where Soldier already precedes Building — a unit standing on a built tile is reachable on
 the first click, not only after cycling past the building.

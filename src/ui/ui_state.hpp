@@ -1087,12 +1087,21 @@ struct ui_state
         entity_id   tile     = null_entity;
         entity_id   expanded = null_entity; ///< The expanded building, null when the grid shows.
         bool        expanded_player = false;
-        bool        charts   = false;       ///< The Profitability charts drew.
+        bool        charts   = false;       ///< The profit row drew.
+        bool        slider   = false;       ///< The workforce slider drew.
+        int         count    = 1;           ///< The expanded stack's member count.
+        std::string title;                  ///< The expanded header's name + " ×N" as drawn.
+        std::string method;                 ///< The production method line, "" when none.
+        std::string net;                    ///< Net per quarter as drawn, "" when not drawn.
+        std::string expenses;               ///< Expenses per quarter as drawn.
+        int         population = 0;         ///< The province card's header figure, thousands.
+        float       province_scroll_max = 0.0f; ///< The province card's OWN window scroll range (must be 0).
         std::string status;                 ///< The expanded card's status line, "" when none.
         float       back_x = -1.0f, back_y = -1.0f;         ///< The back control's centre.
         int         province_standing = 0;
         int         province_ceiling  = -1;
         float       capacity_x = -1.0f, capacity_y = -1.0f; ///< The capacity bar's centre.
+        float       population_x = -1.0f, population_y = -1.0f; ///< The population figure's centre.
         std::vector<std::string> province_rows;             ///< Resource names, table order.
         std::vector<tile_card_button> buttons;
         float       preview_w = 0.0f, province_w = 0.0f, tile_w = 0.0f, actions_w = 0.0f, height = 0.0f;

@@ -51,7 +51,7 @@
   ],
   [
    "gameplay.set_workforce",
-   "The workforce slider in the Construction ledger's Buildings view (`draw_building_workforce_page`), below a placeholder trend graph. The slider reaches 0-100%; the command seam reaches 200."
+   "The workforce slider, drawn by ONE control body (`draw_workforce_slider`) in two places: the Construction ledger's Buildings view (`draw_building_workforce_page`, below a placeholder trend graph) and the expanded building card on the Selection band (ledger.selection_building_workforce). The slider reaches 0-100% with the percentage to its right; the command seam reaches 200."
   ],
   [
    "gameplay.set_workforce_auto",
@@ -415,7 +415,11 @@
   ],
   [
    "ledger.selection_building_back",
-   "Selection band, tile element, the expanded building card's header: the '‹ this tile's buildings' control at its left"
+   "Selection band, tile element, the expanded building card's header: the unlabelled '‹' control at its left (tooltip 'Back to the buildings on this tile')"
+  ],
+  [
+   "ledger.selection_building_workforce",
+   "Selection band, tile element, the expanded building card's workforce row: a horizontal slider with the current percentage to its right (the player's own completed building with profit data only)."
   ],
   [
    "chrome.f12_capture",
