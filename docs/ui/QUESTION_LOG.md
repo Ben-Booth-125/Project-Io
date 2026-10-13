@@ -532,7 +532,7 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 **Because:** Comparison is impossible when every selection replaces the last. The card frame is what makes drill-through (BL-214) a shared idiom rather than a per-panel behaviour. Pairs existed here before BL-247's log was removed.
 
-*Demanded by BL-196, BL-213, BL-214 · `src/ui/selection_card.cpp` · id `selection_card`*
+*Demanded by BL-213, BL-214 · `src/ui/selection_card.cpp` · id `selection_card`*
 
 ### New World wizard - the lapse rounds' top-sixteen board
 

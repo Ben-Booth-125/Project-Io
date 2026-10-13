@@ -215,7 +215,7 @@ a tile keep the shared header (§ Layout & chrome).
   and **the Terrain section** (habitability and hazard against the body average). Neither
   changed what the player does next, and both are reachable elsewhere — the hover card reads
   terrain and habitability, and the lenses read the field. The Resources charts were the
-  resource history's click target (BL-196, resource drill-down); that door goes with them.
+  only door to the resource history drill (BL-196), which retired with them (Ben, 2026-10-14).
 - **"What it fetches here"** — the market and per-good price rows under Production. **This
   REVERSES the 2026-10-08 ruling** (the sprint 51 visibility pass) that added them as the
   initial-market-conditions read; newest-dated wins. The reading itself survives in the Market

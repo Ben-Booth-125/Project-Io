@@ -1936,9 +1936,7 @@ void app::step_economy()
         lap(7); // persona counsel
         session_history::history_stores h{
             m_balance_history, m_income_history, m_expenditure_history,
-            m_market_history, m_building_rank_hist, m_body_resource_hist,
-            m_tile_resource_hist, m_tracked_tiles, m_resource_hist_days,
-            m_resource_sample_index };
+            m_market_history, m_building_rank_hist };
         session_history::record_histories(m_world, m_registry, m_last_econ_report,
                                           flows, m_ui, h);
         // Strategy readout (BL-411): consume this tick's new decision-ring
@@ -2147,32 +2145,22 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
     // corner gear button. Handled before the ImGui keyboard guard so it works even
     // while the popup (or another panel) holds focus. Precedence, highest first: an
-    // armed exit-confirm backs out; an open system menu closes; an open sticky
-    // detail card unwinds one drill level; an open fold overlay folds up (BL-214);
+    // armed exit-confirm backs out; an open system menu closes; an open fold
+    // overlay folds up (BL-214);
     // otherwise the menu opens. The Selection band never hides (BL-266) — its
     // former hide rung is gone, so the system menu is the terminal rung.
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
-    // a level is not a dismissal and `card_stack` already owned the unwind. The
-    // binary model made expanded a full-screen MODE, and a mode with no keyboard exit
-    // is a defect rather than a principle. It sits BELOW the drill so one press never
-    // both unwinds a drill and closes the overlay hosting it — the same rule that put
-    // the drill above the card.
+    // a level is not a dismissal. The binary model made expanded a full-screen MODE,
+    // and a mode with no keyboard exit is a defect rather than a principle.
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
-        // A drill can only exist over a real selection: a valid selection whose
-        // kind actually resolves — so Esc never unwinds an invisible drill. The
-        // band itself is always open (BL-266) and has no hide rung.
-        const bool card_open = m_ui.selected_entity != null_entity &&
-                               ui::selection_kind_of(m_world, m_ui.selected_entity) !=
-                                   ui::selection_kind::none;
+        // The band is always open (BL-266) and has no hide rung.
         if (m_ui.confirm_exit_pending)
             m_ui.confirm_exit_pending = false;
         else if (m_ui.show_system_menu)
             m_ui.show_system_menu = false;
-        else if (card_open && !m_ui.card_stack.empty())
-            m_ui.card_stack.pop_back();                       // unwind one drill level
         else if (m_ui.corp_rollup_drill >= 0)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
@@ -2383,11 +2371,8 @@ bool app::load_game_from(const std::string& path)
     // econ tick overwrote them -- a stale panel is worse than an empty one.
     m_last_econ_report = economy_report{};
     m_last_corp_standings.clear();
-    m_body_resource_hist.clear();
-    m_tile_resource_hist.clear();
 
     // Selection state that indexes into the replaced world.
-    m_ui.card_stack.clear();
     m_ui.clear_battle_selection();
 
     m_screen = app_screen::in_game;
@@ -2671,17 +2656,6 @@ void app::render()
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
 
-    // A *new* entity selection no longer competes with the fold-out ledgers for
-    // screen space (BL-213 — the Selection band lives in its own fixed rect at
-    // the bottom of the screen, sandwiched between the shell column and the
-    // right chrome column), so selecting something leaves whatever ledger is
-    // open untouched. Only the drill-down stack still resets on a new selection.
-    if (m_ui.selected_entity != m_prev_selection)
-    {
-        m_ui.card_stack.clear();        // a new selection resets any drill-down (BL-196)
-        m_prev_selection = m_ui.selected_entity;
-    }
-
     ui::draw_tile_inspector(m_world, m_ui, m_generation_report, m_active_world_params,
                             &m_ui.show_tile_ledger);
     // Generation Ledger (BL-303) — regenerates the per-pass record on demand from
@@ -2778,11 +2752,8 @@ void app::render()
         const ui::shell_rect band = ui::selection_band_rect(disp);
         const ImVec2 band_origin = { band.x, band.y };
         const ImVec2 band_size   = { band.w, band.h };
-        const ui::resource_history_view rhist{ &m_body_resource_hist,
-                                               &m_tile_resource_hist,
-                                               &m_resource_hist_days };
         ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
-                                rhist, m_ui, band_origin, band_size);
+                                m_ui, band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195), and it now really is: the

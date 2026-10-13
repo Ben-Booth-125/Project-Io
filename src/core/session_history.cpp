@@ -307,49 +307,6 @@ void record_histories(const world& w, const recipe_registry& reg,
         }
     }
 
-    // Resource-deposit time series (BL-198): the aggregate (Σ remaining deposit per
-    // body per resource) every tick; a tracked tile's own series lazily, from the
-    // first drill-down into it. All share the sample-day axis (X), capped in
-    // lockstep. One pass over the tiles accumulates the body totals and snapshots
-    // any tracked tile — O(tiles·resources)/tick, the same order as the econ step.
-    {
-        // Drain the card's lazy-tracking request (a tile whose resource drill is
-        // open) so the tile starts recording THIS tick, aligned to today's sample.
-        if (st.card_track_tile != null_entity)
-        {
-            h.tracked_tiles.insert(st.card_track_tile);
-            st.card_track_tile = null_entity;
-        }
-
-        // Date the sample by its quarter index (econ ticks are quarterly). This
-        // equals day_tick in live play but also advances when the verify harness
-        // steps the economy without turning the sim clock, so the Year/Quarter axis
-        // always progresses. See h.sample_index.
-        ui::push_capped(h.sample_days,
-                        h.sample_index * static_cast<std::uint64_t>(sim_loop::econ_tick_days));
-        ++h.sample_index;
-
-        std::unordered_map<entity_id, std::array<float, resource_count>> body_sum;
-        for (const auto& [tid, tc] : w.tiles)
-        {
-            auto& acc = body_sum[tc.body];
-            for (std::size_t r = 0; r < resource_count; ++r)
-                acc[r] += tc.resource_deposit[r];
-
-            if (h.tracked_tiles.count(tid))
-            {
-                auto& th = h.tile_resource[tid];
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    ui::push_capped(th[r], tc.resource_deposit[r]);
-            }
-        }
-        for (const auto& [bid, acc] : body_sum)
-        {
-            auto& bh = h.body_resource[bid];
-            for (std::size_t r = 0; r < resource_count; ++r)
-                ui::push_capped(bh[r], acc[r]);
-        }
-    }
 }
 
 } // namespace session_history
