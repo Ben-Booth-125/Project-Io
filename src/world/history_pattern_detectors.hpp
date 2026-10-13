@@ -2,6 +2,7 @@
 
 #include "world/era_timelapse.hpp"
 #include "world/rise_fall_rules.hpp" // BL-1287: the RF constants, one place with the sim
+#include "world/late_culture_rules.hpp" // BL-1288: the LC constants, one place with the sim
 
 #include <cstdint>
 #include <vector>
@@ -35,9 +36,11 @@ struct settlement_state;
 //                  Where that realm is boxed (Ben, 2026-10-12) the rise falls
 //                  to the largest realm whose reachable ground can hold the
 //                  floor; the record names it (the first `rise_pressed`).
-//   late culture   EXPLORATION.md sec The late culture (Ben, 2026-10-10/11): the
-//                  culture most remote when the Culture round closes, lagging,
-//                  and bound in Exploration by a polity of another culture.
+//   late culture   EXPLORATION.md sec A colony is a subject (Ben, 2026-10-10/11):
+//                  the culture most remote BY REACH when the Culture round
+//                  closes -- as the record's `late_culture_chosen` names it
+//                  (BL-1288) -- lagging, and bound in Exploration by a polity
+//                  of another culture.
 //   world war      INDUSTRIALISATION.md sec A world war in every world (Ben,
 //                  2026-10-11): inside 1900-1930, the top powers drawn in.
 //   civil war      CIVILISATION.md, "What counts as one" (Ben, 2026-10-11): a
@@ -75,7 +78,7 @@ inline constexpr int hp_rf_peak_by_year      = rise_fall_peak_by_year; ///< ...w
 inline constexpr int hp_rf_floor_q           = rise_fall_floor_pm;     ///< ruled: 25 percent (Ben, 2026-10-12)
 inline constexpr int hp_rf_hegemony_q        = rise_fall_hegemony_pm;  ///< the non-hegemony cap (BL-224), not overturned
 inline constexpr int hp_rf_fall_window_y     = rise_fall_window_years; ///< share halves within this many years of the peak
-inline constexpr int hp_lc_lag_x100          = 85;   ///< PROVISIONAL: materials mean <= 85% of the world's at the Empires close
+inline constexpr int hp_lc_lag_x100          = late_culture_lag_x100; ///< late_culture_rules.hpp (BL-1288): PROVISIONAL, materials mean <= 85% of the world's at the Empires close
 inline constexpr int hp_ww_window_start      = 1900;
 inline constexpr int hp_ww_window_end        = 1930; ///< inclusive
 inline constexpr int hp_ww_top_k             = 6;    ///< PROVISIONAL: "the top powers" = the six most populous at the window's open
@@ -108,9 +111,9 @@ struct history_pattern_reading
 
     // --- late culture
     bool lc_hit = false;
-    int  lc_culture = -1;       ///< the most remote founding culture at the Culture close
-    int  lc_gap = 0;            ///< its isolation, grid distance squared to the nearest foreign region
-    int  lc_second_gap = 0;     ///< the next most remote culture's, for scale
+    int  lc_culture = -1;       ///< the most remote founding culture at the Culture close (the record's choice)
+    int  lc_reach = -1;         ///< its remoteness by reach as the record names it (-1: the network joined it to nobody)
+    int  lc_level = 0;          ///< the highest level the backstop pressed (`isolation_pressed`)
     int  lc_lag_x100 = -1;      ///< its polities' materials mean over the world's at the Empires close; -1 none standing
     int  lc_bound = 0;          ///< its polities bound or bought by another culture in Exploration
     std::vector<int32_t> lc_polities;

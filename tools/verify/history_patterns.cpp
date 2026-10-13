@@ -188,7 +188,7 @@ int main(int argc, char** argv)
 
         const history_pattern_reading& q = r.pr;
         std::printf("seed %-3u (%.0f s)  RF %s realm %d%s front %d‰ peak %d‰ at %d x%.2f, %d seats, fall %dy to %d‰, %d split%s%s, levels %d/%d  |"
-                    "  LC %s culture %d gap %d (next %d) lag %d%% bound %d  |"
+                    "  LC %s culture %d reach %d level %d lag %d%% bound %d  |"
                     "  WW %s %d/%d in %d-%d, %d moments  |  CW %d/%d  RV %d (proxy %d)  |"
                     "  pop@1200 %lld  |  tags RF %d LC %d WW %d CW %d RV %d, unfolded %d%s  |"
                     "  nations %d, %d w/ specialist, polities %d\n",
@@ -197,7 +197,7 @@ int main(int argc, char** argv)
                     q.rf_front_q, q.rf_peak_q, q.rf_peak_year, q.rf_margin_x100 / 100.0, q.rf_captures,
                     q.rf_fall_years, q.rf_fall_q, q.rf_breakaways, q.rf_breakaways == 1 ? "" : "s",
                     q.rf_ended ? " ended" : "", q.rf_rise_level, q.rf_fall_level,
-                    q.lc_hit ? "HIT " : "miss", q.lc_culture, q.lc_gap, q.lc_second_gap, q.lc_lag_x100, q.lc_bound,
+                    q.lc_hit ? "HIT " : "miss", q.lc_culture, q.lc_reach, q.lc_level, q.lc_lag_x100, q.lc_bound,
                     q.ww_hit ? "HIT " : "miss", q.ww_belligerents, hp_ww_top_k, hp_ww_window_start, hp_ww_window_end,
                     q.ww_moments, q.cw_count, q.cw_splits, q.rv_count, q.rv_proxy,
                     static_cast<long long>(r.pop_1200),
@@ -234,7 +234,7 @@ int main(int argc, char** argv)
     {
         std::ofstream o(csv);
         o << "seed,rf_hit,rf_polity,rf_front_q,rf_peak_q,rf_peak_year,rf_fall_years,rf_breakaways,"
-             "lc_hit,lc_culture,lc_gap,lc_second_gap,lc_lag_x100,lc_bound,"
+             "lc_hit,lc_culture,lc_reach,lc_level,lc_lag_x100,lc_bound,"
              "ww_hit,ww_belligerents,ww_moments,cw_count,cw_splits,rv_count,rv_proxy,pop_1200,unfolded,"
              "nations,nations_with_specialist,specialists,living_polities\n";
         for (const row& r : rows)
@@ -242,7 +242,7 @@ int main(int argc, char** argv)
             const history_pattern_reading& q = r.pr;
             o << r.seed << ',' << q.rf_hit << ',' << q.rf_polity << ',' << q.rf_front_q << ',' << q.rf_peak_q << ','
               << q.rf_peak_year << ',' << q.rf_fall_years << ',' << q.rf_breakaways << ','
-              << q.lc_hit << ',' << q.lc_culture << ',' << q.lc_gap << ',' << q.lc_second_gap << ','
+              << q.lc_hit << ',' << q.lc_culture << ',' << q.lc_reach << ',' << q.lc_level << ','
               << q.lc_lag_x100 << ',' << q.lc_bound << ','
               << q.ww_hit << ',' << q.ww_belligerents << ',' << q.ww_moments << ',' << q.cw_count << ','
               << q.cw_splits << ',' << q.rv_count << ',' << q.rv_proxy << ',' << r.pop_1200 << ',' << r.unfolded << ','

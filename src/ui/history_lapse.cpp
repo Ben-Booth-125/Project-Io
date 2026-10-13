@@ -5180,6 +5180,50 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
             std::snprintf(buf, sizeof buf, "The overreach of %s deepens; its roads decay further from %s.",
                           polity_name_of(h, e.polity), R);
         break;
+    case lapse_event_kind::late_culture_chosen:
+    {
+        // BL-1288 (EXPLORATION.md sec A colony is a subject): at the Culture
+        // close, the people most remote by reach. `polity` is the CULTURE
+        // index (as culture_split's), named off the roster where it can be;
+        // `other` its remoteness, `lapse_event_none` when no road or march
+        // joined its ground to any other people's.
+        const char* P = (static_cast<std::size_t>(e.polity) < h.people_name.size()
+                         && !h.people_name[e.polity].empty())
+                            ? h.people_name[e.polity].c_str() : nullptr;
+        if (e.other == lapse_event_none)
+            std::snprintf(buf, sizeof buf, P != nullptr
+                              ? "The %s of %s stand apart: no road or march joins them to any other people."
+                              : "%s%s stands apart: no road or march joins it to any other people.",
+                          P != nullptr ? P : "", R);
+        else
+            std::snprintf(buf, sizeof buf, P != nullptr
+                              ? "The %s of %s stand furthest from any other people; what the world learns reaches them last."
+                              : "%s%s stands furthest from any other people; what the world learns reaches it last.",
+                          P != nullptr ? P : "", R);
+        break;
+    }
+    case lapse_event_kind::isolation_pressed:
+    {
+        // BL-1288: the late culture's backstop, one level further -- in the
+        // Empires record the approaches to its ground going unwalked, in the
+        // Exploration record the voyages that finally carry to it. `other` the level.
+        // `other` below 100: the isolation's level; 100 + n: the Exploration
+        // contact press (level n).
+        const char* P = (static_cast<std::size_t>(e.polity) < h.people_name.size()
+                         && !h.people_name[e.polity].empty())
+                            ? h.people_name[e.polity].c_str() : "far people";
+        if (e.other < 100)
+            std::snprintf(buf, sizeof buf, e.other <= 1
+                              ? "The roads to and around %s go unwalked; the %s keep to their own holds."
+                              : "The ways toward %s fall further out of use; the %s grow more apart.",
+                          R, P);
+        else
+            std::snprintf(buf, sizeof buf, e.other <= 101
+                              ? "Voyages begin to carry as far as %s and the %s."
+                              : "Ships reach %s more often; the %s are drawn into the wider world.",
+                          R, P);
+        break;
+    }
     case lapse_event_kind::civil_war_famine:
         // BL-1290 (MILITARY_HISTORY.md sec Armies are distinct from
         // population): the ground a civil war is fought over starves. `polity`
@@ -5250,6 +5294,9 @@ int ticker_priority(const lapse_event& e)
     // BL-1287: the rise and fall's levels, a handful per world, all one realm's.
     case lapse_event_kind::rise_pressed:
     case lapse_event_kind::overextended:         return 0;
+    // BL-1288: the late culture's choice (once) and its backstop's levels.
+    case lapse_event_kind::late_culture_chosen:
+    case lapse_event_kind::isolation_pressed:    return 0;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

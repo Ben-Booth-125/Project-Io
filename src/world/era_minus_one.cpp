@@ -329,6 +329,19 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // people, so a civil war SHOWS on the population map without emptying it.
     hp.civil_war_famine_q = 10;
     hp.civil_war_flight_q = 15;
+
+    // BL-1288 -- THE LATE CULTURE IS A TARGET FROM THIS ROUND'S OPEN
+    // (EXPLORATION.md sec A colony is a subject; GENERATION_STRATEGY.md sec
+    // History patterns, "always"). Chosen at the Culture close as the culture
+    // most remote by reach; it lags because development DIFFUSES BY CONTACT --
+    // a force every polity of this round feels -- and where it is losing the
+    // realm it must carry to Exploration, the isolation on its ground is pressed
+    // one recorded level at a time. This round only: the diffusion is the
+    // Culture -> Exploration lag's mechanism, and the later spans build from
+    // struct defaults (Exploration watches the colonisation instead).
+    hp.late_culture_target       = true;
+    hp.contact_diffusion_q       = 10;
+    hp.contact_diffusion_horizon = 30;
     return hp;
 }
 
@@ -527,6 +540,14 @@ history_sim_params exploration_sim_params(const world_params& params)
     // ports) or does not move. Industrialisation inherits it.
     hp.trade_road_joins_one_landmass = true;
 
+    // BL-1288 -- THE LATE CULTURE IS COLONISED IN THIS AGE (EXPLORATION.md sec
+    // A colony is a subject): the span reads the culture off the polity table
+    // it resumes (`polity::late_isolation`), watches for a polity of another
+    // culture binding one of its realms by the ordinary subjection verbs, and
+    // presses the contact that would, one recorded level at a time.
+    // Industrialisation copies these params and sets it back off.
+    hp.late_culture_colonised = true;
+
     return hp;
 }
 
@@ -620,6 +641,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // Empires age's deeds twice. The span flag is the guard, whatever rate
     // this span inherits or a sweep sets.
     hp.naval_points_convert_at_open = false;
+
+    // BL-1288: the late culture's colonisation is Exploration's pattern clause
+    // alone; this span neither watches nor presses it.
+    hp.late_culture_colonised = false;
 
     // BL-1152 (Ben, 2026-10-02, option D): THE FLEET RULE IS EXPLORATION'S FOR
     // NOW. At 20 / 10 / 50 this span's realms field too few fleets -- on the

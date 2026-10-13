@@ -294,6 +294,13 @@ inline constexpr uint32_t save_game_magic =
 /// 30-33 together (civil war 30-31, rise and fall 32-33). No field moves; the
 /// kind range check is the only reader that changes, and a build that
 /// predates them refuses such a stream on it.
+/// v23 ALSO admits two more appended by the late culture (BL-1288): 34
+/// `late_culture_chosen` (Empires record, once: `polity` = the culture index,
+/// `other` = its remoteness by reach or none) and 35 `isolation_pressed` (the
+/// backstop's level, `polity` = the culture index; in the Empires and the
+/// Exploration record). No field moves, so no version bump; the range check
+/// is the only reader that changes. The detector reads the late culture off
+/// kind 34, so a stream written before it carries no late culture.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

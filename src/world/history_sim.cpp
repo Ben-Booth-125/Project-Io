@@ -12,9 +12,11 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <climits>
 #include <limits>
 #include <map>
 #include <queue>
+#include <set>
 #include <unordered_map>
 
 // ---------------------------------------------------------------------------
@@ -3555,6 +3557,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t event_year = params.start_year;
     const auto note_event = [&](lapse_event_kind kind, int region_idx, int polity_id,
                                 int other_id) {
+        // BL-1288: a polity's BIRTH SEAT, set once beside the note that first
+        // names it -- before the record gate, so a run without the playback
+        // knows the same seats (`polity::birth_seat`).
+        if ((kind == lapse_event_kind::founded || kind == lapse_event_kind::broke_away
+             || kind == lapse_event_kind::schism || kind == lapse_event_kind::inherited)
+            && polity_id >= 0 && static_cast<std::size_t>(polity_id) < out.polities.size()
+            && out.polities[static_cast<std::size_t>(polity_id)].birth_seat < 0)
+            out.polities[static_cast<std::size_t>(polity_id)].birth_seat = region_idx;
         if (!params.record_playback) return;
         const auto slot = [](int v) {
             return (v < 0 || v >= static_cast<int>(lapse_event_none))
@@ -4350,10 +4360,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // below and by `campaign_supply`'s last hop onto a target (BL-922) -- the
     // file's standing thesis: a cost authored on one scale and spent on
     // another is the bug, so both ask the identical question.
+    // BL-1288 -- THE LATE CULTURE (late_culture_rules.hpp), declared here
+    // because `edge_step` reads its isolation press: the culture chosen at the
+    // Culture close (-1 none), and the two levels the backstop has raised.
+    int lc_culture   = -1;
+    int lc_level     = 0;
+    // THE ISOLATION PRESS, ON THE GROUND -- one isolation with the two faces
+    // the ruling names (Ben, 2026-10-11: "the isolation that slows its
+    // development also slows its conquest"). Every step touching the late
+    // culture's founding ground costs `late_isolation_step_q` per mille more
+    // per level, plus `late_isolation_step` reach per level (so a short step is
+    // not exempt), for every walker (supply, campaigns, Organise, the
+    // diffusion) -- never a term in a scorer: the ground goes unwalked, as if
+    // the way were that much further and harder. On the approaches it slows
+    // whoever would march in or carry news in (its conquest, its diffusion);
+    // between two of its own regions it keeps its people apart in small holds
+    // (its development). Identity with the press off, so every other run is
+    // digit-identical.
+    const auto lc_step_level = [&](int a, int b) -> int {
+        if (lc_level <= 0 || lc_culture < 0) return 0;
+        const bool la = ss.regions[static_cast<std::size_t>(a)].founding_culture == lc_culture;
+        const bool lb = ss.regions[static_cast<std::size_t>(b)].founding_culture == lc_culture;
+        return (la || lb) ? lc_level : 0;
+    };
+    const auto lc_press_step = [&](int raw, int level) -> int {
+        const int64_t mul = 1000 + static_cast<int64_t>(level) * clampi(params.late_isolation_step_q, 0, 4000);
+        return static_cast<int>(static_cast<int64_t>(raw) * mul / 1000)
+             + level * clampi(params.late_isolation_step, 0, 100);
+    };
     const auto edge_step = [&](int a, int b) {
         const region& ra = ss.regions[static_cast<std::size_t>(a)];
         const region& rb = ss.regions[static_cast<std::size_t>(b)];
-        const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        if (const int lv = lc_step_level(a, b)) raw_step = lc_press_step(raw_step, lv); // BL-1288
         return raw_step > 0 ? std::max(1, road_discounted(raw_step, road_tier_between(a, b))) : 1;
     };
 
@@ -4366,7 +4405,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     const auto edge_step_at_tier = [&](int a, int b, int tier) {
         const region& ra = ss.regions[static_cast<std::size_t>(a)];
         const region& rb = ss.regions[static_cast<std::size_t>(b)];
-        const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        if (const int lv = lc_step_level(a, b)) raw_step = lc_press_step(raw_step, lv); // BL-1288
         return raw_step > 0 ? std::max(1, road_discounted(raw_step, tier)) : 1;
     };
 
@@ -4833,6 +4873,245 @@ history_sim_state run_history_sim(settlement_state&         ss,
             years_from_calendar_year(y_now), chain_stage::legacy, line, std::string{}});
         note_event(rising ? lapse_event_kind::rise_pressed : lapse_event_kind::overextended,
                    rq.capital, rf_realm, level);
+    };
+
+    // --- BL-1288: THE LATE CULTURE (EXPLORATION.md sec A colony is a -------
+    // subject, THE LATE CULTURE IS TARGETED; Ben 2026-10-10/11).
+    //
+    // CHOSEN AT THE CULTURE CLOSE -- this round's open -- as the founding
+    // culture MOST REMOTE BY REACH, one per world: for each culture with land
+    // standing, the cheapest `edge_step` walk over `supply_neighbours` from any
+    // of its land regions to any land region another culture founded (a
+    // multi-source Dijkstra on (cost, region) pairs, any holder's ground
+    // passable); a culture the network joins to no foreign ground is more
+    // remote than any it does, ranked among itself by its water (grid distance
+    // squared to the nearest foreign region); ties on the lower culture index
+    // (late_culture_rules.hpp). Recorded (`late_culture_chosen`). Nothing about
+    // the choice is read by any scorer: what slows the culture is the DIFFUSION
+    // below, a force every polity feels, and -- only where it is losing the
+    // realm it must carry to Exploration -- the isolation press on its ground.
+    //
+    // A RESUMED SPAN (Exploration) reads the culture off the polity table it
+    // inherits (`polity::late_isolation`), so a harness replaying the span from a
+    // fixture's table reproduces it without a field of its own.
+    const auto birth_culture = [&](const polity& q) -> int {
+        if (q.birth_seat < 0 || static_cast<std::size_t>(q.birth_seat) >= ss.regions.size()) return -1;
+        return ss.regions[static_cast<std::size_t>(q.birth_seat)].founding_culture;
+    };
+    int lc_anchor = -1; // the region the record pins the culture to
+    if (params.late_culture_target && params.resume_polities == nullptr)
+    {
+        std::map<int, std::vector<int>> lc_by_culture;
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            const region& g = ss.regions[i];
+            if (g.founding_culture < 0 || g.domain != region_domain::land) continue;
+            lc_by_culture[g.founding_culture].push_back(static_cast<int>(i));
+        }
+        // A PEOPLE STANDING AS A POLITY. The late culture develops, lags and
+        // is colonised -- it must be a people that holds a seat at the close
+        // (a city state, BL-920), not a scatter of unorganised ground that no
+        // realm will ever carry to Exploration. Every culture still sets the
+        // reach the others are measured against; only seated ones are ranked.
+        // Where no culture holds a seat at all, every culture is ranked.
+        std::set<int> lc_seated;
+        for (const polity& q : out.polities)
+            if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size()
+                && ss.regions[static_cast<std::size_t>(q.capital)].domain == region_domain::land
+                && ss.regions[static_cast<std::size_t>(q.capital)].founding_culture >= 0)
+                lc_seated.insert(ss.regions[static_cast<std::size_t>(q.capital)].founding_culture);
+        // THE CONTACT A PEOPLE RECEIVES is what remoteness means here, so the
+        // choice reads the same quantity the diffusion spends: for each polity
+        // standing at the close whose seat another people founded, the
+        // cheapest walk d from this culture's ground to that polity's ground,
+        // weighted (horizon - d) / horizon inside `contact_diffusion_horizon`
+        // and summed (per mille). The most remote culture receives the least;
+        // ties on the cheapest walk to any other people's ground (further
+        // first; the network joining it to nobody is furthest), then its water,
+        // then the lower index.
+        struct lc_rank { int64_t contact; int64_t reach; int64_t gap2; int culture; };
+        std::vector<lc_rank> ranks;
+        out.late_culture_seated = static_cast<int32_t>(lc_seated.size());
+        const int lc_h = std::max(1, params.contact_diffusion_horizon);
+        if (lc_by_culture.size() >= 2)
+        {
+            const std::size_t n = ss.regions.size();
+            std::vector<int> dist(n, INT_MAX);
+            std::vector<int> touched;
+            for (const auto& kv : lc_by_culture)
+            {
+                const int c = kv.first;
+                if (!lc_seated.empty() && lc_seated.count(c) == 0) continue;
+                using node = std::pair<int, int>;
+                std::priority_queue<node, std::vector<node>, std::greater<node>> pq;
+                for (const int r : kv.second) { dist[static_cast<std::size_t>(r)] = 0; touched.push_back(r); pq.push({0, r}); }
+                int64_t reach = late_culture_unreached;
+                std::map<int, int> met; // foreign polity -> its cheapest walk (first pop)
+                while (!pq.empty())
+                {
+                    const node top = pq.top(); pq.pop();
+                    const int d = top.first, r = top.second;
+                    if (d > dist[static_cast<std::size_t>(r)]) continue;
+                    if (d >= lc_h && reach < late_culture_unreached) break; // nothing further counts
+                    const region& g = ss.regions[static_cast<std::size_t>(r)];
+                    if (g.domain == region_domain::land && g.founding_culture >= 0 && g.founding_culture != c
+                        && reach >= late_culture_unreached)
+                        reach = d;
+                    // What reaches a people is what a POLITY knows: the
+                    // development the diffusion carries is a polity's ladder,
+                    // so the contact counted is to the ground the close's
+                    // polities hold, of every other people.
+                    const int o = r < static_cast<int>(owner.size()) ? owner[static_cast<std::size_t>(r)] : -1;
+                    if (o >= 0 && static_cast<std::size_t>(o) < out.polities.size())
+                    {
+                        const int oc = out.polities[static_cast<std::size_t>(o)].capital;
+                        const int ocul = (oc >= 0 && static_cast<std::size_t>(oc) < ss.regions.size())
+                                       ? ss.regions[static_cast<std::size_t>(oc)].founding_culture : -1;
+                        if (ocul != c) met.emplace(o, d);
+                    }
+                    for (const int nb : supply_neighbours[static_cast<std::size_t>(r)])
+                    {
+                        const int cand = d + edge_step(r, nb);
+                        if (cand < dist[static_cast<std::size_t>(nb)])
+                        {
+                            if (dist[static_cast<std::size_t>(nb)] == INT_MAX) touched.push_back(nb);
+                            dist[static_cast<std::size_t>(nb)] = cand;
+                            pq.push({cand, nb});
+                        }
+                    }
+                }
+                for (const int t : touched) dist[static_cast<std::size_t>(t)] = INT_MAX;
+                touched.clear();
+                int64_t contact = 0;
+                for (const auto& m : met)
+                    if (m.second < lc_h) contact += static_cast<int64_t>(lc_h - m.second) * 1000 / lc_h;
+                int64_t gap2 = INT64_MAX;
+                for (const int a : kv.second)
+                    for (const auto& other : lc_by_culture)
+                    {
+                        if (other.first == c) continue;
+                        for (const int b : other.second)
+                        {
+                            const region& ra = ss.regions[static_cast<std::size_t>(a)];
+                            const region& rb = ss.regions[static_cast<std::size_t>(b)];
+                            int dx = std::abs(ra.col - rb.col);
+                            if (gw > 0 && dx > gw / 2) dx = gw - dx;
+                            const int dy = ra.row - rb.row;
+                            gap2 = std::min<int64_t>(gap2, static_cast<int64_t>(dx) * dx + static_cast<int64_t>(dy) * dy);
+                        }
+                    }
+                ranks.push_back({contact, reach, gap2, c});
+            }
+            std::sort(ranks.begin(), ranks.end(), [](const lc_rank& a, const lc_rank& b) {
+                if (a.contact != b.contact) return a.contact < b.contact;
+                if (a.reach != b.reach) return a.reach > b.reach;
+                if (a.gap2 != b.gap2) return a.gap2 > b.gap2;
+                return a.culture < b.culture; });
+        }
+        out.late_culture_cultures = static_cast<int32_t>(ranks.size());
+        if (!ranks.empty())
+        {
+            lc_culture = ranks[0].culture;
+            out.late_culture       = lc_culture;
+            out.late_culture_reach = static_cast<int32_t>(std::min<int64_t>(ranks[0].reach, INT32_MAX));
+            out.late_culture_gap2  = static_cast<int32_t>(std::min<int64_t>(ranks[0].gap2, INT32_MAX));
+            out.late_culture_contact = static_cast<int32_t>(std::min<int64_t>(ranks[0].contact, INT32_MAX));
+            if (ranks.size() > 1)
+            {
+                out.late_culture_next       = ranks[1].culture;
+                out.late_culture_next_reach = static_cast<int32_t>(std::min<int64_t>(ranks[1].reach, INT32_MAX));
+                out.late_culture_next_contact = static_cast<int32_t>(std::min<int64_t>(ranks[1].contact, INT32_MAX));
+            }
+            const std::vector<int>& regs = lc_by_culture[lc_culture];
+            out.late_culture_regions = static_cast<int32_t>(regs.size());
+            // The record's pin: its most populous region at the close, ties low.
+            int64_t best_pop = -1;
+            for (const int r : regs)
+                if (ss.regions[static_cast<std::size_t>(r)].population > best_pop)
+                { best_pop = ss.regions[static_cast<std::size_t>(r)].population; lc_anchor = r; }
+            note_event(lapse_event_kind::late_culture_chosen, lc_anchor, lc_culture,
+                       ranks[0].reach >= late_culture_unreached ? -1
+                           : static_cast<int>(std::min<int64_t>(ranks[0].reach, lapse_event_none - 1)));
+            const std::string where = lc_anchor >= 0 ? ss.regions[static_cast<std::size_t>(lc_anchor)].name : std::string{};
+            out.history.push_back(history_event{
+                years_from_calendar_year(params.start_year), chain_stage::legacy,
+                ranks[0].reach >= late_culture_unreached
+                    ? "The people of " + where + " stand apart: no road or march joins their ground to any other people's"
+                    : "The people of " + where + " stand furthest from any other: what the world learns reaches them last",
+                std::string{}});
+        }
+    }
+    if (params.late_culture_colonised && params.resume_polities != nullptr)
+    {
+        // THE ISOLATION IT CARRIES INTO THE AGE stands on its ground until the
+        // voyages bind it: the late culture reaches Exploration still apart,
+        // and what opens it is the colonisation itself (`lc_level` is read by
+        // `edge_step` exactly as in the Empires round; it is raised here only
+        // for the realm the verbs need).
+        for (const polity& q : out.polities)
+            if (q.late_isolation >= 0)
+            {
+                if (lc_culture < 0) lc_culture = birth_culture(q);
+                lc_level = std::max<int>(lc_level, q.late_isolation);
+                if (lc_anchor < 0 && q.alive && q.capital >= 0) lc_anchor = q.capital;
+            }
+        out.late_culture = lc_culture;
+    }
+    const bool lc_target = params.late_culture_target && lc_culture >= 0;
+    const bool lc_colony = params.late_culture_colonised && lc_culture >= 0;
+    int64_t lc_last_read      = INT64_MIN;
+    int     lc_contact_level  = 0; // the Exploration press (contact), apart from the Empires ground press
+    int     lc_peak_regions   = 0;
+    // The late culture's living realms and the regions they hold, now.
+    const auto lc_holdings = [&](int& realms, int& regions) {
+        realms = 0; regions = 0;
+        std::vector<int32_t> held(out.polities.size(), 0);
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        for (std::size_t i = 0; i < n_reg; ++i)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < held.size()) ++held[static_cast<std::size_t>(owner[i])];
+        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+            if (held[pi] > 0 && birth_culture(out.polities[pi]) == lc_culture) { ++realms; regions += held[pi]; }
+    };
+    // Its living realms' mean materials band over the world's, x100 (-1 when
+    // it holds none) -- the detector's `cs * 100 * wn / (cn * ws)`.
+    const auto lc_lag_now = [&]() -> int {
+        std::vector<int32_t> held(out.polities.size(), 0);
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        for (std::size_t i = 0; i < n_reg; ++i)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < held.size()) ++held[static_cast<std::size_t>(owner[i])];
+        int64_t cs_ = 0, cn = 0, ws = 0, wn = 0;
+        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+        {
+            if (held[pi] <= 0) continue;
+            const int m = clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255);
+            ws += m; ++wn;
+            if (birth_culture(out.polities[pi]) == lc_culture) { cs_ += m; ++cn; }
+        }
+        return (cn > 0 && wn > 0 && ws > 0) ? static_cast<int>(cs_ * 100 * wn / (cn * ws)) : -1;
+    };
+    // The world's mean materials band over its living realms, x100.
+    const auto lc_world_band_x100 = [&]() -> int {
+        std::vector<char> live(out.polities.size(), 0);
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        for (std::size_t i = 0; i < n_reg; ++i)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < live.size()) live[static_cast<std::size_t>(owner[i])] = 1;
+        int64_t sum = 0, n = 0;
+        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+            if (live[pi]) { sum += clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255); ++n; }
+        return n > 0 ? static_cast<int>(sum * 100 / n) : 0;
+    };
+    // A level raised, recorded (`isolation_pressed`, `other` = the level).
+    const auto lc_note_level = [&](int64_t y_now) {
+        const std::string where = (lc_anchor >= 0 && static_cast<std::size_t>(lc_anchor) < ss.regions.size())
+                                    ? ss.regions[static_cast<std::size_t>(lc_anchor)].name : std::string("the far people");
+        out.history.push_back(history_event{
+            years_from_calendar_year(y_now), chain_stage::legacy,
+            lc_level <= 1
+                ? "The roads to and among the people of " + where + " go unwalked: their ground grows harder to reach, "
+                  "for armies and for news alike, and they keep to their own holds"
+                : "The ways toward " + where + " fall further out of use, and its people keep further apart",
+            std::string{}});
+        note_event(lapse_event_kind::isolation_pressed, lc_anchor, lc_culture, lc_level);
     };
 
     const int64_t years = params.stop_year - params.start_year;
@@ -6272,6 +6551,93 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // pruning is order-preserving: the vector stays sorted.
             prune_flows_without_trade_access(out.trade_flows, out.dated_objects);
 
+            // ---- BL-1288: THE LATE CULTURE'S BACKSTOP, EXPLORATION ----------
+            //
+            // It must be colonised by a polity of another people, through the
+            // ordinary subjection verbs below -- which bind only a native the
+            // arriving power has MET. While it stands unbound, each decision
+            // round from the first in which some power holds the sea legs (the
+            // subjection walk's own test, so the press can only add what the
+            // verb could use this very round), the contact that would carry a
+            // voyage to it is pressed one recorded level further: the nearest
+            // such power of another people that has not yet met every one of
+            // its living realms meets them. Nothing is bound here; the verbs
+            // decide, the same round.
+            if (lc_colony && out.late_culture_bound == 0 && lc_contact_level < late_culture_max_level
+                && y > params.start_year)
+            {
+                const int64_t floor_navy = sea_legs_navy_floor(ss.regions, out.polities, params, y);
+                std::vector<int> natives;
+                for (const polity& q : out.polities)
+                    if (q.alive && q.overlord < 0 && birth_culture(q) == lc_culture
+                        && q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                        natives.push_back(q.id);
+                if (!natives.empty())
+                {
+                    const region& anchor = ss.regions[static_cast<std::size_t>(out.polities[static_cast<std::size_t>(natives.front())].capital)];
+                    std::vector<std::pair<int, int>> powers; // (distance, id)
+                    for (const polity& a : out.polities)
+                    {
+                        if (!a.alive || a.overlord >= 0 || birth_culture(a) == lc_culture) continue;
+                        if (a.capital < 0 || static_cast<std::size_t>(a.capital) >= ss.regions.size()) continue;
+                        if (!polity_holds_sea_legs(ss.regions, a, params, y, floor_navy)) continue;
+                        powers.push_back({region_distance(ss.regions[static_cast<std::size_t>(a.capital)], anchor, gw), a.id});
+                    }
+                    std::sort(powers.begin(), powers.end());
+                    // The nearest power that has not yet met every realm --
+                    // first among those the subjection walk would let bind one
+                    // of them (its seat's treasury clears the native's by the
+                    // margin, and no partner in its sphere has met the native
+                    // first), then any: the voyages that reach a far people are
+                    // the ones that can claim it, where any can.
+                    const auto could_bind = [&](int aid, int nid) {
+                        const polity& a = out.polities[static_cast<std::size_t>(aid)];
+                        const polity& n = out.polities[static_cast<std::size_t>(nid)];
+                        if (ss.regions[static_cast<std::size_t>(a.capital)].treasury
+                            < ss.regions[static_cast<std::size_t>(n.capital)].treasury + params.subjection_treasury_margin_q)
+                            return false;
+                        for (const polity& o : out.polities)
+                            if (o.id != aid && o.alive && has_treaty_clause(out, aid, o.id, treaty_clause::sphere_of_claim)
+                                && has_contact(out, o.id, nid))
+                                return false;
+                        return true;
+                    };
+                    int met_with = -1;
+                    for (int pass = 0; pass < 2 && met_with < 0; ++pass)
+                        for (const auto& pw : powers)
+                        {
+                            bool unmet = false, able = false;
+                            for (const int nid : natives)
+                                if (!contact_exists(pw.second, nid))
+                                {
+                                    unmet = true;
+                                    if (pass == 0 && could_bind(pw.second, nid)) able = true;
+                                }
+                            if (!unmet || (pass == 0 && !able)) continue;
+                            met_with = pw.second;
+                            break;
+                        }
+                    if (met_with >= 0)
+                    {
+                        ++lc_contact_level;
+                        for (const int nid : natives)
+                            raise_contact(met_with, nid, contact_kind::trade,
+                                          out.polities[static_cast<std::size_t>(nid)].capital, y);
+                        if (lc_anchor < 0) lc_anchor = out.polities[static_cast<std::size_t>(natives.front())].capital;
+                        const polity& mq = out.polities[static_cast<std::size_t>(met_with)];
+                        const std::string who = mq.name.empty() ? std::string("a far power") : mq.name;
+                        const std::string where = ss.regions[static_cast<std::size_t>(lc_anchor)].name;
+                        out.history.push_back(history_event{
+                            years_from_calendar_year(y), chain_stage::legacy,
+                            "The voyages of " + who + " reach " + where + ", whose people the world had passed by",
+                            std::string{}});
+                        // The contact press's level is recorded above 100
+                        // (`isolation_pressed`, era_timelapse.hpp).
+                        note_event(lapse_event_kind::isolation_pressed, lc_anchor, lc_culture, 100 + lc_contact_level);
+                    }
+                }
+            }
+
             // ---- BL-934: SUBJECTION -- trade provinces and subjected polities
             //
             // Snapshot the count: a polity subjected THIS round is not itself
@@ -6316,7 +6682,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (!native.alive) continue;
                         if (native.capital < 0
                          || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
-                        if (!has_contact(out, arriving.id, native.id)) continue;
+                        const bool lc_native = lc_colony && birth_culture(native) == lc_culture
+                                            && birth_culture(arriving) != lc_culture; // BL-1288 diagnostic
+                        if (lc_native) ++out.late_culture_diag[0];
+                        if (!has_contact(out, arriving.id, native.id)) { if (lc_native) ++out.late_culture_diag[1]; continue; }
                         // The overlord test, read here rather than first: every
                         // test in this walk is a side-effect-free `continue`, so
                         // the order decides nothing but what the diagnostic sees.
@@ -6358,6 +6727,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                     treaty_clause::sphere_of_claim)) continue;
                             if (has_contact(out, static_cast<int>(oi), native.id))
                                 sphere_blocked = true;
+                        }
+                        if (lc_native)
+                        {
+                            if (is_subject) ++out.late_culture_diag[2];
+                            if (treasury_short) ++out.late_culture_diag[3];
+                            if (sphere_blocked) ++out.late_culture_diag[4];
+                            if (!(is_subject || treasury_short || sphere_blocked)) ++out.late_culture_diag[5];
                         }
                         if (is_subject || treasury_short || sphere_blocked)
                         {
@@ -6451,6 +6827,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                        native.capital, native.id, arriving.id);
                         }
                         ++out.subjections_formed; // one native per arriving power per round
+                        // BL-1288: the late culture colonised -- a realm born of
+                        // its ground bound by one born of another people's.
+                        if (lc_colony && birth_culture(native) == lc_culture && birth_culture(arriving) != lc_culture)
+                        {
+                            if (out.late_culture_bound == 0)
+                            {
+                                out.late_culture_bound_year = static_cast<int32_t>(y);
+                                out.late_culture_bound_by   = arriving.id;
+                                // ITS ISOLATION LIFTS: the voyage that binds it
+                                // opens its ground to every walker.
+                                if (lc_level > 0) { lc_level = 0; ++roads_version; }
+                            }
+                            ++out.late_culture_bound;
+                        }
                     }
                 }
             }
@@ -10672,6 +11062,147 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
         }
+
+        // ---- BL-1288: DIFFUSION BY CONTACT, AND THE LATE CULTURE'S READ ----
+        //
+        // On its own read clock at the recorded steps' cadence (so a run
+        // without the playback reads the same years), crediting the years
+        // since the last read. DIFFUSION (Ben, 2026-10-11): every living
+        // polity behind another on the materials ladder learns from it in
+        // proportion to the reach between their grounds -- the cheapest
+        // `edge_step` walk from any region it holds to any region the other
+        // holds, any ground passable, inside `contact_diffusion_horizon` --
+        // and the ladder's own band cost turns what it learns into bands.
+        // Every band is read BEFORE any credit lands, so the order the
+        // polities are walked in (ascending id) decides nothing.
+        if (params.contact_diffusion_q > 0 || lc_target || lc_colony)
+        {
+            const bool rec = lc_last_read == INT64_MIN || y - lc_last_read >= record_interval;
+            if (rec)
+            {
+                const int64_t yrs = lc_last_read == INT64_MIN ? 0 : y - lc_last_read;
+                lc_last_read = y;
+                if (params.contact_diffusion_q > 0 && yrs > 0)
+                {
+                    const int H = std::max(1, params.contact_diffusion_horizon);
+                    const int mat = static_cast<int>(sim_domain::materials);
+                    const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+                    const std::size_t pc = out.polities.size();
+                    std::vector<std::vector<int>> held(pc);
+                    for (std::size_t i = 0; i < n_reg; ++i)
+                        if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < pc)
+                            held[static_cast<std::size_t>(owner[i])].push_back(static_cast<int>(i));
+                    std::vector<int> band(pc, 1);
+                    for (std::size_t pi = 0; pi < pc; ++pi)
+                        band[pi] = clampi(out.polities[pi].capacity[mat], 1, 6);
+                    std::vector<int>     dist(n_reg, INT_MAX);
+                    std::vector<int>     touched;
+                    std::vector<int>     met_d(pc, INT_MAX);
+                    std::vector<int>     met;
+                    std::vector<int64_t> credit(pc, 0);
+                    using node = std::pair<int, int>;
+                    for (std::size_t pi = 0; pi < pc; ++pi)
+                    {
+                        if (held[pi].empty() || band[pi] >= 6) continue;
+                        std::priority_queue<node, std::vector<node>, std::greater<node>> pq;
+                        for (const int r : held[pi]) { dist[static_cast<std::size_t>(r)] = 0; touched.push_back(r); pq.push({0, r}); }
+                        while (!pq.empty())
+                        {
+                            const node top = pq.top(); pq.pop();
+                            const int d = top.first, r = top.second;
+                            if (d > dist[static_cast<std::size_t>(r)]) continue;
+                            const int o = owner[static_cast<std::size_t>(r)];
+                            if (o >= 0 && static_cast<std::size_t>(o) != pi && static_cast<std::size_t>(o) < pc
+                                && met_d[static_cast<std::size_t>(o)] == INT_MAX)
+                            { met_d[static_cast<std::size_t>(o)] = d; met.push_back(o); }
+                            for (const int nb : supply_neighbours[static_cast<std::size_t>(r)])
+                            {
+                                if (static_cast<std::size_t>(nb) >= n_reg) continue;
+                                const int cand = d + edge_step(r, nb);
+                                if (cand >= H || cand >= dist[static_cast<std::size_t>(nb)]) continue;
+                                if (dist[static_cast<std::size_t>(nb)] == INT_MAX) touched.push_back(nb);
+                                dist[static_cast<std::size_t>(nb)] = cand;
+                                pq.push({cand, nb});
+                            }
+                        }
+                        int64_t learn = 0; // per mille-weighted bands of gap
+                        for (const int o : met)
+                        {
+                            const int gap = band[static_cast<std::size_t>(o)] - band[pi];
+                            if (gap > 0)
+                                learn += static_cast<int64_t>(gap) * (H - met_d[static_cast<std::size_t>(o)]) * 1000 / H;
+                            met_d[static_cast<std::size_t>(o)] = INT_MAX;
+                        }
+                        met.clear();
+                        for (const int t : touched) dist[static_cast<std::size_t>(t)] = INT_MAX;
+                        touched.clear();
+                        credit[pi] = (static_cast<int64_t>(params.contact_diffusion_q) * learn * yrs) / 1000;
+                    }
+                    for (std::size_t pi = 0; pi < pc; ++pi)
+                    {
+                        if (credit[pi] <= 0) continue;
+                        polity& q = out.polities[pi];
+                        q.progress_q[mat] = static_cast<int>(clampi64(q.progress_q[mat] + credit[pi], 0, INT32_MAX / 2));
+                        out.contact_diffusion_progress += credit[pi];
+                        // The ladder's own rule (Invest's): a band costs more the higher it sits.
+                        while (q.capacity[mat] < 6 && q.progress_q[mat] >= params.capacity_band_cost * q.capacity[mat])
+                        {
+                            q.progress_q[mat] -= params.capacity_band_cost * q.capacity[mat];
+                            ++q.capacity[mat];
+                            ++out.contact_diffusion_bands;
+                        }
+                    }
+                }
+
+            }
+
+            // THE LATE CULTURE'S BACKSTOP, EMPIRES (Ben, 2026-10-11: the
+            // isolation that slows its development also slows its conquest, so
+            // it reaches Exploration holding a realm). Read the realms born of
+            // its ground EVERY decision round -- a realm lost is answered the
+            // round it falls, while the ground taken is still a holding the
+            // press can cut off rather than a conqueror's new seat -- and the
+            // lag at the recorded cadence. Where it holds no realm, or less
+            // than half its peak, or (once the world has climbed a tenth of a
+            // band off the floor: something to lag behind) lags less than a
+            // straight course from par at the span's open to
+            // `late_culture_lag_course_x100` at its close asks, the isolation on
+            // its ground is pressed one bounded, recorded level further.
+            if (lc_target)
+            {
+                int realms = 0, regions = 0;
+                lc_holdings(realms, regions);
+                lc_peak_regions = std::max(lc_peak_regions, regions);
+                const int64_t span = std::max<int64_t>(1, params.stop_year - params.start_year);
+                const int64_t done = std::clamp<int64_t>(y - params.start_year, 0, span);
+                const int course = 100 - static_cast<int>((100 - late_culture_lag_course_x100) * done / span);
+                const bool losing = realms == 0 || regions * 2 < lc_peak_regions
+                                 || (rec && lc_world_band_x100() >= 110 && lc_lag_now() > course);
+                if (losing && lc_level < late_culture_max_level)
+                {
+                    ++lc_level;
+                    ++roads_version; // every reach walk re-prices the steps the press moved
+                    lc_note_level(y);
+                }
+            }
+            // ...AND THROUGH EXPLORATION UNTIL THE VOYAGES BIND IT: the
+            // subjection verbs need a realm of its own to bind (from the sea
+            // legs' date), so a realm lost before then is answered as in the
+            // Empires round -- the isolation it carried pressed one level
+            // further. The lag clause is the Empires round's alone.
+            else if (lc_colony && out.late_culture_bound == 0)
+            {
+                int realms = 0, regions = 0;
+                lc_holdings(realms, regions);
+                lc_peak_regions = std::max(lc_peak_regions, regions);
+                if ((realms == 0 || regions * 2 < lc_peak_regions) && lc_level < late_culture_max_level)
+                {
+                    ++lc_level;
+                    ++roads_version;
+                    lc_note_level(y);
+                }
+            }
+        }
     }
 
     // BL-1287: THE VERDICT, clause for clause the detector's (history_patterns
@@ -10934,6 +11465,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
     if (params.record_playback
         && (out.steps.empty() || out.steps.back().year != static_cast<int32_t>(params.stop_year)))
         record_step(params.stop_year);
+
+    // BL-1288: THE LATE CULTURE'S VERDICT, clause for clause the detector's
+    // (history_pattern_detectors.cpp, late culture), read off the same counts
+    // the closing step samples. A miss is a defect the caller records.
+    if (params.late_culture_target || params.late_culture_colonised)
+    {
+        out.late_culture_level     = params.late_culture_target ? lc_level : std::max(lc_level, lc_contact_level);
+        if (lc_culture >= 0)
+        {
+            int realms = 0, regions = 0;
+            lc_holdings(realms, regions);
+            out.late_culture_realms        = realms;
+            out.late_culture_realm_regions = regions;
+            out.late_culture_lag_x100 = lc_lag_now();
+            // Stamp the table the next span resumes from.
+            for (polity& q : out.polities)
+                q.late_isolation = birth_culture(q) == lc_culture
+                    ? static_cast<int16_t>(clampi(lc_level, 0, late_culture_max_level)) : int16_t{-1};
+        }
+        if (params.late_culture_target)
+        {
+            if (lc_culture < 0)                                   out.late_culture_why = "no culture could be ranked at the Culture close";
+            else if (out.late_culture_realms <= 0)                out.late_culture_why = "it held no realm at the Empires close";
+            else if (out.late_culture_lag_x100 > late_culture_lag_x100) out.late_culture_why = "it did not lag";
+        }
+        else if (params.late_culture_colonised)
+        {
+            if (lc_culture < 0)                                   out.late_culture_why = "the inherited table names no late culture";
+            else if (out.late_culture_bound <= 0)                 out.late_culture_why = "no polity of another culture bound it";
+        }
+        out.late_culture_missed = !out.late_culture_why.empty();
+    }
 
     // BL-955: the paid standing army's raw invariant, once more at the close.
     if (params.exploration_upkeep_enabled)

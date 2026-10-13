@@ -19,15 +19,6 @@ namespace {
 using K = lapse_event_kind;
 inline bool is(const lapse_event& e, K k) { return e.kind == static_cast<uint8_t>(k); }
 
-/// Column-wrapped grid distance squared.
-int64_t dist2(const region& a, const region& b, int gw)
-{
-    int dx = std::abs(a.col - b.col);
-    if (gw > 0 && dx > gw / 2) dx = gw - dx;
-    const int dy = a.row - b.row;
-    return static_cast<int64_t>(dx) * dx + static_cast<int64_t>(dy) * dy;
-}
-
 /// Shares (per mille of held regions) of every polity at one step.
 std::map<int, int> shares_at(const era_timelapse& t, const timelapse_step& st)
 {
@@ -154,45 +145,28 @@ std::map<int, int> polity_cultures(const std::vector<const era_timelapse*>& recs
     return out;
 }
 
-void read_late_culture(const era_timelapse& emp, const era_timelapse& exp, const settlement_state& ss, int gw,
+void read_late_culture(const era_timelapse& emp, const era_timelapse& exp,
                        const std::map<int, int>& pc, history_pattern_reading& r)
 {
-    // The Culture round's close is the Empires record's opening year: ground
-    // founded after it (the founding schedule's later arrivals) was not there.
-    const bool have_close = !emp.steps.empty() || emp.years > 0;
-    const int64_t close_year = emp.start_year;
-    std::map<int, std::vector<int>> by_culture;
-    for (std::size_t i = 0; i < ss.regions.size(); ++i)
-    {
-        const region& g = ss.regions[i];
-        if (g.founding_culture < 0 || g.domain != region_domain::land) continue;
-        if (have_close && g.founded_year > close_year) continue;
-        by_culture[g.founding_culture].push_back(static_cast<int>(i));
-    }
-    if (by_culture.size() < 2) return;
-    // Isolation: the smallest gap from any region of the culture to any foreign
-    // one, at the close. A GEOMETRIC PROXY for "most remote by reach" (NR-1034):
-    // the record carries no reach field to read.
-    std::vector<std::pair<int64_t, int>> gaps;
-    for (const auto& kv : by_culture)
-    {
-        int64_t g = INT64_MAX;
-        for (const int a : kv.second)
-            for (const auto& other : by_culture)
-            {
-                if (other.first == kv.first) continue;
-                for (const int b : other.second)
-                    g = std::min(g, dist2(ss.regions[static_cast<std::size_t>(a)],
-                                          ss.regions[static_cast<std::size_t>(b)], gw));
-            }
-        gaps.push_back({g, kv.first});
-    }
-    std::sort(gaps.begin(), gaps.end(), [](const auto& a, const auto& b) {
-        return a.first != b.first ? a.first > b.first : a.second < b.second; });
-    const int c = gaps[0].second;
-    r.lc_culture    = c;
-    r.lc_gap        = static_cast<int>(std::min<int64_t>(gaps[0].first, INT_MAX));
-    r.lc_second_gap = static_cast<int>(std::min<int64_t>(gaps[1].first, INT_MAX));
+    // THE CHOICE IS THE RECORD'S (BL-1288): the sim names the culture most
+    // remote BY REACH at the Culture close -- the Empires record's open -- and
+    // writes it as `late_culture_chosen` (late_culture_rules.hpp says how reach
+    // is measured: over the corridor network, which the record does not carry,
+    // so the detector reads the choice rather than re-deriving a proxy). A
+    // record without the note names no late culture, and the pattern misses.
+    for (const lapse_event& e : emp.events)
+        if (is(e, K::late_culture_chosen))
+        {
+            r.lc_culture = e.polity == lapse_event_none ? -1 : static_cast<int>(e.polity);
+            r.lc_reach   = e.other == lapse_event_none ? -1 : static_cast<int>(e.other);
+            break;
+        }
+    for (const era_timelapse* t : {&emp, &exp})
+        for (const lapse_event& e : t->events)
+            if (is(e, K::isolation_pressed) && e.other != lapse_event_none)
+                r.lc_level = std::max<int>(r.lc_level, e.other >= 100 ? e.other - 100 : e.other); // 100+: the contact press
+    if (r.lc_culture < 0) return;
+    const int c = r.lc_culture;
     // Lag: the culture's polities' mean materials band at the Empires close vs the world's.
     if (!emp.steps.empty())
     {
@@ -345,10 +319,11 @@ history_pattern_reading detect_history_patterns(const era_timelapse& empires,
                                                 const settlement_state& settlement,
                                                 int gw)
 {
+    (void)gw; // BL-1288: the late culture is read off the record now, not off the grid
     history_pattern_reading r;
     const std::map<int, int> pc = polity_cultures({&empires, &exploration, &industrialisation}, settlement);
     read_rise_and_fall(empires, r);
-    read_late_culture(empires, exploration, settlement, gw, pc, r);
+    read_late_culture(empires, exploration, pc, r);
     read_world_war(industrialisation, r);
     std::vector<history_pattern_reading::grant> cw_named;
     const auto cw = read_split_wars(empires, false, &cw_named);

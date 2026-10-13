@@ -56,6 +56,7 @@
 #include "settlement.hpp"
 #include "works_roster.hpp"
 #include "rise_fall_rules.hpp" // BL-1287: the ruled rise-and-fall predicate, shared with the detector
+#include "late_culture_rules.hpp" // BL-1288: the late culture's constants, shared with the detector
 
 #include <array>
 #include <atomic>
@@ -2882,6 +2883,53 @@ struct history_sim_params
     int civil_war_min_share_q   = 250;
     int civil_war_min_regions   = 3;
     int civil_war_window_years  = 50;
+
+    // --- BL-1288: THE LATE CULTURE, A TARGET OF THE EMPIRES -> EXPLORATION ---
+    // EXPLORATION.md sec A colony is a subject (THE LATE CULTURE IS TARGETED,
+    // Ben 2026-10-10; the 2026-10-11 rulings); GENERATION_STRATEGY.md sec
+    // History patterns. The predicate's constants: `late_culture_rules.hpp`.
+
+    /// ON only on generation's own Empires round (`era_minus_one_sim_params`).
+    /// At the round's open -- the Culture round's close -- the founding culture
+    /// most remote by reach is chosen (`late_culture_rules.hpp` says how reach
+    /// is measured), recorded (`late_culture_chosen`); through the round the
+    /// backstop watches that it holds a realm and lags, and presses the
+    /// isolation that already slows it, one bounded recorded level at a time
+    /// (`isolation_pressed`). Struct-default OFF: every isolating fixture and
+    /// every later span keeps its meaning.
+    bool late_culture_target = false;
+    /// ON on generation's own Exploration round (and so inherited, inert, by
+    /// Industrialisation's copy of its params, which sets it back off): the
+    /// late culture the resumed polity table names (`polity::late_people`) is
+    /// watched until a polity of another culture binds one of its realms, and
+    /// the backstop presses the contact that binds it, one level at a time.
+    bool late_culture_colonised = false;
+
+    /// DIFFUSION BY CONTACT (Ben, 2026-10-11): development -- the materials
+    /// capacity -- spreads between peoples in proportion to the reach between
+    /// them. At each recorded read, every living polity takes, for every
+    /// living polity ahead of it on the materials ladder whose ground lies
+    /// within `contact_diffusion_horizon` of its own (the cheapest `edge_step`
+    /// walk, any ground passable), progress of
+    ///   rate x (their band - its band) x (horizon - reach) / horizon
+    /// per year since the last read (rate in progress points per band of gap
+    /// per year at zero reach). The ladder's own band cost turns it into
+    /// bands. Every culture feels it; the most remote receives least. 0 = off
+    /// (the struct default: every other span and fixture byte-identical).
+    int contact_diffusion_q       = 0;
+    int contact_diffusion_horizon = 60;
+
+    /// THE ISOLATION PRESS (the late culture's backstop in the Empires round,
+    /// carried unraised into Exploration until the culture is bound): per
+    /// level, every step that touches the late culture's founding ground --
+    /// its own roads and the approaches to it alike (`edge_step`, read by
+    /// supply, campaigns, Organise and the diffusion) -- costs
+    /// `late_isolation_step_q` per mille more, and `late_isolation_step` reach
+    /// more besides, so a short step is not exempt: the ground going unwalked,
+    /// as if the way were that much further and harder. Ground, never a term
+    /// in any scorer; capped at `late_culture_max_level`.
+    int late_isolation_step_q = 750;
+    int late_isolation_step   = 1;
 };
 
 // BL-1287 -- THE RULED PREDICATE lives in `rise_fall_rules.hpp` (included
@@ -3411,6 +3459,23 @@ struct polity
     /// reads the COUNTERPART's copy of this field, never the decider's own.
     int32_t treaties_broken = 0;
 
+    /// BL-1288 -- THE SEAT THIS POLITY WAS BORN AT: the region its first
+    /// `founded` / `broke_away` / `schism` / `inherited` note names (set once,
+    /// beside that note, whether or not the record is kept). Its people is
+    /// that region's `founding_culture`, which is never overwritten -- the
+    /// same reading `history_pattern_detectors`' polity -> culture map takes
+    /// off the record, so the sim's backstop and the detector count one set of
+    /// realms. -1 until noted. NOT SERIALISED (the polity table is not saved).
+    int32_t birth_seat = -1;
+    /// BL-1288 -- BORN OF THE LATE CULTURE: -1 for every other polity; for a
+    /// polity whose `birth_seat`'s founding culture is the culture chosen at
+    /// the Culture close, the isolation level the press stood at when the span
+    /// closed (0 = never pressed).
+    /// Stamped on the polity table at each span's close, so a resumed span --
+    /// and every harness replaying one from a fixture's polity table -- knows
+    /// the late culture and the isolation it carries without a field of its
+    /// own. Read by the Exploration span alone. NOT SERIALISED.
+    int16_t late_isolation = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -4942,6 +5007,36 @@ struct history_sim_state
     int64_t     rise_fall_rally_home      = 0; ///< REPORT-ONLY: rallied survivors of a lost defence sent home
     bool        rise_fall_missed      = false;
     std::string rise_fall_why;              ///< Which clause missed, when it did.
+
+    /// BL-1288 -- THE LATE CULTURE'S OWN READING (-1/0/false on a run whose
+    /// params carried neither `late_culture_target` nor
+    /// `late_culture_colonised`). `late_culture_missed` is a DEFECT the caller
+    /// records as a violation, never a reported outcome.
+    int64_t     contact_diffusion_progress = 0; ///< REPORT-ONLY (BL-1288): materials progress the diffusion by contact credited.
+    int32_t     contact_diffusion_bands    = 0; ///< REPORT-ONLY: materials bands it lifted.
+    int32_t     late_culture           = -1; ///< The culture chosen at the Culture close (resumed: the one the polity table names).
+    int32_t     late_culture_reach     = 0;  ///< Its remoteness (`late_culture_unreached` when the network joins it to nobody).
+    int32_t     late_culture_gap2      = 0;  ///< Its water: grid distance squared to the nearest foreign region.
+    int32_t     late_culture_next      = -1; ///< The next most remote culture, for scale.
+    int32_t     late_culture_next_reach = 0;
+    int32_t     late_culture_contact   = 0;  ///< The contact it receives at the close (the ranking key, per mille summed).
+    int32_t     late_culture_next_contact = 0;
+    int32_t     late_culture_cultures  = 0;  ///< Cultures ranked at the close.
+    int32_t     late_culture_seated    = 0;  ///< Cultures holding a seat at the close (the ranked set; all when none).
+    int32_t     late_culture_regions   = 0;  ///< Its land regions standing at the close.
+    int32_t     late_culture_realm_regions = 0; ///< Regions its realms hold at the span's close.
+    int32_t     late_culture_realms    = 0;  ///< Its living realms at the span's close.
+    int32_t     late_culture_lag_x100  = -1; ///< Its realms' mean materials band over the world's at the close, x100.
+    int32_t     late_culture_level     = 0;  ///< The highest isolation level (Exploration: the higher of it and the contact press's).
+    int32_t     late_culture_bound     = 0;  ///< Exploration: its realms bound or bought by another culture.
+    int32_t     late_culture_bound_year = 0; ///< The first such binding.
+    int32_t     late_culture_bound_by  = -1; ///< ...and the binder.
+    /// REPORT-ONLY diagnostic: the Exploration subjection walk over the late
+    /// culture's realms as natives -- pairs walked, then no contact / already a
+    /// subject / treasury short / sphere-blocked / eligible.
+    int64_t     late_culture_diag[6]   = {0, 0, 0, 0, 0, 0};
+    bool        late_culture_missed    = false;
+    std::string late_culture_why;
 };
 
 /// Sentinel for "no polity owns this region in this year slice".

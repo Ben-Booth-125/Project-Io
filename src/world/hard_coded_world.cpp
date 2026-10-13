@@ -1605,6 +1605,12 @@ void run_empires(generation_cursor& c)
                                      "realm " + std::to_string(hs.rise_fall_realm) + " peaked at "
                                          + std::to_string(hs.rise_fall_peak_pm) + " per mille in "
                                          + std::to_string(hs.rise_fall_peak_year) + ": " + hs.rise_fall_why);
+        // BL-1288: THE LATE CULTURE IS ALWAYS HIT -- its Empires half (chosen,
+        // holding a realm at the close, lagging). A miss is a recorded defect.
+        if (hs.late_culture_missed)
+            record_handoff_violation(c, "late_culture",
+                                     "culture " + std::to_string(hs.late_culture) + " at the Empires close (level "
+                                         + std::to_string(hs.late_culture_level) + "): " + hs.late_culture_why);
 
         // BL-768/BL-911: the corridors the history walked, filtered to the
         // ones a surviving polity still holds an end of (§ The network is
@@ -1806,6 +1812,13 @@ void run_exploration(generation_cursor& c)
         // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
         // and the now-final `kepler_settlement` ownership are both
         // live, then let world setup read ITS grudges and corridors.
+        // BL-1288: ...and its Exploration half (colonised by another culture).
+        if (kepler_exploration_hs.late_culture_missed)
+            record_handoff_violation(c, "late_culture",
+                                     "culture " + std::to_string(kepler_exploration_hs.late_culture)
+                                         + " in Exploration (level " + std::to_string(kepler_exploration_hs.late_culture_level)
+                                         + "): " + kepler_exploration_hs.late_culture_why);
+
         c.exploration = make_exploration_output(
             kepler_settlement, kepler_exploration_hs, &kepler_creeds);
         const exploration_output& kepler_exploration = c.exploration;
