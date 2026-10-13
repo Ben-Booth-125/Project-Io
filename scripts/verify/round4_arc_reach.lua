@@ -19,13 +19,13 @@
 
 verify.window(1920, 1080)
 
-verify.generation_stage(1)
+verify.generation_stage(2) -- Life (BL-1279: setup is round 1)
 verify.frames(4)
 verify.click(603, 975)            -- round 2's Next, the one press known to land
 verify.frames(6)
 
 local round = select(1, verify.wizard_round())
-verify.expect(round == 2, "parked on round 3, CULTURE (0-based " .. round .. ")")
+verify.expect(round == 3, "parked on round 4, CULTURE (0-based " .. round .. ")")
 verify.capture("arc_00_round3")
 
 -- WALK THE FOOTER DOWN THE COLUMN. Each press is real; the first one that
@@ -38,7 +38,7 @@ for _, y in ipairs({995, 1005, 1017, 1027, 1040, 1055, 1070}) do
         verify.click(603, y)
         verify.frames(4)
         local r = select(1, verify.wizard_round())
-        if r ~= 2 then
+        if r ~= 3 then
             found = y
             verify.capture("arc_01_advanced_at_y" .. y)
         end
@@ -50,7 +50,7 @@ verify.expect(found > 0,
               .. found .. "; -1 means NO press in 995..1070 advanced the round)")
 
 local round2 = select(1, verify.wizard_round())
-verify.expect(round2 == 3,
+verify.expect(round2 == 4,
               "the press landed on round 4, EMPIRES (0-based " .. round2 .. ")")
 verify.expect(verify.history_powers() > 0,
               "round 4 carries a record, so the arc readout has numbers to show ("

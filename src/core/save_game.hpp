@@ -301,10 +301,14 @@ inline constexpr uint32_t save_game_magic =
 /// Exploration record). No field moves, so no version bump; the range check
 /// is the only reader that changes. The detector reads the late culture off
 /// kind 34, so a stream written before it carries no late culture.
+/// v23 ALSO admits three in the Industrialisation record, written by the world
+/// war (BL-1289): 36 `war_joined` (the first in a record is the declaration),
+/// 37 `ground_razed` and 38 `war_peace`; a demoted road is a `road_promoted`
+/// at the lower tier, so no kind of its own.
 /// v23 ALSO admits 39 `revolution` in the Industrialisation record (BL-1294,
 /// INDUSTRIALISATION.md sec Revolution: a splinter takes the whole realm --
-/// `region` the city it rose in, `other` the new regime). 36-38 are held by
-/// other sprint-53 lanes; the range check admits them under this version
+/// `region` the city it rose in, `other` the new regime). 34-35 are held by
+/// another sprint-53 lane (the late culture, BL-1288); the range check admits them under this version
 /// whether or not their writers have landed. The takeover's NEW NAME rides
 /// the record's existing realm name table (`era_timelapse::polity_name`) and
 /// its old name the Exploration record's entry for the same id, so no string

@@ -291,8 +291,9 @@ private:
 
     /// Draw the main menu — the deliberate entry point shown at launch (no world
     /// loaded yet). Wires the "New Game" button to open_new_world_wizard() and "Quit"
-    /// to m_quit_requested. Carries the seed and the world-shape knobs; the
-    /// Planetology knobs moved into the wizard, where each is decided against a chart.
+    /// to m_quit_requested. Carries no world input: the seed and the abundance
+    /// moved to the wizard's setup round (BL-1279), the Planetology knobs to
+    /// the wizard's planetology rounds, where each is decided against a chart.
     /// Called from render() when m_screen == menu; folded into render()'s single
     /// capture path so the menu is golden-verifiable.
     void draw_main_menu();
@@ -312,7 +313,7 @@ private:
     void invalidate_wizard_rounds_below(int round)
     {
         for (int i = 0; i < wizard_pass_round_count; ++i)
-            if (wizard_planetology_round_count + i > round)
+            if (wizard_first_pass_round + i > round)
                 m_wiz_pass_current[i] = false;
 
         // A LAPSE ROUND'S RECORD GOES WITH ITS FLAG (BL-829, generalised to both
@@ -325,7 +326,7 @@ private:
         // the project's most expensive pass unbidden is not a repair.
         for (int i = 0; i < wizard_lapse_round_count; ++i)
         {
-            if (wizard_planetology_round_count + i <= round) continue;
+            if (wizard_first_pass_round + i <= round) continue;
             if (m_wiz_history_future[i].valid())
             {
                 m_wiz_history_stale[i] = true;
@@ -391,7 +392,7 @@ private:
     /// draw gates on `lapse_round` before it asks.
     int wizard_lapse_index() const
     {
-        const int i = m_wiz_round - wizard_planetology_round_count;
+        const int i = m_wiz_round - wizard_first_pass_round;
         if (i < 0)                            return 0;
         if (i >= wizard_lapse_round_count)    return wizard_lapse_round_count - 1;
         return i;
@@ -413,10 +414,22 @@ private:
     /// Open the wizard at its first round. The menu's "New Game" button — it commits
     /// nothing and builds nothing, it just hands the player the first decision.
     void open_new_world_wizard();
-    /// The menu's "Quick Start" (STARTUP.md § Main menu, Ben 2026-10-08): Begin
-    /// with no wizard behind it -- the cold build on the menu's seed and
-    /// resources, the loading bar, then the seat canvas. No second build path.
+    /// The menu's "Quick Start" press (BL-1279; STARTUP.md § Rounds, Ben
+    /// 2026-10-13): opens the wizard on its SETUP round alone, so the one
+    /// place the world-wide inputs are set stays the only place.
+    void open_quick_start();
+    /// The setup round's commit under Quick Start (STARTUP.md § Main menu, Ben
+    /// 2026-10-08): Begin with no other wizard round behind it -- the cold
+    /// build on the setup round's seed, resources and nation targets, the
+    /// loading bar, then the seat canvas. No second build path.
     void quick_start();
+    /// BL-1279: what every entry into the wizard does first -- roll the seed
+    /// once (BL-890, never under --verify) and write the nation targets'
+    /// defaults when they are unset (the wizard always sets both).
+    void prime_wizard_setup();
+    /// BL-1279: draw the setup round's controls (nation targets, seed,
+    /// abundance). Returns true when any of them moved.
+    bool draw_wizard_setup_controls();
 
     /// Resolve the pending preferences against the seed, then re-run the Planetology
     /// chain over the prototype body set into m_wiz_preview (and m_wiz_undrawn, the
@@ -546,11 +559,40 @@ private:
     // carried the drawdown lean -- retires into Industrialisation, which is what
     // draws a world down in the first place. It plays the 1660 -> 1960 span
     // (BL-1068).
+    //
+    // SEVEN ROUNDS SINCE BL-1279 (setup round; STARTUP.md § Rounds, Ben
+    // 2026-10-10/11): the SETUP round sits between System and Life and holds
+    // the world-wide inputs -- the two nation targets, the seed, the
+    // abundance. It is neither a planetology round (no chart chain, no
+    // `roll` counter) nor a pass round (no record), so the planetology
+    // rounds are no longer a contiguous prefix: System is wizard round 0,
+    // setup 1, Life 2, and the pass rounds start at 3. Every "is this a
+    // planetology round" test goes through `wizard_is_planetology`, every
+    // wizard-round -> chain-round mapping through `wizard_chain_round`, and
+    // every pass-round offset through `wizard_first_pass_round`.
     static constexpr int wizard_planetology_round_count = 2;
-    static constexpr int wizard_round_count            = 6;
+    static constexpr int wizard_round_count            = 7;
+    static constexpr int wizard_system_round           = 0;
+    static constexpr int wizard_setup_round            = 1; ///< BL-1279
+    static constexpr int wizard_life_round             = 2;
+    /// The wizard round the first pass round (Culture) sits on.
+    static constexpr int wizard_first_pass_round       = 3;
     /// The pass rounds, which own a reroll counter each rather than a preference block.
     static constexpr int wizard_pass_round_count =
-        wizard_round_count - wizard_planetology_round_count;
+        wizard_round_count - wizard_first_pass_round;
+    /// Whether wizard round @p r is a PLANETOLOGY round (System or Life).
+    static constexpr bool wizard_is_planetology(int r)
+    {
+        return r == wizard_system_round || r == wizard_life_round;
+    }
+    /// The chart-chain round (and `world_preferences::roll` slot) a planetology
+    /// wizard round owns: System 0, Life 1 -- unchanged by the setup round, so
+    /// a roll counter means what it meant before it.
+    static constexpr int wizard_chain_round(int r) { return r == wizard_life_round ? 1 : 0; }
+    /// BL-1279: the nation targets the wizard writes when the player has not
+    /// set them (STARTUP.md § Rounds: "the wizard always sets both targets").
+    static constexpr int wizard_default_nation_total = 20;
+    static constexpr int wizard_default_major_target = 4;
     /// The pass rounds that play a TIME-LAPSE, and so own a record of their own:
     /// round 3 (Culture, the migration), round 4 (Empires, the history), round 5
     /// (Exploration, BL-946) and round 6 (Industrialisation, BL-1068). Every
@@ -607,12 +649,12 @@ private:
     sim_loop        m_sim_loop;
     lua_state       m_lua;
     world           m_world;
-    /// One-shot latch for BL-890's rolled seed. The menu draw rolls
-    /// `m_pending_world_params.seed` the FIRST time it runs and never again, so
-    /// the field the player sees is already a fresh world and anything they
-    /// then type, paste or Roll into it survives. Rolling per-frame would make
-    /// the field impossible to edit; rolling when the wizard opens would throw
-    /// away a seed they had just entered on this very screen.
+    /// One-shot latch for BL-890's rolled seed. `prime_wizard_setup` rolls
+    /// `m_pending_world_params.seed` the FIRST time the wizard opens and never
+    /// again, so the setup round's field is already a fresh world and anything
+    /// the player then types, pastes or Rolls into it survives a trip back to
+    /// the menu. (BL-1279 moved the seed from the menu to the setup round; the
+    /// menu's first draw used to roll it.)
     bool            m_seed_rolled = false;
     world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
@@ -636,6 +678,11 @@ private:
     // changes. None of this touches m_world: the world is built once, on "Begin",
     // from m_pending_world_params.
     int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
+    /// BL-1279: QUICK START OPENS THE SETUP ROUND ALONE (STARTUP.md § Rounds,
+    /// Ben 2026-10-13). While set, the wizard draws only the setup round: no
+    /// round counter or pips, Back returns to the menu, and the commit press
+    /// builds cold straight through (`quick_start`).
+    bool m_wiz_quick_start = false;
     /// Reroll counter for each PASS round (round 4 the migration, round 5 the
     /// history, round 6 the substrate), indexed by `m_wiz_round -
     /// wizard_planetology_round_count`. The planetology rounds keep theirs in

@@ -474,7 +474,7 @@ struct seed_row
     int64_t points_treasury    = 0;     ///< credited from capital treasuries, all rounds
     int64_t treasury_debited   = 0;     ///< ... and the treasury units that took out of capitals
     int64_t points_refused     = 0;     ///< credits refused (must be 0)
-    bool    points_ledger_ok   = false; ///< points_total == points_scale + points_treasury
+    bool    points_ledger_ok   = false; ///< points_total + the war's razed points == points_scale + points_treasury
     int     points_regions     = 0;     ///< regions holding any points at the close
     int     centre_regions     = 0;     ///< regions with centres at the close
     double  points_region_gini = k_undef; ///< over regions holding points
@@ -3199,7 +3199,10 @@ int main(int argc, char** argv)
                 if (rg.nation >= 0) by_polity[rg.nation] += rg.industry_points;
                 else unheld_pts += rg.industry_points;
             }
-            row.points_ledger_ok = row.points_total == row.points_scale + row.points_treasury;
+            // Less what the world war razed, its stated cost (BL-1289), as the split reads it.
+            row.points_ledger_ok = row.points_total + dst.world_war_points_razed_scale
+                                       + dst.world_war_points_razed_treasury
+                                   == row.points_scale + row.points_treasury;
             if (row.points_total > 0)
             {
                 const double tot = static_cast<double>(row.points_total);
@@ -3289,9 +3292,11 @@ int main(int argc, char** argv)
                     sum_s += S[i];
                     sum_t += T;
                 }
-                // The split must reproduce the span's own ledger exactly.
-                row.split_ok = ok && sum_s == dst.industry_points_from_scale
-                                  && sum_t == dst.industry_points_from_treasury;
+                // The split must reproduce the span's own ledger exactly -- less
+                // what the world war razed, its stated cost (BL-1289), each part
+                // on its own side of the split.
+                row.split_ok = ok && sum_s + dst.world_war_points_razed_scale == dst.industry_points_from_scale
+                                  && sum_t + dst.world_war_points_razed_treasury == dst.industry_points_from_treasury;
             }
 
             if (integral_stride > 0 && row.points_on && !row.points_rejected && !open_t.empty())

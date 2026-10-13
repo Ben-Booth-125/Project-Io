@@ -70,8 +70,14 @@ verify.capture("overflow_selection_body")
 -- The New World wizard, all three rounds (the charts' widest host), expanding
 -- every chain stage so the chart draw paths actually run (stages rest folded).
 local rounds = { [0] = { 0, 3 }, [1] = { 4, 7 }, [2] = { 8, 9 } }
+-- BL-1279: the wizard's planetology rounds are wizard rounds 0 (System) and 2
+-- (Life); round 1 is Setup, which has no chain stages. Wizard round per chain
+-- round below; chain round 2 is the History ledger's alone, drawn on Life.
+local wizard_round_for = { [0] = 0, [1] = 2, [2] = 2 }
+verify.generation_stage(1)
+verify.capture("overflow_wizard_setup")
 for r = 0, 2 do
-    verify.generation_stage(r)
+    verify.generation_stage(wizard_round_for[r])
     verify.capture("overflow_wizard_round" .. r)
     for k = rounds[r][1], rounds[r][2] do
         verify.fold("generation_stage", k)

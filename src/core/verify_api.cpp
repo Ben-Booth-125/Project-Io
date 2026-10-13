@@ -409,7 +409,7 @@ int app::run_autostart_adopt()
 
     for (int i = 0; i <= last; ++i)
     {
-        const int round = i + wizard_planetology_round_count + 1;
+        const int round = i + wizard_first_pass_round + 1;
         std::printf("[autostart-adopt] step 1.%d: round %d on the round before's world\n", i + 1, round);
         std::fflush(stdout);
         const auto t0 = std::chrono::steady_clock::now();
@@ -523,9 +523,9 @@ int app::run_autostart_adopt()
         // lean-change path (invalidate from round 4 down), then an invalidation
         // above it while it runs.
         --m_pending_world_params.span_seed[2];
-        invalidate_wizard_rounds_below(wizard_planetology_round_count + 1);
+        invalidate_wizard_rounds_below(wizard_first_pass_round + 1);
         launch_wizard_history_run(2);
-        invalidate_wizard_rounds_below(wizard_planetology_round_count + 1); // marks it stale
+        invalidate_wizard_rounds_below(wizard_first_pass_round + 1); // marks it stale
         wait_round(2);
         const bool stale_ok = !m_wiz_record_landed[2] && m_wiz_slot[3] == nullptr
                            && m_wiz_history[2].empty();
@@ -558,10 +558,10 @@ int app::run_autostart_adopt()
         // is the step that releases them and the memory lines measure it.
         std::shared_ptr<wizard_slot> keep_slots[wizard_lapse_round_count];
         for (int k = 0; k < wizard_lapse_round_count; ++k) keep_slots[k] = m_wiz_slot[k];
-        invalidate_wizard_rounds_below(wizard_planetology_round_count + 1); // Empires rerolled
+        invalidate_wizard_rounds_below(wizard_first_pass_round + 1); // Empires rerolled
         const bool dropped_by_reroll = (m_wiz_world == nullptr);
         m_wiz_world = keep;
-        invalidate_wizard_rounds_below(wizard_planetology_round_count - 1); // a planetology move
+        invalidate_wizard_rounds_below(wizard_life_round); // a planetology move
         const bool dropped_by_chain = (m_wiz_world == nullptr);
         m_wiz_world = keep;
         std::printf("[autostart-adopt] %s  a reroll above round 6 drops the cache\n",
@@ -1695,6 +1695,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("show_generation", [this](bool on) {
         m_screen    = on ? app_screen::generating : app_screen::in_game;
         m_wiz_round = wizard_round_count - 1;
+        m_wiz_quick_start = false;
         m_wiz_dirty = true;
     });
 
@@ -1779,14 +1780,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                                                           : "rejected_invalid";
     });
 
-    // Park the wizard on a specific ROUND (0-5, BL-946: System, Life, Culture,
-    // Empires, Exploration, Industrialisation) so a visual check can capture each
+    // Park the wizard on a specific ROUND (0-6, BL-946 + BL-1279: System, Setup,
+    // Life, Culture, Empires, Exploration, Industrialisation) so a visual check can capture each
     // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
     // the name is kept for the scripts that already call it. Every round is a stable
     // capture: the wizard is driven by the preferences and the seed, not by
     // wall-clock, so there is no animation to race.
     v.set_function("generation_stage", [this](int round) {
         m_screen    = app_screen::generating;
+        m_wiz_quick_start = false;
         m_wiz_round = round;
         m_wiz_dirty = true;
     });
@@ -1798,8 +1800,57 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // check it was to read a capture with human eyes — so a Back press that went
     // nowhere would have passed. Every other wizard hook SETS state; this is the
     // one that reads it, which is what turns a walk into an assertion.
+    // BL-1279: the third value is whether the wizard is on Quick Start's
+    // setup round alone (STARTUP.md § Rounds, Ben 2026-10-13).
     v.set_function("wizard_round", [this]() {
-        return std::make_tuple(m_wiz_round, wizard_round_count);
+        return std::make_tuple(m_wiz_round, wizard_round_count, m_wiz_quick_start);
+    });
+
+    // BL-1279 -- THE SETUP ROUND'S NATION TARGETS. `wizard_targets` reads the
+    // pending pair the wizard will build with (0 = unset). `wizard_set_targets`
+    // writes a pair as the setup round's sliders would, and REJECTS an illegal
+    // one whole (nation_targets_valid; nothing mutates) -- the sliders cannot
+    // reach an illegal pair, so neither can a script. A change takes the
+    // setup round's own dirty path: every round from Life on is rebuilt.
+    v.set_function("wizard_targets", [this]() {
+        return std::make_tuple(m_pending_world_params.nation_total_target,
+                               m_pending_world_params.major_target);
+    });
+    v.set_function("wizard_set_targets", [this](int total, int majors) -> bool {
+        world_params probe = m_pending_world_params;
+        probe.nation_total_target = total;
+        probe.major_target        = majors;
+        if (total < 1 || majors < 1 || !nation_targets_valid(probe))
+            return false;
+        m_pending_world_params.nation_total_target = total;
+        m_pending_world_params.major_target        = majors;
+        m_wiz_dirty = true;
+        return true;
+    });
+    // BL-1279 -- WHAT THE BUILT WORLD HOLDS against what it was asked for:
+    // (nations alive on the homeworld, major nations, the total target and the
+    // major target the live world was built from). Counted as
+    // nation_targets_harness counts them: a nation on the homeworld holds one
+    // of its tiles; a major is home to a non-background corporation.
+    v.set_function("nation_census", [this]() {
+        entity_id home = null_entity;
+        for (const generation_report::body_entry& b : m_generation_report.bodies)
+            if (b.is_homeworld) { home = b.id; break; }
+        int total = 0;
+        for (const auto& kv : m_world.nations)
+        {
+            if (kv.second.tiles.empty()) continue;
+            const auto t = m_world.tiles.find(kv.second.tiles.front());
+            if (t != m_world.tiles.end() && t->second.body == home) ++total;
+        }
+        std::vector<entity_id> majors;
+        for (const auto& kv : m_world.corporations)
+            if (!kv.second.is_background && kv.second.home_nation != null_entity
+                && std::find(majors.begin(), majors.end(), kv.second.home_nation) == majors.end())
+                majors.push_back(kv.second.home_nation);
+        return std::make_tuple(total, static_cast<int>(majors.size()),
+                               m_active_world_params.nation_total_target,
+                               m_active_world_params.major_target);
     });
 
     // THE SEED A LAPSE ROUND'S REROLL MOVES (BL-1083; NR-931). Reads the wizard's
@@ -1829,7 +1880,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("history_run", [this](sol::optional<int> which) {
         const int i = std::clamp(which.value_or(0), 0, wizard_lapse_round_count - 1);
         m_screen    = app_screen::generating;
-        m_wiz_round = wizard_planetology_round_count + i;
+        m_wiz_round = wizard_first_pass_round + i;
         // ORDER MATTERS. The preview is refreshed FIRST because the map's land
         // mask is the wizard's own packed surface, and because the wizard's draw
         // re-runs the chain whenever the preview is empty — which invalidates
@@ -1853,7 +1904,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("history_wait", [this](sol::optional<int> which) -> bool {
         const int i = std::clamp(which.value_or(2), 0, wizard_lapse_round_count - 1);
         m_screen    = app_screen::generating;
-        m_wiz_round = wizard_planetology_round_count + i;
+        m_wiz_round = wizard_first_pass_round + i;
         refresh_wizard_preview();
         m_wiz_dirty = false;
         return verify_stage_wait(i);
@@ -1921,7 +1972,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     // The Reroll press on the round the wizard is on -- the button's own function.
     v.set_function("wizard_reroll", [this]() {
-        const int p = m_wiz_round - wizard_planetology_round_count;
+        const int p = m_wiz_round - wizard_first_pass_round;
         if (p >= 0 && p < wizard_pass_round_count) reroll_wizard_pass_round(p);
     });
     // End a staged run the script no longer needs: stopped at its next stage

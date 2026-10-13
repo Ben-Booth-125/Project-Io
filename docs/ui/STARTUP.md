@@ -141,10 +141,10 @@ lapse round:** each plays its own span, on the same 2D map, and the spans meet e
 
 | Round | Span | Authority |
 |---|---|---|
-| 3 — Culture | 2400 BCE → 400 BCE | [`COLONISATION.md`](../generation/COLONISATION.md) |
-| 4 — Empires | 400 BCE → 1200 CE | [`CIVILISATION.md`](../generation/CIVILISATION.md) |
-| 5 — Exploration | 1200 → 1660 CE | [`EXPLORATION.md`](../generation/EXPLORATION.md) |
-| 6 — Industrialisation | 1660 → 1960 CE | [`INDUSTRIALISATION.md`](../generation/INDUSTRIALISATION.md) |
+| 4 — Culture | 2400 BCE → 400 BCE | [`COLONISATION.md`](../generation/COLONISATION.md) |
+| 5 — Empires | 400 BCE → 1200 CE | [`CIVILISATION.md`](../generation/CIVILISATION.md) |
+| 6 — Exploration | 1200 → 1660 CE | [`EXPLORATION.md`](../generation/EXPLORATION.md) |
+| 7 — Industrialisation | 1660 → 1960 CE | [`INDUSTRIALISATION.md`](../generation/INDUSTRIALISATION.md) |
 
 The wizard does not stop at planetology. The four lapse rounds carry the generation
 phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight

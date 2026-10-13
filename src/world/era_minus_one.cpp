@@ -342,6 +342,8 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.late_culture_target       = true;
     hp.contact_diffusion_q       = 10;
     hp.contact_diffusion_horizon = 30;
+    hp.contact_early_bands       = 2; // Ben 2026-10-14: past band 2 a realm climbs by contact
+    hp.contact_band_per_q        = 1000;
     return hp;
 }
 
@@ -547,6 +549,9 @@ history_sim_params exploration_sim_params(const world_params& params)
     // presses the contact that would, one recorded level at a time.
     // Industrialisation copies these params and sets it back off.
     hp.late_culture_colonised = true;
+    // ...and a power two materials bands ahead of a native needs no treasury
+    // margin to bind it (dominance by development; Industrialisation inherits).
+    hp.subjection_dominance_bands = 1;
 
     return hp;
 }
@@ -667,6 +672,12 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // BL-1298 (Ben, 2026-10-12): the exchange rate re-sized against the real
     // chests the history now banks; history_sim.hpp says why.
     hp.industry_points_per_1000_treasury_units = params.industry_points_per_1000_treasury_units;
+
+    // BL-1289 (Ben, 2026-10-10/11/12; GENERATION_STRATEGY.md sec History
+    // patterns): THE WORLD WAR IS A TARGET, ALWAYS HIT, in this span alone --
+    // inside 1900-1930, so the world redevelops before 1960. The magnitudes
+    // are the struct's (history_sim.hpp says what each costs).
+    hp.world_war_target = true;
 
     // BL-1294 (Ben, 2026-10-10/12; INDUSTRIALISATION.md sec Revolution): THE
     // REVOLUTION LEAN, this span's alone -- it overturns, here and nowhere
