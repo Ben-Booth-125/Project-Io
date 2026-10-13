@@ -307,6 +307,17 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // nothing here; the Exploration open converts it (`exploration_sim_params`).
     hp.naval_points_accrue = true;
 
+    // BL-1287 -- THE RISE AND FALL IS A TARGET OF THIS ROUND (CIVILISATION.md
+    // sec How an empire actually falls; GENERATION_STRATEGY.md sec History
+    // patterns, "always"). The realm largest at 200 BCE is leaned up, peaks by
+    // 400 CE above the floor and under hegemony, and is overextended until its
+    // share halves -- each level a recorded cause. This round only; the later
+    // spans build their params from struct defaults and never lean.
+    hp.rise_fall_target = true;
+    // And the defect its loop exposed: a region taken this round is measured
+    // by its new holder before it can secede from it (history_sim.hpp).
+    hp.secession_waits_for_holder = true;
+
     // BL-1290 (civil war deaths) -- THIS ROUND'S ALONE (MILITARY_HISTORY.md sec
     // Armies are distinct from population, Ben 2026-10-12: the civil war is an
     // Empires pattern; the ruling's exception does not reach Exploration, and

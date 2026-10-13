@@ -1597,6 +1597,14 @@ void run_empires(generation_cursor& c)
             if (!pass_one_output_valid(kepler_pass_one, &why, &kepler_creeds))
                 record_handoff_violation(c, "pass_one_output", why);
         }
+        // BL-1287: THE RISE AND FALL IS ALWAYS HIT (GENERATION_STRATEGY.md sec
+        // History patterns). A miss is a defect, recorded loudly as the
+        // nation totals' is, never shipped as an outcome.
+        if (hs.rise_fall_missed)
+            record_handoff_violation(c, "rise_and_fall",
+                                     "realm " + std::to_string(hs.rise_fall_realm) + " peaked at "
+                                         + std::to_string(hs.rise_fall_peak_pm) + " per mille in "
+                                         + std::to_string(hs.rise_fall_peak_year) + ": " + hs.rise_fall_why);
 
         // BL-768/BL-911: the corridors the history walked, filtered to the
         // ones a surviving polity still holds an end of (§ The network is

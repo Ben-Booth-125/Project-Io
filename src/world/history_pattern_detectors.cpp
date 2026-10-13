@@ -64,6 +64,24 @@ void read_rise_and_fall(const era_timelapse& t, history_pattern_reading& r)
     for (const auto& kv : shares_at(t, t.steps[front_step]))
         if (kv.second > best_q) { best_q = kv.second; best = kv.first; }
     if (best < 0) return;
+    // A BOXED FRONT-RUNNER GIVES WAY (Ben, 2026-10-12): where the largest's
+    // reachable ground (its capital's campaign-graph component, which the
+    // record does not carry) cannot hold the floor, the sim names the largest
+    // realm whose ground can -- the first `rise_pressed` event's realm -- and
+    // writes the give-way into the history. The detector follows that record.
+    for (const lapse_event& e : t.events)
+        if (is(e, K::rise_pressed))
+        {
+            if (e.polity != lapse_event_none && static_cast<int>(e.polity) != best)
+            {
+                r.rf_boxed = best;
+                best = e.polity;
+                const auto sh = shares_at(t, t.steps[front_step]);
+                const auto it = sh.find(best);
+                best_q = it == sh.end() ? 0 : it->second;
+            }
+            break;
+        }
     r.rf_polity  = best;
     r.rf_front_q = best_q;
     // Its peak over the whole span, first step that reaches it.
@@ -75,7 +93,14 @@ void read_rise_and_fall(const era_timelapse& t, history_pattern_reading& r)
         if (it != sh.end() && it->second > r.rf_peak_q) { r.rf_peak_q = it->second; peak_step = static_cast<int>(si); }
     }
     if (peak_step < 0) return;
-    r.rf_peak_year = t.steps[static_cast<std::size_t>(peak_step)].year;
+    const timelapse_step& peak = t.steps[static_cast<std::size_t>(peak_step)];
+    r.rf_peak_year = peak.year;
+    {
+        int second = 0;
+        for (const auto& kv : shares_at(t, peak))
+            if (kv.first != best && kv.second > second) second = kv.second;
+        r.rf_margin_x100 = second > 0 ? r.rf_peak_q * 100 / second : 9999;
+    }
     // The fall: the first later step at which its share is at most half the peak.
     int fall_year = 0;
     bool fell = false;
@@ -84,17 +109,28 @@ void read_rise_and_fall(const era_timelapse& t, history_pattern_reading& r)
         const auto sh = shares_at(t, t.steps[si]);
         const auto it = sh.find(best);
         const int  q  = it == sh.end() ? 0 : it->second;
-        if (q * 2 <= r.rf_peak_q) { fall_year = t.steps[si].year; fell = true; }
+        if (q * 2 <= r.rf_peak_q) { fall_year = t.steps[si].year; fell = true; r.rf_fall_q = q; }
     }
     r.rf_fall_years = fell ? fall_year - r.rf_peak_year : -1;
     const int fall_end = fell ? fall_year : t.start_year + t.years;
     for (const lapse_event& e : t.events)
+    {
         if ((is(e, K::broke_away) || is(e, K::schism)) && e.other == best
             && e.year > r.rf_peak_year && e.year <= fall_end)
             ++r.rf_breakaways;
+        if (is(e, K::seat_captured) && e.polity == best && e.year <= r.rf_peak_year) ++r.rf_captures;
+        if (is(e, K::realm_ended) && e.polity == best) r.rf_ended = true;
+        if (is(e, K::rise_pressed) && e.polity == best) r.rf_rise_level = std::max<int>(r.rf_rise_level, e.other);
+        if (is(e, K::overextended) && e.polity == best) r.rf_fall_level = std::max<int>(r.rf_fall_level, e.other);
+    }
+    // THE RULING, clause for clause (rise_fall_rules.hpp): peak by 400 CE, at
+    // or above the floor, under hegemony, halved within 300 years of the peak,
+    // and the fall a breakdown -- successors breaking away, never only ground
+    // taken by neighbours.
     r.rf_hit = r.rf_peak_year <= hp_rf_peak_by_year
             && r.rf_peak_q >= hp_rf_floor_q && r.rf_peak_q < hp_rf_hegemony_q
-            && r.rf_fall_years >= 0 && r.rf_fall_years <= hp_rf_fall_window_y;
+            && r.rf_fall_years >= 0 && r.rf_fall_years <= hp_rf_fall_window_y
+            && r.rf_breakaways >= 1;
     if (r.rf_hit)
     {
         r.rf_polities.push_back(best);

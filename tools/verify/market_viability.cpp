@@ -223,6 +223,12 @@ constexpr int k_w_late = 50;                ///< W: the late window, the last N 
 float g_k_override = -1.0f;   ///< < 0: shipped k
 bool  g_no_spoil   = false;
 bool  g_logistics  = true;    ///< BL-1223: the L row (--no-logistics drops it)
+/// BL-1287 (the G1b diagnosis): when set, every processor at the handoff is
+/// appended to this file as `seed grid_x grid_y state starved good` (state per
+/// k_state_name; starved 1 for G1b's count -- input now, or decommissioned after
+/// its last row read input; good the report row's limiting input, -1 none), for
+/// a reader that places them on the history's regions (rise_fall_probe).
+const char* g_dump_processors = nullptr;
 std::vector<int> g_lg_ticks;  ///< L: the probe play ticks (set in main)
 
 // --- seeds (market_census's minimal scan of the library) ---------------------
@@ -1087,6 +1093,23 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
 
     // --- G1 at the handoff (the settle's last report, the world after the seat) ---
     r.g1_handoff = tally_processors(w, last_settle, reg, last_row);
+    if (g_dump_processors != nullptr)
+    {
+        std::ofstream dump(g_dump_processors, std::ios::app);
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.type != building_type::processing_facility) continue;
+            const building_report* row = row_of(last_settle, bid);
+            const proc_state s = classify(b, row, reg);
+            const auto li = last_row.find(bid);
+            const bool starved = s == ps_input || (s == ps_decom && li != last_row.end() && li->second == ps_input);
+            const auto ti = w.tiles.find(b.tile);
+            if (ti == w.tiles.end()) continue;
+            const int good = (row != nullptr && row->has_limiting) ? static_cast<int>(row->limiting_input) : -1;
+            dump << seed << ' ' << ti->second.grid_x << ' ' << ti->second.grid_y << ' ' << k_state_name[s]
+                 << ' ' << (starved ? 1 : 0) << ' ' << good << '\n';
+        }
+    }
     for (const auto& [bid, b] : w.buildings)
         if (b.type == building_type::planetary_marketplace && !b.decommissioned)
             ++r.t_marketplaces_handoff;
@@ -1328,6 +1351,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--k") && i + 1 < argc) g_k_override = static_cast<float>(std::atof(argv[++i]));
         else if (!std::strcmp(argv[i], "--no-spoil")) g_no_spoil = true;
         else if (!std::strcmp(argv[i], "--no-logistics")) g_logistics = false;
+        else if (!std::strcmp(argv[i], "--dump-processors") && i + 1 < argc) g_dump_processors = argv[++i]; // BL-1287
         else if (!std::strcmp(argv[i], "--no-snap")) g_road_probe_no_snap = true; // BL-1252 measurement
         else if (!std::strcmp(argv[i], "--snap-run") && i + 1 < argc) g_road_probe_snap_run = std::atoi(argv[++i]); // BL-1252
         else if (!std::strcmp(argv[i], "--snap-bound") && i + 1 < argc) g_road_probe_snap_bound = static_cast<float>(std::atof(argv[++i])); // BL-1252

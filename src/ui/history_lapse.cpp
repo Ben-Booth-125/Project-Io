@@ -1262,11 +1262,11 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
 
     // BL-1118: which event kinds the record carries -- the layer predicates
     // that hang on a kind read one bit per frame (`lapse_layers_drawn`).
-    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 32,
-                  "event_kinds is a 32-bit mask over lapse_event_kind");
+    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 64,
+                  "event_kinds is a 64-bit mask over lapse_event_kind");
     h.event_kinds = 0;
     for (const lapse_event& e : h.lapse.events)
-        if (e.kind < 32) h.event_kinds |= 1u << e.kind;
+        if (e.kind < 64) h.event_kinds |= std::uint64_t{1} << e.kind;
 
     // --- The terrain base, baked once (BL-915) -------------------------------
     //
@@ -1781,7 +1781,7 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h)
     lapse_layer_set s;
     if (!h.derived()) return s;
     const auto kind = [&](lapse_event_kind k) {
-        return ((h.event_kinds >> static_cast<unsigned>(k)) & 1u) != 0;
+        return ((h.event_kinds >> static_cast<unsigned>(k)) & std::uint64_t{1}) != 0;
     };
 
     // THE EMPIRES CUT (Ben, 2026-09-25, walking round 4: "the Empires round
@@ -5159,6 +5159,27 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "A champion of %s buys out the champion of %s.",
                       polity_name_of(h, e.other), polity_name_of(h, e.polity));
         break;
+    case lapse_event_kind::rise_pressed:
+        // BL-1287 (CIVILISATION.md sec How an empire actually falls): the realm
+        // largest at 200 BCE pressed one level harder on its way up -- `other`
+        // the level, 1 the lean itself, more the backstop's escalation.
+        if (e.other <= 1)
+            std::snprintf(buf, sizeof buf, "%s presses its lead from %s: its roads carry its armies on.",
+                          polity_name_of(h, e.polity), R);
+        else
+            std::snprintf(buf, sizeof buf, "%s presses its conquests harder from %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::overextended:
+        // BL-1287: after its peak, the same realm's roads and works decay and its
+        // far garrisons thin, one level further (the fall acts on the map).
+        if (e.other <= 1)
+            std::snprintf(buf, sizeof buf, "%s has overreached: its roads decay, and %s calls its far garrisons home.",
+                          polity_name_of(h, e.polity), R);
+        else
+            std::snprintf(buf, sizeof buf, "The overreach of %s deepens; its roads decay further from %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
     case lapse_event_kind::civil_war_famine:
         // BL-1290 (MILITARY_HISTORY.md sec Armies are distinct from
         // population): the ground a civil war is fought over starves. `polity`
@@ -5226,6 +5247,9 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::champion_chartered:
     case lapse_event_kind::state_charter:
     case lapse_event_kind::champion_bought_out:  return 0;
+    // BL-1287: the rise and fall's levels, a handful per world, all one realm's.
+    case lapse_event_kind::rise_pressed:
+    case lapse_event_kind::overextended:         return 0;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

@@ -187,13 +187,16 @@ int main(int argc, char** argv)
         if (!last.steps.empty()) r.living_polities = last.steps.back().sample_count;
 
         const history_pattern_reading& q = r.pr;
-        std::printf("seed %-3u (%.0f s)  RF %s realm %d front %d\‰ peak %d\‰ at %d, fall %dy, %d split%s  |"
+        std::printf("seed %-3u (%.0f s)  RF %s realm %d%s front %d‰ peak %d‰ at %d x%.2f, %d seats, fall %dy to %d‰, %d split%s%s, levels %d/%d  |"
                     "  LC %s culture %d gap %d (next %d) lag %d%% bound %d  |"
                     "  WW %s %d/%d in %d-%d, %d moments  |  CW %d/%d  RV %d (proxy %d)  |"
                     "  pop@1200 %lld  |  tags RF %d LC %d WW %d CW %d RV %d, unfolded %d%s  |"
                     "  nations %d, %d w/ specialist, polities %d\n",
-                    seed, r.build_s, q.rf_hit ? "HIT " : "miss", q.rf_polity, q.rf_front_q, q.rf_peak_q, q.rf_peak_year,
-                    q.rf_fall_years, q.rf_breakaways, q.rf_breakaways == 1 ? "" : "s",
+                    seed, r.build_s, q.rf_hit ? "HIT " : "miss", q.rf_polity,
+                    q.rf_boxed >= 0 ? (" (boxed " + std::to_string(q.rf_boxed) + " gave way)").c_str() : "",
+                    q.rf_front_q, q.rf_peak_q, q.rf_peak_year, q.rf_margin_x100 / 100.0, q.rf_captures,
+                    q.rf_fall_years, q.rf_fall_q, q.rf_breakaways, q.rf_breakaways == 1 ? "" : "s",
+                    q.rf_ended ? " ended" : "", q.rf_rise_level, q.rf_fall_level,
                     q.lc_hit ? "HIT " : "miss", q.lc_culture, q.lc_gap, q.lc_second_gap, q.lc_lag_x100, q.lc_bound,
                     q.ww_hit ? "HIT " : "miss", q.ww_belligerents, hp_ww_top_k, hp_ww_window_start, hp_ww_window_end,
                     q.ww_moments, q.cw_count, q.cw_splits, q.rv_count, q.rv_proxy,
@@ -201,6 +204,8 @@ int main(int argc, char** argv)
                     r.tagged[0], r.tagged[1], r.tagged[2], r.tagged[3], r.tagged[4], r.unfolded,
                     r.tags_agree ? "" : "  TAGS DISAGREE",
                     r.nations, r.nations_with_specialist, r.living_polities);
+        if (rep.handoff_invalid)
+            std::printf("seed %u: HANDOFF VIOLATION %s\n", seed, rep.handoff_violation.c_str());
         std::fflush(stdout);
         rows.push_back(r);
     }

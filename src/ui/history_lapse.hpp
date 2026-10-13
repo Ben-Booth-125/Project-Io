@@ -652,7 +652,8 @@ struct history_lapse
     /// record and never change after it lands), so the layer predicates that
     /// hang on a kind -- a seat captured, a crack, a diamond, a slide, a works
     /// -- are a bit test per frame rather than a walk of the change list.
-    uint32_t event_kinds = 0;
+    /// 64 bits since the kinds passed 32 (BL-1287 took 32 and 33).
+    uint64_t event_kinds = 0;
 
     /// BL-1118: `lapse_polity_hard` can answer true at some playhead -- a realm
     /// hard at a recorded step, or carried hard where the carry is read -- the

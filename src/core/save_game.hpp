@@ -288,6 +288,12 @@ inline constexpr uint32_t save_game_magic =
 /// civil war deaths): 30 `civil_war_famine` and 31 `civil_war_flight` (`other`
 /// = the destination region). No field moves, so no version bump; a build that
 /// predates them refuses such a stream on the kind range check, as above.
+/// v23 ALSO admits two more in the Empires record, appended by the rise and
+/// fall (BL-1287): 32 `rise_pressed` and 33 `overextended`, each a level the
+/// pattern's lean or backstop pressed. So the Empires record's v23 kinds are
+/// 30-33 together (civil war 30-31, rise and fall 32-33). No field moves; the
+/// kind range check is the only reader that changes, and a build that
+/// predates them refuses such a stream on it.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

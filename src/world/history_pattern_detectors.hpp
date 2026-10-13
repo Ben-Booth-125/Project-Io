@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/era_timelapse.hpp"
+#include "world/rise_fall_rules.hpp" // BL-1287: the RF constants, one place with the sim
 
 #include <cstdint>
 #include <vector>
@@ -30,7 +31,10 @@ struct settlement_state;
 //                  2026-10-11/12): the realm largest at 200 BCE peaks by 400 CE
 //                  at a share of held regions at or above the floor and under
 //                  the 500 per mille non-hegemony cap, and its share halves
-//                  within 300 years of the peak.
+//                  within 300 years of the peak, successors breaking away.
+//                  Where that realm is boxed (Ben, 2026-10-12) the rise falls
+//                  to the largest realm whose reachable ground can hold the
+//                  floor; the record names it (the first `rise_pressed`).
 //   late culture   EXPLORATION.md sec The late culture (Ben, 2026-10-10/11): the
 //                  culture most remote when the Culture round closes, lagging,
 //                  and bound in Exploration by a polity of another culture.
@@ -64,11 +68,13 @@ inline constexpr uint8_t history_pattern_bit(history_pattern p)
 }
 
 /// Provisional thresholds (named so the gate and the card read one number).
-inline constexpr int hp_rf_front_runner_year = -200; ///< the lean backs the realm largest here
-inline constexpr int hp_rf_peak_by_year      = 400;  ///< ...which peaks by this year
-inline constexpr int hp_rf_floor_q           = 250;  ///< PROVISIONAL: the floor's band is 250-350 per mille (BL-1287 sets it)
-inline constexpr int hp_rf_hegemony_q        = 500;  ///< the non-hegemony cap (BL-224), not overturned
-inline constexpr int hp_rf_fall_window_y     = 300;  ///< share halves within this many years of the peak
+// The rise and fall's constants ARE the sim's (`rise_fall_rules.hpp`, BL-1287):
+// aliased, never restated, so the detector and the backstop judge one predicate.
+inline constexpr int hp_rf_front_runner_year = rise_fall_pick_year;    ///< the lean backs the realm largest here
+inline constexpr int hp_rf_peak_by_year      = rise_fall_peak_by_year; ///< ...which peaks by this year
+inline constexpr int hp_rf_floor_q           = rise_fall_floor_pm;     ///< ruled: 25 percent (Ben, 2026-10-12)
+inline constexpr int hp_rf_hegemony_q        = rise_fall_hegemony_pm;  ///< the non-hegemony cap (BL-224), not overturned
+inline constexpr int hp_rf_fall_window_y     = rise_fall_window_years; ///< share halves within this many years of the peak
 inline constexpr int hp_lc_lag_x100          = 85;   ///< PROVISIONAL: materials mean <= 85% of the world's at the Empires close
 inline constexpr int hp_ww_window_start      = 1900;
 inline constexpr int hp_ww_window_end        = 1930; ///< inclusive
@@ -90,7 +96,14 @@ struct history_pattern_reading
     int  rf_peak_q = 0;         ///< its peak share
     int  rf_peak_year = 0;
     int  rf_fall_years = -1;    ///< peak -> first step at or under half the peak; -1 never
-    int  rf_breakaways = 0;     ///< successors that broke from it between peak and fall (reading)
+    int  rf_breakaways = 0;     ///< successors that broke from it between peak and fall (the hit needs one)
+    int  rf_boxed = -1;         ///< the boxed front-runner the rise gave way from, read off the record (-1: none)
+    int  rf_fall_q = -1;        ///< its share at the fall step
+    int  rf_margin_x100 = 0;    ///< its peak share over the next realm's at that step, x100
+    int  rf_captures = 0;       ///< seats it took up to its peak
+    int  rf_rise_level = 0;     ///< the highest rise level the record presses (`rise_pressed`)
+    int  rf_fall_level = 0;     ///< the highest overextension level (`overextended`)
+    bool rf_ended = false;      ///< it ended within the span
     std::vector<int32_t> rf_polities;
 
     // --- late culture
