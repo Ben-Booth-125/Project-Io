@@ -5349,6 +5349,14 @@ struct exploration_spend_facts
     /// (`manpower_stock * standing_army_levy_per_mille_q / 1000`). The army
     /// step is eligible only when this covers a whole step.
     int64_t levy_room           = 0;
+    /// BL-1298 (Ben, 2026-10-11: "a realm keeps only the standing army its earn
+    /// can carry") -- THE EARN'S ROOM: the paid heads this round's earn carries
+    /// (`earn x 1000 / the per-head bill`, the same `carried` the sizing reads)
+    /// less the paid heads standing after the sizing. An army step needs a
+    /// whole step of room, as it needs a whole step of levy: a budget limit in
+    /// the world, stated as the rule, so a realm never buys heads its earn
+    /// would disband the next round. -1 = unbounded (sizing off, or no bill).
+    int64_t earn_room           = -1;
 };
 
 /// Each option's score and whether it may be taken at all.

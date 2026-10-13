@@ -1099,7 +1099,9 @@ exploration_spend_scores score_exploration_spend(const history_sim_params&     p
     // eligibility reads is the treasury AFTER upkeep) and the levy bound: a
     // step is a whole step of heads the seat's pool can actually lend.
     s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q
-                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1);
+                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1)
+                   // BL-1298: and the earn carries the step (`earn_room`, -1 = no bound).
+                   && (f.earn_room < 0 || f.earn_room >= std::max<int64_t>(p.standing_army_build_step_q, 1));
     s.army_q = (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
 
     // PORT and NAVY share the OUTWARD pull: expansion, and wants only water reaches.
@@ -1578,10 +1580,24 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         const int64_t years_q = std::max(step_years, 1);
         const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
         const bool had_navy = q.navy_stock > 0; // the round's OPENING fleet, for the lapse record
+        int64_t earn_carry_cap = -1; // BL-1298: -1 = no bound (sizing off, or no bill)
         {
             int64_t heads = realm_paid[pi];
             const int64_t rate  =
                 std::max<int64_t>(params.standing_army_upkeep_per_1000_heads_year_q, 0) * years_q;
+            // BL-1298: what the round's earn carries, read once -- the sizing
+            // below disbands down to it and the army step may not buy past it.
+            // It excludes the 1200 fold (a one-off windfall is not an earn the
+            // realm can pay a standing army from), by construction: the fold
+            // is credited above, before `purse_before_earn`, and is not in
+            // these terms.
+            if (params.standing_army_sized_to_earn && rate > 0)
+            {
+                const int64_t round_earn_all = std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                earn_carry_cap = round_earn_all >= (INT64_MAX / 1000) ? INT64_MAX
+                                                                      : (round_earn_all * 1000) / rate;
+            }
             // ---- BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS. ----
             // EXPLORATION.md sec Force persists now (Ben, 2026-10-11,
             // overturning NR-878 for the standing army): "a realm keeps only
@@ -1613,6 +1629,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                         const int64_t gone = paid - kept;
                         r.standing_army = kept;
                         r.army_stock    = std::max<int64_t>(r.army_stock - gone, 0);
+                        // Clamped at the pool's ceiling exactly as BL-972's
+                        // unpaid decay and `muster_garrison`'s disband are: a
+                        // head past the ceiling is not returned (known, kept).
                         const int64_t ceiling = manpower_ceiling(r.population, r.work_manpower_mod);
                         r.manpower_stock = clampi64(r.manpower_stock + gone, 0, ceiling);
                         kept_sum += kept;
@@ -1795,6 +1814,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.levy_room           =
             (std::max<int64_t>(seat.manpower_stock, 0)
              * clampi(params.standing_army_levy_per_mille_q, 0, 1000)) / 1000;
+        // BL-1298: the earn's room, after the sizing (`realm_paid` is post-sizing).
+        facts.earn_room = earn_carry_cap < 0 ? -1
+                        : std::max<int64_t>(earn_carry_cap - realm_paid[pi], 0);
         const exploration_spend_scores pick_scores = score_exploration_spend(params, facts);
         const exploration_spend_option pick = choose_exploration_spend(pick_scores);
         if (spend != nullptr) // BL-1152 diagnosis, report only
@@ -10809,6 +10831,9 @@ int64_t industry_points_crowd_brake(const std::vector<region>& regions,
     // units are worth (`industry_points_for_treasury_units`) never exceed
     // kept_points, so the residue is >= 0. At a rate divisible by 1000 this
     // is the per-unit arithmetic it replaced, digit for digit.
+    // Below one unit's worth of points the residue still converts on the
+    // least crowded receiver (at most one unit's points a conversion; known,
+    // kept -- the same residue rule as before BL-1298).
     const int64_t r = points_per_1000_units;
     const int64_t kept_units = (kept_points / r) * 1000 + ((kept_points % r) * 1000) / r;
     spread[best].second += kept_points - industry_points_for_treasury_units(kept_units, r);

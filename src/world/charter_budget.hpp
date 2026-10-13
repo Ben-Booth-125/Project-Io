@@ -639,6 +639,10 @@ struct charter_spend_report
     /// pending exactly as a no-ground champion does (booked `chain_infeasible`
     /// until a fallback takes it). Report-only.
     int champions_passed_over = 0;
+    /// BL-1298 / BL-1283: passed-over champions chartered back at their own
+    /// centre after the walk because no later centre of the nation landed the
+    /// champion (a nation keeps its champion). Report-only.
+    int champions_restored = 0;
     std::vector<entity_id>       firms;        ///< ascending id
     std::vector<charter_record>  charters;     ///< ascending corp id
     std::vector<charter_unspent> unspent;      ///< ascending (centre, reason); zero rows omitted

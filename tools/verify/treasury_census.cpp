@@ -186,7 +186,7 @@ struct span_flows
     int64_t tribute = 0, purchases = 0;
     int64_t army_bill = 0, navy_bill = 0, ports = 0, navies = 0, armies = 0, roads = 0, industry = 0;
     int64_t kept_by_crowding = 0;
-    int64_t levy = 0, disbanded = 0, sized_rounds = 0, ip_from_treasury = 0;
+    int64_t levy = 0, disbanded = 0, sized_rounds = 0, ip_from_treasury = 0, army_steps = 0;
     void add(const span_flows& o)
     {
         ran = ran || o.ran;
@@ -195,7 +195,7 @@ struct span_flows
         consolidation += o.consolidation; tribute += o.tribute; purchases += o.purchases;
         army_bill += o.army_bill; navy_bill += o.navy_bill; ports += o.ports; navies += o.navies;
         armies += o.armies; roads += o.roads; industry += o.industry; kept_by_crowding += o.kept_by_crowding;
-        levy += o.levy; disbanded += o.disbanded; sized_rounds += o.sized_rounds; ip_from_treasury += o.ip_from_treasury;
+        levy += o.levy; disbanded += o.disbanded; sized_rounds += o.sized_rounds; ip_from_treasury += o.ip_from_treasury; army_steps += o.army_steps;
     }
     int64_t earned() const { return earn_endow + earn_corr + earn_trade + consolidation + levy; }
     int64_t spent() const { return army_bill + navy_bill + ports + navies + armies + roads + industry; }
@@ -229,6 +229,7 @@ span_flows read_span(const history_sim_state& st, const std::vector<region>& ope
     f.levy             = st.treasury_earned_levy;       // BL-1298
     f.disbanded        = st.army_disbanded_by_earn;
     f.sized_rounds     = st.army_sized_rounds;
+    f.army_steps       = st.army_steps_bought;
     f.ip_from_treasury = st.industry_points_from_treasury;
     return f;
 }
@@ -247,9 +248,10 @@ void print_span(const char* name, const span_flows& f)
     std::printf("      earn  endowment %9.0f (%4.1f%%)  corridor %9.0f (%4.1f%%)  trade %9.0f (%4.1f%%)  consolidation %9.0f (%4.1f%%)\n",
                 f.earn_endow * kCr, sh(f.earn_endow), f.earn_corr * kCr, sh(f.earn_corr),
                 f.earn_trade * kCr, sh(f.earn_trade), f.consolidation * kCr, sh(f.consolidation));
-    std::printf("      levy  %9.0f (%4.1f%%)  | army sized to earn: %lld polity-rounds, %lld heads disbanded | industry points from treasury %lld\n",
+    std::printf("      levy  %9.0f (%4.1f%%)  | army sized to earn: %lld polity-rounds, %lld heads disbanded; army steps bought %lld | industry points from treasury %lld\n",
                 f.levy * kCr, sh(f.levy), static_cast<long long>(f.sized_rounds),
-                static_cast<long long>(f.disbanded), static_cast<long long>(f.ip_from_treasury));
+                static_cast<long long>(f.disbanded), static_cast<long long>(f.army_steps),
+                static_cast<long long>(f.ip_from_treasury));
     std::printf("      spend army bill %9.0f (%4.1f%%)  navy bill %9.0f (%4.1f%%)  ports %8.0f (%4.1f%%)  navies %8.0f (%4.1f%%)  armies %8.0f (%4.1f%%)\n",
                 f.army_bill * kCr, sh(f.army_bill), f.navy_bill * kCr, sh(f.navy_bill),
                 f.ports * kCr, sh(f.ports), f.navies * kCr, sh(f.navies), f.armies * kCr, sh(f.armies));

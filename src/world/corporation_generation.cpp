@@ -6249,7 +6249,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         const bool is_fallback = !is_champion && pending_it != pending_champion.end()
                                  && static_cast<int64_t>(cc.points) >= specialist_price;
         // BL-1298 / BL-1283 (2026-10-13): passed over where no chain can close,
-        // unless this is the nation's last affording centre. A passed-over
+        // unless this is the nation's last affording centre. (The body state
+        // the walk fixed before it -- B, the shares, the yards -- counted the
+        // champion on the pre-walk champion centre's body; a pass-over moves it
+        // within the nation, almost always on the same body. Known, kept.) A passed-over
         // CHAMPION centre books its set-aside as `chain_infeasible` and leaves
         // the fallback pending, as a no-ground champion does; a passed-over
         // fallback leaves the pending champion where it was.
@@ -6983,6 +6986,50 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 opened.balance          = opened.starting_capital;
             }
         }
+    }
+
+    // --- BL-1298 / BL-1283: A NATION KEEPS ITS CHAMPION ----------------------
+    // The processing test (Ben, 2026-10-13) moves a champion; it never takes
+    // one away. A champion centre passed over for want of a processor-capable
+    // market whose nation no later centre gave a champion -- every fallback
+    // found no ground, or none could afford -- charters it back here, at that
+    // centre, on its own windows and then, as the must-charter reconciliation
+    // does, on any land tile of its nation nearest the centre
+    // (`charter_specialist_at`, nation_wide). Its set-aside, booked
+    // `chain_infeasible` when it was passed over, is spent on it: the booking
+    // moves from unspent to spent, so every balance holds. Nations in id order
+    // (the map's), so the pass is deterministic. A centre passed over for want
+    // of GROUND is not retried: that is the 2026-10-11 rule's own outcome.
+    for (const auto& [nation, pf] : pending_champion)
+    {
+        if (pf.why != charter_unspent_reason::chain_infeasible)
+            continue;
+        charter_centre& cc = centres[pf.centre_index];
+        const int32_t price = static_cast<int32_t>(pf.set_aside);
+        charter_rung rung = charter_rung::centre_window;
+        charter_unspent_reason why = charter_unspent_reason::window_exhausted;
+        output_want spec_want;
+        const output_want* spec_want_p = nullptr;
+        if (const auto bsit = bodies.find(cc.body); bsit != bodies.end())
+        {
+            const charter_body_state& sbs = bsit->second;
+            spec_want = measure_output_want(w, reg, cc.body, sbs.consumer_demand);
+            std::array<bool, resource_count> capped{};
+            for (std::size_t r = 0; r < resource_count; ++r)
+                capped[r] = sbs.per_good_cap >= 0 && sbs.firms_by_resource[r] >= sbs.per_good_cap;
+            raise_by_prospective(w, reg, chain, sbs.prospective, market_for_tile(w, cc.tile),
+                                 spec_want.want, spec_want.production, capped);
+            spec_want_p = &spec_want;
+        }
+        std::vector<entity_id> assets;
+        const entity_id corp_id = charter_specialist_at(w, reg, cc, settle, spend, seed, occupied,
+                                                        chain, spec_want_p, rung, why, assets,
+                                                        /*nation_wide=*/true);
+        if (corp_id == null_entity)
+            continue;   // the nation holds no free land at all: booked as it stands
+        cc.unspent[static_cast<std::size_t>(charter_unspent_reason::chain_infeasible)] -= price;
+        record(corp_id, cc, /*specialist=*/true, rung, assets, price);
+        ++rep.champions_restored;
     }
 
     // --- NR-905: THE EVEN SHARE'S GAP ------------------------------------------
