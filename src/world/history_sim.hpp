@@ -5078,6 +5078,8 @@ struct history_sim_state
     int64_t     world_war_regions_razed = 0;  ///< Regions razed (each once in the war).
     int64_t     world_war_front_rounds  = 0;  ///< (region, round) pairs on a front.
     int64_t     world_war_roads_demoted = 0;  ///< Corridors demoted one tier.
+    int64_t     world_war_post_roads_rebought   = 0; ///< Demoted Post Roads a purchase rebuilt (the only way back to tier 3).
+    int64_t     world_war_walks_held_below_post = 0; ///< Walks on a demoted Post Road held one use under tier 3.
     int64_t     world_war_points_razed_scale    = 0; ///< `industry_points` razed, the scale part
     int64_t     world_war_points_razed_treasury = 0; ///< ... and the treasury-paid part (`industry_points_from_treasury`)
     int64_t     world_war_port_razed_q  = 0;  ///< Port stock razed, summed per mille.

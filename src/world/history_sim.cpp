@@ -3621,7 +3621,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // BL-1289: a demoted Post Road is not re-promoted by a walk.
         if (before < 3 && uses >= params.road_tier3_uses && !ww_held_below_post.empty()
             && ww_held_below_post.count(edge_key(a, b)))
+        {
             uses = params.road_tier3_uses - 1;
+            ++out.world_war_walks_held_below_post;
+        }
         const int after = road_tier_for_uses(uses);
         if (after == before) return;
 
@@ -3823,7 +3826,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         seat.treasury -= params.post_road_treasury_cost;
         road_uses_live[edge_key(a, b)] = params.road_tier3_uses;
-        ww_held_below_post.erase(edge_key(a, b)); // BL-1289: bought back, it is a Post Road again
+        if (ww_held_below_post.erase(edge_key(a, b)) > 0) // BL-1289: bought back, it is a Post Road again
+            ++out.world_war_post_roads_rebought;
         ++roads_version;
         ++out.post_roads_built;
         out.treasury_spent_on_roads += params.post_road_treasury_cost;

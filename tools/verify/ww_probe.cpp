@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -67,6 +68,35 @@ int main(int argc, char** argv)
                     static_cast<long long>(hs.world_war_treasury_spent),
                     static_cast<long long>(hs.industry_points_from_scale),
                     static_cast<long long>(hs.industry_points_from_treasury));
+        // Demotions on the record (a road_promoted below the corridor's last
+        // tier) and how many of those corridors traffic promoted again later.
+        {
+            std::map<std::pair<int, int>, int> tier;
+            std::map<std::pair<int, int>, int> demoted_at;
+            int demotions = 0, back_up = 0, post_back = 0;
+            for (const lapse_event& e : hs.events)
+            {
+                if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
+                const std::pair<int, int> k{e.region, e.other};
+                const auto it = tier.find(k);
+                const int was = it == tier.end() ? 0 : it->second;
+                if (static_cast<int>(e.polity) < was) { ++demotions; demoted_at[k] = was; }
+                else if (demoted_at.count(k))
+                {
+                    ++back_up;
+                    if (e.polity >= 3 && demoted_at[k] >= 3) ++post_back;
+                }
+                tier[k] = e.polity;
+            }
+            // A demoted Post Road comes back to tier 3 only by purchase: every
+            // tier-3 re-promotion on the record must be a counted rebuy.
+            std::printf("    road demotions on the record %d of %lld (the rest were carried in, with no prior event here);"
+                        " promoted back by 1960 %d, %d to Post Road (%lld rebought, %lld walks held under tier 3)\n",
+                        demotions, static_cast<long long>(hs.world_war_roads_demoted), back_up, post_back,
+                        static_cast<long long>(hs.world_war_post_roads_rebought),
+                        static_cast<long long>(hs.world_war_walks_held_below_post));
+            if (post_back > hs.world_war_post_roads_rebought) ++failures;
+        }
         std::printf("    population by step:");
         for (const timelapse_step& st : hs.steps)
         {
