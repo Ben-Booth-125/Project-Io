@@ -71,8 +71,10 @@ int main(int argc, char** argv)
     std::vector<uint32_t> seeds;
     int diffusion = -1, horizon = -1, step = -1; // overrides for the Empires REPLAY (a measuring ladder)
     bool trace = false;
+    bool plain = false; // --plain: world_params{} with no works table and the default config (history_sim_harness's worlds)
     for (int i = 1; i < argc; ++i)
         if (std::strcmp(argv[i], "--trace") == 0) trace = true;
+        else if (std::strcmp(argv[i], "--plain") == 0) plain = true;
         else if (std::strcmp(argv[i], "--diffusion") == 0 && i + 1 < argc) diffusion = std::atoi(argv[++i]);
         else if (std::strcmp(argv[i], "--horizon") == 0 && i + 1 < argc) horizon = std::atoi(argv[++i]);
         else if (std::strcmp(argv[i], "--isolation-step") == 0 && i + 1 < argc) step = std::atoi(argv[++i]);
@@ -96,11 +98,13 @@ int main(int argc, char** argv)
     int diverged = 0, hits = 0;
     for (const uint32_t seed : seeds)
     {
-        world_params p = arc_params(world_arc::shipped);
+        world_params p = plain ? world_params{} : arc_params(world_arc::shipped);
         p.seed = seed;
         generation_report     rep{};
         era_minus_one_fixture fx{};
-        world w = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
+        world w = plain ? make_hard_coded_world(p, &rep, world_gen_config{}, nullptr, nullptr, &fx)
+                        : make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
+        if (rep.handoff_invalid) std::printf("seed %u: HANDOFF VIOLATION %s\n", seed, rep.handoff_violation.c_str());
         (void)w;
         const generation_report::body_entry* home = nullptr;
         for (const generation_report::body_entry& b : rep.bodies) if (b.is_homeworld) { home = &b; break; }
