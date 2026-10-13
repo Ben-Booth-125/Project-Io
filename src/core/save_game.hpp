@@ -294,6 +294,14 @@ inline constexpr uint32_t save_game_magic =
 /// 30-33 together (civil war 30-31, rise and fall 32-33). No field moves; the
 /// kind range check is the only reader that changes, and a build that
 /// predates them refuses such a stream on it.
+/// v23 ALSO admits 39 `revolution` in the Industrialisation record (BL-1294,
+/// INDUSTRIALISATION.md sec Revolution: a splinter takes the whole realm --
+/// `region` the city it rose in, `other` the new regime). 34-38 are held by
+/// other sprint-53 lanes; the range check admits them under this version
+/// whether or not their writers have landed. The takeover's NEW NAME rides
+/// the record's existing realm name table (`era_timelapse::polity_name`) and
+/// its old name the Exploration record's entry for the same id, so no string
+/// and no field is added. No field moves, so no version bump.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

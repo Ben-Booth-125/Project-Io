@@ -681,6 +681,21 @@ void app::draw_seat_screen()
                         }
                         realm_line += ".";
                     }
+                    // BL-1294 (INDUSTRIALISATION.md sec Revolution): a realm a
+                    // revolution took reads by its new name everywhere; the
+                    // card says when, and what it was called before -- the
+                    // Exploration record's entry for the same id.
+                    for (const lapse_event& e : home->industrialisation_timelapse.events)
+                    {
+                        if (e.kind != static_cast<uint8_t>(lapse_event_kind::revolution)
+                            || e.polity != static_cast<uint16_t>(pol)) continue;
+                        const std::vector<std::string>& before = home->exploration_timelapse.polity_name;
+                        const std::string old_name = static_cast<std::size_t>(pol) < before.size()
+                                                         ? before[static_cast<std::size_t>(pol)] : std::string{};
+                        realm_line += " Taken by revolution in " + std::to_string(e.year);
+                        realm_line += old_name.empty() ? std::string(".") : "; formerly " + old_name + ".";
+                        break;
+                    }
                 }
                 break;
             }

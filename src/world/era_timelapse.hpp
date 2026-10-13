@@ -227,6 +227,8 @@ enum class lapse_event_kind : uint8_t
     civil_war_flight    = 31, ///< BL-1290: as above, a further share FLED to the nearest safe region of the same people that could feed them (conserved: exactly the heads landed left; no ceiling moves). `region` = the region fled, `polity` = its holder, `other` = the destination REGION (a region index, as `trade_link_opened`'s `other`).
     rise_pressed        = 32, ///< BL-1287: the rise and fall's lean pressed the realm largest at 200 BCE one level harder on its way up (CIVILISATION.md sec How an empire actually falls) — its campaigns pressed, its network carrying further, its victories steadying it. `region` = its capital, `polity` = the realm, `other` = the level (1 = the lean, more = the backstop's escalation). Empires record only.
     overextended        = 33, ///< BL-1287: after its peak the same realm's network was overextended one level further — its roads and works decay on the ground (`work_reach_mod`) and its far garrisons go home to the capital, so far ground falls under the secession floor and walks away (BL-896). `region` = its capital, `polity` = the realm, `other` = the level. Empires record only.
+    // 34-38 are held by other sprint-53 lanes (append only, never renumber).
+    revolution          = 39, ///< BL-1294 (INDUSTRIALISATION.md sec Revolution, Ben 2026-10-10/12): a splinter rose in a realm whose cities stood far apart and TOOK THE WHOLE NATION -- the same polity id and ground, a NEW REGIME and a newly COINED NAME (the one sanctioned rename, CIVILISATION.md sec A realm's name). `region` = the city the splinter rose in, `polity` = the realm, `other` = its new regime (`polity::regime`, 1 = the first regime after its founding one). The OLD name is the Exploration record's realm name table entry for the same id; the record's own table carries the new. Industrialisation record only (save_game LAYOUT 23 note).
     count};
 
 /// No party in this slot — a founding has no killer, a cradle culture no parent.
@@ -301,7 +303,12 @@ struct era_timelapse
     /// included, so an index that names them stays valid across records.
     /// Empty on the migration record (its owners are cultures) and on a body
     /// the era never ran for; filled from the polity table whether or not the
-    /// playback was recorded, since the names live on the polities. Never read
+    /// playback was recorded, since the names live on the polities. ONE
+    /// SANCTIONED RENAME (BL-1294, INDUSTRIALISATION.md sec Revolution): a
+    /// realm a revolution took carries its NEW name here, and the record's
+    /// `revolution` event names it; its old name is the entry for the same id
+    /// on the record before (the Exploration record's table), so the two
+    /// tables and the event together carry both. Never read
     /// by the sim: record data, not world state. Written after the three
     /// tables above (save_game_version 22).
     std::vector<std::string>     polity_name;
@@ -468,6 +475,18 @@ struct era_lapse_tap
         std::lock_guard<std::mutex> lock(mutex);
         for (std::size_t i = polity_name.size(); i < all_names.size(); ++i)
             polity_name.push_back(all_names[i]);
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
+    /// Worker side (BL-1294): THE ONE SANCTIONED RENAME. A revolution
+    /// (`lapse_event_kind::revolution`) gives a realm a newly coined name, so
+    /// the entry already copied for id @p id is restated in place -- the only
+    /// write to the table that is not a tail append. Ignored for an id the
+    /// tap does not hold yet (the next `publish_polity_names` copies it).
+    void restate_polity_name(std::size_t id, const std::string& name)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (id < polity_name.size()) polity_name[id] = name;
         epoch.fetch_add(1, std::memory_order_release);
     }
 

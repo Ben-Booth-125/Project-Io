@@ -1107,7 +1107,10 @@ backwards into a phase that has no price
 culture, its `speech` — the same pure function of the tongue that coins that people's cities and
 region words, so a realm and everything else in its sound system read as kin
 (`NATION_GENERATION.md` § Pass 5 — Naming holds the register of naming sites). Nothing renames it
-afterwards: not a re-seating, not the loss of its seat, not a span boundary. The seat a polity rose
+afterwards: not a re-seating, not the loss of its seat, not a span boundary. **The one sanctioned
+rename is a revolution** in the Industrialisation span (`INDUSTRIALISATION.md` § Revolution): the realm
+keeps its id and ground and is coined a new name in the same tongue; the record before carries the old
+name by id, and the revolution event links the two. The seat a polity rose
 from is where the name is coined, never what the name IS.
 
 **The record carries the name beside the region table.** The time-lapse record holds a

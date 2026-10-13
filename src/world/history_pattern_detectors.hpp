@@ -127,14 +127,14 @@ struct history_pattern_reading
     std::vector<int32_t> cw_polities;
 
     // --- revolution
-    int  rv_count = 0;          ///< takeovers recorded (no revolution event kind exists yet: always 0)
+    int  rv_count = 0;          ///< takeovers recorded (`revolution` events on the Industrialisation record, BL-1294)
     int  rv_proxy = 0;          ///< READING ONLY: Industrialisation successors that took or ended their parent
     std::vector<int32_t> rv_polities;
 
     /// Every (polity, pattern) a hit names, DATED: the year the pattern touched
     /// that polity (rise and fall: its peak; late culture: the binding; world
     /// war: the polity's first conflict moment in the window; civil war: the
-    /// fight that made it one). The tag fold replays the record's endings and
+    /// fight that made it one; revolution: the takeover). The tag fold replays the record's endings and
     /// splits after these dates (`fold_history_pattern_tags`), so a tag passes
     /// only to realms that inherit or end its holder AFTER it was earned.
     struct grant { int32_t polity = -1; int32_t year = 0; uint8_t pattern = 0; };
