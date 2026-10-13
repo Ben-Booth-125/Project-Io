@@ -111,6 +111,10 @@ is the designated action area and keeps its buttons; the centre's paged accordio
 pages that report. Where a page's whole content is a control — a recipe switcher, a workforce
 slider — that page moves to the ledger for its kind.
 
+**One exception, by a later ruling: the expanded building card carries the workforce slider**
+(Ben, 2026-10-13; § The building element's layout). It writes through the ledger's own control
+body, so there is still one writer. The method switch and every other lever stay in the ledgers.
+
 The rule composes with the **menus-are-broad-ledgers** test in `MENU.md` rather than fighting it.
 That test asks whether a *surface* earns a rail slot; this one asks where a *control* lives once
 the surface exists. A ledger may be entered by a targeted press without becoming a targeted
@@ -153,8 +157,11 @@ a tile keep the shared header (§ Layout & chrome).
    which is a claim about what the tile looks like that the bake then contradicts a moment
    later. A bar says the true thing: the picture is coming.
 2. **Province — one titled card**, province grain throughout, the selected tile serving only
-   to name which province is meant. No pager: everything the province answers fits one card.
-   Top to bottom:
+   to name which province is meant. No pager: everything the province answers fits one card,
+   and **the card itself never scrolls** — only the resource table does, inside its own rows
+   (Ben, 2026-10-13, round 2). Top to bottom:
+   - **The header row** — the title, then the **capacity bar, narrowed** to share the row, then
+     the **population count right-aligned** at the row's end.
    - **Capacity** — the province's building count against its **province building ceiling**
      (`../economy/PRODUCTION.md` § The province building ceiling), drawn as a **bar**. Hovering
      the bar opens a tooltip naming **where the capacity is granted** — the ceiling's four
@@ -169,10 +176,13 @@ a tile keep the shared header (§ Layout & chrome).
      across member tiles — a deposit is a stock, so several tiles each holding a little iron *is*
      one province holding that much). Richest deposit first. This one table replaces the former
      separate Buildings and Deposits sections: they were two readings of the same rows.
-   - **Population** — the province total in thousands, then each population centre by name
-     with its scale word (Outpost / Settlement / Town / City / Metropolis, POPULATION.md
-     § Scale bonus model), headcount and habitability, largest first; a centre standing on the
-     *selected tile itself* is marked. Province grain because the data model is.
+     It takes the rest of the card's height and **scrolls inside itself**.
+   - **Population** — the province total in thousands, **top right of the header row**.
+     Hovering it lists each population centre by name with its scale word (Outpost /
+     Settlement / Town / City / Metropolis, POPULATION.md § Scale bonus model), headcount and
+     habitability, largest first; a centre standing on the *selected tile itself* is marked.
+     The list moved into the hover so the table can have the card's height. Province grain
+     because the data model is.
 
    On unpartitioned ground (ocean) the card says there is no province and falls back to the
    tile's own deposits.
@@ -262,15 +272,17 @@ consequences (settled 2026-08-11; the drill and click model re-ruled Ben, 2026-1
   buildings by `(type, target)`; the tile card's building grid and the management surface
   (`draw_selected_section`, `src/ui/construction_panel.cpp`) both read that grouping, one
   button or row per stack.
+- **A canvas press selects the tile, and the tile opens on its building grid** (Ben,
+  2026-10-13, round 2: *"default tile selection to the list of buildings rather than any
+  individual building"*). This REVERSES the 2026-07-22 rule that a press on a single-building
+  hex lands on the installation: the grid is one press from any building on it, and a hex
+  that opened on a building hid that it was a tile with a province at all.
 - **Selecting a building IS selecting its tile, with that building expanded.** There is no
-  separate building element. Every route that selects a building — a canvas press on a
-  single-building hex (Ben, 2026-07-22: the whole hex belongs to the installation), the
-  repeat-click cycle's Building rung, a ledger row — sets `selected_entity` to the building,
-  and the band draws the **host tile's** card with that building's stack expanded in the tile
-  column. A press on a building button in the grid does the same. So a single-building tile
-  and a drilled-into stack reach the identical view either way, and every existing selecting
-  surface keeps working unchanged. A **"‹ this tile's buildings"** back control on the
-  expanded card selects the tile again and returns to the grid.
+  separate building element. The routes that select a building — a press on its button in the
+  grid, the repeat-click cycle's Building rung, a ledger row — set `selected_entity` to the
+  building, and the band draws the **host tile's** card with that building's stack expanded in
+  the tile column. An unlabelled **‹** back control on the expanded card selects the tile again
+  and returns to the grid.
 - **On the canvas: a cluster, no marker.** A built tile draws no glyph and no count badge; it
   stands a cluster of up to three structures, one per stack, baked into the ground
   (RENDERING.md § Installations). The count is read on the stack's button in the tile card.
@@ -335,43 +347,37 @@ A building is **not a layout of its own** (Ben, 2026-10-13): it is the tile card
 stack **expanded in place** (§ Multi-building tiles). Player-owned and rival buildings alike.
 The preview and the province card do not move; two columns change.
 
-1. **The tile column becomes the building's card** — one titled card, no pager, headed by the
-   building name and a **"‹ this tile's buildings"** back control. A status line first: the
-   building's **running state with its reason** (*Running*; *Idle — input short: Steel, over
-   the fair-price ceiling*), or its construction rate and ETA while it is still building —
-   never a bare "Operating.". Below it, for the player's own completed building with profit
-   data, the **Profitability** charts. A **rival's** card is the status line plus owner name
-   and an explicit `private` row for production (DISCOVERY.md, the competitor-visibility rule;
-   there is no stockpile row — no corporation holds one, `../economy/MARKETS.md` § The shelf
-   economy).
+1. **The tile column becomes the building's card** — one card, no pager, laid out to the
+   card's height with no scrollbar (Ben, 2026-10-13, round 2). Top to bottom:
+   - **The header row** — an unlabelled **‹** back control, the building name, and the
+     **number of buildings** in the stack (*Steel Mill ×3*).
+   - **The production method** — the stack's active recipe by name (an extraction site names
+     the good it extracts), then the status line: the **running state with its reason**
+     (*Running*; *Idle — input short: Steel, over the fair-price ceiling*), or the construction
+     rate and ETA while it is still building — never a bare "Operating.".
+   - **The profit row** — **left**, a short **net-over-time line chart** ("Net, 6 mo.", the
+     honest placeholder series anchored to the live estimate, since no per-building profit
+     history is tracked — NR-249); **right**, the **net profit per quarter** as one figure,
+     coloured by sign, with **expenses per quarter** below it as one figure. Hovering expenses
+     splits it into `input_cost` / `maintenance` / `wages` (NR-248). The column chart of
+     revenue against stacked expenses and the Inputs bar chart are retired: one number says
+     what the column pair said, in a fraction of the height.
+   - **The workforce row** — a **horizontal workforce slider** with the current percentage
+     to its right, writing `workforce_target` through the same body the Construction ledger's
+     Buildings view uses (`draw_building_workforce_page`'s control), never a second writer. A
+     manual edit clears **Auto**, as it does in the ledger.
 
-   The **Profitability** charts (`draw_building_profit`) are laid out to the card's height with
-   no scrollbar (the vertical budget is `ImGui::GetContentRegionAvail().y`; NR-250 records the
-   clamp numbers):
-     - **Left third — Revenue vs a SEGMENTED Expenses bar** (`draw_revenue_expense_bars`,
-       hand-drawn since `ui::charts::draw_bars` has no stacked-column notion). Revenue is one
-       plain bar; Expenses stacks `input_cost` / `maintenance` / `wages` as three shaded
-       segments in one column — the finest split `building_profit.hpp` tracks (NR-248).
-       **Hovering a segment** shows a tooltip naming it ("Input cost: 12.4", etc.).
-     - **Right two-thirds — a "Net, 6 mo." line chart** (`ImGui::PlotLines`) — no per-building
-       profit HISTORY is tracked, so this is a smooth deterministic series anchored to the live
-       net-profit estimate, 6 points for "6 months" — the honest-placeholder idiom (NR-249).
-     - **Below the row — an "Inputs" bar chart** (`draw_input_basket_chart`): the active
-       recipe's input quantities as bars, with a **hover tooltip** naming each input resource
-       rather than a permanent legend. Absent for a building with no recipe
-       (`extraction_site`), in which case the row above takes the full page height.
-   The charts are drawn only once the building is complete (`ticks_remaining <= 0`) **and**
-   `estimate_building_profit` reports `has_data`; otherwise the status line is the card. A
-   rival's card never tests those guards: it short-circuits to the status line, rather than
-   testing each guard against data it must not show.
+   The profit and workforce rows are drawn only for the player's own completed building
+   (`ticks_remaining <= 0`) with profit data (`estimate_building_profit`'s `has_data`); a
+   building still under construction shows the header, method and status. A **rival's** card
+   is the header, owner name and an explicit `private` row for production (DISCOVERY.md, the
+   competitor-visibility rule) — it short-circuits rather than testing each guard against data
+   it must not show.
 
-   **Method and Workforce are NOT on this card.** Their whole content was a control,
-   and the centre presents data (§ The centre presents; it does not operate). They are drawn by
-   the **Construction ledger's Buildings view** — the same `draw_production_method_section` and
-   `draw_building_workforce_page` bodies, called from `construction_panel.cpp`, never a second
-   set of controls writing `workforce_target` and `try_switch_recipe`. The Buildings view reads
-   `ui_state::selected_entity`, so a building selected on the map and a building selected from
-   that view's own roster reach the same levers: the two selectors compose.
+   **The workforce slider is a lever on the centre, and that REVERSES the 2026-08-29 ruling**
+   (§ The centre presents; it does not operate) for workforce alone, newest-dated winning (Ben,
+   2026-10-13). The method switch stays in the Construction ledger's Buildings view; the card
+   names the method and does not switch it.
 
 2. **The action grid retargets to the building** — the same 2×3 cell layout, now holding
    four building-level actions. This is the element's designated place to ACT; the cards are
