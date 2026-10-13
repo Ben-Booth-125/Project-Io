@@ -2867,7 +2867,10 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(rp.colour));
-            fit_text(text_box::table_cell, "selection.province.resource", rp.name,
+            // Agricultural Produce reads "Farm" here (Ben, 2026-10-14): the row's
+            // question is what can be built, and the 247 px card elided the long name.
+            const char* row_label = (r.resource == resource_type::agricultural_produce) ? "Farm" : rp.name;
+            fit_text(text_box::table_cell, "selection.province.resource", row_label,
                      ImGui::GetContentRegionAvail().x);
             ImGui::PopStyleColor();
             ImGui::TableSetColumnIndex(1);
