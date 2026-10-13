@@ -1977,6 +1977,45 @@ int chain_recipe_placeable(world& w, const recipe_registry& reg, chain_reach& cr
     return chain_recipe_tier(w, reg, cr, self, consumer_market, rc, own);
 }
 
+/// BL-1298 / BL-1283 (Ben, 2026-10-13; CORPORATION_GENERATION.md § Pass 1, "A
+/// champion is chartered where it can process") — CAN THE MARKET AT @p tile
+/// STAND A PROCESSOR? True when some processing recipe that runs at @p tile and
+/// takes at least one input has, for EVERY input, a producer within reach of the
+/// tile's market — BL-1185's chain tier (`chain_input_tier`), read over the
+/// buildings standing now. A recipe with no inputs proves nothing about the
+/// market and is not counted. The champion test: a nation's champion is not
+/// chartered at a centre whose market cannot close a chain while a later
+/// affording centre of the nation might. Read-only on the economy; it warms
+/// the reach memo exactly as every placement read does.
+bool chain_market_can_process(world& w, const recipe_registry& reg, chain_reach& cr,
+                              entity_id tile)
+{
+    if (w.tiles.find(tile) == w.tiles.end())
+        return false;
+    const entity_id market = market_for_tile(w, tile);
+    if (market == null_entity)
+        return false;
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        if (!recipe_runs_at_tile(w, rc, tile))
+            continue;
+        bool any_input = false, feasible = true;
+        for (std::size_t r = 0; r < resource_count && feasible; ++r)
+        {
+            if (!(rc.inputs[r] > 0.0f))
+                continue;
+            any_input = true;
+            if (chain_input_tier(w, reg, cr, null_entity, market, r, nullptr) == chain_tier_none)
+                feasible = false;
+        }
+        if (any_input && feasible)
+            return true;
+    }
+    return false;
+}
+
 /// Browse indices of the in-band processing recipes that output @p good, in the
 /// gap selection's own preference: most output of the good first, ties to
 /// registry order (`best_recipe_for_gaps` on that good alone ranks the same way).
@@ -5820,6 +5859,20 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
         window.reserve(ranked.size());
         for (const auto& r : ranked)
             window.push_back(r.second);
+        // BL-1298 / BL-1283 (Ben, 2026-10-13): a chain-feasible site first —
+        // ground whose market can stand a processor, in the same nearest-first
+        // order, then the rest. One read per market (nothing is placed while
+        // the window is ordered).
+        {
+            std::map<entity_id, bool> market_ok;
+            std::stable_partition(window.begin(), window.end(), [&](entity_id tid) {
+                const entity_id m = market_for_tile(w, tid);
+                auto it = market_ok.find(m);
+                if (it == market_ok.end())
+                    it = market_ok.emplace(m, chain_market_can_process(w, reg, chain, tid)).first;
+                return it->second;
+            });
+        }
         // THE FOCUS FIRST, THEN THE OTHERS in enum order: a small nation can hold
         // no free deposit for an extraction anchor and still hold workable land
         // a processing or trading anchor stands on. The champion takes the
@@ -6146,8 +6199,27 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         int64_t                set_aside    = 0;
     };
     std::map<entity_id, pending_fallback> pending_champion;
+    // BL-1298 / BL-1283 (Ben, 2026-10-13): A CHAMPION IS CHARTERED WHERE IT CAN
+    // PROCESS. Per nation, the walk position of its LAST affording centre: a
+    // champion (or fallback) centre whose market cannot stand a processor
+    // (`chain_market_can_process`) is passed over while a later affording
+    // centre of the nation remains, and the champion falls down the nation's
+    // centres exactly as the 2026-10-11 no-ground fallback does. At the last
+    // affording centre the test is not read, so a nation that can afford a
+    // champion still charters one wherever ground allows (the major set the
+    // budget decides is unchanged).
+    std::map<entity_id, std::size_t> last_affording_pos;
+    for (std::size_t k = 0; k < order.size(); ++k)
+    {
+        const charter_centre& oc = centres[order[k]];
+        if (oc.nation != null_entity
+            && static_cast<int64_t>(oc.points) >= spend.specialist_price_of(oc.centre))
+            last_affording_pos[oc.nation] = k;
+    }
+    std::size_t walk_pos = 0;
     for (const std::size_t oi : order)
     {
+        const std::size_t this_pos = walk_pos++;
         charter_centre& cc = centres[oi];
         if (cc.nation == null_entity)
             continue;
@@ -6176,7 +6248,26 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         const auto pending_it  = pending_champion.find(cc.nation);
         const bool is_fallback = !is_champion && pending_it != pending_champion.end()
                                  && static_cast<int64_t>(cc.points) >= specialist_price;
-        if (is_champion || is_fallback)
+        // BL-1298 / BL-1283 (2026-10-13): passed over where no chain can close,
+        // unless this is the nation's last affording centre. A passed-over
+        // CHAMPION centre books its set-aside as `chain_infeasible` and leaves
+        // the fallback pending, as a no-ground champion does; a passed-over
+        // fallback leaves the pending champion where it was.
+        const bool last_chance = [&] {
+            const auto la = last_affording_pos.find(cc.nation);
+            return la == last_affording_pos.end() || la->second == this_pos;
+        }();
+        const bool passed_over = (is_champion || is_fallback) && !last_chance
+                                 && !chain_market_can_process(w, reg, chain, cc.tile);
+        if (passed_over && is_champion)
+        {
+            const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
+            cc.points_after_specialist = cc.points - price;   // the set-aside, as planned
+            cc.unspent[static_cast<std::size_t>(charter_unspent_reason::chain_infeasible)] += price;
+            pending_champion[cc.nation] = { oi, charter_unspent_reason::chain_infeasible, price };
+            ++rep.champions_passed_over;
+        }
+        if ((is_champion || is_fallback) && !passed_over)
         {
             const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
             if (is_champion)
@@ -7670,7 +7761,22 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
             const auto cit = centres_of.find(n);
             if (cit == centres_of.end())
                 continue;
-            for (const auto& [centre_pts, centre] : cit->second)
+            // BL-1298 / BL-1283 (Ben, 2026-10-13): PREFER A CHAIN-FEASIBLE SITE.
+            // The windowed pass walks the nation's centres whose market can stand
+            // a processor first (richest first), then the rest as before; the
+            // nation-wide pass ranks such ground first inside its window
+            // (`charter_specialist_at`); consolidation merges the firms that stand
+            // and keeps their ground.
+            std::vector<std::pair<std::int32_t, entity_id>> centre_order = cit->second;
+            if (pass == 0)
+            {
+                std::stable_partition(centre_order.begin(), centre_order.end(), [&](const auto& e) {
+                    const auto t = w.population_centre_tile.find(e.second);
+                    return t != w.population_centre_tile.end()
+                        && chain_market_can_process(w, reg, chain, t->second);
+                });
+            }
+            for (const auto& [centre_pts, centre] : centre_order)
             {
                 charter_centre cc;
                 cc.centre = centre;

@@ -633,6 +633,12 @@ struct charter_spend_report
     /// pool transfer; ascending walk order.
     std::vector<charter_pool_transfer> champion_fallbacks;
     int champions_fallen_back = 0;   ///< champion_fallbacks.size(), for the log
+    /// BL-1298 / BL-1283 (Ben, 2026-10-13): champion centres passed over because
+    /// their market could not stand a processor (`chain_market_can_process`) while
+    /// a later affording centre of the nation remained. Each leaves its set-aside
+    /// pending exactly as a no-ground champion does (booked `chain_infeasible`
+    /// until a fallback takes it). Report-only.
+    int champions_passed_over = 0;
     std::vector<entity_id>       firms;        ///< ascending id
     std::vector<charter_record>  charters;     ///< ascending corp id
     std::vector<charter_unspent> unspent;      ///< ascending (centre, reason); zero rows omitted
