@@ -167,4 +167,4 @@ end
 tectonics_pair()
 
 print(string.format("lens_ledger_pairs: %d failure(s)", fails))
-verify.expect(fails == 0, "every paired ledger arms its lens on open and keeps it on close")
+verify.expect(fails == 0, "every paired ledger arms its lens on open and disarms it on close")
