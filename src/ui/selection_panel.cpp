@@ -360,7 +360,7 @@ void draw_rival_building_summary(const world& w, const recipe_registry& reg,
     else if (const auto nit = w.nations.find(owner_nation_of(w, id)); nit != w.nations.end())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Owner: %s (state industry)%s", nit->second.name.c_str(),
-                           b.state_idle ? " Â· idle: treasury short" : "");
+                           b.state_idle ? " \xc2\xb7 idle: treasury short" : "");
 
     // Tile location (public — the marker already sits on the surveyed map).
     const auto tile_it = w.tiles.find(b.tile);

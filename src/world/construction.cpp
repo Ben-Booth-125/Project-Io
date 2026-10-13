@@ -11,6 +11,7 @@
 
 #include <algorithm> // std::find (asset-list removal in demolish_building), std::max, std::clamp
 #include <cmath>     // std::lround (BL-323 S3 site-time multiplier)
+#include <limits>    // BL-1296: the founding skips the commitment gate
 
 float construction_site_multiplier(const world& w, const recipe_registry& reg,
                                    entity_id tile, building_type type, resource_type target)
@@ -283,7 +284,8 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 
 construction_result construct_state_building(world& w, const recipe_registry& reg,
                                              entity_id nation, entity_id tile,
-                                             std::uint16_t recipe, entity_id& out_building)
+                                             std::uint16_t recipe, entity_id& out_building,
+                                             bool founding)
 {
     out_building = null_entity;
     const auto nit = w.nations.find(nation);
@@ -299,7 +301,9 @@ construction_result construct_state_building(world& w, const recipe_registry& re
         return construction_result::invalid_tile;
     return construct_for(w, reg, champion, tile, building_type::processing_facility,
                          resource_type::iron_ore, out_building, recipe,
-                         state_uncommitted_treasury(w, nation), nit->second.state_assets);
+                         founding ? std::numeric_limits<float>::max()
+                                  : state_uncommitted_treasury(w, nation),
+                         nit->second.state_assets);
 }
 
 bool demolish_state_building(world& w, entity_id nation, entity_id building)

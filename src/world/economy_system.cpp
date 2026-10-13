@@ -1528,6 +1528,18 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         if (b.ticks_remaining <= 0)
         {
             b.construction_progress = 0.0f;
+            // BL-1296 fix round: a STATE site that completes this tick was
+            // funded for its construction, not for running — it runs from the
+            // next gate. Idle for the rest of this tick (no labour, inputs,
+            // output or operating cost), and the ledger says so.
+            if (own.kind == owner_kind::nation)
+            {
+                b.state_idle = true;
+                world::state_tick_ledger& led = w.state_ledger[corp];
+                --led.funded;
+                ++led.idled;
+            }
+
             // COMPLETION is when a port/hub starts anchoring supply
             // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
             // reach field goes stale at this moment too, not only at placement.
@@ -1645,10 +1657,26 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         return recipe_switch_result::wrong_air;
 
     const float cost = sw.switch_cost;
+    // BL-1296 fix round: a state retool must also fund what the NEW recipe's
+    // inputs add to this tick's bill (the gate priced the old recipe), so the
+    // switch cost and that increase both come out of the uncommitted treasury,
+    // and the increase is committed when the retool applies.
+    float bill_rise = 0.0f;
+    if (nit != w.nations.end() && !b.state_idle)
+    {
+        building_component after = b;
+        after.recipe = new_recipe_id;
+        bill_rise = std::max(0.0f, (state_building_cost_bound(w, reg, after)
+                                    - state_building_cost_bound(w, reg, b)) * 1.0005f);
+        if (!std::isfinite(bill_rise))
+            return recipe_switch_result::insufficient_funds;
+    }
     const float funds = (cit != w.corporations.end()) ? cit->second.balance
-                                                      : state_uncommitted_treasury(w, corp);
+                                                      : state_uncommitted_treasury(w, corp) - bill_rise;
     if (funds < cost)
         return recipe_switch_result::insufficient_funds;
+    if (bill_rise > 0.0f)
+        w.state_ledger[corp].committed += bill_rise;
 
     if (cit != w.corporations.end())
         cit->second.balance -= cost;
@@ -2333,16 +2361,29 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 continue;
             if (!b.workforce_auto)
                 continue;
+            // BL-1296 fix round: a STATE building's target is solved like a
+            // corporation's, but a raise is taken only when the uncommitted
+            // treasury funds what it adds to this tick's bill (committed then);
+            // otherwise the target the gate funded stands.
+            const bool state_set = (solve_owner != w.player_entity);
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue;
             // BL-613/BL-614: the solver optimises against the labour the
             // building can actually reach — its own per-building grant,
             // ordinary and qualified constraints folded.
-            b.workforce_target = solve_workforce_target(
+            const int solved = solve_workforce_target(
                 w, reg, b,
                 labour_for(building_id, solve_owner, building_body(w, b)),
                 rank_of(building_id));
+            if (state_set && solved > b.workforce_target)
+            {
+                building_component after = b;
+                after.workforce_target = solved;
+                if (!state_commit_change(w, reg, solve_owner, b, after))
+                    continue; // unfunded raise: the funded target stands
+            }
+            b.workforce_target = solved;
         }
     }
 
@@ -2995,6 +3036,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                                 best_ratio = ratio;
                                 best_i     = i;
                             }
+                        }
+                        // BL-1296 fix round: a state plant's rescue retool adds
+                        // its new inputs to this tick's bill — funded, or not taken.
+                        if (best_i >= 0 && owner != corp)
+                        {
+                            building_component after = b;
+                            after.recipe = reg.recipe_id(reg.recipe_at(building_type::processing_facility, best_i).name);
+                            if (!state_commit_change(w, reg, owner, b, after))
+                                best_i = -1;
                         }
                         if (best_i >= 0)
                         {

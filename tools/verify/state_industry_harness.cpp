@@ -46,8 +46,8 @@
 //
 // Build: bash tools/verify/build_lua_harness.sh state_industry_harness
 // Run:   build_gen/verify/state_industry_harness.exe [--strict] [seed ...]   (default: 0)
-// Exits non-zero on any FAIL. S1a is a FINDING (a fact about the generated
-// world, not the mechanics) unless --strict makes it a FAIL.
+// Exits non-zero on any FAIL. S1a is a FAIL again since the founding (Ben, 2026-10-14);
+// S1g checks the founding and S8 the post-gate changes; --strict covers finding() rows.
 
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
@@ -239,7 +239,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     }
     std::printf("    COUNTS seed %u: nations %d (majors %d, minors %d), state buildings %d\n",
                 static_cast<unsigned>(seed), majors + minors, majors, minors, total_state);
-    finding(majors > 0 && majors_with == majors, "S1a",
+    check(majors > 0 && majors_with == majors, "S1a",
             fmt("every major owns state industry after the handover (%d of %d)", majors_with, majors));
     check(minors_with == 0, "S1b", fmt("no minor owns state industry (%d minors)", minors));
 
@@ -268,9 +268,12 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     }
     {
         bool champ_ok = true, firm_ok = true;
-        std::set<entity_id> passed;
+        std::set<entity_id> passed, founded_ids;
+        for (const state_founding& f : rep.founded)
+            if (f.building != null_entity) founded_ids.insert(f.building);
         for (const auto& [nid, nc] : w.nations)
-            for (const entity_id b : nc.state_assets) passed.insert(b);
+            for (const entity_id b : nc.state_assets)
+                if (!founded_ids.count(b)) passed.insert(b);
         std::set<entity_id> lost_all;
         for (const auto& [cid, cc] : w.corporations)
         {
@@ -292,6 +295,29 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         check(firm_ok && lost_all == passed, "S1e",
               fmt("background firms lost only what passed, and all of it came from them (%zu)",
                   passed.size()));
+        // S1g: the founding. Every major the handover left empty founded one
+        // plant, complete, on its own ground, paid from its treasury (never
+        // more than it held), in the history log; chain-feasible where any is.
+        int founded = 0, infeasible = 0, overdrawn = 0, logged = 0;
+        for (const state_founding& f : rep.founded)
+        {
+            if (f.building == null_entity) continue;
+            ++founded;
+            if (!f.chain_feasible) ++infeasible;
+            if (w.nations.at(f.nation).treasury < 0.0f || f.paid > f.price) ++overdrawn;
+            if (w.buildings.at(f.building).ticks_remaining != 0) ++overdrawn;
+        }
+        for (const world_history_entry& e : w.history_log)
+            if (e.event.rfind("State charter: ", 0) == 0) ++logged;
+        check(founded == static_cast<int>(rep.founded.size()) && logged >= founded && overdrawn == 0, "S1g",
+              fmt("%d major(s) founded a plant (%d not chain-feasible), complete, paid within the treasury, "
+                  "recorded as a state charter", founded, infeasible));
+        for (const state_founding& f : rep.founded)
+            if (f.building != null_entity)
+                std::printf("    founded: nation %u -> %s at building %u, price %.1f paid %.1f%s\n",
+                            static_cast<unsigned>(f.nation), reg.get_recipe(f.recipe)->name.c_str(),
+                            static_cast<unsigned>(f.building), static_cast<double>(f.price),
+                            static_cast<double>(f.paid), f.chain_feasible ? "" : " (NOT chain-feasible)");
     }
     {
         const std::uint64_t h0 = w.state_hash(0);
@@ -353,6 +379,10 @@ void run_seed(lua_state& lua, std::uint32_t seed)
             if (!is_major_nation(w, nid))
                 continue;
             const entity_id champ = champion_of(w, nid);
+            // Fixture setup: a treasury the founding emptied could build
+            // nothing; the rows below test the mechanics, not this seed's
+            // purse, so each major is topped up to a working floor.
+            w.nations.at(nid).treasury = std::max(w.nations.at(nid).treasury, 20000.0f);
             entity_id got = null_entity;
             int tries = 0;
             for (const entity_id tile : w.nations.at(nid).tiles)
@@ -574,7 +604,115 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     }
 
     // ---- S5: the seam --------------------------------------------------------
+    // ---- S8: changes after the gate cannot overdraw a treasury ---------------
+    std::printf("--- S8 changes after the gate ---\n");
+    if (w.nations.count(pn) && !w.nations.at(pn).state_assets.empty())
+    {
+        const entity_id champ = champion_of(w, pn);
+        const auto running = [&](const world& c) {
+            std::vector<entity_id> out;
+            for (const entity_id b : c.nations.at(pn).state_assets)
+                if (c.buildings.at(b).ticks_remaining == 0 && !c.buildings.at(b).decommissioned)
+                    out.push_back(b);
+            return out;
+        };
+        // (a) Commands: with the treasury exactly what the gate committed, a
+        // raised target and a resume are refused (rejected_funds), nothing moved.
+        {
+            world c = w;
+            std::vector<entity_id> run = running(c);
+            entity_id parked = null_entity;
+            if (run.size() >= 2) { parked = run.back(); c.buildings.at(parked).decommissioned = true; run.pop_back(); }
+            for (const entity_id b : run) c.buildings.at(b).workforce_target = 50;
+            c.nations.at(pn).treasury = 1.0e9f;
+            plan_state_funding(c, reg);
+            c.nations.at(pn).treasury = c.state_ledger.at(pn).committed;
+            const std::uint64_t h0 = c.state_hash(0);
+            corp_command cmd;
+            cmd.corp = champ; cmd.as_nation = pn; cmd.verb = corp_verb::set_workforce;
+            cmd.subject = run.empty() ? null_entity : run.front(); cmd.workforce = 200;
+            const auto r1 = apply_corp_command(c, reg, cmd);
+            corp_command_result r2 = corp_command_result::rejected_funds;
+            if (parked != null_entity)
+            {
+                corp_command rs; rs.corp = champ; rs.as_nation = pn; rs.verb = corp_verb::resume; rs.subject = parked;
+                r2 = apply_corp_command(c, reg, rs);
+            }
+            check(!run.empty() && r1 == corp_command_result::rejected_funds
+                      && r2 == corp_command_result::rejected_funds && c.state_hash(0) == h0,
+                  "S8a", "with nothing uncommitted, a raised workforce and a resume are rejected_funds, nothing moved");
+        }
+        // (b) The auto-solver: every running state building pinned low with
+        // auto on, the treasury just covering that; a full live tick follows.
+        {
+            world c = w;
+            const std::vector<entity_id> run = running(c);
+            float need = 0.0f;
+            for (const entity_id b : c.nations.at(pn).state_assets)
+            {
+                building_component& bc = c.buildings.at(b);
+                if (bc.ticks_remaining == 0 && !bc.decommissioned) { bc.workforce_target = 10; bc.workforce_auto = true; }
+                need += state_building_cost_bound(c, reg, bc) * 1.0006f;
+            }
+            c.nations.at(pn).treasury = need;
+            int raised = 0;
+            const settle_tick_result r = run_settle_tick(c, reg, next_tick, 90 * (next_tick + 1), false);
+            (void)r;
+            for (const entity_id b : run)
+                if (c.buildings.at(b).workforce_target > 10) ++raised;
+            check(c.state_ledger.at(pn).treasury_close >= 0.0f && c.nations.at(pn).treasury >= 0.0f, "S8b",
+                  fmt("the auto-solver on a just-funded treasury leaves it >= 0 (%d of %zu raises funded, close %.2f)",
+                      raised, run.size(), static_cast<double>(c.state_ledger.at(pn).treasury_close)));
+        }
+        // (c) A site finishing this tick runs from the next gate.
+        {
+            world c = w;
+            const entity_id b = c.nations.at(pn).state_assets.front();
+            building_component& bc = c.buildings.at(b);
+            bc.ticks_remaining = 1; bc.construction_progress = 0.999f; bc.decommissioned = false;
+            float need = 0.0f;
+            for (const entity_id s : c.nations.at(pn).state_assets)
+                need += state_building_cost_bound(c, reg, c.buildings.at(s)) * 1.0006f;
+            c.nations.at(pn).treasury = need;
+            const settle_tick_result r = run_settle_tick(c, reg, next_tick, 90 * (next_tick + 1), false);
+            bool ran = false;
+            for (const building_report& br : r.report.buildings)
+                if (br.building == b && br.output_quantity > 0.0f) ran = true;
+            const bool completed = c.buildings.at(b).ticks_remaining == 0;
+            check(c.state_ledger.at(pn).treasury_close >= 0.0f && (!completed || (!ran && c.buildings.at(b).state_idle)),
+                  "S8c", fmt("a state site completing this tick (%s) produces nothing until the next gate; treasury >= 0",
+                             completed ? "completed" : "paused by its market"));
+        }
+        // (d) The scorer on tight treasuries: every state nation funded to the
+        // penny, a spectated tick (every champion dials, the player's too).
+        {
+            world c = w;
+            for (const entity_id nid : state_nations(c))
+            {
+                float need = 0.0f;
+                for (const entity_id s : c.nations.at(nid).state_assets)
+                {
+                    building_component& bc = c.buildings.at(s);
+                    bc.ai_cooldown = 0;
+                    need += state_building_cost_bound(c, reg, bc) * 1.0006f;
+                }
+                c.nations.at(nid).treasury = need;
+            }
+            bool nonneg = true;
+            for (int k = 0; k < 4; ++k)
+            {
+                (void)run_settle_tick(c, reg, next_tick + k, 90 * (next_tick + k + 1), /*spectating=*/true);
+                for (const entity_id nid : state_nations(c))
+                    if (c.state_ledger.count(nid) && c.state_ledger.at(nid).treasury_close < 0.0f) nonneg = false;
+            }
+            check(nonneg, "S8d", "four spectated ticks on to-the-penny treasuries: no state pass ends below zero");
+        }
+    }
+    else
+        check(false, "S8", "the player's nation holds no state building (the founding should guarantee one)");
+
     std::printf("--- S5 the seam ---\n");
+
     {
         agent_protocol::session s;
         s.actor = w.player_entity;

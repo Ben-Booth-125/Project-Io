@@ -2310,6 +2310,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.tick = tick; c.cmd.corp = corp; c.cmd.as_nation = dial_nation;
                         c.cmd.verb = corp_verb::set_recipe; c.cmd.subject = bid;
                         c.cmd.recipe = best_id;
+                        // BL-1296 fix round: a state retool's switch cost is
+                        // the TREASURY's spend, gated against it below.
+                        if (dial_nation != null_entity)
+                            c.spend = reg.recipe_switch().switch_cost;
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_recipe;
                         c.bucket = bucket_for_reason(c.reason);
@@ -2907,6 +2911,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // champion's own book and its nation's are each dialled as fully as a
         // corporation's book alone was — neither starves the other.
         int   state_dials = 0;
+        float state_spent = 0.0f; // BL-1296: this evaluation's treasury spend
+
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
 
@@ -3086,6 +3092,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // themselves); only Nice-to-Have (build/survey) spend is checked,
             // and against the STRICTER should-have-aware floor — the "a lower
             // bucket may never starve a higher one" rule, concretely enforced.
+            // BL-1296 fix round: a STATE command's spend is the treasury's,
+            // gated against what the treasury has uncommitted (less what this
+            // evaluation already spent from it) — never the corp's balance.
+            if (c.cmd.as_nation != null_entity)
+            {
+                if (c.spend > 0.0f
+                    && state_uncommitted_treasury(w, c.cmd.as_nation) - state_spent - c.spend < 0.0f)
+                {
+                    forgo(c);
+                    continue;
+                }
+            }
+            else
+            {
             const float required_floor =
                 (c.bucket == corp_priority_bucket::nice_to_have) ? nice_to_have_floor : floor_;
             if (c.spend > 0.0f &&
@@ -3112,6 +3132,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
                 continue;
             }
+            } // BL-1296: the corporation's own solvency gate
 
             // Resolve the log's body tag BEFORE the command mutates the world —
             // a demolish erases its subject from w.buildings, so resolving
@@ -3172,7 +3193,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             //
             // Nothing asserts this ordering. Reordering these lines, or moving the
             // increments above the apply, reintroduces that starvation silently.
-            committed += c.spend;
+            if (c.cmd.as_nation != null_entity)
+                state_spent += c.spend;
+            else
+                committed += c.spend;
             if (is_build)  ++builds;
             if (is_dial)   ++(is_state_dial ? state_dials : dials);
 

@@ -808,13 +808,21 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
             return corp_command_result::rejected_invalid;
         }
         case corp_verb::set_workforce:
+        {
             if (cmd.workforce < 0 || cmd.workforce > 200)
                 return corp_command_result::rejected_invalid;
             if (b.workforce_target == cmd.workforce && !b.workforce_auto)
                 return corp_command_result::rejected_state;
+            // BL-1296 fix round: a raised target bills more this tick — it
+            // must fit the uncommitted treasury, and is committed when it does.
+            building_component after = b;
+            after.workforce_target = cmd.workforce;
+            if (!state_commit_change(w, reg, nation, b, after))
+                return corp_command_result::rejected_funds;
             b.workforce_target = cmd.workforce;
             b.workforce_auto   = false;
             return corp_command_result::applied;
+        }
         case corp_verb::set_workforce_auto:
             if (b.workforce_auto)
                 return corp_command_result::rejected_state;
@@ -826,7 +834,17 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
             const bool want = (cmd.verb == corp_verb::idle);
             if (b.decommissioned == want)
                 return corp_command_result::rejected_state;
+            // BL-1296 fix round: a resume bills a running building's costs
+            // this tick — funded from the uncommitted treasury, or refused.
+            if (!want)
+            {
+                building_component after = b;
+                after.decommissioned = false;
+                if (!state_commit_change(w, reg, nation, b, after))
+                    return corp_command_result::rejected_funds;
+            }
             b.decommissioned = want;
+
             b.loss_streak    = 0;
             if (building_affects_logistics(b.type))
                 invalidate_logistics_caches(w);

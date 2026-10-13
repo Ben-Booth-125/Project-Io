@@ -1,6 +1,9 @@
 #include "state_industry.hpp"
 
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability
+#include "construction.hpp"    // construct_state_building, construction_capex (the founding)
+#include "input_reach.hpp"     // recipe_inputs_supplied (the founding is chain-feasible)
+#include "placement_rules.hpp" // is_water_tile
 #include "market_clearing.hpp" // market_for_tile
 #include "recipe_registry.hpp"
 #include "world.hpp"
@@ -9,6 +12,8 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#include <memory>
+#include <string>
 
 const char* strategic_sector_name(strategic_sector s)
 {
@@ -164,9 +169,111 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         }
     }
 
+    // ---- THE FOUNDING (Ben, 2026-10-14): every major still holding none ----
+    {
+        static const char* const k_found_recipes[] = {
+            "steel", "steel_bessemer", "refined_fuel", "coal_power_plant",
+            "oil_power_plant", "ordnance", "propellant_atmospheric"};
+        std::vector<std::uint16_t> recipes;
+        for (const char* rn : k_found_recipes)
+        {
+            const std::uint16_t rid = reg.recipe_id(rn);
+            if (rid != no_recipe && reg.get_recipe(rid) != nullptr
+                && state_runs(reg, building_type::processing_facility, rid))
+                recipes.push_back(rid);
+        }
+        const float batches = reg.economics(building_type::processing_facility).base_rate * 0.5f;
+        std::unique_ptr<input_reach> ir; // built on first use: a world fact, shared
+        std::map<std::pair<entity_id, std::uint16_t>, bool> feasible_at; // (market, recipe)
+        for (const entity_id nid : nation_ids)
+        {
+            if (!w.nations.at(nid).state_assets.empty())
+                continue;
+            state_founding f;
+            f.nation = nid;
+            const std::vector<entity_id> tiles = w.nations.at(nid).tiles; // territory order
+            for (int pass = 0; pass < 2 && f.building == null_entity; ++pass)
+                for (const std::uint16_t rid : recipes)
+                {
+                    if (f.building != null_entity) break;
+                    const ::recipe& rc = *reg.get_recipe(rid);
+                    for (const entity_id tile : tiles)
+                    {
+                        const auto tit = w.tiles.find(tile);
+                        if (tit == w.tiles.end() || placement_rules::is_water_tile(tit->second.substrate))
+                            continue;
+                        if (!recipe_runs_at_tile(w, rc, tile))
+                            continue;
+                        bool feasible = false;
+                        if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
+                        {
+                            const auto key = std::make_pair(mid, rid);
+                            auto fit = feasible_at.find(key);
+                            if (fit == feasible_at.end())
+                            {
+                                if (!ir) ir = std::make_unique<input_reach>(make_input_reach(w, reg));
+                                fit = feasible_at.emplace(key, recipe_inputs_supplied(
+                                          w, reg, *ir, mid, rc, batches, null_entity)).first;
+                            }
+                            feasible = fit->second;
+                        }
+                        if (pass == 0 && !feasible)
+                            continue; // pass 0 founds only where the chain runs
+                        const float price = construction_capex(w, reg, tile, building_type::processing_facility,
+                                                               resource_type::iron_ore, rid);
+                        entity_id built = null_entity;
+                        if (construct_state_building(w, reg, nid, tile, rid, built, /*founding=*/true)
+                            != construction_result::placed)
+                            continue;
+                        building_component& b = w.buildings.at(built);
+                        b.ticks_remaining       = 0; // founded standing, as every generation holding
+                        b.construction_progress = 0.0f;
+                        nation_component& nc = w.nations.at(nid);
+                        const float paid = std::min(std::max(0.0f, nc.treasury), price);
+                        nc.treasury        -= paid;
+                        b.construction_paid = paid;
+                        f.building = built;
+                        f.recipe   = rid;
+                        f.chain_feasible = feasible;
+                        f.price    = price;
+                        f.paid     = paid;
+                        if (ir) input_reach_invalidate(*ir);
+                        // Recorded as a state charter (the history log).
+                        world_history_entry e;
+                        e.timestamp = w.current_day_tick;
+                        e.topic     = history_topic::agency;
+                        e.body      = tit->second.body;
+                        e.corp      = champion_of(w, nid);
+                        e.event     = "State charter: " + nc.name + " founds a state " + rc.display_name
+                                    + " (" + strategic_sector_name(strategic_sector_of(reg, b)) + ")"
+                                    + (paid < price ? ", its treasury short of the price" : "");
+                        w.history_log.push_back(std::move(e));
+                        break;
+                    }
+                }
+            out.founded.push_back(f);
+        }
+    }
+
     for (const entity_id nid : nation_ids)
         out.per_nation.emplace_back(nid, static_cast<int>(w.nations.at(nid).state_assets.size()));
     return out;
+}
+
+bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
+                         const building_component& before, const building_component& after)
+{
+    if (before.state_idle)
+        return true; // unfunded this tick: it runs nothing whatever changes
+    constexpr float k_headroom = 1.0005f; // the gate's own
+    const float delta = (state_building_cost_bound(w, reg, after)
+                         - state_building_cost_bound(w, reg, before)) * k_headroom;
+    if (!(delta > 0.0f))
+        return true;
+    if (!std::isfinite(delta) || delta > state_uncommitted_treasury(w, nation))
+        return false;
+    w.state_ledger[nation].committed += delta;
+    return true;
 }
 
 void print_state_handover(const state_handover_report& r)
@@ -181,6 +288,18 @@ void print_state_handover(const state_handover_report& r)
                 r.by_sector[static_cast<std::size_t>(strategic_sector::transport)],
                 r.by_sector[static_cast<std::size_t>(strategic_sector::space)],
                 r.held_back, r.champion_kept, r.firms_emptied);
+    int founded = 0, unfounded = 0, infeasible = 0;
+    float short_by = 0.0f;
+    for (const state_founding& f : r.founded)
+    {
+        if (f.building == null_entity) { ++unfounded; continue; }
+        ++founded;
+        if (!f.chain_feasible) ++infeasible;
+        short_by += f.price - f.paid;
+    }
+    std::printf(" %d founded (%d not chain-feasible, %d with nowhere to stand; treasuries short %.1f);",
+                founded, infeasible, unfounded, static_cast<double>(short_by));
+
     for (const auto& [nid, n] : r.per_nation)
         std::printf(" nation %u:%d", static_cast<unsigned>(nid), n);
     std::printf("\n");

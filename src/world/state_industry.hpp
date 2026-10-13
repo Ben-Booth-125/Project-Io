@@ -79,6 +79,17 @@ strategic_sector strategic_sector_of(const recipe_registry& reg, const building_
 /// `held_back` by the handover). False for anything private.
 bool state_runs(const recipe_registry& reg, building_type type, std::uint16_t recipe);
 
+/// What a major with no strategic plant to inherit FOUNDED at the fold.
+struct state_founding
+{
+    entity_id nation   = null_entity;
+    entity_id building = null_entity; ///< null: nowhere to found one
+    std::uint16_t recipe = 0;
+    bool      chain_feasible = false; ///< its inputs are supplied in reach
+    float     price    = 0.0f;        ///< the plant's capex
+    float     paid     = 0.0f;        ///< what the treasury paid (<= price)
+};
+
 /// What the handover did, for the log and the harness.
 struct state_handover_report
 {
@@ -88,6 +99,9 @@ struct state_handover_report
     int champion_kept  = 0; ///< strategic buildings on a major's ground a champion kept
     int firms_emptied  = 0; ///< background firms left holding no building at all
     std::array<int, 6> by_sector{}; ///< passed, by strategic_sector
+    /// BL-1296 fix round (Ben, 2026-10-14): every major left with no state
+    /// building after the handover FOUNDS one, ascending nation id.
+    std::vector<state_founding> founded;
     /// Per major, ascending nation id: (nation, buildings it now owns).
     std::vector<std::pair<entity_id, int>> per_nation;
 };
@@ -102,8 +116,23 @@ struct state_handover_report
 ///
 /// Deterministic: firms in ascending id, each firm's assets in stored order;
 /// a nation's `state_assets` therefore lists its buildings in (firm id, stored
-/// order). Idempotent: a second call finds nothing left to pass. Mutates only
-/// ownership lists and HQ pointers — no money moves, no building changes.
+/// order). Idempotent: a second call finds nothing left to pass.
+///
+/// THEN EVERY MAJOR STILL HOLDING NONE FOUNDS ONE (Ben, 2026-10-14; NATIONS.md
+/// § State industry, "Every major founds one"), ascending nation id. The plant
+/// is the FIRST strategic recipe of a fixed list — steel, steel_bessemer,
+/// refined_fuel, coal_power_plant, oil_power_plant, ordnance,
+/// propellant_atmospheric — on the FIRST tile of the nation's own ground, in
+/// its territory order (grown out from its seed, so nearest the heartland
+/// first), where it can stand (every gate a state build asks, the champion's
+/// tree) AND its inputs are supplied in reach (`recipe_inputs_supplied` —
+/// chain-feasible). Only where no pair is chain-feasible does the first
+/// placeable pair stand instead (`chain_feasible` false, reported). The plant
+/// stands COMPLETE, as every generation holding does, and is paid for from
+/// the treasury at its capex (`construction_capex`); a treasury short of the
+/// price pays what it holds and the shortfall is reported, never minted —
+/// the state charter's rule. Recorded in the world history log as a state
+/// charter. A second call founds nothing (every major already holds one).
 state_handover_report hand_over_state_industry(world& w, const recipe_registry& reg);
 
 /// Print the handover's one `[state_industry]` log line.
@@ -130,3 +159,18 @@ void plan_state_funding(world& w, const recipe_registry& reg);
 /// less what this tick's funded state buildings are committed to. Never
 /// negative.
 float state_uncommitted_treasury(const world& w, entity_id nation);
+
+/// BL-1296 fix round — A CHANGE TO A FUNDED STATE BUILDING MUST BE FUNDED TOO.
+/// The gate funded each state building at the cost bound of its state THEN; a
+/// later change this tick (a resume, a raised workforce target, a retool) can
+/// raise what the tick will bill. Before such a change is applied, its
+/// increase — `state_building_cost_bound(after) - (before)`, with the gate's
+/// headroom — must fit in @p nation's uncommitted treasury; when it does, it
+/// is COMMITTED (added to this tick's ledger), so a second change cannot spend
+/// the same credits. A building the gate idled this tick runs nothing whatever
+/// changes, so any change to it passes free; so does a change that lowers the
+/// bound. Returns false — and commits nothing — when the treasury cannot carry
+/// it: the caller must then refuse the change.
+bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
+                         const building_component& before, const building_component& after);
+

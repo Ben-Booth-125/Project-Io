@@ -117,7 +117,10 @@ bool demolish_building(world& w, entity_id corp, entity_id building);
 /// `state_assets`. Mutates only on `placed`.
 construction_result construct_state_building(world& w, const recipe_registry& reg,
                                              entity_id nation, entity_id tile,
-                                             std::uint16_t recipe, entity_id& out_building);
+                                             std::uint16_t recipe, entity_id& out_building,
+                                             bool founding = false);
+// @p founding (BL-1296 fix round): the fold's founding — the commitment gate is
+// skipped (the founder pays the capex itself, `hand_over_state_industry`).
 
 /// BL-1296: demolish a state building @p nation owns — demolish_building for
 /// the nation owner kind. No refund (the same rule). True on success; false if
