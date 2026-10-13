@@ -277,6 +277,10 @@ culture; the late culture is lagging because it is isolated, never isolated beca
 **The lag is read against its neighbours (Ben, 2026-10-13).** The late culture lags **the peoples in
 contact with it** — behind those around it — not the world's mean development. Read that way the
 isolation needs only a gentle press, which leaves the rise and fall's empire room to rise.
+**Development spreads only by contact (Ben, 2026-10-14).** Past the early bands a people climbs by
+what reaches it from others, not by its own investment alone, and a breakaway realm does not carry
+its parent's band past what its own contacts sustain. This holds for every culture — a systemic force
+— and the late culture lags because it is cut off.
 
 
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
