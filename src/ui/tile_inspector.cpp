@@ -4,6 +4,7 @@
 #include "foldout_column.hpp"    // shell fold-out column host (BL-122/BL-144)
 #include "format.hpp"            // campaign_epoch_year, cross-checked below (BL-220)
 #include "generation_charts.hpp" // the chain-stage charts, shared with the wizard (BL-211)
+#include "nation_history.hpp"    // the Ages view's nation filter (BL-1295)
 #include "presentation.hpp"
 #include "world/components.hpp"
 #include "world/era_timelapse.hpp" // the recorded Era -1 replay the Ages view folds over
@@ -455,6 +456,30 @@ void draw_tile_inspector(const world& w, ui_state& s,
         const int first_year = lapse.start_year;
         const int last_year  = lapse.start_year + lapse.years;
 
+        // BL-1295: FILTERED TO ONE NATION (the nation selection card's history
+        // link). The lineage is the card's own (ui::nation_lineage), so the
+        // card and the ledger name the same realms. A newly set filter parks
+        // the scrubber at the record's close, where the line stands largest
+        // in the record rather than at an opening it may not yet exist at.
+        static entity_id filter_parked_for = null_entity;
+        std::vector<uint16_t> lineage;
+        std::string           filter_name;
+        if (s.history_nation_filter != null_entity)
+        {
+            lineage = nation_lineage(*entry, s.history_nation_filter);
+            if (const auto nit = w.nations.find(s.history_nation_filter); nit != w.nations.end())
+                filter_name = nit->second.name;
+            if (filter_parked_for != s.history_nation_filter)
+            {
+                filter_parked_for = s.history_nation_filter;
+                s.ages_year       = last_year;
+                s.ages_playing    = false;
+            }
+        }
+        else
+            filter_parked_for = null_entity;
+        const bool filtered = s.history_nation_filter != null_entity;
+
         // --- Transport -----------------------------------------------------
         if (ImGui::Button(s.ages_playing ? "Pause" : "Play"))
             s.ages_playing = !s.ages_playing;
@@ -504,6 +529,21 @@ void draw_tile_inspector(const world& w, ui_state& s,
         ImGui::TextDisabled("%s  |  %d regions  |  %d powers",
                             ages_year_label(s.ages_year).c_str(),
                             live, static_cast<int>(seen.size()));
+        if (filtered)
+        {
+            int lit = 0;
+            for (uint16_t o : slice)
+                if (o != owner_none && std::binary_search(lineage.begin(), lineage.end(), o)) ++lit;
+            ImGui::PushStyleColor(ImGuiCol_Text, palette::hover);
+            ImGui::TextWrapped("Filtered to %s: its realm, the realms folded into it and the line "
+                               "it broke from. %d regions lit here.",
+                               filter_name.empty() ? "one nation" : filter_name.c_str(), lit);
+            ImGui::PopStyleColor();
+            if (lit == 0)
+                ImGui::TextDisabled("Its line held no ground in this year of the record.");
+            if (ImGui::SmallButton("Clear the nation filter"))
+                s.history_nation_filter = null_entity;
+        }
 
         const float avail = ImGui::GetContentRegionAvail().x;
         const int   gw    = sel_body.grid_width  > 0 ? sel_body.grid_width  : 1;
@@ -533,7 +573,12 @@ void draw_tile_inspector(const world& w, ui_state& s,
             // lapse polity palette by index, never `nation_colour` of a polity
             // index dressed as a nation id, which was the third mapping this
             // item retired.
-            dl->AddCircleFilled(at, r, palette::realm_colour(static_cast<int>(slice[i])));
+            ImU32 col = palette::realm_colour(static_cast<int>(slice[i]));
+            // BL-1295: under the nation filter every realm outside the line
+            // dims to a faint grey, so the nation's own ground reads at once.
+            if (filtered && !std::binary_search(lineage.begin(), lineage.end(), slice[i]))
+                col = IM_COL32(70, 74, 84, 150);
+            dl->AddCircleFilled(at, r, col);
         }
         ImGui::Dummy(ImVec2(avail, mh));
 

@@ -1124,6 +1124,11 @@ struct ui_state
     /// display detail, not part of the campaign.
     int  ages_year    = 0;
     bool ages_playing = false;
+    /// BL-1295: the Ages view FILTERED TO ONE NATION -- set by the nation
+    /// selection card's history link (STARTUP.md § The seat). Regions held by
+    /// the nation's lineage (ui::nation_lineage) stay lit, every other realm's
+    /// dims. null_entity = no filter. VIEW state, not serialised.
+    entity_id history_nation_filter = null_entity;
 
     /// F9 mock tech-tree viewer: one era per view — 0=Era -1 Antiquity (placeholder),
     /// 1=Era 0, 2=Era 1, 3=Standing lines. Defaults to Era 0, the campaign's era.

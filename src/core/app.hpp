@@ -38,6 +38,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <utility>
 
 /// BL-1084: one wizard round's closed world -- a `generation_cursor` stopped at
 /// the round's stage, with the report it has written so far (STARTUP.md § The
@@ -82,14 +83,15 @@ public:
     /// run().
     void host_agent(uint16_t port) { m_agent_port = port; }
 
-    /// BL-1076: `--seat <corp-id>` — the seat, picked by whoever launched the
+    /// BL-1076: `--seat <nation-id>` — the seat, picked by whoever launched the
     /// process rather than on the selection canvas (an agent's route to the
     /// pre-play act; the in-play agent hosts refuse `take_seat`). Applies to
-    /// every new-campaign path, autostart included. @p corp is range-checked
-    /// by the caller; the tail validates it against the ranking and a rejected
+    /// every new-campaign path, autostart included. @p nation (BL-1281: a
+    /// MAJOR nation, whose champion is seated) is range-checked
+    /// by the caller; the tail validates it against the majors and a rejected
     /// pick seats nobody (headless paths fail, the interactive path falls back
     /// to the canvas). Call before run() / run_autostart*().
-    void set_seat_pick(long long corp) { m_seat_pick_arg = corp; }
+    void set_seat_pick(long long nation) { m_seat_pick_arg = nation; }
 
     /// BL-705: override `world_params::epoch_year` for every world this process
     /// generates (`--epoch <year>`). Absent = the struct's own default.
@@ -951,6 +953,8 @@ private:
     /// (`fill_works_close`) and the seat briefing's origin sentence has a year
     /// to read. Empty on every interactive path.
     charter_spend_report m_verify_charter;
+    /// The verified world's roster (verify_api.cpp): run_verify and verify.new_world.
+    void verify_lay_roster();
     /// The slot Begin adopted from the wizard, consumed by poll_worldgen on
     /// its next call: the world, report, registry and finish move into play
     /// and the tail (the presentation half, the seat) runs.
@@ -1087,11 +1091,13 @@ private:
     /// True only on the interactive path (run() with no autostart and no
     /// `--seat`): the tail opens the canvas instead of drawing.
     bool m_player_picks_seat = false;
-    /// `--seat <corp-id>`: a pick made before the tail runs, by whoever
+    /// `--seat <nation-id>` (BL-1281: names a MAJOR): a pick made before the tail runs, by whoever
     /// launched the process (an agent's route to the pre-play act). -1 = none.
     /// Parsed in main.cpp as an untrusted input; validated here, against the
-    /// ranking, by take_seat_pick.
+    /// majors, by take_seat_pick.
     long long m_seat_pick_arg = -1;
+    /// BL-1281: the major the last pick named (printed beside the champion).
+    entity_id m_seat_picked_nation = null_entity;
     /// Set by the tail when it drew rather than asked, naming why — printed.
     const char* m_seat_drawn_because = nullptr;
     /// A headless `--seat` pick was refused: the autostart loops stop and fail.
@@ -1099,11 +1105,31 @@ private:
 
     /// Rank the specialists and open the canvas (m_screen = choosing_seat).
     void open_seat_screen();
-    /// The pick, as a game act: validate @p corp against the ranking (it must
-    /// be a ranked specialist) and apply `corp_verb::take_seat`. A rejection
-    /// mutates nothing. On success re-points the player-scoped caches and
-    /// frames the launch view, exactly as a drawn seat does.
-    corp_command_result take_seat_pick(entity_id corp);
+
+    /// BL-1281 (nation selection; STARTUP.md § The seat, Ben 2026-10-10): ONE
+    /// ROW OF THE NATION SELECTION SCREEN — a MAJOR nation (a nation home to a
+    /// specialist: GLOSSARY.md § Major nation) and its CHAMPION, the specialist
+    /// the pick seats. Derived from `m_seat_result` (the ranking) and the
+    /// world; never stored, so it cannot drift from the ranking it reads.
+    struct seat_major
+    {
+        entity_id nation    = null_entity;
+        entity_id champion  = null_entity; ///< the corporation take_seat seats
+        int       candidate = -1;          ///< its index in m_seat_result.candidates
+    };
+    /// The majors, in the champions' rank order. A nation holding more than one
+    /// ranked specialist (majors and seats are one-to-one by design, so this is
+    /// a generation defect, not a case the screen designs for) offers its
+    /// top-ranked one; a specialist with no home nation is no major's champion
+    /// and is not offered.
+    std::vector<seat_major> seat_majors() const;
+    /// The pick, as a game act: @p nation must be a MAJOR of this world (one
+    /// the screen offers — a row of `seat_majors`); its champion is seated by
+    /// `corp_verb::take_seat`. An untrusted input: anything else (a minor, a
+    /// corporation id, an id naming nothing) is rejected whole and mutates
+    /// nothing. On success re-points the player-scoped caches and frames the
+    /// launch view, exactly as a drawn seat does.
+    corp_command_result take_seat_pick(entity_id nation);
     /// The shared tail of a drawn and a picked seat: rebuild the player-scoped
     /// caches, print the seat lines, frame the launch view.
     void finish_seat(bool picked);
@@ -1113,19 +1139,24 @@ private:
     /// The canvas's own state. Presentation only; rebuilt by open_seat_screen.
     struct seat_screen_state
     {
-        int       hovered  = 0;               ///< Candidate index the map and card show.
-        entity_id briefing = null_entity;     ///< The firm whose briefing is open, or none.
+        int       hovered  = 0;               ///< Major (row) index the map and card show.
+        entity_id briefing = null_entity;     ///< The NATION whose briefing is open, or none.
+        /// BL-1295: the card's history link pressed — the History ledger is
+        /// drawn over the screen, on its Ages view, filtered to `briefing` /
+        /// the shown nation (ui_state::history_nation_filter). A toggle.
+        bool      history_open = false;
         entity_id body     = null_entity;     ///< The body the map is baked for.
         int       gw = 0, gh = 0;             ///< That body's grid.
-        /// Per-tile home market (market_for_tile), -1 slot for none, for the
-        /// catchment highlight. Indexed row * gw + col.
-        std::vector<entity_id> tile_market;
         /// Run-merged political base, baked once per body: {row, c0, c1, colour}.
         struct run { int row, c0, c1; uint32_t colour; };
         std::vector<run> base;
-        /// Catchment runs for `catchment_of`, re-merged when the market changes.
-        entity_id        catchment_of = null_entity;
-        std::vector<run> catchment;
+        /// BL-1281: the shown nation's TERRITORY, run-merged, re-merged when
+        /// the nation changes — the card's part 1, highlighted on the map.
+        entity_id        territory_of = null_entity;
+        std::vector<run> territory;
+        /// Nations sharing a land border on the baked body, as (lo, hi) id
+        /// pairs, sorted — the card's neighbours. Baked with the base.
+        std::vector<std::pair<entity_id, entity_id>> borders;
         bool             from_verify  = false; ///< Confirm returns to in_game without finish_new_game.
     };
     seat_screen_state m_seat_ui;

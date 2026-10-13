@@ -8,16 +8,16 @@
 
 ## Headline
 
-**110 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**112 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**56 of 110 elements can be changed without any check going red.**
+**56 of 112 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 51 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 53 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 34 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (51)
+## ASSERTED (53)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -85,6 +85,8 @@ and so is the safety net.
 | `UI-120` New World wizard > Wizard pass round (one of three) | sub-element | `history_lapse_press` | 38 | 0 | 11 |
 | `UI-121` New World wizard > Wizard lapse-round legend (rounds 3-6) | sub-element | `round_legends`, `sea_lanes` | 5 | 0 | 0 |
 | `UI-122` New World wizard > Wizard setup round (round 2) | sub-element | `setup_round`, `quick_start` | 21 | 0 | 10 |
+| `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 42 | 0 | 3 |
+| `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 8 | 0 | 0 |
 
 ## CLIP-ONLY (14)
 
@@ -195,7 +197,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `round6_mid_tail` (2 captures, 11 expects) — BL-1084 (world built once and moved), the K4 cold review -- ROUND 6 WHILE ITS
 - `route_curves` (2 captures, 5 expects) — ROADS AS THINNER CURVES, SEA LANES ON THEIR SEA PATH (Ben, 2026-10-03, playing
 - `routes_and_splits` (10 captures, 16 expects) — BL-1092 -- ROUTES AND SPLITS ON THE MAP: the migration shows its roads
-- `seat_pick` (4 captures, 24 expects) — The corporation selection canvas, and the pick as a reproducible game act
 - `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
 - `tile_production` (4 captures, 18 expects) — The tile Selection element's PRODUCTION section (BL-1239, tile production
 - `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
