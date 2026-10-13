@@ -105,6 +105,11 @@ every processor placement already passes — and falls back down the nation's ce
 player's company never opens on a dead-end islet: a region alone on a small landmass prices a
 specialist cheap (its reach is its whole stock), but a centre where no chain can close is passed
 over for the champion. Measured: islet champions left seeds 6 and 8 with no viable seat.
+**The test reads a chain that ends in a finished good (Ben, 2026-10-13, narrowing the same day's
+test).** Inputs reachable is not enough: a champion goes where its market can complete a chain to a
+final good — the same closure the seat's landscape floor reads — so the champion test and the seat
+floor agree by construction. A nation's champion is never lost to the test: where no centre passes,
+it is chartered back at its first passed-over centre.
 
 ### Pass 2 — Industrial focus assignment
 
