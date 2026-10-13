@@ -432,6 +432,27 @@ see would be invisible to the corporate search, which reads reach cost (BL-812, 
 a lane *decays* when its traffic stops is open in `../generation/EXPLORATION.md` § Open questions;
 roads do not (§ 4a), but the sea is not a roadbed.
 
+### 4c. Railways — a network of its own, entered at stations (Ben, 2026-10-13)
+
+A railway is **not a road rung**. It is a network of its own: track laid tile to tile, and goods
+**board and leave only at a station**. A haul by rail is three legs — road (or ground) to the
+nearest station, rail between stations, road from the far station — and the rail leg is priced far
+below any road. A line with no station touching it carries nothing; a station with no line is a
+building that moves nothing.
+
+- **The price** of a rail leg is set **by measurement against the haulage readings**: cheap enough
+  that long land hauls shift onto rail where a line serves them, not so cheap that every short haul
+  detours to a station. Short hauls stay on the road because the two station legs cost them more
+  than the rail saves.
+- **Stations** are tile buildings (`PRODUCTION.md` § Infrastructure buildings): on a city tile
+  touching a rail line, zero staff, a build cost and upkeep — the port's shape on land.
+- **Ownership:** track and stations are **state industry** in a major (`../politics/NATIONS.md`
+  § State industry — transport infrastructure is a strategic sector) and background firms' in a
+  minor.
+- **Generation lays it** in Industrialisation (`../generation/INDUSTRIALISATION.md`); the player
+  builds stations and lays track in play as its nation's verbs.
+- **Interdiction** cuts a rail line as it cuts a road (§ 7); a cut line strands the stations beyond it.
+
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
 **A tile has a physical size, and it is derived rather than authored.** Planetology generates

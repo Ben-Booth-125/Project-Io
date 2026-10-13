@@ -443,7 +443,7 @@ points on the tile edge, not just the centre"*). This revises the geometry rule 
   ground's own hillshade and takes a share of the ground's tone.
 - **Rail** follows the same routing with **gentler curvature** (a railway cannot turn as tightly
   as a road) and its own treatment — ballast, sleepers, twin rails, cuttings and embankments
-  deeper than a road's — painted wherever the world lays the rail rung (BL-1255 rail rung).
+  deeper than a road's — painted wherever track is laid (BL-1255 railways; `../economy/LOGISTICS.md` § 4c — rail is its own network, not a road rung).
 - **No drawn road network on the plain canvas at any rung** (Ben, 2026-10-10: roads drew too much
   attention when zoomed out, because the drawn web kept a minimum width). Roads are the painted
   ground at every zoom and shrink with it like the ground; **the network as logistics is read on
@@ -463,8 +463,8 @@ takes the light, the grade and the lens wash like the ground does:
   faint verge. **Highway:** a slightly darker asphalt between pale shoulders, with a painted
   centre line only where it can resolve (a surface at least 8 nominal pixels across).
   **Rail:** a ballast bed with sleepers and twin rails — painted on the
-  rail rung of the road ladder (INDUSTRIALISATION.md, the rail sink), wherever the world lays
-  it; its bed is **0.10** wide. Textures are procedural, hash-placed along
+  rail network (`../economy/LOGISTICS.md` § 4c; INDUSTRIALISATION.md, the rail sink), wherever
+  track is laid, and a station building where the line meets a city; its bed is **0.10** wide. Textures are procedural, hash-placed along
   the curve, nominal-keyed, wrap-exact. A dash pattern (the centre line, the sleepers) runs a
   whole number of dashes along each half of a curve, pinned at the edge's crossing point, so it
   meets its neighbour tile's without a break.
