@@ -616,6 +616,10 @@ bool app::same_world_params(const world_params& a, const world_params& b)
         && a.standing_army_sized_to_earn == b.standing_army_sized_to_earn
         && a.industry_points_per_1000_treasury_units == b.industry_points_per_1000_treasury_units
         && a.body_count == b.body_count
+        // BL-1279: the setup round's nation targets steer the history's lean
+        // and its reconciliation, so a world built under others is another world.
+        && a.nation_total_target == b.nation_total_target
+        && a.major_target == b.major_target
         && x.star == y.star && x.world_size == y.world_size && x.interior == y.interior
         && x.metal == y.metal && x.ocean == y.ocean && x.oxygen_story == y.oxygen_story
         && x.coal_basins == y.coal_basins && x.drawdown == y.drawdown
@@ -940,8 +944,8 @@ void app::poll_worldgen()
         std::printf("[seat] --seat %lld REJECTED (%s): nothing seated\n",
                     m_seat_pick_arg,
                     r == corp_command_result::rejected_no_corp
-                        ? "rejected_no_corp: no such corporation"
-                        : "rejected_invalid: not a ranked specialist");
+                        ? "rejected_no_corp: the major's champion is gone"
+                        : "rejected_invalid: not a major nation of this world");
         std::fflush(stdout);
         if (!m_player_picks_seat)
         {
@@ -1454,37 +1458,70 @@ void app::open_seat_screen()
     m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
     m_seat_ui     = seat_screen_state{};
     m_screen      = app_screen::choosing_seat;
-    std::printf("[seat] the selection canvas: %d specialists, %d above the floor%s\n",
+    std::printf("[seat] the nation selection screen: %d majors (%d specialists, %d above the floor)%s\n",
+                static_cast<int>(seat_majors().size()),
                 m_seat_result.specialist_count, m_seat_result.shortlist_size,
                 m_seat_result.floor_unmet ? " (FLOOR UNMET: every firm is marked)" : "");
     std::fflush(stdout);
 }
 
-corp_command_result app::take_seat_pick(entity_id corp)
+std::vector<app::seat_major> app::seat_majors() const
+{
+    // BL-1281 (STARTUP.md § The seat; GLOSSARY.md § Major nation): a MAJOR is a
+    // nation home to a specialist, and its champion is that specialist. The
+    // ranking already lists every specialist in static-score order, so a walk
+    // of it in order meets each major at its champion -- the rows come out in
+    // the champions' rank order, and a nation met twice keeps its first.
+    std::vector<seat_major> out;
+    for (std::size_t i = 0; i < m_seat_result.candidates.size(); ++i)
+    {
+        const entity_id corp = m_seat_result.candidates[i].corp;
+        const auto      cit  = m_world.corporations.find(corp);
+        if (cit == m_world.corporations.end() || cit->second.is_background)
+            continue;
+        const entity_id nation = cit->second.home_nation;
+        if (nation == null_entity || m_world.nations.find(nation) == m_world.nations.end())
+            continue;
+        bool seen = false;
+        for (const seat_major& m : out)
+            if (m.nation == nation) { seen = true; break; }
+        if (seen)
+            continue;
+        out.push_back({nation, corp, static_cast<int>(i)});
+    }
+    return out;
+}
+
+corp_command_result app::take_seat_pick(entity_id nation)
 {
     // THE PICK IS A GAME ACT (Ben, 2026-09-24): it goes through the command
-    // seam as `corp_verb::take_seat`, the same record an agent issues. This is
-    // the PRE-PLAY host, so it owns the phase half of the validation and the
-    // one the seam cannot do — the firm must be one the canvas OFFERS, a
-    // ranked specialist of this world. Everything is checked before anything
-    // moves; a refusal leaves the world as it was.
-    if (m_world.corporations.find(corp) == m_world.corporations.end())
-        return corp_command_result::rejected_no_corp;
-    bool offered = false;
-    for (const spawn_seat_candidate& c : m_seat_result.candidates)
-        if (c.corp == corp)
-            offered = true;
-    if (!offered)
+    // seam as `corp_verb::take_seat`, the same record an agent issues. BL-1281
+    // (Ben, 2026-10-10): the pick NAMES A MAJOR NATION and seats its champion.
+    // This is the PRE-PLAY host, so it owns the phase half of the validation
+    // and the one the seam cannot do -- the nation must be one the screen
+    // OFFERS, a major of this world. AN UNTRUSTED INPUT (io-standing-rules.md,
+    // AI-facing seam): a minor, a corporation id, or an id naming nothing is
+    // rejected whole, and everything is checked before anything moves.
+    if (nation == null_entity || m_world.nations.find(nation) == m_world.nations.end())
         return corp_command_result::rejected_invalid;
+    entity_id champion = null_entity;
+    for (const seat_major& m : seat_majors())
+        if (m.nation == nation)
+            champion = m.champion;
+    if (champion == null_entity) // a minor nation: it holds no champion, and cannot be played
+        return corp_command_result::rejected_invalid;
+    if (m_world.corporations.find(champion) == m_world.corporations.end())
+        return corp_command_result::rejected_no_corp;
 
     corp_command cmd;
     cmd.tick = static_cast<int>(m_world.current_econ_tick);
-    cmd.corp = corp;
+    cmd.corp = champion;
     cmd.verb = corp_verb::take_seat;
     const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
     if (r != corp_command_result::applied)
         return r;
-    m_seat_result.seated = corp;
+    m_seat_result.seated = champion;
+    m_seat_picked_nation = nation;
     finish_seat(/*picked=*/true);
     return r;
 }
@@ -1534,8 +1571,15 @@ void app::finish_seat(bool picked)
     for (const spawn_seat_candidate& c : m_seat_result.candidates)
         std::printf("[seat] ranked %u landscape %.4f%s\n", static_cast<unsigned>(c.corp),
                     c.landscape, c.shortlisted ? "" : "  (below the floor)");
+    // BL-1281: the MAJORS the selection screen offers, each with the champion
+    // a pick of it seats -- the ids `--seat <nation-id>` takes.
+    for (const seat_major& m : seat_majors())
+        std::printf("[seat] major %u champion %u\n", static_cast<unsigned>(m.nation),
+                    static_cast<unsigned>(m.champion));
     if (picked)
-        std::printf("[seat] picked %u (take_seat)\n", static_cast<unsigned>(m_seat_result.seated));
+        std::printf("[seat] picked %u (take_seat, nation %u)\n",
+                    static_cast<unsigned>(m_seat_result.seated),
+                    static_cast<unsigned>(m_seat_picked_nation));
     else
         std::printf("[seat] drawn %u — %s\n", static_cast<unsigned>(m_seat_result.seated),
                     m_seat_drawn_because ? m_seat_drawn_because : "no player to ask");

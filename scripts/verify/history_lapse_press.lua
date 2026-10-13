@@ -60,13 +60,14 @@ local BACKP_X,  BACKP_Y  = 363, 995   -- a pass round's Back
 local NEXTP_X,  NEXTP_Y  = 603, 995   -- a pass round's Next
 
 -- Park on round 3, then walk ONE round by pressing Next for real.
-verify.generation_stage(1)
+verify.generation_stage(2)
 verify.frames(4)
 local round, rounds = verify.wizard_round()
-verify.expect(rounds == 6,
-              "the wizard walks SIX rounds -- System, Life, Culture, Empires, "
+-- BL-1279: SEVEN rounds -- the setup round sits between System and Life.
+verify.expect(rounds == 7,
+              "the wizard walks SEVEN rounds -- System, Setup, Life, Culture, Empires, "
               .. "Exploration, Industrialisation (got " .. rounds .. ")")
-verify.expect(round == 1, "parked on round 2, Life (0-based " .. round .. ")")
+verify.expect(round == 2, "parked on round 3, Life (0-based " .. round .. ")")
 verify.expect(verify.history_powers() == 0,
               "round 2 carries no history record (the case is not pre-loaded)")
 verify.capture("press_00_round3_before_next")
@@ -79,7 +80,7 @@ verify.capture("press_00_round3_before_next")
 verify.click(NEXT3_X, NEXT3_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
-verify.expect(round == 2, "NEXT on round 2 lands on round 3, CULTURE (0-based "
+verify.expect(round == 3, "NEXT on Life lands on round 4, CULTURE (0-based "
                           .. round .. ")")
 local powers = verify.history_powers()
 verify.expect(powers > 0,
@@ -128,7 +129,7 @@ verify.frames(6)
 verify.expect(verify.wizard_span_seed(0) == 0,
               "the Culture round has no Reroll: a press on its slot moves no seed (span_seed[0] = "
               .. verify.wizard_span_seed(0) .. ")")
-verify.expect(select(1, verify.wizard_round()) == 2 and verify.history_powers() > 0,
+verify.expect(select(1, verify.wizard_round()) == 3 and verify.history_powers() > 0,
               "the press leaves the wizard on round 3 with its record")
 verify.capture("press_03_culture_no_reroll")
 
@@ -142,7 +143,7 @@ verify.capture("press_03_culture_no_reroll")
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
-verify.expect(round == 3, "NEXT on round 3 lands on round 4, EMPIRES (0-based "
+verify.expect(round == 4, "NEXT on Culture lands on round 5, EMPIRES (0-based "
                           .. round .. ")")
 local r5 = verify.history_powers()
 verify.expect(r5 > 0,
@@ -204,7 +205,7 @@ verify.capture("press_05_round5_after_reroll")
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
-verify.expect(round == 4, "NEXT on round 4 lands on round 5, EXPLORATION (0-based "
+verify.expect(round == 5, "NEXT on Empires lands on round 6, EXPLORATION (0-based "
                           .. round .. ")")
 local r6 = verify.history_powers()
 verify.expect(r6 > 0,
@@ -233,7 +234,7 @@ verify.capture("press_07_round6_after_reroll")
 verify.click(NEXTP_X, NEXTP_Y)
 verify.frames(6)
 round = select(1, verify.wizard_round())
-verify.expect(round == 5, "NEXT on round 5 lands on round 6, INDUSTRIALISATION (0-based "
+verify.expect(round == 6, "NEXT on Exploration lands on round 7, INDUSTRIALISATION (0-based "
                           .. round .. ")")
 local r7 = verify.history_powers()
 verify.expect(r7 > 0,
@@ -331,7 +332,7 @@ end
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 4, "Back from round 6 lands on round 5, EXPLORATION (0-based "
+verify.expect(round == 5, "Back from Industrialisation lands on EXPLORATION (0-based "
                           .. round .. ")")
 verify.expect(verify.history_powers() > 0,
               "round 5's (Exploration) record survived the trip to round 6 and back")
@@ -343,7 +344,7 @@ verify.expect(back_first == exp_first,
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 3, "Back from round 5 lands on round 4, EMPIRES (0-based "
+verify.expect(round == 4, "Back from Exploration lands on EMPIRES (0-based "
                           .. round .. ")")
 verify.expect(verify.history_powers() > 0,
               "round 4's record survived the walk up to round 6 and back")
@@ -351,7 +352,7 @@ verify.expect(verify.history_powers() > 0,
 verify.click(BACKP_X, BACKP_Y)
 verify.frames(4)
 round = select(1, verify.wizard_round())
-verify.expect(round == 2, "Back from round 4 lands on round 3, CULTURE (0-based "
+verify.expect(round == 3, "Back from Empires lands on CULTURE (0-based "
                           .. round .. ")")
 verify.expect(verify.history_powers() > 0,
               "round 3's record survived the walk up to round 6 and back")

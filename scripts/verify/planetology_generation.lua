@@ -33,10 +33,12 @@ verify.show_menu(false)
 
 -- The three rounds. Named for the chain phase each covers, so a diff points at
 -- the round that moved.
+-- BL-1279: the wizard's first three rounds are System, Setup and Life (the
+-- setup round holds the nation targets, the seed and the abundance).
 local rounds = {
     [0] = "system",      -- A: System, Accretion, Air, Engine
-    [1] = "life",        -- B: Water, Spark, Breath, Green
-    [2] = "inheritance", -- C: Legacy, Spend
+    [1] = "setup",       -- the world-wide inputs (no chart chain)
+    [2] = "life",        -- B: Water, Spark, Breath, Green, Legacy
 }
 
 verify.generation_stage(0)

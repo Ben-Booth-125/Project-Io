@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*166 entries — 32 gameplay · 25 canvas · 19 lens · 54 ledger · 36 chrome.*
+*162 entries — 32 gameplay · 25 canvas · 19 lens · 54 ledger · 32 chrome.*
 
 ---
 
@@ -594,23 +594,23 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Buy a whole competitor rather than out-build it: its holdings, stock, cash and production arrive in one step, priced off a record it published itself. A firm whose filed returns read badly is cheap by exactly the amount the ledger says it is losing — so the verb rewards reading the Profitability ledger before anyone else does. Note that a firm earning through mercenary or procurement contracts reads as less profitable than it is (a filed return sees the money loop only), so it prices below what it is worth.
 
-### `gameplay.take_seat` — The corporation selection canvas at Begin (STARTUP.md § The seat): the ranked list of every specialist beside a map of the home body, a firm's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which corporation the player IS - so an agent must be able to make it. It is a corp_verb (29), but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <corp-id>` (every new-campaign path, --autostart included). NOTE FOR A PLANNER: the list order is the static landscape score (the ground a firm's holdings stand on), and firms below the viability floor are MARKED but offered; a marked firm is a harder opening, never an illegal one.
+### `gameplay.take_seat` — The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, the champion's firm card, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS and which champion they operate - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one.
 
-**Press.** Hover a row to point the map at that firm (its HQ, its works, its home market's catchment) and read its card; press the row to open its briefing; press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. At launch: `ProjectIo --seat <corp-id>` (the id is the corporation's entity id, as the `[seat]` log line and the blackboard print it).
+**Press.** Hover a row to point the map at that nation (its territory lit, its champion's HQ, works and home market drawn) and read its card; press the row to open its briefing; press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. On the card, "Open its history in the History ledger" opens the History ledger's Ages view filtered to the nation; pressed again ("Close its history") it closes the ledger - it reads the record and moves nothing. At launch: `ProjectIo --seat <nation-id>` (the nation's entity id, as the `[seat] major <nation> champion <corp>` log lines print it).
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `corp` | `entity_id` | The corporation to become. Must be a SPECIALIST of this world - one of the ranked rows the canvas offers - never a background firm (a company). |
+| `nation` | `entity_id` | The MAJOR nation to become - one of the rows the screen offers. Its champion (the specialist its ground generated) is the corporation seated. A minor nation, a corporation id, or any other entity is refused. |
 
 **Valid when:**
 - Before play: the validation run is over and no seat has been taken. In play the verb is refused whole (rejected_state) by every agent host, before the seam.
-- `corp` names a real corporation (rejected_no_corp otherwise). `--seat` range-checks the id against entity_id's domain before any narrowing and refuses the launch outright on a malformed, negative or out-of-range token - never truncated into some other firm.
-- `corp` is a ranked specialist: not a background firm, and one the canvas offers (rejected_invalid otherwise). A firm below the viability floor IS offered and IS pickable.
-- A refused pick mutates nothing and seats nobody: a headless run with a refused `--seat` fails rather than falling back to the draw; the interactive path opens the canvas instead.
+- `--seat` range-checks the id against entity_id's domain before any narrowing and refuses the launch outright on a malformed, negative or out-of-range token - never truncated into some other entity.
+- `nation` is a MAJOR of this world: a nation, and one holding a champion the ranking offers (rejected_invalid otherwise - a minor nation, a corporation id, or an id naming nothing). A major whose champion sits below the viability floor IS offered and IS pickable.
+- A refused pick mutates nothing and seats nobody: a headless run with a refused `--seat` fails rather than falling back to the draw; the interactive path opens the screen instead.
 
-**Expected output.** `is_player` and `world::player_entity` re-point onto `corp` (every other corporation's flag cleared), the player-scoped balance series is rebuilt from that corporation's own filed returns, and play opens framed on its holdings — in the live app, after a "Painting the ground" loading step if the home body's ground master (pre-baking since the world finished) has not yet landed (STARTUP.md § Handoff; the wait never counts as game days, and the headless --autostart and --verify paths do not wait). Nothing else moves: the same world and the same pick give the same player and the same state hash (reproducible from (seed, pick); scripts/verify/seat_pick.lua S5, tools/verify/seat_pick_check.js). world::state_hash folds the seat (`is_player` / `world::player_entity`), so a different pick on the same world is a different state hash and the seat is asserted from the hash alone; the player id printed beside it is a diagnostic. Picking the corporation the weighted draw would have chosen gives exactly the state the draw gives. The log prints `[seat] picked <id> (take_seat)`; a path with no player to ask prints `[seat] drawn <id> - <why>`.
+**Expected output.** `is_player` and `world::player_entity` re-point onto the nation's CHAMPION (every other corporation's flag cleared), the player-scoped balance series is rebuilt from that corporation's own filed returns, and play opens framed on its holdings — in the live app, after a "Painting the ground" loading step if the home body's ground master (pre-baking since the world finished) has not yet landed (STARTUP.md § Handoff; the wait never counts as game days, and the headless --autostart and --verify paths do not wait). Nothing else moves: the same world and the same pick give the same player and the same state hash (reproducible from (seed, pick); scripts/verify/seat_pick.lua S5, tools/verify/seat_pick_check.js). world::state_hash folds the seat (`is_player` / `world::player_entity`), so a different pick on the same world is a different state hash and the seat is asserted from the hash alone; the player id printed beside it is a diagnostic. Picking the major whose champion the weighted draw would have chosen gives exactly the state the draw gives. The log prints `[seat] picked <champion-id> (take_seat, nation <nation-id>)`; a path with no player to ask prints `[seat] drawn <id> - <why>`. A History ledger the card's link opened closes when play opens.
 
-**Reason to select.** Choose the opening position rather than be dealt one: the card shows what the firm makes and what its home market pays for it, what it holds and owes, and whose law it trades under - so a planner can prefer depth (a processor near population), a debt-free book, or a friendly nation, or knowingly take a marked firm as a harder game.
+**Reason to select.** Choose the opening position rather than be dealt one: the card shows the nation's ground, people, output and treasury, how its budget is weighted, what its champion makes and what its home market pays, what lies under its ground, which neighbours resent it, and the history that made it - so a planner can prefer a rich treasury, deep deposits, quiet borders, or a champion with depth, or knowingly take a marked major as a harder game.
 
 ---
 
@@ -2047,17 +2047,6 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Mouse route to the session controls (Pause/Resume, Exit Game); Esc is the keyboard parity for the same popup.
 
-### `chrome.menu_copy_seed` — Main menu, New World block, Copy seed button
-
-**Press.** Click Copy seed.
-
-**Valid when:**
-- App is on the main menu screen.
-
-**Expected output.** The current seed, formatted as 8 hex digits, is placed on the system clipboard. Nothing else changes.
-
-**Reason to select.** To record or share the reproducible key for the world about to be generated.
-
 ### `chrome.menu_new_game` — Main menu, primary button column
 
 **Press.** Click New Game.
@@ -2065,9 +2054,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - App is on the main menu screen.
 
-**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 6 (System, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.
+**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 7 (System, Setup, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.
 
-**Reason to select.** To start setting up a new world round by round, choosing the planetology and history leans.
+**Reason to select.** To start setting up a new world round by round: the nation targets, seed and resources on the setup round, then the planetology and history leans.
 
 ### `chrome.menu_quick_start` — Main menu, primary button column, between New Game and Quit
 
@@ -2076,9 +2065,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - App is on the main menu screen.
 
-**Expected output.** The world is built straight through on the menu's seed and resources with no wizard round drawn: the screen goes to the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then to the seat canvas (app_screen::choosing_seat), where the player picks the corporation. The same settings give the same world the wizard would have built.
+**Expected output.** Opens the New World wizard on its setup round alone (STARTUP.md section Rounds, Ben 2026-10-13): the nation targets, the seed and the abundance, which the main menu no longer carries. The setup round's Begin then builds the world straight through with no other wizard round drawn: the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then the nation selection screen (app_screen::choosing_seat), where the player picks a major nation. The same settings give the same world the wizard would have built. Back on that round returns to the menu.
 
-**Reason to select.** To start play on a known seed and resource level without walking the wizard's rounds; the seat is still chosen.
+**Reason to select.** To start play on chosen settings without walking the wizard's rounds; the seat is still chosen.
 
 ### `chrome.menu_quit` — Main menu, primary button column
 
@@ -2090,47 +2079,6 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** The application requests quit and exits. No confirmation is asked here (nothing exists to lose on the menu). Settings were already persisted to options.cfg as they changed.
 
 **Reason to select.** To leave the application from the entry screen.
-
-### `chrome.menu_roll_seed` — Main menu, New World block, Roll button beside the seed field
-
-**Press.** Click Roll.
-
-**Valid when:**
-- App is on the main menu screen.
-
-**Expected output.** The seed field is replaced with a fresh random draw (a one-shot random_device read; the only place entropy touches the pipeline). No world is generated yet.
-
-**Reason to select.** To get a fresh world without caring which one; the seed shown remains the reproducible key.
-
-### `chrome.menu_set_abundance` — Main menu, New World block, Resources radio row
-
-**Press.** Click one of the three radio buttons: Sparse, Lean, or Standard.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `level` | `enum: sparse | lean | standard` | Resource abundance tier. Standard is the Earth-like ceiling; Sparse and Lean step down from it. There is no tier above Standard. |
-
-**Valid when:**
-- App is on the main menu screen.
-
-**Expected output.** The pending world parameters carry the chosen abundance level, consumed at Begin. The Bodies slider next to this row is disabled (fixed at 5) and cannot be pressed.
-
-**Reason to select.** To choose how resource-rich the generated world is; leaner tiers make extraction siting and trade tighter.
-
-### `chrome.menu_set_seed` — Main menu, New World block, Seed field
-
-**Press.** Type an 8-digit hex value into the seed input box.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `seed` | `hex string (8 digits, u32)` | The world seed. Generation is a pure function of this value plus the knobs: same seed and knobs give an identical world. |
-
-**Valid when:**
-- App is on the main menu screen (app_screen::menu).
-
-**Expected output.** The pending world parameters carry the typed seed. Nothing is generated; the seed is consumed only when the wizard's Begin is pressed.
-
-**Reason to select.** To reproduce a specific known world, or to share/compare a world by its seed.
 
 ### `chrome.options_close` — Options window, bottom
 

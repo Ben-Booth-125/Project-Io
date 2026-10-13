@@ -23,7 +23,7 @@ local started = verify.history_wait(2)
 verify.expect(started, "round 5's own stage is running on a worker, from a held copy of round 4's world")
 verify.frames(2)
 local round = select(1, verify.wizard_round())
-verify.expect(round == 4, "parked on round 5, Exploration (0-based " .. round .. ")")
+verify.expect(round == 5, "parked on round 6, Exploration (0-based " .. round .. ")")
 local caption = verify.history_wait_caption()
 verify.expect(caption == "Running the exploration age",
               "round 5's wait names the Exploration span and nothing earlier (caption: '"

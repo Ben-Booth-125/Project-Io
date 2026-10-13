@@ -41,7 +41,7 @@ local STAGE_LEGACY = 8
 
 -- ── 1. The Life round, on its closing fold ────────────────────────────────
 -- First wizard frame after a screen switch is a warmup (main_menu.lua's rule).
-verify.generation_stage(1)
+verify.generation_stage(2) -- Life (BL-1279: setup is round 1)
 verify.frames(4)
 verify.capture("life_to_people_warmup")
 shot("life_to_people_1_life_round")
@@ -58,11 +58,11 @@ verify.fold()
 -- and it has landed by the capture). The pane the wait draws is the one the
 -- round draws before its record exists, so the round is parked with no run
 -- first: the Life map under the 2400 BCE stamp.
-verify.generation_stage(2)
+verify.generation_stage(3) -- Culture
 verify.frames(4)
 verify.capture("life_to_people_3a_culture_wait")
 local wround = select(1, verify.wizard_round())
-verify.expect(wround == 2, "parked on round 3, Culture (0-based " .. wround .. ")")
+verify.expect(wround == 3, "parked on round 4, Culture (0-based " .. wround .. ")")
 -- Then a real run (the Life-gate world built and held, the Culture stage on a
 -- worker from a copy of it), landed, its first year on the same map.
 local started = verify.history_wait(0)
@@ -147,7 +147,7 @@ verify.expect_no_clipping("life_to_people")
 -- After the clipping ledger above on purpose: that ledger is the 1920x1080
 -- design-review read.
 verify.window(1280, 720)
-verify.generation_stage(2)
+verify.generation_stage(3) -- Culture
 verify.frames(4)
 verify.capture("life_to_people_7_small_culture_wait")
 verify.history_run(0)

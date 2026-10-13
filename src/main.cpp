@@ -650,14 +650,15 @@ int main(int argc, char* argv[])
             epoch_set  = true;
         }
 
-        // --seat <corp-id>  (BL-1076): the seat, picked at launch rather than on
+        // --seat <nation-id>  (BL-1076; BL-1281 names a MAJOR nation, whose
+        // champion is seated): the seat, picked at launch rather than on
         // the selection canvas -- the route an agent takes to the pre-play act
         // (the in-play agent hosts refuse `take_seat`). AN UNTRUSTED INPUT
         // (io-standing-rules.md, AI-facing seam): parsed WIDE, the whole token
         // must be digits, and the value is range-checked against entity_id's
         // real domain before any narrowing -- a malformed or out-of-range id
         // refuses the launch outright rather than truncating into some other
-        // firm. Whether the id names a RANKED SPECIALIST of the world is the
+        // firm. Whether the id names a MAJOR NATION of the world is the
         // tail's check (app::take_seat_pick), the only place that has the
         // ranking; a refused pick seats nobody and a headless run fails.
         bool      seat_set  = false;
@@ -668,7 +669,7 @@ int main(int argc, char* argv[])
                 continue;
             if (i + 1 >= argc)
             {
-                std::fprintf(stderr, "ProjectIo: --seat needs a corporation id\n");
+                std::fprintf(stderr, "ProjectIo: --seat needs a major nation id\n");
                 return 1;
             }
             const std::string arg  = argv[i + 1];
@@ -683,7 +684,7 @@ int main(int argc, char* argv[])
                 || static_cast<entity_id>(v) == null_entity)
             {
                 std::fprintf(stderr,
-                             "ProjectIo: --seat expects a corporation entity id in "
+                             "ProjectIo: --seat expects a major nation entity id in "
                              "0..%lld (got \"%s\")\n", id_max, arg.c_str());
                 return 1;
             }

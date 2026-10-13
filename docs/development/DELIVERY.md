@@ -315,6 +315,19 @@ figures from the shards' numerators. Two tiers:
 
 One heavy parallel run per machine at a time; a second only slows the first.
 
+### Sprint throughput rules (Ben, 2026-10-13)
+
+- **Independent lanes start at once.** UI and tech work that does not depend on a running
+  generation lane builds in parallel with it; live clicks are batched for Ben at the end.
+- **Calibration inside a ruled band is the session's call.** Where Ben has ruled a range (a floor
+  within 25-35%, a rate near a third), the session picks the value by measurement and logs a
+  `decision` entry in `NEEDS_REVIEW.json` instead of stopping.
+- **Only invariants block a merge:** determinism, conservation, the seat guard, the history pattern
+  targets, and the item's own requirement. Economy readings already failing before the sprint
+  (market_viability G1b, G1 at tick 50) are reported, not gating, until the sprint's economy pass.
+- **One integration lane re-measures cross-cutting targets** (all five history patterns together)
+  after a wave lands, rather than every lane re-measuring after every merge.
+
 ### The symbol-level dependency contract (`provides` / `consumes`)
 
 `waits_on` / `blocked_on` in `backlog.json` capture *item-level* ordering — coarse, and enough to

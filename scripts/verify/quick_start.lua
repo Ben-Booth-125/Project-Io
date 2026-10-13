@@ -2,14 +2,23 @@
 --
 --   ProjectIo --verify scripts/verify/quick_start.lua
 --
--- STARTUP.md § Main menu. Two claims, both driven by a REAL PRESS:
+-- STARTUP.md § Main menu and § Rounds. Claims, each driven by a REAL PRESS:
 --
---   Q1. Quick Start is a button on the menu, and a press on it leaves the menu
---       for the loading bar (app_screen::building) -- no wizard round drawn.
+--   Q1. Quick Start is a button on the menu, and a press on it opens the
+--       wizard's SETUP round alone (BL-1279; Ben, 2026-10-13) -- the one place
+--       the nation targets, the seed and the abundance are set.
+--   Q1b. A press on the Total slider moves the nation total, and the pair
+--       stays legal (the slider's range is cut by the majors).
+--   Q1c. The setup round's Begin leaves for the loading bar
+--       (app_screen::building) -- no other wizard round drawn.
 --   Q2. The cold build behind that bar lands on the SEAT canvas, the same
 --       screen the wizard's Begin reaches. It is Begin's own cold case
 --       (launch_cold_build: make_hard_coded_world, then finish_campaign_world),
 --       not a second generation path.
+--   Q3. The params flow: the world built was built from the setup round's
+--       targets, and lands on them (nations alive on the homeworld == the
+--       total; major nations == the majors). nation_targets_harness owns the
+--       sim's half across seeds; this is the wizard-to-world seam.
 --
 -- And one visual: the loading bar sits ~15% of the window's height from the
 -- top, horizontally centred (ui::loading_bar_y). The building capture is for
@@ -29,12 +38,33 @@ verify.show_menu(true)
 verify.frames(3)
 verify.capture("quick_start_00_menu")
 
-local QX, QY = 958, 682 --the Quick Start button's centre (see the menu capture)
+local QX, QY = 958, 628 --the Quick Start button's centre (see the menu capture)
 verify.click(QX, QY)
-verify.frames(2)
+verify.frames(4)
 local s = verify.screen()
+local round, rounds, quick = verify.wizard_round()
+verify.expect(s == "generating" and round == 1 and quick,
+              "Quick Start opens the setup round alone (screen " .. s .. ", round "
+              .. round .. ", quick " .. tostring(quick) .. ")")
+verify.capture("quick_start_00b_setup")
+
+-- Q1b -- a press a third of the way along the Total slider (Quick Start's
+-- setup round draws it at y~170, x 248..720 at 1920x1080).
+local t0, m0 = verify.wizard_targets()
+verify.click(400, 170)
+verify.frames(3)
+local total, majors = verify.wizard_targets()
+verify.expect(total ~= t0 and total >= majors and total <= 40 and majors == m0,
+              "a press on the Total slider moves the total and keeps the pair legal ("
+              .. t0 .. " / " .. m0 .. " -> " .. total .. " / " .. majors .. ")")
+verify.capture("quick_start_00c_setup_moved")
+
+local BEGIN_X, BEGIN_Y = 603, 995 -- the setup round's Begin under Quick Start
+verify.click(BEGIN_X, BEGIN_Y)
+verify.frames(2)
+s = verify.screen()
 verify.expect(s == "building",
-              "Quick Start leaves the menu for the loading bar, no wizard round (screen: " .. s .. ")")
+              "the setup round's Begin leaves for the loading bar, no other round (screen: " .. s .. ")")
 verify.frames(30)
 verify.capture("quick_start_01_building")
 
@@ -56,3 +86,15 @@ verify.expect(open and candidates > 0,
               "the seat canvas offers the specialists (" .. tostring(candidates) .. " candidates)")
 verify.frames(3)
 verify.capture("quick_start_03_seat")
+
+-- Q3 -- the targets flowed from the setup round into the built world.
+local n_total, n_majors, p_total, p_majors = verify.nation_census()
+verify.expect(p_total == total and p_majors == majors,
+              "the world was built from the setup round's targets (" .. p_total .. " / "
+              .. p_majors .. " vs " .. total .. " / " .. majors .. ")")
+verify.expect(n_total == total,
+              "the homeworld holds the target total (" .. n_total .. " nations, target "
+              .. total .. ")")
+verify.expect(n_majors == majors,
+              "the homeworld holds the target majors (" .. n_majors .. " majors, target "
+              .. majors .. ")")
