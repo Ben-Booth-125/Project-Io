@@ -235,6 +235,17 @@ int main()
     }
     w.corporations[corp].assets.push_back(control);
 
+    // BL-1310 (workforce stepped auto): the game steps the SEATED player's workforce
+    // each tick, and this fixture has no market, so it would step the Well toward 0.
+    // The arithmetic rows pin workforce 100, so the seat moves to an empty corp: the
+    // owner stays is_player (the corp AI never steers it) and nothing steps its sites.
+    {
+        const entity_id seat = w.create_entity();
+        corporation_component sc;
+        sc.is_player = true;
+        w.corporations[seat] = sc;
+        w.player_entity = seat;
+    }
     const std::size_t rw = ri(resource_type::water);
     float last = 0.0f, first_delta = -1.0f;
     bool  steady = true, all_active = true, never_exhausted = true, control_idle = true;
