@@ -1347,7 +1347,7 @@
    "id": "BL-1309",
    "short_name": "SETTLE_TICKS_FEED_READINGS",
    "category": "UI",
-   "priority": "B",
+   "priority": "A",
    "difficulty": 2,
    "authority_doc": "docs/ui/STARTUP.md",
    "files": [
@@ -1357,7 +1357,35 @@
     "src/ui/market_ledger.cpp"
    ],
    "title": "A fresh campaign opens on the settle ticks' readings: no per-quarter surface shows 'no data yet' at Begin",
-   "design": "DESIGNED (Ben, 2026-10-13): STARTUP.md § Handoff, the paragraph after the twelve pre-game ticks. Sweep every surface that waits on an economy tick (building profit '— / qtr' - seen on a Port in the BL-1300 captures -, the header net and sparkline, market Sold here / Traded in / Traded out, price series, balance series) and make each read the settle's last values at Begin. BL-1308 (market trade value record) does its own figures. Change no simulated value: the settle runs as now; only what the presentation keeps from it changes. Live click at Begin."
+   "design": "DESIGNED (Ben, 2026-10-13): STARTUP.md § Handoff, the paragraph after the twelve pre-game ticks. Sweep every surface that waits on an economy tick (building profit '— / qtr' - seen on a Port in the BL-1300 captures -, the header net and sparkline, market Sold here / Traded in / Traded out, price series, balance series) and make each read the settle's last values at Begin. BL-1308 (market trade value record) does its own figures. Change no simulated value: the settle runs as now; only what the presentation keeps from it changes. Live click at Begin. PULLED INTO THE SPRINT 54 BUILD (Ben, 2026-10-13 live click): the building card showed no method or chart for an Iron Mine before the first tick and for a Port always. Every card shows method + status always (a Port names its trade points); profit rows read the settle's last quarter on a fresh campaign."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-13, from the sprint 54 live click); filed by Claude",
+   "requires": [],
+   "id": "BL-1310",
+   "short_name": "WORKFORCE_STEPPED_AUTO",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/corp_command.hpp",
+    "src/world/components.hpp",
+    "src/world/corp_ai.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/construction_panel.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The game sets the player's workforce: one 25% step a quarter toward the most profitable level, capped at 100%; player controls retired",
+   "design": "DESIGNED (Ben, 2026-10-13): PRODUCTION.md § Workforce target and the auto-solver; AI_OPPONENT.md § 11 amendment; SELECTION.md building card. Range 0-100 for every building (clamp generation seeds, the verb, the solver grid 0/25/50/75/100). Player buildings: each econ tick move workforce_target one 25-point step toward solve_workforce_target's best. Retire the card slider, the Construction ledger's slider and Auto button, the player's set_workforce and set_workforce_auto verbs (rivals keep set_workforce under their grant, within 0-100; check corp_ai and the --serve/MCP seam's validation). Card shows the target read-only. World mover: measure before/after for BL-1277's wave (market_viability quick tier, player_seed_sweep digests); no re-bless here."
   }
  ]
 }

@@ -111,9 +111,6 @@ is the designated action area and keeps its buttons; the centre's paged accordio
 pages that report. Where a page's whole content is a control — a recipe switcher, a workforce
 slider — that page moves to the ledger for its kind.
 
-**One exception, by a later ruling: the expanded building card carries the workforce slider**
-(Ben, 2026-10-13; § The building element's layout). It writes through the ledger's own control
-body, so there is still one writer. The method switch and every other lever stay in the ledgers.
 
 The rule composes with the **menus-are-broad-ledgers** test in `MENU.md` rather than fighting it.
 That test asks whether a *surface* earns a rail slot; this one asks where a *control* lives once
@@ -362,22 +359,27 @@ The preview and the province card do not move; two columns change.
      splits it into `input_cost` / `maintenance` / `wages` (NR-248). The column chart of
      revenue against stacked expenses and the Inputs bar chart are retired: one number says
      what the column pair said, in a fraction of the height.
-   - **The workforce row** — a **horizontal workforce slider** with the current percentage
-     to its right, writing `workforce_target` through the same body the Construction ledger's
-     Buildings view uses (`draw_building_workforce_page`'s control), never a second writer. A
-     manual edit clears **Auto**, as it does in the ledger.
+   - **The workforce row** — the building's workforce target as a **read-only bar** with the
+     percentage to its right (0–100 %). The game sets it, one 25 % step a quarter toward the
+     most profitable level (`../economy/PRODUCTION.md` § Workforce target and the auto-solver);
+     the slider and the Auto control are retired (Ben, 2026-10-13).
 
-   The profit and workforce rows are drawn only for the player's own completed building
-   (`ticks_remaining <= 0`) with profit data (`estimate_building_profit`'s `has_data`); a
-   building still under construction shows the header, method and status. A **rival's** card
+   **Every card shows its method and status line, always** — before the first quarter, and for
+   a building with no recipe. A building with no recipe names what it does instead (a Port: the
+   trade points it makes; a hub: the haul it discounts). The profit and workforce rows are drawn
+   for the player's own completed building; **a fresh campaign opens with them filled**, from the
+   settle's quarters (`STARTUP.md` § Handoff, Ben 2026-10-13: *"the first few ticks in
+   generation … pass their data to the live game"*). A building with no output still has costs:
+   its profit row reads its net (negative) and expenses. A building still under construction
+   shows the header, method and status. A **rival's** card
    is the header, owner name and an explicit `private` row for production (DISCOVERY.md, the
    competitor-visibility rule) — it short-circuits rather than testing each guard against data
    it must not show.
 
-   **The workforce slider is a lever on the centre, and that REVERSES the 2026-08-29 ruling**
-   (§ The centre presents; it does not operate) for workforce alone, newest-dated winning (Ben,
-   2026-10-13). The method switch stays in the Construction ledger's Buildings view; the card
-   names the method and does not switch it.
+   The card holds no lever: the workforce slider it briefly carried (2026-10-13, round 2) is
+   retired with player workforce control altogether, so § The centre presents holds without
+   exception. The method switch stays in the Construction ledger's Buildings view; the card names
+   the method and does not switch it.
 
 2. **The action grid retargets to the building** — the same 2×3 cell layout, now holding
    four building-level actions. This is the element's designated place to ACT; the cards are
