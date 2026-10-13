@@ -220,7 +220,7 @@ BL-049 (wage/maintenance split).
   of code, and the loader rejects a value outside [0, 1] rather than clamping it. Every call site
   passes the registry's value into `compute_building_opex`, which takes it undefaulted so a new
   one cannot fall back to a stale copy. Non-zero deliberately: holding land is never free.
-- **Labour maintenance** — the remainder, scaled by `workforce_target` (0–100 %,
+- **Labour maintenance** — the remainder, scaled by `workforce_target` (0–200 internal, shown as 0–100 % of full employment,
   `wt_scalar` clamped [0, 2]); zero when decommissioned, and floored at zero rather than going
   negative where `wt_scalar` falls below the idle floor — there the floor already covers more
   than the scaled total, and maintenance is the floor alone.
