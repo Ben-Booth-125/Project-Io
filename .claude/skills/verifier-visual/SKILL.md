@@ -329,7 +329,7 @@ rail and its tooltip, comms dock, Selection band in three kinds, minimap at each
 ladder, the lens region, the hover card, the launch screen, the in-session system menu, and each
 of the thirteen rail ledgers. 30 captures from one world. (The band's fourth kind was the
 **province**; BL-598 folded it into the tile element as accordion sections, so the two captures
-would have been the same picture. `selection_accordion.lua` is where that element is checked.) It is a **design review, not a gate** —
+would have been the same picture. `tile_card.lua` is where that element is checked.) It is a **design review, not a gate** —
 no goldens, and its only assertion is the clipping ledger's.
 
 Two things about it are worth copying, and one is worth not copying.

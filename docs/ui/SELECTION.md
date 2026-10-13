@@ -121,9 +121,9 @@ Each kind routes its 'go to' to the right place:
 
 | Selection kind | Action (hero) | Facts (muted) | 'Go to' target |
 |---|---|---|---|
-| **Tile** | Dedicated three-column band — § The tile element's layout. | | **No-op.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
+| **Tile** | Dedicated four-column band, no header row — § The tile element's layout. | | **No-op.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
 | **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey**. Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened".) |
-| **Building** (any) | Dedicated three-column band — § The building element's layout. Player-owned and rival buildings alike. | | Canvas: `focus_on_tile` (host tile). |
+| **Building** (any) | The host tile's card with this stack expanded in place, no header row — § The building element's layout. Player-owned and rival buildings alike. | | None: the tile element draws no go-to. |
 | **Unit** | Dedicated three-column band — § The unit element's layout. | | Canvas: entity's position. |
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
 | **Nation / Corporation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
