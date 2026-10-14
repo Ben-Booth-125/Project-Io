@@ -6,6 +6,7 @@
 #include "hover_card.hpp"
 #include "hover_content.hpp"
 #include "hex_render.hpp"
+#include "rail_tool.hpp" // BL-1255: the rail tool preview + gestures
 #include "icons.hpp"
 #include "tile_inspector.hpp"   // history_view_tectonics (BL-660 routing)
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
@@ -5885,6 +5886,86 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // BL-1255 (rail construction UI): the armed rail tool's preview. Lay track
+    // draws the PLANNED run (rings joined in lay order) and tints the hovered
+    // tile by whether it may extend the run; Railway station rings every legal
+    // city tile on the body. Reads rail_tool.hpp's preview of the door's rules
+    // and mutates nothing but the hover it publishes for the ledger.
+    state.construction.rail_hover = null_entity;
+    if (state.construction.rail != rail_tool::none)
+    {
+        const entity_id rail_nation = rail_player_nation(w);
+        state.construction.rail_hover = have_hover ? hovered_tile : null_entity;
+        const float rr = std::max(3.0f, draw_r * 0.55f);
+        const auto ring_all = [&](entity_id t, ImU32 col, float thick) {
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end() || tit->second.body != state.active_body)
+                return;
+            const ImVec2 c0 = to_screen(hex_local_centre(tit->second.grid_x, tit->second.grid_y, hex_size));
+            const int k_min = (period_px > 0.0f) ? static_cast<int>(std::ceil((visible_left - c0.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f) ? static_cast<int>(std::floor((visible_right - c0.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+                dl->AddCircle({c0.x + static_cast<float>(k) * period_px, c0.y}, rr, col, 16, thick);
+        };
+        if (state.construction.rail == rail_tool::station)
+        {
+            for (const auto& [centre, ctile] : w.population_centre_tile)
+            {
+                (void)centre;
+                if (rail_station_tile_ok(w, rail_nation, ctile))
+                    ring_all(ctile, palette::positive, 2.5f);
+            }
+        }
+        else
+        {
+            const std::vector<entity_id>& run = state.construction.rail_run;
+            for (std::size_t i = 0; i < run.size(); ++i)
+            {
+                ring_all(run[i], IM_COL32(235, 205, 120, 255), 2.5f);
+                if (i == 0)
+                    continue;
+                const auto ta = w.tiles.find(run[i - 1]), tb = w.tiles.find(run[i]);
+                if (ta == w.tiles.end() || tb == w.tiles.end() || ta->second.body != state.active_body)
+                    continue;
+                const ImVec2 a = to_screen(hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size));
+                const ImVec2 b = to_screen(hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size));
+                if (std::fabs(a.x - b.x) > period_px * 0.5f)
+                    continue; // the seam: the wrap copy carries the join
+                const int k_min = (period_px > 0.0f) ? static_cast<int>(std::ceil((visible_left - std::max(a.x, b.x)) / period_px)) : 0;
+                const int k_max = (period_px > 0.0f) ? static_cast<int>(std::floor((visible_right - std::min(a.x, b.x)) / period_px)) : 0;
+                for (int k = k_min; k <= k_max; ++k)
+                {
+                    const float off = static_cast<float>(k) * period_px;
+                    dl->AddLine({a.x + off, a.y}, {b.x + off, b.y}, IM_COL32(235, 205, 120, 220), 3.0f);
+                }
+            }
+        }
+        if (have_hover)
+        {
+            const char* why = nullptr;
+            const bool  is_back = state.construction.rail == rail_tool::track
+                               && !state.construction.rail_run.empty()
+                               && state.construction.rail_run.back() == hovered_tile;
+            const bool ok = is_back
+                || (state.construction.rail == rail_tool::station
+                        ? rail_station_tile_ok(w, rail_nation, hovered_tile, &why)
+                        : rail_track_tile_ok(w, rail_nation, hovered_tile, state.construction.rail_run, &why));
+            float gx = 0.0f, gy = 0.0f;
+            for (const ImVec2& v : hover_verts) { gx += v.x; gy += v.y; }
+            gx /= 6.0f;
+            gy /= 6.0f;
+            dl->AddCircle({gx, gy}, rr + 2.0f, ok ? palette::positive : palette::negative, 16, 2.0f);
+            if (!ok && why != nullptr)
+            {
+                const ImVec2 tsz = ImGui::CalcTextSize(why);
+                const ImVec2 tp{gx - tsz.x * 0.5f, gy + rr + 5.0f};
+                dl->AddRectFilled({tp.x - 3.0f, tp.y - 1.0f}, {tp.x + tsz.x + 3.0f, tp.y + tsz.y + 1.0f},
+                                  IM_COL32(0, 0, 0, 180), 2.0f);
+                dl->AddText(tp, palette::negative, why); // fit-exempt: backdrop sized to its measured text
+            }
+        }
+    }
+
     dl->PopClipRect();
 
     // The active lens's key, in the ONE lens chrome region (BL-602): the minimap's
@@ -6229,6 +6310,32 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                         ? w.provinces.province_of(hovered_tile) : 0u;
             if (march_prov != 0)
                 state.pending_march_dest_province = march_prov;
+        }
+        else if (state.construction.rail != rail_tool::none)
+        {
+            // BL-1255: an armed rail tool owns the click, as placement mode does.
+            // Track: the click plans (or, on the run's last tile, un-plans) a
+            // tile; a click on an earlier planned tile cuts the run back to it.
+            // Station: a click on a legal city tile queues the build.
+            if (hovered_tile != null_entity)
+            {
+                const entity_id rn = rail_player_nation(w);
+                std::vector<entity_id>& run = state.construction.rail_run;
+                if (state.construction.rail == rail_tool::station)
+                {
+                    if (rail_station_tile_ok(w, rn, hovered_tile))
+                        state.construction.pending_station_tile = hovered_tile;
+                }
+                else if (!run.empty() && run.back() == hovered_tile)
+                    run.pop_back();
+                else if (const auto at = std::find(run.begin(), run.end(), hovered_tile); at != run.end())
+                    run.erase(at + 1, run.end());
+                else if (rail_track_tile_ok(w, rn, hovered_tile, run))
+                {
+                    run.push_back(hovered_tile);
+                    state.rail_drag_live = true; // only a press that planned starts a drag
+                }
+            }
         }
         else if (shift_pick_owner != null_entity && !state.construction.active)
         {
@@ -6715,6 +6822,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.construction.pending_type   = state.construction.type;
             state.construction.pending_target = state.construction.target;
         }
+    }
+
+    // BL-1255: DRAG to lay a run — while the button stays down after a press
+    // that planned a tile, each newly hovered tile that may extend the run joins
+    // it. Released, the drag ends; a fresh press is a fresh gesture.
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        state.rail_drag_live = false;
+    else if (state.rail_drag_live && state.construction.rail == rail_tool::track
+             && hovered_tile != null_entity && !ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        std::vector<entity_id>& run = state.construction.rail_run;
+        if ((run.empty() || run.back() != hovered_tile)
+            && rail_track_tile_ok(w, rail_player_nation(w), hovered_tile, run))
+            run.push_back(hovered_tile);
     }
 
     // BL-737: the camera. One squash over every map-space vertex emitted since

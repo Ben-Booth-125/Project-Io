@@ -1998,6 +1998,24 @@
    "checks": [
     "nation_select"
    ]
+  },
+  {
+   "id": "UI-126",
+   "name": "Rail group",
+   "kind": "sub-element",
+   "parent": "UI-074",
+   "source": [
+    "docs/economy/LOGISTICS.md § 4c",
+    "docs/politics/NATIONS.md § State industry",
+    "src/ui/rail_tool.hpp",
+    "src/ui/rail_tool.cpp"
+   ],
+   "summary": "In the Construction view: the seat nation's uncommitted treasury and two toggle tools. Lay track arms a Planetary-canvas tool that plans a run tile by tile (click or drag; click the last tile to undo), previews it as joined rings, and prices it per tile and in total (credits, steel bought at the tile market, upkeep) with the first refusal named; 'Lay planned track' lays it through lay_track. Railway station rings every legal city tile and builds one on a click. Closing the ledger or switching tab disarms both.",
+   "interesting_question": "A run is laid tile by tile through the seam and stops at the first refusal - does a partly laid run (the shelf ran dry mid-line) read as progress or as a failure?",
+   "resolution": "Open - the laid tiles stay laid and leave the plan, the remainder stays planned, and the outcome line says how many were laid and why it stopped; whether to price the shelf before the press (done) is enough is Ben's call.",
+   "checks": [
+    "rail_construction"
+   ]
   }
  ]
 }

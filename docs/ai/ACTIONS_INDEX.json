@@ -63,11 +63,11 @@
   ],
   [
    "gameplay.lay_track",
-   "The command seam only (--serve / MCP `issue_command` verb `lay_track` with `nation`, and the verify API's `corp_command{verb=lay_track, as_nation=...}`). No canvas control yet: the rail rendering and its build tool are a separate lane (RENDERING.md)."
+   "Construction ledger > Construction view > Rail group > 'Lay track' (a toggle that arms the track tool on the Planetary canvas), then map clicks/drags plan a run and 'Lay planned track' commits it. Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`)."
   ],
   [
    "gameplay.build_station",
-   "The command seam only (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`). No canvas control yet (a separate lane)."
+   "Construction ledger > Construction view > Rail group > 'Railway station' (a toggle that arms the station tool; legal tiles are ringed on the Planetary canvas), then a click on a ringed city tile. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`)."
   ],
   [
    "gameplay.survey",
