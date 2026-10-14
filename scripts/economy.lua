@@ -1071,7 +1071,11 @@ economy = {
     research = {
         base_rp_per_nation          = 120.0,
         rp_per_research_credit      = 0.0,
-        rp_per_research_credit_sqrt = 20.0,
+        -- BL-1305 (sprint 53): 20 -> 10. Real treasuries (BL-1298) made the
+        -- concave term outrun the band (median 14 quarters, p10 7); re-fit in band
+        -- (nation_tech_harness R0, 16 seeds, 32 q): sqrt 20: p10 7 p50 14 p90 25 |
+        -- 12: 11/18/27 | 10: 12/20/28 | 8: 14/22/28. Base 120 kept (Ben's).
+        rp_per_research_credit_sqrt = 10.0,
         rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
         rp_per_institute            = 50.0,  -- unmeasured: likewise
         rp_per_cost_unit            = 200.0,

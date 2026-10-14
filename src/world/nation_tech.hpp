@@ -52,7 +52,8 @@ class recipe_registry;
 /// "building:university"; 1 when none is held)
 /// all times `research_multiplier`. Its SHAPE is a dial change, not a code
 /// change. The defaults are Ben's ruling (2026-10-10): base + sqrt — 120 RP a
-/// quarter for every nation plus 20 x sqrt(credits the line spends), linear 0,
+/// quarter for every nation plus 20 x sqrt(credits the line spends) (re-fit to
+/// 10 x sqrt by BL-1305 once real treasuries landed), linear 0,
 /// 200 RP per cost unit (an age is about 80 years; Ben's correction of the
 /// 100-RP measurement, which ran about twice too fast). Why a base and a
 /// concave term: treasuries span orders of magnitude, and about a third of
@@ -74,7 +75,7 @@ struct research_params
     /// RP per credit the academic-research budget line spends (the linear term).
     float rp_per_research_credit = 0.0f;
     /// RP per sqrt(credit) the line spends (the concave term).
-    float rp_per_research_credit_sqrt = 20.0f;
+    float rp_per_research_credit_sqrt = 10.0f; // BL-1305: re-fit 20 -> 10 (scripts/economy.lua)
     /// RP per quarter per STAFFED University (completed, standing, workforce
     /// assigned > 0) in the nation's territory (RESEARCH.md § Research points).
     float rp_per_university = 100.0f;
