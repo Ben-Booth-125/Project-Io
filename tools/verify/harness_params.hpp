@@ -172,6 +172,10 @@ struct harness_charter_input
     /// champion row runs `hand_over_state_industry` itself on that world).
     /// False is the shipped sequence.
     bool skip_state_handover = false;
+    /// BL-1255: hold back the rail handover (no owners, no stations, so no rail
+    /// route exists) -- the BEFORE reading of the haulage shift on one build.
+    /// Held back too whenever the state handover is, which it follows.
+    bool skip_rail_handover = false;
 };
 
 struct shipped_landscape
@@ -198,6 +202,7 @@ struct shipped_landscape
     marketplace_retrofit_report retrofit;
     /// BL-1296: the state-industry handover the mirror ran after the recipes.
     state_handover_report   state;
+    rail_handover_report    rail; ///< BL-1255
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -301,6 +306,12 @@ inline shipped_landscape apply_shipped_landscape(
     {
         out.state = hand_over_state_industry(w, reg);
         print_state_handover(out.state);
+    }
+    // BL-1255: finish_campaign_world's rail handover, verbatim, right after it.
+    if (!charter.skip_rail_handover && !charter.skip_state_handover) // it follows the state handover
+    {
+        out.rail = hand_over_rail(w);
+        print_rail_handover(out.rail);
     }
 
     std::vector<entity_id> after;

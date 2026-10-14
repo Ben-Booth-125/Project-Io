@@ -134,6 +134,11 @@ struct generation_cursor
     /// else Exploration's 1660 one; empty when neither ran.
     std::vector<sea_leg> kepler_sea_legs;
 
+    /// BL-1255 -- THE RAIL RECORD: the Industrialisation span's rail links
+    /// (`industrialisation_output::rail_links`), carried to the tail where
+    /// `stamp_history_rail` lays them as track. Empty when the span did not run.
+    std::vector<history_rail_link> kepler_rail_links;
+
     /// BL-1268 — THE TRADE RECORD (`trade_record_cell`), carried to the tail
     /// where `w.gen_trade_record` is built from it: Exploration's whole span,
     /// plus Industrialisation's when it ran (`merge_trade_record`). Empty when

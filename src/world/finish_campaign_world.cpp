@@ -386,6 +386,14 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // the opening position play receives was earned with the state running.
     out.state = hand_over_state_industry(w, reg);
     print_state_handover(out.state);
+    // BL-1255 -- THE RAIL HANDOVER (INDUSTRIALISATION.md § Who lays rail): the
+    // track the Industrialisation span laid passes to the major whose ground it
+    // stands on, or to a minor's background firm, and a station stands at each
+    // city a line serves. After the state handover (a station is never a firm's
+    // on a major's ground) and before the settle, so the opening position is
+    // earned with the rail running.
+    out.rail = hand_over_rail(w);
+    print_rail_handover(out.rail);
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

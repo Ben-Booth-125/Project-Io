@@ -214,6 +214,28 @@ uint64_t world::state_hash(int tick) const
         fnv1a_u32(h, fm.into);
     }
 
+    // BL-1255: the rail track field — std::map, ascending tile — and the stations
+    // a convoy rides. Folded only when the world carries track, so a world with
+    // no rail hashes exactly as it did before the field existed.
+    if (!rail_track.empty())
+    {
+        fnv1a_u32(h, 0x7A11u);
+        for (const auto& [tile, owner] : rail_track)
+        {
+            fnv1a_u32(h, tile);
+            fnv1a_u32(h, owner);
+        }
+        for (const convoy_component& cv : convoys)
+            if (cv.station_a != null_entity || cv.station_b != null_entity)
+            {
+                fnv1a_u32(h, cv.id);
+                fnv1a_u32(h, cv.station_a);
+                fnv1a_u32(h, cv.station_b);
+            }
+        for (const entity_id o : rail_idle)
+            fnv1a_u32(h, o);
+    }
+
     // BL-1265: corporations hold no pools — every good is on a market's shelf,
     // folded with the markets above.
 

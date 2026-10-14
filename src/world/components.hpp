@@ -658,6 +658,11 @@ enum class building_type : uint8_t
                                 ///< POINTS for its owner each tick at its staffed rate, as a processor
                                 ///< makes goods; carries a fuel and building-material upkeep (unmet:
                                 ///< no points that tick). Produces no good.
+    railway_station = 11, ///< BL-1255 (LOGISTICS.md § 4c; PRODUCTION.md § Infrastructure
+                          ///< buildings): where goods board and leave the rail network. On a
+                          ///< city tile touching track, zero staff, a build cost and upkeep —
+                          ///< the port's shape on land. Produces nothing. State industry in a
+                          ///< major (transport sector), a background firm's in a minor.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -667,7 +672,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::planetary_marketplace) + 1;
+    static_cast<uint8_t>(building_type::railway_station) + 1;
 
 /// BL-615 stratum placement gates (docs/economy/POPULATION.md § Strata gate
 /// buildings): which relationship to the population-centre scale ladder a
@@ -1649,6 +1654,11 @@ struct convoy_component
     entity_id   origin_tile    = null_entity;
     entity_id   port_a         = null_entity;
     entity_id   port_b         = null_entity;
+    /// BL-1255: the boarding and alighting railway STATIONS (their tiles) of a
+    /// road -> rail -> road route; both null otherwise. Fixed at dispatch like the
+    /// Ports. SERIALISED in the v49 rail trailing section (world_save.cpp).
+    entity_id   station_a      = null_entity;
+    entity_id   station_b      = null_entity;
 
     /// BL-1195: TRANSIENT, never serialised. The progress the convoy stood at before
     /// this tick's `advance_convoys`, so interdiction sweeps every tile the cargo

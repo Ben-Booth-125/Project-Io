@@ -604,3 +604,27 @@ void stamp_sea_lanes(world& w, entity_id body,
                      sea_lane_stats* stats = nullptr,
                      sea_lane_trace* trace = nullptr,
                      int reuse_cost_q = kSeaLaneReuseCostQ);
+
+// ---------------------------------------------------------------------------
+// The rail record, carried to the fold (BL-1255)
+// ---------------------------------------------------------------------------
+//
+// LOGISTICS.md sec 4c / INDUSTRIALISATION.md sec Who lays rail: a realm that
+// leans into works lays rail links between its regions in the Industrialisation
+// span (`history_sim_state::rail_links`). The track is laid at the FOLD, not
+// here: a line must reach MARKETS (the BL-1255 fix round), and markets are carved
+// after this stage. So this pass only records each link as the pair of its two
+// regions' SEAT TILES on `world::gen_rail_links`, in record order; the fold's
+// `hand_over_rail` (state_industry.hpp) snaps each end to the city holding the
+// market that serves the seat and lays the track between them. A seat off the
+// grid, or a link whose two seats are one tile, is skipped and counted.
+struct rail_stamp_stats
+{
+    int links   = 0; ///< links read
+    int laid    = 0; ///< links recorded for the fold
+    int skipped = 0; ///< a seat off the grid, or both ends one tile
+    int tiles   = 0; ///< unused here (the fold lays the track); kept for the log line
+};
+rail_stamp_stats stamp_history_rail(world& w, entity_id body,
+                                    const std::vector<history_road_node>& nodes,
+                                    const std::vector<std::pair<int, int>>& links);

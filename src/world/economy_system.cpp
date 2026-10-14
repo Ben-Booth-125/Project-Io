@@ -3004,6 +3004,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     continue; // not operating
                 if (b.state_idle)
                     continue; // BL-1296: unfunded this tick — nothing ran to judge
+                // BL-1255: a railway station is never judged a loser: it earns
+                // nothing by design (its value is the network's), and no grant
+                // lets the AI build, idle or tear down rail (AI_OPPONENT.md § 11).
+                if (b.type == building_type::railway_station)
+                    continue;
 
                 // (1) Recipe rescue: a processor whose current output is floored
                 // switches to the recipe with the healthiest output, if better.

@@ -1256,6 +1256,23 @@ public:
     /// sea leg passes two ports and pays it twice per unit, independent of distance.
     float port_handling() const { return m_port_handling; }
 
+    /// BL-1255 (LOGISTICS.md § 4c): the railway's prices (logistics.rail in Lua).
+    /// `cost_per_step` — credits per unit of cargo per track step of a rail leg;
+    /// `station_handling` — credits per unit at EACH station (boarding and
+    /// alighting, so twice a route); `track_build_cost` and `track_steel_per_tile`
+    /// — what laying one tile costs the treasury (the steel priced at the tile's
+    /// market); `track_upkeep_per_tile` — credits per track tile per econ tick.
+    struct rail_params
+    {
+        float cost_per_step         = 0.0025f; // measured: scripts/economy.lua logistics.rail
+        float station_handling      = 0.05f;
+        float track_build_cost      = 20.0f;
+        float track_steel_per_tile  = 2.0f;
+        float track_upkeep_per_tile = 0.25f;
+    };
+    const rail_params& rail() const { return m_rail; }
+    void set_rail(const rail_params& r) { m_rail = r; }
+
     /// Player road-placement cost for a tier (BL-172): 1=Track, 2=Road, 3=Highway; clamped to
     /// [1,3]. Authored in economy.roads.{track,road,highway}. Default arg keeps BL-147 callers
     /// (Track) unchanged.
@@ -1777,6 +1794,7 @@ private:
     /// unloading, so a sea route pays it twice. The default mirrors economy.lua; a
     /// non-finite or negative authored value is refused at load and this default stands.
     float m_port_handling = 0.10f;
+    rail_params m_rail; ///< BL-1255: see rail()
 
     /// Road-placement cost per tier (BL-172): index 0..2 = Track/Road/Highway (road_level 1/2/3).
     /// Credit defaults are used by the Lua-free harnesses; the material line is seeded from Lua

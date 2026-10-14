@@ -159,6 +159,16 @@ struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
 struct closing_rounds_spec; // BL-1278: closing_rounds.hpp, on the same raw-pointer footing.
 
+/// BL-1255 -- one rail link a realm laid in the Industrialisation span: the two
+/// regions it joins (a < b), the polity that paid, and the year.
+struct history_rail_link
+{
+    uint16_t a      = 0;
+    uint16_t b      = 0;
+    int32_t  polity = -1;
+    int32_t  year   = 0;
+};
+
 /// Scorer weights and loop bounds. Defaults are PLACEHOLDERS, not tuned
 /// values: BL-277 records that the `w_*` weights are BL-275 sweep outputs
 /// rather than authored constants. They are set here to plausible magnitudes
@@ -937,6 +947,25 @@ struct history_sim_params
     /// is untouched regardless of this field's value; zero disables the
     /// purchase even where upkeep runs.
     int64_t post_road_treasury_cost = 30000000;
+
+    /// BL-1255 (INDUSTRIALISATION.md sec "Who lays rail"; LOGISTICS.md sec 4c):
+    /// RAIL, the span's first sink. A realm that leans into works -- read in
+    /// the sim as one that has crossed its industrial moment (`industrial_year`
+    /// set) -- spends treasury laying ONE rail link per decision round from
+    /// its capital outward: an existing road corridor, one end already on its
+    /// line (the capital starts it), the other ANY realm's region (lines cross borders, Ben 2026-10-14),
+    /// corridor chosen by its live traffic (busiest first, ties to the lower
+    /// pair), paid from the capital's `region::treasury`. ZERO DISABLES IT, and
+    /// only `industrialisation_sim_params` sets it, so every other span and
+    /// every fixture is byte-identical. The value is measured, see
+    /// era_minus_one.cpp.
+    int64_t rail_treasury_cost = 0;
+    /// BL-1255: the first year a link may be laid (the railway's own date --
+    /// no polity holds technology in generation, TREES.md).
+    int64_t rail_open_year     = 1830;
+    /// BL-1255: how many links a works-leaning realm may lay per decision round
+    /// (one per pass, `rail_treasury_cost` each). In-band calibration.
+    int     rail_links_per_round = 1;
 
     /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
     /// supply currency `campaign_supply` already prices. At or below this,
@@ -4719,6 +4748,11 @@ struct history_sim_state
     /// in this seed", the same split `supply_sites_upgraded` makes.
     int64_t post_roads_built           = 0;
     int64_t treasury_spent_on_roads    = 0;
+    /// BL-1255 -- rail links laid (one row each, in laying order) and the
+    /// treasury spent on them. The world stamps `rail_links` onto the tile
+    /// grid as track (`stamp_history_rail`, road_generation.hpp).
+    std::vector<history_rail_link> rail_links;
+    int64_t treasury_spent_on_rail     = 0;
     /// BL-949: post roads bought per polity id (grown on demand, so a polity
     /// past the end bought none). Lets a sweep ask whether the spend tracks
     /// the polities that built rather than only the world total.
@@ -6620,6 +6654,10 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
 /// place. The fixture and the harnesses read the struct too.
 struct industrialisation_output : exploration_output
 {
+    /// BL-1255: every rail link the span laid, in laying order (track is not
+    /// filtered over the dead: a line outlives the realm that laid it, and the
+    /// fold hands it to whoever holds the ground in 1960).
+    std::vector<history_rail_link> rail_links;
 };
 
 /// Fold the Industrialisation span's closing sim state and settlement state into

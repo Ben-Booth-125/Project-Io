@@ -161,6 +161,14 @@ enum class corp_verb : uint8_t
     queue_research,    ///< The seat's nation queues node `order` with its unheld requirements ahead of it (`enqueue_node`). rejected_state when already held/queued or a pick-one pair refuses it; rejected_invalid for an unknown node.
     unqueue_research,  ///< The seat's nation takes queued node `order` off its research queue with every later entry that needs it (the toggle, NR-1033); `order == unqueue_last` drops the LAST entry instead. rejected_state when the node is not queued / the queue is empty; rejected_invalid for any other out-of-tree `order`.
     clear_research,    ///< The seat's nation empties its research queue (the pool stays). rejected_state when the queue is empty.
+    // --- BL-1255: railways join the seam (2026-10-14) ---
+    // Appended AFTER clear_research, same append-only rule. LOGISTICS.md § 4c:
+    // the player's NATION lays track and builds stations, paid from the treasury.
+    // Both act for `as_nation` (the state-industry door) and only when `corp` IS
+    // the seat (`world::player_entity`) and the nation's champion: no grant lets a
+    // rival build rail, so corp_ai.cpp issues neither. The station rides `build`
+    // with `type = railway_station`; the track is this verb.
+    lay_track,         ///< Lay one tile of rail track at `tile` for nation `as_nation`: land, the nation's own ground, untracked, extending its own line or opening one at a city; costs `rail.track_build_cost` + `rail.track_steel_per_tile` steel (priced at the tile's market) from the treasury, upkeep per tile per tick after. rejected_placement / rejected_funds / rejected_era_locked on the door's refusals.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -170,7 +178,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::clear_research) + 1;
+    static_cast<uint8_t>(corp_verb::lay_track) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

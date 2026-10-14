@@ -900,6 +900,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         std::size_t idle_n = 0;
         for (const auto& [bid, b] : w.buildings) idle_n += b.state_idle ? 1 : 0;
         tail += sizeof(uint32_t) + idle_n * sizeof(entity_id);
+        tail += 3 * sizeof(uint32_t); // BL-1255 (v49): the empty rail section after it
         std::string v47 = bytes.substr(0, bytes.size() - tail);
         const uint32_t ver = k_world_save_version_pre_state;
         std::memcpy(&v47[4], &ver, sizeof ver);

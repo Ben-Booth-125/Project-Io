@@ -52,8 +52,8 @@ const char* strategic_sector_name(strategic_sector s);
 /// for the infrastructure the type itself names, by RECIPE OUTPUT for a
 /// processing facility (a recipe IS the named building, PRODUCTION.md):
 ///
-///   transport   type port, inland_logistics_hub (rail and stations join when
-///               they exist as buildings — LOGISTICS.md § 4c)
+///   transport   type port, inland_logistics_hub, railway_station (BL-1255,
+///               LOGISTICS.md § 4c; the track itself is `world::rail_track`)
 ///   space       type launchpad; a processor making spacecraft_components or
 ///               propellant
 ///   energy      a processor making power or refined_fuel
@@ -174,3 +174,47 @@ float state_uncommitted_treasury(const world& w, entity_id nation);
 bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
                          const building_component& before, const building_component& after);
 
+
+/// BL-1255 -- what the rail handover did at the fold.
+struct rail_handover_report
+{
+    int links           = 0; ///< generated links read (world::gen_rail_links)
+    int links_laid      = 0; ///< market-city pairs laid as track (spanning-tree edges)
+    int links_merged    = 0; ///< lines lying inside one market's catchment (no track)
+    int links_broken    = 0; ///< market cities a line could not reach over land (a strait)
+    int track_tiles     = 0; ///< track tiles on the world
+    int to_nations      = 0; ///< tiles handed to a major as state industry
+    int to_firms        = 0; ///< tiles handed to a minor's background firm
+    int along_the_line  = 0; ///< of them, owned by the owner nearest along the line (not the ground's)
+    int unowned         = 0; ///< tiles no owner could reach (no owner on the body at all)
+    int stations        = 0; ///< stations stood up
+    int station_nations = 0; ///< of them, a major's
+    std::vector<std::pair<entity_id, int>> per_owner_tiles; ///< ascending owner id
+};
+
+/// RAIL OWNERSHIP (BL-1255; LOGISTICS.md sec 4c). Every track tile's owner is
+/// what its GROUND names — the major holding it (state industry), or the minor
+/// holding it's lowest-id background firm — else (ground no nation holds, or a
+/// minor with no background firm; Ben 2026-10-14, "no track is ownerless") the
+/// owner NEAREST ALONG THE LINE: a breadth-first walk over track from every
+/// named tile, seeded in ascending tile id. A line touching no named ground
+/// takes the owner whose ground lies nearest its tile. Re-read every tick by
+/// the funding gate, so OWNERSHIP FOLLOWS TERRITORY when ground changes hands.
+/// @return how many tiles changed owner (a change clears the rail network).
+int assign_rail_owners(world& w);
+
+/// THE RAIL HANDOVER (BL-1255; INDUSTRIALISATION.md sec Who lays rail: "the
+/// track and stations pass to the nation at the fold as state industry (a
+/// major's) or to background firms (a minor's)"). First the Industrialisation
+/// span's links (`world::gen_rail_links`), joined into lines, are LAID as the
+/// spanning tree of the CITIES holding the market centres that serve the
+/// line's seats (a rail must reach markets); a city across water is left
+/// unjoined (the line breaks at the strait). Then every tile is
+/// owned (`assign_rail_owners`), and a STATION stands, complete, on every city
+/// tile touching track ("a station at each city a line serves"), ascending tile
+/// id, owned by the track it touches. Generation holdings stand complete and
+/// unpaid. Idempotent: a second call lays nothing and stands no second station.
+rail_handover_report hand_over_rail(world& w);
+
+/// Print the rail handover's one `[rail]` log line.
+void print_rail_handover(const rail_handover_report& r);

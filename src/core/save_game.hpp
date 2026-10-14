@@ -316,6 +316,12 @@ inline constexpr uint32_t save_game_magic =
 /// v23 ALSO admits 40 `late_culture_contact` in the Empires record (BL-1288
 /// alignment: the realms in contact BY REACH the late culture's lag was read
 /// against at the close; `other` = the walk). No field moves, so no version bump.
+/// v23 ALSO admits 41 `rail_laid` in the Industrialisation record (BL-1255,
+/// INDUSTRIALISATION.md sec Who lays rail: a realm that leans into works laid
+/// a rail link out from its capital -- `region` the end already on its line,
+/// `polity` the realm, `other` the region the line now reaches). No field
+/// moves, so no version bump; a build that predates it refuses such a stream
+/// on the kind range check. (The track itself is world state: world_save v49.)
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

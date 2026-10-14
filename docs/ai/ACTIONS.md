@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*160 entries — 35 gameplay · 25 canvas · 20 lens · 49 ledger · 31 chrome.*
+*162 entries — 37 gameplay · 25 canvas · 20 lens · 49 ledger · 31 chrome.*
 
 ---
 
@@ -317,6 +317,48 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The underlying verb's effect on a STATE building: a build joins the nation's state_assets and is paid for tick by tick from the treasury; a dial, retool, idle or resume changes the state building exactly as it would a corporation's. Each tick the funding gate runs first: a state building whose whole cost this tick (maintenance, wages at full staffing, a full run of inputs, upkeep goods, construction) does not fit in what is left of the treasury IDLES for the tick — it produces, draws and pays nothing — so the treasury never goes below zero. A running state building's sales land in the treasury at the clearing price and its inputs, wages and maintenance are paid from it.
 
 **Reason to select.** The player runs its nation's strategic sectors — steel, energy, arms, space — beside its champion's private book (NATIONS.md § State industry). Build a state plant where the nation needs strategic capacity its firms will not supply; dial or idle one whose costs the treasury should not carry; demolish one to dispose of it (there is no privatisation verb).
+
+### `gameplay.lay_track` — The command seam only (--serve / MCP `issue_command` verb `lay_track` with `nation`, and the verify API's `corp_command{verb=lay_track, as_nation=...}`). No canvas control yet: the rail rendering and its build tool are a separate lane (RENDERING.md).
+
+**Press.** Issue corp_verb 36 (`lay_track`) with `corp` = the seat, `nation` = the seat's home nation and `tile` = the tile to lay.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `entity_id` | The tile to lay one tile of rail track on. |
+| `nation` | `entity_id (wire key `nation`; corp_command::as_nation)` | The nation laying (and paying for) the track: the seat's home nation. Omitted = the corporation's own book, which lays no track (rejected_invalid). |
+
+**Valid when:**
+- Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).
+- `corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): the player's nation lays track; no rival does (no AI_OPPONENT.md § 11 grant covers rail).
+- The tile exists (rejected_invalid), is land, carries no track yet, and is the nation's own ground (rejected_placement).
+- The tile EXTENDS one of the nation's own lines (a cardinal neighbour is its track) or OPENS a line at a city (rejected_placement otherwise).
+- The railway exists in the campaign's era (rejected_era_locked).
+- The treasury's UNCOMMITTED part covers `rail.track_build_cost` + `rail.track_steel_per_tile` x the tile market's steel price (rejected_funds).
+- A rejection mutates nothing.
+
+**Expected output.** The tile carries the nation's rail track at once, and the price leaves the treasury up front (like a road). From the next settlement the tile bills `rail.track_upkeep_per_tile` a tick to the treasury (never below zero). Track carries goods only between STATIONS: a haul boards at a station, rides connected track no hostile unit stands on, and leaves at another, chosen by the router only where road -> rail -> road is cheaper than the road alone.
+
+**Reason to select.** Cheapen the nation's long land hauls: a line between two cities with stations moves goods at a fraction of the road's cost per tile, so markets far apart overland trade where they could not.
+
+### `gameplay.build_station` — The command seam only (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`). No canvas control yet (a separate lane).
+
+**Press.** Issue corp_verb 0 (`build`) with `type` = 11 (railway_station), `tile` = a city tile touching the nation's track, `corp` = the seat and `nation` = the seat's home nation.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `entity_id` | A city tile with rail track on it or on a cardinal neighbour. |
+| `type` | `building_type` | 11 (railway_station). |
+| `nation` | `entity_id (wire key `nation`)` | The seat's home nation; a station is state industry and is never built on a corporation's own book (rejected_invalid). |
+
+**Valid when:**
+- As gameplay.lay_track's wire, seat and champion rules (rejected_invalid / rejected_not_owner); no recipe is named (rejected_invalid).
+- The tile is the nation's own ground, a CITY (a population centre) touching track, and holds no station yet (rejected_placement), plus the ordinary era and reach gates.
+- Its whole capex fits the treasury's uncommitted part (rejected_funds).
+- A rejection mutates nothing.
+
+**Expected output.** A Railway Station site joins the nation's state industry (zero staff, built pay-as-you-build from the treasury, maintenance once standing). Complete, it is where goods board and leave the rail network.
+
+**Reason to select.** A line with no station carries nothing: put a station at each city the line should serve.
 
 ### `gameplay.survey` — The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey).
 
