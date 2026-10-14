@@ -87,27 +87,6 @@
    "risk": "The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).",
    "done_when": "Set at the cut. Proposed: no authority doc describes the player as a corporation holding a seat, and the player can be seated on a nation in a live build.",
    "notes": "Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree."
-  },
-  {
-   "id": "54",
-   "theme": "UI improvements",
-   "state": "landed",
-   "status_line": "CLOSED 2026-10-14 (Ben: every live click passed, merge to main). Run beside sprint 53 from origin/main: the tile card split, the market pass, a Nations lens, the trade value record, the workforce stepped auto, the settle's readings handed to play.",
-   "opened_date": "2026-10-12",
-   "author": "Ben (2026-10-12: run sprint 54 as a UI improvement round, independent of sprint 53)",
-   "goal": "Ben plays the build and calls out what to improve; each call is designed into its doc, built in a lane, merged and live-clicked the same day.",
-   "planned": [
-    "Driven by Ben's live walks, not pre-planned: tile selection (7 notes), the market (5 notes), then the calls each walk raised."
-   ],
-   "risk": "Running beside sprint 53 on a branch of origin/main: the pin table and backlog will conflict at the merge, and world movers here re-bless in sprint 53's wave.",
-   "done_when": "Every item live-clicked by Ben; world movers measured for BL-1277 (tech wave re-bless); merged to main.",
-   "notes": "World movers (names, the player's workforce step) folded into BL-1277's re-bless (Ben, 2026-10-13); measured in docs/development/drafts/sprint-54-name-movement.md and BL-1322's report. Left open: BL-1319 (fixture base stall), pre-existing.",
-   "closed_date": "2026-10-14",
-   "retro": {
-    "landed": "BL-1312 (tile card split, two rounds), BL-1313 (tile preview loading bar), BL-1314 (bottom strip taller), BL-1315 (market names unique) with unique city names per body, BL-1316 (market labels on canvas, lens-only), BL-1317 (market ledger top section; Sold / In / Out), BL-1318 (nation name cap, 20), BL-1320 (market trade value record), BL-1321 (settle ticks feed readings), BL-1322 (workforce stepped auto; 100% is the label for full employment), BL-1323 (Nations lens; bordering nations never alike). Also: lens-paired ledgers disarm on close; market colours distinct; the Debug app's startup stack overflow (every --verify run had been dying silently); the orphaned resource history drill and its chart retired; Farm label.",
-    "carried": "BL-1319 (fixture base stall) - pre-existing, 12 verify scripts blocked; check against sprint 53's main before fixing. stack_capacity_harness (7 rows) and recipe_workforce.lua's seed precondition fail independently of this sprint.",
-    "lessons": "The walk-build-walk loop worked again: each note was written into its doc, built in a lane and clicked within hours. Two of Ben's notes had larger reaches than they read: 'max workforce 100%' halved field income until it was read as a label, and 'duplicate market names' had a second cause (city names) behind the first. Measuring before reporting caught both. The Debug app had been unable to run any --verify for days; the agents' workarounds (a 64 MB stack copy) hid it until the main session fixed the cause. Briefs that named a broken build command cost every lane a round trip."
-   }
   }
  ],
  "next_up": "SPRINTS 50, 51 AND 52 CLOSED and on main; v0.1.30 cut 2026-10-11 (sprints 50 and 52). SPRINT 53 next: the player is a nation and the history patterns, with sprint 52's tech tail; generation first. Handoff: docs/development/NEXT_SESSION.md.",

@@ -12,6 +12,55 @@ release.
 
 ## [Unreleased]
 
+## [0.1.31] — 2026-10-14
+
+*Read the ground, read the market. Sprint 54 was a UI round run beside sprint 53: Ben played the
+build, called out what to change, and each call was designed, built and clicked the same day. This
+tag is on local main, which also carries sprint 53's work in progress; sprint 53 is not closed.*
+
+### Added
+
+- **The tile card** (BL-1312 (tile card split)): no header; a province card (capacity bar with where
+  the capacity comes from, Built / Max / Resource, population on hover) beside a tile card of building
+  buttons, three across, each with its profit per quarter. A pressed building expands in place: its
+  count, method, status, net and expenses beside a short chart, and its workforce.
+- **A loading bar** in the tile preview until the ground is painted (BL-1313 (tile preview loading bar));
+  **a taller bottom strip** (BL-1314 (bottom strip taller)).
+- **The market ledger's top section** (BL-1317 (market ledger top section)): the nations in a market by
+  full name, beside Sold / In / Out per quarter, over a new per-market **trade value record**
+  (BL-1320 (market trade value record)). Goods rows condensed.
+- **Market labels** on market cities under the Market lens (BL-1316 (market labels on canvas)).
+- **A Nations lens** (BL-1323 (Nations lens)): each nation's whole territory in its colour, and no two
+  bordering nations alike, on every surface.
+
+### Changed
+
+- **Markets have their own names** (BL-1315 (market names unique)): the largest city in each catchment;
+  city names are unique on a body. Every market on a body has its own lens colour.
+- **The game sets the player's workforce** (BL-1322 (workforce stepped auto)): one 25 % step a quarter
+  toward the most profitable level, for the player's corporation and its state industry. 100 % is the
+  label for full employment. The workforce slider, Auto and the player's workforce verbs are retired.
+- **A fresh campaign opens on real figures** (BL-1321 (settle ticks feed readings)): the pre-game
+  quarters' readings reach play; every building card names its method, a Port its trade points.
+- **Nation names are capped at 20 characters** (BL-1318 (nation name cap)).
+- A canvas press opens the tile's building list; closing the Market, Convoys or History ledger turns
+  its lens off; Agricultural Produce reads "Farm" in the province table.
+
+### Removed
+
+- The tile card's Resources and Terrain sections, its six-section nav and the market rows under
+  Production; the resource history drill and its chart.
+
+### Fixed
+
+- The Debug app died at startup on every `--verify` run (a stack overflow): the app is on the heap.
+
+### Measured, not re-blessed
+
+- City names, the name cap and the workforce step move the pinned digests from land onward; all fold
+  into BL-1277 (tech wave re-bless). Field income holds (32.6k → 32.2k a seed-tick).
+- BL-1319 (fixture base stall) is open: twelve verify scripts fail in a shared fixture.
+
 ## [0.1.30] — 2026-10-11
 
 *The shelf and the tree. Two sprints cut as one release. Sprint 50 set out to get goods that exist to
@@ -1502,7 +1551,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.30...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.31...HEAD
+[0.1.31]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.30...v0.1.31
 [0.1.30]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.29...v0.1.30
 [0.1.29]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.28...v0.1.29
 [0.1.28]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.27...v0.1.28
