@@ -553,6 +553,11 @@ history_sim_params exploration_sim_params(const world_params& params)
     // ...and a power two materials bands ahead of a native needs no treasury
     // margin to bind it (dominance by development; Industrialisation inherits).
     hp.subjection_dominance_bands = 1;
+    // BL-1303 (Ben accepted, NR-1042): THE STALE READING IN EVERY SPAN -- ground
+    // taken this round is measured by its new holder before it can secede
+    // from it, here as in the Empires round (history_sim.hpp);
+    // Industrialisation inherits it.
+    hp.secession_waits_for_holder = true;
 
     return hp;
 }
