@@ -1407,7 +1407,14 @@ bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_doma
 bool append_rail_leg(world& w, entity_id body, entity_id from, entity_id to,
                      std::vector<entity_id>& out, std::vector<lane_leg>& legs)
 {
-    const logistics_path lp = rail_leg_path(w, body, from, to, /*respect_cuts=*/false);
+    // BL-1255 fix round (review 5, one price): the lane runs over the SAME
+    // cut- and idle-respecting path the price was read off. Only when no such
+    // path remains — the line was cut (or idled) under the cargo after dispatch —
+    // does the lane fall back to the physical track, so a hostile unit standing
+    // on the line is ON the lane and intercepts the cargo there (§ 7).
+    logistics_path lp = rail_leg_path(w, body, from, to, /*respect_cuts=*/true);
+    if (!lp.reachable || lp.tiles.empty())
+        lp = rail_leg_path(w, body, from, to, /*respect_cuts=*/false);
     if (!lp.reachable || lp.tiles.empty())
         return false;
     std::size_t k = 0;
@@ -1555,9 +1562,9 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     if (cv.station_a != null_entity && cv.station_b != null_entity)
     {
         // BL-1255: road -> rail -> road through the two stations fixed at dispatch.
-        // The rail leg is the physical track as it stands now, cut or not: a hostile
-        // unit standing on the line is ON the lane, so the sweep intercepts the cargo
-        // there exactly as it would on a road (§ 7). Track since lifted: no lane.
+        // The rail leg is the path the price used (append_rail_leg), falling back to
+        // the physical track only when the line was cut under the cargo, so a
+        // hostile unit standing on it intercepts it (§ 7). Track lifted: no lane.
         if (!append_leg(w, body, st, cv.station_a, leg_domain::land, convoy_mode::land, tiles, legs)
             || !append_rail_leg(w, body, cv.station_a, cv.station_b, tiles, legs)
             || !append_leg(w, body, cv.station_b, dt, leg_domain::land, convoy_mode::land, tiles,
@@ -1739,7 +1746,7 @@ namespace {
 /// unless the start itself is track. Neighbour order is fixed (N, E, S, W) and
 /// the frontier is FIFO, so the parent chain is a pure function of the grid.
 void rail_bfs(world& w, entity_id body, entity_id from, const std::vector<entity_id>& cut,
-              std::vector<int>& dist, std::vector<int>& parent)
+              std::vector<int>& dist, std::vector<int>& parent, bool respect_idle = true)
 {
     const auto bit = w.bodies.find(body);
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
@@ -1749,7 +1756,16 @@ void rail_bfs(world& w, entity_id body, entity_id from, const std::vector<entity
     if (bit == w.bodies.end() || tit == w.tiles.end() || tit->second.body != body)
         return;
     const int gw = bit->second.grid_width, gh = bit->second.grid_height;
-    const auto is_cut = [&](entity_id t) { return std::binary_search(cut.begin(), cut.end(), t); };
+    // BL-1255 fix round: IDLE track (its owner's upkeep unfunded this tick,
+    // `world::rail_idle`) carries nothing, exactly as cut track does.
+    const auto is_cut = [&](entity_id t) {
+        if (std::binary_search(cut.begin(), cut.end(), t))
+            return true;
+        if (!respect_idle || w.rail_idle.empty())
+            return false;
+        const auto rt = w.rail_track.find(t);
+        return rt != w.rail_track.end() && w.rail_idle.count(rt->second) != 0;
+    };
     const int start = tit->second.grid_y * gw + tit->second.grid_x;
     if (start < 0 || static_cast<std::size_t>(start) >= grid.size())
         return;
@@ -1796,7 +1812,10 @@ const world::rail_network& body_rail_network(world& w, entity_id body)
         for (const auto& [bid, bc] : w.buildings)
         {
             (void)bid;
-            if (bc.type != building_type::railway_station || bc.ticks_remaining > 0 || bc.decommissioned)
+            // BL-1255 (review 3): an unfunded (state_idle) station carries nothing
+            // either; the funding gate clears the network when one flips.
+            if (bc.type != building_type::railway_station || bc.ticks_remaining > 0 || bc.decommissioned
+                || bc.state_idle)
                 continue;
             const auto tit = w.tiles.find(bc.tile);
             if (tit == w.tiles.end() || tit->second.body != body)
@@ -1843,7 +1862,7 @@ logistics_path rail_leg_path(world& w, entity_id body, entity_id a, entity_id b,
     const int gw = bit->second.grid_width;
     std::vector<int> dist, parent;
     rail_bfs(w, body, a, respect_cuts ? rail_cut_tiles(w, body) : std::vector<entity_id>{}, dist,
-             parent);
+             parent, respect_cuts);
     const int cb = bt->second.grid_y * gw + bt->second.grid_x;
     if (cb < 0 || static_cast<std::size_t>(cb) >= dist.size() || dist[static_cast<std::size_t>(cb)] < 0)
         return out;

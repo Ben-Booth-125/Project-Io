@@ -9,6 +9,7 @@
 #include "world.hpp"
 #include "logistics.hpp"       // BL-1255: tile_touches_track, invalidate_logistics_caches
 #include <set>
+#include <functional>
 
 #include <algorithm>
 #include <cmath>
@@ -387,9 +388,25 @@ float state_building_cost_bound(const world& w, const recipe_registry& reg,
 void plan_state_funding(world& w, const recipe_registry& reg)
 {
     w.state_ledger.clear();
+    // BL-1255 fix round (review 6): OWNERSHIP FOLLOWS TERRITORY. Track on ground
+    // that changed hands passes to the new holder's state (or a minor's firm) —
+    // and ownerless track to the owner nearest along the line — before the gate
+    // reads who owes its upkeep. A no-op on a world with no rail.
+    assign_rail_owners(w);
+    // BL-1255: per owner, its track tiles (for the gate below).
+    std::map<entity_id, int> rail_tiles_of;
+    for (const auto& [tile, owner] : w.rail_track)
+    {
+        (void)tile;
+        if (owner != null_entity && w.nations.count(owner) != 0)
+            ++rail_tiles_of[owner];
+    }
+    const std::set<entity_id> rail_idle_before = w.rail_idle;
+    w.rail_idle.clear();
+    bool station_flipped = false;
     std::vector<entity_id> nation_ids;
     for (const auto& [nid, nc] : w.nations)
-        if (!nc.state_assets.empty())
+        if (!nc.state_assets.empty() || rail_tiles_of.count(nid) != 0)
             nation_ids.push_back(nid);
     std::sort(nation_ids.begin(), nation_ids.end());
 
@@ -411,6 +428,7 @@ void plan_state_funding(world& w, const recipe_registry& reg)
                 continue;
             building_component& b = bit->second;
             const float bound = state_building_cost_bound(w, reg, b) * k_headroom;
+            const bool was_idle = b.state_idle;
             if (std::isfinite(bound) && bound <= left)
             {
                 left        -= bound;
@@ -423,7 +441,32 @@ void plan_state_funding(world& w, const recipe_registry& reg)
                 b.state_idle = true;
                 ++led.idled;
             }
+            // BL-1255 (review 3): an idle station carries nothing, so its flip
+            // stales the rail network.
+            if (b.type == building_type::railway_station && b.state_idle != was_idle)
+                station_flipped = true;
         }
+        // BL-1255 fix round (review 2; Ben's state rule "a losing building idles,
+        // never debt"): THE TRACK'S UPKEEP IS FUNDED HERE, after the nation's
+        // buildings. Funded: committed, and apply_budget charges it. Not: the
+        // nation's track IDLES for the tick (`world::rail_idle`) — no rail route
+        // runs over it — and pays nothing.
+        if (const auto rt = rail_tiles_of.find(nid); rt != rail_tiles_of.end())
+        {
+            const float bill = reg.rail().track_upkeep_per_tile * static_cast<float>(rt->second) * k_headroom;
+            if (std::isfinite(bill) && bill <= left)
+            {
+                left          -= bill;
+                led.committed += bill;
+            }
+            else
+                w.rail_idle.insert(nid);
+        }
+    }
+    if (station_flipped || w.rail_idle != rail_idle_before)
+    {
+        w.rail_networks.clear();
+        bump_logistics_cache_generation(w);
     }
 }
 
@@ -439,52 +482,325 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
 }
 
 // ---------------------------------------------------------------------------
-// BL-1255 -- the rail handover (see the header)
+// BL-1255 -- rail ownership and the rail handover (see the header)
 // ---------------------------------------------------------------------------
+namespace {
+
+/// A minor's background firm: the lowest-id one homed there.
+std::map<entity_id, entity_id> rail_firm_of(const world& w)
+{
+    std::map<entity_id, entity_id> firm_of;
+    std::vector<entity_id> ids;
+    for (const auto& [cid, cc] : w.corporations)
+        if (cc.is_background)
+            ids.push_back(cid);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id cid : ids)
+        firm_of.emplace(w.corporations.at(cid).home_nation, cid);
+    return firm_of;
+}
+
+/// The owner the GROUND names for track on @p tile: a major's state, or a
+/// minor's background firm; null for ground no nation holds or a minor with
+/// no background firm.
+entity_id rail_ground_owner(const world& w, const std::map<entity_id, entity_id>& firm_of,
+                            entity_id tile)
+{
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end() || tn->second == null_entity)
+        return null_entity;
+    if (is_major_nation(w, tn->second))
+        return tn->second;
+    const auto f = firm_of.find(tn->second);
+    return f != firm_of.end() ? f->second : null_entity;
+}
+
+/// The four cardinal neighbour tiles of @p tile (N, E, S, W; columns wrap);
+/// null for a step off the grid.
+std::array<entity_id, 4> rail_tile_neighbours(world& w, entity_id tile)
+{
+    std::array<entity_id, 4> out{null_entity, null_entity, null_entity, null_entity};
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return out;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return out;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const int x = tit->second.grid_x, y = tit->second.grid_y;
+    const std::vector<entity_id>& grid = body_tile_grid(w, tit->second.body);
+    const int c[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                      y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+    for (int k = 0; k < 4; ++k)
+        if (c[k] >= 0 && static_cast<std::size_t>(c[k]) < grid.size())
+            out[static_cast<std::size_t>(k)] = grid[static_cast<std::size_t>(c[k])];
+    return out;
+}
+
+} // namespace
+
+int assign_rail_owners(world& w)
+{
+    if (w.rail_track.empty())
+        return 0;
+    const std::map<entity_id, entity_id> firm_of = rail_firm_of(w);
+
+    // 1. What the ground names, tile by tile (ascending tile id).
+    std::map<entity_id, entity_id> want;
+    for (const auto& [tile, owner] : w.rail_track)
+    {
+        (void)owner;
+        want[tile] = rail_ground_owner(w, firm_of, tile);
+    }
+
+    // 2. NO TRACK IS OWNERLESS (Ben, 2026-10-14): a tile the ground names no
+    //    owner for passes to the owner NEAREST ALONG THE LINE — a breadth-first
+    //    walk over track from every named tile at once, seeded in ascending tile
+    //    id, FIFO, neighbours N/E/S/W: the first to reach a tile owns it.
+    std::vector<entity_id> frontier;
+    for (const auto& [tile, o] : want)
+        if (o != null_entity)
+            frontier.push_back(tile);
+    for (std::size_t head = 0; head < frontier.size(); ++head)
+    {
+        const entity_id t = frontier[head];
+        const entity_id o = want.at(t);
+        for (const entity_id n : rail_tile_neighbours(w, t))
+        {
+            const auto it = want.find(n);
+            if (it == want.end() || it->second != null_entity)
+                continue;
+            it->second = o;
+            frontier.push_back(n);
+        }
+    }
+
+    // 3. A line touching no owned ground at all (an island of track): the owner
+    //    whose ground lies nearest to its lowest tile, wrapped Chebyshev on the
+    //    body, ties to the lower ground tile id — then along the line as above.
+    bool any_left = false;
+    for (const auto& [tile, o] : want)
+        any_left = any_left || o == null_entity;
+    if (any_left)
+    {
+        std::vector<entity_id> ground;
+        for (const auto& [t, n] : w.tile_to_nation)
+            if (rail_ground_owner(w, firm_of, t) != null_entity)
+                ground.push_back(t);
+        std::sort(ground.begin(), ground.end());
+        for (auto& [tile, o] : want)
+        {
+            if (o != null_entity)
+                continue;
+            const tile_component& tc = w.tiles.at(tile);
+            const int gw = w.bodies.at(tc.body).grid_width;
+            entity_id best = null_entity;
+            int best_d = 0;
+            for (const entity_id g : ground)
+            {
+                const tile_component& gt = w.tiles.at(g);
+                if (gt.body != tc.body)
+                    continue;
+                int dx = std::abs(gt.grid_x - tc.grid_x);
+                dx = std::min(dx, gw - dx);
+                const int d = std::max(dx, std::abs(gt.grid_y - tc.grid_y));
+                if (best == null_entity || d < best_d)
+                {
+                    best = g;
+                    best_d = d;
+                }
+            }
+            if (best == null_entity)
+                continue; // no owner on the body at all: left unowned
+            o = rail_ground_owner(w, firm_of, best);
+            // The rest of this island takes it along the line.
+            std::vector<entity_id> f{tile};
+            for (std::size_t h = 0; h < f.size(); ++h)
+                for (const entity_id n : rail_tile_neighbours(w, f[h]))
+                {
+                    const auto it = want.find(n);
+                    if (it == want.end() || it->second != null_entity)
+                        continue;
+                    it->second = o;
+                    f.push_back(n);
+                }
+        }
+    }
+
+    // 4. Apply. The rail network reads the owner (its operator for the cut, its
+    //    funding for idle track), so a change stales it.
+    int changed = 0;
+    for (auto& [tile, owner] : w.rail_track)
+    {
+        const entity_id o = want.at(tile);
+        if (o != owner)
+        {
+            owner = o;
+            ++changed;
+        }
+    }
+    if (changed > 0)
+    {
+        w.rail_networks.clear();
+        bump_logistics_cache_generation(w);
+    }
+    return changed;
+}
+
 rail_handover_report hand_over_rail(world& w)
 {
     rail_handover_report out;
-    if (w.rail_track.empty())
-        return out;
 
-    // A minor's background firm: the lowest-id one homed there.
-    std::map<entity_id, entity_id> firm_of;
-    {
-        std::vector<entity_id> ids;
-        for (const auto& [cid, cc] : w.corporations)
-            if (cc.is_background)
-                ids.push_back(cid);
-        std::sort(ids.begin(), ids.end());
-        for (const entity_id cid : ids)
-            firm_of.emplace(w.corporations.at(cid).home_nation, cid);
-    }
-    const auto owner_for = [&](entity_id tile) -> entity_id {
-        const auto tn = w.tile_to_nation.find(tile);
-        if (tn == w.tile_to_nation.end() || tn->second == null_entity)
+    // 1. LAY THE GENERATED LINKS BETWEEN THE CITIES HOLDING MARKET CENTRES (the
+    //    BL-1255 fix round: "a rail must reach markets"). Each end of a link —
+    //    a region's seat tile — is snapped to the MARKET that serves it
+    //    (`market_for_tile`, the catchment every tile already routes to), then to
+    //    the CITY holding that market's centre: the population centre nearest the
+    //    centre tile within kMarketCity cells (wrapped Chebyshev), ties to the
+    //    larger scale, then the lower tile id; the centre tile itself when no
+    //    city stands that near. The track follows the cheapest land path between
+    //    the two cities. A link whose ends snap to one market, or a pair already
+    //    laid, adds nothing; a pair with no land path between them (a strait) is
+    //    LEFT BROKEN and counted — the line stops at the water.
+    constexpr int kMarketCity = 4;
+    const auto city_for = [&](entity_id seat) -> entity_id {
+        const entity_id mid = market_for_tile(w, seat);
+        const auto mit = w.markets.find(mid);
+        if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
             return null_entity;
-        if (is_major_nation(w, tn->second))
-            return tn->second;
-        const auto f = firm_of.find(tn->second);
-        return f != firm_of.end() ? f->second : null_entity;
+        const entity_id ct = mit->second.centre_tile;
+        const tile_component& tc = w.tiles.at(ct);
+        const int gw = w.bodies.at(tc.body).grid_width;
+        entity_id best = null_entity;
+        int best_d = 0, best_s = 0;
+        for (const auto& [cid, ctile] : w.population_centre_tile)
+        {
+            const auto tit = w.tiles.find(ctile);
+            const auto pit = w.population_centres.find(cid);
+            if (tit == w.tiles.end() || pit == w.population_centres.end() || tit->second.body != tc.body)
+                continue;
+            int dx = std::abs(tit->second.grid_x - tc.grid_x);
+            dx = std::min(dx, gw - dx);
+            const int d = std::max(dx, std::abs(tit->second.grid_y - tc.grid_y));
+            if (d > kMarketCity)
+                continue;
+            const int s = pit->second.scale;
+            if (best == null_entity || d < best_d || (d == best_d && (s > best_s || (s == best_s && ctile < best))))
+            {
+                best = ctile;
+                best_d = d;
+                best_s = s;
+            }
+        }
+        return best != null_entity ? best : ct;
     };
 
+    // The realm's LINE is what the span built: links joined end to end (a
+    // union over seat tiles, in record order). Each line's seats snap to the
+    // market cities serving them; the line is laid as the minimum spanning tree
+    // of those cities by land path cost (Prim from the lowest city tile, ties
+    // to the lower tile pair) — so a line that spans two markets JOINS them. A
+    // line inside one market's catchment adds no track.
+    std::map<entity_id, entity_id> parent;
+    const std::function<entity_id(entity_id)> find = [&](entity_id x) -> entity_id {
+        auto it = parent.find(x);
+        if (it == parent.end()) { parent[x] = x; return x; }
+        if (it->second == x) return x;
+        const entity_id r = find(it->second);
+        parent[x] = r;
+        return r;
+    };
+    for (const auto& [sa, sb] : w.gen_rail_links)
+    {
+        ++out.links;
+        const entity_id ra = find(sa), rb = find(sb);
+        if (ra != rb)
+            parent[std::max(ra, rb)] = std::min(ra, rb);
+    }
+    std::map<entity_id, std::set<entity_id>> line_cities;
+    for (const auto& [seat, pr] : parent)
+    {
+        (void)pr;
+        const entity_id c = city_for(seat);
+        if (c != null_entity)
+            line_cities[find(seat)].insert(c);
+    }
+    for (const auto& [root, cityset] : line_cities)
+    {
+        (void)root;
+        if (cityset.size() < 2)
+        {
+            ++out.links_merged;
+            continue;
+        }
+        const std::vector<entity_id> cities(cityset.begin(), cityset.end());
+        const entity_id body = w.tiles.at(cities.front()).body;
+        std::vector<char> in(cities.size(), 0);
+        in[0] = 1;
+        for (std::size_t added = 1; added < cities.size(); ++added)
+        {
+            std::size_t bi = cities.size(), bj = cities.size();
+            float bc = 0.0f;
+            for (std::size_t i = 0; i < cities.size(); ++i)
+            {
+                if (!in[i]) continue;
+                for (std::size_t j = 0; j < cities.size(); ++j)
+                {
+                    if (in[j]) continue;
+                    const logistics_path& lp = intra_body_leg_path(w, body, cities[i], cities[j], leg_domain::land);
+                    if (!lp.reachable) continue;
+                    if (bi == cities.size() || lp.cost < bc)
+                    {
+                        bi = i; bj = j; bc = lp.cost;
+                    }
+                }
+            }
+            if (bi == cities.size())
+            {
+                // The rest of the line's cities lie across water from the tree: the
+                // line is LEFT BROKEN at the strait (counted per city stranded).
+                for (std::size_t j = 0; j < cities.size(); ++j)
+                    if (!in[j]) ++out.links_broken;
+                break;
+            }
+            in[bj] = 1;
+            const logistics_path lp = intra_body_leg_path(w, body, cities[bi], cities[bj], leg_domain::land); // copied
+            for (const entity_id t : lp.tiles)
+            {
+                const auto tit = w.tiles.find(t);
+                if (tit != w.tiles.end() && !is_water(tit->second.substrate))
+                    w.rail_track.emplace(t, null_entity);
+            }
+            ++out.links_laid;
+        }
+    }
+    w.gen_rail_links.clear();
+    if (w.rail_track.empty())
+        return out;
+    invalidate_logistics_caches(w);
+
+    // 2. OWNERS: the ground's, else nearest along the line (assign_rail_owners).
+    assign_rail_owners(w);
     std::map<entity_id, int> per_owner;
-    for (auto& [tile, owner] : w.rail_track)
+    const std::map<entity_id, entity_id> firm_of = rail_firm_of(w);
+    for (const auto& [tile, owner] : w.rail_track)
     {
         ++out.track_tiles;
         if (owner == null_entity)
-            owner = owner_for(tile);
-        if (owner == null_entity)
-            ++out.unowned;
-        else
         {
-            ++per_owner[owner];
-            if (w.nations.count(owner) != 0) ++out.to_nations; else ++out.to_firms;
+            ++out.unowned;
+            continue;
         }
+        ++per_owner[owner];
+        if (w.nations.count(owner) != 0) ++out.to_nations; else ++out.to_firms;
+        if (rail_ground_owner(w, firm_of, tile) != owner)
+            ++out.along_the_line;
     }
     out.per_owner_tiles.assign(per_owner.begin(), per_owner.end());
 
-    // Stations: every city tile touching track, ascending tile id.
+    // 3. STATIONS: every city tile touching track, ascending tile id, owned by
+    //    the track it touches (the tile's own, else its first track neighbour
+    //    N/E/S/W) — so every station has the owner its line has.
     std::vector<entity_id> cities;
     for (const auto& [centre, ctile] : w.population_centre_tile)
     {
@@ -497,11 +813,23 @@ rail_handover_report hand_over_rail(world& w)
     for (const auto& [bid, b] : w.buildings)
         if (b.type == building_type::railway_station)
             has_station.insert(b.tile);
+    std::set<entity_id> market_cities;
+    for (const auto& [mid, mc] : w.markets)
+        market_cities.insert(mc.centre_tile);
     for (const entity_id tile : cities)
     {
         if (has_station.count(tile) != 0 || !tile_touches_track(w, tile))
             continue;
-        const entity_id owner = owner_for(tile);
+        entity_id owner = null_entity;
+        if (const auto rt = w.rail_track.find(tile); rt != w.rail_track.end())
+            owner = rt->second;
+        for (const entity_id n : rail_tile_neighbours(w, tile))
+        {
+            if (owner != null_entity)
+                break;
+            if (const auto rt = w.rail_track.find(n); rt != w.rail_track.end())
+                owner = rt->second;
+        }
         if (owner == null_entity)
             continue;
         const entity_id bid = w.create_entity();
@@ -527,8 +855,10 @@ rail_handover_report hand_over_rail(world& w)
 
 void print_rail_handover(const rail_handover_report& r)
 {
-    std::printf("[rail] handover: %d track tiles (%d to majors, %d to minors' firms, %d unowned), "
-                "%d stations (%d a major's)\n",
-                r.track_tiles, r.to_nations, r.to_firms, r.unowned, r.stations, r.station_nations);
+    std::printf("[rail] handover: %d links laid between market cities of %d (%d merged into one, "
+                "%d broken at water); %d track tiles (%d to majors, %d to minors' firms, %d of them "
+                "along the line, %d unowned), %d stations (%d a major's)\n",
+                r.links_laid, r.links, r.links_merged, r.links_broken, r.track_tiles, r.to_nations,
+                r.to_firms, r.along_the_line, r.unowned, r.stations, r.station_nations);
     std::fflush(stdout);
 }

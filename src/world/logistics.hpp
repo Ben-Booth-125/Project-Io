@@ -465,6 +465,10 @@ entity_id convoy_tile_at(world& w, const convoy_component& cv);
 // terrain does not weight it, and no road discount applies). The grid is the one
 // every traversal reader walks: four cardinal steps, columns wrapping.
 //
+// IDLE TRACK (the fix round): track whose owner's upkeep this tick's funding gate
+// could not fund (`world::rail_idle`) carries nothing, like cut track; an unfunded
+// (state_idle) station boards nothing.
+//
 // THE CUT (§ 7, "interdiction cuts a rail line as it cuts a road"): a track tile
 // on which a unit stands whose owner has DECLARED hostility toward the track's
 // operator (the owning corporation, or a nation's champion) is cut — the line does
@@ -492,8 +496,8 @@ const world::rail_network& body_rail_network(world& w, entity_id body);
 /// The rail leg from station tile @p a to station tile @p b: the tile sequence
 /// a -> ... -> b over uncut track (both station tiles included), and its cost in
 /// track steps. Unreachable when the stations are not joined.
-/// @p respect_cuts false reads the physical track (a convoy's lane: a hostile unit
-/// standing on the line must still be ON the lane to intercept the cargo).
+/// @p respect_cuts false reads the physical track, ignoring cuts AND idle track
+/// (a convoy's lane falls back to it when the line was cut under the cargo).
 logistics_path rail_leg_path(world& w, entity_id body, entity_id a, entity_id b,
                              bool respect_cuts = true);
 

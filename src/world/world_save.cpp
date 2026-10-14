@@ -1101,7 +1101,8 @@ void write_world_snapshot(const world& w, std::ostream& out)
     // BL-1255 (world_save_version 49): RAILWAYS, their own trailing section after
     // state industry. The track field — (tile, owner) ascending by tile, as the
     // std::map holds it — then every convoy riding a rail route, in `w.convoys`
-    // order, as (id, boarding station, alighting station). A trailing section, so
+    // order, as (id, boarding station, alighting station); then the owners whose
+    // track the funding gate idled this tick (`rail_idle`), ascending. A trailing section, so
     // a v48 (and v47) stream — which ends before it — still reads, as a world with
     // no rail. The stations themselves are ordinary buildings in the building store.
     {
@@ -1124,6 +1125,8 @@ void write_world_snapshot(const world& w, std::ostream& out)
             w_id(out, cv.station_a);
             w_id(out, cv.station_b);
         }
+        // The fix round: the owners whose track is idle (unfunded upkeep), ascending.
+        w_ids(out, std::vector<entity_id>(w.rail_idle.begin(), w.rail_idle.end()));
     }
 }
 
@@ -1429,6 +1432,24 @@ bool read_world_snapshot(world& w, std::istream& in)
                 return false;
             hit->station_a = a;
             hit->station_b = b;
+        }
+        // Idle track owners: ascending, distinct, each an owner of track in the stream.
+        std::vector<entity_id> idle;
+        if (!r_ids(in, idle))
+            return false;
+        entity_id last = null_entity;
+        for (std::size_t k = 0; k < idle.size(); ++k)
+        {
+            const entity_id o = idle[k];
+            if (o == null_entity || (k > 0 && o <= last))
+                return false;
+            last = o;
+            bool owns = false;
+            for (const auto& [t, own] : s.rail_track)
+                if (own == o) { owns = true; break; }
+            if (!owns)
+                return false;
+            s.rail_idle.insert(o);
         }
     }
 

@@ -232,6 +232,8 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, cv.station_a);
                 fnv1a_u32(h, cv.station_b);
             }
+        for (const entity_id o : rail_idle)
+            fnv1a_u32(h, o);
     }
 
     // BL-1265: corporations hold no pools — every good is on a market's shelf,

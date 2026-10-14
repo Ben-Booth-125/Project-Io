@@ -524,11 +524,12 @@ void apply_budget(world& w,
                 led.wages       += opex.wages;
                 delta           -= opex.wages;
             }
-            // BL-1255: the nation's track, after its buildings. NEVER DEBT: the
-            // funding gate did not commit it, so it pays what the treasury holds
-            // after the rest of the settlement; the shortfall goes unpaid, never
-            // minted (the state's rule).
-            if (const auto rt = rail_tiles_of.find(nid); rt != rail_tiles_of.end() && rail_upkeep > 0.0f)
+            // BL-1255: the nation's track, after its buildings — FUNDED by this
+            // tick's gate (plan_state_funding committed it), or IDLE
+            // (`w.rail_idle`) and charged nothing. The clamp is the never-debt
+            // backstop the building settlement also relies on.
+            if (const auto rt = rail_tiles_of.find(nid);
+                rt != rail_tiles_of.end() && rail_upkeep > 0.0f && w.rail_idle.count(nid) == 0)
             {
                 const float bill = rail_upkeep * static_cast<float>(rt->second);
                 const float paid = std::clamp(bill, 0.0f, std::max(0.0f, nc.treasury + delta));

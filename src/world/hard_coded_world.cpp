@@ -2778,12 +2778,11 @@ void run_tail(generation_cursor& c)
                         lp.sea_current_weight_q, lp.sea_current_rotation_sense);
     }
 
-    // RAIL TRACK, STAMPED FROM THE RAIL RECORD (BL-1255; LOGISTICS.md § 4c,
-    // INDUSTRIALISATION.md § Who lays rail). The links works-leaning realms laid in
-    // the Industrialisation span, laid onto the grid along the land road between
-    // the two seats -- after the road stamps, so the line follows the roads the
-    // history built. Unowned until the fold hands it over. No-op when the span did
-    // not run.
+    // THE RAIL RECORD (BL-1255; LOGISTICS.md § 4c, INDUSTRIALISATION.md § Who
+    // lays rail). The links works-leaning realms laid in the Industrialisation
+    // span, recorded as seat-tile pairs for the fold, which lays them between the
+    // cities holding market centres (markets are carved after this stage). No-op
+    // when the span did not run.
     if (!c.kepler_rail_links.empty())
     {
         std::vector<history_road_node> rail_nodes;
@@ -2795,8 +2794,8 @@ void run_tail(generation_cursor& c)
         for (const history_rail_link& l : c.kepler_rail_links)
             links.emplace_back(static_cast<int>(l.a), static_cast<int>(l.b));
         const rail_stamp_stats rs = stamp_history_rail(w, kepler, rail_nodes, links);
-        std::printf("[rail] %d links laid of %d (%d skipped), %d track tiles\n",
-                    rs.laid, rs.links, rs.skipped, rs.tiles);
+        std::printf("[rail] %d links recorded for the fold of %d (%d skipped)\n",
+                    rs.laid, rs.links, rs.skipped);
         std::fflush(stdout);
     }
 

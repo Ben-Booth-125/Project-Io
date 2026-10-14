@@ -357,11 +357,7 @@ float track_tile_cost(const world& w, const recipe_registry& reg, entity_id tile
     float steel_price = 0.0f;
     if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
         if (const auto mit = w.markets.find(mid); mit != w.markets.end())
-        {
-            const std::size_t si = static_cast<std::size_t>(resource_type::steel);
-            steel_price = mit->second.price[si] > 0.0f ? mit->second.price[si]
-                                                       : mit->second.base_price[si];
-        }
+            steel_price = posted_price(mit->second, static_cast<std::size_t>(resource_type::steel));
     return rp.track_build_cost + rp.track_steel_per_tile * steel_price;
 }
 
@@ -415,10 +411,26 @@ construction_result lay_track(world& w, const recipe_registry& reg, entity_id na
     }
     if (!city && !track_tile_extends(w, nation, tile))
         return construction_result::invalid_tile;
+    // THE STEEL IS REAL (the BL-1255 fix round): `track_steel_per_tile` units are
+    // BOUGHT OFF THE TILE MARKET'S SHELF at its posted price — the stock drawn,
+    // the treasury billed — the state-purchase shape every market draw takes
+    // (network upkeep's and the space programme's market fallback: the goods
+    // leave the shelf, the money leaves the treasury). No market, or a shelf
+    // short of the steel: refused (insufficient_funds), nothing mutated.
+    const float steel = reg.rail().track_steel_per_tile;
+    market_component* mkt = nullptr;
+    if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            mkt = &mit->second;
+    const std::size_t si = static_cast<std::size_t>(resource_type::steel);
+    if (steel > 0.0f && (mkt == nullptr || !(mkt->inventory[si] >= steel)))
+        return construction_result::insufficient_funds;
     const float cost = track_tile_cost(w, reg, tile);
     if (!std::isfinite(cost) || cost < 0.0f || state_uncommitted_treasury(w, nation) < cost)
         return construction_result::insufficient_funds;
     // Commit. Instant, like a road: paid up front from the treasury.
+    if (steel > 0.0f)
+        mkt->inventory[si] -= steel;
     nit->second.treasury -= cost;
     w.state_ledger[nation].construction += cost;
     w.rail_track.emplace(tile, nation);

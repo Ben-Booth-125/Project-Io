@@ -351,6 +351,17 @@ struct world
     /// (`building_type::railway_station`). Ascending by tile id, so every walk is
     /// layout-independent. SERIALISED in the v49 rail trailing section.
     std::map<entity_id, entity_id>                         rail_track;
+    /// BL-1255 fix round (Ben's state rule, "a losing building idles, never
+    /// debt"): the owners whose track upkeep this tick's funding gate could not
+    /// fund. Their track is IDLE — no rail route runs over it — until paid.
+    /// Written by `plan_state_funding`; SERIALISED in the v49 rail section.
+    std::set<entity_id>                                    rail_idle;
+    /// BL-1255 fix round: the Industrialisation span's rail links as SEAT TILE
+    /// pairs, carried from generation to the fold, where `hand_over_rail` lays
+    /// them between the cities holding market centres (markets do not exist when
+    /// the span closes). GENERATION-TRANSIENT: emptied by the fold, never
+    /// serialised (a world is never saved between generation and the fold).
+    std::vector<std::pair<entity_id, entity_id>>           gen_rail_links;
     faithful_unordered_map<entity_id, unit_component>             units;
 
     /// Population centre entities keyed by their entity ID. Populated by

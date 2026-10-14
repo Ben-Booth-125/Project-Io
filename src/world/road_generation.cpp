@@ -2145,61 +2145,24 @@ void stamp_sea_lanes(world& w, entity_id body,
 }
 
 // ---------------------------------------------------------------------------
-// BL-1255 -- rail track stamped from the rail record (see the header)
+// BL-1255 -- the rail record, carried to the fold (see the header)
 // ---------------------------------------------------------------------------
 rail_stamp_stats stamp_history_rail(world& w, entity_id body,
                                     const std::vector<history_road_node>& nodes,
                                     const std::vector<std::pair<int, int>>& links)
 {
     rail_stamp_stats st;
-    if (links.empty())
-        return st;
     const auto bit = w.bodies.find(body);
-    if (bit == w.bodies.end())
+    if (links.empty() || bit == w.bodies.end())
         return st;
     const int gw = bit->second.grid_width, gh = bit->second.grid_height;
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
-    // "Track ... from the city, a station at each city served": a link runs from
-    // the CITY its region is known by, not from the sim's seat cell — the seat is
-    // the region's anchor, and the campaign's cities stand where generation put
-    // them. The city: the largest-scale population centre within kRailSnap cells
-    // of the seat (wrapped Chebyshev), ties to the nearer, then the lower tile id;
-    // the seat cell itself when no centre stands that near.
-    constexpr int kRailSnap = 6;
-    struct city_cell { int x, y, scale; entity_id tile; };
-    std::vector<city_cell> cities;
-    for (const auto& [cid, ctile] : w.population_centre_tile)
-    {
-        const auto pit = w.population_centres.find(cid);
-        const auto tit = w.tiles.find(ctile);
-        if (pit == w.population_centres.end() || tit == w.tiles.end() || tit->second.body != body)
-            continue;
-        cities.push_back({tit->second.grid_x, tit->second.grid_y, pit->second.scale, ctile});
-    }
     const auto seat_tile = [&](int r) -> entity_id {
         if (r < 0 || static_cast<std::size_t>(r) >= nodes.size())
             return null_entity;
         const int x = nodes[static_cast<std::size_t>(r)].col, y = nodes[static_cast<std::size_t>(r)].row;
         if (x < 0 || x >= gw || y < 0 || y >= gh)
             return null_entity;
-        const city_cell* best = nullptr;
-        int best_d = 0;
-        for (const city_cell& c : cities)
-        {
-            int dx = std::abs(c.x - x);
-            dx = std::min(dx, gw - dx);
-            const int d = std::max(dx, std::abs(c.y - y));
-            if (d > kRailSnap)
-                continue;
-            if (best == nullptr || c.scale > best->scale
-                || (c.scale == best->scale && (d < best_d || (d == best_d && c.tile < best->tile))))
-            {
-                best   = &c;
-                best_d = d;
-            }
-        }
-        if (best != nullptr)
-            return best->tile;
         return grid[static_cast<std::size_t>(y) * static_cast<std::size_t>(gw) + static_cast<std::size_t>(x)];
     };
     for (const auto& [a, b] : links)
@@ -2211,29 +2174,8 @@ rail_stamp_stats stamp_history_rail(world& w, entity_id body,
             ++st.skipped;
             continue;
         }
-        // Copied: a later leg read may rehash the cache this reference points into.
-        const logistics_path lp = intra_body_leg_path(w, body, ta, tb, leg_domain::land);
-        if (!lp.reachable || lp.tiles.empty())
-        {
-            ++st.skipped;
-            continue;
-        }
-        for (const entity_id t : lp.tiles)
-        {
-            const auto tit = w.tiles.find(t);
-            if (tit == w.tiles.end() || is_water(tit->second.substrate))
-                continue;
-            w.rail_track.emplace(t, null_entity);
-        }
+        w.gen_rail_links.emplace_back(ta, tb);
         ++st.laid;
     }
-    for (const auto& [t, owner] : w.rail_track)
-    {
-        (void)owner;
-        const auto tit = w.tiles.find(t);
-        if (tit != w.tiles.end() && tit->second.body == body)
-            ++st.tiles;
-    }
-    invalidate_logistics_caches(w);
     return st;
 }

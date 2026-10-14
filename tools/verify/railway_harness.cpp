@@ -39,7 +39,7 @@
 //
 // Build: bash tools/verify/build_lua_harness.sh railway_harness
 // Run:   build_gen/verify/railway_harness.exe [--sweep] [--long N] [--serve C] [--measure-only] [--quiet] [seed ...]
-//        (default seed 9; the mechanics rows run on the FIRST seed, M on every seed)
+//        (default seed 2; the mechanics rows run on the FIRST seed, M on every seed)
 // Exits non-zero on any FAIL.
 
 #include "harness_params.hpp"
@@ -384,28 +384,32 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
 
     // ---- R1 generation ------------------------------------------------------
     std::printf("--- R1 generation ---\n");
-    check(laid > 0, "R1", fmt("the Industrialisation span laid track (%zu tiles)", laid));
+    (void)laid;
+    check(rh.track_tiles > 0, "R1", fmt("the fold laid the span's links as track (%d tiles, %d links between market cities, %d broken at water)",
+                                       rh.track_tiles, rh.links_laid, rh.links_broken));
+    check(rh.unowned == 0, "R1/B", fmt("no track is ownerless (%d of %d tiles owned along the line)", rh.along_the_line, rh.track_tiles));
     check(rh.stations > 0, "R1", fmt("stations stood at the cities a line serves (%d)", rh.stations));
     {
         bool own_ok = true;
         std::string why;
         for (const auto& [tile, owner] : w.rail_track)
         {
-            if (owner == null_entity) continue;
+            if (owner == null_entity) { own_ok = false; why = "an ownerless tile"; continue; }
             const auto tn = w.tile_to_nation.find(tile);
             const entity_id ground = tn != w.tile_to_nation.end() ? tn->second : null_entity;
             if (w.nations.count(owner))
             {
-                if (!is_major_nation(w, owner) || ground != owner) { own_ok = false; why = "a nation's track off its ground or a minor's"; }
+                if (!is_major_nation(w, owner)) { own_ok = false; why = "a minor's state owning track"; }
+                if (ground != null_entity && is_major_nation(w, ground) && ground != owner)
+                { own_ok = false; why = "a major's ground carrying another's track"; }
             }
             else if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
             {
-                if (!cit->second.is_background || cit->second.home_nation != ground || is_major_nation(w, ground))
-                { own_ok = false; why = "a firm's track not a minor's background firm on its ground"; }
+                if (!cit->second.is_background) { own_ok = false; why = "a specialist owning track"; }
             }
             else { own_ok = false; why = "an owner that is neither"; }
         }
-        check(own_ok, "R1", "every track owner is a major (own ground) or a minor's background firm"
+        check(own_ok, "R1", "every track tile is owned by a major or a minor's background firm, a major's ground by that major"
                             + (own_ok ? std::string() : " -- " + why));
         for (const auto& [o, n] : rh.per_owner_tiles)
             std::printf("    owner %u (%s): %d track tiles\n", static_cast<unsigned>(o),
@@ -455,8 +459,13 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
                 cv.source_market = a; cv.dest_market = b; cv.origin_tile = w.markets.at(a).centre_tile;
                 cv.station_a = leg.station_a; cv.station_b = leg.station_b;
                 const convoy_route lane = convoy_route_tiles(w, cv);
-                if (std::find(lane.tiles.begin(), lane.tiles.end(), leg.station_a) == lane.tiles.end()
+                const auto ia = std::find(lane.tiles.begin(), lane.tiles.end(), leg.station_a);
+                if (ia == lane.tiles.end()
                     || std::find(lane.tiles.begin(), lane.tiles.end(), leg.station_b) == lane.tiles.end())
+                    ok = false;
+                // F (one price): the lane's rail stretch IS the path the price read.
+                else if (static_cast<std::size_t>(lane.tiles.end() - ia) < rp.tiles.size()
+                         || !std::equal(rp.tiles.begin(), rp.tiles.end(), ia))
                     ok = false;
                 if (cut_tile == null_entity && rp.tiles.size() >= 5)
                 {
@@ -467,7 +476,7 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
             }
         check(riding > 0, "R2", fmt("some market pairs ride the rail (%d)", riding));
         check(ok, "R2", "every rail route boards and alights at two network stations over unbroken track, "
-                        "and its convoy lane passes both");
+                        "and its convoy lane rides the very rail path the price read (F)");
     }
 
     // ---- R3 a cut strands ---------------------------------------------------
@@ -596,6 +605,10 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         if (city != null_entity)
         {
             w.nations.at(pn).treasury = 2.0e4f; // fund the fixture (small: float resolution at 1e7 is a whole credit)
+            // Track buys real steel off the tile market's shelf (the fix round): stock it.
+            for (const entity_id t : {city, next})
+                if (const entity_id mid = market_for_tile(w, t); mid != null_entity)
+                    w.markets.at(mid).inventory[static_cast<std::size_t>(resource_type::steel)] += 50.0f;
             const float cost1 = track_tile_cost(w, reg, city);
             const float t0 = state_uncommitted_treasury(w, pn), tr0 = w.nations.at(pn).treasury;
             const std::string o1 = serve(w, reg, ps, P_(fmt("verb=%u tile=%u nation=%u", LT, city, pn)));
@@ -718,6 +731,131 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
             check(false, "R5", "a nation owns track to bill");
     }
 
+    // ---- R7 the fix round: steel, idle track and stations, territory --------
+    std::printf("--- R7 real steel, unpaid track idles, idle stations, ownership follows territory ---\n");
+    {
+        const entity_id pn7 = player_nation(w);
+        // C: a tile extending the player's own line (R4 laid one).
+        entity_id ext = null_entity;
+        for (const auto& [t, o] : w.rail_track)
+        {
+            if (o != pn7 || ext != null_entity) continue;
+            for (const entity_id nb : neighbours_of(w, t))
+            {
+                const auto tn = w.tile_to_nation.find(nb);
+                if (tn != w.tile_to_nation.end() && tn->second == pn7 && !tile_has_track(w, nb)
+                    && !is_water(w.tiles.at(nb).substrate) && market_for_tile(w, nb) != null_entity)
+                { ext = nb; break; }
+            }
+        }
+        if (ext != null_entity)
+        {
+            const std::size_t si = static_cast<std::size_t>(resource_type::steel);
+            const float qty = reg.rail().track_steel_per_tile;
+            {
+                world c = w;
+                c.nations.at(pn7).treasury = 2.0e4f;
+                market_component& m = c.markets.at(market_for_tile(c, ext));
+                m.inventory[si] = qty + 3.0f;
+                const float cost = track_tile_cost(c, reg, ext);
+                const float tr0 = c.nations.at(pn7).treasury;
+                const construction_result r = lay_track(c, reg, pn7, ext);
+                check(r == construction_result::placed && std::fabs(c.markets.at(market_for_tile(c, ext)).inventory[si] - 3.0f) < 1e-4f
+                          && std::fabs((tr0 - c.nations.at(pn7).treasury) - cost) < 1e-3f,
+                      "R7/C", fmt("laying track buys its %.1f steel off the shelf (stock drawn) and the treasury pays %.2f", static_cast<double>(qty), static_cast<double>(cost)));
+            }
+            {
+                world c = w;
+                c.nations.at(pn7).treasury = 2.0e4f;
+                c.markets.at(market_for_tile(c, ext)).inventory[si] = qty * 0.5f;
+                const std::uint64_t h0 = c.state_hash(0);
+                const construction_result r = lay_track(c, reg, pn7, ext);
+                check(r == construction_result::insufficient_funds && c.state_hash(0) == h0,
+                      "R7/C", "a shelf short of the steel lays no track (refused, nothing mutated)");
+            }
+        }
+        else
+            check(false, "R7/C", "a tile extending the player's line to test the steel purchase");
+
+        // D: an owner whose track upkeep goes unfunded idles its track. The pair:
+        // two joined stations whose rail path crosses track a NATION owns.
+        if (cut_a != null_entity)
+        {
+            entity_id sa = null_entity, sb = null_entity, nat = null_entity, via = null_entity;
+            {
+                const world::rail_network n0 = body_rail_network(w, w.home_body);
+                for (std::size_t i = 0; i < n0.stations.size() && nat == null_entity; ++i)
+                    for (std::size_t j = 0; j < n0.stations.size() && nat == null_entity; ++j)
+                    {
+                        if (i == j || n0.steps[i][j] < 2) continue;
+                        const logistics_path p = rail_leg_path(w, w.home_body, n0.stations[i], n0.stations[j]);
+                        for (std::size_t k = 1; k + 1 < p.tiles.size(); ++k)
+                        {
+                            const auto rt = w.rail_track.find(p.tiles[k]);
+                            if (rt != w.rail_track.end() && w.nations.count(rt->second))
+                            { sa = n0.stations[i]; sb = n0.stations[j]; nat = rt->second; via = p.tiles[k]; break; }
+                        }
+                    }
+            }
+            if (nat != null_entity)
+            {
+                world c = w;
+                c.nations.at(nat).treasury = 0.0f;
+                plan_state_funding(c, reg);
+                const bool idle = c.rail_idle.count(nat) != 0;
+                const logistics_path live = rail_leg_path(c, c.home_body, sa, sb);
+                const logistics_path phys = rail_leg_path(c, c.home_body, sa, sb, false);
+                bool avoids = true;
+                for (const entity_id t : live.tiles)
+                    if (const auto rt = c.rail_track.find(t); rt != c.rail_track.end() && rt->second == nat) avoids = false;
+                std::unordered_map<entity_id, corp_cash_flow> flows;
+                std::map<std::pair<entity_id, entity_id>, float> contention;
+                apply_budget(c, reg, flows, contention);
+                check(idle && avoids && phys.reachable && c.nations.at(nat).treasury == 0.0f, "R7/D",
+                      fmt("a nation (%u) with nothing to pay its track upkeep: its track idles (no rail route over it, tile %u), and pays nothing",
+                          static_cast<unsigned>(nat), static_cast<unsigned>(via)));
+                c.nations.at(nat).treasury = 1.0e6f;
+                plan_state_funding(c, reg);
+                check(c.rail_idle.count(nat) == 0 && rail_leg_path(c, c.home_body, sa, sb).reachable, "R7/D",
+                      "funded again, the track runs again");
+            }
+            else
+                check(false, "R7/D", "a rail path over state-owned track to idle");
+
+            // E: an idle station boards nothing.
+            world e = w;
+            for (auto& [bid, b] : e.buildings)
+                if (b.type == building_type::railway_station && b.tile == cut_a)
+                    b.state_idle = true;
+            e.rail_networks.clear();
+            const world::rail_network ne = body_rail_network(e, e.home_body);
+            check(std::find(ne.stations.begin(), ne.stations.end(), cut_a) == ne.stations.end(), "R7/E",
+                  "an unfunded (state_idle) station leaves the network");
+        }
+
+        // G: ownership follows territory.
+        {
+            world c = w;
+            entity_id tile = null_entity, x = null_entity, y = null_entity;
+            for (const auto& [t, o] : c.rail_track)
+                if (c.nations.count(o)) { tile = t; x = o; break; }
+            std::vector<entity_id> nids;
+            for (const auto& [nid, nc] : c.nations) nids.push_back(nid);
+            std::sort(nids.begin(), nids.end());
+            for (const entity_id nid : nids)
+                if (nid != x && is_major_nation(c, nid)) { y = nid; break; }
+            if (tile != null_entity && y != null_entity)
+            {
+                c.tile_to_nation[tile] = y;
+                const int moved = assign_rail_owners(c);
+                check(c.rail_track.at(tile) == y && moved >= 1, "R7/G",
+                      "track on ground that changes hands passes to the new holder's state");
+            }
+            else
+                check(false, "R7/G", "a state-owned tile and a second major to test territory");
+        }
+    }
+
     // ---- R6 the save -----------------------------------------------------------
     std::printf("--- R6 the save ---\n");
     {
@@ -744,6 +882,7 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         std::size_t tail = 2 * sizeof(uint32_t) + c.rail_track.size() * 2 * sizeof(entity_id);
         for (const convoy_component& k : c.convoys)
             if (k.station_a != null_entity) tail += sizeof(uint32_t) + 2 * sizeof(entity_id);
+        tail += sizeof(uint32_t) + c.rail_idle.size() * sizeof(entity_id);
         std::string v48 = b.substr(0, b.size() - tail);
         const uint32_t ver = k_world_save_version_pre_rail;
         std::memcpy(&v48[4], &ver, sizeof ver);
@@ -778,7 +917,7 @@ int main(int argc, char** argv)
         seeds.push_back(static_cast<std::uint32_t>(std::strtoul(argv[i], nullptr, 10)));
     }
     if (seeds.empty())
-        seeds.push_back(9); // a world whose lines carry market traffic (seed 0 has track, none ridden)
+        seeds.push_back(2); // a world whose lines carry market traffic (after the fix round)
 
     lua_state lua;
     for (std::size_t i = 0; i < seeds.size(); ++i)

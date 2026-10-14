@@ -419,7 +419,7 @@ inline constexpr uint32_t world_save_magic =
 /// Bumped to 49 by BL-1255 (railways; LOGISTICS.md § 4c, Ben 2026-10-13): a
 /// TRAILING SECTION after state industry -- the rail track field (tile, owner)
 /// ascending by tile, then each convoy riding a rail route as (id, boarding
-/// station, alighting station). Nothing else moves, so v48 is a STRICT PREFIX of
+/// station, alighting station), then the idle-track owners (`rail_idle`). Nothing else moves, so v48 is a STRICT PREFIX of
 /// v49 and is read too (`k_world_save_version_pre_rail`), as a world with no rail;
 /// v47 still reads (no state industry, no rail). Every other version is refused.
 inline constexpr uint32_t world_save_version = 49;

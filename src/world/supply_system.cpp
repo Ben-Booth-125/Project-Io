@@ -667,12 +667,10 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
     }
 
     // RAIL (BL-1255, LOGISTICS.md § 4c): land origin -> station A, rail A -> B over
-    // connected uncut track, land station B -> dest. A and B range over every built,
-    // active station touching track; the pair minimising the WHOLE route, both station
-    // fees included, wins, and only when it beats every route above — strictly, so a
-    // tie stays on the road (or the sea). The same cheap exit and the same lower
-    // bounds as the sea search: every rail route pays both fees on three
-    // non-negative legs. With no track on the world the network is empty and this
+    // connected uncut, funded track, land station B -> dest, A and B the stations
+    // nearest each market by road (below). Taken only when it beats every route
+    // above — strictly, so a tie stays on the road (or the sea). The cheap exit:
+    // every rail route pays both fees on three non-negative legs. With no track on the world the network is empty and this
     // block does nothing, so a world without rail prices to the same bits.
     if (!w.rail_track.empty())
     {
@@ -726,28 +724,37 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 }
                 return from_st[j];
             };
+            // BOARD AT THE STATION NEAREST THE MARKET BY ROAD (the BL-1255 fix
+            // round): A is the station whose land leg from the origin is cheapest,
+            // B the station joined to A whose land leg to the destination is
+            // cheapest; ties to the lower station tile (the ascending list). One
+            // candidate, taken only when it beats every route above.
+            std::size_t ia = stations.size();
             for (std::size_t i = 0; i < stations.size(); ++i)
             {
                 const end_leg& in = to(i);
-                if (!in.ok)
-                    continue;
-                if (have && !(in.per_unit + rfees < best))
-                    continue;
+                if (in.ok && (ia == stations.size() || in.per_unit < to(ia).per_unit))
+                    ia = i;
+            }
+            std::size_t jb = stations.size();
+            if (ia < stations.size() && !(have && !(to(ia).per_unit + rfees < best)))
                 for (std::size_t j = 0; j < stations.size(); ++j)
                 {
-                    if (j == i || steps[i][j] < 0)
-                        continue;
-                    const route_leg rail{convoy_mode::land, rail_rate,
-                                         static_cast<float>(steps[i][j]), 0.0f};
-                    const float rail_pu = route_leg_per_unit(rail);
-                    if (have && !(in.per_unit + rail_pu + rfees < best))
+                    if (j == ia || steps[ia][j] < 0)
                         continue;
                     const end_leg& on = from(j);
-                    if (!on.ok)
-                        continue;
-                    const float per_unit = in.per_unit + rail_pu + on.per_unit + rfees;
-                    if (have && !(per_unit < best))
-                        continue;
+                    if (on.ok && (jb == stations.size() || on.per_unit < from(jb).per_unit))
+                        jb = j;
+                }
+            if (jb < stations.size())
+            {
+                const end_leg& in = to(ia);
+                const end_leg& on = from(jb);
+                const route_leg rail{convoy_mode::land, rail_rate,
+                                     static_cast<float>(steps[ia][jb]), 0.0f};
+                const float per_unit = in.per_unit + route_leg_per_unit(rail) + on.per_unit + rfees;
+                if (!have || per_unit < best)
+                {
                     route.n_legs    = 3;
                     route.legs[0]   = in.leg;
                     route.legs[1]   = rail;
@@ -756,8 +763,8 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                     route.port_a    = null_entity;
                     route.port_b    = null_entity;
                     route.stations  = 2;
-                    route.station_a = stations[i];
-                    route.station_b = stations[j];
+                    route.station_a = stations[ia];
+                    route.station_b = stations[jb];
                     route.mode      = convoy_mode::land;
                     route.travel_ticks = travel_ticks_for_days(
                         leg_travel_days(w, body, in.leg.dist, convoy_mode::land)

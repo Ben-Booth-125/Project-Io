@@ -698,8 +698,8 @@ int main()
             // counts, 8 bytes), stamped 47. It reads, as a world with no state
             // industry. Its own destination, so P3's untouched victim stays so.
             // BL-1255 (v49): the rail section follows it (a world with no rail
-            // writes two empty counts, 8 more bytes), so the v47 prefix is 16 short.
-            std::string v47 = bytes_once.substr(0, bytes_once.size() - 4 * sizeof(uint32_t));
+            // writes three empty counts, 12 more bytes), so the v47 prefix is 20 short.
+            std::string v47 = bytes_once.substr(0, bytes_once.size() - 5 * sizeof(uint32_t));
             const uint32_t pre = k_world_save_version_pre_state;
             std::memcpy(&v47[4], &pre, sizeof pre);
             world old;
@@ -713,9 +713,9 @@ int main()
         }
         {
             // P20c (BL-1255) -- the v48 stream: this v49 stream less its rail
-            // section (a world with no rail writes two empty counts, 8 bytes),
+            // section (a world with no rail writes three empty counts, 12 bytes),
             // stamped 48. It reads, as a world with no rail.
-            std::string v48 = bytes_once.substr(0, bytes_once.size() - 2 * sizeof(uint32_t));
+            std::string v48 = bytes_once.substr(0, bytes_once.size() - 3 * sizeof(uint32_t));
             const uint32_t pre = k_world_save_version_pre_rail;
             std::memcpy(&v48[4], &pre, sizeof pre);
             world old;
