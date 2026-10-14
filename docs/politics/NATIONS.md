@@ -100,7 +100,10 @@ buildings.
 - **A losing building idles.** When its costs exceed what the treasury can pay, a state building
   stops producing and paying until the treasury can pay again. The state never runs into debt.
 - **The player's controls** over a state building are a corporation's building verbs — build,
-  recipe, workforce dial, sell — paid from the treasury.
+  recipe, sell — paid from the treasury. **Workforce is not one of them**: the game steps a
+  state building's workforce as it steps the player's own, one 25 % step a quarter toward the most
+  profitable level, a raise taken only when the treasury funds it (Ben, 2026-10-14;
+  `../economy/PRODUCTION.md` § Workforce target and the auto-solver).
 - **Rail and stations** are state industry too (`../economy/LOGISTICS.md` § 4c). Laying track costs
   the treasury per tile, plus steel per tile, with upkeep per tile.
 
