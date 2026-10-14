@@ -686,6 +686,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // The bar and the pressure are the struct's (history_sim.hpp says how
     // each reads); a lean, so no backstop rides with it.
     hp.revolution_lean = true;
+    // BL-1304: calibrated toward about a third of worlds (in band, the lane's):
+    // the struct's 600 bar caught 1-2 of the 16 library worlds; 560 caught 7,
+    // 580 caught 4, 570 catches 6 (10, 11, 13, 25, 31, 32).
+    hp.revolution_disparity_bar_pm = 570;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).
