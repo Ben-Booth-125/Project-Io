@@ -504,6 +504,8 @@ bool market_within_reach(world& w, const recipe_registry& reg, input_reach& ir,
         if (out_haul) *out_haul = 0.0f;
         return true;
     }
+    if (ir.same_market_only) // the founding's first ask: no trade route at all
+        return false;
     if (reg.grid_goods().grid(r)) // BL-708: a grid good is never cargo
         return false;
     const auto sit = w.markets.find(src_market);

@@ -184,7 +184,9 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         }
         const float batches = reg.economics(building_type::processing_facility).base_rate * 0.5f;
         std::unique_ptr<input_reach> ir; // built on first use: a world fact, shared
+        std::unique_ptr<input_reach> ir_local; // the same, reach = its own market only
         std::map<std::pair<entity_id, std::uint16_t>, bool> feasible_at; // (market, recipe)
+        std::map<std::pair<entity_id, std::uint16_t>, bool> local_at;    // (market, recipe)
         for (const entity_id nid : nation_ids)
         {
             if (!w.nations.at(nid).state_assets.empty())
@@ -192,7 +194,15 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
             state_founding f;
             f.nation = nid;
             const std::vector<entity_id> tiles = w.nations.at(nid).tiles; // territory order
-            for (int pass = 0; pass < 2 && f.building == null_entity; ++pass)
+            // Sprint 53 economy pass (G1b): THREE passes, nearest its feed first
+            // -- the charter's own order (CORPORATION_GENERATION.md, "the recipe
+            // bends before the building goes": own market, then reach). Pass 0
+            // founds only where its OWN market makes every input (no trade route
+            // to wait on: a founded plant opens with no stock, and one fed only
+            // by trade starved through the haul's lead time and was idled in the
+            // settle's first quarters); pass 1 where the chain runs by reach;
+            // pass 2 anywhere (unchanged: every major founds one).
+            for (int pass = 0; pass < 3 && f.building == null_entity; ++pass)
                 for (const std::uint16_t rid : recipes)
                 {
                     if (f.building != null_entity) break;
@@ -205,9 +215,25 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                         if (!recipe_runs_at_tile(w, rc, tile))
                             continue;
                         bool feasible = false;
+                        bool local    = false;
                         if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
                         {
                             const auto key = std::make_pair(mid, rid);
+                            if (pass == 0)
+                            {
+                                auto lit = local_at.find(key);
+                                if (lit == local_at.end())
+                                {
+                                    if (!ir_local)
+                                    {
+                                        ir_local = std::make_unique<input_reach>(make_input_reach(w, reg));
+                                        ir_local->same_market_only = true;
+                                    }
+                                    lit = local_at.emplace(key, recipe_inputs_supplied(
+                                              w, reg, *ir_local, mid, rc, batches, null_entity)).first;
+                                }
+                                local = lit->second;
+                            }
                             auto fit = feasible_at.find(key);
                             if (fit == feasible_at.end())
                             {
@@ -217,8 +243,10 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                             }
                             feasible = fit->second;
                         }
-                        if (pass == 0 && !feasible)
-                            continue; // pass 0 founds only where the chain runs
+                        if (pass == 0 && !local)
+                            continue; // pass 0 founds only where its own market feeds it
+                        if (pass == 1 && !feasible)
+                            continue; // pass 1 founds only where the chain runs
                         const float price = construction_capex(w, reg, tile, building_type::processing_facility,
                                                                resource_type::iron_ore, rid);
                         entity_id built = null_entity;
@@ -238,6 +266,8 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                         f.price    = price;
                         f.paid     = paid;
                         if (ir) input_reach_invalidate(*ir);
+                        if (ir_local) input_reach_invalidate(*ir_local);
+                        local_at.clear(); // the founded plant now draws: ask its market again
                         // Recorded as a state charter (the history log).
                         world_history_entry e;
                         e.timestamp = w.current_day_tick;

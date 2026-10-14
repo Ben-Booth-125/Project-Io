@@ -229,6 +229,7 @@ bool  g_logistics  = true;    ///< BL-1223: the L row (--no-logistics drops it)
 /// its last row read input; good the report row's limiting input, -1 none), for
 /// a reader that places them on the history's regions (rise_fall_probe).
 const char* g_dump_processors = nullptr;
+entity_id   g_trace_proc = null_entity; ///< --trace-proc BID: one processor's settle, tick by tick
 std::vector<int> g_lg_ticks;  ///< L: the probe play ticks (set in main)
 
 // --- seeds (market_census's minimal scan of the library) ---------------------
@@ -310,6 +311,101 @@ void remember_rows(const world& w, const economy_report& rep, const recipe_regis
         if (br.type != building_type::processing_facility) continue;
         const auto bi = w.buildings.find(br.building);
         if (bi != w.buildings.end()) last[br.building] = classify_row(bi->second, &br, reg);
+    }
+}
+
+/// BL-1217 G1b (sprint 53 economy pass): WHY a processor starved in the settle.
+/// Each settle tick, every processor whose row is input-starved records its
+/// limiting input and, at that tick, where that good stood: the plant's own
+/// market shelf (and the fair-price ceiling's verdict), the body's other shelves,
+/// and whether anything on the body PRODUCED it this tick. The LAST starved tick
+/// wins, so a plant decommissioned after starving carries the read that killed it.
+struct settle_starve
+{
+    int   good = -1;
+    int   tick = -1;
+    uint16_t recipe = 0;
+    float shelf_here = 0.0f;     ///< its market's shelf of the good
+    bool  admits = true;         ///< the ceiling admits that shelf
+    float shelf_body = 0.0f;     ///< every other market on the body
+    int   producers = 0;         ///< buildings on the body making the good this tick
+    int   producers_idle = 0;    ///< buildings on the body that would make it, idle this tick
+    bool  state_idle = false;    ///< a state plant its treasury could not fund that tick
+    float pool = 0.0f;           ///< the owner's own pool of the good at its market
+    float made_here = 0.0f;      ///< units of the good made at its own market this tick
+    float need = 0.0f;           ///< its full-run need of the good this tick
+    float hh_bid = 0.0f, hh_fill = 0.0f; ///< households at its market, last clear
+};
+using settle_starve_map = std::map<entity_id, settle_starve>;
+
+/// The class a settle starvation files under, most structural first:
+///   here      its own shelf holds >= 1 unit and is admitted (thin / outdrawn)
+///   ceiling   its own shelf holds >= 1 unit, priced over the fair-price ceiling
+///   elsewhere another market's shelf holds >= 1 unit but its own does not (REACH)
+///   made      made on the body this tick, no shelf anywhere holds it (drawn or
+///             kept in pools before it lists)
+///   idlemaker nothing made it this tick, but a maker stands idle on the body
+///   nomaker   nothing on the body would make it at all (a CHAIN HOLE)
+const char* settle_starve_class(const settle_starve& s)
+{
+    if (s.shelf_here >= 1.0f) return s.admits ? "here" : "ceiling";
+    if (s.shelf_body >= 1.0f) return "elsewhere";
+    if (s.producers > 0) return "made";
+    return s.producers_idle > 0 ? "idlemaker" : "nomaker";
+}
+
+void remember_starve(const world& w, const economy_report& rep, const recipe_registry& reg,
+                     int tick, settle_starve_map& out)
+{
+    for (const building_report& br : rep.buildings)
+    {
+        if (br.type != building_type::processing_facility || !br.has_limiting) continue;
+        const auto bi = w.buildings.find(br.building);
+        if (bi == w.buildings.end()) continue;
+        if (classify_row(bi->second, &br, reg) != ps_input) continue;
+        const std::size_t g = static_cast<std::size_t>(br.limiting_input);
+        if (g >= resource_count) continue;
+        settle_starve st;
+        st.state_idle = bi->second.state_idle;
+        st.good = static_cast<int>(g);
+        st.tick = tick;
+        st.recipe = bi->second.recipe;
+        const entity_id m = market_for_tile(w, bi->second.tile);
+        if (const auto mi = w.markets.find(m); mi != w.markets.end())
+        {
+            st.shelf_here = mi->second.inventory[g];
+            st.admits = shelf_admits(mi->second, g, reg.price_band().reservation_mult, false);
+            st.hh_bid = mi->second.household_bid[g];
+            st.hh_fill = mi->second.household_fill[g];
+        }
+        if (const recipe* rc = reg.get_recipe(bi->second.recipe))
+            st.need = rc->inputs[g] * reg.economics(building_type::processing_facility).base_rate
+                    * br.effective_workforce * std::clamp(bi->second.workforce_target / 100.0f, 0.0f, 2.0f);
+        for (const auto& [mid, mc] : w.markets)
+            if (mid != m && mc.body == br.body) st.shelf_body += mc.inventory[g];
+        for (const building_report& o : rep.buildings)
+        {
+            if (o.body != br.body) continue;
+            bool makes = false;
+            if (o.type == building_type::extraction_site) makes = static_cast<std::size_t>(o.target_resource) == g;
+            else if (o.type == building_type::processing_facility)
+                if (const recipe* rc = reg.get_recipe(o.recipe)) makes = rc->outputs[g] > 0.0f;
+            if (!makes) continue;
+            if (o.active) ++st.producers; else ++st.producers_idle;
+            if (o.active)
+                if (const auto ob = w.buildings.find(o.building); ob != w.buildings.end()
+                    && market_for_tile(w, ob->second.tile) == m)
+                {
+                    if (o.type == building_type::extraction_site) st.made_here += o.output_quantity;
+                    else if (const recipe* rc = reg.get_recipe(o.recipe))
+                    {
+                        float tot = 0.0f;
+                        for (std::size_t k = 0; k < resource_count; ++k) tot += rc->outputs[k];
+                        if (tot > 0.0f) st.made_here += o.output_quantity * rc->outputs[g] / tot;
+                    }
+                }
+        }
+        out[br.building] = st;
     }
 }
 
@@ -501,6 +597,7 @@ struct seed_reading
     int    decom_at_build = 0, proc_at_build = 0; ///< processors when the world is handed to the settle
     int    port_at_build = 0, port_decom_at_build = 0, port_building_at_build = 0; ///< BL-1306: ports as handed to the settle
     int    trade_corps_at_build = 0; ///< BL-1306: corporations of trade focus (the port archetype)
+    std::string g1b_why; ///< G1b's settle read per starved plant (settle_starve_class)
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
     // G4
     entity_id seat = null_entity;
@@ -553,6 +650,7 @@ struct seed_reading
     std::array<double, resource_count> bg_ship{}, bg_ship_bid{}, bg_ship_drawn{};
     double secs = 0.0;
     std::vector<lg_reading> lg; ///< L (BL-1223): one per g_lg_ticks entry
+    lg_reading lg_settle; ///< L over the 12 settle ticks (G1b's window), every tick read
 };
 
 /// W: one tick's water read. `max_convoy_id` is the highest convoy id seen
@@ -1074,6 +1172,15 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         if (cc.focus == industrial_focus::trade) ++r.trade_corps_at_build;
     }
     last_row_map last_row;
+    settle_starve_map settle_starve_rows;
+    lg_probe slg; // L over the settle (G1b's window): the play row's reader, every settle tick
+    slg.reg = &reg;
+    for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+    {
+        if (std::strcmp(k_campaign_settle_lap_names[i], "run_economy_step") == 0) slg.lap = i;
+        if (std::strcmp(k_campaign_settle_lap_names[i], "convoys") == 0) slg.lap_pre = i;
+    }
+    for (const convoy_component& c : w.convoys) slg.max_id = std::max(slg.max_id, c.id);
 
     // --- the settle: econ steps 0..11, day 0, spectating (the validation run) ---
     std::map<entity_id, int> ran_window;   // processor -> active ticks in the last 8 settle ticks
@@ -1082,10 +1189,54 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     g5_track(w, g5, 0, false, r); // the world as handed to the settle
     for (int step = 0; step < k_campaign_settle_ticks; ++step)
     {
-        settle_tick_result res = run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
+        settle_tick_hooks shooks;
+        hook_pair spair;
+        if (g_logistics)
+        {
+            slg.armed = true; slg.cur = &r.lg_settle;
+            spair.lg = &slg;
+            shooks.after_lap = pair_after_lap; shooks.ctx = &spair;
+        }
+        settle_tick_result res = run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true,
+                                                 g_logistics ? &shooks : nullptr);
+        if (g_logistics) lg_after_tick(w, res.report, reg, slg);
+        for (const convoy_component& c : w.convoys) slg.max_id = std::max(slg.max_id, c.id);
         r.inc_settle_mean += field_income(w) / k_campaign_settle_ticks;
         g5_track(w, g5, step, false, r);
         remember_rows(w, res.report, reg, last_row);
+        remember_starve(w, res.report, reg, step, settle_starve_rows);
+        if (g_trace_proc != null_entity)
+            if (const auto tb = w.buildings.find(g_trace_proc); tb != w.buildings.end())
+            {
+                const building_component& b = tb->second;
+                const building_report* row = row_of(res.report, g_trace_proc);
+                const entity_id m = market_for_tile(w, b.tile);
+                std::printf("TRACE t%d bid %llu mkt %llu decom %d streak %d wt %d assigned %.2f state_idle %d",
+                            step, static_cast<unsigned long long>(g_trace_proc), static_cast<unsigned long long>(m),
+                            b.decommissioned ? 1 : 0, b.loss_streak, b.workforce_target, b.workforce_assigned,
+                            b.state_idle ? 1 : 0);
+                if (row) std::printf(" | row active %d run %.2f eff_wf %.2f lim %s out %.1f",
+                                     row->active ? 1 : 0, row->run, row->effective_workforce,
+                                     row->has_limiting ? resource_names::name_of(row->limiting_input).c_str() : "-",
+                                     row->output_quantity);
+                if (const recipe* rc = reg.get_recipe(b.recipe); rc && w.markets.count(m))
+                {
+                    const market_component& mc = w.markets.at(m);
+                    std::printf(" | %s", rc->name.c_str());
+                    for (std::size_t g = 0; g < resource_count; ++g)
+                        if (rc->inputs[g] > 0.0f)
+                            std::printf(" in %s shelf %.1f p/b %.2f admit %d hh %.0f/%.0f dem %.1f",
+                                        resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                                        mc.inventory[g], mc.base_price[g] > 0 ? mc.price[g] / mc.base_price[g] : 0.0f,
+                                        shelf_admits(mc, g, reg.price_band().reservation_mult, false) ? 1 : 0,
+                                        mc.household_fill[g], mc.household_bid[g], mc.demand[g]);
+                    for (std::size_t g = 0; g < resource_count; ++g)
+                        if (rc->outputs[g] > 0.0f)
+                            std::printf(" out %s p/b %.2f", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                                        mc.base_price[g] > 0 ? mc.price[g] / mc.base_price[g] : 0.0f);
+                }
+                std::printf("\n");
+            }
         if (step >= k_campaign_settle_ticks - k_seat_settle_window)
             for (const building_report& br : res.report.buildings)
                 if (br.type == building_type::processing_facility && br.active)
@@ -1122,6 +1273,39 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             dump << seed << ' ' << ti->second.grid_x << ' ' << ti->second.grid_y << ' ' << k_state_name[s]
                  << ' ' << (starved ? 1 : 0) << ' ' << good << '\n';
         }
+    }
+    {
+        // G1b's WHY: every plant G1b counts, filed by the settle read that last
+        // saw it starved (remember_starve), in ascending building id.
+        std::map<std::string, int> cls_n;
+        std::string rows;
+        std::set<entity_id> state_owned;
+        for (const auto& [nid, nc] : w.nations) { (void)nid; for (const entity_id a : nc.state_assets) state_owned.insert(a); }
+        for (const auto& [bid, st] : settle_starve_rows)
+        {
+            const auto bi = w.buildings.find(bid);
+            if (bi == w.buildings.end()) continue;
+            const proc_state s = classify(bi->second, row_of(last_settle, bid), reg);
+            const auto li = last_row.find(bid);
+            const bool counted = s == ps_input || (s == ps_decom && li != last_row.end() && li->second == ps_input);
+            if (!counted) continue;
+            const char* c = settle_starve_class(st);
+            ++cls_n[c];
+            const recipe* rc = reg.get_recipe(st.recipe);
+            char buf[400];
+            std::snprintf(buf, sizeof buf, "\n      %s %s %llu %s<-%s t%d %s (here %.1f%s, body %.1f, made by %d, idle makers %d; made here %.1f, need %.1f, hh fill/bid %.0f/%.0f)%s",
+                          s == ps_decom ? "decom" : "input", state_owned.count(bid) ? "state" : "firm ",
+                          static_cast<unsigned long long>(bid),
+                          rc ? rc->name.c_str() : "?",
+                          resource_names::name_of(static_cast<resource_type>(st.good)).c_str(), st.tick, c,
+                          st.shelf_here, st.admits ? "" : " over ceiling", st.shelf_body, st.producers,
+                          st.producers_idle, st.made_here, st.need, st.hh_fill, st.hh_bid,
+                          st.state_idle ? " UNFUNDED" : "");
+            rows += buf;
+        }
+        r.g1b_why = " G1b why (settle read):";
+        for (const auto& [c, n] : cls_n) r.g1b_why += " " + c + " " + std::to_string(n);
+        r.g1b_why += rows;
     }
     for (const auto& [bid, b] : w.buildings)
         if (b.type == building_type::planetary_marketplace && !b.decommissioned)
@@ -1365,6 +1549,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--no-spoil")) g_no_spoil = true;
         else if (!std::strcmp(argv[i], "--no-logistics")) g_logistics = false;
         else if (!std::strcmp(argv[i], "--dump-processors") && i + 1 < argc) g_dump_processors = argv[++i]; // BL-1287
+        else if (!std::strcmp(argv[i], "--trace-proc") && i + 1 < argc) g_trace_proc = static_cast<entity_id>(std::strtoull(argv[++i], nullptr, 10));
         else if (!std::strcmp(argv[i], "--no-snap")) g_road_probe_no_snap = true; // BL-1252 measurement
         else if (!std::strcmp(argv[i], "--snap-run") && i + 1 < argc) g_road_probe_snap_run = std::atoi(argv[++i]); // BL-1252
         else if (!std::strcmp(argv[i], "--snap-bound") && i + 1 < argc) g_road_probe_snap_bound = static_cast<float>(std::atof(argv[++i])); // BL-1252
@@ -1416,6 +1601,7 @@ int main(int argc, char** argv)
         std::printf(" ports as handed to the settle: %d (decommissioned %d, under construction %d);"
                     " trade-focus corporations %d\n",
                     r.port_at_build, r.port_decom_at_build, r.port_building_at_build, r.trade_corps_at_build);
+        std::printf("%s\n", r.g1b_why.c_str());
         print_tally("handoff", r.g1_handoff);
         print_tally("tick 50", r.g1_t50);
         std::printf(" G2 field income/tick  settle close %10.0f  tick 50 %10.0f  ratio %5.1f%%"
@@ -1484,6 +1670,8 @@ int main(int argc, char** argv)
                 std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
                             pct(r.late_fill[g] / r.late_bid[g]));
         std::printf("\n");
+        if (g_logistics && r.lg_settle.reads > 0)
+            print_lg("settle", r.lg_settle, 6);
         if (g_logistics && !r.lg.empty())
         {
             std::printf(" L logistics (reported, no target):\n");

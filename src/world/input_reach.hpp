@@ -147,6 +147,12 @@ struct input_reach
         std::vector<reached_draw> draws;   ///< consumer markets any of them reaches, ascending
     };
 
+    /// Sprint 53 economy pass (G1b): when set, reach is the SAME MARKET only --
+    /// a lane that needs no trade at all. The state founding asks it first, so a
+    /// founded plant stands where its feed is made before it leans on a trade
+    /// route (CORPORATION_GENERATION.md: the recipe bends nearest its feed --
+    /// own market, then reach). Never set by the play-time scorer.
+    bool same_market_only = false;
     bool index_built = false;
     /// Per resource: every producer, sorted by (market, building).
     std::array<std::vector<producer>, resource_count>                      producers;
