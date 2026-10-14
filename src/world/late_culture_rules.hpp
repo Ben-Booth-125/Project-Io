@@ -44,14 +44,15 @@
 /// its living realms' mean materials band at or under this share of its
 /// NEIGHBOURHOOD's mean band, x100. PROVISIONAL (the number is measurement's).
 ///
-/// THE NEIGHBOURHOOD, read off the close's map alone (so the detector and the
-/// sim read one set, `read_late_culture_lag`): every living realm of another
-/// people holding a region within `late_culture_neighbour_tiles` (grid
-/// distance, columns wrapped) of a region the culture's realms hold -- the
-/// peoples around it. WHERE NONE STANDS THAT NEAR (an isolated people has no
-/// one around it), the `late_culture_nearest_peoples` living realms of other
-/// peoples nearest its ground, however far -- the first it would meet. Ties on
-/// the lower polity id. Unweighted means, realm by realm, as the old reading.
+/// THE NEIGHBOURHOOD IS CONTACT BY REACH (Ben, 2026-10-13: contact is by
+/// reach, as the development ceiling reads it): every living realm of another
+/// people the cheapest `edge_step` walk from the ground its realms hold meets
+/// inside `contact_diffusion_horizon` -- the diffusion's own walk -- and never
+/// fewer than the `late_culture_nearest_peoples` the walk meets first, however
+/// far (a pressed people still has the first it would meet). The sim reads the set live and records it at the Empires close
+/// (`late_culture_contact`); the detector reads the recorded set, so both read
+/// one neighbourhood. `late_culture_neighbour_tiles` is only the detector's
+/// fallback for a record written before the set was. Unweighted means.
 inline constexpr int late_culture_lag_x100        = 85;
 inline constexpr int late_culture_neighbour_tiles = 18; ///< two campaign-neighbour radii (`neighbour_radius` 9)
 inline constexpr int late_culture_nearest_peoples = 3;

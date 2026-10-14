@@ -344,6 +344,7 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.contact_diffusion_horizon = 30;
     hp.contact_early_bands       = 2; // Ben 2026-10-14: past band 2 a realm climbs by contact
     hp.contact_band_per_q        = 1000;
+    hp.late_isolation_floor_level = 8; // BL-1288 alignment: the deep press, from level 8
     return hp;
 }
 

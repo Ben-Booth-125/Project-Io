@@ -2954,6 +2954,12 @@ struct history_sim_params
     /// in any scorer; capped at `late_culture_max_level`.
     int late_isolation_step_q = 750;
     int late_isolation_step   = 1;
+    /// BL-1288 alignment: from this press level (0 = never) the late culture's
+    /// realms' contact ceiling stands one band under what its contacts would
+    /// sustain -- under the early bands too -- and a realm of it above sheds to
+    /// it at the diffusion's read: the press's development face carried far
+    /// enough that a people its few, as-backward contacts reach still lags them.
+    int late_isolation_floor_level = 0;
     // --- BL-1289 (the world war) -----------------------------------------------
     // INDUSTRIALISATION.md sec A world war in every world, sec War kills people
     // (Ben, 2026-09-15, 2026-10-10/11/12). THE TARGET: inside the window

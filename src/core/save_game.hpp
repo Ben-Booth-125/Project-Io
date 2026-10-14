@@ -313,6 +313,9 @@ inline constexpr uint32_t save_game_magic =
 /// the record's existing realm name table (`era_timelapse::polity_name`) and
 /// its old name the Exploration record's entry for the same id, so no string
 /// and no field is added. No field moves, so no version bump.
+/// v23 ALSO admits 40 `late_culture_contact` in the Empires record (BL-1288
+/// alignment: the realms in contact BY REACH the late culture's lag was read
+/// against at the close; `other` = the walk). No field moves, so no version bump.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;
