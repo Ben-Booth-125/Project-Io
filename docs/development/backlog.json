@@ -1441,6 +1441,34 @@
    ],
    "title": "State builds read wrong in two places: a station under construction doesn't reduce the uncommitted treasury shown, and the player's own state building hovers as \"Competitor - output private\"",
    "design": "FOUND 2026-10-14 (rail construction UI): check state_uncommitted_treasury accounts for state construction in progress; the hover owner logic must recognise the player's nation's state buildings as the player's own."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-14",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-14, the logistics form); filed by Claude",
+   "id": "BL-1309",
+   "short_name": "LOGISTICS_ONE_POOL",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1255",
+    "BL-1296"
+   ],
+   "files": [
+    "src/world/logistics.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/construction.cpp",
+    "src/world/components.hpp",
+    "src/core/world_save.cpp"
+   ],
+   "title": "Logistic Points become one nation-held pool, made by hubs/stations/ports on their own networks, fading with distance, consumed by production",
+   "design": "DESIGNED (Ben, 2026-10-14): LOGISTICS.md § One pool. Replaces passive/active LP and city generation. Hubs (roads, tier-extended), stations (rail), ports (sea); full strength to a threshold then fade; production consumes LP, proportional output on shortfall; every building draws its host nation's pool; the nation sets shares (state/champion/firms), mechanical default in proportion to need; anyone builds sources; trade points separate; military off-network reach later. Player verb: set LP shares (ACTIONS.json, seam). Generation must seed enough sources that 1960 produces. World-mover + save bump. Then the economy pass re-ladder and the re-bless."
   }
  ]
 }

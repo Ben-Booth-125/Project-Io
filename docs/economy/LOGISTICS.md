@@ -563,6 +563,29 @@ processors that starve have their input on another market's shelf on the same bo
 Logistic Point cap, and some Marketplaces earn no trade points because their upkeep goes unpaid.
 Capacity rises, and a Marketplace's upkeep is met, so the trade the economy needs can flow.
 
+### One pool, made by buildings, consumed by production (Ben, 2026-10-14) — supersedes the bifold split below
+
+The player is a nation, so Logistic Points are **one resource held by each nation** — not split
+into passive and active. What follows replaces the bifold model, the city generation and the
+"ambient vs owned" table below; that text stands as history.
+
+- **Made only by buildings, each on its own network.** A **logistics hub** makes points carried
+  along **roads** (further on higher road tiers); a **railway station** along **rail**; a **port**
+  over **sea**. Cities make none. Anyone may build them — nations and corporations alike.
+- **Reach fades with distance.** A source's points reach at full strength out to a threshold
+  distance along its own network, then fade to zero, so a nation needs several sources to cover
+  its ground. Off the networks, points reach a few tiles to supply armies (military detail later).
+- **Production consumes them.** A producing building needs Logistic Points to produce and uses them
+  up each tick; short of its need it produces **in proportion** (half the points, half the output).
+- **The host nation's pool.** Every building on a nation's ground — its state's, its champion's,
+  other firms', foreign firms' — draws on **that nation's** pool, and a source on its ground adds to
+  it whoever built it. **The nation sets how its points are shared** among state, champion and other
+  firms; where no rule is set the share is mechanical (in proportion to need), never a scored choice.
+- **Trade points stay separate** (`TRADE.md`): how much an owner can ship, beside the capacity to
+  move and produce.
+- Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
+  **new** stations; generated rail still passes as § 4c says.
+
 BL-596 (LP active march) and BL-597 (LP passive convoys) own the build, BL-606 (throughput lens)
 the surface — all 2026-08-24, replacing the purged BL-464 umbrella. Ben, 2026-08-18: *"Let's begin codifying Logistic Points
 in this sprint. It's an important layer for military and goods transport."* The reasoning below has
