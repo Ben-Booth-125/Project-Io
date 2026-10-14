@@ -5115,7 +5115,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // (ties: the walk, then the region order). Each entry is
     // (polity, walk, first region met). Walked in region-index order; pure.
     struct lc_contact { int polity; int walk; int region; };
-    const auto lc_contact_set = [&]() -> std::vector<lc_contact> {
+    const auto lc_contact_walk = [&](bool by_sea) -> std::vector<lc_contact> {
         std::vector<lc_contact> got;
         const std::size_t pc = out.polities.size();
         const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
@@ -5132,6 +5132,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
         if (pq.empty()) return got;
         const int H = std::max(1, params.contact_diffusion_horizon);
+        // THE SEA, for an island people (Ben 2026-10-14): every land region
+        // with a coast (`port_q` > 0) on a known landmass, index order.
+        std::vector<int> coastal;
+        if (by_sea)
+            for (std::size_t i = 0; i < n_reg; ++i)
+                if (ss.regions[i].domain == region_domain::land && ss.regions[i].port_q > 0
+                    && landmass_of_region(static_cast<int>(i)) >= 0)
+                    coastal.push_back(static_cast<int>(i));
         std::vector<lc_contact> all; // in walk order
         while (!pq.empty())
         {
@@ -5154,12 +5162,42 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 dist[static_cast<std::size_t>(nb)] = cand;
                 pq.push({cand, nb});
             }
+            // A SEA STEP: from a coast to every coast on another landmass,
+            // priced as a sea leg -- the tile distance by the current along it
+            // (`sea_leg_cost_q`, still water 1000), the isolation press on
+            // its ground as on any step.
+            if (by_sea && ss.regions[static_cast<std::size_t>(r)].port_q > 0)
+            {
+                const int32_t lm = landmass_of_region(r);
+                if (lm >= 0)
+                    for (const int nb : coastal)
+                    {
+                        if (landmass_of_region(nb) == lm) continue;
+                        int raw = static_cast<int>(static_cast<int64_t>(region_distance(ss.regions[static_cast<std::size_t>(r)],
+                                      ss.regions[static_cast<std::size_t>(nb)], gw)) * sea_leg_cost_q(r, nb) / 1000);
+                        if (const int lv = lc_step_level(r, nb)) raw = lc_press_step(raw, lv);
+                        const int cand = d + std::max(1, raw);
+                        if (cand >= dist[static_cast<std::size_t>(nb)]) continue;
+                        dist[static_cast<std::size_t>(nb)] = cand;
+                        pq.push({cand, nb});
+                    }
+            }
         }
         // Inside the horizon, and never fewer than the nearest
         // `late_culture_nearest_peoples` it meets, however far.
         for (std::size_t k = 0; k < all.size(); ++k)
             if (all[k].walk < H || k < static_cast<std::size_t>(late_culture_nearest_peoples)) got.push_back(all[k]);
         return got;
+    };
+    // AN ISLAND PEOPLE IS READ ACROSS ITS SEA (Ben, 2026-10-14, EXPLORATION.md
+    // sec A colony is a subject): where the land walk cannot find even the
+    // `late_culture_nearest_peoples` it would first meet, its ground is an
+    // island, and the walk is taken again with sea steps between coasts.
+    const auto lc_contact_set = [&]() -> std::vector<lc_contact> {
+        std::vector<lc_contact> land = lc_contact_walk(false);
+        if (static_cast<int>(land.size()) >= late_culture_nearest_peoples) return land;
+        std::vector<lc_contact> sea = lc_contact_walk(true);
+        return sea.size() > land.size() ? sea : land;
     };
     const auto lc_lag_reading = [&]() -> late_culture_lag_reading {
         const std::size_t pc = out.polities.size();
