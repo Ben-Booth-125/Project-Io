@@ -294,6 +294,70 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         }
     }
 
+    // ---- THE COASTAL SEAT'S PORT (NATIONS.md § State industry, Ben 2026-10-14) ----
+    // A major whose capital stands on the coast holds a port as state industry
+    // (transport infrastructure is a strategic sector), and the state carries
+    // the trade machinery it needs: its points are the nation's, and the trade
+    // pass ships them under the nation's id (trade.cpp). One per such major,
+    // unless it already holds one; sited on the coastal tile of its own ground
+    // nearest the capital (Chebyshev on the grid, ties to territory order),
+    // founded standing and paid like the founding above.
+    for (const entity_id nid : nation_ids)
+    {
+        nation_component& nc = w.nations.at(nid);
+        const auto cap = w.tiles.find(nc.capital_tile);
+        if (cap == w.tiles.end() || !placement_rules::is_coastal(w, nc.capital_tile))
+            continue;
+        bool has_port = false;
+        for (const entity_id bid : nc.state_assets)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && bit->second.type == building_type::port)
+                has_port = true;
+        if (has_port)
+            continue;
+        std::vector<std::pair<int, entity_id>> sites; // (distance, tile), territory order kept by stable sort
+        for (const entity_id tile : nc.tiles)
+        {
+            const auto tit = w.tiles.find(tile);
+            if (tit == w.tiles.end() || tit->second.body != cap->second.body
+                || placement_rules::is_water_tile(tit->second.substrate)
+                || !placement_rules::is_coastal(w, tile))
+                continue;
+            const int d = std::max(std::abs(tit->second.grid_x - cap->second.grid_x),
+                                   std::abs(tit->second.grid_y - cap->second.grid_y));
+            sites.emplace_back(d, tile);
+        }
+        std::stable_sort(sites.begin(), sites.end(),
+                         [](const auto& a, const auto& b) { return a.first < b.first; });
+        entity_id built = null_entity;
+        for (const auto& [d, tile] : sites)
+        {
+            (void)d;
+            if (construct_state_port(w, reg, nid, tile, built, /*founding=*/true)
+                != construction_result::placed)
+                continue;
+            building_component& b = w.buildings.at(built);
+            b.ticks_remaining       = 0; // founded standing, as every generation holding
+            b.construction_progress = 0.0f;
+            const float price = construction_capex(w, reg, tile, building_type::port, resource_type::iron_ore);
+            const float paid  = std::min(std::max(0.0f, nc.treasury), price);
+            nc.treasury        -= paid;
+            b.construction_paid = paid;
+            invalidate_logistics_caches(w); // a new supply anchor
+            world_history_entry e;
+            e.timestamp = w.current_day_tick;
+            e.topic     = history_topic::agency;
+            e.body      = cap->second.body;
+            e.corp      = champion_of(w, nid);
+            e.event     = "State charter: " + nc.name + " founds a state port at its coastal seat"
+                        + std::string(paid < price ? ", its treasury short of the price" : "");
+            w.history_log.push_back(std::move(e));
+            break;
+        }
+        if (built != null_entity) { ++out.ports_founded; out.port_buildings.push_back(built); }
+        else ++out.ports_unplaced;
+    }
+
     for (const entity_id nid : nation_ids)
         out.per_nation.emplace_back(nid, static_cast<int>(w.nations.at(nid).state_assets.size()));
     return out;
@@ -336,6 +400,7 @@ void print_state_handover(const state_handover_report& r)
         if (!f.chain_feasible) ++infeasible;
         short_by += f.price - f.paid;
     }
+    std::printf(" %d state port(s) at coastal seats (%d with no ground);", r.ports_founded, r.ports_unplaced);
     std::printf(" %d founded (%d not chain-feasible, %d with nowhere to stand; treasuries short %.1f);",
                 founded, infeasible, unfounded, static_cast<double>(short_by));
 

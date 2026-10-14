@@ -43,13 +43,19 @@ std::map<entity_id, float> market_trade_points(const world& w, const recipe_regi
                                                const economy_report* report, entity_id corp)
 {
     std::map<entity_id, float> out;
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // A corporation's trade buildings, or a nation's STATE ones (its coastal
+    // seat's port, Ben 2026-10-14): the state carries the trade machinery.
+    const std::vector<entity_id>* assets = nullptr;
+    if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
+        assets = &cit->second.assets;
+    else if (const auto nit = w.nations.find(corp); nit != w.nations.end())
+        assets = &nit->second.state_assets;
+    else
         return out;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : *assets)
     {
         const auto bit = w.buildings.find(bid);
-        if (bit == w.buildings.end() || !trade_building_active(bit->second))
+        if (bit == w.buildings.end() || !trade_building_active(bit->second) || bit->second.state_idle)
             continue;
         const entity_id mid = market_for_tile(w, bit->second.tile);
         if (mid == null_entity)
@@ -219,13 +225,30 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     // Ben, 2026-10-10 (NR-1018): each trade building makes its points for the
     // MARKET it stands in, and they are spent on trades leaving that market.
     std::map<entity_id, std::map<entity_id, float>> points; // corp -> market -> points
+    // Then every nation holding state trade buildings, ascending id, AFTER the
+    // corporations (a fixed order): the state port's points (Ben, 2026-10-14).
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            for (const entity_id bid : nc.state_assets)
+                if (const auto bit = w.buildings.find(bid);
+                    bit != w.buildings.end() && (bit->second.type == building_type::port
+                                                 || bit->second.type == building_type::planetary_marketplace))
+                {
+                    nids.push_back(nid);
+                    break;
+                }
+        std::sort(nids.begin(), nids.end());
+        corp_ids.insert(corp_ids.end(), nids.begin(), nids.end());
+    }
     for (const entity_id corp : corp_ids)
     {
         std::map<entity_id, float> pm = market_trade_points(w, reg, &report, corp);
         float p = 0.0f;
         for (const auto& [mid, v] : pm)
             p += v;
-        w.corporations.at(corp).trade_points = p;
+        if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
+            cit->second.trade_points = p;
         if (p > 0.0f)
         {
             points[corp] = std::move(pm);
@@ -299,13 +322,15 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
 
         for (auto& [corp, mpts] : points)
         {
-            const corporation_component& cc = w.corporations.at(corp);
             float made = 0.0f;
             for (const auto& [mid, v] : mpts)
                 made += v;
             // ONE reserve per corporation (Ben, 2026-10-10): the points held
             // back from auto for its manual trades, clamped to what it makes.
-            float reserve_left = std::clamp(cc.trade_reserve, 0.0f, made);
+            // A nation's state port reserves nothing: it runs auto alone.
+            const auto ccit = w.corporations.find(corp);
+            float reserve_left = (ccit != w.corporations.end())
+                ? std::clamp(ccit->second.trade_reserve, 0.0f, made) : 0.0f;
 
             // --- MANUAL: the owner's trades, in placement order, spend the
             // reserve out of the points of the market each one leaves.

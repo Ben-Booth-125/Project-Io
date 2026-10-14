@@ -257,7 +257,12 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                 if (bit == w.buildings.end()) { ok = false; why = "dangling id"; continue; }
                 const auto tn = w.tile_to_nation.find(bit->second.tile);
                 if (tn == w.tile_to_nation.end() || tn->second != nid) { ok = false; why = "off its ground"; }
-                if (!state_runs(reg, bit->second.type, bit->second.recipe)) { ok = false; why = "not a state sector"; }
+                // A processor must be one the state runs; a port (the coastal
+                // seat's, Ben 2026-10-14) is transport infrastructure.
+                if (bit->second.type == building_type::processing_facility
+                        ? !state_runs(reg, bit->second.type, bit->second.recipe)
+                        : strategic_sector_of(reg, bit->second) == strategic_sector::none)
+                { ok = false; why = "not a state sector"; }
                 if (corp_owned.count(bid)) { ok = false; why = "also corp-owned"; }
                 if (!seen.insert(bid).second) { ok = false; why = "listed twice"; }
                 if (building_owner_of(w, bid).kind != owner_kind::nation
@@ -271,6 +276,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         std::set<entity_id> passed, founded_ids;
         for (const state_founding& f : rep.founded)
             if (f.building != null_entity) founded_ids.insert(f.building);
+        for (const entity_id b : rep.port_buildings) founded_ids.insert(b); // founded, not passed
         for (const auto& [nid, nc] : w.nations)
             for (const entity_id b : nc.state_assets)
                 if (!founded_ids.count(b)) passed.insert(b);
@@ -292,6 +298,26 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                 }
         }
         check(champ_ok, "S1d", "every champion and specialist kept exactly its holdings");
+        // S1h (NATIONS.md § State industry, Ben 2026-10-14): every major whose
+        // capital stands on the coast holds a state port, on its own coast.
+        {
+            bool port_ok = true;
+            int coastal = 0;
+            for (const auto& [nid, nc] : w.nations)
+            {
+                if (!is_major_nation(w, nid) || !placement_rules::is_coastal(w, nc.capital_tile)) continue;
+                ++coastal;
+                bool has = false;
+                for (const entity_id b : nc.state_assets)
+                    if (const auto bit = w.buildings.find(b); bit != w.buildings.end()
+                        && bit->second.type == building_type::port && placement_rules::is_coastal(w, bit->second.tile))
+                        has = true;
+                if (!has) port_ok = false;
+            }
+            check(port_ok && rep.ports_unplaced == 0, "S1h",
+                  fmt("every major with a coastal capital holds a state port (%d coastal, %d founded)",
+                      coastal, rep.ports_founded));
+        }
         check(firm_ok && lost_all == passed, "S1e",
               fmt("background firms lost only what passed, and all of it came from them (%zu)",
                   passed.size()));
