@@ -6465,6 +6465,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // ascending index and neighbour lists in stored order.
             if (params.rail_treasury_cost > 0 && y >= params.rail_open_year)
             {
+                // Up to `rail_links_per_round` passes, each laying at most one link
+                // per realm (polities in stored order every pass).
+                for (int rail_pass = 0; rail_pass < params.rail_links_per_round; ++rail_pass)
                 for (polity& q : out.polities)
                 {
                     if (!q.alive || q.industrial_year == k_never_industrialised) continue;
@@ -6473,8 +6476,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
                     if (seat.treasury < params.rail_treasury_cost) continue;
 
-                    // The realm's line: regions joined to the capital by links,
-                    // through ground it still holds.
+                    // The realm's line: regions joined to the capital by the links
+                    // it laid, through anyone's ground (lines cross borders).
                     std::vector<char> on_line(ss.regions.size(), 0);
                     on_line[static_cast<std::size_t>(q.capital)] = 1;
                     for (bool grew = true; grew;)
@@ -6483,7 +6486,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         for (const history_rail_link& l : out.rail_links)
                         {
                             if (l.a >= ss.regions.size() || l.b >= ss.regions.size()) continue;
-                            if (ss.regions[l.a].nation != q.id || ss.regions[l.b].nation != q.id) continue;
+                            if (l.polity != static_cast<int32_t>(q.id)) continue; // its own line, wherever it runs
                             if (on_line[l.a] != on_line[l.b]) { on_line[l.a] = on_line[l.b] = 1; grew = true; }
                         }
                     }
@@ -6497,12 +6500,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     int best_a = -1, best_b = -1, best_uses = -1;
                     for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
                     {
-                        if (!on_line[hi] || ss.regions[hi].nation != q.id) continue;
+                        if (!on_line[hi]) continue;
                         if (hi >= neighbours.size()) continue;
                         for (int nb : neighbours[hi])
                         {
                             if (nb < 0 || static_cast<std::size_t>(nb) >= ss.regions.size()) continue;
-                            if (ss.regions[static_cast<std::size_t>(nb)].nation != q.id) continue;
+                            // LINES CROSS BORDERS (Ben, 2026-10-14): the next region may be
+                            // any realm's ground along the corridor; the track there is the
+                            // ground owner's at the fold (ownership follows ground).
                             if (on_line[static_cast<std::size_t>(nb)]) continue; // the line reaches it
                             if (road_tier_between(static_cast<int>(hi), nb) < 1) continue;
                             if (railed(static_cast<int>(hi), nb)) continue;

@@ -952,8 +952,8 @@ struct history_sim_params
     /// RAIL, the span's first sink. A realm that leans into works -- read in
     /// the sim as one that has crossed its industrial moment (`industrial_year`
     /// set) -- spends treasury laying ONE rail link per decision round from
-    /// its capital outward: an existing road corridor between two of its own
-    /// regions, one end already on its line (the capital starts it), the
+    /// its capital outward: an existing road corridor, one end already on its
+    /// line (the capital starts it), the other ANY realm's region (lines cross borders, Ben 2026-10-14),
     /// corridor chosen by its live traffic (busiest first, ties to the lower
     /// pair), paid from the capital's `region::treasury`. ZERO DISABLES IT, and
     /// only `industrialisation_sim_params` sets it, so every other span and
@@ -963,6 +963,9 @@ struct history_sim_params
     /// BL-1255: the first year a link may be laid (the railway's own date --
     /// no polity holds technology in generation, TREES.md).
     int64_t rail_open_year     = 1830;
+    /// BL-1255: how many links a works-leaning realm may lay per decision round
+    /// (one per pass, `rail_treasury_cost` each). In-band calibration.
+    int     rail_links_per_round = 1;
 
     /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
     /// supply currency `campaign_supply` already prices. At or below this,

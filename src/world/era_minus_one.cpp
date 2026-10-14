@@ -617,6 +617,7 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // rail, Ben 2026-10-13). On in this span only. The price per link is a dial
     // read off the sweep (history_sim_harness's rail line): see the field.
     hp.rail_treasury_cost = 5000000;
+    hp.rail_links_per_round = 2; // BL-1255 calibration (railway_harness shift sweep)
 
     // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
     // Far pairs meet and bind, and this phase makes them: "far pairs bind across
