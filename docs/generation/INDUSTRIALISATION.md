@@ -620,7 +620,11 @@ stockpile becomes its charter budget (property 1).
 
 **Who lays rail (Ben, 2026-10-13):** realms that lean into works spend treasury laying track on their
 busiest corridors from the city, with a station at each city a line serves; the track and stations
-pass to the nation at the fold as state industry (a major's) or to background firms (a minor's).
+pass to the nation at the fold as state industry (a major's) or to background firms (a minor's). **Lines cross borders (Ben, 2026-10-14):**
+a realm's line may run into a neighbour's ground along the busiest road corridors, and a major's line
+may reach a minor's market city, so rail joins the cities trade actually flows between. Track on
+another nation's ground belongs to that nation's state (or a minor's background firm), as ownership
+always follows ground.
 
 **The works lean: some polities spend into rail and force, others stockpile and charter.** That is
 a derived disposition, not a flag, and it is why two equally industrial powers open the campaign
