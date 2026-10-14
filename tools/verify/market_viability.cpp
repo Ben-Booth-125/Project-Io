@@ -499,6 +499,8 @@ struct seed_reading
     int t_short_empty[resource_count] = {}, t_short_ceiling[resource_count] = {};
     double secs_build = 0.0, secs_settle = 0.0, secs_play = 0.0;
     int    decom_at_build = 0, proc_at_build = 0; ///< processors when the world is handed to the settle
+    int    port_at_build = 0, port_decom_at_build = 0, port_building_at_build = 0; ///< BL-1306: ports as handed to the settle
+    int    trade_corps_at_build = 0; ///< BL-1306: corporations of trade focus (the port archetype)
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
     // G4
     entity_id seat = null_entity;
@@ -1056,9 +1058,20 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     for (const auto& [bid, b] : w.buildings)
     {
         (void)bid;
+        if (b.type == building_type::port)
+        {
+            ++r.port_at_build;
+            if (b.decommissioned) ++r.port_decom_at_build;
+            else if (b.ticks_remaining > 0) ++r.port_building_at_build;
+        }
         if (b.type != building_type::processing_facility) continue;
         ++r.proc_at_build;
         if (b.decommissioned) ++r.decom_at_build;
+    }
+    for (const auto& [cid, cc] : w.corporations)
+    {
+        (void)cid;
+        if (cc.focus == industrial_focus::trade) ++r.trade_corps_at_build;
     }
     last_row_map last_row;
 
@@ -1400,6 +1413,9 @@ int main(int argc, char** argv)
         if (!r.built) { std::fflush(stdout); continue; }
         std::printf(" G1 processors  (as handed to the settle: %d, %d of them decommissioned)\n",
                     r.proc_at_build, r.decom_at_build);
+        std::printf(" ports as handed to the settle: %d (decommissioned %d, under construction %d);"
+                    " trade-focus corporations %d\n",
+                    r.port_at_build, r.port_decom_at_build, r.port_building_at_build, r.trade_corps_at_build);
         print_tally("handoff", r.g1_handoff);
         print_tally("tick 50", r.g1_t50);
         std::printf(" G2 field income/tick  settle close %10.0f  tick 50 %10.0f  ratio %5.1f%%"
