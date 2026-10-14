@@ -45,6 +45,8 @@
 #include "world/construction.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/logistics.hpp"
+#include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
+#include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/placement_rules.hpp"
 #include "world/stance.hpp"
@@ -4205,6 +4207,126 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["levers_ok"]      = (c.levers_for != null_entity);
         out["levers_for"]     = static_cast<unsigned>(c.levers_for);
         return out;
+    });
+
+    // === BL-1255 (rail construction UI): rail_construction.lua ===
+    //
+    // What the Rail group and its canvas tool left in the world and on screen: the
+    // seat nation's uncommitted treasury, its track tiles and stations, the planned
+    // run, the armed tool, the last outcome line, and where the group's presses
+    // landed this frame (so a check presses the REAL control).
+    v.set_function("rail_state", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const entity_id nation = ui::rail_player_nation(m_world);
+        int track = 0, stations = 0;
+        for (const auto& [t, o] : m_world.rail_track)
+            if (o == nation) { (void)t; ++track; }
+        if (const auto nit = m_world.nations.find(nation); nit != m_world.nations.end())
+            for (const entity_id b : nit->second.state_assets)
+                if (const auto bit = m_world.buildings.find(b);
+                    bit != m_world.buildings.end() && bit->second.type == building_type::railway_station)
+                    ++stations;
+        const auto& c = m_ui.construction_ui;
+        out["nation"]    = static_cast<unsigned>(nation);
+        out["treasury"]  = nation != null_entity ? state_uncommitted_treasury(m_world, nation) : 0.0f;
+        out["track"]     = track;
+        out["stations"]  = stations;
+        out["run"]       = static_cast<int>(m_ui.construction.rail_run.size());
+        out["tool"]      = static_cast<int>(m_ui.construction.rail);
+        out["message"]   = m_ui.construction.rail_message;
+        out["track_x"]   = c.rail_track_x;   out["track_y"]   = c.rail_track_y;
+        out["station_x"] = c.rail_station_x; out["station_y"] = c.rail_station_y;
+        out["commit_x"]  = c.rail_commit_x;  out["commit_y"]  = c.rail_commit_y;
+        out["steel_per_tile"] = m_registry.rail().track_steel_per_tile;
+        out["track_cost"]     = m_registry.rail().track_build_cost;
+        return out;
+    });
+
+    // A FIXTURE: a city of the seat nation on the active body with no track yet,
+    // and a two-tile path of the nation's untracked land leading off it — the
+    // three grid positions only (the tile_screen idiom; nothing about the ground).
+    // With @p stock, the city's market shelf is topped up to 50 steel so a short
+    // run can be bought (track buys real steel, construction.cpp lay_track).
+    // Returns the market's steel before/after so the check can assert the draw.
+    v.set_function("rail_fixture", [this](bool stock) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        out["ok"] = false;
+        const entity_id nation = ui::rail_player_nation(m_world);
+        if (nation == null_entity)
+            return out;
+        const auto own_free = [&](entity_id t) {
+            const auto tit = m_world.tiles.find(t);
+            const auto tn  = m_world.tile_to_nation.find(t);
+            return tit != m_world.tiles.end() && !is_water(tit->second.substrate)
+                && m_world.rail_track.count(t) == 0 && tn != m_world.tile_to_nation.end()
+                && tn->second == nation;
+        };
+        const auto nbrs = [&](entity_id t) {
+            std::vector<entity_id> r;
+            const tile_component& tc = m_world.tiles.at(t);
+            const body_component& b  = m_world.bodies.at(tc.body);
+            const std::vector<entity_id>& grid = body_tile_grid(m_world, tc.body);
+            const int x = tc.grid_x, y = tc.grid_y, gw = b.grid_width, gh = b.grid_height;
+            const int c[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                              y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+            for (const int i : c)
+                if (i >= 0 && static_cast<std::size_t>(i) < grid.size())
+                    r.push_back(grid[static_cast<std::size_t>(i)]);
+            return r;
+        };
+        for (const auto& [centre, ctile] : m_world.population_centre_tile)
+        {
+            (void)centre;
+            const auto cit = m_world.tiles.find(ctile);
+            if (cit == m_world.tiles.end() || cit->second.body != m_ui.active_body || !own_free(ctile))
+                continue;
+            for (const entity_id n1 : nbrs(ctile))
+            {
+                if (!own_free(n1))
+                    continue;
+                for (const entity_id n2 : nbrs(n1))
+                {
+                    if (n2 == ctile || !own_free(n2))
+                        continue;
+                    const tile_component& a = cit->second;
+                    const tile_component& b = m_world.tiles.at(n1);
+                    const tile_component& d = m_world.tiles.at(n2);
+                    out["ok"] = true;
+                    out["cx"] = a.grid_x; out["cy"] = a.grid_y;
+                    out["x1"] = b.grid_x; out["y1"] = b.grid_y;
+                    out["x2"] = d.grid_x; out["y2"] = d.grid_y;
+                    const std::size_t si = static_cast<std::size_t>(resource_type::steel);
+                    float before = 0.0f, after = 0.0f;
+                    if (const auto mit = m_world.markets.find(market_for_tile(m_world, ctile));
+                        mit != m_world.markets.end())
+                    {
+                        before = mit->second.inventory[si];
+                        if (stock && before < 50.0f)
+                            mit->second.inventory[si] = 50.0f;
+                        after = mit->second.inventory[si];
+                    }
+                    out["steel_before"] = before;
+                    out["steel"]        = after;
+                    return out;
+                }
+            }
+        }
+        return out;
+    });
+
+    // The steel on the shelf of the market serving grid tile (@p x, @p y) on the
+    // active body — read back after a run to assert the purchase drew it.
+    v.set_function("rail_market_steel", [this](int x, int y) -> double {
+        const auto bit = m_world.bodies.find(m_ui.active_body);
+        if (bit == m_world.bodies.end()) return -1.0;
+        const std::vector<entity_id>& grid = body_tile_grid(m_world, m_ui.active_body);
+        const int i = y * bit->second.grid_width + x;
+        if (x < 0 || y < 0 || static_cast<std::size_t>(i) >= grid.size()) return -1.0;
+        const auto mit = m_world.markets.find(market_for_tile(m_world, grid[static_cast<std::size_t>(i)]));
+        return mit == m_world.markets.end() ? -1.0
+             : static_cast<double>(mit->second.inventory[static_cast<std::size_t>(resource_type::steel)]);
     });
 
     // === Sprint 50: the air gate and the sea-route lane (air_gate.lua, sea_lane.lua) ===

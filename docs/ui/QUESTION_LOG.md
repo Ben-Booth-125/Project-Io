@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**67 surfaces** — 7 settled, 60 awaiting Ben's wording.
+**68 surfaces** — 7 settled, 61 awaiting Ben's wording.
 
 ---
 
@@ -329,6 +329,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** A player deciding whether a locality is worth a mine asks about the locality, not one hex, and the data model holds population on centres, not tiles - so the province is the grain of the answer, with the selected tile serving only to name which province is meant. BL-598 had made the province readings SECTIONS of a paged tile accordion; Ben's 2026-10-13 tile pass (BL-1312 (tile card split)) gave them one titled card of their own beside the tile card, with no pager, because everything the province answers fits one card. The former Buildings and Deposits sections were two readings of the same rows, so they are one table - Built (extraction sites standing), Max (placement capacity, through the same can_place / stack_capacity the build button uses, so the table cannot disagree with it) and Resource (the summed deposit, a stock) - richest deposit first. Capacity became a BAR because standing-against-ceiling is a proportion, and its hover names WHERE the ceiling is granted - area, habitability, infrastructure and population with their shares, read from measure_province_sustain so the tooltip cannot disagree with the ceiling it explains. Ocean and unpartitioned ground says it has no province and falls back to the tile's own deposits. Round 2 (Ben, 2026-10-13): the card itself never scrolls - the header row carries the title, a narrowed capacity bar and the population figure at its right end, the list of population centres moved into that figure's hover, and the resource table takes the remaining height and scrolls inside its own rows, because the table is the part a player reads down and the centre list is the part they ask about.
 
 *Demanded by BL-511, BL-598, BL-1312 · `src/ui/selection_panel.cpp`, `src/world/province.hpp` · id `province_card`*
+
+### Construction ledger - Construction view - Rail group (Lay track / Railway station tools, the planned run's price, and their Planetary-canvas preview)
+
+**Answers:** Where can my nation lay rail and stand stations, what will this run cost the treasury in credits, steel and upkeep before I commit, and why was a tile refused?
+
+**Because:** Rail is the nation's state industry (LOGISTICS.md § 4c; NATIONS.md § State industry): track costs the treasury per tile plus steel bought off the tile market's shelf, with upkeep per tile after, so a run is a priced commitment whose total the player must see BEFORE paying - a tile-by-tile build with a post-hoc toast would let a line strand halfway on an empty shelf. It lives in Construction (Ben, 2026-10-14: 'they can go in construction') as one group of two toggles, because track is a drawn path and a station a point - neither fits the per-tile build bar, which needs a selected tile. Track is PLANNED on the map (click or drag, click the last tile to undo) and LAID by one press, so the price line is the plan's; a station's legal tiles are ringed on the canvas so the player is never asked to guess the 'city touching track' rule. Refusals are named in the words of the door: no steel on the shelf, the treasury cannot cover it, track cannot go there.
+
+*Demanded by BL-1255 · `src/ui/rail_tool.cpp`, `src/ui/rail_tool.hpp`, `src/ui/construction_panel.cpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp` · id `rail_group`*
 
 ### Resource lens (Planetary canvas) — the washed-clear map, the toggled deposit set with split tiles, and its search-and-checklist key
 

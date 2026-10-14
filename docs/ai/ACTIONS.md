@@ -318,9 +318,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The player runs its nation's strategic sectors — steel, energy, arms, space — beside its champion's private book (NATIONS.md § State industry). Build a state plant where the nation needs strategic capacity its firms will not supply; dial or idle one whose costs the treasury should not carry; demolish one to dispose of it (there is no privatisation verb).
 
-### `gameplay.lay_track` — The command seam only (--serve / MCP `issue_command` verb `lay_track` with `nation`, and the verify API's `corp_command{verb=lay_track, as_nation=...}`). No canvas control yet: the rail rendering and its build tool are a separate lane (RENDERING.md).
+### `gameplay.lay_track` — Construction ledger > Construction view > Rail group > 'Lay track' (a toggle that arms the track tool on the Planetary canvas), then map clicks/drags plan a run and 'Lay planned track' commits it. Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`).
 
-**Press.** Issue corp_verb 36 (`lay_track`) with `corp` = the seat, `nation` = the seat's home nation and `tile` = the tile to lay.
+**Press.** UI: press 'Lay track' in the Rail group (pressing it again disarms it); click a start tile (a city of the seat nation, or a tile touching its own line), then click or drag each next tile (cardinal neighbour of the run's last tile; clicking the last tile un-plans it, clicking an earlier one cuts the run back to it); read the per-tile and total cost, steel and upkeep; press 'Lay planned track'. The UI issues corp_verb 36 (`lay_track`) once per planned tile in lay order, `corp` = the seat, `nation` = the seat's home nation, stopping at the first refusal (named inline: no steel on the shelf / the treasury cannot cover it / track cannot go there / no railway in this era). Seam: issue corp_verb 36 with `corp`, `nation` and `tile` directly.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -340,9 +340,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Cheapen the nation's long land hauls: a line between two cities with stations moves goods at a fraction of the road's cost per tile, so markets far apart overland trade where they could not.
 
-### `gameplay.build_station` — The command seam only (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`). No canvas control yet (a separate lane).
+### `gameplay.build_station` — Construction ledger > Construction view > Rail group > 'Railway station' (a toggle that arms the station tool; legal tiles are ringed on the Planetary canvas), then a click on a ringed city tile. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`).
 
-**Press.** Issue corp_verb 0 (`build`) with `type` = 11 (railway_station), `tile` = a city tile touching the nation's track, `corp` = the seat and `nation` = the seat's home nation.
+**Press.** UI: press 'Railway station' in the Rail group (pressing it again disarms it), then click a ringed tile - a city of the seat nation with track on it or a cardinal neighbour and no station yet; the ledger shows the station's build cost under the cursor and its upkeep. The UI issues corp_verb 0 (`build`) with `type` = 11 (railway_station), `tile`, `corp` = the seat and `nation` = the seat's home nation, and words the outcome in the Rail group. Seam: issue the same command directly.
 
 | Arg | Type | Meaning |
 |---|---|---|

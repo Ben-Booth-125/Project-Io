@@ -13,6 +13,7 @@
 #include <unordered_set>
 #include <vector>
 #include <vector>
+#include <vector>
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
 /// The minimap shows the rung one step *out* (towards solar) from this.
@@ -166,6 +167,16 @@ struct unit_marker_summary
 /// app executes against the world (build-cost spend + world mutation, via
 /// construction.hpp). The per-tile build entry also lives on the tile Selection
 /// element (the build front door, SELECTION.md).
+/// BL-1255 (rail construction UI): which rail tool the Construction view's Rail
+/// group has armed on the planetary canvas. Rail is the seat NATION's state
+/// industry (LOGISTICS.md § 4c), so both tools act for the nation.
+enum class rail_tool : std::uint8_t
+{
+    none,    ///< Disarmed: the canvas click selects as usual.
+    track,   ///< Lay track: clicks/drags plan a run of tiles, committed from the ledger.
+    station, ///< Railway station: a click on a legal city tile builds one.
+};
+
 struct construction_state
 {
     bool          active = false;                          ///< Whether placement mode is engaged (set by the construction panel's Build section).
@@ -193,6 +204,22 @@ struct construction_state
     /// `null_entity` = nothing pending; `pending_road_tier` carries which tier (1/2/3) to place.
     entity_id     pending_road_tile = null_entity;
     std::uint8_t  pending_road_tier = 1;
+
+    /// BL-1255 (rail construction UI). `rail` is the armed rail tool (a toggle in
+    /// the Rail group; arming it disarms building placement). `rail_run` is the
+    /// PLANNED track, tiles in lay order — nothing is laid until the ledger's
+    /// Lay track press sets `pending_rail_commit`, which app::render executes as
+    /// one lay_track command per tile through apply_corp_command, stopping at the
+    /// first refusal. `pending_station_tile` is a station press on the canvas
+    /// (build type 11 for the nation). `rail_hover` is the tile under the cursor
+    /// while a rail tool is armed (published by the canvas, read by the ledger's
+    /// per-tile price line). `rail_message` words the last outcome.
+    rail_tool              rail = rail_tool::none;
+    std::vector<entity_id> rail_run;
+    bool                   pending_rail_commit  = false;
+    entity_id              pending_station_tile = null_entity;
+    entity_id              rail_hover           = null_entity;
+    std::string            rail_message;
 
     /// Pending hire-unit request (BL-324) — set by the build front door's Hire
     /// affordance (the construction ledger's roster section) and executed by
@@ -271,6 +298,12 @@ struct construction_state
 /// VIEW state, not serialised.
 struct construction_controls
 {
+    float     rail_track_x   = -1.0f; ///< BL-1255: the Rail group's Lay track tool toggle.
+    float     rail_track_y   = -1.0f;
+    float     rail_station_x = -1.0f; ///< BL-1255: the Railway station tool toggle.
+    float     rail_station_y = -1.0f;
+    float     rail_commit_x  = -1.0f; ///< BL-1255: the planned run's Lay track (commit) press.
+    float     rail_commit_y  = -1.0f;
     float     tab_x[2]      = {-1.0f, -1.0f}; ///< The two tab buttons; index = panel_view (0 Construction, 1 Buildings).
     float     tab_y[2]      = {-1.0f, -1.0f};
 
@@ -793,6 +826,11 @@ struct ui_state
     /// The province under the cursor this frame, or 0. Written by the Planetary
     /// canvas draw pass from the hovered tile; drives the province hover outline.
     uint32_t hovered_province = 0;
+
+    /// BL-1255: a Lay track drag is live — the press planned a tile and the
+    /// button is still down, so newly hovered tiles extend the run. Canvas
+    /// gesture state, not serialised.
+    bool rail_drag_live = false;
 
     // --- The selected battle (BL-469) ------------------------------------
     // Keyed by (province, attacker, defender), exactly as `active_battle` is,

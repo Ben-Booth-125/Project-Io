@@ -10,6 +10,7 @@
 #include <SDL3/SDL.h>
 
 #include "ui/body_surface_canvas.hpp"
+#include "ui/rail_tool.hpp" // BL-1255: rail_player_nation for the Rail group presses
 #include "ui/canvas_command.hpp"
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
@@ -2930,6 +2931,75 @@ void app::render()
                 m_ui.construction.last_message = "Road placement failed."; break;
         }
         m_ui.construction.pending_road_tile = null_entity; // consume the request
+    }
+
+    // BL-1255 (rail construction UI): the Rail group's presses. Track is laid as
+    // ONE lay_track command per planned tile, in lay order, through the same
+    // apply_corp_command seam the wire validates; the player takes no shortcut.
+    // The first refusal stops the run (later tiles extend the refused one) and
+    // is worded; the tiles already laid stay laid and leave the plan.
+    if (m_ui.construction.pending_rail_commit)
+    {
+        m_ui.construction.pending_rail_commit = false;
+        const entity_id nation = ui::rail_player_nation(m_world);
+        std::vector<entity_id>& run = m_ui.construction.rail_run;
+        std::size_t laid = 0;
+        std::string why;
+        for (; laid < run.size(); ++laid)
+        {
+            const entity_id t = run[laid];
+            // Name the steel shortfall before the seam folds it into rejected_funds.
+            const float steel = m_registry.rail().track_steel_per_tile;
+            const auto mit = m_world.markets.find(market_for_tile(m_world, t));
+            const bool shelf_short = steel > 0.0f
+                && (mit == m_world.markets.end()
+                    || !(mit->second.inventory[static_cast<std::size_t>(resource_type::steel)] >= steel));
+            corp_command cmd;
+            cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp      = m_world.player_entity;
+            cmd.verb      = corp_verb::lay_track;
+            cmd.tile      = t;
+            cmd.as_nation = nation;
+            const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+            if (r == corp_command_result::applied)
+                continue;
+            why = r == corp_command_result::rejected_funds
+                      ? (shelf_short ? "no steel on the shelf" : "the treasury cannot cover it")
+                  : r == corp_command_result::rejected_era_locked ? "no railway in this era"
+                  : r == corp_command_result::rejected_placement  ? "track cannot go there"
+                                                                  : "refused";
+            break;
+        }
+        if (laid > 0)
+            m_ground.touch(); // the rail surface re-bakes now
+        char msg[160];
+        if (why.empty())
+            std::snprintf(msg, sizeof msg, "Laid %zu tile%s of track.", laid, laid == 1 ? "" : "s");
+        else
+            std::snprintf(msg, sizeof msg, "Laid %zu tile%s; stopped: %s.", laid,
+                          laid == 1 ? "" : "s", why.c_str());
+        m_ui.construction.rail_message = msg;
+        run.erase(run.begin(), run.begin() + static_cast<std::ptrdiff_t>(laid));
+    }
+    if (m_ui.construction.pending_station_tile != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::build;
+        cmd.type      = building_type::railway_station;
+        cmd.tile      = m_ui.construction.pending_station_tile;
+        cmd.as_nation = ui::rail_player_nation(m_world);
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        m_ui.construction.rail_message =
+            r == corp_command_result::applied             ? "Railway station started."
+          : r == corp_command_result::rejected_funds      ? "The treasury cannot cover the station."
+          : r == corp_command_result::rejected_placement  ? "A station cannot stand there."
+          : r == corp_command_result::rejected_era_locked ? "No railway in this era."
+                                                          : "Station refused.";
+        if (r == corp_command_result::applied)
+            m_ground.touch();
+        m_ui.construction.pending_station_tile = null_entity;
     }
 
     // Execute any hire-unit request queued this frame by the build front door's
