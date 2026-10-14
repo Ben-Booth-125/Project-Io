@@ -138,6 +138,15 @@ construction_result construct_state_station(world& w, const recipe_registry& reg
                                             entity_id nation, entity_id tile,
                                             entity_id& out_building);
 
+/// Sprint 53 (NATIONS.md § State industry, "A major's coastal seat has a state
+/// port", Ben 2026-10-14): build a PORT for @p nation's state industry on
+/// @p tile, a coastal tile of its own ground. @p founding as for
+/// construct_state_building: the fold's port skips the commitment gate (the
+/// founder pays its capex itself).
+construction_result construct_state_port(world& w, const recipe_registry& reg,
+                                         entity_id nation, entity_id tile,
+                                         entity_id& out_building, bool founding);
+
 /// BL-1255: what laying one track tile on @p tile costs — `rail.track_build_cost`
 /// plus `rail.track_steel_per_tile` steel at the tile market's posted price.
 float track_tile_cost(const world& w, const recipe_registry& reg, entity_id tile);

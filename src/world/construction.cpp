@@ -334,6 +334,25 @@ construction_result construct_state_building(world& w, const recipe_registry& re
                          nit->second.state_assets);
 }
 
+construction_result construct_state_port(world& w, const recipe_registry& reg,
+                                         entity_id nation, entity_id tile,
+                                         entity_id& out_building, bool founding)
+{
+    out_building = null_entity;
+    const auto nit = w.nations.find(nation);
+    const entity_id champion = champion_of(w, nation);
+    if (nit == w.nations.end() || champion == null_entity)
+        return construction_result::no_corp; // no major nation to own it
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end() || tn->second != nation)
+        return construction_result::invalid_tile; // on its own ground
+    return construct_for(w, reg, champion, tile, building_type::port,
+                         resource_type::iron_ore, out_building, no_recipe,
+                         founding ? std::numeric_limits<float>::max()
+                                  : state_uncommitted_treasury(w, nation),
+                         nit->second.state_assets);
+}
+
 construction_result construct_state_station(world& w, const recipe_registry& reg,
                                             entity_id nation, entity_id tile,
                                             entity_id& out_building)

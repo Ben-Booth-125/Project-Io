@@ -102,6 +102,11 @@ struct state_handover_report
     /// BL-1296 fix round (Ben, 2026-10-14): every major left with no state
     /// building after the handover FOUNDS one, ascending nation id.
     std::vector<state_founding> founded;
+    /// Sprint 53 (Ben, 2026-10-14): ports a major with a coastal capital took
+    /// as state industry at the fold, and majors whose coastal seat found no
+    /// ground for one.
+    int ports_founded = 0, ports_unplaced = 0;
+    std::vector<entity_id> port_buildings; ///< the ports founded, in nation order
     /// Per major, ascending nation id: (nation, buildings it now owns).
     std::vector<std::pair<entity_id, int>> per_nation;
 };

@@ -924,8 +924,16 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
 {
     convoy_leg leg;
 
-    const auto cit = w.corporations.find(corp_id);
-    if (cit == w.corporations.end())
+    // Sprint 53 (NATIONS.md § State industry, Ben 2026-10-14): a major's state
+    // port trades under the NATION's id -- the state carries the trade machinery
+    // -- so the trader is a corporation or a nation; its home nation is the one
+    // whose held nodes price the haul.
+    entity_id home = null_entity;
+    if (const auto cit = w.corporations.find(corp_id); cit != w.corporations.end())
+        home = cit->second.home_nation;
+    else if (w.nations.find(corp_id) != w.nations.end())
+        home = corp_id;
+    else
         return leg;
     // BL-1265: a trade moves goods from one market's shelf to another's.
     // Moving goods into the market they already sit on is not a haul.
@@ -950,7 +958,6 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     if (!std::isfinite(qty) || !(qty > 0.0f))
         return leg;
 
-    const corporation_component& corp        = cit->second;
     const market_component&      dest_market = mit->second;
     const entity_id              dest_body   = dest_market.body;
 
@@ -962,7 +969,7 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     const auto nation_haul = [&](float haul) {
         effect_target at;
         at.resource = static_cast<int>(ri);
-        return nation_scalar(w, corp.home_nation, modifier_subject::logistics_cost, at, haul);
+        return nation_scalar(w, home, modifier_subject::logistics_cost, at, haul);
     };
 
     if (src_body == dest_body)
@@ -979,7 +986,10 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
 
     // Inter-body (TRADE.md § A trade, "Between bodies"): the space lane,
     // launchpad-gated — the trader must hold a pad on the source body.
-    if (!corp_has_launchpad_on(w, corp, src_body))
+    // A nation's state trade has no launchpad of its own: its trade stays on
+    // the body (a state port is a sea anchor, not a space one).
+    const auto lcit = w.corporations.find(corp_id);
+    if (lcit == w.corporations.end() || !corp_has_launchpad_on(w, lcit->second, src_body))
         return leg;
     // BL-308 / BL-1265: the pad also has to be FUELLED. A launch burns
     // `launch_draw_per_convoy()`, which the trader BUYS off the source shelf;
@@ -995,7 +1005,7 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     // ROCKETRY GATES LAUNCH (Ben, 2026-10-10; ERAS.md § Era 2 -> Era 3 gate,
     // "Rocketry research purchased"): the pad operates only for a corp whose
     // home nation holds Rocketry's `space_dispatch` mechanic.
-    if (!nation_mechanic(w, corp.home_nation, "space_dispatch"))
+    if (!nation_mechanic(w, home, "space_dispatch"))
         return leg;
     // BL-354: evaluated at the tick-pure angle, so sourcing, pricing and
     // convoy speed are a pure function of tick, never of frame rate.
@@ -1079,13 +1089,19 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
 {
     if (!leg.viable || ri >= resource_count || !std::isfinite(qty) || !(qty > 0.0f))
         return false;
-    const auto cit = w.corporations.find(corp_id);
-    if (cit == w.corporations.end())
+    // The trader's purse: a corporation's balance, or -- for a state port's
+    // trade (Ben, 2026-10-14) -- the nation's treasury, which pays the haul
+    // now and its purchases at the clear (apply_budget, as state buildings').
+    float* purse = nullptr;
+    if (const auto cit = w.corporations.find(corp_id); cit != w.corporations.end())
+        purse = &cit->second.balance;
+    else if (const auto nit = w.nations.find(corp_id); nit != w.nations.end())
+        purse = &nit->second.treasury;
+    else
         return false;
     const auto sit = w.markets.find(src_market);
     if (sit == w.markets.end() || w.markets.find(dest_market_id) == w.markets.end())
         return false;
-    corporation_component& corp = cit->second;
     market_component&      src  = sit->second;
     const entity_id src_body    = src.body;
     const float res_mult        = reg.price_band().reservation_mult;
@@ -1142,7 +1158,7 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // now and the purchase at this tick's clear, and must be able to cover both
     // — beside every purchase it has already committed this tick.
     const float already = (io_committed != nullptr) ? *io_committed : 0.0f;
-    if (!(corp.balance - already >= haul + purchase))
+    if (!(*purse - already >= haul + purchase))
         return false;
 
     // Granted: consume the anchor's capacity (LP is the CAP, not a second PRICE).
@@ -1167,7 +1183,7 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
 
     // TRADE.md § A trade, step 2: IT PAYS THE HAUL, and the goods travel as a
     // convoy for the leg's travel time (SUPPLY.md).
-    corp.balance -= haul;
+    *purse -= haul;
 
     convoy_component c;
     c.id             = w.allocate_convoy_id();
