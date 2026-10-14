@@ -581,6 +581,9 @@ into passive and active. What follows replaces the bifold model, the city genera
   other firms', foreign firms' — draws on **that nation's** pool, and a source on its ground adds to
   it whoever built it. **The nation sets how its points are shared** among state, champion and other
   firms; where no rule is set the share is mechanical (in proportion to need), never a scored choice.
+- **A source's points dim with its upkeep (Ben, 2026-10-14).** A hub, station or port makes points in
+  proportion to the upkeep goods it actually receives — half its stone, half its points — never
+  zeroed by a shortfall.
 - **Trade points stay separate** (`TRADE.md`): how much an owner can ship, beside the capacity to
   move and produce.
 - Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for

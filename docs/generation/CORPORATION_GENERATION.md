@@ -320,6 +320,10 @@ not a broad presence across the nation.
   as idle plant. The reason is legibility: an idle building the player inherits reads as a
   broken economy, where an absent chain reads as a world that lacks it. BL-1185
   (chain-feasible placement) owns the work.
+- **A food processor reads real household demand (Ben, 2026-10-14).** A processor that takes
+  agricultural produce is placed only where the produce left after households' real bids — not the
+  base basket — covers its draw; households clear first, so a plant sited on food they will eat
+  starves.
 - **Sized to its inputs — a processor needs SPARE reachable supply (Ben, 2026-10-07; BL-1233,
   processors to inputs).** A producer within reach is necessary, not sufficient: every pass (the
   charter web, Pass 6, the specialists, the seat's kit) places a processor only where the **spare**
