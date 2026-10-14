@@ -148,6 +148,19 @@ enum class corp_verb : uint8_t
     set_trade,         ///< Set a MANUAL trade: move good `target` from market `subject` to market `counterparty` with `quantity` trade points per tick. `order` 0 adds a trade; a nonzero `order` changes the caller's own trade with that id in place.
     clear_trade,       ///< Erase the caller's own manual trade with id `order`.
     set_trade_reserve, ///< `corp`'s trade points reserved for manual trades := `quantity` (finite, >= 0; clamped to what it makes at use). The rest is auto.
+    // --- BL-1276: the research queue joins the seam (2026-10-10) ---
+    // Appended AFTER set_trade_reserve (BL-1266), same append-only rule. The NATION holds
+    // technology (RESEARCH.md § Who holds technology); the player reaches its
+    // nation's queue as the seat — the nation's operating champion — so these
+    // three act on the home nation of `corp`, and only when `corp` IS the seat
+    // (`world::player_entity`): a rival corporation does not plan its nation's
+    // research (that is the nation scorer's, AI_OPPONENT.md § 11), and a wire
+    // agent acting as one must not either. `order` names the node: an index
+    // into `io::dg::nodes`, range-checked before any use. DELIBERATELY NOT in
+    // corp_ai.cpp's candidate list.
+    queue_research,    ///< The seat's nation queues node `order` with its unheld requirements ahead of it (`enqueue_node`). rejected_state when already held/queued or a pick-one pair refuses it; rejected_invalid for an unknown node.
+    unqueue_research,  ///< The seat's nation takes queued node `order` off its research queue with every later entry that needs it (the toggle, NR-1033); `order == unqueue_last` drops the LAST entry instead. rejected_state when the node is not queued / the queue is empty; rejected_invalid for any other out-of-tree `order`.
+    clear_research,    ///< The seat's nation empties its research queue (the pool stays). rejected_state when the queue is empty.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -157,7 +170,11 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_trade_reserve) + 1;
+    static_cast<uint8_t>(corp_verb::clear_research) + 1;
+
+/// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
+/// (the MCP boundary's -1). UINT32_MAX, never a node index.
+inline constexpr uint32_t unqueue_last = 0xFFFFFFFFu;
 
 /// BL-1266: ceiling on one corporation's manual trades. Reachable by command,
 /// so by a scorer with a bug in it — the bound that keeps a runaway from
@@ -271,6 +288,21 @@ struct corp_command
     /// is what a stored command and a wire caller agree on; dropping it would
     /// re-interpret every command already recorded.
     std::array<entity_id, mercenary_contract_max_units> units{};
+
+    // --- BL-1296: state industry joins the seam (2026-10-13) ---
+    /// The STATE INDUSTRY this command acts for (NATIONS.md § State industry,
+    /// "The player's controls"; AI_OPPONENT.md § 11, the 2026-10-11 grant).
+    /// `null_entity` (the default) is every command there has ever been: `corp`
+    /// acts on its own book. Non-null, the command acts on that NATION's state
+    /// buildings, paid from its treasury, and `corp` must be the nation's
+    /// CHAMPION (`champion_of`) — a nation's state industry is operated from its
+    /// champion's seat, the player's from the player's, a rival major's from its
+    /// champion's scored layer. Only a corporation's building verbs are legal
+    /// (build, demolish, set_recipe, set_workforce, set_workforce_auto, idle,
+    /// resume); any other verb is `rejected_invalid`, and a building the nation
+    /// does not own is `rejected_not_owner`. Appended LAST so every older field
+    /// keeps its place in the record.
+    entity_id as_nation = null_entity;
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every

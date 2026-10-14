@@ -721,6 +721,9 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         if (first < 0 || count < 0 || first + count > static_cast<int64_t>(b.nation_absorbed.size()))
             return false;
     }
+    // BL-1286: the pattern tags are DERIVED from what was just read, never
+    // written -- re-derived here so a loaded report carries what generation's did.
+    fill_history_pattern_tags(b);
     return true;
 }
 
@@ -893,9 +896,36 @@ void w_envelope(std::ostream& o, const save_envelope& e)
     w_f32(o, e.planetary_zoom);
     w_f32(o, e.planetary_pan_x);
     w_f32(o, e.planetary_pan_y);
+
+    // save_game_version 23 (BL-1278): the nation targets, at the TAIL so the
+    // v22 layout is a strict prefix (save_game.hpp, LAYOUT 23). They belong to
+    // `world_params` but are written here, not in w_world_params, for that
+    // reason alone. Keep r_envelope in step.
+    w_int(o, e.params.nation_total_target);
+    w_int(o, e.params.major_target);
 }
 
-bool r_envelope(std::istream& i, save_envelope& e)
+/// Every envelope field a v22 stream carries, in order (defined below).
+bool r_envelope_v22(std::istream& i, save_envelope& e);
+
+bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
+{
+    if (!r_envelope_v22(i, e))
+        return false;
+    if (version == save_game_version_prefix_compatible)
+    {
+        // A v22 stream ends here: its world was built at the natural count.
+        e.params.nation_total_target = 0;
+        e.params.major_target        = 0;
+        return true;
+    }
+    // save_game_version 23 (BL-1278) -- keep w_envelope in step. An illegal
+    // pair is corrupt, refused whole rather than clamped.
+    return r_int(i, e.params.nation_total_target) && r_int(i, e.params.major_target)
+        && nation_targets_valid(e.params);
+}
+
+bool r_envelope_v22(std::istream& i, save_envelope& e)
 {
     return r_u64(i, e.sim_tick) && r_u64(i, e.day_tick) && r_u64(i, e.econ_tick)
         && r_f64(i, e.elapsed_days) && r_int(i, e.speed) && r_world_params(i, e.params)
@@ -945,8 +975,9 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env)
         return false; // not a save game -- possibly a bare world snapshot
 
     uint32_t version = 0;
-    if (!r_u32(in, version) || version != save_game_version)
-        return false;
+    if (!r_u32(in, version)
+        || (version != save_game_version && version != save_game_version_prefix_compatible))
+        return false; // LAYOUT 23: v22 is a strict prefix of v23, the one accepted predecessor
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller
@@ -956,7 +987,7 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env)
 
     if (!read_world_snapshot(scratch_world, in))
         return false;
-    if (!r_envelope(in, scratch_env))
+    if (!r_envelope(in, scratch_env, version))
         return false;
 
     w   = std::move(scratch_world);

@@ -8,12 +8,14 @@
 --   1. The Life round closes on the LEGACY fold -- water..legacy is one round
 --      now (generation_charts.cpp's chain table) -- and the Drawdown lean sits
 --      under it, on Life, not on Culture.
---   2. Next on Life leaves no blank pane: the Culture round holds the Life
---      round's globe through its wait, and the moment the record lands the
---      migration map REPLACES it -- a sharp jump, no dissolve (Ben, 2026-09-25:
---      "so the globe doesn't block a player's view"). Under --verify the run
---      is synchronous, so the wait cannot be photographed; the record's first
---      year is captured to show the map whole, with no globe over it.
+--   2. ONE MAP FROM LIFE TO BEGIN (BL-1280; STARTUP.md § The Life map; the
+--      globe is retired, Ben, 2026-10-10). The Life round draws the homeworld
+--      as the pass rounds' 2D map -- the Life-gate world's raster over the same
+--      terrain base -- and the Culture round holds that map through its wait
+--      under a 2400 BCE stamp; the record then plays on the same map. The
+--      pre-record pane is photographed (the wait itself lands too fast under
+--      --verify to hold), then a real run's landed first year: the two frames
+--      should show the same ground in the same frame, the record over it.
 --   3. The ticker's first lines name each cradle and the package it raised:
 --      a `cradle` moment per people (lapse_event_kind::cradle, 23), read off
 --      the settlement's pure-output records.
@@ -39,7 +41,7 @@ local STAGE_LEGACY = 8
 
 -- ── 1. The Life round, on its closing fold ────────────────────────────────
 -- First wizard frame after a screen switch is a warmup (main_menu.lua's rule).
-verify.generation_stage(1)
+verify.generation_stage(2) -- Life (BL-1279: setup is round 1)
 verify.frames(4)
 verify.capture("life_to_people_warmup")
 shot("life_to_people_1_life_round")
@@ -50,7 +52,28 @@ verify.scroll_panel("wizard_charts", 1.0)
 shot("life_to_people_2_legacy_fold")
 verify.fold()
 
--- ── 2. The Culture map replaces the globe at once ────────────────────────
+-- ── 2. The Culture round's wait holds the Life map ──────────────────────
+-- The Culture stage lands within the first polled frame under --verify, so
+-- the wait itself cannot be held for a shot (verify.history_wait(0) runs it,
+-- and it has landed by the capture). The pane the wait draws is the one the
+-- round draws before its record exists, so the round is parked with no run
+-- first: the Life map under the 2400 BCE stamp.
+verify.generation_stage(3) -- Culture
+verify.frames(4)
+verify.capture("life_to_people_3a_culture_wait")
+local wround = select(1, verify.wizard_round())
+verify.expect(wround == 3, "parked on round 4, Culture (0-based " .. wround .. ")")
+-- Then a real run (the Life-gate world built and held, the Culture stage on a
+-- worker from a copy of it), landed, its first year on the same map.
+local started = verify.history_wait(0)
+verify.expect(started, "the Culture round's own stage is running on a worker")
+-- The run lands; its record plays on the same map.
+verify.expect(verify.history_wait_land(), "the Culture run lands and its record is whole")
+verify.frames(4)
+local lf = select(1, verify.history_span())
+verify.history_year(lf)
+shot("life_to_people_3b_culture_landed")
+
 -- `history_run(0)` adopts the harness's own finished record for the Culture
 -- round (the same fold generation makes), so the captures never race a run.
 verify.history_run(0)
@@ -116,3 +139,19 @@ verify.show_panel("tile", false)
 -- The clipping ledger over every frame above: the lean rows and the stamp
 -- are the shapes that overrun.
 verify.expect_no_clipping("life_to_people")
+
+-- ── 5. One frame at a small window (BL-1280 fix round) ───────────────────
+-- At 1280x720 the band under the map is too shallow for the key, so the map
+-- is framed above a reserved band. The Life map (no record, no key yet) and
+-- the landed Culture map must frame in the SAME rect: compare the two PNGs.
+-- After the clipping ledger above on purpose: that ledger is the 1920x1080
+-- design-review read.
+verify.window(1280, 720)
+verify.generation_stage(3) -- Culture
+verify.frames(4)
+verify.capture("life_to_people_7_small_culture_wait")
+verify.history_run(0)
+verify.frames(4)
+local sf = select(1, verify.history_span())
+verify.history_year(sf)
+shot("life_to_people_8_small_culture_landed")

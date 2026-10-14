@@ -1531,12 +1531,14 @@
    "source": [
     "docs/ui/STARTUP.md § Main menu — draw_main_menu"
    ],
-   "summary": "The app's opening screen (app_screen::menu): seed entry + Roll + Copy, a Sparse/Lean/Standard resource-abundance radio, a disabled bodies-count slider fixed at 5, New Game and Quit.",
+   "summary": "The app's opening screen (app_screen::menu): a disabled bodies-count slider fixed at 5, New Game, Quick Start and Quit. It carries no world input: the seed and the abundance moved to the wizard's setup round (BL-1279).",
    "interesting_question": "The bodies-count slider is present but disabled, fixed at 5 — why ship a visible-but-inert control rather than simply omitting it until the feature lands?",
    "resolution": "Named as a deliberate phasing choice: STARTUP.md states 'the count knob is phased to a later update,' presenting the slider now as a promise of future scope rather than an omission — though the doc does not explain why visibility-before-function was chosen over waiting to add the control.",
    "checks": [
     "main_menu",
     "planetology_generation",
+    "quick_start",
+    "setup_round",
     "shell_pass"
    ]
   },
@@ -1548,27 +1550,29 @@
    "source": [
     "docs/ui/STARTUP.md § New World wizard — draw_generation_screen (BL-167)"
    ],
-   "summary": "Six rounds: three thematic rounds over the ten-stage Planetology chain, then three PASS rounds (4 the migration, 5 the history, 6 the substrate). The planetology rounds re-run a throwaway preview on every control move (no world state touched) resolved against named preferences, not raw parameters; the pass rounds cannot be previewed per keystroke, so arriving on one runs its pass and the wait is the content. Only the last round commits.",
+   "summary": "Seven rounds: System, Setup, Life, then four PASS rounds (Culture, Empires, Exploration, Industrialisation). System and Life are the planetology rounds over the chart chain, re-running a throwaway preview on every control move resolved against named preferences, not raw parameters; Setup holds the world-wide inputs (nation targets, seed, abundance); the pass rounds cannot be previewed per keystroke, so arriving on one runs its pass and the wait is the content. Only the last round commits.",
    "interesting_question": "Rounds are stated to be causal — rerolling round A re-draws rounds B and C downstream — and Back is 'a plain revision with no per-round snapshot.' Does a player who liked round B's preview lose it irrecoverably by going back to tweak round A?",
    "resolution": "Confirmed as the accepted cost, not mitigated: STARTUP.md states this plainly — 'Rounds are causal... so Back is a plain revision with no per-round snapshot' — no undo/snapshot mechanism is described.",
    "checks": [
+    "history_lapse_press",
     "planetology_generation",
-    "history_lapse_press"
+    "setup_round"
    ]
   },
   {
    "id": "UI-093",
-   "name": "Wizard planetology round (one of three)",
+   "name": "Wizard planetology round (System or Life)",
    "kind": "sub-element",
    "parent": "UI-092",
    "source": [
     "docs/ui/STARTUP.md § New World wizard"
    ],
-   "summary": "Each of the first three rounds stacks its Planetology-stage charts + explanations, then takes that round's preference inputs; charts are shared verbatim with the History ledger's Chain view. The three pass rounds that follow take no preference rows yet.",
+   "summary": "Each of the first three rounds stacks its Planetology-stage charts + explanations, then takes that round's preference inputs; charts are shared verbatim with the History ledger's Chain view. The three pass rounds that follow take no preference rows yet. The pane beside the column: the System round draws the system (star colour and size, orbits, body sizes); the Life round draws the homeworld as the pass rounds' 2D map from the Life-gate world's raster, over the same terrain base, and the Culture round holds that map through its wait under a 2400 BCE stamp (BL-1280, the globe retired; STARTUP.md § The Life map). No input on either.",
    "interesting_question": "n/a — see UI-092 for the causal-rounds open question this sub-element is part of.",
    "resolution": "n/a",
    "checks": [
-    "planetology_generation"
+    "planetology_generation",
+    "life_to_people"
    ]
   },
   {
@@ -1758,17 +1762,19 @@
   },
   {
    "id": "UI-108",
-   "name": "Research panel (tech-tree design mock)",
+   "name": "Research panel",
    "kind": "ledger",
    "parent": null,
    "source": [
     "docs/economy/RESEARCH.md",
+    "docs/economy/tech/DIGITISATION_TREE.md",
     "src/ui/tech_tree_panel.cpp",
-    "src/ui/nav_pane.cpp"
+    "src/ui/nav_pane.cpp",
+    "src/world/nation_tech.cpp"
    ],
-   "summary": "Rail slot 4: an era-selector fold-out, one row per era with a real thumbnail of that era's node graph. The slot's own tooltip says design mock, not gameplay.",
-   "interesting_question": "A mock on a live rail slot is indistinguishable from a feature until the player clicks it. Is the tooltip enough?",
-   "resolution": "Judged enough for now - the slot tooltip reads \"Technology unlocks and the route to space (design mock)\", which is the same honesty idiom slot 8 uses for its stand-in. RESEARCH.md is itself a stub, so the mock is ahead of its own authority.",
+   "summary": "Rail slot 4 / F9: the Digitisation tree as three trees in a ring on the canvas — every node in its tier's glyph (travel dot, minor ring, major disc, quest diamond, pair outlined red, placeholder dashed, joint/mastery accent ring), AND links in the accent, held / open / locked / queued states, rim majors and branches labelled — with the shared hover card on a node. The column holds the seat's nation with its RP a quarter and the queue with each entry's arrival quarter, Remove last and Clear. SHIFT + left click on a node queues it with its requirements (queue_research); on a queued node it takes it off with the entries that need it (unqueue_research). Each tree's name sits in its own sector.",
+   "interesting_question": "The arrival quarter is a projection at today's treasury and today's buildings, and quests never complete until their deeds have readers. Is a date that will move a promise the panel cannot keep?",
+   "resolution": "It is labelled as what it is: the projection runs the quarterly pass's own accrual and queue flow on a copy of the state, holding the treasury where it stands, so it is the date AT THE CURRENT RATE (RESEARCH.md § The research queue: 'every entry shows its arrival date at the current research rate'). An entry that cannot complete says so ('on its deed', 'after a deed') instead of printing a date.",
    "checks": [
     "tech_tree_panel"
    ]
@@ -1885,7 +1891,7 @@
    "source": [
     "docs/ui/STARTUP.md § Rounds 4, 5 and 6"
    ],
-   "summary": "A 2D political map in place of the globe, replaying a recorded ownership history (era_timelapse / owner_slice_at) at tile resolution with every land tile assigned to its nearest region; run-merged per row so a 261x121 raster stays inside ImGui 16-bit draw indices. Drawn by BOTH lapse rounds - round 4 The Migration and round 5 The History - each from its own record slot. Takes no mouse input, inheriting the globe rule; playback frozen under --verify. Every lapse round (3-6) draws it; the roads a round lays are handed on at the seam and drawn from the next round's first frame (BL-1134, roads carried across rounds), and a sea lane is a bowed arc off its colonial tie's line (BL-1124).",
+   "summary": "A 2D political map - the same map the Life round opens on (BL-1280) - replaying a recorded ownership history (era_timelapse / owner_slice_at) at tile resolution with every land tile assigned to its nearest region; run-merged per row so a 261x121 raster stays inside ImGui 16-bit draw indices. Drawn by BOTH lapse rounds - round 4 The Migration and round 5 The History - each from its own record slot. Takes no mouse input (no pan, no zoom); playback frozen under --verify. Every lapse round (3-6) draws it; the roads a round lays are handed on at the seam and drawn from the next round's first frame (BL-1134, roads carried across rounds), and a sea lane is a bowed arc off its colonial tie's line (BL-1124).",
    "interesting_question": "The wizard walks the two rounds the design asks for, but generation still emits ONE recorded age: rounds 4 and 5 run the same pass and replay the same span, so the migration does not yet stop where the history begins. Does a player read two rounds showing the same map as a bug?",
    "resolution": "Open, and named on screen rather than hidden: each round's caption says it replays the same recorded age as the other and why. The generation-side split - a migration span with its own terminating condition, then a history span to 1200 CE - is BL-858/BL-861.",
    "checks": [
@@ -1941,6 +1947,56 @@
    "checks": [
     "round_legends",
     "sea_lanes"
+   ]
+  },
+  {
+   "id": "UI-122",
+   "name": "Wizard setup round (round 2)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § Rounds (the SETUP ROUND rulings, 2026-10-10/11/13)",
+    "docs/generation/NATION_GENERATION.md § The nation count is a target",
+    "src/ui/startup_screens.cpp draw_wizard_setup_controls"
+   ],
+   "summary": "Between System and Life: the two nation targets as sliders (Total 1..40, Majors 1..6, each slider's range cut by the other so the pair is always legal), the seed (hex entry, Roll, Copy seed) and the Sparse/Lean/Standard abundance radio. Defaults 20 nations / 4 majors when unset. A change invalidates Life and every round below. No Reroll (the seed's Roll is the round's draw). The pane keeps System's drawing. Quick Start opens this round alone, its press reading Begin and building cold straight through to the seat.",
+   "interesting_question": "The seed is set on round 2 but round 1, System, is already drawn from it - is it honest for a later round to change what an earlier one showed?",
+   "resolution": "Open, and Ben's: STARTUP.md fixes the order System, setup, Life (2026-10-11) and puts the seed on the setup round, so a new seed re-draws the System preview while rounds stay causal downward for everything the world BUILDS (nothing is built before Life).",
+   "checks": [
+    "setup_round",
+    "quick_start"
+   ]
+  },
+  {
+   "id": "UI-124",
+   "name": "Nation selection screen (Begin, before play)",
+   "kind": "view",
+   "source": [
+    "docs/ui/STARTUP.md § The seat"
+   ],
+   "summary": "The pre-play screen that answers which nation am I: a list of the MAJOR nations only (each holding one champion; rows ordered by the champion's static landscape score, a champion below the viability floor marked and its nation still pickable) beside a map of the home body lighting the shown nation's territory with its champion's HQ, works and home market, and the seven-part nation card below the map. A press opens the nation's briefing; Confirm issues take_seat naming the major and seats its champion; Back changes nothing. Shaped for up to six humans, seats one.",
+   "interesting_question": "The card shows neighbours' readings as derived sentiment because no nation-to-nation stance table exists before play - is the derived Trust a faithful enough stand-in for the \"stances and grudges\" the design names?",
+   "resolution": "Open: the derived reading is what the world carries at the seat; a declared nation stance would be new state, which the screen may not add.",
+   "checks": [
+    "nation_select",
+    "seat_pick",
+    "quick_start"
+   ]
+  },
+  {
+   "id": "UI-125",
+   "name": "Nation card (seven parts)",
+   "kind": "sub-element",
+   "parent": "UI-124",
+   "source": [
+    "docs/ui/STARTUP.md § The seat",
+    "docs/generation/GENERATION_STRATEGY.md § History patterns"
+   ],
+   "summary": "Two columns under the map. Left: territory (tile count, lit on the map), population and GDP (last cleared quarter, per head), treasury and budget weights, richest deposits, and land-border neighbours with their reading both ways and any grudge. Right: the champion (the firm card unchanged in content) and the history - the nation's pattern tags, its fold line, a timeline of up to eight key events of its lineage, and a toggle link that opens the History ledger's Ages view filtered to the nation.",
+   "interesting_question": "A timeline capped at eight rows keeps foundings, secessions, charters and the revolution first and lets conquests fill the rest - does an old, warlike lineage lose the conquests that made it?",
+   "resolution": "Accepted as drafted; the full record is one press away in the filtered History ledger.",
+   "checks": [
+    "nation_select"
    ]
   }
  ]

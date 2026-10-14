@@ -370,6 +370,7 @@ void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelaps
                                [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
         if (it == segs.end())
         {
+            if (e.polity < 1) continue; // BL-1289: a Track falling out of use names no new corridor
             lapse_road_seg seg;
             seg.region_a   = a;
             seg.region_b   = b;
@@ -377,9 +378,29 @@ void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelaps
             segs.push_back(std::move(seg));
             it = std::prev(segs.end());
         }
+        // BL-1289: AN EVENT BELOW THE RUNG THE CORRIDOR STANDS ON IS A
+        // DEMOTION (the world war's razing): each rung above the event's tier
+        // ends at its year. Read before the promotion half, which only ever
+        // reaches the event's own tier.
+        {
+            constexpr int32_t unset = 0x7FFFFFFF;
+            const auto holds = [&](int32_t from, int32_t until) { return from <= e.year && until == unset; };
+            int stands = 0;
+            if (holds(it->year_track, it->year_track_end)) stands = 1;
+            if (it->year_road != unset && holds(it->year_road, it->year_road_end)) stands = 2;
+            if (it->year_post_road != unset && holds(it->year_post_road, it->year_post_road_end)) stands = 3;
+            if (static_cast<int>(e.polity) < stands)
+            {
+                if (e.polity < 3 && stands >= 3) it->year_post_road_end = e.year;
+                if (e.polity < 2 && stands >= 2) it->year_road_end      = e.year;
+                if (e.polity < 1)                it->year_track_end     = e.year;
+                continue;
+            }
+        }
         it->year_track = std::min(it->year_track, e.year);
-        if (e.polity >= 2) it->year_road      = std::min(it->year_road, e.year);      // BL-917
-        if (e.polity >= 3) it->year_post_road = std::min(it->year_post_road, e.year); // BL-940/BL-943
+        if (e.polity >= 1) it->year_track_end = 0x7FFFFFFF; // back on the rung (BL-1289)
+        if (e.polity >= 2) { it->year_road = std::min(it->year_road, e.year); it->year_road_end = 0x7FFFFFFF; }           // BL-917
+        if (e.polity >= 3) { it->year_post_road = std::min(it->year_post_road, e.year); it->year_post_road_end = 0x7FFFFFFF; } // BL-940/BL-943
         it->promoted_here = true;
     }
 }
@@ -1095,6 +1116,119 @@ std::string lapse_year_label(int year)
     return buf;
 }
 
+/// THE TERRAIN BASE, baked once (BL-915): run-merged land by landform band,
+/// the mountain rims, and the downstream river edges, all in tile units.
+/// Shared by `finish_history_lapse` (the pass rounds) and `bake_lapse_ground`
+/// (the Life round, BL-1280), so the Life map and the pass maps stand on ONE
+/// ground by construction. @p packed must hold gw*gh tiles. Returns the band
+/// per tile (0xFF water), which the road and fleet bakes read.
+static std::vector<uint8_t> bake_ground_layers(int gw, int gh, const uint8_t* packed,
+                                               const uint16_t* terrain, std::size_t terrain_len,
+                                               std::vector<lapse_base_run>&   base_runs,
+                                               std::vector<lapse_relief_seg>& relief_segs,
+                                               std::vector<lapse_river_seg>&  river_segs)
+{
+    base_runs.clear();
+    river_segs.clear();
+    relief_segs.clear();
+    const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    const bool have_terrain = (terrain != nullptr && terrain_len == n);
+
+    // The base band per tile, 0xFF for water. Computed once so the run merge
+    // and the relief edges below read the same thing.
+    std::vector<uint8_t> band(n, 0xFF);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (is_water(preview_substrate(packed[i]))) continue;
+        band[i] = have_terrain ? base_kind(lapse_landform(terrain[i])) : 0;
+    }
+
+    for (int r = 0; r < gh; ++r)
+    {
+        int c = 0;
+        while (c < gw)
+        {
+            const uint8_t kind = band[static_cast<std::size_t>(r * gw + c)];
+            if (kind == 0xFF) { ++c; continue; }
+            int e = c + 1;
+            while (e < gw && band[static_cast<std::size_t>(r * gw + e)] == kind) ++e;
+            base_runs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
+                                   static_cast<uint16_t>(e), kind});
+            c = e;
+        }
+    }
+
+    // RELIEF EDGES. Only MOUNTAIN (band 3) gets a rim, and only where its north
+    // or south neighbour is LOW ground — flat, valley, a cut, or water; a step
+    // down to highland is left to the band colours. The landform field is noisy
+    // at tile grain, so rimming every highland step drew scanlines across whole
+    // continents (measured: 978 rims for 1,966 base runs) — a rim is worth
+    // drawing only where the drop is a real one. The north rim is lit and the
+    // south rim shadowed, the same top-left light every canvas here assumes.
+    // Merged along the row.
+    {
+        const auto elevated = [](uint8_t b) { return b == 3; };
+        const auto height_of = [](uint8_t b) { return (b == 0xFF || b == 4) ? 0 : (b >= 2 ? 2 : 0); };
+        for (int r = 0; r < gh; ++r)
+        {
+            for (int lit = 1; lit >= 0; --lit)
+            {
+                const int nr = lit ? r - 1 : r + 1;
+                int c = 0;
+                while (c < gw)
+                {
+                    const uint8_t b = band[static_cast<std::size_t>(r * gw + c)];
+                    const bool rim = elevated(b)
+                        && (nr < 0 || nr >= gh
+                            || height_of(band[static_cast<std::size_t>(nr * gw + c)]) < height_of(b));
+                    if (!rim) { ++c; continue; }
+                    int e = c + 1;
+                    while (e < gw)
+                    {
+                        const uint8_t b2 = band[static_cast<std::size_t>(r * gw + e)];
+                        const bool rim2 = elevated(b2)
+                            && (nr < 0 || nr >= gh
+                                || height_of(band[static_cast<std::size_t>(nr * gw + e)]) < height_of(b2));
+                        if (!rim2) break;
+                        ++e;
+                    }
+                    relief_segs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
+                                             static_cast<uint16_t>(e), static_cast<uint8_t>(lit)});
+                    c = e;
+                }
+            }
+        }
+    }
+
+    // Rivers: one segment per DOWNSTREAM edge, from the tile's centre to its
+    // downstream neighbour's — so every river edge is drawn exactly once, by the
+    // tile upstream of it, and consecutive edges chain into a polyline. The
+    // river bits are keyed by odd-r hex side (river_generation.hpp), so the
+    // neighbour is read off the shared side table rather than a square-grid
+    // guess. A segment that would cross the wrap seam is dropped: a line across
+    // the whole map is not a river.
+    if (have_terrain)
+    {
+        for (int r = 0; r < gh; ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const uint16_t t = terrain[static_cast<std::size_t>(r * gw + c)];
+                const uint8_t down = lapse_river_downstream(t) & lapse_river_edges(t);
+                if (down == 0) continue;
+                for (int side = 0; side < 6; ++side)
+                {
+                    if ((down & (1u << side)) == 0) continue;
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side);
+                    if (nb.gy < 0 || nb.gy >= gh) continue;
+                    if (nb.gx < 0 || nb.gx >= gw) continue; // the wrap seam
+                    river_segs.push_back({static_cast<int16_t>(c),     static_cast<int16_t>(r),
+                                            static_cast<int16_t>(nb.gx), static_cast<int16_t>(nb.gy)});
+                }
+            }
+    }
+    return band;
+}
+
 void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t packed_len,
                           const uint16_t* terrain, std::size_t terrain_len)
 {
@@ -1149,11 +1283,11 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
 
     // BL-1118: which event kinds the record carries -- the layer predicates
     // that hang on a kind read one bit per frame (`lapse_layers_drawn`).
-    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 32,
-                  "event_kinds is a 32-bit mask over lapse_event_kind");
+    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 64,
+                  "event_kinds is a 64-bit mask over lapse_event_kind");
     h.event_kinds = 0;
     for (const lapse_event& e : h.lapse.events)
-        if (e.kind < 32) h.event_kinds |= 1u << e.kind;
+        if (e.kind < 64) h.event_kinds |= std::uint64_t{1} << e.kind;
 
     // --- The terrain base, baked once (BL-915) -------------------------------
     //
@@ -1163,103 +1297,8 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // merge, and the scale is applied at draw time. A missing terrain raster
     // (the async build not landed, or an older caller) bakes flat land, so the
     // map is never blocked on the ground.
-    h.base_runs.clear();
-    h.river_segs.clear();
-    h.relief_segs.clear();
-    const bool have_terrain = (terrain != nullptr && terrain_len == n);
-
-    // The base band per tile, 0xFF for water. Computed once so the run merge
-    // and the relief edges below read the same thing.
-    std::vector<uint8_t> band(n, 0xFF);
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        if (is_water(preview_substrate(packed[i]))) continue;
-        band[i] = have_terrain ? base_kind(lapse_landform(terrain[i])) : 0;
-    }
-
-    for (int r = 0; r < gh; ++r)
-    {
-        int c = 0;
-        while (c < gw)
-        {
-            const uint8_t kind = band[static_cast<std::size_t>(r * gw + c)];
-            if (kind == 0xFF) { ++c; continue; }
-            int e = c + 1;
-            while (e < gw && band[static_cast<std::size_t>(r * gw + e)] == kind) ++e;
-            h.base_runs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
-                                   static_cast<uint16_t>(e), kind});
-            c = e;
-        }
-    }
-
-    // RELIEF EDGES. Only MOUNTAIN (band 3) gets a rim, and only where its north
-    // or south neighbour is LOW ground — flat, valley, a cut, or water; a step
-    // down to highland is left to the band colours. The landform field is noisy
-    // at tile grain, so rimming every highland step drew scanlines across whole
-    // continents (measured: 978 rims for 1,966 base runs) — a rim is worth
-    // drawing only where the drop is a real one. The north rim is lit and the
-    // south rim shadowed, the same top-left light every canvas here assumes.
-    // Merged along the row.
-    {
-        const auto elevated = [](uint8_t b) { return b == 3; };
-        const auto height_of = [](uint8_t b) { return (b == 0xFF || b == 4) ? 0 : (b >= 2 ? 2 : 0); };
-        for (int r = 0; r < gh; ++r)
-        {
-            for (int lit = 1; lit >= 0; --lit)
-            {
-                const int nr = lit ? r - 1 : r + 1;
-                int c = 0;
-                while (c < gw)
-                {
-                    const uint8_t b = band[static_cast<std::size_t>(r * gw + c)];
-                    const bool rim = elevated(b)
-                        && (nr < 0 || nr >= gh
-                            || height_of(band[static_cast<std::size_t>(nr * gw + c)]) < height_of(b));
-                    if (!rim) { ++c; continue; }
-                    int e = c + 1;
-                    while (e < gw)
-                    {
-                        const uint8_t b2 = band[static_cast<std::size_t>(r * gw + e)];
-                        const bool rim2 = elevated(b2)
-                            && (nr < 0 || nr >= gh
-                                || height_of(band[static_cast<std::size_t>(nr * gw + e)]) < height_of(b2));
-                        if (!rim2) break;
-                        ++e;
-                    }
-                    h.relief_segs.push_back({static_cast<uint16_t>(r), static_cast<uint16_t>(c),
-                                             static_cast<uint16_t>(e), static_cast<uint8_t>(lit)});
-                    c = e;
-                }
-            }
-        }
-    }
-
-    // Rivers: one segment per DOWNSTREAM edge, from the tile's centre to its
-    // downstream neighbour's — so every river edge is drawn exactly once, by the
-    // tile upstream of it, and consecutive edges chain into a polyline. The
-    // river bits are keyed by odd-r hex side (river_generation.hpp), so the
-    // neighbour is read off the shared side table rather than a square-grid
-    // guess. A segment that would cross the wrap seam is dropped: a line across
-    // the whole map is not a river.
-    if (have_terrain)
-    {
-        for (int r = 0; r < gh; ++r)
-            for (int c = 0; c < gw; ++c)
-            {
-                const uint16_t t = terrain[static_cast<std::size_t>(r * gw + c)];
-                const uint8_t down = lapse_river_downstream(t) & lapse_river_edges(t);
-                if (down == 0) continue;
-                for (int side = 0; side < 6; ++side)
-                {
-                    if ((down & (1u << side)) == 0) continue;
-                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side);
-                    if (nb.gy < 0 || nb.gy >= gh) continue;
-                    if (nb.gx < 0 || nb.gx >= gw) continue; // the wrap seam
-                    h.river_segs.push_back({static_cast<int16_t>(c),     static_cast<int16_t>(r),
-                                            static_cast<int16_t>(nb.gx), static_cast<int16_t>(nb.gy)});
-                }
-            }
-    }
+    std::vector<uint8_t> band = bake_ground_layers(gw, gh, packed, terrain, terrain_len,
+                                                  h.base_runs, h.relief_segs, h.river_segs);
 
     // --- Promoted road corridors (BL-917), baked once -------------------------
     //
@@ -1763,7 +1802,7 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h)
     lapse_layer_set s;
     if (!h.derived()) return s;
     const auto kind = [&](lapse_event_kind k) {
-        return ((h.event_kinds >> static_cast<unsigned>(k)) & 1u) != 0;
+        return ((h.event_kinds >> static_cast<unsigned>(k)) & std::uint64_t{1}) != 0;
     };
 
     // THE EMPIRES CUT (Ben, 2026-09-25, walking round 4: "the Empires round
@@ -1819,10 +1858,14 @@ lapse_layer_set lapse_layers_drawn(const history_lapse& h)
             return std::any_of(h.road_segs.begin(), h.road_segs.end(), pred);
         };
         const int window = lapse_marker_window_years(h);
+        // BL-1289: a rung ends where the world war demoted the corridor off it.
+        const auto end_of = [&](int32_t e) { return e == lapse_never ? never : int64_t{e}; };
         s.set(L::track, any_road([&](const lapse_road_seg& r) {
-            return shows(r.year_track, r.year_road == lapse_never ? never : r.year_road); }));
+            return shows(r.year_track, std::min(r.year_road == lapse_never ? never : int64_t{r.year_road},
+                                                end_of(r.year_track_end))); }));
         s.set(L::road, any_road([&](const lapse_road_seg& r) {
-            return r.year_road != lapse_never && shows(std::max(r.year_track, r.year_road), never); }));
+            return r.year_road != lapse_never
+                && shows(std::max(r.year_track, r.year_road), std::min(end_of(r.year_road_end), end_of(r.year_track_end))); }));
         // The Post Road the legend names is its PULSE (a steady Post Road is
         // drawn as a Road), so it is listed when a pulse falls in the span.
         s.set(L::post_road, any_road([&](const lapse_road_seg& r) {
@@ -2298,6 +2341,17 @@ float legend_band_h(const legend_layout& g)
     return g.cols.empty() ? 0.0f : g.h + 2.0f * legend_pad + legend_gap_top + 4.0f;
 }
 
+} // namespace
+
+float lapse_legend_reserve_h()
+{
+    // One band, a heading row plus three: measure_lapse_legend's own sums.
+    const float row_h = std::max(18.0f, ImGui::GetTextLineHeight() + 4.0f);
+    return row_h * 4.0f + 2.0f * legend_pad + legend_gap_top + 4.0f;
+}
+
+namespace {
+
 /// Paint the measured legend with its block's top-left at @p o, on a dark
 /// backing. Returns the primitives drawn; @p listed gets the labels in order,
 /// for the capture log.
@@ -2341,6 +2395,88 @@ int paint_lapse_legend(const history_lapse& h, const legend_layout& g, ImDrawLis
 
 } // namespace
 
+/// THE GROUND PASS, shared by the pass rounds' map and the Life map (BL-1280):
+/// the baked base runs by landform band, then the lit north rim and shadowed
+/// south rim of every range. Tile edges snap to whole pixels (see
+/// `draw_lapse_map`). Returns the primitives drawn.
+static int paint_ground_layer(ImDrawList* dl, ImVec2 tl, float scale,
+                              const std::vector<lapse_base_run>&   base_runs,
+                              const std::vector<lapse_relief_seg>& relief_segs)
+{
+    const auto px = [&](float c) { return std::floor(tl.x + c * scale); };
+    const auto py = [&](float r) { return std::floor(tl.y + r * scale); };
+    int prims = 0;
+    for (const lapse_base_run& b : base_runs)
+    {
+        paint_ground(dl, px(static_cast<float>(b.c0)), py(static_cast<float>(b.row)),
+                         px(static_cast<float>(b.c1)), py(static_cast<float>(b.row + 1)), b.kind);
+        ++prims;
+    }
+    for (const lapse_relief_seg& s : relief_segs)
+    {
+        const float y = s.lit ? py(static_cast<float>(s.row)) + 0.5f
+                              : py(static_cast<float>(s.row + 1)) - 0.5f;
+        paint_relief_rim(dl, px(static_cast<float>(s.c0)), px(static_cast<float>(s.c1)), y,
+                         s.lit != 0);
+        ++prims;
+    }
+    return prims;
+}
+
+/// THE RIVER PASS, shared likewise: tile centre to downstream centre.
+static int paint_river_layer(ImDrawList* dl, ImVec2 tl, float scale,
+                             const std::vector<lapse_river_seg>& river_segs)
+{
+    const auto px = [&](float c) { return std::floor(tl.x + c * scale); };
+    const auto py = [&](float r) { return std::floor(tl.y + r * scale); };
+    const float half = scale * 0.5f;
+    for (const lapse_river_seg& s : river_segs)
+        paint_river(dl, {px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
+                        {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
+                    scale);
+    return static_cast<int>(river_segs.size());
+}
+
+void bake_lapse_ground(lapse_ground& g, int gw, int gh,
+                       const uint8_t* packed, std::size_t packed_len,
+                       const uint16_t* terrain, std::size_t terrain_len)
+{
+    g = lapse_ground{};
+    if (gw <= 0 || gh <= 0 || packed == nullptr
+        || packed_len != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return; // the gate world's raster is not built yet
+    bake_ground_layers(gw, gh, packed, terrain, terrain_len,
+                       g.base_runs, g.relief_segs, g.river_segs);
+    g.grid_w = gw;
+    g.grid_h = gh;
+}
+
+void draw_lapse_ground(const lapse_ground& g)
+{
+    const ImVec2 avail  = ImGui::GetContentRegionAvail();
+    ImDrawList*  dl     = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    if (avail.x <= 1.0f || avail.y <= 1.0f) return;
+    if (!g.baked())
+    {
+        ImGui::Dummy(avail);
+        return;
+    }
+
+    // The pass rounds' frame, the pass rounds' ground, the pass rounds' rivers:
+    // the Culture record lands on exactly this picture (STARTUP.md § The Life
+    // map, "one map from Life to Begin").
+    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
+    lapse_map_frame_keyed(g.grid_w, g.grid_h, avail.x, avail.y, lapse_legend_reserve_h(),
+                          fx, fy, scale);
+    const ImVec2 tl{origin.x + fx, origin.y + fy};
+    paint_sea(dl, tl, {tl.x + scale * static_cast<float>(g.grid_w),
+                       tl.y + scale * static_cast<float>(g.grid_h)});
+    paint_ground_layer(dl, tl, scale, g.base_runs, g.relief_segs);
+    paint_river_layer(dl, tl, scale, g.river_segs);
+    ImGui::Dummy(avail);
+}
+
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year)
 {
@@ -2382,23 +2518,21 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // pane begins. The offset is authored rather than derived — it is a framing
     // judgement about this screen, and deriving it from some other quantity
     // would only disguise that. THE RULE LIVES IN `lapse_map_frame` (BL-1091):
-    // the wizard's globe dissolve stamps its year over this same corner, and
-    // one framing shared beats two that agree by luck.
-    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
-    lapse_map_frame(gw, gh, avail.x, avail.y, fx, fy, scale);
-
+    // the Life map (`draw_lapse_ground`) and its stamp share this same frame,
+    // and one framing shared beats two that agree by luck.
     // BL-1118: THE LEGEND'S BAND. The key is measured before the map is
     // framed: where the pane's band under the map already holds it (1920x1080
     // leaves ~290 px) nothing moves; where it does not, the map is framed in
     // the height left above the key rather than the key being laid over the
-    // map, which is the subject.
+    // map, which is the subject. BL-1280 fix round: the band claimed is never
+    // less than the fixed reservation the Life map frames with, so the Culture
+    // record lands in the Life map's exact rect at any window size (a legend
+    // that wraps to a second band on a very narrow pane still claims more).
     const legend_layout legend = measure_lapse_legend(h, L, avail.x - 2.0f * legend_pad - 4.0f);
-    {
-        const float need  = legend_band_h(legend);
-        const float below = avail.y - (fy + scale * static_cast<float>(gh));
-        if (need > 0.0f && below < need && avail.y - need > 40.0f)
-            lapse_map_frame(gw, gh, avail.x, avail.y - need, fx, fy, scale);
-    }
+    const float key_h = legend.cols.empty() ? 0.0f
+                                            : std::max(legend_band_h(legend), lapse_legend_reserve_h());
+    float fx = 0.0f, fy = 0.0f, scale = 0.0f;
+    lapse_map_frame_keyed(gw, gh, avail.x, avail.y, key_h, fx, fy, scale);
     const float mw = scale * static_cast<float>(gw);
     const float mh = scale * static_cast<float>(gh);
     const ImVec2 tl{origin.x + fx, origin.y + fy};
@@ -2421,26 +2555,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    frame — see finish_history_lapse. ──
     int prims = 0;
     if (L.has(lapse_layer::ground))
-    {
-        for (const lapse_base_run& b : h.base_runs)
-        {
-            const float x0 = px(static_cast<float>(b.c0));
-            const float x1 = px(static_cast<float>(b.c1));
-            const float y0 = py(static_cast<float>(b.row));
-            const float y1 = py(static_cast<float>(b.row + 1));
-            paint_ground(dl, x0, y0, x1, y1, b.kind);
-            ++prims;
-        }
-        for (const lapse_relief_seg& s : h.relief_segs)
-        {
-            const float x0 = px(static_cast<float>(s.c0));
-            const float x1 = px(static_cast<float>(s.c1));
-            const float y  = s.lit ? py(static_cast<float>(s.row)) + 0.5f
-                                   : py(static_cast<float>(s.row + 1)) - 0.5f;
-            paint_relief_rim(dl, x0, x1, y, s.lit != 0);
-            ++prims;
-        }
-    }
+        prims += paint_ground_layer(dl, tl, scale, h.base_runs, h.relief_segs);
 
     // ── 2. THE FILL, as a translucent TINT over the ground. One owner per tile,
     //    RUN-MERGED along the row: a political map is long runs of one owner,
@@ -2741,16 +2856,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    reads best on top of the tint rather than dimmed under it. Tile centre
     //    to downstream centre, baked once. ──
     if (L.has(lapse_layer::rivers))
-    {
-        const float half = scale * 0.5f;
-        for (const lapse_river_seg& s : h.river_segs)
-        {
-            paint_river(dl, {px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
-                            {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
-                        scale);
-        }
-        prims += static_cast<int>(h.river_segs.size());
-    }
+        prims += paint_river_layer(dl, tl, scale, h.river_segs);
 
     // ── 3b. THE PROMOTED ROAD NETWORK (BL-917), over the rivers: a corridor
     //    not yet promoted at the playhead's year is not drawn at all — the
@@ -2775,7 +2881,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     for (const lapse_road_seg& s : h.road_segs)
     {
         if (!lapse_road_drawn(s, year)) continue; // not promoted yet at this playhead
-        const bool at_road = year >= s.year_road;
+        const bool at_road = year >= s.year_road && year < s.year_road_end; // BL-1289: until the war demoted it
         const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
         const float shift   = s.c1 < 0.0f ? world_w : -world_w;
 
@@ -2928,6 +3034,11 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 auto it = std::find_if(h.road_segs.begin(), h.road_segs.end(),
                     [&](const lapse_road_seg& s) { return s.region_a == e.region && s.region_b == e.other; });
                 if (it == h.road_segs.end()) continue;
+                // BL-1289: a demotion (the event's tier below a rung that
+                // ended that year) is the war's razing, not throughput.
+                if ((e.polity < 3 && it->year_post_road_end == e.year)
+                    || (e.polity < 2 && it->year_road_end == e.year)
+                    || (e.polity < 1 && it->year_track_end == e.year)) continue;
                 mx = (it->c0 + it->c1) * 0.5f;
                 my = (it->r0 + it->r1) * 0.5f;
                 over_water = it->over_water;
@@ -3779,6 +3890,13 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
                     }
                 }
             break;
+        case lapse_event_kind::absorbed_at_close:
+            // BL-1278: a closing-round absorption ends the absorbed REALM when
+            // both parties are named (`polity` absorbed, `other` absorber);
+            // unheld ground (`polity` none) and a small realm taking unheld
+            // ground (`other` none) end nobody.
+            if (e.polity == lapse_event_none || e.other == lapse_event_none) break;
+            [[fallthrough]];
         case lapse_event_kind::realm_ended:
             // The link dissolves with either party (the sim: "the overlord is
             // gone; the link dissolves with it"), and so does a treaty.
@@ -4703,7 +4821,10 @@ lapse_arc summarise_lapse_arc(const history_lapse& h)
     // A REALM THAT ENDED is one the sim recorded ending — never one merely
     // missing from the closing step, which is what every dead realm is.
     for (const lapse_event& e : h.lapse.events)
-        if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)) ++out.eliminated;
+        if (e.kind == static_cast<uint8_t>(lapse_event_kind::realm_ended)
+            || (e.kind == static_cast<uint8_t>(lapse_event_kind::absorbed_at_close) // BL-1278
+                && e.polity != lapse_event_none && e.other != lapse_event_none))
+            ++out.eliminated;
 
     int biggest_end = 0, smallest_end = 0;
     for (std::size_t id = 0; id < first_r.size(); ++id)
@@ -4869,9 +4990,29 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
                       polity_name_of(h, e.polity), R);
         break;
     case lapse_event_kind::road_promoted:
-        std::snprintf(buf, sizeof buf, "A %s is laid between %s and %s.",
-                      e.polity >= 2 ? "road" : "track", R, region_name_of(h, e.other));
+    {
+        // BL-1289: the same kind, one tier DOWN, is the world war's demotion.
+        // The rung the corridor stood on is replayed from the carried network
+        // and this record's events before this one.
+        int stood = 0;
+        for (const lapse_road_seg& c : h.road_carry)
+            if (c.region_a == e.region && c.region_b == e.other)
+                stood = c.year_post_road != 0x7FFFFFFF ? 3 : c.year_road != 0x7FFFFFFF ? 2 : 1;
+        for (const lapse_event& x : h.lapse.events)
+        {
+            if (&x == &e) break;
+            if (x.kind == static_cast<uint8_t>(lapse_event_kind::road_promoted)
+                && x.region == e.region && x.other == e.other)
+                stood = x.polity;
+        }
+        if (static_cast<int>(e.polity) < stood)
+            std::snprintf(buf, sizeof buf, "War wrecks the %s between %s and %s.",
+                          stood >= 2 ? "road" : "track", R, region_name_of(h, e.other));
+        else
+            std::snprintf(buf, sizeof buf, "A %s is laid between %s and %s.",
+                          e.polity >= 2 ? "road" : "track", R, region_name_of(h, e.other));
         break;
+    }
     case lapse_event_kind::civilisation_formed:
         // BL-1106: `other` is the civilisation index; its coined name is on
         // the record's name table. The wording is the history log's own.
@@ -5024,6 +5165,179 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "%s sails against %s from %s.",
                       polity_name_of(h, e.polity), R, region_name_of(h, e.other));
         break;
+    case lapse_event_kind::absorbed_at_close:
+    {
+        // BL-1278 (NATION_GENERATION.md sec Pass 2c, sec The nation count is a
+        // target): the CAUSE is the date. The size floor's absorptions fall in
+        // the span's last simulated year; the total's corrections at the close
+        // itself (the record's start + years). The slots say who: `polity`
+        // absorbed by `other`; `polity` none for unheld ground; `other` none
+        // where the realm in `polity` was too small and took unheld ground.
+        const bool to_total = e.year >= h.lapse.start_year + h.lapse.years;
+        if (e.other == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "%s, too small to stand alone, takes the unheld ground at %s.",
+                          polity_name_of(h, e.polity), R);
+        else if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, to_total ? "%s takes the unheld ground at %s as the realms settle."
+                                                    : "%s takes the unheld ground at %s, too small to stand alone.",
+                          polity_name_of(h, e.other), R);
+        else if (to_total)
+            std::snprintf(buf, sizeof buf, "%s is absorbed by %s as the realms settle to their number.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        else
+            std::snprintf(buf, sizeof buf, "%s, too small to stand alone, is absorbed by %s.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    }
+    case lapse_event_kind::seceded_at_close:
+        // BL-1278: a province breaks away to bring the realms to the player's total.
+        std::snprintf(buf, sizeof buf, "%s breaks from %s as the realms settle to their number.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::champion_chartered:
+        // BL-1278 lane C: a minor raises a national champion from its own capital.
+        std::snprintf(buf, sizeof buf, "%s charters a national champion at %s.",
+                      polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::state_charter:
+        // BL-1278 lane C: the same, the treasury making up the price.
+        std::snprintf(buf, sizeof buf, "The treasury of %s charters a national champion at %s.",
+                      polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::champion_bought_out:
+        // BL-1278 lane C: the cross-border buy-out; `other` is the buyer.
+        std::snprintf(buf, sizeof buf, "A champion of %s buys out the champion of %s.",
+                      polity_name_of(h, e.other), polity_name_of(h, e.polity));
+        break;
+    case lapse_event_kind::rise_pressed:
+        // BL-1287 (CIVILISATION.md sec How an empire actually falls): the realm
+        // largest at 200 BCE pressed one level harder on its way up -- `other`
+        // the level, 1 the lean itself, more the backstop's escalation.
+        if (e.other <= 1)
+            std::snprintf(buf, sizeof buf, "%s presses its lead from %s: its roads carry its armies on.",
+                          polity_name_of(h, e.polity), R);
+        else
+            std::snprintf(buf, sizeof buf, "%s presses its conquests harder from %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::overextended:
+        // BL-1287: after its peak, the same realm's roads and works decay and its
+        // far garrisons thin, one level further (the fall acts on the map).
+        if (e.other <= 1)
+            std::snprintf(buf, sizeof buf, "%s has overreached: its roads decay, and %s calls its far garrisons home.",
+                          polity_name_of(h, e.polity), R);
+        else
+            std::snprintf(buf, sizeof buf, "The overreach of %s deepens; its roads decay further from %s.",
+                          polity_name_of(h, e.polity), R);
+        break;
+    case lapse_event_kind::late_culture_chosen:
+    {
+        // BL-1288 (EXPLORATION.md sec A colony is a subject): at the Culture
+        // close, the people most remote by reach. `polity` is the CULTURE
+        // index (as culture_split's), named off the roster where it can be;
+        // `other` its remoteness, `lapse_event_none` when no road or march
+        // joined its ground to any other people's.
+        const char* P = (static_cast<std::size_t>(e.polity) < h.people_name.size()
+                         && !h.people_name[e.polity].empty())
+                            ? h.people_name[e.polity].c_str() : nullptr;
+        if (e.other == lapse_event_none)
+            std::snprintf(buf, sizeof buf, P != nullptr
+                              ? "The %s of %s stand apart: no road or march joins them to any other people."
+                              : "%s%s stands apart: no road or march joins it to any other people.",
+                          P != nullptr ? P : "", R);
+        else
+            std::snprintf(buf, sizeof buf, P != nullptr
+                              ? "The %s of %s stand furthest from any other people; what the world learns reaches them last."
+                              : "%s%s stands furthest from any other people; what the world learns reaches it last.",
+                          P != nullptr ? P : "", R);
+        break;
+    }
+    case lapse_event_kind::isolation_pressed:
+    {
+        // BL-1288: the late culture's backstop, one level further -- in the
+        // Empires record the approaches to its ground going unwalked, in the
+        // Exploration record the voyages that finally carry to it. `other` the level.
+        // `other` below 100: the isolation's level; 100 + n: the Exploration
+        // contact press (level n).
+        const char* P = (static_cast<std::size_t>(e.polity) < h.people_name.size()
+                         && !h.people_name[e.polity].empty())
+                            ? h.people_name[e.polity].c_str() : "far people";
+        if (e.other < 100)
+            std::snprintf(buf, sizeof buf, e.other <= 1
+                              ? "The roads to and around %s go unwalked; the %s keep to their own holds."
+                              : "The ways toward %s fall further out of use; the %s grow more apart.",
+                          R, P);
+        else
+            std::snprintf(buf, sizeof buf, e.other <= 101
+                              ? "Voyages begin to carry as far as %s and the %s."
+                              : "Ships reach %s more often; the %s are drawn into the wider world.",
+                          R, P);
+        break;
+    }
+    case lapse_event_kind::civil_war_famine:
+        // BL-1290 (MILITARY_HISTORY.md sec Armies are distinct from
+        // population): the ground a civil war is fought over starves. `polity`
+        // held it when the halves fought; `other` is the half that attacked.
+        std::snprintf(buf, sizeof buf, "Famine grips %s as %s and %s fight their civil war.",
+                      R, polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::civil_war_flight:
+        // BL-1290: and its people flee to the nearest safe ground of their own
+        // kin; `other` is that destination REGION, not a polity.
+        std::snprintf(buf, sizeof buf, "Refugees flee the civil war at %s for %s.",
+                      R, region_name_of(h, e.other));
+        break;
+    case lapse_event_kind::war_joined:
+    {
+        // BL-1289 (INDUSTRIALISATION.md sec A world war in every world): the
+        // FIRST entry in the record is the declaration -- `polity` opened the
+        // war on `other` over the ground at `region`; every later one is a
+        // realm entering beside `other` (its pact partner, overlord or leader).
+        bool declaration = false;
+        for (const lapse_event& x : h.lapse.events)
+            if (x.kind == static_cast<uint8_t>(lapse_event_kind::war_joined))
+            {
+                declaration = x.year == e.year && x.region == e.region && x.polity == e.polity && x.other == e.other;
+                break;
+            }
+        if (declaration)
+            std::snprintf(buf, sizeof buf, "%s goes to war with %s over %s, and the world war begins.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other), R);
+        else
+            std::snprintf(buf, sizeof buf, "%s enters the world war beside %s.",
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    }
+    case lapse_event_kind::ground_razed:
+        // BL-1289: the ground the war is fought over -- works, port and roads
+        // razed, its people starved and driven out while the war stands.
+        std::snprintf(buf, sizeof buf, "The war with %s razes %s, in the realm of %s; famine and flight follow.",
+                      polity_name_of(h, e.other), R, polity_name_of(h, e.polity));
+        break;
+    case lapse_event_kind::war_peace:
+        // BL-1289: peace between the two realms that opened it.
+        std::snprintf(buf, sizeof buf, "Peace between %s and %s ends the world war.",
+                      polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
+    case lapse_event_kind::revolution:
+    {
+        // BL-1294 (INDUSTRIALISATION.md sec Revolution): a splinter rose at
+        // `region` and took the whole realm -- same ground, a new regime and a
+        // newly coined name. The record's table carries the NEW name; the old
+        // one is the record before's entry for the same id
+        // (`former_polity_name`), named where the app filled it.
+        const char* now_name = polity_name_of(h, e.polity);
+        const std::string* was = (e.polity != lapse_event_none
+                                  && static_cast<std::size_t>(e.polity) < h.former_polity_name.size())
+                                     ? &h.former_polity_name[e.polity] : nullptr;
+        if (was != nullptr && !was->empty() && *was != now_name)
+            std::snprintf(buf, sizeof buf, "A splinter rises at %s and takes %s whole; the realm is %s now.",
+                          R, was->c_str(), now_name);
+        else
+            std::snprintf(buf, sizeof buf, "A splinter rises at %s and takes the realm whole; it is %s now.",
+                          R, now_name);
+        break;
+    }
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5074,6 +5388,18 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::schism:
     case lapse_event_kind::furnace_lit:
     case lapse_event_kind::rung_crossed:         return 0; // BL-1100: a realm's crossing, a handful per world
+    // BL-1278 lane C: the majors' corrections, a handful per world at most.
+    case lapse_event_kind::champion_chartered:
+    case lapse_event_kind::state_charter:
+    case lapse_event_kind::champion_bought_out:  return 0;
+    // BL-1287: the rise and fall's levels, a handful per world, all one realm's.
+    case lapse_event_kind::rise_pressed:
+    case lapse_event_kind::overextended:         return 0;
+    // BL-1288: the late culture's choice (once) and its backstop's levels.
+    case lapse_event_kind::late_culture_chosen:
+    case lapse_event_kind::isolation_pressed:    return 0;
+    // BL-1294: a revolution, a handful per world at most -- a realm renamed.
+    case lapse_event_kind::revolution:           return 0;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.
@@ -5087,6 +5413,15 @@ int ticker_priority(const lapse_event& e)
     // BL-1095: a wet campaign fires as often as the corridors do; the map's
     // sail is its mark, and the ticker names it only when the arc is quiet.
     case lapse_event_kind::sea_leg_campaign:     return 2;
+    // BL-1290: the famine is the civil war's moment on the ticker (common
+    // tier); the flight beside it names where the people went, and takes the
+    // ticker only when the arc is quiet -- the map is its primary telling.
+    // BL-1289: the world war's peace is once a world; its entries come by the
+    // dozen in its opening round, so they take the common tier; its razings
+    // take the ticker only when the arc is quiet (the map pins them).
+    case lapse_event_kind::war_peace:            return 0;
+    case lapse_event_kind::ground_razed:         return 2;
+    case lapse_event_kind::civil_war_flight:     return 2;
     default:                                     return 1;
     }
 }

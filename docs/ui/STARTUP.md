@@ -50,7 +50,8 @@ in-game days. `run_verify()` jumps straight to `in_game`
 A dark, centred title card — deliberately spare, a launch entry point, not a
 settings hub (no Load/Save on the menu; `--load` is a command-line path). Contents:
 
-- **Seed** — hex entry, a one-shot **Roll** (a `random_device` draw feeds *only*
+- **Seed** — **moved to the wizard's setup round (Ben, 2026-10-11; § Rounds)**; what follows
+  describes the control wherever it is drawn. Hex entry, a one-shot **Roll** (a `random_device` draw feeds *only*
   the seed value; generation stays a pure function of it), and **Copy seed**.
   **The wizard OPENS on a rolled seed, not on a fixed one (Ben, 2026-09-10):**
   *"Let's lose the framing of seeded worlds... it allows the player to have a higher degree of
@@ -64,13 +65,13 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
   explicitly. Seed `0` still names the reference world; it is simply no longer what you get by
   accident.
 - **Resources** — abundance radio: Sparse / Lean / Standard (Standard is the
-  Earth-like ceiling, GENERATION_STRATEGY.md § The resource ceiling).
+  Earth-like ceiling, GENERATION_STRATEGY.md § The resource ceiling). **Moved to the setup round
+  with the seed (Ben, 2026-10-11).**
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
-  later update. No nation knob: nation count is a consequence of landmass, not
-  a target (NATION_GENERATION.md).
+  later update. The nation targets are set on the setup round, not here (§ Rounds).
 - **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Quit**.
-- **Quick Start (Ben, 2026-10-08)** — generates the world straight through on the menu's seed and
-  resources, with no wizard rounds drawn: the cold build behind one loading bar, then the **seat
+- **Quick Start (Ben, 2026-10-08)** — generates the world straight through with no wizard rounds
+  drawn but the setup round, which it opens alone (§ Rounds): the cold build behind one loading bar, then the **seat
   screen**, so the player still chooses the corporation. It is the same world the wizard builds
   on the same settings (§ Handoff: a cold build and an adopted world open on one state hash), so
   it is a way past the rounds, not a different game.
@@ -126,23 +127,24 @@ map when it lands. The 2026-09-24/25 rulings that the globe holds through that w
 in one sharp jump are retired with the globe: there is nothing to replace.
 
 **The map takes no steering input.** The premise the globe carried survives it: **you set
-conditions here, you do not steer** (Ben, 2026-08-10). Whether a player may pan or zoom the Life
-map to read it is open design; nothing on it is a control over the world.
+conditions here, you do not steer** (Ben, 2026-08-10). The Life map neither pans nor zooms,
+matching the pass rounds' map (Ben, 2026-10-11); nothing on it is a control over the world.
 
-## Rounds — System, Life, Culture, Empires, Exploration, Industrialisation
+## Rounds — System, setup, Life, Culture, Empires, Exploration, Industrialisation
 
-The wizard has **six rounds** (`wizard_round_count`; Ben, 2026-09-08, the set settled
-2026-09-09 and 2026-09-13): two planetology rounds — **System** and **Life** — and four lapse
+The wizard has **seven rounds**: the six below (`wizard_round_count`; Ben, 2026-09-08, the set
+settled 2026-09-09 and 2026-09-13) and the **setup round** between System and Life (Ben,
+2026-10-10/11; below). The six are two planetology rounds — **System** and **Life** — and four lapse
 rounds — **Culture**, **Empires**, **Exploration** and **Industrialisation**
 (`wizard_pass_round_count` and `wizard_lapse_round_count`, both 4). **Every pass round is a
 lapse round:** each plays its own span, on the same 2D map, and the spans meet end to end.
 
 | Round | Span | Authority |
 |---|---|---|
-| 3 — Culture | 2400 BCE → 400 BCE | [`COLONISATION.md`](../generation/COLONISATION.md) |
-| 4 — Empires | 400 BCE → 1200 CE | [`CIVILISATION.md`](../generation/CIVILISATION.md) |
-| 5 — Exploration | 1200 → 1660 CE | [`EXPLORATION.md`](../generation/EXPLORATION.md) |
-| 6 — Industrialisation | 1660 → 1960 CE | [`INDUSTRIALISATION.md`](../generation/INDUSTRIALISATION.md) |
+| 4 — Culture | 2400 BCE → 400 BCE | [`COLONISATION.md`](../generation/COLONISATION.md) |
+| 5 — Empires | 400 BCE → 1200 CE | [`CIVILISATION.md`](../generation/CIVILISATION.md) |
+| 6 — Exploration | 1200 → 1660 CE | [`EXPLORATION.md`](../generation/EXPLORATION.md) |
+| 7 — Industrialisation | 1660 → 1960 CE | [`INDUSTRIALISATION.md`](../generation/INDUSTRIALISATION.md) |
 
 The wizard does not stop at planetology. The four lapse rounds carry the generation
 phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight
@@ -154,8 +156,16 @@ player sets the **nation targets**: how many nations the homeworld ends with (**
 and how many of them are **majors** (1 to 6). Both are always hit
 ([`NATION_GENERATION.md`](../generation/NATION_GENERATION.md) § The nation count is a target).
 They are the wizard's one sanctioned exception to *preferences, not parameters*: a count a player
-plainly wants to set, hit by in-world events rather than by fiat. What else the setup round holds,
-and where it sits against System, is open design.
+plainly wants to set, hit by in-world events rather than by fiat.
+
+**It sits between System and Life, and holds the world-wide inputs too (Ben, 2026-10-11).** The
+setup round carries the two nation targets, the **seed** (hex entry, Roll, Copy seed) and the
+**abundance** radio — the inputs that shape the whole world rather than one round's subject. They
+move here from the main menu. Every round keeps its own leans: System's and Life's preferences, and
+each pass round's, stay where they are. The order is System, setup, Life, then the four pass rounds.
+**Quick Start opens the setup round alone, then builds straight through (Ben, 2026-10-13)**: the one
+place the world-wide inputs are set stays the only place, and Quick Start still skips every other
+round.
 
 **INHERITANCE IS NOT A ROUND (Ben, 2026-09-09; held 2026-09-24).** The third planetology round —
 *Inheritance*, which asked what the era before you already took — is retired and is not revived:

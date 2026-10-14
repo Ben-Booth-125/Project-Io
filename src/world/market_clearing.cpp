@@ -1520,7 +1520,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const auto mkit = w.markets.find(mid);
         if (mkit == w.markets.end())
             continue;
-        const bool paid = w.corporations.find(owner) != w.corporations.end();
+        // BL-1296: a NATION is paid too — what its state buildings land is sold
+        // like any building's output, and apply_budget settles it into the
+        // treasury (NATIONS.md § 2, the second exception: market flows).
+        const bool paid = w.corporations.find(owner) != w.corporations.end()
+                       || w.nations.find(owner) != w.nations.end();
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             const float qty = landed.quantities[r];

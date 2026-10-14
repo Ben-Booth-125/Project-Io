@@ -114,14 +114,11 @@ foot("balance", "balance", "ledger_02_budget_foot")
 ledger("construction", "ledger_03_construction")
 
 -- ===========================================================================
--- Slot 4 — Research / tech-tree mock (UI-108)
+-- Slot 4 — Research panel (UI-108, BL-1276)
 -- ===========================================================================
--- One era per tab, and the default is Era 0 rather than the first tab, so a
--- single capture shows neither the placeholder era above it nor the unauthored
--- one below.
-for v = 0, 3 do
-    ledger("tech_tree", string.format("ledger_04_research_era_%d", v), "tech_tree", v)
-end
+-- One view (no modes: shift-click queues, Ben 2026-10-10). tech_tree_panel.lua
+-- drives the presses.
+ledger("tech_tree", "ledger_04_research")
 
 -- ===========================================================================
 -- Slot 5 — Acquisitions ledger

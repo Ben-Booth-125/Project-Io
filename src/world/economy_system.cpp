@@ -12,6 +12,7 @@
 #include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
+#include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
 
@@ -129,7 +130,8 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // here is bit-for-bit what it was before the field existed.
     // BL-1198/BL-1199: a Well or a Fishing Wharf has no deposit; it runs at a
     // typical deposit's rate.
-    const float rich = placement_rules::is_depositless_site(w, b.tile, b.target_resource)
+    const bool  depositless = placement_rules::is_depositless_site(w, b.tile, b.target_resource);
+    const float rich = depositless
                      ? placement_rules::depositless_rate_scalar(b.target_resource)
                      : richness_rate_scalar(e, tc.resource_deposit[ri]);
     const float nominal = e.base_rate
@@ -138,13 +140,16 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
          * wt_scalar
          * building_supply_scalar(b)
          * (1.0f - tc.hazard_level);
-    // BL-1273: the owning corp's home nation's held-node extraction_rate
-    // multiplier, folded into the single definition of the draw (BL-479's
-    // per-corp read site before it). `nation_scalar` hands back `nominal`
-    // untouched — no arithmetic — until the effect pass (BL-1274) fills it.
-    const auto cit = w.corporations.find(corp);
-    const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
-    return nation_scalar(w, nation, modifier_subject::extraction_rate, nominal);
+    // BL-1273/BL-1274: the owning corp's home nation's held-node
+    // extraction_rate modifiers (scoped to this site's resource, or "all"),
+    // folded into the single definition of the draw. A nation holding nothing
+    // gets `nominal` back untouched — no arithmetic.
+    // BL-1296: a state building answers to its own nation (owner_home_nation).
+    const entity_id nation = owner_home_nation(w, corp);
+    effect_target at;
+    at.resource = static_cast<int>(b.target_resource);
+    at.site     = extraction_site_name(b.target_resource, depositless); // "farm" is not a Fishing Wharf
+    return nation_scalar(w, nation, modifier_subject::extraction_rate, at, nominal);
 }
 
 // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared pro-rata",
@@ -502,6 +507,27 @@ bool market_wired(world& w, entity_id market)
     return rc >= 0.0f && std::isfinite(rc);
 }
 
+/// BL-1274: one output good of one run, as the owning corp's home nation's
+/// held processing_yield modifiers make it (scope "all", the good, the recipe or
+/// its group). A nation holding nothing gets @p outq back untouched. The ONE
+/// expression the credit and the store-ceiling run limit both read, so a run is
+/// never sized against a smaller output than it is credited.
+float processing_output(const world& w, entity_id corp, const recipe& rcp, std::size_t r, float outq)
+{
+    const auto      cit    = w.corporations.find(corp);
+    const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+    effect_target   at;
+    at.group    = rcp.group;
+    at.recipe   = rcp.name;
+    at.resource = static_cast<int>(r);
+    return nation_scalar(w, nation, modifier_subject::processing_yield, at, outq);
+}
+
+} // namespace
+
+// Exported (BL-1274): declared in economy_system.hpp so nation_tech_harness can
+// measure a processing_yield node at the one place output accrues. The
+// anonymous namespace re-opens below.
 /// Land one run's outputs on @p market under the BL-708 store ceiling. Returns
 /// what was produced. Shared by the draw and BL-1209's top-up.
 float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id corp,
@@ -525,6 +551,9 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
 
     std::array<float, resource_count> stock{};
     bool stock_read = false;
+    // BL-1274: the held-node processing_yield modifiers, per output good,
+    // applied where the output accrues (processing_output). The run's INPUTS
+    // are unchanged — a yield node makes more from the same draw.
     float produced = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -533,6 +562,7 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
             continue;
         if (grid.any() && grid.grid(r) && !market_wired(w, market))
             continue; // BL-708: no wire to sell it down
+        outq = processing_output(w, corp, rcp, r, outq);
         const float cap = grid.ceiling(r);
         if (cap > 0.0f)
         {
@@ -554,6 +584,8 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
     return produced;
 }
 
+namespace {
+
 /// BL-1265: does any of @p rcp's outputs carry a BL-708 store ceiling? Only
 /// then is the shelf stock read for `store_run_limit`.
 bool any_capped_output(const recipe_registry& reg, const recipe& rcp)
@@ -568,8 +600,11 @@ bool any_capped_output(const recipe_registry& reg, const recipe& rcp)
 /// BL-1209: the most extra run a processor's outputs can still be credited for
 /// under the BL-708 store ceiling. Infinite while any output is uncapped (a run
 /// still makes that output); else the largest run any capped output has room for.
-/// @p stock is the shelf as `shelf_stock_with_landings` reads it.
-float store_run_limit(const recipe_registry& reg, const recipe& rcp,
+/// @p stock is the shelf as `shelf_stock_with_landings` reads it. Sized with
+/// the output the run will actually be credited — BL-1274's yield modifiers
+/// included (processing_output) — so no input is drawn for output the
+/// ceiling then clamps away.
+float store_run_limit(const world& w, entity_id corp, const recipe_registry& reg, const recipe& rcp,
                       const std::array<float, resource_count>& stock, float batches_full)
 {
     const grid_goods_params& grid = reg.grid_goods();
@@ -577,9 +612,9 @@ float store_run_limit(const recipe_registry& reg, const recipe& rcp,
     bool any_output = false;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float outq = rcp.outputs[r] * batches_full;
-        if (!(outq > 0.0f))
+        if (!(rcp.outputs[r] * batches_full > 0.0f))
             continue;
+        const float outq = processing_output(w, corp, rcp, r, rcp.outputs[r] * batches_full);
         any_output = true;
         const float cap = grid.ceiling(r);
         if (!(cap > 0.0f))
@@ -798,7 +833,7 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
     if (!has_input)
         return false;
     if (any_capped_output(reg, *rcp))
-        extra = std::min(extra, store_run_limit(reg, *rcp, shelf_stock_with_landings(w, market_id), batches_full));
+        extra = std::min(extra, store_run_limit(w, corp, reg, *rcp, shelf_stock_with_landings(w, market_id), batches_full));
     const float new_run = std::min(1.0f, rep.run + extra);
     // A meaningful increment only: float dust left by the first turn is not a run.
     if (!(new_run >= reg.t_idle()) || !(new_run - rep.run > 1e-5f))
@@ -885,7 +920,7 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
         if (!std::isfinite(more))
             continue; // no inputs
         if (any_capped_output(reg, *rcp))
-            more = std::min(more, store_run_limit(reg, *rcp, shelf_stock_with_landings(w, mid), bf));
+            more = std::min(more, store_run_limit(w, rep.corp, reg, *rcp, shelf_stock_with_landings(w, mid), bf));
         const float could = std::min(1.0f, rep.run + more);
         if (!(could >= reg.t_idle()) || !(could - rep.run > 1e-4f))
             continue;
@@ -1222,7 +1257,9 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             if (duration <= 0.0f)
                 continue;
             const entity_id mid = market_for_tile(w, b.tile);
-            if (mid == null_entity || owner_corp_of(w, bid) == null_entity
+            if (b.state_idle) // BL-1296: the treasury could not pay — paused, draws nothing
+                continue;
+            if (mid == null_entity || building_owner_of(w, bid).id == null_entity
                 || building_body(w, b) == null_entity)
                 continue; // no draw is made (the pass below draws only for these)
             const market_component& m = w.markets.at(mid);
@@ -1329,6 +1366,10 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const building_economics& econ = reg.economics(b.type);
         const float duration           = econ.build_duration_ticks;
         if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
+        // BL-1296: a state site its treasury could not fund this tick waits —
+        // it draws nothing, pays nothing, and registers no want.
+        if (b.state_idle)
+            continue;
         // BL-1209: this site's allocation where it draws a contended shelf.
         const auto sp = site_plan.find(bid);
         site_alloc* alloc = (sp != site_plan.end()) ? &sp->second : nullptr;
@@ -1375,7 +1416,11 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         // processors hold back, and the affordability gate prices every unit at
         // the market (construction_capex). The corp's surplus reaches its own
         // site the way any seller's does — listed, then bought off the shelf.
-        const entity_id corp     = owner_corp_of(w, bid);
+        // BL-1296: the OWNER — a corporation, or a nation for a state site
+        // (its draws book under the nation's id, its flat cost leaves the
+        // treasury below).
+        const building_owner own = building_owner_of(w, bid);
+        const entity_id corp     = own.id;
         const entity_id body     = building_body(w, b);
         const entity_id pool_key = (mid != null_entity) ? mid : body;
 
@@ -1501,6 +1546,15 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 cit->second.balance -= flat;
                 b.construction_paid += flat; // BL-1206: the flat half, as debited
             }
+            else if (own.kind == owner_kind::nation)
+            {
+                // BL-1296: a state site's flat cost leaves its treasury — funded
+                // by this tick's gate, so it cannot overdraw it.
+                const float flat = (econ.build_cost / duration) * rate;
+                w.nations.at(corp).treasury -= flat;
+                b.construction_paid += flat;
+                w.state_ledger[corp].construction += flat;
+            }
         }
 
         // Advance sub-tick progress; a full-rate tick consumes exactly one whole
@@ -1514,6 +1568,18 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         if (b.ticks_remaining <= 0)
         {
             b.construction_progress = 0.0f;
+            // BL-1296 fix round: a STATE site that completes this tick was
+            // funded for its construction, not for running — it runs from the
+            // next gate. Idle for the rest of this tick (no labour, inputs,
+            // output or operating cost), and the ledger says so.
+            if (own.kind == owner_kind::nation)
+            {
+                b.state_idle = true;
+                world::state_tick_ledger& led = w.state_ledger[corp];
+                --led.funded;
+                ++led.idled;
+            }
+
             // COMPLETION is when a port/hub starts anchoring supply
             // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
             // reach field goes stale at this moment too, not only at placement.
@@ -1577,8 +1643,20 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     if (b.recipe_switch_cooldown > 0)
         return recipe_switch_result::on_cooldown;
 
+    // BL-1296: @p corp may name a NATION switching one of its state buildings
+    // (NATIONS.md § State industry, "The player's controls"). Then the tech
+    // gate asks its champion (same home nation, same tree), the cost comes out
+    // of the treasury's uncommitted part, and the new recipe must keep the
+    // building state industry (`state_runs`) — nothing moves between state and
+    // private in play.
     const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    const auto nit = (cit == w.corporations.end()) ? w.nations.find(corp) : w.nations.end();
+    if (cit == w.corporations.end() && nit == w.nations.end())
+        return recipe_switch_result::invalid;
+    const entity_id gate_corp = (cit != w.corporations.end()) ? corp : champion_of(w, corp);
+    if (gate_corp == null_entity)
+        return recipe_switch_result::invalid;
+    if (nit != w.nations.end() && !state_runs(reg, b.type, new_recipe_id))
         return recipe_switch_result::invalid;
 
     const recipe_switch_params& sw = reg.recipe_switch();
@@ -1610,7 +1688,7 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     // doors for the reason the depth gate used to: guarding only placement
     // leaves the one-click bypass (place the ungated method, retool onto the
     // tech-locked one in the same group).
-    if (!recipe_unlocked(w, reg, corp, new_recipe_id))
+    if (!recipe_unlocked(w, reg, gate_corp, new_recipe_id))
         return recipe_switch_result::tech_locked;
 
     // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
@@ -1619,10 +1697,32 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         return recipe_switch_result::wrong_air;
 
     const float cost = sw.switch_cost;
-    if (cit->second.balance < cost)
+    // BL-1296 fix round: a state retool must also fund what the NEW recipe's
+    // inputs add to this tick's bill (the gate priced the old recipe), so the
+    // switch cost and that increase both come out of the uncommitted treasury,
+    // and the increase is committed when the retool applies.
+    float bill_rise = 0.0f;
+    if (nit != w.nations.end() && !b.state_idle)
+    {
+        building_component after = b;
+        after.recipe = new_recipe_id;
+        bill_rise = std::max(0.0f, (state_building_cost_bound(w, reg, after)
+                                    - state_building_cost_bound(w, reg, b)) * 1.0005f);
+        if (!std::isfinite(bill_rise))
+            return recipe_switch_result::insufficient_funds;
+    }
+    const float funds = (cit != w.corporations.end()) ? cit->second.balance
+                                                      : state_uncommitted_treasury(w, corp) - bill_rise;
+    if (funds < cost)
         return recipe_switch_result::insufficient_funds;
+    if (bill_rise > 0.0f)
+        w.state_ledger[corp].committed += bill_rise;
 
-    cit->second.balance -= cost;
+    if (cit != w.corporations.end())
+        cit->second.balance -= cost;
+    else
+        nit->second.treasury -= cost; // a one-off retool, paid from the treasury
+
     b.recipe                 = new_recipe_id;
     b.active_recipe_index    = static_cast<int>(new_recipe_id); // registry index == id (recipe_at)
     b.loss_streak            = 0;                                // give the new recipe a chance
@@ -1673,6 +1773,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // flat one-tick-per-tick decrement with a market-gated rate: each build draws +
     // pays for its materials as real market demand and progresses only as fast as
     // the local market can supply them (full / stretched / paused).
+    // BL-1296 (state industry; NATIONS.md § State industry, "A losing building
+    // idles"): BEFORE anything this tick charges an owner, each nation's
+    // treasury funds the state buildings it can pay for and idles the rest for
+    // the tick (`plan_state_funding`). Every pass below skips a `state_idle`
+    // building — it builds, staffs, draws, produces and pays nothing — so the
+    // state never runs into debt. No state industry anywhere: a no-op.
+    plan_state_funding(w, reg);
+
     run_construction(w, reg, report);
     phase_stamp(1); // construction (sentiment decay included)
 
@@ -1901,14 +2009,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     };
     // Building counts per (corp, body) for apportionment. Integer counts commute
     // exactly, so the unordered corporations walk is safe here.
+    // BL-1296: every ECONOMIC OWNER — corporations and the nations holding
+    // state industry (economic_owner_ids) — ascending id. With no state
+    // industry anywhere this is exactly the sorted corporation list it replaced.
+    // A state building the treasury idled this tick is skipped by every walk
+    // below: it staffs, draws and produces nothing.
+    std::vector<entity_id> corp_ids = economic_owner_ids(w);
     std::map<std::pair<entity_id, entity_id>, int> bldg_count_by_corp_body;
     std::map<entity_id, int>                        bldg_count_by_body;
-    for (const auto& [corp, cc] : w.corporations)
+    for (const entity_id corp : corp_ids)
     {
-        for (const entity_id bid : cc.assets)
+        for (const entity_id bid : *assets_of(w, corp))
         {
             const auto bit = w.buildings.find(bid);
-            if (bit == w.buildings.end())
+            if (bit == w.buildings.end() || bit->second.state_idle)
                 continue;
             const entity_id body = building_body(w, bit->second);
             if (body == null_entity)
@@ -1918,12 +2032,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
-    // Visit corporations in ascending id order for deterministic output.
-    std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
-        corp_ids.push_back(kv.first);
-    std::sort(corp_ids.begin(), corp_ids.end());
+    // Visit owners in ascending id order for deterministic output (`corp_ids`,
+    // built above — corporations and state-holding nations, BL-1296).
 
     // ── Pass 1: labour contention for every (corp, body).
     //
@@ -1969,7 +2079,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     std::map<std::pair<entity_id, entity_id>, std::pair<float, float>> wage_signal_acc;
     for (const entity_id corp : corp_ids)
     {
-        const corporation_component& cc = w.corporations.at(corp);
+        const std::vector<entity_id>& owned = *assets_of(w, corp); // BL-1296: corp or nation
 
         // Workforce pool, step 1: sum this corp's labour demand on each body
         // (the requested workforce_assigned of every producing building there),
@@ -1978,7 +2088,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         // BL-041: demand is capped by the body's habitability scalar before summing.
         demand_by_body.clear();
         claims.clear();
-        for (const entity_id building_id : cc.assets)
+        for (const entity_id building_id : owned)
         {
             const auto bit = w.buildings.find(building_id);
             if (bit == w.buildings.end())
@@ -1986,6 +2096,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const building_component& b = bit->second;
             if (b.ticks_remaining > 0)
                 continue; // still under construction — no labour demand yet
+            if (b.state_idle)
+                continue; // BL-1296: unfunded this tick — staffs nobody
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue; // ports and none demand no labour in L3
@@ -2107,18 +2219,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         std::map<std::pair<entity_id, entity_id>, std::vector<qual_claim>> qual_claims;
         for (const entity_id corp : corp_ids)
         {
-            const corporation_component& cc = w.corporations.at(corp);
-            for (const entity_id building_id : cc.assets)
+            for (const entity_id building_id : *assets_of(w, corp))
             {
                 const auto bit = w.buildings.find(building_id);
                 if (bit == w.buildings.end())
                     continue;
                 const building_component& b = bit->second;
-                if (b.decommissioned || b.ticks_remaining > 0)
+                if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle)
                     continue;
                 if (b.type != building_type::processing_facility)
                     continue; // extraction has no recipe, hence no qualified draw
                 const recipe* rcp = reg.get_recipe(b.recipe);
+
                 if (rcp == nullptr || rcp->qualified_workforce <= 0.0f)
                     continue;
                 const entity_id body = building_body(w, b);
@@ -2270,27 +2382,56 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // tile state, neither of which production moves, so hoisting it changes nothing
     // else. It is handed the site's rank so it maximises against the curve the site
     // actually rides (BL-346).
+    // BL-1296: the player runs its nation's state industry beside its champion
+    // (NATIONS.md § State industry, "Who runs it"), so the same stepped dial
+    // reaches the player's STATE buildings too — the player's own, not a rival's.
+    std::vector<std::pair<entity_id, const std::vector<entity_id>*>> auto_solve_sets;
     if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
     {
-        for (const entity_id building_id : pit->second.assets)
+        auto_solve_sets.emplace_back(w.player_entity, &pit->second.assets);
+        if (const auto pn = w.nations.find(pit->second.home_nation);
+            pn != w.nations.end() && !pn->second.state_assets.empty())
+            auto_solve_sets.emplace_back(pn->first, &pn->second.state_assets);
+    }
+    for (const auto& [solve_owner, solve_assets] : auto_solve_sets)
+    {
+        for (const entity_id building_id : *solve_assets)
         {
             const auto bit = w.buildings.find(building_id);
             if (bit == w.buildings.end())
                 continue;
             building_component& b = bit->second; // mutable: the auto-solver sets the target
-            if (b.decommissioned || b.ticks_remaining > 0)
+            if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle)
                 continue;
+            // BL-1322: no opt-out — the player runs these, and the player has no
+            // workforce control, so workforce_auto is not read here.
+            // BL-1296 fix round: a STATE building's target is solved like a
+            // corporation's, but a raise is taken only when the uncommitted
+            // treasury funds what it adds to this tick's bill (committed then);
+            // otherwise the target the gate funded stands.
+            const bool state_set = (solve_owner != w.player_entity);
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue;
             // BL-613/BL-614: the solver optimises against the labour the
             // building can actually reach — its own per-building grant,
             // ordinary and qualified constraints folded.
+            // BL-1322: one 50-internal step (25 % shown) toward the solver's best
+            // on the 0/50/100/150/200 grid; a STATE building's raise is still
+            // taken only when the uncommitted treasury funds it (BL-1296).
             const int best = solve_workforce_target(
                 w, reg, b,
-                labour_for(building_id, w.player_entity, building_body(w, b)),
+                labour_for(building_id, solve_owner, building_body(w, b)),
                 rank_of(building_id), nullptr, -1, workforce_step); // the 50-grid
-            b.workforce_target = step_workforce_target(b.workforce_target, best);
+            const int next = step_workforce_target(b.workforce_target, best);
+            if (state_set && next > b.workforce_target)
+            {
+                building_component after = b;
+                after.workforce_target = next;
+                if (!state_commit_change(w, reg, solve_owner, b, after))
+                    continue; // unfunded raise: the funded target stands
+            }
+            b.workforce_target = next;
         }
     }
 
@@ -2312,6 +2453,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         for (const auto& [c, cc] : w.corporations)
             for (const entity_id asset : cc.assets)
                 corp_of_building[asset] = c;
+        for (const auto& [n, nc] : w.nations) // BL-1296: a state owner, by nation id
+            for (const entity_id asset : nc.state_assets)
+                corp_of_building[asset] = n;
         const auto owner_of = [&](entity_id bid) -> entity_id {
             const auto it = corp_of_building.find(bid);
             return (it != corp_of_building.end()) ? it->second : null_entity;
@@ -2327,7 +2471,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             for (std::size_t i = first; i < last; ++i)
             {
                 const building_component& b = w.buildings.at(sites[i].id);
-                if (b.decommissioned || b.ticks_remaining > 0)
+                if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle)
                     continue;
                 const entity_id body = building_body(w, b);
                 if (body == null_entity)
@@ -2382,14 +2526,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         const float res_mult = reg.price_band().reservation_mult;
         for (const entity_id corp : corp_ids)
         {
-            const corporation_component& cc = w.corporations.at(corp);
-            for (const entity_id building_id : cc.assets)
+            for (const entity_id building_id : *assets_of(w, corp))
             {
                 const auto bit = w.buildings.find(building_id);
                 if (bit == w.buildings.end())
                     continue;
                 const building_component& b = bit->second;
-                if (b.decommissioned || b.ticks_remaining > 0
+                if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle
                     || b.type != building_type::processing_facility)
                     continue;
                 const entity_id body = building_body(w, b);
@@ -2443,9 +2586,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // ── Pass 5: production.
     for (const entity_id corp : corp_ids)
     {
-        const corporation_component& cc = w.corporations.at(corp);
-
-        for (const entity_id building_id : cc.assets)
+        for (const entity_id building_id : *assets_of(w, corp))
         {
             const auto bit = w.buildings.find(building_id);
             if (bit == w.buildings.end())
@@ -2455,6 +2596,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
             // Decommissioned buildings produce nothing — skip production entirely.
             if (b.decommissioned)
+                continue;
+            // BL-1296: nor does a state building its treasury could not fund.
+            if (b.state_idle)
                 continue;
             // Still under construction — no production yet (playtest patch, 2026-07-06).
             if (b.ticks_remaining > 0)
@@ -2829,13 +2973,28 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             }
             return *rescue_reach_ctx;
         };
-        for (const entity_id corp : corp_ids)
+        for (const entity_id owner : corp_ids)
         {
-            const corporation_component& acc = w.corporations.at(corp);
-            if (acc.is_player)
-                continue; // never auto-act on the player's own corp
+            // BL-1296 (AI_OPPONENT.md § 11, the 2026-10-11 grant): a rival
+            // major's STATE buildings take the same reflexes its champion's
+            // buildings take, logged under the champion (`corp` below). Never
+            // the player's nation's — its champion is the player's corp — and
+            // never a nation with no champion (a minor holds no state industry).
+            entity_id corp = owner;
+            if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+            {
+                if (cit->second.is_player)
+                    continue; // never auto-act on the player's own corp
+            }
+            else
+            {
+                corp = champion_of(w, owner);
+                const auto ch = w.corporations.find(corp);
+                if (ch == w.corporations.end() || ch->second.is_player || corp == w.player_entity)
+                    continue; // the player's state industry is the player's
+            }
 
-            for (const entity_id bid : acc.assets)
+            for (const entity_id bid : *assets_of(w, owner))
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end())
@@ -2843,6 +3002,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 building_component& b = bit->second;
                 if (b.ticks_remaining > 0 || b.decommissioned)
                     continue; // not operating
+                if (b.state_idle)
+                    continue; // BL-1296: unfunded this tick — nothing ran to judge
 
                 // (1) Recipe rescue: a processor whose current output is floored
                 // switches to the recipe with the healthiest output, if better.
@@ -2913,12 +3074,25 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
                             if (ratio > best_ratio
                                 && recipe_runs_at_tile(w, cand, b.tile) // the body's air (Ben, 2026-10-09)
+                                // BL-1296: a state building stays state industry.
+                                && (owner == corp
+                                    || state_runs(reg, building_type::processing_facility,
+                                                  reg.recipe_id(cand.name)))
                                 && recipe_inputs_supplied(w, reg, rescue_reach(), mid, cand,
                                                           sw_batches, bid))
                             {
                                 best_ratio = ratio;
                                 best_i     = i;
                             }
+                        }
+                        // BL-1296 fix round: a state plant's rescue retool adds
+                        // its new inputs to this tick's bill — funded, or not taken.
+                        if (best_i >= 0 && owner != corp)
+                        {
+                            building_component after = b;
+                            after.recipe = reg.recipe_id(reg.recipe_at(building_type::processing_facility, best_i).name);
+                            if (!state_commit_change(w, reg, owner, b, after))
+                                best_i = -1;
                         }
                         if (best_i >= 0)
                         {
@@ -3698,6 +3872,13 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         for (const entity_id bid : cc.assets)
             if (w.buildings.find(bid) != w.buildings.end())
                 owner_of[bid] = corp;
+    // BL-1296: a state building draws its basket under its nation's id, billed
+    // to the treasury at the clear — unless the gate idled it this tick.
+    for (const auto& [nid, nc] : w.nations)
+        for (const entity_id bid : nc.state_assets)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && !bit->second.state_idle)
+                owner_of[bid] = nid;
 
     // Ascending building id. The pass writes a SHARED pool (two buildings of one
     // corp on one body draw the same stock), so the visit order decides which one

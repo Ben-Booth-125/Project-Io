@@ -639,8 +639,9 @@ enum class building_type : uint8_t
     military_base       = 6, ///< BL-325 S1: unit muster building. Produces nothing, staffs at zero,
                              ///< and is deliberately NOT a supply anchor — military reach IS the
                              ///< economic reach field (BL-325 ruling 3). Hire moves onto it in S2.
-    research_institute  = 7, ///< BL-332: the dedicated "how does tech get done" building. Passive
-                             ///< like military_base (produces nothing tradeable, staffs at zero) —
+    research_institute  = 7, ///< BL-332: the dedicated "how does tech get done" building. Produces
+                             ///< nothing tradeable; staffed at construction like the University
+                             ///< (Ben, 2026-10-10) and counted only while staffed —
                              ///< its output is research points, each quarter, into its owning
                              ///< corp's home nation's pool (BL-1273; nation_tech.hpp's
                              ///< `advance_research`), not a resource_type.
@@ -1014,6 +1015,17 @@ struct building_component
     /// seam; decremented once per economy tick (run_economy_step). NOT touched by
     /// the BL-079 reflex switch, which stays free/instant — see recipe_switch_params.
     int  recipe_switch_cooldown = 0;
+
+    /// BL-1296 (state industry; NATIONS.md § State industry, "A losing building
+    /// idles", Ben 2026-10-13): true while this STATE building's owning nation's
+    /// treasury could not cover this tick's costs. Decided each tick, before
+    /// anything is charged, by `plan_state_funding` (state_industry.hpp) — an
+    /// idled state building produces nothing, draws nothing, staffs nothing and
+    /// pays nothing (no maintenance either), until a later tick's treasury can
+    /// pay again. The state never runs into debt. Always false on a building a
+    /// corporation owns. SERIALISED in the v48 state-industry trailing section
+    /// (world_save.cpp) so a load reads what the surfaces read before the save.
+    bool state_idle = false;
 };
 
 /// BL-641. The output scalar `building_component::supply_factor_permille`
@@ -2132,6 +2144,19 @@ struct nation_component
     /// 12 → 13 moved with it (10 → 11 pre-renumber); a non-finite or out-of-[0,1] value refuses the
     /// whole stream.
     float qualification = 0.0f;
+
+    /// BL-1296 — THE NATION'S STATE INDUSTRY (NATIONS.md § State industry, Ben
+    /// 2026-10-11/13): building entity ids this nation owns OUTRIGHT, with no
+    /// corporation between them and it. The ownership authority for a state
+    /// building, as `corporation_component::assets` is for a private one — a
+    /// building is in exactly one corporation's `assets` or one nation's
+    /// `state_assets`, never both, and owner lookups go through
+    /// `building_owner_of` (world.hpp). A MAJOR's only: a minor's list is always
+    /// empty. Filled at the fold by `hand_over_state_industry` and by the
+    /// player's own state builds; in stored (handover, then build) order, which
+    /// is the order the funding gate and every per-owner walk visit it.
+    /// SERIALISED in the v48 state-industry trailing section (world_save.cpp).
+    std::vector<entity_id> state_assets;
 };
 
 // ---------------------------------------------------------------------------

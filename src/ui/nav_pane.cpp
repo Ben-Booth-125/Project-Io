@@ -279,16 +279,17 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Construction", "What you are building now, and the buildings you own.", false);
             break;
-        case 4: // Research (BL-310, 2026-08-06): opens the F9 mock tech-tree
-                // viewer, same flag F9 drives. Was a hard-disabled placeholder;
-                // the real research system stays post-prototype (BL-087
-                // resolution 6) — this slot shows the design mock, not gameplay.
+        case 4: // Research (BL-1276): the research panel — the Digitisation
+                // tree's ring on the canvas, the mode strip and the seat's
+                // nation's queue in the column. Same flag F9 drives.
             if (ImGui::Selectable(id, state.show_tech_tree, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_tech_tree;
                 close_all_panels(state);
                 state.show_tech_tree = !was_open;
             }
-            slot_tooltip("Research", "Technology unlocks and the route to space (design mock).", false);
+            slot_tooltip("Research",
+                         "Which technologies your nation can reach, and when your plan arrives.",
+                         false);
             break;
         case 5: // Acquisitions ledger — inserted above Market (Ben, 2026-08-29)
             if (ImGui::Selectable(id, state.show_acquisitions_ledger, 0, {slot_size, slot_size})) {

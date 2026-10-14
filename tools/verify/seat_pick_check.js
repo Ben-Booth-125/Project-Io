@@ -8,16 +8,18 @@
 //
 //   1. --autostart               the tail DRAWS (no player to ask) and says so;
 //                                its seat X and state hash H are read off the log;
-//   2. --autostart --seat X      the same firm, PICKED through corp_verb::take_seat:
-//                                must open on H exactly -- a pick of the drawn firm
-//                                is the drawn seat, nothing else moves;
-//   3. --autostart --seat Y      a different ranked firm, twice: both runs open on
+//   2. --autostart --seat NX     the MAJOR whose champion is X (BL-1281: the pick
+//                                names a nation, `[seat] major <n> champion <c>`),
+//                                PICKED through corp_verb::take_seat on X: must
+//                                open on H exactly -- a pick of the drawn firm's
+//                                nation is the drawn seat, nothing else moves;
+//   3. --autostart --seat NY     a different major, twice, seating its champion Y: both runs open on
 //                                the same hash (reproducible from (seed, pick)),
 //                                both seated on Y -- and that hash is NOT the
 //                                draw's: world::state_hash folds the seat
 //                                (BL-1082), so a different pick is a different
 //                                hash, asserted from the hash alone;
-//   4. --autostart --seat 1      an id that names no ranked specialist: the run
+//   4. --autostart --seat 1      an id that names no major nation: the run
 //                                FAILS and seats nobody (never a silent fall-back
 //                                to the draw).
 //
@@ -62,18 +64,22 @@ function run(more) {
 }
 
 const draw = run([]);
-// A second ranked firm, read off the tail's own `[seat] ranked <id>` lines (the
-// canvas's order, printed on every seat) -- the last-ranked one, so the check
-// also picks a firm the floor may have MARKED.
-const ids = [];
-for (const m of draw.out.matchAll(/\[seat\] ranked (\d+)/g)) ids.push(m[1]);
-const other = ids.slice().reverse().find((id) => id !== draw.drawn) || null;
+// The majors and their champions, read off the tail's own `[seat] major <n>
+// champion <c>` lines (the screen's order, printed on every seat). The drawn
+// firm's nation is the pick that must reproduce the draw; a second major -- the
+// last listed, so the check also picks one the floor may have MARKED -- is the
+// different pick.
+const majors = [];
+for (const m of draw.out.matchAll(/\[seat\] major (\d+) champion (\d+)/g)) majors.push({ nation: m[1], champ: m[2] });
+const drawnMajor = majors.find((m) => m.champ === draw.drawn) || null;
+const otherMajor = majors.slice().reverse().find((m) => m.champ !== draw.drawn) || null;
+const other = otherMajor ? otherMajor.champ : null;
 
-const same = draw.drawn ? run(['--seat', draw.drawn]) : null;
+const same = drawnMajor ? run(['--seat', drawnMajor.nation]) : null;
 let y1 = null, y2 = null;
-if (other) {
-  y1 = run(['--seat', other]);
-  y2 = run(['--seat', other]);
+if (otherMajor) {
+  y1 = run(['--seat', otherMajor.nation]);
+  y2 = run(['--seat', otherMajor.nation]);
 }
 const bad = run(['--seat', '1']);
 
@@ -81,7 +87,8 @@ const checks = [
   ['draw run exited 0', draw.rc === 0],
   ['draw run says it drew, and why', !!draw.drawn && /\[seat\] drawn \d+ .+no player to ask/.test(draw.out)],
   ['draw run printed a state hash', !!draw.hash],
-  ['the ranking is printed (another firm to pick)', !!other],
+  ['the majors are printed, the drawn firm a champion among them', !!drawnMajor],
+  ['the majors are printed (another major to pick)', !!other],
   ['pick of the drawn firm exited 0', !!same && same.rc === 0],
   ['pick of the drawn firm went through take_seat', !!same && same.picked === draw.drawn],
   ['pick of the drawn firm == the drawn state hash', !!same && same.hash === draw.hash],
@@ -93,7 +100,7 @@ const checks = [
   // id printed beside it above is a diagnostic, not the assertion.
   ['a different pick is a different seat (from the state hash alone)',
    !!y1 && !!y1.hash && !!draw.hash && y1.hash !== draw.hash],
-  ['a pick naming no ranked firm FAILS the run', bad.rc !== 0 && /--seat 1 REJECTED/.test(bad.out)],
+  ['a pick naming no major nation FAILS the run', bad.rc !== 0 && /--seat 1 REJECTED/.test(bad.out)],
   ['a refused pick seats nobody', !/\[seat\] (drawn|picked)/.test(bad.out)],
 ];
 

@@ -6,10 +6,12 @@
 #include "placement_rules.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked (BL-1273: the nation's tree; BL-588 before it)
 #include "recipe_registry.hpp" // recipe_runs_at_tile (defined at the foot of this file)
+#include "state_industry.hpp"  // BL-1296: state_runs, state_uncommitted_treasury
 #include "world.hpp"
 
 #include <algorithm> // std::find (asset-list removal in demolish_building), std::max, std::clamp
 #include <cmath>     // std::lround (BL-323 S3 site-time multiplier)
+#include <limits>    // BL-1296: the founding skips the commitment gate
 
 float construction_site_multiplier(const world& w, const recipe_registry& reg,
                                    entity_id tile, building_type type, resource_type target)
@@ -100,17 +102,27 @@ int construction_build_ticks(const world& w, const recipe_registry& reg,
         duration * construction_site_multiplier(w, reg, tile, type, target))));
 }
 
-construction_result construct_building(world& w, const recipe_registry& reg,
-                                       entity_id corp, entity_id tile,
-                                       building_type type, resource_type target,
-                                       entity_id& out_building,
-                                       std::uint16_t recipe)
+float construction_initial_workforce(building_type type)
+{
+    return (type == building_type::port || type == building_type::inland_logistics_hub
+            || type == building_type::military_base) ? 0.0f : 0.5f;
+}
+
+namespace {
+
+/// The one build door, for both owner kinds (BL-1296). @p corp is WHO the tech
+/// and placement gates ask about (the building corporation; for a state build,
+/// the nation's champion — the same home nation, so the same tree). @p funds is
+/// what the builder may commit (a corporation's balance; a treasury's
+/// uncommitted part). @p assets is the owner's asset list the new building
+/// joins. Every check runs before anything mutates.
+construction_result construct_for(world& w, const recipe_registry& reg,
+                                  entity_id corp, entity_id tile,
+                                  building_type type, resource_type target,
+                                  entity_id& out_building, std::uint16_t recipe,
+                                  float funds, std::vector<entity_id>& assets)
 {
     out_building = null_entity;
-
-    const auto corp_it = w.corporations.find(corp);
-    if (corp_it == w.corporations.end())
-        return construction_result::no_corp;
 
     const auto tile_it = w.tiles.find(tile);
     if (tile_it == w.tiles.end())
@@ -178,7 +190,6 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         return construction_result::invalid_tile; // Port not coastal
     }
 
-    corporation_component& cc = corp_it->second;
     // Affordability is a commitment gate only (BL-095): the corp must be able to
     // afford the whole build to start it, but is not debited here — payment is
     // spread across construction by run_construction (pay-as-you-build). BL-1066
@@ -186,7 +197,7 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     // plus materials, times the site multiplier (PRODUCTION.md § Construction site
     // time). Pricing the authored cost admitted builds the corp could not finish.
     const float total_cost = construction_capex(w, reg, tile, type, target, recipe);
-    if (cc.balance < total_cost)
+    if (funds < total_cost)
         return construction_result::insufficient_funds;
 
     // Create and author the building, mirroring corporation_generation.cpp Pass 3.
@@ -197,11 +208,10 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     bc.type               = type;
     // Staff producing buildings so they run; ports, logistics hubs and military
     // bases take no L3 production action (passive infrastructure), so they staff
-    // at zero.
-    bc.workforce_assigned =
-        (type == building_type::port || type == building_type::inland_logistics_hub
-         || type == building_type::military_base
-         || type == building_type::research_institute) ? 0.0f : 0.5f; // BL-332: passive, like military_base
+    // at zero. A research institute is staffed at construction like the
+    // University (Ben, 2026-10-10; PRODUCTION.md): it adds RP only while
+    // staffed (nation_tech.cpp, advance_research).
+    bc.workforce_assigned = construction_initial_workforce(type);
     // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
     // for its build ticks before economy_system lets it produce. BL-323 S3: that
     // duration depends on WHERE, not just WHAT (construction_build_ticks above),
@@ -242,7 +252,7 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (bc.ticks_remaining <= 0)
         maybe_spawn_market(w, reg, tile_it->second.body, tile);
 
-    cc.assets.push_back(bld_id);
+    assets.push_back(bld_id);
     // BL-095: no up-front debit — run_construction charges build_cost + materials
     // incrementally as the build progresses (pay-as-you-build).
 
@@ -261,8 +271,70 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     return construction_result::placed;
 }
 
+} // namespace
+
+construction_result construct_building(world& w, const recipe_registry& reg,
+                                       entity_id corp, entity_id tile,
+                                       building_type type, resource_type target,
+                                       entity_id& out_building,
+                                       std::uint16_t recipe)
+{
+    out_building = null_entity;
+    const auto corp_it = w.corporations.find(corp);
+    if (corp_it == w.corporations.end())
+        return construction_result::no_corp;
+    return construct_for(w, reg, corp, tile, type, target, out_building, recipe,
+                         corp_it->second.balance, corp_it->second.assets);
+}
+
+construction_result construct_state_building(world& w, const recipe_registry& reg,
+                                             entity_id nation, entity_id tile,
+                                             std::uint16_t recipe, entity_id& out_building,
+                                             bool founding)
+{
+    out_building = null_entity;
+    const auto nit = w.nations.find(nation);
+    const entity_id champion = champion_of(w, nation);
+    if (nit == w.nations.end() || champion == null_entity)
+        return construction_result::no_corp; // no major nation to own it
+    // Strategic, and run by the state, or it is not state industry at all.
+    if (!state_runs(reg, building_type::processing_facility, recipe))
+        return construction_result::invalid_tile;
+    // On its own ground: a nation's state industry stands on its own territory.
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end() || tn->second != nation)
+        return construction_result::invalid_tile;
+    return construct_for(w, reg, champion, tile, building_type::processing_facility,
+                         resource_type::iron_ore, out_building, recipe,
+                         founding ? std::numeric_limits<float>::max()
+                                  : state_uncommitted_treasury(w, nation),
+                         nit->second.state_assets);
+}
+
+bool demolish_state_building(world& w, entity_id nation, entity_id building)
+{
+    const auto bld_it = w.buildings.find(building);
+    if (bld_it == w.buildings.end())
+        return false;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return false;
+    std::vector<entity_id>& sa = nit->second.state_assets;
+    const auto it = std::find(sa.begin(), sa.end(), building);
+    if (it == sa.end())
+        return false;
+    const building_type demolished_type = bld_it->second.type;
+    sa.erase(it);
+    w.buildings.erase(bld_it);
+    w.stockpiles.erase(building);
+    if (building_affects_logistics(demolished_type))
+        invalidate_logistics_caches(w);
+    return true;
+}
+
 bool demolish_building(world& w, entity_id corp, entity_id building)
 {
+
     const auto bld_it = w.buildings.find(building);
     if (bld_it == w.buildings.end())
         return false;

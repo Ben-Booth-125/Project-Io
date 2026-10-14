@@ -261,7 +261,61 @@ inline constexpr uint32_t save_game_magic =
 ///     the range check admits those numbers under this version whether or not
 ///     the lane that writes them has landed.
 /// A v21 stream is refused whole on the same strict-equality contract.
-inline constexpr uint32_t save_game_version = 22; // sprint 47: span seeds, province_bought, sea_lane_opened, inherited, realm names, the polity fold's record
+///
+/// LAYOUT 23 = LAYOUT 22 PLUS TWO INTS AT THE ENVELOPE'S TAIL (BL-1278, nation
+/// count targets): `world_params::nation_total_target` then `::major_target`,
+/// written by `w_envelope` after `planetary_pan_y` and read back by
+/// `r_envelope` into `params`. At the TAIL, not inside `w_world_params`, on
+/// purpose: it makes the v22 layout a strict prefix of v23, so this reader
+/// accepts a v22 stream too and reads both targets as 0 (unset -- the natural
+/// count, which is what a v22 world was built at). THE ONE EXCEPTION to the
+/// strict-equality contract, and only for the immediately previous layout;
+/// v21 and older are still refused whole. A v23 stream carrying an illegal
+/// target pair (`nation_targets_valid`) is corrupt and refused whole.
+/// AND TWO EVENT KINDS appended to `lapse_event_kind` under this number
+/// (BL-1278 lane B, the closing rounds), each moving `count` and so the
+/// event-kind range check; no field changes width: `absorbed_at_close` (25,
+/// a closing-round absorption -- the size floor's, or one surplus to the
+/// total) and `seceded_at_close` (26, a closing-round secession to the
+/// total). A v22 stream carries none of
+/// them, so the prefix acceptance above is unchanged.
+/// v23 ALSO admits three `lapse_event_kind` values in the Industrialisation
+/// record, written by the finish's majors reconciliation (BL-1278 lane C):
+/// 27 `champion_chartered`, 28 `state_charter`, 29 `champion_bought_out`. No
+/// field moves; a build that predates them refuses such a stream on the kind
+/// range check, as it should.
+/// v23 ALSO admits two `lapse_event_kind` values in the Empires record (BL-1290,
+/// civil war deaths): 30 `civil_war_famine` and 31 `civil_war_flight` (`other`
+/// = the destination region). No field moves, so no version bump; a build that
+/// predates them refuses such a stream on the kind range check, as above.
+/// v23 ALSO admits two more in the Empires record, appended by the rise and
+/// fall (BL-1287): 32 `rise_pressed` and 33 `overextended`, each a level the
+/// pattern's lean or backstop pressed. So the Empires record's v23 kinds are
+/// 30-33 together (civil war 30-31, rise and fall 32-33). No field moves; the
+/// kind range check is the only reader that changes, and a build that
+/// predates them refuses such a stream on it.
+/// v23 ALSO admits two more appended by the late culture (BL-1288): 34
+/// `late_culture_chosen` (Empires record, once: `polity` = the culture index,
+/// `other` = its remoteness by reach or none) and 35 `isolation_pressed` (the
+/// backstop's level, `polity` = the culture index; in the Empires and the
+/// Exploration record). No field moves, so no version bump; the range check
+/// is the only reader that changes. The detector reads the late culture off
+/// kind 34, so a stream written before it carries no late culture.
+/// v23 ALSO admits three in the Industrialisation record, written by the world
+/// war (BL-1289): 36 `war_joined` (the first in a record is the declaration),
+/// 37 `ground_razed` and 38 `war_peace`; a demoted road is a `road_promoted`
+/// at the lower tier, so no kind of its own.
+/// v23 ALSO admits 39 `revolution` in the Industrialisation record (BL-1294,
+/// INDUSTRIALISATION.md sec Revolution: a splinter takes the whole realm --
+/// `region` the city it rose in, `other` the new regime). 34-35 are held by
+/// another sprint-53 lane (the late culture, BL-1288); the range check admits them under this version
+/// whether or not their writers have landed. The takeover's NEW NAME rides
+/// the record's existing realm name table (`era_timelapse::polity_name`) and
+/// its old name the Exploration record's entry for the same id, so no string
+/// and no field is added. No field moves, so no version bump.
+inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
+/// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
+inline constexpr uint32_t save_game_version_prefix_compatible = 22;
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

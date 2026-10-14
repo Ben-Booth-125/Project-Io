@@ -1,39 +1,50 @@
 /// @file seat_screen.cpp
-/// The corporation selection canvas (BL-1076, STARTUP.md § The seat).
+/// The NATION SELECTION screen (BL-1281, BL-1295; STARTUP.md § The seat).
 ///
-/// ITS QUESTION: which corporation am I? Drawn at Begin, over the settled world
-/// the wizard handed forward, once the validation run is over and before play
-/// opens. Ben, 2026-09-24 (the select-company design session):
+/// ITS QUESTION: which nation am I? Drawn at Begin, over the settled world the
+/// wizard handed forward, once the validation run is over and before play
+/// opens. Ben, 2026-10-10 (overturning the corporation canvas at the grain of
+/// the pick; CONCEPT.md § Player identity):
 ///
-///   * a ranked list BESIDE a map — every specialist, in static-score order,
-///     the ones below the viability floor visibly MARKED and still pickable;
-///   * the map is the home body, and it HIGHLIGHTS THE HOVERED ROW'S FIRM —
-///     its HQ, its works and its home market's catchment;
-///   * a card with FOUR things and no more: industry and goods; HQ and home
-///     market with that market's prices for the firm's goods and inputs; cash,
-///     debt and assets; its nation and that nation's stance;
-///   * picking opens a BRIEFING (the opening position in prose; for a marked
-///     firm, why the floor marked it), then Confirm seats the player and opens
-///     play, Back returns with nothing changed. Two presses, because choosing
-///     who you are is a deliberate act.
+///   * a list of the MAJOR nations only -- nations holding a champion; majors
+///     and seats are one-to-one, so the rows are the major target's count --
+///     in their champions' rank order, a champion below the viability floor
+///     visibly MARKED and its nation still pickable;
+///   * the map is the home body, and it HIGHLIGHTS THE SHOWN NATION'S
+///     TERRITORY, with its champion's HQ, works and home market on it;
+///   * a NATION CARD of seven parts: territory; population and GDP; treasury
+///     and budget weights; the champion (the firm card, unchanged in content);
+///     resource profile and deposits; neighbours with their reading and
+///     grudges; and HISTORY (BL-1295) -- the pattern tags, a short timeline,
+///     and a link into the History ledger filtered to the nation;
+///   * picking opens a BRIEFING, then Confirm seats the player and opens play,
+///     Back returns with nothing changed. Two presses, because choosing who you
+///     are is a deliberate act. The screen is shaped for up to six humans and
+///     seats one (NR-1025): nothing here assumes there is only one row taken.
 ///
-/// READ-ONLY UNTIL CONFIRM. Every figure is read off `m_world` and the
-/// ranking; the one mutation is Confirm's `take_seat_pick`, which goes through
-/// the command seam as `corp_verb::take_seat` — the same act an agent makes.
+/// READ-ONLY UNTIL CONFIRM. Every figure is read off `m_world`, the ranking
+/// and the generation report; the one mutation is Confirm's `take_seat_pick`,
+/// which names the MAJOR and goes through the command seam as
+/// `corp_verb::take_seat` on its champion -- the same act an agent makes.
 /// Immediate-mode: nothing here is retained but the baked map runs, which are
 /// a draw cache for one body and are rebuilt if the body changes.
 
 #include "core/app.hpp"
 
 #include <imgui.h>
+#include <imgui_internal.h> // BringWindowToDisplayFront -- the history link's ledger over the screen
 
 #include "ui/history_lapse.hpp"   // lapse_year_label, for the briefing's origin sentence (BL-1099)
 #include "ui/icons.hpp"
 #include "ui/market_ledger.hpp"   // market_city_name
+#include "ui/nation_history.hpp"  // the card's history part (BL-1295)
 #include "ui/presentation.hpp"
+#include "ui/tile_inspector.hpp"  // the History ledger the card's link opens (BL-1295)
 #include "world/budget_system.hpp" // k_debt_interest_per_quarter, for the briefing's debt line
+#include "world/building_profit.hpp" // estimate_building_profit -- the card's GDP read (BL-1281)
 #include "world/era_timelapse.hpp" // owner_slice_at / owner_none -- the origin sentence's realm (BL-1099)
 #include "world/logistics.hpp"     // body_tile_grid
+#include "world/nation_budget.hpp" // budget_priority -- the card's budget weights (BL-1281)
 #include "world/polity_identity.hpp" // polity_seat_region -- the origin sentence's seat fallback (BL-1088's rule)
 #include "world/market_clearing.hpp"
 #include "world/sentiment.hpp"
@@ -42,6 +53,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cmath>     // std::floor -- the map's pixel-snapped runs
 #include <cstdlib>   // std::abs — the card's nearest-region read (BL-1089)
 #include <string>
 #include <vector>
@@ -310,6 +322,105 @@ ImU32 mix(ImU32 a, ImU32 b, float t)
          | (0xFFu << IM_COL32_A_SHIFT);
 }
 
+
+/// BL-1281: the on-screen name of a national budget line.
+const char* budget_line_word(std::size_t i)
+{
+    switch (static_cast<budget_priority>(i))
+    {
+    case budget_priority::logistics_maintenance: return "Logistics maintenance";
+    case budget_priority::schooling:             return "Schooling";
+    case budget_priority::military_research:     return "Military research";
+    case budget_priority::academic_research:     return "Academic research";
+    case budget_priority::public_exploration:    return "Public exploration";
+    case budget_priority::contracted_force:      return "Contracted force";
+    case budget_priority::strategic_reserve:     return "Strategic reserve";
+    case budget_priority::public_works:          return "Public works";
+    case budget_priority::charters:              return "Charters";
+    case budget_priority::space_programme:       return "Space programme";
+    default:                                     break;
+    }
+    return "Other";
+}
+
+/// BL-1281 -- THE NATION'S FIGURES, read off the world as it stands at the
+/// seat: no new state, nothing stored. GDP is NATIONS.md § GDP's reading,
+/// "the value of production on its tiles at local market prices": the last
+/// cleared quarter's output of every building on the nation's ground, valued
+/// at its market's price (`estimate_building_profit`'s revenue), times the
+/// four quarters of a year. A world no quarter has cleared on reads none.
+struct nation_figures
+{
+    int    tiles      = 0;
+    double population = 0.0; ///< thousands
+    int    centres    = 0;
+    double gdp_year   = 0.0;
+    bool   gdp_read   = false;
+};
+
+nation_figures figures_of(const world& w, const recipe_registry& reg, const economy_report& rep,
+                          entity_id nation, const nation_component& nat)
+{
+    nation_figures f;
+    f.tiles = static_cast<int>(nat.tiles.size());
+    for (const auto& [pc, comp] : w.population_centres)
+    {
+        if (comp.razed) continue;
+        const auto t = w.population_centre_tile.find(pc);
+        if (t == w.population_centre_tile.end()) continue;
+        const auto n = w.tile_to_nation.find(t->second);
+        if (n == w.tile_to_nation.end() || n->second != nation) continue;
+        f.population += comp.population;
+        ++f.centres;
+    }
+    for (const auto& [bid, b] : w.buildings)
+    {
+        const auto n = w.tile_to_nation.find(b.tile);
+        if (n == w.tile_to_nation.end() || n->second != nation) continue;
+        const building_profit p = estimate_building_profit(w, reg, rep, bid);
+        if (!p.has_data) continue;
+        f.gdp_read = true;
+        f.gdp_year += static_cast<double>(p.revenue) * 4.0; // one economy tick is one quarter (budget_system.hpp)
+    }
+    return f;
+}
+
+/// "Iron Ore 412, Coal 220, ..." -- the nation's richest deposits by its summed
+/// abundance (`nation_component::resource_abundance`, Pass 3), and how many of
+/// the goods its ground carries at all.
+std::string deposits_line(const nation_component& nat, int& present)
+{
+    std::array<std::size_t, resource_count> order{};
+    present = 0;
+    for (std::size_t i = 0; i < resource_count; ++i)
+    {
+        order[i] = i;
+        if (nat.resource_abundance[i] > 0.0f) ++present;
+    }
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        return nat.resource_abundance[a] > nat.resource_abundance[b];
+    });
+    std::string s;
+    for (std::size_t k = 0; k < 5 && k < resource_count; ++k)
+    {
+        const std::size_t i = order[k];
+        if (nat.resource_abundance[i] <= 0.0f) break;
+        char buf[96];
+        std::snprintf(buf, sizeof buf, "%s%s %.0f", s.empty() ? "" : ", ",
+                      ui::resource_name(static_cast<resource_type>(i)),
+                      static_cast<double>(nat.resource_abundance[i]));
+        s += buf;
+    }
+    return s.empty() ? std::string("none on its ground") : s;
+}
+
+void card_heading(const char* label)
+{
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(170, 190, 220, 255));
+    ImGui::SeparatorText(label);
+    ImGui::PopStyleColor();
+}
+
 } // namespace
 
 void app::draw_seat_screen()
@@ -327,12 +438,13 @@ void app::draw_seat_screen()
         return;
     }
 
-    const auto& cands = m_seat_result.candidates;
-    if (cands.empty())
+    const auto&                   cands  = m_seat_result.candidates;
+    const std::vector<seat_major> majors = seat_majors();
+    if (majors.empty())
     {
-        // No specialist at all: nothing to offer. Say so, and let the player go
-        // on with whatever the generator flagged rather than strand them here.
-        ImGui::TextUnformatted("This world holds no corporation to seat.");
+        // No major at all: nothing to offer. Say so, and let the player go on
+        // with whatever the generator flagged rather than strand them here.
+        ImGui::TextUnformatted("This world holds no major nation to seat.");
         if (ImGui::Button("Open play"))
         {
             if (m_seat_ui.from_verify) m_screen = app_screen::in_game;
@@ -341,106 +453,108 @@ void app::draw_seat_screen()
         ImGui::End();
         return;
     }
-    m_seat_ui.hovered = std::clamp(m_seat_ui.hovered, 0, static_cast<int>(cands.size()) - 1);
+    m_seat_ui.hovered = std::clamp(m_seat_ui.hovered, 0, static_cast<int>(majors.size()) - 1);
+    const generation_report::body_entry* home = ui::homeworld_entry(m_generation_report);
 
     // --- the header ------------------------------------------------------
     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
-    ImGui::TextUnformatted("WHICH CORPORATION ARE YOU?");
+    ImGui::TextUnformatted("WHICH NATION ARE YOU?");
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
-    ImGui::Text("%d corporations, ranked by the ground they stand on. %d clear the viability "
-                "floor; the marked ones do not, and you may still take one.",
-                static_cast<int>(cands.size()), m_seat_result.shortlist_size);
+    int majors_clear = 0;
+    for (const seat_major& m : majors)
+        if (cands[static_cast<std::size_t>(m.candidate)].shortlisted) ++majors_clear;
+    ImGui::Text("%d major nations, each holding one champion. Taking a nation is governing it and "
+                "operating its champion. Ranked by the ground the champion stands on: %d clear the "
+                "viability floor; the marked ones do not, and you may still take one.",
+                static_cast<int>(majors.size()), majors_clear);
     // BL-1089: THE NATION COUNT EXPLAINS THE MERGES (NATION_GENERATION.md
-    // § Pass 2d): how many of the map's nations are realms of the close, how
-    // many realms the size floor folded into a neighbour, and how many are
-    // ground no realm held. Read off the saved report's fold record.
-    for (const generation_report::body_entry& b : m_generation_report.bodies)
+    // § Pass 2d), read off the saved report's fold record.
+    if (home != nullptr)
     {
-        if (!b.is_homeworld || b.nation_ids.empty()) continue;
         int realms = 0, absorbed = 0, ownerless = 0;
-        for (std::size_t n = 0; n < b.nation_polity.size(); ++n)
+        for (std::size_t n = 0; n < home->nation_polity.size(); ++n)
         {
-            if (b.nation_polity[n] >= 0) ++realms; else ++ownerless;
-            if (n < b.nation_absorbed_count.size()) absorbed += std::max<int32_t>(0, b.nation_absorbed_count[n]);
+            if (home->nation_polity[n] >= 0) ++realms; else ++ownerless;
+            if (n < home->nation_absorbed_count.size()) absorbed += std::max<int32_t>(0, home->nation_absorbed_count[n]);
         }
-        ImGui::Text("%zu nations: %d realms of the close, %d realms absorbed under the floor, %d of ground no realm held.",
-                    b.nation_ids.size(), realms, absorbed, ownerless);
-        break;
+        ImGui::Text("%zu nations: %d realms of the close, %d realms absorbed under the floor, %d of ground no realm held. "
+                    "Only the majors can be played.",
+                    home->nation_ids.size(), realms, absorbed, ownerless);
     }
     ImGui::PopStyleColor();
     ImGui::Dummy({1.0f, 6.0f});
 
-    const float pad    = ImGui::GetStyle().ItemSpacing.x;
-    const float avail  = ImGui::GetContentRegionAvail().x;
-    const float list_w = std::max(360.0f, avail * 0.40f);
+    const float pad     = ImGui::GetStyle().ItemSpacing.x;
+    const float avail   = ImGui::GetContentRegionAvail().x;
+    const float list_w  = std::max(340.0f, avail * 0.30f);
     const float right_w = std::max(200.0f, avail - list_w - pad);
-    const float body_h = ImGui::GetContentRegionAvail().y;
+    const float body_h  = ImGui::GetContentRegionAvail().y;
 
-    // The firm the map and the card show: the open briefing's, else the hovered row.
+    // The nation the map and the card show: the open briefing's, else the hovered row.
     int shown = m_seat_ui.hovered;
     if (m_seat_ui.briefing != null_entity)
-        for (int i = 0; i < static_cast<int>(cands.size()); ++i)
-            if (cands[static_cast<std::size_t>(i)].corp == m_seat_ui.briefing)
+        for (int i = 0; i < static_cast<int>(majors.size()); ++i)
+            if (majors[static_cast<std::size_t>(i)].nation == m_seat_ui.briefing)
                 shown = i;
 
-    // --- the ranked list -------------------------------------------------
+    // --- the list of majors ----------------------------------------------
     ImGui::BeginChild("##seat_list", {list_w, body_h}, ImGuiChildFlags_Borders);
     if (ImGui::BeginTable("##seat_rows", 4,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
     {
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 22.0f);
-        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch, 3.0f);
-        ImGui::TableSetupColumn("Industry", ImGuiTableColumnFlags_WidthStretch, 1.4f);
-        ImGui::TableSetupColumn("Holdings", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+        ImGui::TableSetupColumn("Nation", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+        ImGui::TableSetupColumn("Champion", ImGuiTableColumnFlags_WidthStretch, 2.4f);
+        ImGui::TableSetupColumn("Industry", ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableHeadersRow();
 
-        bool any_hovered = false;
-        for (int i = 0; i < static_cast<int>(cands.size()); ++i)
+        for (int i = 0; i < static_cast<int>(majors.size()); ++i)
         {
-            const spawn_seat_candidate& c = cands[static_cast<std::size_t>(i)];
-            const auto cit = m_world.corporations.find(c.corp);
-            if (cit == m_world.corporations.end())
+            const seat_major& m = majors[static_cast<std::size_t>(i)];
+            const spawn_seat_candidate& c = cands[static_cast<std::size_t>(m.candidate)];
+            const auto cit = m_world.corporations.find(m.champion);
+            const auto nit = m_world.nations.find(m.nation);
+            if (cit == m_world.corporations.end() || nit == m_world.nations.end())
                 continue;
-            const corporation_component& cc = cit->second;
             const bool marked = !c.shortlisted;
 
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             ImGui::PushID(i);
             // The row is one Selectable spanning every column: hover points the
-            // map at the firm; a press opens its briefing, and pressing the row
-            // whose briefing is open closes it (the toggle rule).
-            const bool open = (m_seat_ui.briefing == c.corp);
+            // map at the nation; a press opens its briefing, and pressing the
+            // row whose briefing is open closes it (the toggle rule).
+            const bool open = (m_seat_ui.briefing == m.nation);
             char label[16];
             std::snprintf(label, sizeof label, "%d", i + 1);
-            if (ImGui::Selectable(label, open || i == shown,
-                                  ImGuiSelectableFlags_SpanAllColumns))
-                m_seat_ui.briefing = open ? null_entity : c.corp;
+            if (ImGui::Selectable(label, open || i == shown, ImGuiSelectableFlags_SpanAllColumns))
+                m_seat_ui.briefing = open ? null_entity : m.nation;
             if (ImGui::IsItemHovered())
-            {
-                m_seat_ui.hovered = i;
-                any_hovered       = true;
-            }
+                m_seat_ui.hovered = i; // the last hovered row stays shown when the pointer leaves
             ImGui::PopID();
 
             ImGui::TableSetColumnIndex(1);
+            const ImVec2 sw = ImGui::GetCursorScreenPos();
+            const float  lh = ImGui::GetTextLineHeight();
+            ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + 2.0f}, {sw.x + lh - 4.0f, sw.y + lh - 2.0f},
+                                                      ui::palette::nation_colour(m.nation));
+            ImGui::Dummy({lh - 2.0f, lh});
+            ImGui::SameLine();
+            ImGui::TextUnformatted(nit->second.name.c_str());
+            ImGui::TableSetColumnIndex(2);
             if (marked) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 150, 158, 255));
-            ImGui::TextUnformatted(cc.name.c_str());
+            ImGui::TextUnformatted(cit->second.name.c_str());
             if (marked)
             {
                 ImGui::PopStyleColor();
-                ImGui::SameLine();
                 ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::pinned);
-                ImGui::TextUnformatted("  below the floor");
+                ImGui::TextUnformatted("below the floor");
                 ImGui::PopStyleColor();
             }
-            ImGui::TableSetColumnIndex(2);
-            ImGui::TextUnformatted(focus_word(cc.focus));
             ImGui::TableSetColumnIndex(3);
-            ImGui::Text("%d", c.holdings);
+            ImGui::TextUnformatted(focus_word(cit->second.focus));
         }
-        (void)any_hovered; // the last hovered row stays shown when the pointer leaves
         ImGui::EndTable();
     }
     ImGui::EndChild();
@@ -449,24 +563,33 @@ void app::draw_seat_screen()
 
     // --- the map and the card / briefing ---------------------------------
     ImGui::BeginChild("##seat_right", {right_w, body_h});
-    const spawn_seat_candidate& sc = cands[static_cast<std::size_t>(shown)];
-    const auto scit = m_world.corporations.find(sc.corp);
+    const seat_major&           sm  = majors[static_cast<std::size_t>(shown)];
+    const spawn_seat_candidate& sc  = cands[static_cast<std::size_t>(sm.candidate)];
+    const auto                  scit = m_world.corporations.find(sm.champion);
     const corporation_component* scc =
         scit != m_world.corporations.end() ? &scit->second : nullptr;
+    const nation_component* nat = nullptr;
+    if (const auto nit = m_world.nations.find(sm.nation); nit != m_world.nations.end())
+        nat = &nit->second;
     const entity_id hq_tile = scc ? hq_tile_of(m_world, *scc) : null_entity;
     entity_id body = null_entity;
     if (const auto t = m_world.tiles.find(hq_tile); t != m_world.tiles.end())
         body = t->second.body;
+    if (body == null_entity && nat != nullptr)
+        if (const auto t = m_world.tiles.find(nat->capital_tile); t != m_world.tiles.end())
+            body = t->second.body;
     if (body == null_entity)
         body = m_launch_body;
 
-    // Bake the body's political base once: water, and land tinted by its nation.
+    // Bake the body's political base once: water, and land tinted by its
+    // nation; and, in the same pass, which nations share a land border.
     if (body != null_entity && body != m_seat_ui.body)
     {
         m_seat_ui.body = body;
         m_seat_ui.base.clear();
-        m_seat_ui.catchment.clear();
-        m_seat_ui.catchment_of = null_entity;
+        m_seat_ui.borders.clear();
+        m_seat_ui.territory.clear();
+        m_seat_ui.territory_of = null_entity;
         m_seat_ui.gw = m_seat_ui.gh = 0;
         if (const auto bit = m_world.bodies.find(body); bit != m_world.bodies.end())
         {
@@ -477,7 +600,7 @@ void app::draw_seat_screen()
         const int gw = m_seat_ui.gw, gh = m_seat_ui.gh;
         if (gw > 0 && gh > 0 && grid.size() == static_cast<std::size_t>(gw) * gh)
         {
-            m_seat_ui.tile_market.assign(grid.size(), null_entity);
+            std::vector<entity_id> owner(grid.size(), null_entity);
             for (int row = 0; row < gh; ++row)
             {
                 int    c0  = 0;
@@ -497,8 +620,10 @@ void app::draw_seat_screen()
                             colour = IM_COL32(64, 70, 62, 255);
                             if (const auto nit = m_world.tile_to_nation.find(tid);
                                 nit != m_world.tile_to_nation.end())
-                                colour = mix(colour, ui::palette::nation_colour(nit->second), 0.35f);
-                            m_seat_ui.tile_market[k] = market_for_tile(m_world, tid);
+                            {
+                                colour   = mix(colour, ui::palette::nation_colour(nit->second), 0.35f);
+                                owner[k] = nit->second;
+                            }
                         }
                     }
                     if (col == 0) { cur = colour; continue; }
@@ -508,38 +633,60 @@ void app::draw_seat_screen()
                     cur = colour;
                 }
             }
+            // A land border: two land tiles side by side (east, column-wrapped,
+            // and south) held by different nations.
+            for (int row = 0; row < gh; ++row)
+                for (int col = 0; col < gw; ++col)
+                {
+                    const entity_id a = owner[static_cast<std::size_t>(row) * gw + col];
+                    if (a == null_entity) continue;
+                    const entity_id e = owner[static_cast<std::size_t>(row) * gw + (col + 1) % gw];
+                    const entity_id s = row + 1 < gh ? owner[static_cast<std::size_t>(row + 1) * gw + col]
+                                                     : null_entity;
+                    for (const entity_id b : {e, s})
+                        if (b != null_entity && b != a)
+                            m_seat_ui.borders.push_back({std::min(a, b), std::max(a, b)});
+                }
+            std::sort(m_seat_ui.borders.begin(), m_seat_ui.borders.end());
+            m_seat_ui.borders.erase(std::unique(m_seat_ui.borders.begin(), m_seat_ui.borders.end()),
+                                    m_seat_ui.borders.end());
         }
+    }
+
+    // The shown nation's territory, run-merged (re-merged when it changes).
+    if (sm.nation != m_seat_ui.territory_of && m_seat_ui.gw > 0)
+    {
+        m_seat_ui.territory_of = sm.nation;
+        m_seat_ui.territory.clear();
+        const std::vector<entity_id>& grid = body_tile_grid(m_world, m_seat_ui.body);
+        const int gw = m_seat_ui.gw;
+        if (grid.size() == static_cast<std::size_t>(gw) * m_seat_ui.gh)
+            for (int row = 0; row < m_seat_ui.gh; ++row)
+            {
+                int start = -1;
+                for (int col = 0; col <= gw; ++col)
+                {
+                    bool in = false;
+                    if (col < gw)
+                        if (const auto nit = m_world.tile_to_nation.find(grid[static_cast<std::size_t>(row) * gw + col]);
+                            nit != m_world.tile_to_nation.end())
+                            in = nit->second == sm.nation;
+                    if (in && start < 0) start = col;
+                    if (!in && start >= 0)
+                    {
+                        m_seat_ui.territory.push_back({row, start, col, 0});
+                        start = -1;
+                    }
+                }
+            }
     }
 
     const entity_id home_market = hq_tile != null_entity ? market_for_tile(m_world, hq_tile)
                                                          : null_entity;
-    if (home_market != m_seat_ui.catchment_of && m_seat_ui.gw > 0)
-    {
-        m_seat_ui.catchment_of = home_market;
-        m_seat_ui.catchment.clear();
-        const int gw = m_seat_ui.gw;
-        for (int row = 0; row < m_seat_ui.gh; ++row)
-        {
-            int start = -1;
-            for (int col = 0; col <= gw; ++col)
-            {
-                const bool in = col < gw && home_market != null_entity
-                    && m_seat_ui.tile_market[static_cast<std::size_t>(row) * gw + col] == home_market;
-                if (in && start < 0) start = col;
-                if (!in && start >= 0)
-                {
-                    m_seat_ui.catchment.push_back({row, start, col, 0});
-                    start = -1;
-                }
-            }
-        }
-    }
 
-    // The card or briefing takes a fixed band under the map; the map fills the rest.
-    const float line_h   = ImGui::GetTextLineHeightWithSpacing();
-    const float card_h   = line_h * 9.0f;
+    // The map takes the top of the pane, capped so the card keeps the rest.
     const float map_wmax = ImGui::GetContentRegionAvail().x;
-    const float map_hmax = std::max(80.0f, ImGui::GetContentRegionAvail().y - card_h);
+    const float map_hmax = std::max(80.0f, ImGui::GetContentRegionAvail().y * 0.40f);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     if (m_seat_ui.gw > 0 && m_seat_ui.gh > 0)
     {
@@ -550,14 +697,19 @@ void app::draw_seat_screen()
         const ImVec2 tl   = ImGui::GetCursorScreenPos();
         ImGui::Dummy({map_w, map_h}); // the map takes no input: pointing is done at the list
 
+        // Run edges snap to whole pixels: at a fractional cell an unsnapped
+        // row edge leaves a hairline seam of background between rows.
+        const auto run_rect = [&](const seat_screen_state::run& r, ImU32 colour) {
+            dl->AddRectFilled({std::floor(tl.x + r.c0 * cell), std::floor(tl.y + r.row * cell)},
+                              {std::floor(tl.x + r.c1 * cell), std::floor(tl.y + (r.row + 1) * cell)},
+                              colour);
+        };
         for (const auto& r : m_seat_ui.base)
-            dl->AddRectFilled({tl.x + r.c0 * cell, tl.y + r.row * cell},
-                              {tl.x + r.c1 * cell, tl.y + (r.row + 1) * cell}, r.colour);
-        // The home market's catchment: a light wash over the tiles it serves.
-        for (const auto& r : m_seat_ui.catchment)
-            dl->AddRectFilled({tl.x + r.c0 * cell, tl.y + r.row * cell},
-                              {tl.x + r.c1 * cell, tl.y + (r.row + 1) * cell},
-                              IM_COL32(120, 190, 255, 60));
+            run_rect(r, r.colour);
+        // THE CARD'S PART 1: the nation's territory, lit in its own colour.
+        const ImU32 lit = mix(ui::palette::nation_colour(sm.nation), IM_COL32(255, 255, 255, 255), 0.30f);
+        for (const auto& r : m_seat_ui.territory)
+            run_rect(r, lit);
 
         const auto at = [&](entity_id tile, ImVec2& out) {
             const auto t = m_world.tiles.find(tile);
@@ -565,12 +717,12 @@ void app::draw_seat_screen()
             out = {tl.x + (t->second.grid_x + 0.5f) * cell, tl.y + (t->second.grid_y + 0.5f) * cell};
             return true;
         };
-        // Every other ranked firm's HQ, faint, so the highlighted one reads as a
-        // choice among neighbours rather than a lone dot.
-        for (const spawn_seat_candidate& c : cands)
+        // Every other major's champion HQ, faint: the shown nation reads as a
+        // choice among rivals rather than a lone patch.
+        for (const seat_major& m : majors)
         {
-            if (c.corp == sc.corp) continue;
-            const auto cit = m_world.corporations.find(c.corp);
+            if (m.nation == sm.nation) continue;
+            const auto cit = m_world.corporations.find(m.champion);
             if (cit == m_world.corporations.end()) continue;
             ImVec2 p;
             if (at(hq_tile_of(m_world, cit->second), p))
@@ -606,7 +758,7 @@ void app::draw_seat_screen()
     }
 
     ImGui::Dummy({1.0f, 4.0f});
-    if (!scc)
+    if (!scc || !nat)
     {
         ImGui::EndChild();
         ImGui::End();
@@ -623,76 +775,59 @@ void app::draw_seat_screen()
     const float cash = std::max(0.0f, scc->balance);
     const float debt = std::max(0.0f, -scc->balance);
     const float book = scc->returns.empty() ? -1.0f : scc->returns.back().book_value;
-    const nation_component* nat = nullptr;
-    if (const auto nit = m_world.nations.find(scc->home_nation); nit != m_world.nations.end())
-        nat = &nit->second;
-    const sentiment_value read = sentiment_toward(m_world.sentiment, scc->home_nation, sc.corp);
+    const sentiment_value read = sentiment_toward(m_world.sentiment, sm.nation, sm.champion);
 
     // --- BL-1089: WHICH REALM THE NATION IS, and the region under the city --
-    // Read off the saved report's fold record (NATION_GENERATION.md § Pass 2d):
-    // the nation's founding realm, the realms the size floor folded into it
-    // (merge rule A — the absorber kept its name, these are listed under it),
-    // or that the ground had no realm at the close. Names come off the last
-    // span's own name table, by polity id. The city's REGION is the settled
-    // region nearest the HQ tile on the wrapped grid — the same "whose ground"
-    // read the city's own name was coined by.
-    std::string realm_line;   // appended to the nation line
-    std::string city_region;  // "(in <region>)" on the HQ line
+    // Read off the saved report's fold record (NATION_GENERATION.md § Pass 2d).
+    // The revolution line (BL-1294) is the timeline's now, one row of it.
+    std::string realm_line;
+    std::string city_region; // "(in <region>)" on the HQ line
+    if (home != nullptr)
     {
-        const generation_report::body_entry* home = nullptr;
-        for (const generation_report::body_entry& b : m_generation_report.bodies)
-            if (b.is_homeworld) { home = &b; break; }
-        if (home != nullptr && nat != nullptr)
+        const std::vector<std::string>* names =
+            !home->industrialisation_timelapse.polity_name.empty() ? &home->industrialisation_timelapse.polity_name
+          : !home->exploration_timelapse.polity_name.empty()       ? &home->exploration_timelapse.polity_name
+          : !home->prehistory_timelapse.polity_name.empty()        ? &home->prehistory_timelapse.polity_name
+                                                                    : nullptr;
+        const auto realm_name = [&](int32_t pol) -> std::string {
+            if (names != nullptr && pol >= 0 && static_cast<std::size_t>(pol) < names->size()
+                && !(*names)[static_cast<std::size_t>(pol)].empty())
+                return (*names)[static_cast<std::size_t>(pol)];
+            return "an unnamed realm";
+        };
+        const int n = ui::nation_fold_slot(*home, sm.nation);
+        if (n >= 0 && static_cast<std::size_t>(n) < home->nation_polity.size())
         {
-            const std::vector<std::string>* names =
-                !home->industrialisation_timelapse.polity_name.empty() ? &home->industrialisation_timelapse.polity_name
-              : !home->exploration_timelapse.polity_name.empty()       ? &home->exploration_timelapse.polity_name
-              : !home->prehistory_timelapse.polity_name.empty()        ? &home->prehistory_timelapse.polity_name
-                                                                        : nullptr;
-            const auto realm_name = [&](int32_t pol) -> std::string {
-                if (names != nullptr && pol >= 0 && static_cast<std::size_t>(pol) < names->size()
-                    && !(*names)[static_cast<std::size_t>(pol)].empty())
-                    return (*names)[static_cast<std::size_t>(pol)];
-                return "an unnamed realm";
-            };
-            for (std::size_t n = 0; n < home->nation_ids.size() && n < home->nation_polity.size(); ++n)
+            const std::size_t sn  = static_cast<std::size_t>(n);
+            const int32_t     pol = home->nation_polity[sn];
+            if (pol < 0)
+                realm_line = "Ground no realm held at the close; named at the fold.";
+            else
             {
-                if (home->nation_ids[n] != scc->home_nation) continue;
-                const int32_t pol = home->nation_polity[n];
-                if (pol < 0)
-                {
-                    realm_line = " Ground no realm held at the close; named at the fold.";
-                }
+                const int32_t first = sn < home->nation_absorbed_first.size() ? home->nation_absorbed_first[sn] : 0;
+                const int32_t count = sn < home->nation_absorbed_count.size() ? home->nation_absorbed_count[sn] : 0;
+                if (count <= 0)
+                    realm_line = "The realm as it stood at the close.";
                 else
                 {
-                    const int32_t first = n < home->nation_absorbed_first.size() ? home->nation_absorbed_first[n] : 0;
-                    const int32_t count = n < home->nation_absorbed_count.size() ? home->nation_absorbed_count[n] : 0;
-                    if (count <= 0)
-                        realm_line = " The realm as it stood at the close.";
-                    else
+                    realm_line = "Absorbed under the floor: ";
+                    for (int32_t k = 0; k < count; ++k)
                     {
-                        realm_line = " Absorbed under the floor: ";
-                        for (int32_t k = 0; k < count; ++k)
-                        {
-                            const std::size_t at = static_cast<std::size_t>(first + k);
-                            if (at >= home->nation_absorbed.size()) break;
-                            if (k > 0) realm_line += k + 1 == count ? " and " : ", ";
-                            realm_line += realm_name(home->nation_absorbed[at]);
-                        }
-                        realm_line += ".";
+                        const std::size_t ab = static_cast<std::size_t>(first + k);
+                        if (ab >= home->nation_absorbed.size()) break;
+                        if (k > 0) realm_line += k + 1 == count ? " and " : ", ";
+                        realm_line += realm_name(home->nation_absorbed[ab]);
                     }
+                    realm_line += ".";
                 }
-                break;
             }
         }
-        if (home != nullptr && hq_tile != null_entity && !home->settlement.regions.empty())
+        if (hq_tile != null_entity && !home->settlement.regions.empty())
         {
             if (const auto t = m_world.tiles.find(hq_tile); t != m_world.tiles.end())
             {
                 // The homeworld's own grid width for the column wrap — the
-                // grid `region::col` and `tile_component::grid_x` index, not
-                // the report's `tiles.gw` (the generator's call record, which
-                // reads smaller than the body on a --verify world).
+                // grid `region::col` and `tile_component::grid_x` index.
                 const int gw = home_grid_width;
                 int best = -1; long best_d = 0;
                 for (std::size_t r = 0; r < home->settlement.regions.size(); ++r)
@@ -710,40 +845,180 @@ void app::draw_seat_screen()
         }
     }
 
+    const bool draws_any = std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; });
+
+    // The card / briefing scrolls inside the rest of the pane.
+    ImGui::BeginChild("##seat_card", {0.0f, 0.0f}, ImGuiChildFlags_None);
     if (m_seat_ui.briefing == null_entity)
     {
-        // --- THE CARD: four lines, and no more -----------------------------
+        // --- THE NATION CARD: seven parts (STARTUP.md § The seat) ------------
+        // Its question: which nation am I? Two columns: the nation's own facts
+        // on the left, its champion and its history on the right.
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
-        ImGui::Text("%s%s", scc->name.c_str(), sc.shortlisted ? "" : "   (below the viability floor)");
+        ImGui::Text("%s, a major nation: %s %s state, %s on its borders.", nat->name.c_str(),
+                    nat->politics == ideology::isolationist ? "an" : "a",
+                    politics_word(nat->politics), posture_word(nat->posture));
         ImGui::PopStyleColor();
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::Text("Industry: %s. Makes %s%s%s.", focus_word(scc->focus),
-                    goods_list(goods.makes).c_str(),
-                    std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; })
-                        ? "; draws " : "",
-                    std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; })
-                        ? goods_list(goods.draws).c_str() : "");
-        ImGui::Text("HQ and home market: %s%s. Prices there: %s%s%s.", city.c_str(), city_region.c_str(),
-                    price_list(hm, goods.makes).c_str(),
-                    std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; })
-                        ? "; inputs " : "",
-                    std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; })
-                        ? price_list(hm, goods.draws).c_str() : "");
-        if (book >= 0.0f)
-            ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings (book value %.0f cr).",
-                        static_cast<double>(cash), static_cast<double>(debt), sc.holdings,
-                        static_cast<double>(book));
-        else
-            ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings.",
-                        static_cast<double>(cash), static_cast<double>(debt), sc.holdings);
-        if (nat)
-            ImGui::Text("Nation: %s, %s and %s. Its stance toward the firm: Access %+.2f, Trust %+.2f.%s",
-                        nat->name.c_str(), politics_word(nat->politics), posture_word(nat->posture),
-                        static_cast<double>(read.access), static_cast<double>(read.trust),
-                        realm_line.c_str());
-        else
-            ImGui::TextUnformatted("Nation: none. The firm answers to no national law.");
-        ImGui::PopTextWrapPos();
+
+        const nation_figures fig = figures_of(m_world, m_registry, m_last_econ_report, sm.nation, *nat);
+        if (ImGui::BeginTable("##nation_card", 2, ImGuiTableFlags_SizingStretchSame))
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::PushTextWrapPos(0.0f);
+
+            // (1) territory
+            card_heading("Territory");
+            ImGui::Text("%d tiles, lit on the map.", fig.tiles);
+
+            // (2) population and GDP
+            card_heading("Population and GDP");
+            ImGui::Text("Population %.2f million in %d centres.", fig.population / 1000.0, fig.centres);
+            if (fig.gdp_read)
+            {
+                const double per_head = fig.population > 0.0 ? fig.gdp_year / (fig.population * 1000.0) : 0.0;
+                ImGui::Text("GDP %.0f cr a year (%.2f cr a head): its ground's last quarter of output, "
+                            "at its markets' prices.", fig.gdp_year, per_head);
+            }
+            else
+                ImGui::TextUnformatted("GDP: no quarter has cleared on this world yet.");
+
+            // (3) treasury and budget weights
+            card_heading("Treasury and budget");
+            ImGui::Text("Treasury %.0f cr.", static_cast<double>(nat->treasury));
+            if (const auto bit = m_world.nation_budgets.find(sm.nation); bit != m_world.nation_budgets.end())
+            {
+                const nation_budget& nb = bit->second;
+                std::array<std::size_t, priority_count> order{};
+                for (std::size_t i = 0; i < priority_count; ++i) order[i] = i;
+                std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+                    return nb.weights[a] > nb.weights[b];
+                });
+                std::string lines;
+                for (const std::size_t i : order)
+                {
+                    if (nb.weights[i] <= 0.0f) break;
+                    char buf[80];
+                    std::snprintf(buf, sizeof buf, "%s%s %.0f%%", lines.empty() ? "" : ", ",
+                                  budget_line_word(i), static_cast<double>(nb.weights[i] * 100.0f));
+                    lines += buf;
+                }
+                ImGui::Text("Budget: %s; %.0f%% held in reserve.",
+                            lines.empty() ? "no line weighted" : lines.c_str(),
+                            static_cast<double>(std::clamp(nb.reserve_fraction, 0.0f, 1.0f) * 100.0f));
+            }
+            else
+                ImGui::TextUnformatted("Budget: no weights set yet.");
+
+            // (5) resource profile and deposits
+            card_heading("Resources");
+            int present = 0;
+            const std::string deps = deposits_line(*nat, present);
+            ImGui::Text("Richest deposits: %s. %d of %d goods lie on its ground.", deps.c_str(), present,
+                        static_cast<int>(resource_count));
+
+            // (6) neighbours, with their reading and any grudge
+            card_heading("Neighbours");
+            // No nation-to-nation stance is declared at the seat, so the reading
+            // shown is the derived one (RELATIONS.md: sentiment), both ways. A
+            // negative Trust before play is the grudge record's seeding
+            // (grudge_sentiment.hpp, BL-898): the old quarrel, continued.
+            int shown_n = 0, more = 0;
+            for (const auto& [a, b] : m_seat_ui.borders)
+            {
+                if (a != sm.nation && b != sm.nation) continue;
+                const entity_id nb = a == sm.nation ? b : a;
+                const auto nit = m_world.nations.find(nb);
+                if (nit == m_world.nations.end()) continue;
+                if (shown_n >= 6) { ++more; continue; }
+                ++shown_n;
+                bool is_major = false;
+                for (const seat_major& m : majors) if (m.nation == nb) is_major = true;
+                const sentiment_value theirs = sentiment_toward(m_world.sentiment, nb, sm.nation);
+                const sentiment_value ours   = sentiment_toward(m_world.sentiment, sm.nation, nb);
+                std::string grudge;
+                if (theirs.trust < 0.0f && ours.trust < 0.0f) grudge = "; a grudge both ways";
+                else if (theirs.trust < 0.0f)                grudge = "; it holds a grudge";
+                else if (ours.trust < 0.0f)                  grudge = "; you hold a grudge";
+                ImGui::Text("%s (%s): reads you Access %+.2f, Trust %+.2f; you read it Access %+.2f, Trust %+.2f%s.",
+                            nit->second.name.c_str(), is_major ? "major" : "minor",
+                            static_cast<double>(theirs.access), static_cast<double>(theirs.trust),
+                            static_cast<double>(ours.access), static_cast<double>(ours.trust),
+                            grudge.c_str());
+            }
+            if (shown_n == 0)
+                ImGui::TextUnformatted("No nation shares a land border with it.");
+            else if (more > 0)
+                ImGui::Text("+%d more.", more);
+            ImGui::PopTextWrapPos();
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::PushTextWrapPos(0.0f);
+
+            // (4) the champion -- the firm card, unchanged in content
+            card_heading("Champion");
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
+            ImGui::Text("%s%s", scc->name.c_str(), sc.shortlisted ? "" : "   (below the viability floor)");
+            ImGui::PopStyleColor();
+            ImGui::Text("Industry: %s. Makes %s%s%s.", focus_word(scc->focus),
+                        goods_list(goods.makes).c_str(), draws_any ? "; draws " : "",
+                        draws_any ? goods_list(goods.draws).c_str() : "");
+            ImGui::Text("HQ and home market: %s%s. Prices there: %s%s%s.", city.c_str(), city_region.c_str(),
+                        price_list(hm, goods.makes).c_str(), draws_any ? "; inputs " : "",
+                        draws_any ? price_list(hm, goods.draws).c_str() : "");
+            if (book >= 0.0f)
+                ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings (book value %.0f cr).",
+                            static_cast<double>(cash), static_cast<double>(debt), sc.holdings,
+                            static_cast<double>(book));
+            else
+                ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings.",
+                            static_cast<double>(cash), static_cast<double>(debt), sc.holdings);
+            ImGui::Text("Its nation's stance toward it: Access %+.2f, Trust %+.2f.",
+                        static_cast<double>(read.access), static_cast<double>(read.trust));
+
+            // (7) history (BL-1295)
+            card_heading("History");
+            if (home != nullptr)
+            {
+                const std::string tags = ui::nation_pattern_tags_text(*home, sm.nation);
+                ImGui::Text("Patterns: %s.", tags.empty() ? "none of the five" : tags.c_str());
+                if (!realm_line.empty())
+                    ImGui::TextUnformatted(realm_line.c_str());
+                const std::vector<ui::nation_history_row> rows = ui::nation_timeline(*home, sm.nation, 8);
+                for (const ui::nation_history_row& r : rows)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
+                    ImGui::Text("%-9s", ui::lapse_year_label(r.year).c_str());
+                    ImGui::PopStyleColor();
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted(r.text.c_str());
+                }
+                if (rows.empty())
+                    ImGui::TextUnformatted("No recorded event names its line.");
+                // The link into the History ledger, filtered to this nation. A
+                // toggle: pressed while open, it closes the ledger.
+                const bool open_here = m_seat_ui.history_open && m_ui.history_nation_filter == sm.nation;
+                if (ImGui::SmallButton(open_here ? "Close its history" : "Open its history in the History ledger"))
+                {
+                    if (open_here)
+                    {
+                        m_seat_ui.history_open = false;
+                        m_ui.show_tile_ledger  = false;
+                    }
+                    else
+                    {
+                        m_seat_ui.history_open   = true;
+                        m_ui.show_tile_ledger    = true;
+                        m_ui.history_view        = ui::history_view_ages;
+                        m_ui.history_nation_filter = sm.nation;
+                    }
+                }
+            }
+            else
+                ImGui::TextUnformatted("This world carries no generation record.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTable();
+        }
         ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
         ImGui::TextUnformatted("Press a row to read its briefing.");
         ImGui::PopStyleColor();
@@ -752,40 +1027,38 @@ void app::draw_seat_screen()
     {
         // --- THE BRIEFING: the opening position, in prose -------------------
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
-        ImGui::Text("Briefing: %s", scc->name.c_str());
+        ImGui::Text("Briefing: %s", nat->name.c_str());
         ImGui::PopStyleColor();
         ImGui::PushTextWrapPos(0.0f);
+        // The nation's grain first: whose realm this is, and whose law.
+        ImGui::Text("You are %s, %s %s state, %s on its borders, with %.0f cr in its treasury. You "
+                    "govern it, and you operate its champion, %s.", nat->name.c_str(),
+                    nat->politics == ideology::isolationist ? "an" : "a",
+                    politics_word(nat->politics), posture_word(nat->posture),
+                    static_cast<double>(nat->treasury), scc->name.c_str());
         const std::string makes = goods_list(goods.makes, 6);
-        const bool draws_any =
-            std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; });
-        ImGui::Text("You are %s, %s corporation with %d works. You make %s.",
+        ImGui::Text("%s is %s corporation with %d works. It makes %s.",
                     scc->name.c_str(), scc->focus == industrial_focus::extraction
                         ? "an extraction" : scc->focus == industrial_focus::processing
                         ? "a processing" : "a trade",
                     goods.works, makes.c_str());
         if (draws_any)
-            ImGui::Text("You sell at %s's market, where your goods fetch %s, and you buy %s "
+            ImGui::Text("It sells at %s's market, where its goods fetch %s, and buys %s "
                         "there at %s.", city.c_str(), price_list(hm, goods.makes).c_str(),
                         goods_list(goods.draws).c_str(), price_list(hm, goods.draws).c_str());
         else
-            ImGui::Text("You sell at %s's market, where your goods fetch %s.", city.c_str(),
+            ImGui::Text("It sells at %s's market, where its goods fetch %s.", city.c_str(),
                         price_list(hm, goods.makes).c_str());
         if (debt > 0.0f)
-            ImGui::Text("You owe %.0f cr. While the balance stays below zero the debt compounds "
+            ImGui::Text("It owes %.0f cr. While the balance stays below zero the debt compounds "
                         "at %.1f%% a quarter.", static_cast<double>(debt),
                         static_cast<double>(k_debt_interest_per_quarter * 100.0f));
         else
-            ImGui::Text("You owe nothing, and hold %.0f cr in cash.", static_cast<double>(cash));
-        if (nat)
-            ImGui::Text("You trade under %s's law: %s %s state, %s on its borders. It reads you "
-                        "at Access %+.2f, Trust %+.2f.", nat->name.c_str(),
-                        nat->politics == ideology::isolationist ? "an" : "a",
-                        politics_word(nat->politics), posture_word(nat->posture),
-                        static_cast<double>(read.access), static_cast<double>(read.trust));
-        else
-            ImGui::TextUnformatted("You trade under no nation's law.");
-        // BL-1099 / R22: one sentence of origin, from the firm's own fields and
-        // the record's owner slice -- the whole of the history the seat carries.
+            ImGui::Text("It owes nothing, and holds %.0f cr in cash.", static_cast<double>(cash));
+        ImGui::Text("Your nation reads it at Access %+.2f, Trust %+.2f.",
+                    static_cast<double>(read.access), static_cast<double>(read.trust));
+        // BL-1099 / R22: one sentence of origin, at the champion's grain where
+        // it names the charter and the nation's where it names the realm.
         if (const std::string origin = seat_origin_sentence(m_world, m_generation_report, *scc, city, nat);
             !origin.empty())
             ImGui::TextUnformatted(origin.c_str());
@@ -793,14 +1066,14 @@ void app::draw_seat_screen()
         {
             ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::pinned);
             if (sc.holdings_scored == 0)
-                ImGui::Text("The floor marked this firm: none of your %d holdings stands in a market "
+                ImGui::Text("The floor marked this champion: none of its %d holdings stands in a market "
                             "the landscape scored, so none stands where a chain closes and a "
-                            "resource sits inside the pin band. You may still take it.",
+                            "resource sits inside the pin band. You may still take its nation.",
                             sc.holdings);
             else
-                ImGui::Text("The floor marked this firm: %d of your %d holdings stand in scored "
+                ImGui::Text("The floor marked this champion: %d of its %d holdings stand in scored "
                             "markets, but in none of them does a chain close with a resource "
-                            "inside the pin band. You may still take it.",
+                            "inside the pin band. You may still take its nation.",
                             sc.holdings_scored, sc.holdings);
             ImGui::PopStyleColor();
         }
@@ -808,10 +1081,15 @@ void app::draw_seat_screen()
         ImGui::Dummy({1.0f, 4.0f});
         if (ImGui::Button("Confirm"))
         {
-            // THE PICK, as a game act: through the seam as corp_verb::take_seat.
-            const corp_command_result r = take_seat_pick(sc.corp);
+            // THE PICK, as a game act: the major, through the seam as
+            // corp_verb::take_seat on its champion.
+            const corp_command_result r = take_seat_pick(sm.nation);
             if (r == corp_command_result::applied)
             {
+                // Play opens clean: the history link's ledger and filter close.
+                if (m_seat_ui.history_open) m_ui.show_tile_ledger = false;
+                m_seat_ui.history_open     = false;
+                m_ui.history_nation_filter = null_entity;
                 if (m_seat_ui.from_verify) m_screen = app_screen::in_game;
                 else                       finish_new_game();
             }
@@ -820,7 +1098,27 @@ void app::draw_seat_screen()
         if (ImGui::Button("Back"))
             m_seat_ui.briefing = null_entity; // nothing changed: the world was only read
     }
+    ImGui::EndChild();
 
     ImGui::EndChild();
     ImGui::End();
+
+    // BL-1295: THE HISTORY LINK'S LEDGER -- the real History ledger, drawn over
+    // the screen in its own column, on its Ages view, filtered to the nation.
+    // Its own close (re-pressing its active tab) ends the link as well.
+    if (m_seat_ui.history_open && m_screen == app_screen::choosing_seat)
+    {
+        if (!m_ui.show_tile_ledger)
+            m_seat_ui.history_open = false;
+        else
+        {
+            ui::draw_tile_inspector(m_world, m_ui, m_generation_report, m_active_world_params,
+                                    &m_ui.show_tile_ledger);
+            // The ledger's window may predate this screen's (an in-game frame
+            // drew it first), and both refuse bring-to-front-on-focus, so the
+            // screen would paint over it: lift it above the screen explicitly.
+            if (ImGuiWindow* lw = ImGui::FindWindowByName("Tile Ledger"))
+                ImGui::BringWindowToDisplayFront(lw);
+        }
+    }
 }

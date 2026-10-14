@@ -22,7 +22,8 @@
   "save format but no verb and no surface, and the canvas/lens/ledger/chrome families are view",
   "controls that were never on the command seam by design.",
   "",
-  "THE PRE-GAME WIZARD IS OUT OF SCOPE (Ben, 2026-09-09, ruling on NR-804). The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family. The dictionary exists for an agent playing the game, and nobody plays the wizard; a startup family would be inventory with no reader. The \"any control change updates its entry\" rule above does not reach it. Stated rather than left silent because the silence is what made it a question."
+  "THE PRE-GAME WIZARD IS OUT OF SCOPE (Ben, 2026-09-09, ruling on NR-804). The startup wizard - its rounds, per-round Reroll, Next and Begin - gets no entries here and no startup.* family. The dictionary exists for an agent playing the game, and nobody plays the wizard; a startup family would be inventory with no reader. The \"any control change updates its entry\" rule above does not reach it. Stated rather than left silent because the silence is what made it a question.",
+  "THE MENU'S SEED AND RESOURCES ENTRIES ARE RETIRED (BL-1279, 2026-10-13). chrome.menu_set_seed, chrome.menu_roll_seed, chrome.menu_copy_seed and chrome.menu_set_abundance named controls that moved from the main menu to the wizard's setup round with the nation targets (STARTUP.md section Rounds, Ben 2026-10-11). The pre-game wizard is out of scope here (the ruling above), so they are removed rather than re-homed, and no entry is added for the setup round's controls."
  ],
  "entries": [
   {
@@ -80,7 +81,8 @@
     "The BL-615 stratum gate accepts the SPECIFIC named building's authored placement_gate (POPULATION.md § Strata gate buildings): schooling must stand ON a population-centre tile (needs_centre otherwise), a university on a centre of stratum City (4)+ (centre_too_small below it), and a heavy processor recipe (the steel-mill class: steel, steel_from_iron_nickel, steel_bessemer) within 6 grid steps of some centre (far_from_centre beyond). All three surface as rejected_placement through the seam; the reason codes are distinct at the placement layer.",
     "The building type is UNLOCKED for the acting corporation's nation, AND, if a recipe is stated, that RECIPE is separately unlocked. Technology is held by the NATION (BL-1273, RESEARCH.md): a node of the Digitisation tree that unlocks a structure or recipe gates it for every corporation of a nation that does not hold it. No node carries a machine unlock effect yet, so today NOTHING is tech-locked -- the four old per-corp gates (military_base, Toolmaker, Bessemer Converter, refined_copper) retired with BL-1273 (NR-1022) and are open to every nation. When a node does lock something, the two locks show two different ways: a locked STRUCTURE still appears as a row, showing \"Locked - the technology that permits this has not been researched\" in place of the Build button, while a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: \"the door not showing what the gate would refuse\", the same treatment era_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.",
     "The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market, times the tile's site multiplier (landform x reach x stack, rounded to whole ticks — a hard site draws more; PRODUCTION.md § Construction site time) (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short.",
-    "A processing recipe — stated, or the default a recipe-less processor is seeded with — must run on the tile body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body (atmosphere none or thin), propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; construction_result::wrong_air). The ledger never offers a row this refuses."
+    "A processing recipe — stated, or the default a recipe-less processor is seeded with — must run on the tile body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body (atmosphere none or thin), propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; construction_result::wrong_air). The ledger never offers a row this refuses.",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).\n\nNOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT scripts/world_gen.lua, so only 16 of 37 resources carry a market price and coal is not among them. Since steel's recipe needs coal, a processing facility built through the seam has never produced a unit in any recorded session. Extraction works; processing does not, and the cause is configuration rather than the verb.",
    "reason_to_select": "The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper, a launchpad gates space access, and a military base is where units muster (BL-325; hire moves onto it in S2 — until then it is positioning ahead of that change). The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash."
@@ -119,7 +121,8 @@
    "preconditions": [
     "The acting corporation exists (rejected_no_corp otherwise).",
     "The building entity exists (rejected_invalid otherwise).",
-    "The corporation owns the building (rejected_not_owner otherwise)."
+    "The corporation owns the building (rejected_not_owner otherwise).",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "Enqueued at confirm; executed against the mutable world after the draw. The building's components are erased, its id is removed from the corporation's assets, and the tile slot is freed for something else. NO refund — the build cost is not returned; demolition destroys the asset outright. A rejected attempt changes nothing and shows nothing beyond the world staying identical.",
    "reason_to_select": "Frees a capacity-capped tile for a better use — the press when the tile is worth more re-purposed than the building is worth running. For a merely loss-making building, idle is the better press: demolition is irreversible and refundless."
@@ -166,7 +169,8 @@
    "preconditions": [
     "The acting corporation exists (rejected_no_corp otherwise).",
     "The corporation owns the building (rejected_not_owner otherwise).",
-    "The building is not already idled (rejected_state — a no-op in current state)."
+    "The building is not already idled (rejected_state — a no-op in current state).",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "decommissioned := true immediately. From the next economy tick production stops and wages stop; material upkeep CONTINUES, and the building keeps occupying its tile. Status surfaces read 'Decommissioned' / 'Idled - producing nothing'. Fully reversible via resume. Rejected attempts change nothing.",
    "reason_to_select": "A persistently loss-making building burns wages and maintenance every quarter; idling stops the wage bleed while keeping the asset and its tile for when prices recover. The reversible alternative to demolition — pay a small upkeep to keep the option open."
@@ -274,7 +278,8 @@
    "preconditions": [
     "The acting corporation exists (rejected_no_corp otherwise).",
     "The corporation owns the building (rejected_not_owner otherwise).",
-    "The building is currently idled (rejected_state otherwise — resuming a running building is a no-op)."
+    "The building is currently idled (rejected_state otherwise — resuming a running building is a no-op).",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "decommissioned := false immediately; production and wages restart on the next economy tick at the building's existing workforce target and recipe. Rejected attempts change nothing.",
    "reason_to_select": "The idled asset now reads profitable again — prices recovered or inputs cheapened — so resuming captures margin with zero capex. The AI's own dial_resume fires on exactly this signal."
@@ -302,7 +307,8 @@
     "The recipe is valid for the building's type, and in the ACTIVE recipe's own group - a cross-group retool is refused outright, so it is never offered (rejected_invalid otherwise).",
     "Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.",
     "The building is a processing facility (nothing else has a method to choose; the section draws nothing for other types).",
-    "The recipe runs on the building's body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body, propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; try_switch_recipe returns wrong_air). The Method grid never offers a wrong-air row."
+    "The recipe runs on the building's body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body, propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; try_switch_recipe returns wrong_air). The Method grid never offers a wrong-air row.",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing. A Switch press the seam still refuses (funds, tech, cooldown) is said in a status line under the grid rather than discarded.",
    "reason_to_select": "The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one."
@@ -311,7 +317,7 @@
    "id": "gameplay.set_workforce",
    "family": "gameplay",
    "surface": "No UI (BL-1322, Ben 2026-10-13: the player has no workforce control). The workforce slider on the expanded building card and in the Construction ledger's Buildings view is retired; both now show the target as a read-only bar. A RIVAL-ONLY corp_verb: the background scorer's workforce dial issues it under its grant (AI_OPPONENT.md § 11), and the command seam refuses it for the player's corporation.",
-   "press": "None for the player. `COMMAND corp=<rival> verb=3 subject=<building> workforce=<0-100>` on the --serve line protocol reaches it only for a corporation that is not the player's; for the player's corporation it is rejected_invalid and mutates nothing.",
+   "press": "None for the player. `COMMAND corp=<rival> verb=3 subject=<building> workforce=<0-200>` on the --serve line protocol reaches it only for a corporation that is not the player's; for the player's corporation it is rejected_invalid and mutates nothing.",
    "args": [
     {
      "name": "building",
@@ -320,16 +326,18 @@
     },
     {
      "name": "workforce",
-     "type": "int [0, 100]",
-     "meaning": "Target staffing as % of nominal, 0-100 (Ben, 2026-10-13: the maximum is 100 %)."
+     "type": "int [0, 200]",
+     "meaning": "Internal staffing target, 0-200; shown to the player as target/2 % of full employment (Ben, 2026-10-13: 100 % is the label for full employment)."
     }
    ],
    "preconditions": [
     "The acting corporation exists (rejected_no_corp otherwise).",
     "The acting corporation is NOT the player's (rejected_invalid otherwise - the game sets the player's workforce, PRODUCTION.md § Workforce target and the auto-solver).",
     "The corporation owns the building (rejected_not_owner otherwise).",
-    "The value is inside [0, 100] (rejected_invalid otherwise; the whole command is refused, never clamped).",
-    "The building is not ALREADY at that target AND already pinned (rejected_state otherwise)."
+    "The value is inside [0, 200] (rejected_invalid otherwise).",
+    "Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.",
+    "The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op - it takes control away from the solver, which is a real change.",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "A rival's workforce_target is set AND its workforce_auto flag is cleared (the flag records that the dial, not the solver, holds the value - `dial_idled` reads it). Actual staffing is the target mediated by body-level labour contention. Wages scale with assigned workforce; output scales with effective workforce. For the player's corporation the verb is refused and nothing changes: the economy tick moves each of the player's producing buildings one 25 % step a quarter toward the solver's most profitable target on the grid 0/25/50/75/100.",
    "reason_to_select": "A rival's lever, scored by its workforce dial: throttle to cut losses without idling, or staff to 0 to park a building cheaply. Not a player action - the player's staffing follows the market one step a quarter."
@@ -351,10 +359,41 @@
     "The acting corporation is NOT the player's (rejected_invalid otherwise).",
     "`subject` names a real building (rejected_invalid otherwise).",
     "The corporation owns the building (rejected_not_owner otherwise).",
-    "The building is not ALREADY on auto (rejected_state otherwise - a genuine no-op)."
+    "The building is not ALREADY on auto (rejected_state otherwise — a genuine no-op).",
+    "Construction is complete (the UI hides the controls until then; the seam does not itself gate on this).",
+    "BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part)."
    ],
    "expected_output": "For a non-player corporation: workforce_auto := true, which only clears the dial-idled record (`dial_idled`); the auto-solver runs on the player's corporation alone. For the player's corporation: refused, nothing changes - the game sets the player's workforce every quarter regardless of the flag.",
    "reason_to_select": "None for the player: the opt-out it undid is retired (AI_OPPONENT.md § 11, amended 2026-10-13)."
+  },
+  {
+   "id": "gameplay.state_industry_command",
+   "family": "gameplay",
+   "surface": "The command seam only (--serve / MCP `issue_command` with `nation`, and the verify API's `corp_command{as_nation=...}`). No ledger or card control yet: a state building's card names its nation as owner (\"Owner: <nation> (state industry)\") and offers no levers.",
+   "press": "Issue one of a corporation's building verbs — build (0), demolish (1), set_recipe (2), set_workforce (3), idle (4), resume (5), set_workforce_auto (11) — with `corp` = your corporation and `nation` = your corporation's home nation. The champion's blackboard lists the nation's `treasury` and every state building (`state_building_*` facts, including `state_building_idle`).",
+   "args": [
+    {
+     "name": "nation",
+     "type": "entity_id (wire key `nation`; corp_command::as_nation)",
+     "meaning": "The nation whose state industry the command acts on. 0 / omitted = the corporation's own book (every other command)."
+    },
+    {
+     "name": "verb args",
+     "type": "as the underlying verb",
+     "meaning": "subject / workforce / recipe exactly as the corporation verb reads them; build reads tile, type (must be 2, processing_facility) and recipe (must be NAMED and strategic)."
+    }
+   ],
+   "preconditions": [
+    "Wire: `nation` parses as an entity id (rejected_invalid otherwise); unless the session runs `--as any`, it must equal the session corporation's home nation (rejected_not_owner otherwise) — actor authority reaches the session's nation and no other.",
+    "The nation exists (rejected_invalid) and the acting corporation is its CHAMPION — the seated corporation for the player's nation, else the nation's lowest-id specialist (rejected_not_owner).",
+    "The verb is one of the seven building verbs (rejected_invalid otherwise — no survey, trade, unit or stance verb acts for a state).",
+    "A named building exists (rejected_invalid) and is in the nation's state industry (rejected_not_owner).",
+    "build: type processing_facility on a recipe the state runs — one making steel, power, refined fuel, ordnance, spacecraft components or propellant (rejected_invalid otherwise); on a tile of the nation's own territory, plus every ordinary placement, era, tech and air gate (rejected_placement / rejected_tech_locked / rejected_wrong_air); its whole capex within the treasury's UNCOMMITTED part — the treasury less what this tick's funded state buildings are owed (rejected_funds).",
+    "set_recipe: the new recipe must also be one the state runs (state stays state: rejected_invalid), plus the ordinary group, cooldown, tech and air gates; the switch cost comes from the treasury's uncommitted part (rejected_funds).",
+    "A rejection mutates nothing."
+   ],
+   "expected_output": "The underlying verb's effect on a STATE building: a build joins the nation's state_assets and is paid for tick by tick from the treasury; a dial, retool, idle or resume changes the state building exactly as it would a corporation's. Each tick the funding gate runs first: a state building whose whole cost this tick (maintenance, wages at full staffing, a full run of inputs, upkeep goods, construction) does not fit in what is left of the treasury IDLES for the tick — it produces, draws and pays nothing — so the treasury never goes below zero. A running state building's sales land in the treasury at the clearing price and its inputs, wages and maintenance are paid from it.",
+   "reason_to_select": "The player runs its nation's strategic sectors — steel, energy, arms, space — beside its champion's private book (NATIONS.md § State industry). Build a state plant where the nation needs strategic capacity its firms will not supply; dial or idle one whose costs the treasury should not carry; demolish one to dispose of it (there is no privatisation verb)."
   },
   {
    "id": "gameplay.survey",
@@ -799,8 +838,8 @@
    "preconditions": [
     "The app is in-game and no ImGui text field has keyboard focus."
    ],
-   "expected_output": "Toggles the research canvas. The mock Lua tree it drew retired with BL-1273; until the Digitisation tree panel (BL-1276) lands it shows a \"Research panel pending\" state and nothing can be researched from it. Pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.",
-   "reason_to_select": "Preview the planned research structure. Do not select this expecting to act — it is a mock, not a system."
+   "expected_output": "Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, \"Requires: A + B\" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.",
+   "reason_to_select": "Read which technologies the nation can reach and what each gives, and shift-click nodes to plan its research queue."
   },
   {
    "id": "canvas.zoom_keys",
@@ -1604,6 +1643,18 @@
    "reason_to_select": "Answers 'what do I own, and what is each kind of it earning me?' - the broad estate overview, and the route to a single building's levers (expand its type, press the building)."
   },
   {
+   "id": "ledger.nav_research",
+   "family": "ledger",
+   "surface": "Nav rail, slot 4 (Research icon)",
+   "press": "Click the branching-node glyph on the left icon rail (or press F9).",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, \"Requires: A + B\" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.",
+   "reason_to_select": "Answers \"which technologies can my nation reach, what does each give, and when will my plan arrive?\""
+  },
+  {
    "id": "ledger.nav_corporation",
    "family": "ledger",
    "surface": "Nav rail, slot 1 (Corporation overview icon)",
@@ -1822,15 +1873,15 @@
   {
    "id": "chrome.f9_tech_tree",
    "family": "chrome",
-   "surface": "Keyboard; opens the mock tech-tree viewer",
+   "surface": "Keyboard; opens the research panel",
    "press": "Press F9 (press again to close).",
    "args": [],
    "preconditions": [
     "App is in game.",
     "Not while an ImGui widget owns the keyboard."
    ],
-   "expected_output": "Toggles the research surface (nav slot 4) and its fold-out. The mock Lua tree it drew retired with BL-1273; until the Digitisation tree panel (BL-1276) lands both show a \"Research panel pending\" state. Honest status: nothing can be researched from it yet.",
-   "reason_to_select": "To browse the drafted tech-tree content; of no strategic use to an AI player yet."
+   "expected_output": "Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, \"Requires: A + B\" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.",
+   "reason_to_select": "Answers \"which technologies can my nation reach, what does each give, and when will my plan arrive?\" - the route to the queue_research press."
   },
   {
    "id": "chrome.gear_toggle",
@@ -1845,18 +1896,6 @@
    "reason_to_select": "Mouse route to the session controls (Pause/Resume, Exit Game); Esc is the keyboard parity for the same popup."
   },
   {
-   "id": "chrome.menu_copy_seed",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Copy seed button",
-   "press": "Click Copy seed.",
-   "args": [],
-   "preconditions": [
-    "App is on the main menu screen."
-   ],
-   "expected_output": "The current seed, formatted as 8 hex digits, is placed on the system clipboard. Nothing else changes.",
-   "reason_to_select": "To record or share the reproducible key for the world about to be generated."
-  },
-  {
    "id": "chrome.menu_new_game",
    "family": "chrome",
    "surface": "Main menu, primary button column",
@@ -1865,8 +1904,8 @@
    "preconditions": [
     "App is on the main menu screen."
    ],
-   "expected_output": "The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 6 (System, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.",
-   "reason_to_select": "To start setting up a new world round by round, choosing the planetology and history leans."
+   "expected_output": "The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 7 (System, Setup, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.",
+   "reason_to_select": "To start setting up a new world round by round: the nation targets, seed and resources on the setup round, then the planetology and history leans."
   },
   {
    "id": "chrome.menu_quick_start",
@@ -1877,8 +1916,8 @@
    "preconditions": [
     "App is on the main menu screen."
    ],
-   "expected_output": "The world is built straight through on the menu's seed and resources with no wizard round drawn: the screen goes to the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then to the seat canvas (app_screen::choosing_seat), where the player picks the corporation. The same settings give the same world the wizard would have built.",
-   "reason_to_select": "To start play on a known seed and resource level without walking the wizard's rounds; the seat is still chosen."
+   "expected_output": "Opens the New World wizard on its setup round alone (STARTUP.md section Rounds, Ben 2026-10-13): the nation targets, the seed and the abundance, which the main menu no longer carries. The setup round's Begin then builds the world straight through with no other wizard round drawn: the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then the nation selection screen (app_screen::choosing_seat), where the player picks a major nation. The same settings give the same world the wizard would have built. Back on that round returns to the menu.",
+   "reason_to_select": "To start play on chosen settings without walking the wizard's rounds; the seat is still chosen."
   },
   {
    "id": "chrome.menu_quit",
@@ -1891,54 +1930,6 @@
    ],
    "expected_output": "The application requests quit and exits. No confirmation is asked here (nothing exists to lose on the menu). Settings were already persisted to options.cfg as they changed.",
    "reason_to_select": "To leave the application from the entry screen."
-  },
-  {
-   "id": "chrome.menu_roll_seed",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Roll button beside the seed field",
-   "press": "Click Roll.",
-   "args": [],
-   "preconditions": [
-    "App is on the main menu screen."
-   ],
-   "expected_output": "The seed field is replaced with a fresh random draw (a one-shot random_device read; the only place entropy touches the pipeline). No world is generated yet.",
-   "reason_to_select": "To get a fresh world without caring which one; the seed shown remains the reproducible key."
-  },
-  {
-   "id": "chrome.menu_set_abundance",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Resources radio row",
-   "press": "Click one of the three radio buttons: Sparse, Lean, or Standard.",
-   "args": [
-    {
-     "name": "level",
-     "type": "enum: sparse | lean | standard",
-     "meaning": "Resource abundance tier. Standard is the Earth-like ceiling; Sparse and Lean step down from it. There is no tier above Standard."
-    }
-   ],
-   "preconditions": [
-    "App is on the main menu screen."
-   ],
-   "expected_output": "The pending world parameters carry the chosen abundance level, consumed at Begin. The Bodies slider next to this row is disabled (fixed at 5) and cannot be pressed.",
-   "reason_to_select": "To choose how resource-rich the generated world is; leaner tiers make extraction siting and trade tighter."
-  },
-  {
-   "id": "chrome.menu_set_seed",
-   "family": "chrome",
-   "surface": "Main menu, New World block, Seed field",
-   "press": "Type an 8-digit hex value into the seed input box.",
-   "args": [
-    {
-     "name": "seed",
-     "type": "hex string (8 digits, u32)",
-     "meaning": "The world seed. Generation is a pure function of this value plus the knobs: same seed and knobs give an identical world."
-    }
-   ],
-   "preconditions": [
-    "App is on the main menu screen (app_screen::menu)."
-   ],
-   "expected_output": "The pending world parameters carry the typed seed. Nothing is generated; the seed is consumed only when the wizard's Begin is pressed.",
-   "reason_to_select": "To reproduce a specific known world, or to share/compare a world by its seed."
   },
   {
    "id": "chrome.options_close",
@@ -2083,24 +2074,6 @@
    ],
    "expected_output": "While on, competitor-visibility redactions lift for the WATCHER only: rival building internals (production, the market it sells into, profitability read-only page), corp cash/reserve facts and trade points / reserve / manual-trade count, and the survey tell (unsurveyed tiles render through a lock-colour wash so the corp's own blindness stays visible). Off restores the BL-068 redactions with no residue. Never changes what any AI reads; the rival action grid stays disabled - sight, never hands.",
    "reason_to_select": "To audit a watched corp's decisions against what it actually knew, held and ran - honest watching vs omniscient watching is a deliberate, visible state (BL-408)."
-  },
-  {
-   "id": "chrome.tech_tree_era_tab",
-   "family": "chrome",
-   "surface": "Tech-tree viewer (F9), era tab strip",
-   "press": "Click the 'Era -1 Antiquity', 'Era 0 — Terrestrial', 'Era 1 — Early Space' or 'Standing lines' tab button",
-   "args": [
-    {
-     "name": "view",
-     "type": "enum",
-     "meaning": "'Era -1 Antiquity' (placeholder pointing at the BL-307 ladder store) / 'Era 0 — Terrestrial' (the default) / 'Era 1 — Early Space' / 'Standing lines' (span eras, never gate one)"
-    }
-   ],
-   "preconditions": [
-    "Tech-tree viewer is open (F9)"
-   ],
-   "expected_output": "Switches which era's tree is shown — each era carries its own tree; eras with no authored quests show a placeholder. Re-clicking the currently-active tab closes the viewer (toggle rule); switching tabs is an ordinary view change.",
-   "reason_to_select": "To browse a specific era's drafted content; of no strategic use to an AI player yet — the viewer is a mock with no simulation coupling."
   },
   {
    "id": "chrome.wizard_back",
@@ -2488,23 +2461,78 @@
   {
    "id": "gameplay.take_seat",
    "family": "gameplay",
-   "surface": "The corporation selection canvas at Begin (STARTUP.md § The seat): the ranked list of every specialist beside a map of the home body, a firm's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which corporation the player IS - so an agent must be able to make it. It is a corp_verb (29), but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <corp-id>` (every new-campaign path, --autostart included). NOTE FOR A PLANNER: the list order is the static landscape score (the ground a firm's holdings stand on), and firms below the viability floor are MARKED but offered; a marked firm is a harder opening, never an illegal one.",
-   "press": "Hover a row to point the map at that firm (its HQ, its works, its home market's catchment) and read its card; press the row to open its briefing; press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. At launch: `ProjectIo --seat <corp-id>` (the id is the corporation's entity id, as the `[seat]` log line and the blackboard print it).",
+   "surface": "The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, the champion's firm card, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS and which champion they operate - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one.",
+   "press": "Hover a row to point the map at that nation (its territory lit, its champion's HQ, works and home market drawn) and read its card; press the row to open its briefing; press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. On the card, \"Open its history in the History ledger\" opens the History ledger's Ages view filtered to the nation; pressed again (\"Close its history\") it closes the ledger - it reads the record and moves nothing. At launch: `ProjectIo --seat <nation-id>` (the nation's entity id, as the `[seat] major <nation> champion <corp>` log lines print it).",
    "args": [
     {
-     "name": "corp",
+     "name": "nation",
      "type": "entity_id",
-     "meaning": "The corporation to become. Must be a SPECIALIST of this world - one of the ranked rows the canvas offers - never a background firm (a company)."
+     "meaning": "The MAJOR nation to become - one of the rows the screen offers. Its champion (the specialist its ground generated) is the corporation seated. A minor nation, a corporation id, or any other entity is refused."
     }
    ],
    "preconditions": [
     "Before play: the validation run is over and no seat has been taken. In play the verb is refused whole (rejected_state) by every agent host, before the seam.",
-    "`corp` names a real corporation (rejected_no_corp otherwise). `--seat` range-checks the id against entity_id's domain before any narrowing and refuses the launch outright on a malformed, negative or out-of-range token - never truncated into some other firm.",
-    "`corp` is a ranked specialist: not a background firm, and one the canvas offers (rejected_invalid otherwise). A firm below the viability floor IS offered and IS pickable.",
-    "A refused pick mutates nothing and seats nobody: a headless run with a refused `--seat` fails rather than falling back to the draw; the interactive path opens the canvas instead."
+    "`--seat` range-checks the id against entity_id's domain before any narrowing and refuses the launch outright on a malformed, negative or out-of-range token - never truncated into some other entity.",
+    "`nation` is a MAJOR of this world: a nation, and one holding a champion the ranking offers (rejected_invalid otherwise - a minor nation, a corporation id, or an id naming nothing). A major whose champion sits below the viability floor IS offered and IS pickable.",
+    "A refused pick mutates nothing and seats nobody: a headless run with a refused `--seat` fails rather than falling back to the draw; the interactive path opens the screen instead."
    ],
-   "expected_output": "`is_player` and `world::player_entity` re-point onto `corp` (every other corporation's flag cleared), the player-scoped balance series is rebuilt from that corporation's own filed returns, and play opens framed on its holdings — in the live app, after a \"Painting the ground\" loading step if the home body's ground master (pre-baking since the world finished) has not yet landed (STARTUP.md § Handoff; the wait never counts as game days, and the headless --autostart and --verify paths do not wait). Nothing else moves: the same world and the same pick give the same player and the same state hash (reproducible from (seed, pick); scripts/verify/seat_pick.lua S5, tools/verify/seat_pick_check.js). world::state_hash folds the seat (`is_player` / `world::player_entity`), so a different pick on the same world is a different state hash and the seat is asserted from the hash alone; the player id printed beside it is a diagnostic. Picking the corporation the weighted draw would have chosen gives exactly the state the draw gives. The log prints `[seat] picked <id> (take_seat)`; a path with no player to ask prints `[seat] drawn <id> - <why>`.",
-   "reason_to_select": "Choose the opening position rather than be dealt one: the card shows what the firm makes and what its home market pays for it, what it holds and owes, and whose law it trades under - so a planner can prefer depth (a processor near population), a debt-free book, or a friendly nation, or knowingly take a marked firm as a harder game."
+   "expected_output": "`is_player` and `world::player_entity` re-point onto the nation's CHAMPION (every other corporation's flag cleared), the player-scoped balance series is rebuilt from that corporation's own filed returns, and play opens framed on its holdings — in the live app, after a \"Painting the ground\" loading step if the home body's ground master (pre-baking since the world finished) has not yet landed (STARTUP.md § Handoff; the wait never counts as game days, and the headless --autostart and --verify paths do not wait). Nothing else moves: the same world and the same pick give the same player and the same state hash (reproducible from (seed, pick); scripts/verify/seat_pick.lua S5, tools/verify/seat_pick_check.js). world::state_hash folds the seat (`is_player` / `world::player_entity`), so a different pick on the same world is a different state hash and the seat is asserted from the hash alone; the player id printed beside it is a diagnostic. Picking the major whose champion the weighted draw would have chosen gives exactly the state the draw gives. The log prints `[seat] picked <champion-id> (take_seat, nation <nation-id>)`; a path with no player to ask prints `[seat] drawn <id> - <why>`. A History ledger the card's link opened closes when play opens.",
+   "reason_to_select": "Choose the opening position rather than be dealt one: the card shows the nation's ground, people, output and treasury, how its budget is weighted, what its champion makes and what its home market pays, what lies under its ground, which neighbours resent it, and the history that made it - so a planner can prefer a rich treasury, deep deposits, quiet borders, or a champion with depth, or knowingly take a marked major as a harder game."
+  },
+  {
+   "id": "gameplay.queue_research",
+   "family": "gameplay",
+   "surface": "The research panel's ring: SHIFT + left click on a node (Ben, 2026-10-10; there is no Plan mode - a plain click or a hover only inspects). A corp_verb (33, `queue_research`), so an agent issues it through the same seam.",
+   "press": "Hold Shift and left-click a node on the ring. Holding Shift over a node first rings what the click would queue; the hover card says the count and RP, or why it is refused.",
+   "args": [
+    {
+     "name": "order",
+     "type": "uint32",
+     "meaning": "The node: its INDEX in io::dg::nodes - store order of docs/economy/tech/digitisation_tree.json, generated into src/world/digitisation_tree_data.hpp, where each row carries its index. 0..159. The MCP server refuses anything else before the wire; the seam range-checks it again (rejected_invalid)."
+    }
+   ],
+   "preconditions": [
+    "`corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.",
+    "The seat has a home nation (rejected_state otherwise).",
+    "The node is not already held (rejected_state) and not already queued (a shift-click on a queued node is the unqueue toggle, gameplay.unqueue_research, not this verb).",
+    "Neither the node nor every route to it crosses a pick-one pair whose other side is held or queued (rejected_state; the panel says which pair). A refusal queues nothing."
+   ],
+   "expected_output": "The nation's queue gains the node with its unheld requirements AHEAD of it - every requirement group, the cheapest member where a group offers a choice (RESEARCH.md § The research queue). RP flow to the head each quarter; a quest whose deed is unmet is passed over, not blocking. The panel lists each entry's arrival quarter at the nation's current RP rate.",
+   "reason_to_select": "Plan a route to a technology far out: one press queues the whole path, and the arrival column says when each step lands."
+  },
+  {
+   "id": "gameplay.unqueue_research",
+   "family": "gameplay",
+   "surface": "The research panel: SHIFT + left click on a QUEUED node (the toggle rule, NR-1033), or the 'Remove last' button under the queue. A corp_verb (34, `unqueue_research`).",
+   "press": "Hold Shift and left-click a queued node on the ring (it carries a white ring and its queue position); or click 'Remove last' under the queue.",
+   "args": [
+    {
+     "name": "order",
+     "type": "uint32",
+     "meaning": "The queued node to take off: its INDEX in io::dg::nodes (0..159, as queue_research). The sentinel 4294967295 (`unqueue_last`; -1 at the MCP server, which is also its default) means the LAST entry instead - what 'Remove last' sends. Any other value outside the tree is rejected_invalid."
+    }
+   ],
+   "preconditions": [
+    "`corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.",
+    "The seat has a home nation (rejected_state otherwise).",
+    "The named node is queued, or (for the last-entry sentinel) the queue is not empty (rejected_state otherwise; nothing touched)."
+   ],
+   "expected_output": "The node comes off the nation's research queue together with every LATER entry that needs it - an entry with a requirement group that loses its only queued-or-held member (so a press on Field Practice II also takes off Seismic Survey behind it, and keeps Field Practice I ahead of it). The rest of the queue keeps its order. RP in hand stay: the pool is the head's progress, so nothing researched is stranded. With the last-entry sentinel, only the last entry comes off.",
+   "reason_to_select": "Undo part of the plan: the toggle on the node you queued takes its dependents with it, so the queue never holds an entry that can no longer open."
+  },
+  {
+   "id": "gameplay.clear_research",
+   "family": "gameplay",
+   "surface": "The research panel's column: the 'Clear' button under the queue (always shown while the seat's nation exists). A corp_verb (35, `clear_research`).",
+   "press": "Click 'Clear' under the queue.",
+   "args": [],
+   "preconditions": [
+    "`corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.",
+    "The seat has a home nation (rejected_state otherwise).",
+    "The queue is not empty (rejected_state; the button is disabled)."
+   ],
+   "expected_output": "The nation's research queue is emptied. RP in hand stay and keep accruing; with nothing queued the research line spends nothing.",
+   "reason_to_select": "Start the plan over, or stop the research line spending the treasury."
   },
   {
    "id": "chrome.quick_save_key",

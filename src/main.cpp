@@ -22,13 +22,13 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <memory>
 #include <windows.h>
 #endif
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <memory>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -90,7 +90,7 @@ namespace {
 //           target=<resource_type>
 //           recipe=<id> workforce=<n> road_tier=<n> unit_type=<n>
 //           quantity=<f> floor_price=<f> order=<n> counterparty=<id>
-//           province=<province::id>
+//           province=<province::id> nation=<id>   (BL-1296: state industry)
 //                                                   -> apply_corp_command
 //   SHUTDOWN                                        -> BYE, then exit
 //
@@ -532,8 +532,8 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--verify-all")
             {
-                auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-                app& a = *a_heap;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
                 return a.run_verify_all(positional(i, "scripts/verify"), bless);
             }
@@ -543,8 +543,8 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--verify")
             {
-                auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-                app& a = *a_heap;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
                 return a.run_verify(positional(i, "scripts/verify/corporation_lens.lua"), bless);
             }
@@ -653,14 +653,15 @@ int main(int argc, char* argv[])
             epoch_set  = true;
         }
 
-        // --seat <corp-id>  (BL-1076): the seat, picked at launch rather than on
+        // --seat <nation-id>  (BL-1076; BL-1281 names a MAJOR nation, whose
+        // champion is seated): the seat, picked at launch rather than on
         // the selection canvas -- the route an agent takes to the pre-play act
         // (the in-play agent hosts refuse `take_seat`). AN UNTRUSTED INPUT
         // (io-standing-rules.md, AI-facing seam): parsed WIDE, the whole token
         // must be digits, and the value is range-checked against entity_id's
         // real domain before any narrowing -- a malformed or out-of-range id
         // refuses the launch outright rather than truncating into some other
-        // firm. Whether the id names a RANKED SPECIALIST of the world is the
+        // firm. Whether the id names a MAJOR NATION of the world is the
         // tail's check (app::take_seat_pick), the only place that has the
         // ranking; a refused pick seats nobody and a headless run fails.
         bool      seat_set  = false;
@@ -671,7 +672,7 @@ int main(int argc, char* argv[])
                 continue;
             if (i + 1 >= argc)
             {
-                std::fprintf(stderr, "ProjectIo: --seat needs a corporation id\n");
+                std::fprintf(stderr, "ProjectIo: --seat needs a major nation id\n");
                 return 1;
             }
             const std::string arg  = argv[i + 1];
@@ -686,7 +687,7 @@ int main(int argc, char* argv[])
                 || static_cast<entity_id>(v) == null_entity)
             {
                 std::fprintf(stderr,
-                             "ProjectIo: --seat expects a corporation entity id in "
+                             "ProjectIo: --seat expects a major nation entity id in "
                              "0..%lld (got \"%s\")\n", id_max, arg.c_str());
                 return 1;
             }
@@ -702,8 +703,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-windowed")
             {
-                auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-                app& a = *a_heap;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
@@ -721,8 +722,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-play")
             {
-                auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-                app& a = *a_heap;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
@@ -738,8 +739,8 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-adopt")
             {
-                auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-                app& a = *a_heap;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 if (epoch_set) a.set_epoch_year(epoch_year);
                 if (seat_set) a.set_seat_pick(seat_corp);
                 return a.run_autostart_adopt();
@@ -750,8 +751,8 @@ int main(int argc, char* argv[])
             {
                 // Review 2026-08-19 #9: this path used to ignore --host-agent
                 // silently; wire it like every sibling path.
-                auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-                app& a = *a_heap;
+                auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+                app& a = *a_owner;
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
@@ -769,8 +770,8 @@ int main(int argc, char* argv[])
                 if (std::string(argv[i]) == "--load" && i + 1 < argc)
                     load_path = argv[i + 1];
 
-            auto a_heap = std::make_unique<app>(); // on the heap: see app.cpp, sizeof(app) vs the Debug stack
-            app& a = *a_heap;
+            auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
+            app& a = *a_owner;
             a.host_agent(agent_port);
             if (spectate)
                 a.spectate_session();

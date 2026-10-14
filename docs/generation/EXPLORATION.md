@@ -262,6 +262,26 @@ colonised in this phase. Its lag is a development lag read from its remoteness, 
 Culture round, never a flag that says "colonise me"; and it is bound by the ordinary subjection verbs
 below. Other cultures may be colonised too; this one always is.
 
+**Chosen at the Culture close, and kept alive by the same isolation (Ben, 2026-10-11, confirming
+NR-1034).** The late culture is the culture most remote by reach when the Culture round closes, one
+per world. The isolation that slows its development also slows its conquest through Empires, so it
+reaches this phase holding a realm of its own to be colonised. Unforced, the most isolated culture
+has no realm left by 1200 on half the library — which is why the lag must carry both effects.
+
+**The lag is diffusion by contact (Ben, 2026-10-11).** Development spreads between peoples in
+proportion to the reach between them: what a neighbour knows reaches a polity along the corridors
+that join them, and the cheaper the reach the faster it arrives. Every culture feels this force;
+the most remote culture simply receives the least, so it falls behind for a reason a player can read
+off the map — distance, water, a road never built. It is a systemic force, not a handicap on one
+culture; the late culture is lagging because it is isolated, never isolated because it is chosen.
+**The lag is read against its neighbours (Ben, 2026-10-13).** The late culture lags **the peoples in
+contact with it** — behind those around it — not the world's mean development. Read that way the
+isolation needs only a gentle press, which leaves the rise and fall's empire room to rise.
+**Development spreads only by contact (Ben, 2026-10-14).** Past the early bands a people climbs by
+what reaches it from others, not by its own investment alone, and a breakaway realm does not carry
+its parent's band past what its own contacts sustain. This holds for every culture — a systemic force
+— and the late culture lags because it is cut off.
+
 
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
 heartland first sails: its push — land crowding (people per unit of farmland) times navy, in this age — sends voyages, plants settler colonies
@@ -465,6 +485,13 @@ landscape search. Whether a lane *decays* once its traffic stops is this doc's o
 ---
 
 ## Force persists now, and persistence has a bill
+
+**A realm sizes its army to what it earns (Ben, 2026-10-11; overturns NR-878 for the standing army).**
+The army bill never empties the chest: a realm keeps only the standing army its earn can carry,
+so an army is a cost the realm budgets rather than a drain that bankrupts it. The navy and the
+other stocks keep the ruling below. The census that prompted it: with almost no ongoing income,
+the army bill turned 314 realms that held real chests at 1200 into near-zero nations by 1960
+(`../generation/NATION_GENERATION.md` § Pass 7).
 
 **SETTLED (Ben, 2026-09-16, NR-878): the actor has NO PURSE TERM, and poverty is the brake.** With the saturation caps replaced by a real per-head bill, a polity ranked above about 500 on either lean buys a stock step whenever one is affordable and the bill then drains what it bought with: over the span the per-seed MEDIAN polity treasury falls from 1.26M to **211**, the top decile loses about 3%, and roughly **14% of polity-rounds cannot pay the army bill**. Ben ruled that shape ACCEPTED: **a realm that over-builds is poor, and being poor is the consequence.** No solvency rule was added to a step's eligibility, and no cap came back.
 

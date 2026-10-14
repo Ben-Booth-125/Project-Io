@@ -58,6 +58,10 @@
    "No UI (BL-1322, Ben 2026-10-13): the building card's Auto control is retired with player workforce control; its action-grid cell is Reserved. The corp_verb remains in the enum (append-only) and the command seam refuses it for the player's corporation."
   ],
   [
+   "gameplay.state_industry_command",
+   "The command seam only (--serve / MCP `issue_command` with `nation`, and the verify API's `corp_command{as_nation=...}`). No ledger or card control yet: a state building's card names its nation as owner (\"Owner: <nation> (state industry)\") and offers no levers."
+  ],
+  [
    "gameplay.survey",
    "The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey)."
   ],
@@ -362,6 +366,10 @@
    "Nav rail, slot 3 (Construction icon)"
   ],
   [
+   "ledger.nav_research",
+   "Nav rail, slot 4 (Research icon)"
+  ],
+  [
    "ledger.nav_corporation",
    "Nav rail, slot 1 (Corporation overview icon)"
   ],
@@ -431,15 +439,11 @@
   ],
   [
    "chrome.f9_tech_tree",
-   "Keyboard; opens the mock tech-tree viewer"
+   "Keyboard; opens the research panel"
   ],
   [
    "chrome.gear_toggle",
    "In-game chrome, top-right gear button just left of the time column"
-  ],
-  [
-   "chrome.menu_copy_seed",
-   "Main menu, New World block, Copy seed button"
   ],
   [
    "chrome.menu_new_game",
@@ -452,18 +456,6 @@
   [
    "chrome.menu_quit",
    "Main menu, primary button column"
-  ],
-  [
-   "chrome.menu_roll_seed",
-   "Main menu, New World block, Roll button beside the seed field"
-  ],
-  [
-   "chrome.menu_set_abundance",
-   "Main menu, New World block, Resources radio row"
-  ],
-  [
-   "chrome.menu_set_seed",
-   "Main menu, New World block, Seed field"
   ],
   [
    "chrome.options_close",
@@ -504,10 +496,6 @@
   [
    "chrome.sysmenu_god_view",
    "System menu popup, spectate-only checkbox"
-  ],
-  [
-   "chrome.tech_tree_era_tab",
-   "Tech-tree viewer (F9), era tab strip"
   ],
   [
    "chrome.wizard_back",
@@ -595,7 +583,19 @@
   ],
   [
    "gameplay.take_seat",
-   "The corporation selection canvas at Begin (STARTUP.md § The seat): the ranked list of every specialist beside a map of the home body, a firm's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which corporation the player IS - so an agent must be able to make it. It is a corp_verb (29), but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <corp-id>` (every new-campaign path, --autostart included). NOTE FOR A PLANNER: the list order is the static landscape score (the ground a firm's holdings stand on), and firms below the viability floor are MARKED but offered; a marked firm is a harder opening, never an illegal one."
+   "The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, the champion's firm card, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS and which champion they operate - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one."
+  ],
+  [
+   "gameplay.queue_research",
+   "The research panel's ring: SHIFT + left click on a node (Ben, 2026-10-10; there is no Plan mode - a plain click or a hover only inspects). A corp_verb (33, `queue_research`), so an agent issues it through the same seam."
+  ],
+  [
+   "gameplay.unqueue_research",
+   "The research panel: SHIFT + left click on a QUEUED node (the toggle rule, NR-1033), or the 'Remove last' button under the queue. A corp_verb (34, `unqueue_research`)."
+  ],
+  [
+   "gameplay.clear_research",
+   "The research panel's column: the 'Clear' button under the queue (always shown while the seat's nation exists). A corp_verb (35, `clear_research`)."
   ],
   [
    "chrome.quick_save_key",

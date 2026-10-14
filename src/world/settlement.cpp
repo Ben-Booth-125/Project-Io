@@ -416,7 +416,7 @@ void survey_regions_at_span_open(const world& w, const std::vector<entity_id>& i
         regions[i].survey_fuel_q   = score_against_exact_mean(raw_fuel[i],   fuel_sum,   n_regions);
         regions[i].survey_forest_q = score_against_exact_mean(raw_forest[i], forest_sum, n_regions);
         // BL-1059 (NR-900): the unclamped share each score was taken from --
-        // what the Fuel Doctrine's top-third bars rank.
+        // the survey's record (read by harness reports, not the sim; BL-1272).
         regions[i].survey_fuel_raw   = raw_fuel[i];
         regions[i].survey_forest_raw = raw_forest[i];
     }
@@ -2396,6 +2396,22 @@ void settle_urban_migrants(region& p, int64_t heads)
     // NR-958: ...and arrives with it, so the heads are fed and the farm-fed
     // people's ceiling (`region_farm_fed_ceiling`) is exactly what it was.
     p.capacity_carried = clampi64(p.capacity_carried + heads, -(1LL << 40), 1LL << 40);
+}
+
+int64_t refugee_room(const region& p)
+{
+    const int64_t farm_fed = clampi64(p.population - p.industrial_heads, 0, 1LL << 40);
+    return clampi64(region_farm_fed_ceiling(p) - farm_fed, 0, 1LL << 40);
+}
+
+int64_t settle_refugees(region& p, int64_t heads)
+{
+    const int64_t taken = clampi64(heads, 0, refugee_room(p));
+    if (taken <= 0) return 0;
+    // Farm-fed heads inside the ceiling: the next demography step clamps
+    // nothing away, and no ceiling moves anywhere.
+    p.population = clampi64(p.population + taken, 0, 1LL << 40);
+    return taken;
 }
 
 namespace {

@@ -55,9 +55,9 @@
 #include "creeds.hpp"
 #include "settlement.hpp"
 #include "works_roster.hpp"
-#include "empire_tree_data.hpp" // BL-912 — the empire tree's generated node table
-#include "exploration_tree_data.hpp" // BL-930 — the exploration tree's generated node table
-#include "industry_tree_data.hpp" // BL-1038 — the industry tree's generated node table
+#include "rise_fall_rules.hpp" // BL-1287: the ruled rise-and-fall predicate, shared with the detector
+#include "late_culture_rules.hpp" // BL-1288: the late culture's constants, shared with the detector
+#include "world_war_rules.hpp" // BL-1289: the ruled world-war predicate, shared with the detector
 
 #include <array>
 #include <atomic>
@@ -157,6 +157,7 @@ struct ocean_current_field; // BL-1120/BL-1140: ocean_currents.hpp
 struct sea_field;           // BL-1152: ocean_currents.hpp
 struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
+struct closing_rounds_spec; // BL-1278: closing_rounds.hpp, on the same raw-pointer footing.
 
 /// Scorer weights and loop bounds. Defaults are PLACEHOLDERS, not tuned
 /// values: BL-277 records that the `w_*` weights are BL-275 sweep outputs
@@ -442,85 +443,55 @@ struct history_sim_params
     /// tuned as data. The value is unchanged; only its address is.
     int capacity_band_cost = 4000;
 
-    /// BL-912 — THE EMPIRE TREE'S RESEARCH FRACTION. Research is a FLOW
-    /// derived from the industry slice, never a stockpile (TREES.md sec
-    /// State): this per-mille share of a polity's summed
-    /// `region_industry_output` over its held ground is what the Invest
-    /// verb spends on the tree's currently-targeted node, each round,
-    /// scaled further by the spire ring held and by contact degree. A
-    /// sweep dial per TREES.md sec Open questions ("the research
-    /// fraction... to be set against the sizing rule rather than picked");
-    /// 60 (6%) is a first guess sized so the Empire tree's ~48 nodes are
-    /// reachable, not exhausted, by a leading polity over 400 BCE-1200 CE.
-    int empire_research_fraction_q = 60;
-
     // -----------------------------------------------------------------------
-    // BL-1038 — THE INDUSTRY TREE, INVESTED BEHIND A SWITCH.
+    // THE DATE GATES (docs/generation/trees/TREES.md, Ben 2026-10-10).
     // -----------------------------------------------------------------------
     //
-    // TREES.md sec Milestones: the Industry tree opens at its root to EVERY
-    // living polity at 1660 (Ben, 2026-09-18) — no rim gate, unlike the
-    // Exploration tree's entry on the Empire rim. OFF BY DEFAULT, and it must
-    // stay off on every shipped path until the one re-bless (BL-1044): Industry
-    // modifiers sum into the SHARED `polity::tree_mod_q`, which feeds defence,
-    // cohesion, the materials pull-forward and every tree's research rate, so
-    // a node bought here moves the whole world. With the switch off no code
-    // path below reads or writes an Industry field, and `industry_mask` stays
-    // 0, so its fold in `apply_tree_effects` adds nothing.
+    // Research is removed from generation: the history's polities hold no
+    // technology tree, earn no research and invest in no node. What the trees
+    // used to gate opens on a calendar year, for every polity alike. Each year
+    // is MEASURED, not picked (tools/verify/tree_gate_years_probe.cpp, the 16
+    // library seeds): the median year the gating node was acquired in the
+    // history as it stood before the trees were removed.
 
-    /// The switch. Read only by the Invest verb's Industry block.
-    bool industry_tree_enabled = false;
+    /// Sea legs: from this year a polity that can field a navy may arrive
+    /// across water to subject a coast (the subjection block,
+    /// `polity_holds_sea_legs`: the date AND naval capacity, Ben 2026-10-10,
+    /// AND a fleet afloat at or above the year's 90th-percentile entry of the
+    /// free naval-capable navies, `sea_legs_navy_floor`, Ben 2026-10-11).
+    /// Was the Exploration tree's Oceanic
+    /// Navigation (the `sea_legs` key). MEASURED: 150 polities acquired the
+    /// key over the 16 seeds (first 112 CE); the pooled median acquisition is
+    /// 1640 (median of per-seed medians 1620). No seed ever had half its
+    /// living polities holding it before 1929, so "the year by which the
+    /// median polity held it" is undefined and the acquisition median stands.
+    int64_t sea_legs_year = 1640;
 
-    /// The calendar year the Industry tree opens (the Industrialisation span's
-    /// own start, 1660). A round at or after it invests; one before it does
-    /// not, so a run with the switch on that stops at or before this year is
-    /// the switch-off run bit for bit (exploration_sim_harness pins that).
+    /// The treasury-bought third road rung (the Post Road): from this year a
+    /// polity may buy it. Was the Exploration tree's Post Roads (the
+    /// `post_roads` key). MEASURED: 191 acquisitions
+    /// (first 68 BCE); pooled median 1560 (median of per-seed medians 1552).
+    int64_t post_roads_year = 1560;
+
+    /// Coastal sea technology as a date ramp: a COASTAL polity (Ben,
+    /// 2026-10-10; `apply_coastal_naval_ramp`) holds one coastal sea tech per
+    /// year below at or before the round's year (`coastal_sea_techs_at`), and
+    /// each is a naval deed
+    /// (`polity::naval_sea_techs`, weighted by `naval_points_per_sea_tech`).
+    /// Was the Empire tree's three coastal nodes (Deep-Hull Sail, Lateen &
+    /// Long-Range Rig, Ocean-Rated Hulls). Ascending. MEASURED: the
+    /// pooled median year a polity took its first, second and third coastal
+    /// sea tech (253, 68 and 58 acquisitions; per-seed medians -104, 164,
+    /// 176). Before, 116 of the 1,636 polities living at 1200 held one; now
+    /// every coastal polity living in the Empires span from those years does,
+    /// which is why `naval_points_per_sea_tech` is re-measured.
+    static constexpr int coastal_naval_ramp_n = 3;
+    int64_t coastal_naval_ramp[coastal_naval_ramp_n] = {-92, 152, 176};
+
+    /// The calendar year industry points open (the Industrialisation span's
+    /// own start, 1660; `industrialisation_sim_params` sets it to the span's
+    /// start). A round at or after it accrues; one before it does not.
     int64_t industry_open_year = 1660;
-
-    /// THE INDUSTRY RESEARCH RATE (TREES.md sec State: "the Industry tree's
-    /// rate reads urban mass instead of the industry slice", PROPOSED
-    /// 2026-09-18, not overturned). Per year, before the `research` modifier:
-    ///
-    ///     M      = urban_population summed over the polity's
-    ///              `industry_research_top_k` largest held regions
-    ///     Mc     = min(M, industry_urban_mass_cap)            CLAMPED FIRST
-    ///     rate_q = Mc * isqrt64(Mc) / isqrt64(reference)
-    ///              * industry_research_fraction_q / 1000
-    ///              * (1000 + spire_ring * 150) / 1000      the empire's own
-    ///                                                      spire scaling
-    ///
-    /// i.e. `fraction x Mc x sqrt(Mc / reference)`: linear-equivalent at the
-    /// reference mass, x2.83 for twice the mass, x0.35 for half. Superlinear so
-    /// innovation gathers where people do; a RATE, never a scorer term — the
-    /// scorer may not carry anything that grows with the polity's size
-    /// (TREES.md sec The scorer). The cap is what keeps the transform from
-    /// running away (a clamped sum cannot overflow the product, and one giant
-    /// city cannot finish the tree in a decade). FIRST-CUT MAGNITUDES — the
-    /// sweep re-prices them against the sizing rule (TREES.md sec Sizes: the
-    /// leading polity finishes just before 1960, the median reaches halfway).
-    ///
-    /// MEASURED ONCE (exploration_sweep --through 1960 --industry-open 1660,
-    /// the 16 library seeds, 2026-09-18). The top-3 urban mass of a living
-    /// polity at 1660 has per-seed medians 69k-278k (median of medians ~214k)
-    /// and maxima 499k-654k. The first guess (reference 100k, fraction 60)
-    /// did not bind: every polity above ~200k earned a whole node per Invest
-    /// round, so the spread was set by how often Invest won, not by urban
-    /// mass. The reference is therefore the measured median mass, rounded,
-    /// and the fraction sized so the cap-mass leader earns ~25k a 4-year
-    /// round (a ring-2 major a round, a ring-3 milestone in three) and so
-    /// needs most of the span's rounds to finish — 6 per mille of urban
-    /// mass a year, which is the same order per head as the empire's 60
-    /// per mille of the industry slice. The cap sits at the measured
-    /// maxima, so it binds on the few largest realms only.
-    ///
-    /// The spire-ring factor (BL-1038 fix round) lifts a polity past The
-    /// Cheap Ton by x1.15 and past The Renewed Line by x1.45; re-read on the
-    /// same 16 seeds it moved the pooled rim holders 86 -> 121 and left the
-    /// leader's median (38 nodes) and the median polity's (6 -> 7) nearly
-    /// where they were, so the constants above are kept.
-    int     industry_research_fraction_q   = 6;
-    int64_t industry_urban_mass_reference  = 200000;
-    int64_t industry_urban_mass_cap        = 600000;
 
     // -----------------------------------------------------------------------
     // BL-1041 — INDUSTRY POINTS, A LOCATED STOCK (INDUSTRIALISATION.md sec Beat 1).
@@ -535,7 +506,6 @@ struct history_sim_params
     //                       * industry_points_per_million_urban_heads_year
     //                                                   * step_years / 1000000
     //              * fuel_factor_q / 1000
-    //              * (1000 + industry industrial per-mille) / 1000
     //
     //     employed heads = the heads the region's works employ
     //                      (`works_registry::employed_heads_mask`, BL-1149: the
@@ -546,18 +516,15 @@ struct history_sim_params
     //     fuel_reading_q = `industry_fuel_reading_q(region)` (the span-open
     //                      survey, or energy_q where nothing was surveyed)
     //
-    //   The industrial per-mille is the INDUSTRY TREE's own industrial
-    //   modifiers held by the region's holder (`industry_tree_industrial_q`)
-    //   -- "Industry tree capacity nodes held" (the doc's table) -- never the
-    //   shared surface, which also carries the Empire tree's industrial
-    //   nodes. Unheld ground reads 0.
+    //   There is no industrial per-mille: the history holds no technology,
+    //   so every region credits at the same rate (TREES.md, Ben 2026-10-10).
     //
     //   TREASURY PAID IN (`run_exploration_upkeep`), out of a living
     //   polity's `capital` treasury: `industry_points_treasury_share_q` per
     //   mille of the round's SURPLUS -- the purse's net rise across the
     //   round's earn and its army and navy bills, floored at 0 -- leaves the
-    //   treasury and lands as points, `industry_points_per_treasury_unit` to
-    //   the unit. RULED a consequence (Ben, 2026-09-18): no polity scores it,
+    //   treasury and lands as points, `industry_points_per_1000_treasury_units`
+    //   to the thousand units. RULED a consequence (Ben, 2026-09-18): no polity scores it,
     //   so it is no verb. The points SPREAD over the polity's held regions
     //   that stand centres, by the heads their works employ (NR-964, amending
     //   NR-897's urban scale; `industry_points_apportion_by_scale`;
@@ -587,8 +554,29 @@ struct history_sim_params
     /// over the span. The treasury's exchange rate below is set against it.
     int64_t industry_points_per_million_urban_heads_year = 1000;
 
-    /// Points one TREASURY unit converts to (domain 1-10000, so a conversion
-    /// of up to the treasury's own 2^48 ceiling stays inside int64). 1000. A
+    /// Points a THOUSAND treasury units convert to (domain 1 -
+    /// `industry_points_per_1000_units_max`, staged by
+    /// `industry_points_for_treasury_units` so a conversion of up to the
+    /// treasury's own 2^48 ceiling stays inside int64). PER THOUSAND since
+    /// BL-1298: once the history banked real chests the right rate fell below
+    /// one point per unit, which a per-unit integer cannot say.
+    ///
+    /// The struct keeps 1,000,000 (= the old 1000 per unit) so every fixture
+    /// reads as before; GENERATION's value rides on
+    /// `world_params::industry_points_per_1000_treasury_units` (see below).
+    ///
+    /// BL-1298 RE-SIZE (Ben, 2026-10-12, NATION_GENERATION.md sec Pass 7): the
+    /// treasury now earns a standing levy and a summed endowment, so the
+    /// capitals' Industrialisation surplus is several hundred times larger and
+    /// at 1000 points per unit the treasury term swamped the scale term (share
+    /// ~0.999 of all points). The rate is re-sized TOWARD the rule below --
+    /// the treasury term the same order as the scale term -- and set at the
+    /// LOWEST rate that keeps market_viability's G1 at tick 50 at or above its
+    /// target (Ben, 2026-10-12: the same-order rate cost G1 t50 its margin).
+    /// world_params records the ladder (G1 t50 and treasury share per rung)
+    /// and the chosen value.
+    ///
+    /// The original reasoning, which still sets the rule: A
     /// UNIT CHOICE, NOT A FINDING, and it is what sets reading 8's
     /// treasury-paid share: sized so the treasury term and the scale term are
     /// the same order on the library's median world. MEASURED (BL-1041, the 16
@@ -600,7 +588,7 @@ struct history_sim_params
     /// At 1000 the treasury-paid share runs 0.16-0.82 (median 0.69): a
     /// property of each world (how its capitals' surplus ran against its
     /// cities), scaled as a whole by this constant.
-    int64_t industry_points_per_treasury_unit = 1000;
+    int64_t industry_points_per_1000_treasury_units = 1000000;
 
     /// The fuel factor's FLOOR, per mille (domain 0-1000). A city standing on
     /// no fuel at all still builds at this share of a coalfield city's rate,
@@ -714,17 +702,6 @@ struct history_sim_params
     /// founding is untouched. Off: the daughter stays -1 and the fuel reading
     /// falls back to its inherited `energy_q`.
     bool industry_survey_inherits_at_founding = false;
-
-    /// DEFAULT B (RULED, Ben 2026-09-18, wave 1 form: "inside the span every
-    /// fuel read in this tree takes the same survey"). The Industry tree's
-    /// SEAM (the `fuel` gate, its re-check in `industry_target_stands`,
-    /// `industry_fuel_seen`, and the `ground_fuel` term, which all read one
-    /// field) reads `industry_fuel_reading_q` -- the
-    /// span-open survey, energy_q where a region was never surveyed -- so the
-    /// gate and the points agree about who has coal. Off: the seam reads
-    /// `energy_q` as BL-1038 built it. Industry tree only; the empire and
-    /// exploration gates are untouched either way.
-    bool industry_fuel_gate_reads_survey = false;
 
     /// WHERE A POLITY'S INVESTMENT GOES (BL-767). The Invest verb raises ONE
     /// domain a round, and these two weights decide which.
@@ -929,8 +906,8 @@ struct history_sim_params
 
     // --- BL-940: the road ladder's third rung, bought with capital --------
     // EXPLORATION.md sec Goods move as throughput: "The road ladder gets its
-    // third rung here... bought with capital rather than earned by traffic"
-    // (tree node EX-WY-1a, Post Roads).
+    // third rung here... bought with capital rather than earned by traffic",
+    // open from `post_roads_year`).
 
     /// THE THRESHOLD ORDINARY TRAFFIC IS NOT MEANT TO REACH. `road_tier_for_
     /// uses` still reads a plain use count, so a purchase and enough
@@ -943,14 +920,14 @@ struct history_sim_params
     int road_tier3_uses = 200;
 
     /// Treasury spent (BL-932's `region::treasury`, NEVER `material_stock`)
-    /// to promote one corridor from Road (tier 2) to Post Road (tier 3), once
-    /// the spending polity holds EX-WY-1a. MEASURED (BL-949, exploration_sweep
+    /// to promote one corridor from Road (tier 2) to Post Road (tier 3), from
+    /// `post_roads_year`. MEASURED (BL-949, exploration_sweep
     /// 16 seeds, 2026-09-14, after a resumed span began seeding its live
     /// corridor counts): seeds with a post road / total bought at 3,000 15/69,
     /// 100,000 15/69, 1,000,000 15/67, 3,000,000 15/61, 10,000,000 15/46,
     /// 30,000,000 12/28, 100,000,000 9/15, 300,000,000 3/3. Up to 10M the
-    /// treasury gates nothing -- the purchase is decided by holding EX-WY-1a
-    /// and an internal Road, and the price is noise against capital
+    /// treasury gates nothing -- the purchase was decided by holding the
+    /// Post Roads node (a date now) and an internal Road, and the price is noise against capital
     /// treasuries in the tens of millions. 30M is the first swept value at
     /// which the bill refuses a real share of would-be builders while a clear
     /// majority of worlds still buy one (median living capital treasury at
@@ -960,17 +937,6 @@ struct history_sim_params
     /// is untouched regardless of this field's value; zero disables the
     /// purchase even where upkeep runs.
     int64_t post_road_treasury_cost = 30000000;
-
-    /// BL-942 — TWO WAYS TO BE STRONG. Per-mille weight applied to the creed-
-    /// derived lean (`consolidator_lean_q`/`expansion_lean_q`, history_sim.cpp)
-    /// when it boosts `choose_exploration_node`'s `throughput_bound` term (for
-    /// a consolidator) or its `coastal_holdings`/`ground_port`/`subject_held`
-    /// terms (for an expansionist) — EXPLORATION.md sec Two ways to be strong:
-    /// "neither is a flag, neither is chosen." A WEIGHTING of existing scorer
-    /// terms, not a new one; 0 makes every polity's tree choice creed-blind,
-    /// which is the falsifiable case the doc's own open question names. FIRST
-    /// CUT, UNMEASURED.
-    int exploration_creed_lean_weight_q = 400;
 
     /// SUSTAINABLE-REACH FLOOR FOR LAUNCHING A CAMPAIGN, in the same 0..1000
     /// supply currency `campaign_supply` already prices. At or below this,
@@ -2279,6 +2245,59 @@ struct history_sim_params
     /// round); neither moved reading 8, which consolidation dominates.
     int treasury_trade_income_q = 100;
 
+    /// BL-1298 -- THE STANDING LEVY (NATION_GENERATION.md sec Pass 7, Ben
+    /// 2026-10-11: "a realm taxes its seats' stores every round"). On every
+    /// decision round AFTER `consolidation_year` (the 1200 round itself folds
+    /// the whole stock, once), each living polity sweeps this per-mille of
+    /// the `material_stock` on every seat it holds -- and on its capital,
+    /// exactly the ground the consolidation reads -- into the capital's
+    /// `region::treasury`. A share PER ROUND (both resumed spans run a 4-year
+    /// band), floored per seat. It is EARN: it counts toward the round's
+    /// surplus and toward what the realm's earn can carry
+    /// (`standing_army_sized_to_earn`). Domain 0-1000; 0 = off (the struct
+    /// default, so every fixture and the Empires round is unmoved), and a
+    /// `consolidation_year` of INT64_MIN ("never") never levies either.
+    /// Generation's value rides on `world_params::treasury_levy_per_mille_q`.
+    int treasury_levy_per_mille_q = 0;
+
+    /// BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS (EXPLORATION.md
+    /// sec Force persists now, Ben 2026-10-11, overturning NR-878 for the
+    /// standing army only). When on, a polity whose army bill for the round
+    /// exceeds the round's EARN (levy + endowment + corridor + trade +
+    /// tribute) disbands, before the bill is paid, the paid standing heads
+    /// that earn cannot carry: every region carrying its paid heads keeps
+    /// the same per-mille share, and the disbanded men go home to that
+    /// ground's `manpower_stock` exactly as the unpaid decay's do. The bill
+    /// is then met out of the round's earn, so the army never draws the
+    /// chest down. A rule on the stock, not a term in the scorer: the spend
+    /// choice is untouched. The navy and the other stocks keep NR-878. Off
+    /// in the struct; `exploration_sim_params` turns it on (Industrialisation
+    /// inherits it).
+    bool standing_army_sized_to_earn = false;
+
+    /// BL-1298 -- THE ENDOWMENT IS SUMMED OVER HELD GROUND (NATION_GENERATION.md
+    /// sec Pass 7, Ben 2026-10-12). When on, `treasury_endowment_income_q` is
+    /// a per-mille of the SUM of the polity's held regions' endowment
+    /// (`(farm_q+ore_q+energy_q+port_q)/4` each), not their mean: a larger
+    /// realm earns more, so the order the 1200 chests set holds. (A flat
+    /// per-realm mean reached the band but scrambled which realms were
+    /// richest.) Off in the struct, so the fixtures that pin the mean form
+    /// keep it; `exploration_sim_params` turns it on for both resumed spans.
+    bool treasury_endowment_summed = false;
+
+    /// BL-1298 -- THE ENDOWMENT AS A SHARE OF THE WORLD (Ben, 2026-10-12,
+    /// NATION_GENERATION.md sec Pass 7: "a realm earns by the share of its
+    /// world's held ground it holds, so a small world's nations are not poorer
+    /// for the world being small"). When on, the endowment income a year is
+    /// `treasury_endowment_income_q` x (the realm's summed held endowment /
+    /// the world's summed held endowment) x (the living realms holding any
+    /// ground) -- a realm holding the world's AVERAGE share earns the rate, a
+    /// realm holding twice it earns twice. The share alone would hand a world
+    /// of 20 realms twice the per-realm income of a world of 40; the realm
+    /// count normalises that away. Supersedes the summed and mean forms where
+    /// on. Off in the struct; `exploration_sim_params` turns it on.
+    bool treasury_endowment_world_share = false;
+
     /// BL-954 -- per-mille of the TRADE VALUE a pair's trade-access clause
     /// WOULD open (the marginal volume, both directions, every good --
     /// `pair_trade_value_q`) added to `treaty_value_q`, near home and far
@@ -2484,20 +2503,30 @@ struct history_sim_params
     bool naval_points_accrue = false;
 
     /// THE THREE DEEDS' WEIGHTS, naval points per deed -- a coastal province
-    /// held for a year, a sea crossing made, a coastal sea tech taken. How the
-    /// deeds weigh against each other is a READING FOR BEN (BL-1147); these
-    /// make each deed comparable in magnitude on the 16 curated seeds. MEASURED
-    /// (`ocean_currents_harness --naval`, 2026-09-26, coastal by the terrain):
-    /// the 1,665 polities living at 1200 did 2,212,520 coastal province-years,
-    /// 7,819 crossings and took 230 coastal sea techs, so at 1 / 280 / 9600 the
-    /// three pooled shares are 2.21M / 2.19M / 2.21M points -- a third each.
-    /// Per polity the deeds spread very differently (coastal years: 877
-    /// polities, median 200, max 61,744; crossings: 424 polities, median 4,
-    /// max 333; techs: 134 polities, at most 3), which is the reading.
+    /// held for a year, a sea crossing made, a coastal sea tech held. How the
+    /// deeds weigh against each other is a READING FOR BEN (BL-1147). The
+    /// coastal-year and crossing weights were set so each deed was comparable
+    /// in magnitude on the 16 curated seeds (`ocean_currents_harness --naval`,
+    /// 2026-09-26: 2,212,520 coastal province-years, 7,819 crossings, 230 sea
+    /// techs over 1,665 polities living at 1200 -> 2.21M / 2.19M / 2.21M points
+    /// at 1 / 280 / 9600).
+    ///
+    /// THE SEA-TECH WEIGHT IS RE-MEASURED (Ben, 2026-10-10, BL-1272): sea techs
+    /// are a date ramp for every coastal polity (`apply_coastal_naval_ramp`),
+    /// no longer a node a few polities bought, so the weight is set to keep
+    /// the world's pooled naval points at 1200 where the history as last
+    /// blessed had them. MEASURED (`ocean_currents_harness --naval`, the 16
+    /// library seeds): at c05844d9, 1,631 polities living at 1200 held
+    /// 2,756,312 coastal-year + 2,267,720 crossing + 1,929,600 tech points
+    /// (201 techs x 9600) = 6,953,632. With the ramp, 1,564 living polities
+    /// hold 4,299 techs beside 3,090,996 + 2,344,720 points, so 353 per tech
+    /// brings the total to 6,953,263 (techs 1,517,547, 22%). One weight cannot
+    /// also restore the old per-polity spread: the techs now fall on every
+    /// coastal polity, not on the 134 that bought them.
     /// Domain [0, 100000] each.
     int64_t naval_points_per_coastal_year = 1;
     int64_t naval_points_per_crossing     = 280;
-    int64_t naval_points_per_sea_tech     = 9600;
+    int64_t naval_points_per_sea_tech     = 353;
 
     /// THE CONVERSION, the one named constant: navy hulls per 1000 naval
     /// points, applied ONCE at a resumed span's open to every LIVING polity
@@ -2555,6 +2584,12 @@ struct history_sim_params
     /// economic half of "technologically dominant" (treasury already folds
     /// endowment, network and market together). FIRST CUT, UNMEASURED.
     int64_t subjection_treasury_margin_q = 200;
+    /// BL-1288 -- DOMINANCE BY DEVELOPMENT: an arriving power this many
+    /// materials bands ahead of a native clears the treasury test whatever the
+    /// two chests hold ("the most technologically dominant nations are able to
+    /// lay claim", Ben 2026-09-11). 0 = the treasury test alone (the struct
+    /// default; generation's Exploration span sets 2).
+    int subjection_dominance_bands = 0;
 
     /// Chebyshev capital-to-capital distance beyond which even a sea-legs
     /// power will not attempt subjection this round — a first-cut reach bound
@@ -2719,7 +2754,285 @@ struct history_sim_params
     // `navy_upkeep_per_1000_units_year_q`) and the levy bound
     // (`standing_army_levy_per_mille_q`) are the forces that now limit a
     // stock, and both are visible in the world rather than inside the actor.
+
+    // --- BL-1278: THE NATION COUNT, INSIDE THE HISTORY ----------------------
+    // NATION_GENERATION.md § The nation count is a target / § Pass 2c (Ben,
+    // 2026-10-11).
+
+    /// THE CLOSING ROUNDS. Non-null only on the Industrialisation span of a
+    /// settled world (`run_industrialisation`): at the close, before the
+    /// closing step is recorded, the size floor runs as absorptions and, with
+    /// a total set, the total is reconciled by absorption or secession — each
+    /// a recorded event (`lapse_event_kind::absorbed_at_close`,
+    /// `seceded_at_close`). Planned by `plan_closing_rounds` against the carve
+    /// ground the spec carries. A raw non-owning pointer like the resume
+    /// pointers, but KEPT on the fixture's copy: the spec is a self-contained
+    /// value the fixture co-owns (`era_minus_one_fixture::
+    /// industrialisation_closing`), so a replay of the span from
+    /// `fixture.industrialisation_params` runs the same closing rounds.
+    const closing_rounds_spec* closing_rounds = nullptr;
+
+    /// THE TOTAL'S LEAN ON CONQUEST APPETITE, per mille on a campaign's value
+    /// (+ more appetite, - less), applied beside the creed's appetite lean.
+    /// 0 everywhere but an Industrialisation span whose world carries a total
+    /// target fewer (+) or more (-) than the span opens on — the lean of
+    /// § The nation count is a target, stage 1. 0 is the identity. Its
+    /// secession half is `secession_supply_floor_q`, which that span leaves
+    /// at 0 and the lean raises only when MORE nations are wanted.
+    int campaign_appetite_q = 0;
+
+    // --- BL-1287: THE RISE AND FALL, A TARGET OF THE EMPIRES SPAN -------------
+    // CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS
+    // TARGETED, Ben 2026-10-10/11/12); GENERATION_STRATEGY.md § History patterns.
+
+    /// ON only on generation's own Empires round (`era_minus_one_sim_params`).
+    /// The realm largest at `rise_fall_pick_year` is leaned on its way up --
+    /// its campaigns pressed harder (appetite, harder at a seat, read on
+    /// Organise too with the opposition it reads cut), its network carrying
+    /// further (the terrain price of reach and the burden of breadth relieved)
+    /// and rallying its armies to its own ground under attack while its seat
+    /// keeps its guard, its victories steadying it (cohesion) -- until it
+    /// peaks; then it is overextended ON THE MAP -- its roads and works decay
+    /// on the ground (`region::work_reach_mod`) and its far garrisons go home
+    /// to its capital, no private price -- so that its
+    /// far ground falls under `secession_supply_floor_q` and secedes by the
+    /// BL-896 mechanism until its share halves. Each lean is a LEVEL; the
+    /// backstop raises a level, one bounded step at a time, whenever a recorded
+    /// step finds the realm behind its course, and every step is a recorded
+    /// cause (a history line and a lapse event). Struct-default OFF, so every
+    /// isolating fixture keeps its meaning and the later spans never lean.
+    bool rise_fall_target = false;
+
+    /// BL-1287 (a defect the rise exposed): ground conquered or organised this
+    /// round is not walked by the secession block until its new holder has
+    /// measured it (its next turn) -- `network_supply_q` still carries the old
+    /// holder's reading -- and a realm whose turn ended before it measured its
+    /// ground this round secedes nothing that round. ON on generation's Empires round beside the target;
+    /// struct-default OFF so every isolating fixture keeps its meaning.
+    bool secession_waits_for_holder = false;
+
+    /// Per level, per mille: the appetite lean on the realm's campaign value
+    /// (the same idiom as `campaign_appetite_q`).
+    int rise_appetite_step_q  = 400;
+    /// Per level, per mille, ADDED to the appetite step when the target is a
+    /// seat: the rise is pressed at the cities that carry their hinterland.
+    int rise_seat_step_q      = 500;
+    /// Per level, ADDED to a candidate's value (scaled by its estimated odds,
+    /// per mille), so a march the pressed realm expects to win outbids the
+    /// quiet verbs (Invest's score grows with the ground a large realm holds).
+    int rise_appetite_add_q   = 40;
+    /// Per level, per mille: the cut to the cultural opposition the rising
+    /// realm's Organise reads (bar, price and score alike) -- its ascendancy
+    /// draws in peoples it would once have counted strangers.
+    int rise_kin_step_q       = 50;
+    /// Per level, per mille: the cut to its terrain price of reach and to
+    /// its burden of breadth on the way up (floored at a fifth of the price).
+    int rise_reach_step_q     = 80;
+    /// Per level, per mille: the cohesion each conquest of its restores.
+    int rise_cohesion_step_q  = 40;
+    /// The rise's level ceiling: the backstop never presses past it.
+    int rise_max_level        = 12;
+    /// THE FALL ACTS ON THE MAP (Ben, 2026-10-12). Per level, per year: the
+    /// reach relief (`region::work_reach_mod`) every region of the
+    /// overextended realm loses on the ground -- its roads and works decay.
+    int fall_works_decay_per_year_q = 5;
+    /// Per level, per round, per mille of a walked corridor's live uses: its
+    /// roads decay (at least one use a round), on the ground's own record.
+    int fall_road_decay_q     = 40;
+    /// A holding whose last supply reading is at or under this is FAR, and
+    /// its garrison thins: per level, per round, this many per mille of its
+    /// army goes home to the capital (conserved).
+    int fall_far_supply_q     = 500;
+    int fall_thin_per_level_q = 400;
+    /// BARE (Ben, 2026-10-13): an outer-march holding of the falling realm
+    /// whose army stands below this many per mille of its garrison target
+    /// relays no supply onward in that realm's reach walk.
+    int fall_bare_share_q     = 250;
+    /// The fall's level ceiling.
+    int fall_max_level        = 12;
+    /// The share (per mille of held regions) at which the rise stops being
+    /// pressed, below the hegemony cap so a hegemon still fails (BL-224); and
+    /// the year by which it stops whatever the share, ahead of
+    /// `rise_fall_peak_by_year` so the turn lands inside the window.
+    int rise_ceiling_pm       = 420;
+    int64_t rise_stop_year    = 340;
+    /// A rise above the floor that sets no new peak for this many years has
+    /// run its course, and turns.
+    int64_t rise_stall_years  = 60;
+    /// The share the backstop steers the rise toward, above the floor so
+    /// the floor is cleared with room.
+    int rise_goal_pm          = 340;
+
+    // --- BL-1290 (civil war deaths) ------------------------------------------
+    // MILITARY_HISTORY.md sec Armies are distinct from population (Ben,
+    // 2026-10-10/11/12): a civil war kills civilians ONLY through a famine and
+    // displacement mechanism of its own, never a coefficient in a battle. A
+    // CIVIL WAR is a successor that broke away (or schismed) holding at least
+    // `civil_war_min_share_q` per mille of what its parent kept and at least
+    // `civil_war_min_regions` regions, then fighting that parent within
+    // `civil_war_window_years` (CIVILISATION.md, "What counts as one"). Every
+    // region a battle between the two targets is FOUGHT OVER that round: it
+    // loses `civil_war_famine_q` per mille per year of the round to famine
+    // (`remove_region_people` -- the dead leave their food behind, so the
+    // ground regrows), and a further `civil_war_flight_q` per mille per year
+    // FLEES to the nearest safe region of the same people that can feed them
+    // (`settle_refugees`, bounded by its `refugee_room`; exactly the heads
+    // landed leave -- people conserved, and no ceiling moves on either end, so
+    // the emptied ground regrows). At most once per region per decision round, and
+    // each share is capped at `civil_war_round_cap_q` per round, so no region
+    // is emptied. Both recorded (`lapse_event_kind::civil_war_famine`,
+    // `civil_war_flight`). 0 = off: the struct default, so every span but
+    // Empires (era_minus_one_sim_params) and every legacy harness arc is
+    // byte-identical.
+    int civil_war_famine_q      = 0;
+    int civil_war_flight_q      = 0;
+    int civil_war_round_cap_q   = 150;
+    int civil_war_min_share_q   = 250;
+    int civil_war_min_regions   = 3;
+    int civil_war_window_years  = 50;
+
+    // --- BL-1288: THE LATE CULTURE, A TARGET OF THE EMPIRES -> EXPLORATION ---
+    // EXPLORATION.md sec A colony is a subject (THE LATE CULTURE IS TARGETED,
+    // Ben 2026-10-10; the 2026-10-11 rulings); GENERATION_STRATEGY.md sec
+    // History patterns. The predicate's constants: `late_culture_rules.hpp`.
+
+    /// ON only on generation's own Empires round (`era_minus_one_sim_params`).
+    /// At the round's open -- the Culture round's close -- the founding culture
+    /// most remote by reach is chosen (`late_culture_rules.hpp` says how reach
+    /// is measured), recorded (`late_culture_chosen`); through the round the
+    /// backstop watches that it holds a realm and lags, and presses the
+    /// isolation that already slows it, one bounded recorded level at a time
+    /// (`isolation_pressed`). Struct-default OFF: every isolating fixture and
+    /// every later span keeps its meaning.
+    bool late_culture_target = false;
+    /// ON on generation's own Exploration round (and so inherited, inert, by
+    /// Industrialisation's copy of its params, which sets it back off): the
+    /// late culture the resumed polity table names (`polity::late_people`) is
+    /// watched until a polity of another culture binds one of its realms, and
+    /// the backstop presses the contact that binds it, one level at a time.
+    bool late_culture_colonised = false;
+
+    /// DIFFUSION BY CONTACT (Ben, 2026-10-11): development -- the materials
+    /// capacity -- spreads between peoples in proportion to the reach between
+    /// them. At each recorded read, every living polity takes, for every
+    /// living polity ahead of it on the materials ladder whose ground lies
+    /// within `contact_diffusion_horizon` of its own (the cheapest `edge_step`
+    /// walk, any ground passable), progress of
+    ///   rate x (their band - its band) x (horizon - reach) / horizon
+    /// per year since the last read (rate in progress points per band of gap
+    /// per year at zero reach). The ladder's own band cost turns it into
+    /// bands. Every culture feels it; the most remote receives least. 0 = off
+    /// (the struct default: every other span and fixture byte-identical).
+    int contact_diffusion_q       = 0;
+    int contact_diffusion_horizon = 60;
+    /// DEVELOPMENT SPREADS ONLY BY CONTACT (Ben, 2026-10-14, EXPLORATION.md
+    /// sec A colony is a subject). The EARLY BANDS are materials bands 1 to
+    /// this: any realm climbs them by its own Invest. Past them a realm climbs
+    /// no higher than its CONTACT-SUSTAINED CEILING -- one band above the best
+    /// realm that reaches it inside `contact_diffusion_horizon` (the
+    /// diffusion's own walk; the contact that reaches it sets how far past the
+    /// early bands, `contact_band_per_q`), read at the diffusion's cadence; a realm no one
+    /// reaches is held at the early bands. A successor (secession, schism),
+    /// read for the first time, is cut to its own ceiling: it does not carry
+    /// its parent's band past what its contacts sustain. Every culture alike.
+    /// 0 = off (every other span and fixture byte-identical).
+    int contact_early_bands       = 0;
+    /// ...and the CEILING: the early bands, plus one band for every this much
+    /// contact reaching the realm (per mille, summed over the realms inside the
+    /// horizon, each weighted (horizon - reach) / horizon: 1000 is one realm at
+    /// its door), never more than one band above the best realm that reaches it.
+    int contact_band_per_q        = 1000;
+
+    /// THE ISOLATION PRESS (the late culture's backstop in the Empires round,
+    /// carried unraised into Exploration until the culture is bound): per
+    /// level, every step that touches the late culture's founding ground --
+    /// its own roads and the approaches to it alike (`edge_step`, read by
+    /// supply, campaigns, Organise and the diffusion) -- costs
+    /// `late_isolation_step_q` per mille more, and `late_isolation_step` reach
+    /// more besides, so a short step is not exempt: the ground going unwalked,
+    /// as if the way were that much further and harder. Ground, never a term
+    /// in any scorer; capped at `late_culture_max_level`.
+    int late_isolation_step_q = 750;
+    int late_isolation_step   = 1;
+    // --- BL-1289 (the world war) -----------------------------------------------
+    // INDUSTRIALISATION.md sec A world war in every world, sec War kills people
+    // (Ben, 2026-09-15, 2026-10-10/11/12). THE TARGET: inside the window
+    // (`world_war_rules.hpp`) a war forms by the mutual-defence spread -- the
+    // treaty graph's own spark, else the contest for a subject between the two
+    // largest powers -- and, where the spread leaves fewer than the ruled count
+    // of the top powers engaged, escalates one bounded, recorded step a round
+    // (the largest unengaged top power drawn in by its grudge, else by the war
+    // on its doorstep). While it stands, every round of it costs, each cost
+    // authored and recorded as itself, never a battle coefficient:
+    //   GROUND FOUGHT OVER -- each opposing pair's front (the regions of each
+    //     nearest the other, `world_war_front_per_pair` a side, within
+    //     `world_war_front_reach` of the enemy; across water, each side's
+    //     nearest port, where a top power is one of the pair and either
+    //     fields a navy) is RAZED once in the war:
+    //     `world_war_raze_industry_q` per mille of its `industry_points` and
+    //     `world_war_raze_port_q` of its `port_stock_q` gone, and every road
+    //     through it demoted one tier;
+    //   PEOPLE -- CONSCRIPT DEAD across each belligerent's ground in proportion
+    //     to what each region gave (its people), `world_war_conscript_q` per
+    //     mille a year; BLOCKADE FAMINE on the front while it stands,
+    //     `world_war_famine_q`; DISPLACEMENT of the front's people to the
+    //     nearest safe region of their own realm that can feed them,
+    //     `world_war_flight_q` (conserved). Each share capped per round at
+    //     `world_war_round_cap_q`, so no region is emptied;
+    //   TREASURIES -- each belligerent spends `world_war_cost_q` per mille a
+    //     year of the chest it entered with, from its capital, never below zero
+    //     and never owed, up to its WAR CHEST: `world_war_exhaustion_q` per
+    //     mille of that chest.
+    // Peace comes when one side has spent its war chests, at the latest in the
+    // window's last round. The war chest is about half the treasury, not all
+    // of it, so thirty years refill what the war drained (the ruling's
+    // "refilled treasuries"): measured on the quick seeds, a war spending the
+    // whole chest left the 1960 opening medians at 177-358 credits against
+    // 1252-4227 with no war -- thirty years of earnings cannot refill a chest
+    // three centuries filled. Struct-default OFF: every span but Industrialisation
+    // (industrialisation_sim_params) and every legacy fixture is byte-identical.
+    bool world_war_target          = false;
+    int  world_war_front_per_pair  = 1;
+    int  world_war_front_reach     = 0;   ///< 0: `neighbour_radius`
+    int  world_war_raze_industry_q = 500;
+    int  world_war_raze_port_q     = 500;
+    int  world_war_conscript_q     = 4;
+    int  world_war_famine_q        = 10;
+    int  world_war_flight_q        = 20;
+    int  world_war_round_cap_q     = 150;
+    int  world_war_cost_q          = 60;  ///< per mille of the entry chest a year: 480 over the 8 years to exhaustion
+    int  world_war_exhaustion_q    = 480;
+
+    // --- BL-1294 (revolution lean) -------------------------------------------
+    // INDUSTRIALISATION.md sec Revolution (Ben, 2026-10-10/12): A LEAN, which
+    // promises nothing -- no backstop, no target. The DISPARITY BETWEEN A
+    // REALM'S CITIES is read once, at the span's open (the Exploration close
+    // it resumes from): the Gini spread, per mille, of `region::urban_population`
+    // over the regions it holds that carry a centre (`centres > 0`) -- the
+    // inequality between cities the economic premise rules on, never between
+    // households (sec 5). A realm of fewer than `revolution_min_cities` cities
+    // has no spread to read. Where the spread is at or over
+    // `revolution_disparity_bar_pm`, a PRESSURE accrues each decision round:
+    // the excess over the bar x the round's years, weighed up by a faltering
+    // realm (x (2000 - cohesion) / 1000, so a realm at full cohesion accrues
+    // the excess alone and a broken one twice it). When the pressure reaches
+    // `revolution_pressure_q`, a SPLINTER rises in the realm's largest city
+    // other than its capital and takes the whole nation: the polity id and
+    // its ground stay, it takes a new regime (`polity::regime` + 1) and a name
+    // newly coined in its own tongue, and the takeover is recorded (a history
+    // line and `lapse_event_kind::revolution`). At most once per realm per
+    // span. It overturns, for this span alone, the Empires rule that no
+    // regime resets while the map stands still. Struct-default OFF, so every
+    // span but Industrialisation (`industrialisation_sim_params`) and every
+    // isolating fixture is byte-identical.
+    bool    revolution_lean               = false;
+    int     revolution_disparity_bar_pm   = 600;
+    int     revolution_min_cities         = 3;
+    int64_t revolution_pressure_q         = 6000;
 };
+
+// BL-1287 -- THE RULED PREDICATE lives in `rise_fall_rules.hpp` (included
+// above), read by this sim's backstop and by the detector alike.
 
 // ---------------------------------------------------------------------------
 // BL-931 — OBJECTS WITH A TERM.
@@ -2890,6 +3203,19 @@ struct exploration_upkeep_spend
     int64_t industry_points_refused  = 0;
     /// BL-1169: treasury units the crowding brake kept in the purse this call.
     int64_t industry_treasury_kept_by_crowding = 0;
+    /// BL-1298 census, WRITE-ONLY (read by nothing in the sim): the EARN by
+    /// source this call, before the purse's clamp -- endowment, corridor,
+    /// trade -- and the material stock the 1200 consolidation folded in.
+    int64_t earn_endowment       = 0;
+    int64_t earn_corridor        = 0;
+    int64_t earn_trade           = 0;
+    int64_t consolidation_folded = 0;
+    /// BL-1298: the standing levy swept from seats this call, the paid heads
+    /// disbanded because the round's earn could not carry them, and the
+    /// polity-rounds on which that sizing bound. Write-only.
+    int64_t earn_levy            = 0;
+    int64_t army_disbanded_by_earn = 0;
+    int64_t army_sized_rounds    = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -3038,7 +3364,9 @@ struct polity
     /// culture's tongue (`coin_realm_name` over `culture::speech`, a pure
     /// function of the tongue and this realm — no draw from the sim's stream)
     /// and never changed after: not by a re-seating, not by losing the seat,
-    /// not by a span boundary (CIVILISATION.md sec A realm's name). Carried by
+    /// not by a span boundary (CIVILISATION.md sec A realm's name) -- save by
+    /// a revolution in the Industrialisation span (BL-1294), the one
+    /// sanctioned rename, which coins it anew in the same tongue. Carried by
     /// id across a resume with the rest of the table, and copied onto the
     /// record's `polity_name` by `as_timelapse` so the board, the ticker and
     /// Pass 5 print one name. READ BY NOTHING IN THE SIM: a string on the
@@ -3164,93 +3492,6 @@ struct polity
     bool alive = true; ///< False once the polity holds no regions.
 
     // -----------------------------------------------------------------------
-    // BL-912 — THE EMPIRE TREE, held as real per-polity state.
-    // -----------------------------------------------------------------------
-    //
-    // trees/TREES.md sec State: "one 64-bit mask per tree plus one accumulated
-    // progress integer for the node being invested in." This is that state,
-    // added alongside the capacity ladder above rather than in place of it —
-    // TREES.md sec "The sim reads nodes, not bands" demotes the band to a
-    // DERIVED reading kept where a consumer still wants a scalar (the works
-    // gate, the unit roster boundary); nothing here retires `capacity`.
-    //
-    // `empire_mask` bit i is set iff this polity holds `empire_tree::nodes[i]`
-    // (docs/generation/trees/empire_tree.json, via the generated
-    // `empire_tree_data.hpp` — see `tools/session/gen_empire_tree_table.js`).
-    // A closed fork side (`node::excludes`) never sets its bit once the other
-    // side is held; see `empire_node_available` in history_sim.cpp.
-    uint64_t empire_mask = 0;
-
-    /// Index into `empire_tree::nodes`, or -1 when nothing is targeted. The
-    /// Invest verb (BL-912) picks this via the scorer and keeps investing in
-    /// it, round over round, until it is bought or goes unavailable (a rival
-    /// branch closed under it, e.g. after a fork).
-    int16_t empire_investing = -1;
-
-    /// Progress accumulated toward `empire_investing`'s cost. Reset to 0 when
-    /// the node is bought or abandoned. Same accumulated-progress currency the
-    /// domain ladder's `progress_q` uses; the unit is `capacity_band_cost`-
-    /// scaled, per node kind and ring (TREES.md sec Nodes: "cost is base x ring").
-    int32_t empire_progress_q = 0;
-
-    // -----------------------------------------------------------------------
-    // BL-930 — THE EXPLORATION TREE, held alongside the empire tree's state.
-    // -----------------------------------------------------------------------
-    //
-    // Exactly the empire tree's shape (BL-912, above), copied rather than
-    // templated: `trees/TREES.md` sec State fixes "one 64-bit mask per tree
-    // plus one accumulated progress integer for the node being invested in"
-    // as the per-tree shape every tree gets, and a polity holds one of these
-    // triples per tree it can invest in. The Exploration tree opens behind
-    // the empire tree's rim (`polity_holds_empire_rim`), so a polity that
-    // never reaches that rim simply never sets a bit here.
-    //
-    // `exploration_mask` bit i is set iff this polity holds
-    // `exploration_tree::nodes[i]` (docs/generation/trees/exploration_tree.json,
-    // via the generated `exploration_tree_data.hpp` — see
-    // `tools/session/gen_empire_tree_table.js exploration`). A closed fork
-    // side (`node::excludes`) never sets its bit once the other side is held;
-    // see `exploration_node_available` in history_sim.cpp.
-    uint64_t exploration_mask = 0;
-
-    /// Index into `exploration_tree::nodes`, or -1 when nothing is targeted.
-    /// Same Invest verb, same round, as `empire_investing`.
-    int16_t exploration_investing = -1;
-
-    /// Progress accumulated toward `exploration_investing`'s cost. Same
-    /// currency as `empire_progress_q`.
-    int32_t exploration_progress_q = 0;
-
-    // -----------------------------------------------------------------------
-    // BL-1038 — THE INDUSTRY TREE, the third triple, same shape again.
-    // -----------------------------------------------------------------------
-    //
-    // `industry_mask` bit i is set iff this polity holds
-    // `industry_tree::nodes[i]` (docs/generation/trees/industry_tree.json via
-    // the generated `industry_tree_data.hpp`). Written ONLY by the Invest
-    // verb's Industry block, which runs only while
-    // `history_sim_params::industry_tree_enabled` is set and the round's year
-    // has reached `industry_open_year` — so on every shipped path all three
-    // stay at their defaults and the fold reads a zero mask. NOT SERIALISED,
-    // same footing as the other two triples: `polity` does not cross the save
-    // seam.
-    uint64_t industry_mask = 0;
-
-    /// Index into `industry_tree::nodes`, or -1 when nothing is targeted.
-    int16_t industry_investing = -1;
-
-    /// Progress toward `industry_investing`'s cost. Same currency as
-    /// `empire_progress_q`, earned at the Industry rate (urban mass).
-    int32_t industry_progress_q = 0;
-
-    /// Has this polity EVER, on an Industry-investing round, held ground with
-    /// a fuel seam that clears the gate's bar? Written only by the Industry
-    /// block; read by nothing in the sim — the sweep's "never passes the fuel
-    /// gate" share reads it, which is why it is a fact on the polity rather
-    /// than a closing-map reconstruction (ground changes hands).
-    bool industry_fuel_seen = false;
-
-    // -----------------------------------------------------------------------
     // BL-934 — THE OVERLORD LINK. A colony is a LIVE POLITY with one field
     // pointing at somebody else, never a region annotation and never a new
     // actor class (EXPLORATION.md sec A colony is a subject).
@@ -3299,8 +3540,10 @@ struct polity
     /// times the round's years.
     /// `naval_crossings`: the sea crossings it made (its wet campaigns
     /// launched, staging hub to target across water). `naval_sea_techs`: the
-    /// coastal sea techs it took (EM-RD-2b Deep-Hull Sail, EM-RD-3b Lateen &
-    /// Long-Range Rig, EM-RD-4a Ocean-Rated Hulls; at most 3). The deeds stay
+    /// coastal sea techs it holds, a date ramp
+    /// (`history_sim_params::coastal_naval_ramp`, `coastal_sea_techs_at`;
+    /// at most `coastal_naval_ramp_n`), written each Empires round to every
+    /// living polity. The deeds stay
     /// on the polity that did them -- a polity that loses its coast keeps its
     /// sailors -- and cross every handoff unchanged with the polity table.
     /// Weighted into naval points (`naval_points_of`) they are why a polity
@@ -3317,104 +3560,38 @@ struct polity
     /// reads the COUNTERPART's copy of this field, never the decider's own.
     int32_t treaties_broken = 0;
 
-    // -----------------------------------------------------------------------
-    // BL-973 — THE TREE EFFECT SURFACE, folded from the masks above.
-    // -----------------------------------------------------------------------
-    //
-    // DERIVED, NEVER AUTHORED: `apply_tree_effects` rewrites both fields
-    // from `empire_mask`, `exploration_mask` and (BL-1038) `industry_mask` —
-    // zero on every shipped path — at the top of every round
-    // and again the instant a node is bought, walking the generated
-    // `effects[]` tables (tree_effect.hpp is the vocabulary). Nothing else
-    // writes them, and nothing in the sim names a node — a reader asks for
-    // a TERM or a KEY, never for "node 11". NOT SERIALISED, same footing as
-    // the masks: recomputable from them, and this struct does not cross the
-    // save seam.
+    /// BL-1288 -- THE SEAT THIS POLITY WAS BORN AT: the region its first
+    /// `founded` / `broke_away` / `schism` / `inherited` note names (set once,
+    /// beside that note, whether or not the record is kept). Its people is
+    /// that region's `founding_culture`, which is never overwritten -- the
+    /// same reading `history_pattern_detectors`' polity -> culture map takes
+    /// off the record, so the sim's backstop and the detector count one set of
+    /// realms. -1 until noted. NOT SERIALISED (the polity table is not saved).
+    int32_t birth_seat = -1;
+    /// BL-1288 -- BORN OF THE LATE CULTURE: -1 for every other polity; for a
+    /// polity whose `birth_seat`'s founding culture is the culture chosen at
+    /// the Culture close, the isolation level the press stood at when the span
+    /// closed (0 = never pressed).
+    /// Stamped on the polity table at each span's close, so a resumed span --
+    /// and every harness replaying one from a fixture's polity table -- knows
+    /// the late culture and the isolation it carries without a field of its
+    /// own. Read by the Exploration span alone. NOT SERIALISED.
+    int16_t late_isolation = -1;
+    /// BL-1294 -- THE REGIME, as an ordinal: 0 is the regime the realm was
+    /// founded under, and each revolution (`history_sim_params::
+    /// revolution_lean`, INDUSTRIALISATION.md sec Revolution) gives it the
+    /// next. The Political system stub's one regime field (sec 6) is what this
+    /// grows into; until that stub names regimes, a regime is told apart from
+    /// the one before it and nothing more. Read by nothing in the sim; NOT
+    /// SERIALISED, same footing as `parent` -- the record carries the
+    /// takeover (`lapse_event_kind::revolution`, `other` = the new value).
+    int32_t regime = 0;
 
-    /// Per-term sum of held `modifier` effects' per-mille, every invested
-    /// tree, indexed by `io::tree_modifier_term`. A term with no reader in the
-    /// sim is still summed here (the surface is generic); which terms are
-    /// read is `tree_effect_reader_of`'s to say.
-    int32_t tree_mod_q[io::tree_modifier_term_count] = {};
-
-    /// Bit `k` set iff some held node carries an effect with
-    /// `key == io::tree_effect_key(k)`. The identity reads (sea legs, post
-    /// roads) test this and nothing else.
-    uint32_t tree_keys = 0;
 };
 
 // ---------------------------------------------------------------------------
-// The empire tree (BL-912) — availability, the scorer, and the rim read
+// Creed leans (BL-942) — read by the Exploration spend's lean ranks
 // ---------------------------------------------------------------------------
-
-/// True iff `node_idx` is a legal Invest target for a polity holding `mask`:
-/// not already held, its fork partner (if any) not held, its ring unlocked
-/// (the milestone one ring down is held, or it sits at ring 1), and rule 2's
-/// OR-availability satisfied (a linked neighbour is held, or it has none —
-/// the spire roots). A milestone additionally needs its `requires` AND set
-/// and, if present, one side of its `requires_fork` pair.
-bool empire_node_available(uint64_t mask, int node_idx);
-
-/// The scorer (TREES.md sec The scorer): a seeded, deterministic argmax over
-/// every available node, integer throughout, tie-broken on the lower node
-/// index (the tree's own fixed authored order). Returns -1 when nothing is
-/// available (tree exhausted, or every open branch closed under a fork).
-///
-/// Terms read the polity's own state and its held ground — never a rank,
-/// never anything that grows with the polity's size alone (TREES.md sec
-/// "every term is an in-world quantity with a visible cause"). Argument to
-/// the Invest verb the AI grant register already covers
-/// (docs/ai/AI_OPPONENT.md sec 11); this chooses a node, not a new verb.
-int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
-                        int reach_bound_q, int manpower_bound_q, int food_bound_q,
-                        int ground_ore_q, int ground_farm_q, int ground_fuel_q,
-                        int ground_port_q, int surplus_q);
-
-/// THE RIM (BL-912/BL-907): has this polity crossed EM-SP-4m, "The
-/// Enforceable Promise"? A per-polity BOOLEAN, read straight off the mask —
-/// the closure contract's "explorer set" reading, per the item's own naming.
-inline bool polity_holds_empire_rim(const polity& q)
-{
-    return (q.empire_mask & (1ULL << io::empire_tree::rim_node_index)) != 0;
-}
-
-// ---------------------------------------------------------------------------
-// The exploration tree (BL-930) — availability, the scorer, and the rim read
-// ---------------------------------------------------------------------------
-//
-// EXACT PRECEDENT: `empire_node_available`/`choose_empire_node` above,
-// re-read against `io::exploration_tree` instead of `io::empire_tree`. The
-// five rules (`TREES.md` sec The five rules) are the tree grammar, not an
-// empire-specific mechanic, so the availability test is identical in shape.
-
-/// True iff `node_idx` is a legal Invest target for a polity holding
-/// `mask` in the EXPLORATION tree — same five-rule test
-/// `empire_node_available` runs, over `io::exploration_tree::nodes`.
-bool exploration_node_available(uint64_t mask, int node_idx);
-
-/// The scorer (TREES.md sec The scorer — one shape, four trees), read against
-/// `io::exploration_tree`. Four of the terms this tree adds
-/// (`EXPLORATION_TREE.md` sec The scorer: `purse_low`, `wants_unmet`,
-/// `throughput_bound`, `subject_held`) read quantities this item does not
-/// build — the capital treasury (BL-932), the scarcity signal (BL-939),
-/// corridor throughput (BL-940), and the overlord/subject link (BL-933/934)
-/// respectively. `purse_low_q`, `wants_unmet_q` and `throughput_bound_q` are
-/// now real, threaded-through parameters (BL-932/939/940); `subject_held`
-/// alone is still STUBBED AT A PINNED NEUTRAL VALUE inside the function body,
-/// exactly as `choose_empire_node` stubs `threatened`/`plague_struck`/
-/// `many_peoples` at 0 — a 0 term never wins the argmax on its own account,
-/// which is honest rather than wrong, and a harness pins the remaining
-/// stub's value so BL-933/934 landing shows as a diff.
-/// BL-942 -- `consolidator_lean_q`/`expansion_lean_q` (0-1000, see the two
-/// free functions of the same name below) weight the terms EXPLORATION.md
-/// sec Two ways to be strong names for each strategy; `creed_lean_weight_q`
-/// scales how hard that weighting bites, 0 reducing it to a no-op so every
-/// pre-existing call site (default arguments below) is unchanged.
-int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
-                             int ground_port_q, int ground_farm_q, int surplus_q,
-                             int purse_low_q, int wants_unmet_q, int throughput_bound_q,
-                             int subject_held_q = 0, int consolidator_lean_q = 0,
-                             int expansion_lean_q = 0, int creed_lean_weight_q = 0);
 
 /// BL-942 -- CONSOLIDATOR LEAN, 0-1000: "high dominion with no sea legs is
 /// the continental consolidator" (EXPLORATION.md sec Two ways to be strong).
@@ -3428,246 +3605,90 @@ int consolidator_lean_q(const culture& c);
 /// same temperament axis `culture_opposition_q` reads), never rolled.
 int expansion_lean_q(const culture& c);
 
-/// THE RIM (BL-930): has this polity crossed EX-SP-3m, "The Long Reckoning"?
-/// A per-polity boolean, read straight off the mask — this is the fact
-/// `EXPLORATION_TREE.md` sec What the tree hands the Industry tree calls
-/// "entry timing": a polity holding this at 1660 starts the Industry tree at
-/// its root.
-inline bool polity_holds_exploration_rim(const polity& q)
-{
-    return (q.exploration_mask & (1ULL << io::exploration_tree::rim_node_index)) != 0;
-}
-
-// ---------------------------------------------------------------------------
-// The industry tree (BL-1038) — availability, the scorer, the rim, the rate
-// ---------------------------------------------------------------------------
-//
-// Same five-rule availability as the other two trees, over
-// `io::industry_tree`. What differs is ALL in the Industry tree's own reading,
-// and none of it touches the empire or exploration scorers:
-//
-//   - ENTRY. Every living polity invests from `industry_open_year`; there is
-//     no rim gate (TREES.md sec Milestones, the Industry exception).
-//   - THE FUEL GATE READS A SEAM (INDUSTRY_TREE.md sec Aims, PROPOSED
-//     2026-09-18): `fuel` passes when ANY held region's `energy_q` clears
-//     `industry_fuel_seam_bar_q`, not the held mean. The empire scorer keeps
-//     its mean reading; the exploration scorer keeps its open fuel gate.
-//   - THE RATE READS URBAN MASS (TREES.md sec State), never the industry
-//     slice, and never the scorer (`industry_research_per_year_q`).
-
-/// The bar a held region's `energy_q` must clear for the Industry tree's
-/// `fuel` gate. The same 250/1000 placeholder bar the empire scorer's gates
-/// use (TREES.md sec Effects: "magnitudes are authored by judgement") —
-/// only WHAT it is compared against differs: one region, not the mean.
-inline constexpr int industry_fuel_seam_bar_q = 250;
-
-/// BL-1059 (Ben, 2026-09-19, NR-899, NR-900): THE TOP-THIRD BARS. A held
-/// region counts toward `ground_fuel` / `ground_forest` when its span-open
-/// share of that resource is in the world's TOP THIRD for it -- each resource
-/// against its OWN distribution, so coal's rarity no longer starves its pull
-/// (against the mean, few regions cleared a mean a handful of coalfields set).
-/// Fixed ONCE at the span open from the region table
-/// (`industry_ground_bars_at_open`), carried on `history_sim_state::ground_bars`,
-/// never moved after: a property of the map, never a rank among polities.
-/// Report-only on the state: nothing serialised, nothing digested.
-///
-/// WHAT IS RANKED (NR-900): the UNCLAMPED survey share
-/// (`region::survey_fuel_raw` / `survey_forest_raw`), not the score. The score
-/// is capped at twice the world mean, so a pile of regions at the cap is one
-/// tied value and would push the bar past every one of them; the share has no
-/// cap (the unclamped score orders identically, up to its truncation).
-///
-/// OVER WHICH REGIONS (NR-900): EVERY region carrying the span-open survey of
-/// both scores -- the set the pulls read, which at the open is every region --
-/// zeros included. So both resources clear at one rate of the WORLD; ranking
-/// only a resource's carriers clears a third of its carriers, and a rarer
-/// resource then clears less of the world (the rarity tilt, back).
-///
-/// THE DEFINITION. n regions read; k = floor(n / 3); sort the shares ascending
-/// and let v be the value at position n - k. The bar is max(v, 1), and a region
-/// clears iff `share > 0 && share >= bar` (`industry_ground_clears`).
-///   - TIE RULE (Ben, 2026-09-19, NR-904): A TIE AT THE CUT CLEARS WHOLE. Every
-///     region whose share equals v clears, so a bar can never come out empty
-///     while any region carries the resource. Where a tie band straddles the
-///     cut, MORE than a third of the world clears -- by design: the forest
-///     share tops out at a fully wooded window, and on a heavily wooded world
-///     more than a third of regions may sit there; a fully wooded region is a
-///     forest whatever its neighbours hold.
-///   - A SHARE OF 0 NEVER CLEARS, however few regions carry the resource: when
-///     fewer than a third do, v is 0, the bar is 1, and every carrier clears
-///     (fewer than a third of the world).
-///   - FEWER THAN THREE regions read (k = 0): nothing clears; both bars are
-///     `industry_ground_bar_none`.
-/// Integer only; independent of region order. A region in the read set with no
-/// share (only a hand-built table can have one: the survey writes the share
-/// with the score) ranks as 0 and never clears.
-inline constexpr int industry_ground_bar_none = std::numeric_limits<int>::max(); ///< a bar no share clears
-
-struct industry_ground_bars
-{
-    int fuel_raw   = industry_ground_bar_none; ///< in `survey_fuel_raw` units
-    int forest_raw = industry_ground_bar_none; ///< in `survey_forest_raw` units
-    bool operator==(const industry_ground_bars& o) const { return fuel_raw == o.fuel_raw && forest_raw == o.forest_raw; }
-    bool operator!=(const industry_ground_bars& o) const { return !(*this == o); }
-};
-
-/// Does span-open share @p raw clear @p bar? `raw > 0 && raw >= bar`.
-inline bool industry_ground_clears(int raw, int bar) { return raw > 0 && raw >= bar; }
-
-/// The two bars, from @p regions (see above). Only regions carrying both
-/// survey scores are read; with fewer than three, both bars are
-/// `industry_ground_bar_none`.
-industry_ground_bars industry_ground_bars_at_open(const std::vector<region>& regions);
-
-/// How many held regions the Industry rate reads (`industry_urban_mass`).
-///
-/// THREE, AND WHY. The doc's reading is "the population of the polity's
-/// largest held centres" — concentration, not breadth. k = 1 makes the rate
-/// hostage to one city (a sacked capital zeroes a century's research) and
-/// cannot tell a one-city realm from a realm of great cities; k = all held
-/// regions makes the rate the realm's total urban headcount, i.e. its SIZE,
-/// which is breadth wearing a density label. Three is a seat and its two
-/// largest rivals: a small realm (most living polities hold a handful of
-/// regions) sums nearly all of its urban ground, and a large one stops
-/// earning research for breadth past its third city — it earns it by making
-/// those cities denser. A named constant rather than a param because it is
-/// the definition of the reading, not a magnitude the sweep re-prices.
-inline constexpr int industry_research_top_k = 3;
-
 /// Integer square root: the largest r with r*r <= v, for v >= 0 (0 for any
 /// v <= 0). Exact over the whole int64_t range — Newton's iteration from a
 /// power-of-two overestimate, no floating point, so it is bit-identical on
-/// every machine. src/world had none before BL-1038.
+/// every machine.
 int64_t isqrt64(int64_t v);
 
-/// The Industry rate's input: `urban_population` summed over the
-/// `industry_research_top_k` largest of @p held's regions. UNCLAMPED — the
-/// clamp belongs to the transform (`industry_research_per_year_q`). The sum of
-/// the k largest values is the same whichever of several equal values is
-/// picked, so the reading is independent of `held`'s order.
-int64_t industry_urban_mass(const std::vector<region>& regions, const std::vector<int>& held);
-
-/// The highest ring of any Industry MILESTONE in @p mask, 0 with none held —
-/// the "spire ring held" TREES.md sec State scales a research rate by, read
-/// exactly as the empire rate reads it off `empire_mask` (a milestone lives on
-/// the spire by the lint's rule, so the kind is the test).
-int industry_spire_ring(uint64_t mask);
-
-/// Research earned per year toward the Industry node being invested in:
-/// clamp @p urban_mass to `industry_urban_mass_cap` FIRST, then the integer
-/// superlinear transform `Mc * isqrt64(Mc) / isqrt64(reference)`, times
-/// `industry_research_fraction_q / 1000`, then the SAME scaling the EMPIRE
-/// rate applies after its base (TREES.md sec State: the Industry tree swaps
-/// only the industry slice for urban mass): the spire ring held
-/// `(1000 + spire_ring * 150) / 1000`, contact degree at 0 (inert, as in
-/// every tree), and the `research` modifier `(1000 + clamp(mod, 0, 4000)) /
-/// 1000`. Each factor truncates in the empire's order. Never negative.
-int64_t industry_research_per_year_q(int64_t urban_mass, int spire_ring, int research_mod_q,
-                                     const history_sim_params& params);
-
-/// True iff `node_idx` is a legal Invest target for a polity holding `mask`
-/// in the INDUSTRY tree — the same five-rule test `empire_node_available`
-/// runs, over `io::industry_tree::nodes`.
-bool industry_node_available(uint64_t mask, int node_idx);
-
-/// Everything the Industry scorer reads, as one value, so a harness can set
-/// a reading by name rather than by position in a 20-argument call. Every
-/// field is 0-1000 unless said otherwise; the Invest block fills it.
-struct industry_scorer_reading
+/// THE THREE DATE GATES (docs/generation/trees/TREES.md: research is removed
+/// from generation, Ben 2026-10-10). The history's polities hold no
+/// technology; what a tree node used to gate opens on a calendar year for
+/// every polity alike.
+///
+/// Sea legs, the date half: has the year come?
+inline bool sea_legs_open(const history_sim_params& p, int64_t year) { return year >= p.sea_legs_year; }
+/// Naval capability, the first half of sea legs (Ben, 2026-10-10: a date AND
+/// naval capacity): has the date come, and can some region @p q holds
+/// (`region::nation`) field a navy at its military band -- `can_field_naval`,
+/// the test general ocean crossing already reads (a harbour and the band's
+/// naval rows)?
+bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
+                          const history_sim_params& p, int64_t year);
+/// THE FLEET-AFLOAT FLOOR IS RELATIVE (Ben, 2026-10-11; TREES.md): the
+/// percentile P of the year's free naval-capable navies whose entry a
+/// polity's own fleet must reach to hold sea legs (Ben, 2026-10-11).
+constexpr int sea_legs_fleet_percentile = 90;
+/// The fleet-afloat floor for @p year. The list is the `navy_stock` of every
+/// living polity (`alive`, `id` equal to its index) that is FREE
+/// (`overlord < 0`; Ben, 2026-10-11: only free polities set the bar a free
+/// arriving power must clear) and passes `polity_naval_capable`, gathered in
+/// region-index order and sorted ascending. THE INDEX RULE: with n entries
+/// the floor is the 90th-percentile entry, the one at index
+/// floor((n - 1) x 90 / 100) (P = `sea_legs_fleet_percentile`), integer
+/// arithmetic only -- so every count has one defined answer, the result is
+/// independent of polity order, and P = 50 would be the lower middle. A
+/// polity at or above that entry clears it, so ties at the floor all clear
+/// and a SMALL list admits a larger share than a tenth: of 10 entries the
+/// floor is index 8, and 2 of 10 clear it. 0 before the date or when no
+/// polity is naval-capable. The subjection block computes it ONCE per round,
+/// before its walk.
+///
+/// WHY RELATIVE, AND WHY THE 90TH PERCENTILE. Ben ruled that arriving across
+/// water to subject a native needs a fleet afloat. A fixed hull floor was
+/// measured first (16 library seeds, tree_gate_years_probe): Industrialisation
+/// subjections fell 440 -> 132 -> 94 -> 63 -> 21 at 0 / 100 / 400 / 1600 /
+/// 25600 hulls, but Exploration's fell with them, 146 -> 92 -> 72 -> 42 -> 18,
+/// so no fixed number restored the one without gutting the other. Subjections
+/// formed at the 90th percentile are Exploration 56 / Industrialisation 96
+/// with 71 subjects alive at 1960 (under the trees 169 / 21 / 31; at the
+/// median 123 / 339 / 149). The holder shares were measured ad hoc 2026-10-11 with an instrumented census against c05844d9 (BL-1297 owns committing it):
+/// the median let 39% of free polity-rounds hold sea legs in
+/// Industrialisation where under the trees 9.9% held the node, and the 90th
+/// percentile lets 9.0%. The remaining Industrialisation gap is the
+/// sphere-of-claim test, which passes 0.44% of free, funded pairs against the
+/// trees' 0.076% (same ad hoc census) -- filed separately, not a matter for
+/// this floor.
+int64_t sea_legs_navy_floor(const std::vector<region>& regions, const std::vector<polity>& polities,
+                            const history_sim_params& p, int64_t year);
+/// Sea legs: may @p q arrive across water to subject a coast in @p year?
+/// True iff @p q is naval-capable (`polity_naval_capable`) AND it has a
+/// fleet afloat -- `navy_stock > 0`, a hull in the water (Ben, 2026-10-10:
+/// "a fleet afloat"), so a floor of 0 never admits a polity with no ships --
+/// AND that `navy_stock` is at or above @p navy_floor, the year's
+/// 90th-percentile entry (index floor((n-1) x 90 / 100)) of the free
+/// naval-capable navies, `sea_legs_navy_floor` (Ben, 2026-10-11).
+bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
+                           const history_sim_params& p, int64_t year, int64_t navy_floor);
+/// The naval ramp (Ben, 2026-10-10: coastal polities only): every living
+/// polity holding a coastal region (`region::port_q > 0`, the old `coastal`
+/// gate's reading) holds `coastal_sea_techs_at(year)` sea techs as naval
+/// deeds (`polity::naval_sea_techs`). A held count is never lowered: a polity
+/// that loses its coast keeps its sailors, as every deed does.
+void apply_coastal_naval_ramp(std::vector<polity>& polities, const std::vector<region>& regions,
+                              const history_sim_params& p, int64_t year);
+/// The treasury-bought third road rung (the Post Road): may it be bought?
+inline bool post_roads_open(const history_sim_params& p, int64_t year) { return year >= p.post_roads_year; }
+/// Coastal sea technology held, 0-3: the number of `coastal_naval_ramp`
+/// years at or before @p year. Each counts as one naval deed
+/// (`polity::naval_sea_techs`).
+inline int coastal_sea_techs_at(const history_sim_params& p, int64_t year)
 {
-    // --- The shared core, derived exactly as the empire scorer's inputs are
-    int reach_bound_q    = 0;
-    int manpower_bound_q = 0;
-    int food_bound_q     = 0;
-    int stores_low_q     = 0;
-    int cohesion_q       = 1000; ///< `cohesion_low` reads 1000 - this.
-    int surplus_q        = 0;
-    int ground_ore_q     = 0;    ///< held MEAN — the `ore_q` gate reads it, as the empire's does.
-    int ground_farm_q    = 0;    ///< held mean — `arable`, `ground_farm`.
-    int ground_port_q    = 0;    ///< held mean — `coastal`, `coastal_holdings`, `ground_port`.
-
-    /// THE SEAM: the MAX `energy_q` over held ground. The `fuel` gate
-    /// (`>= industry_fuel_seam_bar_q`), the re-check in
-    /// `industry_target_stands` and `polity::industry_fuel_seen` read it —
-    /// "coal seams under held ground" is a claim about a region. BL-1041
-    /// DEFAULT B (`history_sim_params::industry_fuel_gate_reads_survey`): the
-    /// MAX `industry_fuel_reading_q` instead, so every one of those reads the
-    /// span-open survey where a region has one and `energy_q` where none does.
-    /// The `ground_fuel` TERM reads it only where `ground_fuel_q` is -1.
-    int fuel_seam_q      = 0;
-
-    /// BL-1056 (Ben, 2026-09-19, NR-896) — the `ground_fuel` TERM: the
-    /// per-mille SHARE of held surveyed regions whose span-open fuel score
-    /// share clears the world's fuel bar, its top third (`industry_ground_fuel_q`;
-    /// BL-1059, NR-899, NR-900), so the Fuel Doctrine's coal pull does not grow with
-    /// the realm. -1 = NO SHARE TAKEN (the
-    /// span-open survey never ran: every path but the Industrialisation span, or a
-    /// harness reading built by hand): the term then reads `fuel_seam_q`, the
-    /// old seam. Inside the span it is never -1.
-    int ground_fuel_q    = -1;
-
-    // --- Terms this phase adds (INDUSTRY_TREE.md sec The scorer)
-    int threatened_q     = 0; ///< the heaviest grudge a living polity holds against this one
-    int fuel_bound_q     = 0; ///< the seat market's unmet energy want
-    int labour_bound_q   = 0; ///< share of the held non-subsistence surplus standing under arms
-    int credit_bound_q   = 0; ///< how far the seat's purse falls short of one road's price
-    int colonial_reach_q = 0; ///< 1000 iff a held region lies across a sea leg from the seat
-    int many_peoples_q   = 0; ///< share of held regions whose plurality culture is not the polity's
-
-    /// BL-1051 — `ground_forest`: the per-mille SHARE of surveyed held
-    /// regions whose span-open forest score clears the world's forest bar, its
-    /// top third (BL-1059, NR-899) (`industry_ground_forest_q`; BL-1056, Ben 2026-09-19, NR-896: a share
-    /// over the same regions `ground_fuel` reads). 0 wherever no held region
-    /// was surveyed, which includes every path the span does not run.
-    int ground_forest_q  = 0;
-
-    /// `known` is PER NODE (TREES.md sec The scorer: "a neighbour already
-    /// holds it"): the OR of the Industry masks of every living polity this
-    /// one has met. A node whose bit is set here reads `known` at 1000.
-    uint64_t known_mask  = 0;
-};
-
-/// THE FUEL DOCTRINE'S TWO PULLS (INDUSTRY_TREE.md sec The scorer; NR-891,
-/// and a SHARE, BL-1056, Ben 2026-09-19, NR-896). Both are taken over ONE set
-/// of @p held's regions -- those carrying the span-open survey of both scores
-/// (`survey_fuel_q >= 0` and `survey_forest_q >= 0`) -- and each is the per
-/// mille of that set whose span-open SHARE clears ITS OWN resource's bar, the
-/// world's top third for it fixed at the span open (`industry_ground_bars`;
-/// BL-1059, Ben 2026-09-19, NR-899, NR-900). Like with like: the same regions, and each
-/// resource cleared at the same rate world-wide. A share, never a best: a maximum can only rise as a
-/// realm grows, and let breadth rather than ground decide the fork. A region
-/// with no span-open reading of both (the span did not run, or founded it
-/// after its open: DEFAULT A inherits fuel but never forest) is out of BOTH
-/// pulls. Integer, independent of @p held's order; an out-of-range index is
-/// not counted. The `fuel` GATE, its re-check and `industry_fuel_seen` read
-/// none of this: they still read any held seam.
-
-/// Did the span-open survey run on this region table? True iff any region
-/// carries a forest survey (the survey writes every region at the open, and
-/// forest is never written anywhere else). Separates "the span did not run"
-/// from "this polity holds no surveyed ground".
-bool industry_span_survey_ran(const std::vector<region>& regions);
-
-/// `ground_forest`: the share of the read set whose forest share clears
-/// @p bars.forest_raw, 0-1000; 0 with no read region held -- off the span that
-/// is exactly the old pin.
-int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held,
-                             const industry_ground_bars& bars);
-
-/// `ground_fuel`: the share of the SAME read set whose fuel share clears
-/// @p bars.fuel_raw, 0-1000. -1 only when @p survey_ran is false (`industry_span_survey_ran`:
-/// every path but the span), which leaves the term on the seam, the old
-/// reading; inside the span a realm with no read region reads 0.
-int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector<int>& held,
-                           const industry_ground_bars& bars, bool survey_ran);
-
-/// `furnace_lit` (INDUSTRY_TREE.md sec The scorer; Ben, 2026-09-18, wave 1
-/// form): does the polity hold COKE SMELTING (IN-MT-1a), a coal-fired
-/// furnace? Found BY ID at compile time (a static_assert fails the build if
-/// the store drops the id), never by a magic index. It read "a Fuel Doctrine
-/// side held" (NR-892) before, which every reader of the term held by
-/// construction: all three sit behind The Cheap Ton, which requires a side.
-bool industry_coke_smelting_held(uint64_t mask);
+    int n = 0;
+    for (int i = 0; i < history_sim_params::coastal_naval_ramp_n; ++i)
+        if (year >= p.coastal_naval_ramp[i]) ++n;
+    return n;
+}
 
 // ---------------------------------------------------------------------------
 // BL-1041 — industry points (INDUSTRIALISATION.md sec Beat 1)
@@ -3734,8 +3755,7 @@ bool works_event_params_valid(const history_sim_params& p);
 /// its span-open survey (`survey_fuel_q`, inherited at a founding under
 /// DEFAULT A) where it has one, else its `energy_q` -- the settlement pass's
 /// survey or its founding inheritance -- on every path the span did not
-/// survey. ONE FUNCTION, read by the points' fuel factor and (DEFAULT B) the
-/// Industry tree's seam, so the two cannot disagree about who has coal.
+/// survey. Read by the points' fuel factor.
 int industry_fuel_reading_q(const region& r);
 
 /// The fuel factor, per mille: `floor + (1000 - floor) * fuel_reading / 1000`
@@ -3743,13 +3763,6 @@ int industry_fuel_reading_q(const region& r);
 /// no seam threshold appears in the points: a reading of 0 builds at the
 /// floor, the world's mean region (500) midway, twice the mean (1000) at full.
 int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& p);
-
-/// The INDUSTRY TREE's own industrial capacity: the summed per-mille of every
-/// `industrial` modifier on the Industry nodes held in @p industry_mask, read
-/// off the generated table in its fixed order. Not `tree_mod_q`, which also
-/// sums the Empire tree's industrial nodes -- the doc's input is "Industry
-/// tree capacity nodes held". May be negative (a node can trade capacity away).
-int industry_tree_industrial_q(uint64_t industry_mask);
 
 /// One region's scale credit for one round, or -1 when the credit is REFUSED
 /// (its urban headcount, its employed heads or the step is outside the
@@ -3759,14 +3772,10 @@ int industry_tree_industrial_q(uint64_t industry_mask);
 /// sec 1): the heads credited are the region's urban heads UP TO @p
 /// employed_heads, the heads its works employ
 /// (`works_registry::employed_heads_mask` of `works_built`); the heads beyond
-/// earn nothing, and a region with no works earns no scale credit.
-/// `industrial_q` is its holder's
-/// `industry_tree_industrial_q` (0 for unheld ground); the tree multiplier
-/// `1000 + industrial_q` is held to [100, 5000] per mille -- a DOMAIN, not a
-/// tuning clamp: the table's industrial nodes sum to well inside it, and a
-/// holder whose tree left it would be a table defect, refused (-1) like any
-/// other out-of-domain input. Integer, staged so no intermediate overflows.
-int64_t industry_points_scale_credit(const region& r, int industrial_q,
+/// earn nothing, and a region with no works earns no scale credit. No
+/// holder carries an industrial multiplier: the history holds no technology
+/// (TREES.md, Ben 2026-10-10). Integer, staged so no intermediate overflows.
+int64_t industry_points_scale_credit(const region& r,
                                      const history_sim_params& p, int step_years,
                                      int64_t employed_heads);
 
@@ -3828,8 +3837,21 @@ int64_t industry_points_crowding_q(const region& r, const works_registry* works)
 /// 1..`industry_points_crowding_k_max`): the caller refuses the conversion.
 int64_t industry_points_crowd_brake(const std::vector<region>& regions,
                                     std::vector<std::pair<int, int64_t>>& spread,
-                                    int64_t k, int64_t points_per_unit,
+                                    int64_t k, int64_t points_per_1000_units,
                                     const works_registry* works);
+
+/// BL-1298: the largest `industry_points_per_1000_treasury_units` may be set
+/// to (10^7, i.e. 10^4 points per unit, the old per-unit domain's ceiling).
+inline constexpr int64_t industry_points_per_1000_units_max = 10000000LL;
+
+/// BL-1298: the points @p units treasury units convert to at @p per_1000
+/// points per thousand units, floored, staged so it cannot overflow for
+/// units <= 2^48 (a treasury's own clamp) and per_1000 <= the max above:
+/// (units / 1000) x rate + ((units % 1000) x rate) / 1000.
+inline int64_t industry_points_for_treasury_units(int64_t units, int64_t per_1000)
+{
+    return (units / 1000) * per_1000 + ((units % 1000) * per_1000) / 1000;
+}
 
 /// What one round's scale accrual did.
 struct industry_points_round
@@ -3839,11 +3861,10 @@ struct industry_points_round
 };
 
 /// THE ROUND'S SCALE ACCRUAL: every region with `centres > 0` is credited, ON
-/// ITSELF, `industry_points_scale_credit` against its holder's Industry-tree
-/// industrial capacity and the heads its works employ (@p works; BL-1149 —
+/// ITSELF, `industry_points_scale_credit` against the heads its works employ (@p works; BL-1149 —
 /// with no works table no work stands, so no region earns scale credit).
 /// ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit reads only its own
-/// fields, its holder's mask and the table, and writes only its own stock, so
+/// fields and the table, and writes only its own stock, so
 /// walking the table in any order gives the same table. The caller gates it
 /// (the switch, the open year, and `industry_points_params_valid`).
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
@@ -3851,123 +3872,6 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              const history_sim_params&  p,
                                              int                        step_years,
                                              const works_registry*      works);
-
-/// Every scorer term's value for one polity, indexed by the generated
-/// `io::industry_tree::scorer_term` (never positionally — see the guard in
-/// history_sim.cpp). `known` is 0 here because it is per node;
-/// `choose_industry_node` reads it off `known_mask`. TWO TERMS ARE PINNED AT
-/// 0, named so their landing shows as a diff in exploration_sim_harness:
-/// `tariff_pressure` (no price at a market before the campaign) and
-/// `plague_struck` (the history sim runs no plague; the empire scorer pins it
-/// too). `ground_forest` reads `r.ground_forest_q` (BL-1051) and `furnace_lit`
-/// reads `industry_coke_smelting_held(mask)`.
-void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
-                          int (&out)[io::industry_tree::term_count]);
-
-/// The Industry tree's endowment gates. The EMPIRE scorer's shape
-/// (`ore_q`/`arable`/`grassland` against the held means at the 250 bar,
-/// `coastal` on any port) with ONE difference: `fuel` reads the seam.
-bool industry_gate_open(io::industry_tree::gate_atom g, const industry_scorer_reading& r);
-
-/// The scorer (TREES.md sec The scorer — one shape, four trees): argmax over
-/// every available, gate-open node of `term + kind_bonus - cost`, integer
-/// throughout, tie-broken on the lower node index. -1 when nothing is
-/// available. The same kind bonus and cost shape the other two trees use.
-int choose_industry_node(uint64_t mask, const industry_scorer_reading& r);
-
-/// Does the Industry node a polity is investing in still stand as a target
-/// THIS round? True iff @p investing is a node, still available under the five
-/// rules, AND its endowment gate is still open on this round's reading. The
-/// Invest block re-picks when this is false.
-///
-/// THE GATE HALF IS INDUSTRY-ONLY. The empire and exploration trees check a
-/// gate only at pick, so a target bought on a seam the polity has since lost
-/// is still finished there. INDUSTRY_TREE.md sec Aims says a polity without a
-/// seam cannot take Railway, and that holds only if the gate is read every
-/// round the target is funded, not once when it was chosen.
-bool industry_target_stands(uint64_t mask, int investing, const industry_scorer_reading& r);
-
-/// THE RIM (BL-1038): has this polity crossed IN-SP-3m, "The Renewed Line"?
-/// Its `open "campaign tree"` effect is classified `tree_gate` by
-/// `tree_effect_reader_of`, but NOTHING in the sim consumes it — the campaign
-/// tree lives past the 1960 handoff. The harness says so rather than passing
-/// a vacuous check.
-inline bool polity_holds_industry_rim(const polity& q)
-{
-    return (q.industry_mask & (1ULL << io::industry_tree::rim_node_index)) != 0;
-}
-
-// ---------------------------------------------------------------------------
-// The tree effect surface (BL-973) — one fold, generic readers, an honest
-// unread list
-// ---------------------------------------------------------------------------
-//
-// TREES.md sec Effects: "a node whose effect nothing in the sim reads is not
-// authored." Before this item the generated tables carried topology only and
-// the sim read three nodes by hand (a counted rim index, `index 11` for sea
-// legs, a strcmp on "EX-WY-1a"). Now every store effect reaches the sim
-// through ONE fold, and what the sim does with each kind is stated here in
-// code, so the harness can hold the store to it.
-
-/// Fold `q.empire_mask`, `q.exploration_mask` and `q.industry_mask`
-/// (BL-1038; zero unless the Industry switch is on) into `q.tree_mod_q[]` and
-/// `q.tree_keys`, walking the three generated `effects[]` tables in their
-/// fixed authored order. Pure in the masks; idempotent; cheap (≈230 rows).
-void apply_tree_effects(polity& q);
-
-/// Does a held node carry an effect keyed `k`? Reads the folded surface.
-inline bool polity_holds_tree_key(const polity& q, io::tree_effect_key k)
-{
-    return (q.tree_keys & (1u << static_cast<unsigned>(k))) != 0;
-}
-
-/// The polity's summed per-mille for one modifier term (0 when nothing held).
-inline int tree_mod_q(const polity& q, io::tree_modifier_term t)
-{
-    const int i = static_cast<int>(t);
-    return (i >= 0 && i < io::tree_modifier_term_count) ? q.tree_mod_q[i] : 0;
-}
-
-/// BL-934 — THE ASYMMETRY THAT PERMITS SUBJECTION, AS A NODE, NEVER A RANK
-/// (EXPLORATION.md sec Where subjects come from: "nothing reads size"): the
-/// store effect keyed `sea_legs` ("a crossing to unmet ground no longer
-/// requires an adjacent shore"), whichever node carries it.
-inline bool polity_holds_exploration_sea_legs(const polity& q)
-{
-    return polity_holds_tree_key(q, io::tree_effect_key::sea_legs);
-}
-
-/// Which sim surface consumes an effect. `unread` is the honest gap: the
-/// effect is folded (a modifier still sums into `tree_mod_q`) but nothing
-/// downstream reads it yet.
-enum class tree_effect_reader : uint8_t
-{
-    unread = 0,
-    ring_gate,        ///< open "ring N": `*_node_available`'s ring lock
-    tree_gate,        ///< open "<tree> tree": `polity_holds_*_rim`
-    sea_legs_gate,    ///< key sea_legs: the subjection block
-    post_roads_gate,  ///< key post_roads: the treasury-bought third road rung
-    modifier_defence,     ///< the defender's readiness (campaign pricing and resolution)
-    modifier_industrial,  ///< the materials ladder's pull-forward
-    modifier_cohesion,    ///< Consolidate's recovery rate
-    modifier_research,    ///< every invested tree's research flow
-};
-tree_effect_reader tree_effect_reader_of(const io::tree_effect& e);
-
-/// THE STATED UNREAD LIST. True for exactly the effects the sim does not
-/// consume today: kinds `unlock`, `upgrade`, `retire`, `access`, `reach`,
-/// `intel`, `institution`, `doctrine`, `resource` when they carry no key
-/// (works and unit rows still gate on the derived band — TREES.md's open
-/// question; the rest are prose the sim has no term for), and modifier
-/// terms `carrying_capacity`, `manpower`, `stores`, `assimilation`, `plague`,
-/// `forage`, `muster_cost` (their consumers read region fields or do not
-/// exist in this sim) plus `reach`, which HAS a surface and is withheld on
-/// a measured finding (the authored magnitudes collapse the BL-872 distance
-/// fixtures — see the holdings-supply site in run_history_sim). A harness
-/// asserts every store effect is either read or on this list, and never
-/// both, so authoring a new kind or term into a store without a reader
-/// fails loudly instead of doing nothing.
-bool tree_effect_declared_unread(const io::tree_effect& e);
 
 /// What the scorer chose for one polity in one year — kept for the harness and
 /// for the History Log, so a run can be read back as decisions rather than as
@@ -4805,8 +4709,8 @@ struct history_sim_state
 
     /// BL-940 -- corridors promoted to the road ladder's third rung (Post
     /// Road), and the treasury actually spent on them. The observable that
-    /// separates "the mechanism never fires" from "no polity ever holds
-    /// EX-WY-1a in this seed", the same split `supply_sites_upgraded` makes.
+    /// separates "the mechanism never fires" from "no polity could buy one
+    /// in this seed", the same split `supply_sites_upgraded` makes.
     int64_t post_roads_built           = 0;
     int64_t treasury_spent_on_roads    = 0;
     /// BL-949: post roads bought per polity id (grown on demand, so a polity
@@ -4983,6 +4887,19 @@ struct history_sim_state
     /// each bill went short. The observable for "a cost in the world binds".
     int64_t treasury_spent_on_army_upkeep = 0;
     int64_t treasury_spent_on_navy_upkeep = 0;
+    /// BL-1298 census, WRITE-ONLY (read by nothing in the sim, in no digest):
+    /// the treasury EARNED over the run by source (`exploration_upkeep_spend`'s
+    /// `earn_*`, summed), and the seats' material stock the 1200 consolidation
+    /// folded into treasuries -- so a reader can say where the chests came from.
+    int64_t treasury_earned_endowment     = 0;
+    int64_t treasury_earned_corridor      = 0;
+    int64_t treasury_earned_trade         = 0;
+    int64_t treasury_from_consolidation   = 0;
+    /// BL-1298, write-only: the standing levy summed over the run, the paid
+    /// heads the earn-sized army disbanded, and the polity-rounds it bound.
+    int64_t treasury_earned_levy          = 0;
+    int64_t army_disbanded_by_earn        = 0;
+    int64_t army_sized_rounds             = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
     /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
@@ -5022,7 +4939,7 @@ struct history_sim_state
     /// open work filled at home, a conversion, not a move along a corridor).
     int64_t urbanisation_heads_within     = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
-    /// points above divided by `industry_points_per_treasury_unit`): the
+    /// points above at `industry_points_per_1000_treasury_units`): the
     /// observable for how hard paying in draws on the round's other spend.
     int64_t treasury_spent_on_industry    = 0;
     /// BL-1169: TREASURY UNITS the crowding brake left in capitals' purses
@@ -5034,11 +4951,6 @@ struct history_sim_state
     /// `industry_points_ceiling`, or whose urban headcount left the accrual's
     /// stated domain. Must be 0; nothing moves on a refusal.
     int64_t industry_points_refused       = 0;
-    /// BL-1059: the Fuel Doctrine's two top-third bars, fixed once at the top
-    /// of the run from the table it opened on (`industry_ground_bars_at_open`)
-    /// and read by every pull after. Report-only here: never serialised, in no
-    /// digest; both `industry_ground_bar_none` off the span.
-    industry_ground_bars ground_bars;
     /// True when the run's industry-point constants left their stated domain
     /// (`industry_points_params_valid`): the WHOLE run then credits nothing
     /// and debits no treasury -- rejected, never clamped.
@@ -5085,6 +4997,46 @@ struct history_sim_state
     /// or a relay that moved this round); a rise here says the supply index
     /// and the map disagree again. Report-only; `history_sweep` prints it.
     int64_t regions_seceded_graph_cut = 0;
+
+    /// BL-1290 (civil war deaths) -- report-only tallies of the civil-war
+    /// famine and flight (history_sim_params::civil_war_famine_q). `civil_wars`
+    /// counts the splits that qualified as halves (a quarter of the parent's
+    /// kept ground, 3+ regions); `civil_war_strikes` the (region, round) pairs
+    /// fought over between such halves inside the window; `civil_war_no_refuge`
+    /// the strikes whose people had no safe region of their own to flee to (the
+    /// flight then moves nobody -- counted, never silent). Not saved.
+    int64_t civil_wars             = 0;
+    int64_t civil_war_strikes      = 0;
+    int64_t civil_war_famine_dead  = 0;
+    int64_t civil_war_fled         = 0;
+    int64_t civil_war_no_refuge    = 0;
+
+    /// BL-1294 (revolution lean) -- REPORT-ONLY: every takeover the lean
+    /// raised this span, in the order it fired, with the reading that raised
+    /// it, so a harness can say which realm, when, how wide its cities stood
+    /// and what it was called before and after. The record's own telling is
+    /// the `revolution` lapse event; this is the gate's reading of it. Not
+    /// saved; read by nothing in the sim.
+    struct revolution_note
+    {
+        int32_t     polity        = -1;
+        int32_t     year          = 0;
+        int32_t     region        = -1; ///< The city the splinter rose in.
+        int32_t     disparity_pm  = 0;  ///< The realm's spread at the span's open.
+        int32_t     cities        = 0;  ///< Its cities then.
+        int32_t     regime        = 0;  ///< The new regime.
+        std::string old_name;
+        std::string new_name;
+    };
+    std::vector<revolution_note> revolutions;
+    /// BL-1294 -- REPORT-ONLY: realms read at the span's open (living, with at
+    /// least `revolution_min_cities` cities), and of those, how many stood at
+    /// or over the disparity bar. The denominator the firing rate is read on.
+    int32_t revolution_realms_read = 0;
+    int32_t revolution_realms_wide = 0;
+    /// BL-1294 -- REPORT-ONLY: each realm's spread at the open, per mille, by
+    /// polity id (-1 = not read: dead, or too few cities). For calibration.
+    std::vector<int32_t> revolution_disparity_pm;
 
     /// BL-869 — every civilisation mixing actually grew, in formation order.
     /// A NAMED RECORD each (creeds.hpp), never a creed: `region::civilisation`
@@ -5152,6 +5104,109 @@ struct history_sim_state
     /// polity's own Settle. `foundings == foundings_scheduled + foundings_settled`.
     int64_t foundings_scheduled = 0;
     int64_t foundings_settled   = 0;
+
+    /// BL-1278 — THE CLOSING ROUNDS' OWN COUNT (zero, and `closing_predicted`
+    /// -1, on every run whose params carried no `closing_rounds`). The fold's
+    /// predicted nation count after the rounds is what `run_tail` holds
+    /// `generate_nations` to (the drift guard). Read by no decision.
+    int32_t closing_nations_before      = -1; ///< The fold's count before any closing step.
+    int32_t closing_nations_after_floor = -1; ///< ... after the floor's absorptions.
+    int32_t closing_predicted          = -1;
+    int32_t closing_floor_absorptions  = 0;
+    int32_t closing_target_absorptions = 0;
+    int32_t closing_target_secessions  = 0;
+    int32_t closing_subfloor_secessions = 0; ///< Secessions taken below the floor (the target outranks it).
+    bool    closing_short_of_target    = false;
+
+    /// BL-1287 — THE RISE AND FALL'S OWN READING (all -1/0/false on a run
+    /// whose params did not carry `rise_fall_target`). Taken at the recorded
+    /// steps' cadence off the same counts the record samples, so it reads
+    /// what `history_patterns`' detector reads. Read by no decision outside
+    /// the backstop itself; `rise_fall_missed` is a DEFECT the caller records
+    /// as a violation, never a reported outcome.
+    int32_t     rise_fall_realm       = -1; ///< The front-runner read at `rise_fall_pick_year`.
+    int32_t     rise_fall_start_pm    = 0;  ///< Its share then, per mille of held regions.
+    int32_t     rise_fall_peak_pm     = 0;  ///< Its largest share at any read of the span.
+    int32_t     rise_fall_peak_year   = 0;
+    int32_t     rise_fall_fall_year   = 0;  ///< First read after the peak at or under half of it (0: never).
+    int32_t     rise_fall_fall_pm     = -1;
+    int32_t     rise_fall_breakaways  = 0;  ///< Successors (secession or schism) out of it between peak and fall.
+    int32_t     rise_fall_rise_level  = 0;  ///< The highest rise level pressed (1 = the lean, more = the backstop).
+    int32_t     rise_fall_fall_level  = 0;  ///< The highest overextension level pressed.
+    int32_t     rise_fall_room_regions = 0; ///< Its REACHABLE GROUND: regions in its capital's campaign-graph component at the pick.
+    int32_t     rise_fall_room_total   = 0; ///< Held regions in the world at the pick (the floor is read against these).
+    int32_t     rise_fall_boxed_realm  = -1; ///< The realm largest at the pick, when it was boxed and the rise gave way (-1: it did not).
+    int32_t     rise_fall_boxed_room   = 0;  ///< That boxed realm's reachable ground, in regions.
+    int64_t     rise_fall_roads_decayed   = 0; ///< REPORT-ONLY: corridor-rounds the fall decayed a road on
+    int64_t     rise_fall_works_decayed   = 0; ///< REPORT-ONLY: region-rounds the fall decayed reach relief on
+    int64_t     rise_fall_heads_sent_home = 0; ///< REPORT-ONLY: far-garrison heads the fall sent home to the capital
+    int64_t     rise_fall_bare_region_rounds = 0; ///< REPORT-ONLY: region-rounds the falling realm's ground stood bare
+    int64_t     rise_fall_rally_heads     = 0; ///< REPORT-ONLY: heads the rise's rally marched to a defence
+    int64_t     rise_fall_rally_home      = 0; ///< REPORT-ONLY: rallied survivors of a lost defence sent home
+    bool        rise_fall_missed      = false;
+    std::string rise_fall_why;              ///< Which clause missed, when it did.
+
+    /// BL-1288 -- THE LATE CULTURE'S OWN READING (-1/0/false on a run whose
+    /// params carried neither `late_culture_target` nor
+    /// `late_culture_colonised`). `late_culture_missed` is a DEFECT the caller
+    /// records as a violation, never a reported outcome.
+    int64_t     contact_diffusion_progress = 0; ///< REPORT-ONLY (BL-1288): materials progress the diffusion by contact credited.
+    int32_t     contact_diffusion_bands    = 0; ///< REPORT-ONLY: materials bands it lifted.
+    int32_t     contact_bands_shed         = 0; ///< REPORT-ONLY: bands successors shed to their contact ceiling.
+    int32_t     late_culture           = -1; ///< The culture chosen at the Culture close (resumed: the one the polity table names).
+    int32_t     late_culture_reach     = 0;  ///< Its remoteness (`late_culture_unreached` when the network joins it to nobody).
+    int32_t     late_culture_gap2      = 0;  ///< Its water: grid distance squared to the nearest foreign region.
+    int32_t     late_culture_next      = -1; ///< The next most remote culture, for scale.
+    int32_t     late_culture_next_reach = 0;
+    int32_t     late_culture_contact   = 0;  ///< The contact it receives at the close (the ranking key, per mille summed).
+    int32_t     late_culture_next_contact = 0;
+    int32_t     late_culture_cultures  = 0;  ///< Cultures ranked at the close.
+    int32_t     late_culture_seated    = 0;  ///< Cultures holding a seat at the close (the ranked set; all when none).
+    int32_t     late_culture_regions   = 0;  ///< Its land regions standing at the close.
+    int32_t     late_culture_realm_regions = 0; ///< Regions its realms hold at the span's close.
+    int32_t     late_culture_realms    = 0;  ///< Its living realms at the span's close.
+    int32_t     late_culture_lag_x100  = -1; ///< Its realms' mean materials band over the world's at the close, x100.
+    int32_t     late_culture_level     = 0;  ///< The highest isolation level (Exploration: the higher of it and the contact press's).
+    int32_t     late_culture_bound     = 0;  ///< Exploration: its realms bound or bought by another culture.
+    int32_t     late_culture_bound_year = 0; ///< The first such binding.
+    int32_t     late_culture_bound_by  = -1; ///< ...and the binder.
+    /// REPORT-ONLY diagnostic: the Exploration subjection walk over the late
+    /// culture's realms as natives -- pairs walked, then no contact / already a
+    /// subject / treasury short / sphere-blocked / eligible.
+    int64_t     late_culture_diag[6]   = {0, 0, 0, 0, 0, 0};
+    bool        late_culture_missed    = false;
+    std::string late_culture_why;
+    /// BL-1289 — THE WORLD WAR'S OWN READING (all 0/-1/false on a run whose
+    /// params did not carry `world_war_target`). The top powers are read at
+    /// the first decision round at or after the window's open, after that
+    /// round's recorded step -- off the same counts the step samples, so the
+    /// backstop and `history_patterns`' detector judge one set. Report-only
+    /// beyond the war itself; `world_war_missed` is a DEFECT the caller
+    /// records as a violation. Not saved.
+    int32_t     world_war_year        = 0;  ///< The round the war began (0: never).
+    int32_t     world_war_peace_year  = 0;  ///< The round peace was made (0: never).
+    int32_t     world_war_spark       = 0;  ///< 1 the treaty graph's own spark, 2 the contest for a subject.
+    int32_t     world_war_contested   = -1; ///< The region the war began over.
+    int32_t     world_war_side_a      = -1; ///< The realm that opened the war.
+    int32_t     world_war_side_b      = -1; ///< The realm it opened on.
+    int32_t     world_war_belligerents = 0; ///< Realms engaged, both sides.
+    int32_t     world_war_top_engaged = 0;  ///< Of the top powers at the open, how many engaged.
+    int32_t     world_war_escalations = 0;  ///< Backstop steps taken (each one realm drawn in).
+    int64_t     world_war_regions_razed = 0;  ///< Regions razed (each once in the war).
+    int64_t     world_war_front_rounds  = 0;  ///< (region, round) pairs on a front.
+    int64_t     world_war_roads_demoted = 0;  ///< Corridors demoted one tier.
+    int64_t     world_war_post_roads_rebought   = 0; ///< Demoted Post Roads a purchase rebuilt (the only way back to tier 3).
+    int64_t     world_war_walks_held_below_post = 0; ///< Walks on a demoted Post Road held one use under tier 3.
+    int64_t     world_war_points_razed_scale    = 0; ///< `industry_points` razed, the scale part
+    int64_t     world_war_points_razed_treasury = 0; ///< ... and the treasury-paid part (`industry_points_from_treasury`)
+    int64_t     world_war_port_razed_q  = 0;  ///< Port stock razed, summed per mille.
+    int64_t     world_war_conscript_dead = 0;
+    int64_t     world_war_famine_dead   = 0;
+    int64_t     world_war_fled          = 0;
+    int64_t     world_war_no_refuge     = 0;  ///< Front strikes whose people had nowhere safe to flee (counted, never silent).
+    int64_t     world_war_treasury_spent = 0; ///< The war's stated cost: treasury spent, never owed.
+    bool        world_war_missed      = false;
+    std::string world_war_why;              ///< Which clause missed, when it did.
 };
 
 /// Sentinel for "no polity owns this region in this year slice".
@@ -5673,6 +5728,14 @@ struct exploration_spend_facts
     /// (`manpower_stock * standing_army_levy_per_mille_q / 1000`). The army
     /// step is eligible only when this covers a whole step.
     int64_t levy_room           = 0;
+    /// BL-1298 (Ben, 2026-10-11: "a realm keeps only the standing army its earn
+    /// can carry") -- THE EARN'S ROOM: the paid heads this round's earn carries
+    /// (`earn x 1000 / the per-head bill`, the same `carried` the sizing reads)
+    /// less the paid heads standing after the sizing. An army step needs a
+    /// whole step of room, as it needs a whole step of levy: a budget limit in
+    /// the world, stated as the rule, so a realm never buys heads its earn
+    /// would disband the next round. -1 = unbounded (sizing off, or no bill).
+    int64_t earn_room           = -1;
 };
 
 /// Each option's score and whether it may be taken at all.
@@ -6380,7 +6443,6 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
 ///                                  in `regions`, `polity::navy_stock` in
 ///                                  `polities`
 ///   - The contact and want tables -> `contacts`, `wants`
-///   - Exploration tree masks    -> `polity::exploration_mask` in `polities`
 ///   - The grudge table and the surviving network
 ///                               -> `grudges`, `surviving_corridors`
 ///   - (the political map, as a set) -> `holdings`
@@ -6393,7 +6455,7 @@ struct exploration_output
     std::vector<region> regions;
 
     /// The polities at the span's close — carries navy_stock, overlord,
-    /// subject_kind and exploration_mask.
+    /// subject_kind and the naval ledger.
     std::vector<polity> polities;
 
     /// How many cultures the shares and `culture_preference` index into.

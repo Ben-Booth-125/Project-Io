@@ -44,9 +44,7 @@
 //
 // THE SPAN-OPEN SURVEY (BL-1051). In span mode a section after the span's own
 // table prints, per seed, the forest and fuel survey generation took over every
-// region the span opened on (`era_minus_one_fixture::industrialisation_open_regions`)
-// and the Fuel Doctrine split at the close with each side's mean held forest --
-// the evidence that `ground_forest` makes the wooded polity choose Charcoal.
+// region the span opened on (`era_minus_one_fixture::industrialisation_open_regions`).
 // Evidence, not one of the thirteen readings.
 //
 // FOUR STATES, NEVER A FIFTH. A reading is MEASURED (its observable exists in
@@ -284,8 +282,6 @@ struct handoff_reading
     // Reading 8's evidence: region half (Stage 4) and polity half (the band).
     int industrialised_regions = 0;
     int polities_industrial    = 0; ///< living polities whose materials band crossed industrial.
-    int polities_industry_nodes = 0; ///< BL-1040: living polities holding any Industry-tree node.
-    int industry_nodes          = 0; ///< ... and the nodes they hold, summed.
 
     // Reading 9's urban half.
     int64_t urban_heads = 0;
@@ -321,11 +317,6 @@ handoff_reading read_handoff(const exploration_output& h, int gw)
         ++out.alive_polities;
         if (q.overlord >= 0) ++out.subjects;
         if (q.industrial_year != k_never_industrialised) ++out.polities_industrial;
-        if (q.industry_mask != 0)
-        {
-            ++out.polities_industry_nodes;
-            out.industry_nodes += static_cast<int>(std::bitset<64>(q.industry_mask).count());
-        }
     }
 
     // Reading 7. A market here is a LIVING polity's capital seat: the flow
@@ -458,11 +449,10 @@ struct seed_row
     int laws_tariff      = 0;  ///< enacted LAW-IMPORT-TARIFF-* laws on the generated world
     int laws_band[3]     = {}; ///< ... by rate: 5% / 10% / 20%
 
-    // --- BL-1051: the span-open survey and the Fuel Doctrine (span mode) ----
+    // --- BL-1051: the span-open survey (span mode) --------------------------
     // The survey is read off the table the span OPENED on
-    // (`era_minus_one_fixture::industrialisation_open_regions`); the doctrine and
-    // the held forest off the span's own 1960 close. Evidence for the
-    // `ground_forest` term, not one of the thirteen readings.
+    // (`era_minus_one_fixture::industrialisation_open_regions`). Evidence for
+    // the points' fuel factor, not one of the thirteen readings.
     bool   survey_ran        = false;
     int    survey_regions    = 0;  ///< regions the span opened on
     int    survey_unseen     = 0;  ///< ... of which the survey left at -1 (must be 0)
@@ -470,51 +460,8 @@ struct seed_row
     int    survey_forested   = 0;  ///< regions at the open with any forest (> 0)
     int    survey_wooded     = 0;  ///< ... whose forest score is at or above the world's mean (>= 500)
     int    survey_fuel_med   = 0;  ///< survey_fuel_q median at the open (500 = the world's mean region)
-    int    survey_fuel_seam  = 0;  ///< regions whose survey_fuel_q clears the 250 seam bar
-    int    survey_seam_energy = 0; ///< ... and whose inherited energy_q clears it (the gate's reading before BL-1041's DEFAULT B)
     int    close_regions     = 0;  ///< regions at the close
     int    close_unsurveyed  = 0;  ///< ... founded after the open, so never surveyed (-1)
-    int    doctrine[3]       = {}; ///< living polities at the close: coke / charcoal / neither
-    /// Mean of each living polity's held-ground forest reading
-    /// (`industry_ground_forest_q` over the regions it holds at the close:
-    /// the share of its held ground clearing the forest top-third bar, BL-1056/BL-1059), per doctrine
-    /// group; NaN for an empty group.
-    double doctrine_forest[3] = { k_undef, k_undef, k_undef };
-    /// ... and of each living polity's `ground_fuel` share (BL-1059), per side.
-    double doctrine_fuel[3]   = { k_undef, k_undef, k_undef };
-
-    // --- BL-1059: the top-third bars (span mode) ---------------------------
-    int    bar_fuel        = industry_ground_bar_none; ///< the sim's fuel bar, in survey_fuel_raw units
-    int    bar_forest      = industry_ground_bar_none; ///< the sim's forest bar, in survey_forest_raw units
-    int    bar_read        = 0; ///< regions the bars rank (both span-open scores present: the world)
-    int    fuel_carriers   = 0; ///< ... with a nonzero fuel share
-    int    fuel_clear      = 0; ///< ... clearing the fuel bar
-    int    fuel_capped     = 0; ///< ... whose fuel SCORE sits at the 1000 cap (one tied value if ranked)
-    int    forest_carriers = 0; ///< ... with a nonzero forest share
-    int    forest_clear    = 0; ///< ... clearing the forest bar
-    int    forest_capped   = 0; ///< ... whose forest SCORE sits at the 1000 cap
-    /// THE THREE "BARS DID NOT MOVE" LEGS -- what each can and cannot catch:
-    ///  - OPEN: the sim's recorded bars == the pure function on the table the
-    ///    fixture recorded as the span's open. The same function on (what
-    ///    should be) the same table: it catches only the sim deriving its
-    ///    bars from some other table (a mutation before the derivation, a
-    ///    different source), never a bar that moves during the span.
-    ///  - CLOSE: the same function on the 1960 CLOSE table == the sim's bars.
-    ///    THE REAL GUARD: it catches any rewrite of a surveyed region's share
-    ///    or score during the span, and any ground that gained both span-open
-    ///    scores after the open -- anything that would make a run resumed
-    ///    mid-span (which re-derives its bars at its top) read another bar. It
-    ///    cannot catch a scorer that ignores the stored bars.
-    ///  - RE-RUN: the harness-side re-run's recorded bars == the span's. The
-    ///    same function on the same open table again: it catches only
-    ///    nondeterminism in the derivation (an integer sort: none today) and a
-    ///    resume path that stops recording them.
-    bool   bars_open       = false;
-    bool   bars_close      = false;
-    int    bars_rerun      = -1;    ///< 1 same, 0 DIFFER, -1 not run
-    int    charcoal_seam_seen  = 0; ///< Charcoal polities that ever passed the seam gate (fuel_seen)
-    int    charcoal_seam_close = 0; ///< Charcoal polities holding a seam (the gate's reading >= 250) at the close
-
     // --- BL-1041: reading 8, industry points (span mode) --------------------
     // Read off the span's 1960 close (`industrialisation_handoff.regions`, the
     // located stock) and its own counters (`industrialisation_state`). The points
@@ -527,7 +474,7 @@ struct seed_row
     int64_t points_treasury    = 0;     ///< credited from capital treasuries, all rounds
     int64_t treasury_debited   = 0;     ///< ... and the treasury units that took out of capitals
     int64_t points_refused     = 0;     ///< credits refused (must be 0)
-    bool    points_ledger_ok   = false; ///< points_total == points_scale + points_treasury
+    bool    points_ledger_ok   = false; ///< points_total + the war's razed points == points_scale + points_treasury
     int     points_regions     = 0;     ///< regions holding any points at the close
     int     centre_regions     = 0;     ///< regions with centres at the close
     double  points_region_gini = k_undef; ///< over regions holding points
@@ -755,15 +702,15 @@ std::vector<uint32_t> library_seeds(const char* path)
 //        its cultures; works and terrain from the fixture; and (BL-1040) THE
 //        INDUSTRIALISATION SPAN'S OWN PARAMS as generation captured them
 //        (`era_minus_one_fixture::industrialisation_params`: Exploration's
-//        derivation, the span moved to 1660, both anchors left at 1200, the
-//        Industry tree open from 1660).
+//        derivation, the span moved to 1660, both anchors left at 1200,
+//        industry points open from 1660).
 //
 // THE CONTINUED RUN CARRIES THE SPAN'S FORCES FROM 1660 (BL-1040). The span
-// opens the Industry tree, so C does too, from the same year: before 1660 the
+// opens industry points, so C does too, from the same year: before 1660 the
 // switch reads nothing (`industry_open_year`), so C up to the top of 1660 is
 // Exploration's shipped run bit for bit, and after it C and R play the same
-// forces. Without that, the Industry tree would be a fifth divergence source
-// the doc does not name.
+// forces. Without that, the points would be a fifth divergence source the doc
+// does not name.
 //
 // GATE 1 (BL-1036 R4): the resume's OPENING, captured before its first act,
 //   equals the struct field for field -- every region field, every polity
@@ -895,15 +842,12 @@ void polity_fields(const polity& a, const polity& b, field_census& out)
     FID_CMP(id); FID_CMP(culture); FID_CMP(capital); FID_CMP(aggression_q); FID_CMP_ARR(capacity);
     FID_CMP_ARR(progress_q); FID_CMP(cohesion_q); FID_CMP(industrial_year); FID_CMP(protection_q);
     FID_CMP(major); FID_CMP(parent); FID_CMP(universal_creed); FID_CMP(creed_adopted_year);
-    FID_CMP(alive); FID_CMP(empire_mask); FID_CMP(empire_investing); FID_CMP(empire_progress_q);
-    FID_CMP(exploration_mask); FID_CMP(exploration_investing); FID_CMP(exploration_progress_q);
+    FID_CMP(alive);
     FID_CMP(overlord); FID_CMP(subject_kind); FID_CMP(navy_stock); FID_CMP(treaties_broken);
-    FID_CMP_ARR(tree_mod_q); FID_CMP(tree_keys);
-    // BL-1038's Industry triple and its fuel flag (merged beside BL-1036).
-    FID_CMP(industry_mask); FID_CMP(industry_investing); FID_CMP(industry_progress_q);
-    FID_CMP(industry_fuel_seen);
 }
-constexpr int k_polity_fields = 30;
+// BL-1272: the twelve tree fields (three masks, targets and progresses, the
+// effect surface, the fuel flag) left `polity` with the generation trees.
+constexpr int k_polity_fields = 18;
 
 #undef FID_CMP
 #undef FID_CMP_ARR
@@ -1116,15 +1060,13 @@ run_out continued(const era_minus_one_fixture& fx, int64_t stop, int64_t capture
         hp.resume_seeds_corridor_tier = *tier_seed;
     if (span_forces != nullptr)
     {
-        hp.industry_tree_enabled = span_forces->industry_tree_enabled;
         hp.industry_open_year    = span_forces->industry_open_year;
-        // BL-1041: industry points open with the tree (inert before its open
-        // year, so C to the top of 1660 is still Exploration's shipped run),
-        // and the two ruled defaults (A, B) ride along -- both inert here, where
-        // nothing was surveyed, but the forces are the span's.
+        // BL-1041: industry points (inert before their open year, so C to the
+        // top of 1660 is still Exploration's shipped run), and the ruled
+        // default A rides along -- inert here, where nothing was surveyed, but
+        // the forces are the span's.
         hp.industry_points_enabled              = span_forces->industry_points_enabled;
         hp.industry_survey_inherits_at_founding = span_forces->industry_survey_inherits_at_founding;
-        hp.industry_fuel_gate_reads_survey      = span_forces->industry_fuel_gate_reads_survey;
     }
     run_out r;
     r.ss = fx.pre_exploration_settlement;
@@ -1251,33 +1193,11 @@ struct divergence
     int     overlord      = 0;
     int64_t battles       = 0; ///< this run's battles over its own span
     int64_t treasury      = 0; ///< this run's summed region treasury at its close
-    int     doctrine[3]   = {}; ///< BL-1051: living polities at its close, coke / charcoal / neither
 };
-
-/// BL-1051 — the Fuel Doctrine side a polity holds: 0 Coke Smelting, 1
-/// Charcoal Iron, 2 neither. By id: the harness names the pair it reports.
-int fuel_doctrine_side(const polity& q)
-{
-    static const int coke = [] {
-        for (int i = 0; i < io::industry_tree::node_count; ++i)
-            if (std::strcmp(io::industry_tree::nodes[i].id, "IN-MT-1a") == 0) return i;
-        return -1;
-    }();
-    static const int charcoal = [] {
-        for (int i = 0; i < io::industry_tree::node_count; ++i)
-            if (std::strcmp(io::industry_tree::nodes[i].id, "IN-MT-1b") == 0) return i;
-        return -1;
-    }();
-    if (coke >= 0 && ((q.industry_mask >> coke) & 1ULL) != 0) return 0;
-    if (charcoal >= 0 && ((q.industry_mask >> charcoal) & 1ULL) != 0) return 1;
-    return 2;
-}
 
 divergence diverge(const run_out& v, const run_out& c)
 {
     divergence d;
-    for (const polity& q : v.hs.polities)
-        if (q.alive) ++d.doctrine[fuel_doctrine_side(q)];
     const std::size_t n = std::min(v.ss.regions.size(), c.ss.regions.size());
     for (std::size_t i = 0; i < n; ++i)
         if (v.ss.regions[i].nation != c.ss.regions[i].nation) ++d.owner_regions;
@@ -1336,7 +1256,6 @@ struct seed_fidelity
     int        c_living = 0;
     int64_t    c_battles = 0;
     int64_t    c_treasury = 0;
-    int        c_doctrine[3] = {}; ///< BL-1051: the continued run's Fuel Doctrine split
     double     seconds = 0.0;
 
     // Gate 3 (BL-1040) -- the shipped span against V5, the real resume.
@@ -1379,18 +1298,14 @@ std::vector<std::string> span_params_issues(const history_sim_params& dp, const 
          "an anchor moved off 1200");
     need(dp.exploration_upkeep_enabled == ep.exploration_upkeep_enabled && dp.w_want_q == ep.w_want_q,
          "the base is not Exploration's derivation");
-    need(dp.industry_tree_enabled && dp.industry_open_year == dp.start_year,
-         "the Industry tree is not open from the span's open");
-    need(!ep.industry_tree_enabled, "the Industry tree is open in Exploration's own span");
-    // BL-1041: the industry-point switch and its two ruled defaults (A, the
-    // founding inherits the survey; B, every Industry fuel read takes it) are
-    // the span's own forces -- ON here, OFF in Exploration's params.
-    need(dp.industry_points_enabled && dp.industry_survey_inherits_at_founding
-             && dp.industry_fuel_gate_reads_survey,
-         "industry points or a ruled survey default (A, B) is off in the span");
-    need(!ep.industry_points_enabled && !ep.industry_survey_inherits_at_founding
-             && !ep.industry_fuel_gate_reads_survey,
-         "industry points or a ruled survey default (A, B) is on in Exploration's own span");
+    need(dp.industry_open_year == dp.start_year, "industry points do not open at the span's open");
+    // BL-1041: the industry-point switch and its ruled default (A, the
+    // founding inherits the survey) are the span's own forces -- ON here,
+    // OFF in Exploration's params.
+    need(dp.industry_points_enabled && dp.industry_survey_inherits_at_founding,
+         "industry points or the ruled survey default (A) is off in the span");
+    need(!ep.industry_points_enabled && !ep.industry_survey_inherits_at_founding,
+         "industry points or the ruled survey default (A) is on in Exploration's own span");
     need(dp.resume_seeds_corridor_tier == wp.resume_seeds_corridor_tier
              && ep.resume_seeds_corridor_tier == wp.resume_seeds_corridor_tier,
          "BL-1037's switch is not the world's (world_params, on by default since BL-1044)");
@@ -1427,7 +1342,14 @@ std::vector<std::string> span_params_issues(const history_sim_params& dp, const 
         EMPIRES_ONLY(supply_upgrade_material_cost);
         EMPIRES_ONLY(supply_upgrade_reach_gain_q);
         EMPIRES_ONLY(supply_upgrade_threshold_q);
-        EMPIRES_ONLY(secession_supply_floor_q);
+        // BL-1278: THE ONE EXCEPTION, AND ONLY WITH A TARGET. The total's lean
+        // (NATION_GENERATION.md sec The nation count is a target) gives the
+        // span a secession floor when the world wants MORE nations than it
+        // opens on; with the target unset (every world this row builds unless
+        // `nation_total_target` is set) the field must sit at the default
+        // exactly as before. Checked as Empires-only for unset targets only.
+        if (wp.nation_total_target == 0) EMPIRES_ONLY(secession_supply_floor_q);
+        else if (!(E.secession_supply_floor_q == B.secession_supply_floor_q)) ++empires_only;
         EMPIRES_ONLY(secession_min_regions);
         EMPIRES_ONLY(universal_creed_humbled_cohesion_q);
         EMPIRES_ONLY(universal_creed_min_trade_links);
@@ -1964,7 +1886,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                      && row.span_polities.empty() && row.span_tables.empty();
         }
         for (const polity& q : c_1960.hs.polities)
-            if (q.alive) { ++row.c_living; ++row.c_doctrine[fuel_doctrine_side(q)]; }
+            if (q.alive) ++row.c_living;
         for (const region& r : c_1960.ss.regions) row.c_treasury += r.treasury;
         row.c_battles = c_1960.hs.battles - fx.exploration_state.battles;
 
@@ -2048,7 +1970,7 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                 "  (the handoff as it is) | V4 + the span's own seed | V5 + the span-open survey (BL-1051: the\n"
                 "  real resume; C never has it, so V5 against V4 is the survey's own footprint)\n");
     std::printf("  Against C: regions owned differently, living polities, treaty pairs differing, battles 1660-1960,\n"
-                "  summed region treasury (x1e3), the Fuel Doctrine coke/charcoal/neither over living polities.\n"
+                "  summed region treasury (x1e3).\n"
                 "  By source: each variant against the one before it (the source's own footprint, 'regions owned\n"
                 "  differently / treaty pairs differing').\n");
     for (const seed_fidelity& r : rows)
@@ -2071,10 +1993,6 @@ int run(const std::vector<uint32_t>& seeds, const world_gen_config& cfg_in, work
                     static_cast<long long>(r.v[1].treasury / 1000), static_cast<long long>(r.v[2].treasury / 1000),
                     static_cast<long long>(r.v[3].treasury / 1000), static_cast<long long>(r.v[4].treasury / 1000),
                     static_cast<long long>(r.v[5].treasury / 1000));
-        std::printf("         Fuel Doctrine coke/charcoal/neither: C %d/%d/%d | V4 %d/%d/%d | V5 %d/%d/%d\n",
-                    r.c_doctrine[0], r.c_doctrine[1], r.c_doctrine[2],
-                    r.v[4].doctrine[0], r.v[4].doctrine[1], r.v[4].doctrine[2],
-                    r.v[5].doctrine[0], r.v[5].doctrine[1], r.v[5].doctrine[2]);
         std::printf("         by source: market stamp %d/%d | 1660 record %d/%d | dead-filter %d/%d | seed %d/%d | "
                     "survey %d/%d | residual %d/%d\n",
                     r.step[1].owner_regions, r.step[1].treaty_pairs, r.step[2].owner_regions, r.step[2].treaty_pairs,
@@ -2316,13 +2234,8 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
 /// adds, run in EVERY mode before any world generates (they need none), and
 /// GATING: a failure exits 1 whatever else the run reports.
 ///
-/// (1) NO FUEL DOCTRINE PULL RISES WHEN A REALM GAINS GROUND BELOW THE WORLD
-/// MEAN (INDUSTRY_TREE.md sec The scorer, NR-896). Over every held set of up
-/// to five of a fixed nine-region table, add each region scoring at or below
-/// the mean (fuel reading <= 500 and forest <= 500 or unsurveyed) and read the
-/// `ground_fuel` and `ground_forest` TERMS the Industry scorer reads
-/// (`industry_term_values`, off the sim's own readings): neither may rise. The
-/// seam is carried too, so the gate is shown still reading any seam.
+/// (Its first half, the Fuel Doctrine pulls, went with the Industry tree --
+/// BL-1272, TREES.md: the history runs no technology tree.)
 ///
 /// (2) THE TREASURY POINTS SPREAD BY SCALE, EXACTLY (INDUSTRIALISATION.md sec Beat 1,
 /// NR-897): `industry_points_apportion_by_scale` sums to the credit, gives a
@@ -2333,97 +2246,6 @@ int run_resume_tier(const std::vector<uint32_t>& seeds, const world_gen_config& 
 bool bl1056_self_check()
 {
     bool ok = true;
-
-    // (1) --------------------------------------------------------------------
-    // Regions 9-11 carry NO span-open reading of both scores: 9 and 10 were
-    // never surveyed (energy_q 600, above the mean), 11 was founded in the span
-    // (fuel inherited at 900, no forest). The review's counterexample is held
-    // {9, 10, 11} gaining region 1 (surveyed fuel 100): before this fix the
-    // unsurveyed realm read the seam (900) and the gain read a share over
-    // energy_q -- a rise from nowhere. Here it must read 0, and stay 0.
-    constexpr int NR = 12;
-    //                       0    1    2    3    4    5    6    7    8     9    10   11
-    const int fuel[NR]   = { 900, 100, 500, 700, 0,   300, 400, 450, 1000, -1,  -1,  900 };
-    const int forest[NR] = { 200, 800, 500, -1,  0,   600, -1,  300, 900,  -1,  -1,  -1  };
-    std::vector<region> rg(NR);
-    for (int i = 0; i < NR; ++i)
-    {
-        rg[static_cast<std::size_t>(i)].survey_fuel_q   = fuel[i];
-        rg[static_cast<std::size_t>(i)].survey_forest_q = forest[i];
-        // BL-1059 (NR-900): the unclamped share the bars rank, written with
-        // the score. This toy's shares equal its scores (an unclamped world
-        // where 500 * n / sum = 1); -1 where it was never surveyed.
-        rg[static_cast<std::size_t>(i)].survey_fuel_raw   = fuel[i];
-        rg[static_cast<std::size_t>(i)].survey_forest_raw = forest[i];
-        rg[static_cast<std::size_t>(i)].energy_q        = i >= 9 ? 600 : 1000; // "rich" if the survey were ignored
-    }
-    const bool survey_ran = industry_span_survey_ran(rg);
-    // BL-1059: the bars over the fixture's read set (rows 0,1,2,4,5,7,8 -- n 7,
-    // k 2, zeros ranked). Fuel {0,100,300,450,500,900,1000}: the value at 5 is
-    // 900, bar 900. Forest {0,200,300,500,600,800,900}: bar 800. Pinned here so
-    // a change in the bar's definition fails loudly rather than moving the
-    // check below.
-    const industry_ground_bars bars = industry_ground_bars_at_open(rg);
-    const auto terms = [&rg, &bars, survey_ran](const std::vector<int>& held, int& gf, int& gw, bool& gate) {
-        industry_scorer_reading r;
-        for (int hi : held) r.fuel_seam_q = std::max(r.fuel_seam_q, industry_fuel_reading_q(rg[static_cast<std::size_t>(hi)]));
-        r.ground_fuel_q   = industry_ground_fuel_q(rg, held, bars, survey_ran);
-        r.ground_forest_q = industry_ground_forest_q(rg, held, bars);
-        int v[io::industry_tree::term_count];
-        industry_term_values(0, r, v);
-        gf   = v[static_cast<int>(io::industry_tree::scorer_term::ground_fuel)];
-        gw   = v[static_cast<int>(io::industry_tree::scorer_term::ground_forest)];
-        gate = industry_gate_open(io::industry_tree::gate_atom::fuel, r);
-    };
-    int sets = 0, adds = 0, rose = 0, gate_lost = 0;
-    for (unsigned mask = 1; mask < (1u << NR); ++mask)
-    {
-        std::vector<int> held;
-        for (int i = 0; i < NR; ++i) if (mask & (1u << i)) held.push_back(i);
-        if (held.size() > 5) continue;
-        ++sets;
-        int gf0 = 0, gw0 = 0; bool gate0 = false;
-        terms(held, gf0, gw0, gate0);
-        for (int add = 0; add < NR; ++add)
-        {
-            if (mask & (1u << add)) continue;
-            // Not clearing its bar on either resource (BL-1059: its own top
-            // third), or with no span-open reading of both (such ground is
-            // out of the pulls, so it cannot raise one).
-            const bool unread = fuel[add] < 0 || forest[add] < 0;
-            if (!unread && (industry_ground_clears(fuel[add], bars.fuel_raw)
-                            || industry_ground_clears(forest[add], bars.forest_raw)))
-                continue;
-            std::vector<int> grown = held;
-            grown.push_back(add);
-            int gf1 = 0, gw1 = 0; bool gate1 = false;
-            terms(grown, gf1, gw1, gate1);
-            ++adds;
-            if (gf1 > gf0 || gw1 > gw0) ++rose;
-            if (gate0 && !gate1) ++gate_lost; // any held seam still opens it
-        }
-    }
-    // The shape it replaced, for the record: a best-of-held forest.
-    int gf_a = 0, gw_a = 0, gf_b = 0, gw_b = 0; bool g_a = false, g_b = false;
-    terms({4}, gf_a, gw_a, g_a);        // one bare region
-    terms({4, 1, 7}, gf_b, gw_b, g_b);  // + a wooded region (clears 800) + one under the bar
-    // The review's counterexample: an unsurveyed-only realm inside the span,
-    // then the same realm gaining surveyed ground under the mean.
-    int gf_u = 0, gw_u = 0, gf_v = 0, gw_v = 0; bool g_u = false, g_v = false;
-    terms({9, 10, 11}, gf_u, gw_u, g_u);
-    terms({9, 10, 11, 1}, gf_v, gw_v, g_v);
-    std::printf("BL-1056/BL-1059 self-check (1): bars fuel %d forest %d; %d held sets, %d not-clearing or unread"
-                " regions gained: ground_fuel or"
-                " ground_forest rose on %d, the fuel gate closed on %d; e.g. {bare} forest %d -> {bare, wooded,"
-                " not-clearing} %d; unsurveyed-only realm fuel/forest %d/%d (seam gate %s) -> + surveyed fuel 100:"
-                " %d/%d\n",
-                bars.fuel_raw, bars.forest_raw, sets, adds, rose, gate_lost, gw_a, gw_b, gf_u, gw_u, g_u ? "open" : "shut", gf_v, gw_v);
-    if (rose != 0 || gate_lost != 0 || adds == 0 || gw_b != 333 || !survey_ran
-        || gf_u != 0 || gw_u != 0 || gf_v != 0 || !g_u || bars.fuel_raw != 900 || bars.forest_raw != 800)
-    {
-        std::printf("FAIL  BL-1056/BL-1059 (1): a Fuel Doctrine pull rose on ground not clearing its bar\n");
-        ok = false;
-    }
 
     // (2) --------------------------------------------------------------------
     std::vector<region> pr(7);
@@ -2587,7 +2409,7 @@ bool bl1169_self_check()
         p.treasury_endowment_income_q = 1000;
         p.industry_points_enabled = true;
         p.industry_open_year = 1660;
-        p.industry_points_per_treasury_unit = 1000;
+        p.industry_points_per_1000_treasury_units = 1000000; // BL-1298: per thousand units now; = 1000 per unit
         p.industry_points_treasury_share_q = 250;
         p.industry_points_crowding_k = k;
         return p;
@@ -2635,7 +2457,7 @@ bool bl1169_self_check()
     const int64_t d0 = on.rg[0].industry_points - 2000, d1 = on.rg[1].industry_points - 1000;
     // The brake alone, on the same spread, says the same thing.
     std::vector<std::pair<int, int64_t>> spread = unbraked;
-    const int64_t kept_direct = industry_points_crowd_brake(pre, spread, k_shipped, 1000, &w);
+    const int64_t kept_direct = industry_points_crowd_brake(pre, spread, k_shipped, 1000000, &w);
     std::printf("BL-1169 self-check (3): K = %lld, crowding 2000/1000, share 100000/100000 -> converted %lld/%lld"
                 " (expect 33333/50667), debited %lld (expect 84), kept in the purse %lld (expect 116), purse %lld"
                 " (expect 716); the brake alone kept %lld units\n",
@@ -2666,7 +2488,7 @@ bool bl1169_self_check()
         one[0].nation = 0; one[0].centres = 1; one[0].urban_population = 1000; one[0].works_built = 1u;
         one[0].industry_points = c; // crowding = points x 1000 / 1000 heads = c
         std::vector<std::pair<int, int64_t>> s1 = { { 0, 100000 } };
-        if (industry_points_crowd_brake(one, s1, k_shipped, 1000, &w) < 0) { ++rises; continue; }
+        if (industry_points_crowd_brake(one, s1, k_shipped, 1000000, &w) < 0) { ++rises; continue; }
         const int64_t conv = s1[0].second;
         if (prev >= 0 && conv > prev) ++rises;
         if (prev >= 0 && conv < prev) ++falls;
@@ -2680,7 +2502,7 @@ bool bl1169_self_check()
     { two[i].nation = 0; two[i].centres = 1; two[i].urban_population = 1000; two[i].works_built = 1u; }
     two[0].industry_points = 4000; two[1].industry_points = 3000;
     std::vector<std::pair<int, int64_t>> s2 = { { 0, 100000 }, { 1, 100000 } };
-    const int64_t k2 = industry_points_crowd_brake(two, s2, k_shipped, 1000, &w);
+    const int64_t k2 = industry_points_crowd_brake(two, s2, k_shipped, 1000000, &w);
     // And in the loop itself (row 3's run): the region at crowding 2000 took
     // less than the one at 1000 from the same 100000-point share.
     std::printf("BL-1169 self-check (4): share 100000 over crowding 0..2^40 -> %d rises, %d falls; at 0 %lld"
@@ -2721,9 +2543,9 @@ bool bl1169_self_check()
         || at_one.sp.industry_treasury_debited != 1 || at_one.sp.industry_treasury_kept_by_crowding != 199)
         fail("(5): K = 1, the domain's low boundary, did not brake as the rule says");
     std::vector<std::pair<int, int64_t>> s3 = unbraked, s4 = unbraked, s5 = unbraked;
-    const int64_t b_over = industry_points_crowd_brake(pre, s3, kmax + 1, 1000, &w);
-    const int64_t b_zero = industry_points_crowd_brake(pre, s4, 0, 1000, &w);
-    const int64_t b_max  = industry_points_crowd_brake(pre, s5, kmax, 1000, &w);
+    const int64_t b_over = industry_points_crowd_brake(pre, s3, kmax + 1, 1000000, &w);
+    const int64_t b_zero = industry_points_crowd_brake(pre, s4, 0, 1000000, &w);
+    const int64_t b_max  = industry_points_crowd_brake(pre, s5, kmax, 1000000, &w);
     std::printf("BL-1169 self-check (5): K = 10^9 valid %s, converts %lld, debits %lld; K = 10^9+1 valid %s, converts"
                 " %lld, debits %lld, purse %lld; K = -1 valid %s, converts %lld; the brake at 10^9+1 / 0 / 10^9 returns"
                 " %lld / %lld / %lld\n",
@@ -3148,7 +2970,7 @@ int main(int argc, char** argv)
                 }
             }
 
-            // ---- BL-1051: the span-open survey, and who took which fuel ----
+            // ---- BL-1051: the span-open survey -----------------------------
             const std::vector<region>& open_t = fx.industrialisation_open_regions;
             row.survey_ran     = !open_t.empty();
             row.survey_regions = static_cast<int>(open_t.size());
@@ -3160,8 +2982,6 @@ int main(int argc, char** argv)
                 fuel_v.push_back(rg.survey_fuel_q);
                 if (rg.survey_forest_q > 0)   ++row.survey_forested;
                 if (rg.survey_forest_q >= 500) ++row.survey_wooded;
-                if (rg.survey_fuel_q >= industry_fuel_seam_bar_q) ++row.survey_fuel_seam;
-                if (rg.energy_q      >= industry_fuel_seam_bar_q) ++row.survey_seam_energy;
             }
             std::sort(forest_v.begin(), forest_v.end());
             std::sort(fuel_v.begin(), fuel_v.end());
@@ -3176,68 +2996,6 @@ int main(int argc, char** argv)
             const std::vector<region>& close_t = fx.industrialisation_handoff.regions;
             row.close_regions = static_cast<int>(close_t.size());
             for (const region& rg : close_t) if (rg.survey_forest_q < 0) ++row.close_unsurveyed;
-
-            // Held sets at the close, in ascending region order, by `nation`.
-            std::map<int, std::vector<int>> held_by;
-            for (std::size_t i = 0; i < close_t.size(); ++i)
-                if (close_t[i].nation >= 0) held_by[close_t[i].nation].push_back(static_cast<int>(i));
-            double forest_sum[3] = {}, fuel_sum[3] = {};
-            // BL-1059: the bars the span fixed at its open, read back off its
-            // state; the pulls below read them exactly as the scorer did.
-            const industry_ground_bars span_bars = fx.industrialisation_state.ground_bars;
-            row.bar_fuel   = span_bars.fuel_raw;
-            row.bar_forest = span_bars.forest_raw;
-            // The OPEN and CLOSE legs (see `seed_row::bars_open`).
-            row.bars_open  = industry_ground_bars_at_open(open_t)  == span_bars;
-            row.bars_close = industry_ground_bars_at_open(close_t) == span_bars;
-            for (const region& rg : open_t)
-            {
-                if (rg.survey_forest_q < 0 || rg.survey_fuel_q < 0) continue;
-                ++row.bar_read;
-                if (rg.survey_fuel_raw > 0)
-                {
-                    ++row.fuel_carriers;
-                    if (industry_ground_clears(rg.survey_fuel_raw, span_bars.fuel_raw)) ++row.fuel_clear;
-                }
-                if (rg.survey_forest_raw > 0)
-                {
-                    ++row.forest_carriers;
-                    if (industry_ground_clears(rg.survey_forest_raw, span_bars.forest_raw)) ++row.forest_clear;
-                }
-                if (rg.survey_fuel_q   >= 1000) ++row.fuel_capped;
-                if (rg.survey_forest_q >= 1000) ++row.forest_capped;
-            }
-            for (const polity& q : fx.industrialisation_handoff.polities)
-            {
-                if (!q.alive) continue;
-                const int side = fidelity::fuel_doctrine_side(q);
-                ++row.doctrine[side];
-                const auto it = held_by.find(q.id);
-                const std::vector<int> none;
-                const std::vector<int>& held = it != held_by.end() ? it->second : none;
-                forest_sum[side] += static_cast<double>(industry_ground_forest_q(close_t, held, span_bars));
-                fuel_sum[side]   += static_cast<double>(industry_ground_fuel_q(close_t, held, span_bars, true));
-                if (side == 1)
-                {
-                    if (q.industry_fuel_seen) ++row.charcoal_seam_seen;
-                    // BL-1041: the seam as the span's gate read it -- the fuel
-                    // reading under DEFAULT B, energy_q with it off.
-                    const bool b_on = fx.industrialisation_params.industry_fuel_gate_reads_survey;
-                    int seam = 0;
-                    for (int hi : held)
-                    {
-                        const region& hr = close_t[static_cast<std::size_t>(hi)];
-                        seam = std::max(seam, b_on ? industry_fuel_reading_q(hr) : hr.energy_q);
-                    }
-                    if (seam >= industry_fuel_seam_bar_q) ++row.charcoal_seam_close;
-                }
-            }
-            for (int s = 0; s < 3; ++s)
-                if (row.doctrine[s] > 0)
-                {
-                    row.doctrine_forest[s] = forest_sum[s] / row.doctrine[s];
-                    row.doctrine_fuel[s]   = fuel_sum[s]   / row.doctrine[s];
-                }
 
             // ---- BL-1041: reading 8, industry points at the close ----------
             const history_sim_params& dpp = fx.industrialisation_params;
@@ -3441,7 +3199,10 @@ int main(int argc, char** argv)
                 if (rg.nation >= 0) by_polity[rg.nation] += rg.industry_points;
                 else unheld_pts += rg.industry_points;
             }
-            row.points_ledger_ok = row.points_total == row.points_scale + row.points_treasury;
+            // Less what the world war razed, its stated cost (BL-1289), as the split reads it.
+            row.points_ledger_ok = row.points_total + dst.world_war_points_razed_scale
+                                       + dst.world_war_points_razed_treasury
+                                   == row.points_scale + row.points_treasury;
             if (row.points_total > 0)
             {
                 const double tot = static_cast<double>(row.points_total);
@@ -3531,9 +3292,11 @@ int main(int argc, char** argv)
                     sum_s += S[i];
                     sum_t += T;
                 }
-                // The split must reproduce the span's own ledger exactly.
-                row.split_ok = ok && sum_s == dst.industry_points_from_scale
-                                  && sum_t == dst.industry_points_from_treasury;
+                // The split must reproduce the span's own ledger exactly -- less
+                // what the world war razed, its stated cost (BL-1289), each part
+                // on its own side of the split.
+                row.split_ok = ok && sum_s + dst.world_war_points_razed_scale == dst.industry_points_from_scale
+                                  && sum_t + dst.world_war_points_razed_treasury == dst.industry_points_from_treasury;
             }
 
             if (integral_stride > 0 && row.points_on && !row.points_rejected && !open_t.empty())
@@ -3566,7 +3329,6 @@ int main(int argc, char** argv)
                     }
                 else
                     row.rerun_mismatch = -1;
-                row.bars_rerun = x.hs.ground_bars == fx.industrialisation_state.ground_bars ? 1 : 0; // BL-1059
                 row.rerun_ok = row.rerun_mismatch == 0 && x.hs.industry_points_refused == 0
                             && dst.industry_points_refused == 0;
 
@@ -3905,10 +3667,9 @@ int main(int argc, char** argv)
     {
         std::printf("\n=== THE INDUSTRIALISATION SPAN, per seed - its own call from the 1660 handoff (BL-1040) ===\n");
         std::printf("  rounds = decision rounds the span ran; battles/conquests/foundings = the span's own counters;\n"
-                    "  living and subjects at K (1660) -> C; industry = living polities holding an Industry node at C\n"
-                    "  (nodes summed); ms = generation's own span call, wall clock, this build (reported, never asserted)\n");
-        std::printf("  seed | ran | span       | rounds | battles conq found | living K->C | subj K->C | industry pol/nodes |"
-                    "  span ms\n");
+                    "  living and subjects at K (1660) -> C; ms = generation's own span call, wall clock, this build\n"
+                    "  (reported, never asserted)\n");
+        std::printf("  seed | ran | span       | rounds | battles conq found | living K->C | subj K->C |  span ms\n");
         std::vector<double> ms;
         std::size_t ran_n = 0, rounds_ok = 0;
         for (const seed_row& r : rows)
@@ -3923,12 +3684,11 @@ int main(int argc, char** argv)
             const int64_t step = 4; // Exploration's band (NR-888); the span's params are checked by --fidelity
             if (r.span_rounds == (r.span_stop - r.span_start + step - 1) / step) ++rounds_ok;
             ms.push_back(static_cast<double>(r.span_ms));
-            std::printf("  %4u | yes | %4lld-%4lld |   %4lld | %7lld %4lld %5lld |   %3d->%-3d  |  %3d->%-3d |   %4d/%-5d        | %7lld\n",
+            std::printf("  %4u | yes | %4lld-%4lld |   %4lld | %7lld %4lld %5lld |   %3d->%-3d  |  %3d->%-3d | %7lld\n",
                         r.seed, static_cast<long long>(r.span_start), static_cast<long long>(r.span_stop),
                         static_cast<long long>(r.span_rounds), static_cast<long long>(r.span_battles),
                         static_cast<long long>(r.span_conquests), static_cast<long long>(r.span_foundings),
                         r.at_1660.alive_polities, r.at_close.alive_polities, r.at_1660.subjects, r.at_close.subjects,
-                        r.at_close.polities_industry_nodes, r.at_close.industry_nodes,
                         static_cast<long long>(r.span_ms));
         }
         std::printf("  the span ran on %zu of %zu seeds; ran its full round count ((stop - start) / 4) on %zu\n",
@@ -3970,108 +3730,35 @@ int main(int argc, char** argv)
         std::printf("  (a world whose polities all sit under the floor enacts nothing, which is a legitimate outcome)\n");
     }
 
-    // ============ BL-1051: the span-open survey and the Fuel Doctrine ========
+    // ============ BL-1051: the span-open survey ==============================
     if (span_mode)
     {
-        std::printf("\n=== THE SPAN-OPEN SURVEY AND THE FUEL DOCTRINE, per seed (BL-1051; evidence, not a reading) ===\n");
+        std::printf("\n=== THE SPAN-OPEN SURVEY, per seed (BL-1051; evidence, not a reading) ===\n");
         std::printf("  survey (at the open, every region the span opened on): forest = survey_forest_q, the window's\n"
                     "  land share under forest SCORED against the open's mean share as fuel is (500 = the world's mean\n"
                     "  region; Ben 2026-09-18) -- min/p25/med/p75/max, regions with any forest, regions at or above the\n"
-                    "  mean (>= 500); fuel = survey_fuel_q (500 = the world's mean region), its median, and regions\n"
-                    "  clearing the 250 seam bar on the survey vs on the inherited energy_q (the gate's reading before\n"
-                    "  BL-1041's DEFAULT B; with B on, every Industry fuel read takes the survey).\n"
-                    "  close (1960): regions the span founded after its open are unsurveyed (-1, out of every mean);\n"
-                    "  the Fuel Doctrine side each living polity holds (IN-MT-1a coke / IN-MT-1b charcoal / neither),\n"
-                    "  per side the mean over its polities of ground_forest (each polity's SHARE of held\n"
-                    "  ground clearing the forest top-third bar, per mille; BL-1056/BL-1059),\n"
-                    "  and Charcoal polities that ever passed the seam gate (fuel_seen) or hold a seam at the close --\n"
-                    "  they had Coke open and took Charcoal anyway.\n");
-        std::printf("  seed | open (unseen) | forest min/p25/med/p75/max | any / >=500 | fuel med | seams surv/energy_q |"
-                    " close (unsurv) | coke/charc/none | held forest coke / charc / none | charc: seam seen / now\n");
-        int p_doc[3] = {};
-        double p_forest_sum[3] = {};
+                    "  mean (>= 500); fuel = survey_fuel_q (500 = the world's mean region), its median.\n"
+                    "  close (1960): regions the span founded after its open are unsurveyed (-1, out of every mean).\n");
+        std::printf("  seed | open (unseen) | forest min/p25/med/p75/max | any / >=500 | fuel med | close (unsurv)\n");
         int p_forested = 0, p_wooded = 0, p_open = 0, p_unseen = 0, p_close = 0, p_unsurv = 0;
-        int p_seen = 0, p_now = 0, seeds_charcoal_wooder = 0, seeds_compared = 0;
         std::vector<double> med_forest;
         for (const seed_row& r : rows)
         {
             if (!r.span_ran) continue;
-            const auto f = [](double x, char* buf, std::size_t n) {
-                if (std::isnan(x)) std::snprintf(buf, n, "  -");
-                else std::snprintf(buf, n, "%3.0f", x);
-            };
-            char fc[16], fch[16], fn[16];
-            f(r.doctrine_forest[0], fc, sizeof fc);
-            f(r.doctrine_forest[1], fch, sizeof fch);
-            f(r.doctrine_forest[2], fn, sizeof fn);
-            std::printf("  %4u | %5d (%3d)   | %3d/%3d/%3d/%3d/%4d       | %4d/%-4d   |   %4d   |   %4d / %-4d       |"
-                        " %5d (%4d)   | %3d/%3d/%3d     |   %s / %s / %s                 |   %3d / %-3d\n",
+            std::printf("  %4u | %5d (%3d)   | %3d/%3d/%3d/%3d/%4d       | %4d/%-4d   |   %4d   | %5d (%4d)\n",
                         r.seed, r.survey_regions, r.survey_unseen,
                         r.survey_forest[0], r.survey_forest[1], r.survey_forest[2], r.survey_forest[3],
                         r.survey_forest[4], r.survey_forested, r.survey_wooded, r.survey_fuel_med,
-                        r.survey_fuel_seam, r.survey_seam_energy, r.close_regions, r.close_unsurveyed,
-                        r.doctrine[0], r.doctrine[1], r.doctrine[2], fc, fch, fn,
-                        r.charcoal_seam_seen, r.charcoal_seam_close);
-            for (int s = 0; s < 3; ++s)
-            {
-                p_doc[s] += r.doctrine[s];
-                if (!std::isnan(r.doctrine_forest[s])) p_forest_sum[s] += r.doctrine_forest[s] * r.doctrine[s];
-            }
+                        r.close_regions, r.close_unsurveyed);
             p_forested += r.survey_forested; p_wooded += r.survey_wooded; p_open += r.survey_regions;
             p_unseen += r.survey_unseen; p_close += r.close_regions; p_unsurv += r.close_unsurveyed;
-            p_seen += r.charcoal_seam_seen; p_now += r.charcoal_seam_close;
             med_forest.push_back(static_cast<double>(r.survey_forest[2]));
-            if (!std::isnan(r.doctrine_forest[0]) && !std::isnan(r.doctrine_forest[1]))
-            {
-                ++seeds_compared;
-                if (r.doctrine_forest[1] > r.doctrine_forest[0]) ++seeds_charcoal_wooder;
-            }
         }
-        const auto pooled_mean = [&](int s) { return p_doc[s] > 0 ? p_forest_sum[s] / p_doc[s] : k_undef; };
         std::printf("  POOLED survey: %d regions opened on, %d left unseen; %d with any forest (%.0f%%), %d scoring at or"
                     " above the mean (%.0f%%); at the close %d of %d regions unsurveyed (founded in the span)\n",
                     p_open, p_unseen, p_forested, p_open > 0 ? 100.0 * p_forested / p_open : 0.0, p_wooded,
                     p_open > 0 ? 100.0 * p_wooded / p_open : 0.0, p_unsurv, p_close);
         print_spread("median region forest score at the open, per world", med_forest);
-        std::printf("  POOLED Fuel Doctrine at the close: coke %d / charcoal %d / neither %d (living polities).\n"
-                    "         BL-1051 cites 404 / 118 / 340 for BL-1038's run, which this harness does not reproduce;\n"
-                    "         the like-for-like split WITHOUT the survey is --fidelity's V4 column (V5 is this run).\n",
-                    p_doc[0], p_doc[1], p_doc[2]);
-        std::printf("  ARE THE CHARCOAL POLITIES THE WOODED ONES? mean ground_forest (share clearing the forest bar), pooled\n"
-                    "         over polities: coke %.0f, charcoal %.0f, neither %.0f;\n"
-                    "         charcoal wooder than coke on %d of %d seeds holding both sides; Charcoal polities that\n"
-                    "         ever passed the seam gate %d, holding a seam at the close %d (of %d)\n",
-                    pooled_mean(0), pooled_mean(1), pooled_mean(2), seeds_charcoal_wooder, seeds_compared,
-                    p_seen, p_now, p_doc[1]);
-
-        // BL-1059: THE TOP-THIRD BARS, per seed (NR-900: ranked over every
-        // read region, zeros in, on the UNCLAMPED share). Each clearance is
-        // printed of the WORLD (the regions ranked; at most a third) and of
-        // the CARRIERS (regions with a nonzero share). Not gated: a tie at the
-        // cut clears whole (NR-904), so on a heavily wooded world more than a
-        // third of the world clears on forest, by design. GATED at the end of
-        // the run: a bar clearing no region while three or more carry the
-        // resource (impossible under NR-904; kept as a guard), and any of the
-        // three "did not move" legs.
-        std::printf("\n=== BL-1059 THE TOP-THIRD BARS, per seed (fixed at the span open over every surveyed region, on the"
-                    " unclamped share; clear = share > 0 && >= bar) ===\n");
-        std::printf("  bar = the sim's bar in share units (fuel: coal+petroleum per-tile mean x1000; forest: land share"
-                    " per mille);\n  capped = regions whose SCORE sits at the 1000 cap (one tied value had the score"
-                    " been ranked);\n  legs: open / close / re-run -- see seed_row::bars_open for what each catches.\n");
-        std::printf("  seed | world | fuel: bar  carriers capped  clear  %%world %%carriers | forest: bar carriers capped"
-                    "  clear  %%world %%carriers | legs\n");
-        for (const seed_row& r : rows)
-        {
-            if (!r.span_ran) continue;
-            const auto pct = [](int a, int b) { return b > 0 ? 100.0 * a / b : 0.0; };
-            std::printf("  %4u | %5d | %8d %8d %6d %6d  %5.1f  %6.1f   | %8d %8d %6d %6d  %5.1f  %6.1f   | %s/%s/%s\n",
-                        r.seed, r.bar_read, r.bar_fuel, r.fuel_carriers, r.fuel_capped, r.fuel_clear,
-                        pct(r.fuel_clear, r.bar_read), pct(r.fuel_clear, r.fuel_carriers),
-                        r.bar_forest, r.forest_carriers, r.forest_capped, r.forest_clear,
-                        pct(r.forest_clear, r.bar_read), pct(r.forest_clear, r.forest_carriers),
-                        r.bars_open ? "same" : "DIFF", r.bars_close ? "same" : "DIFF",
-                        r.bars_rerun < 0 ? "-" : r.bars_rerun ? "same" : "DIFF");
-        }
     }
 
     // ============ BL-1041: readings 8 and 9, per seed =========================
@@ -4441,24 +4128,11 @@ int main(int argc, char** argv)
             print_spread("largest region's share of the world's points",
                          span_collect([](const seed_row& r) { return r.points_top_region; }));
             {
-                // BL-1056 (POINTS_SIZE_NEUTRAL): the two numbers the item moves,
-                // on one line -- the Fuel Doctrine split pooled over living
-                // polities at the close, and the top region's share of its
+                // BL-1056 (POINTS_SIZE_NEUTRAL): the top region's share of its
                 // world's points (median and max over the worlds).
-                int split[3] = {};
-                double pull_fuel[3] = {}, pull_forest[3] = {};
                 std::vector<double> tops;
                 for (const seed_row& r : rows)
-                {
-                    if (!r.span_ran) continue;
-                    for (int d = 0; d < 3; ++d)
-                    {
-                        split[d] += r.doctrine[d];
-                        if (!std::isnan(r.doctrine_fuel[d]))   pull_fuel[d]   += r.doctrine_fuel[d]   * r.doctrine[d];
-                        if (!std::isnan(r.doctrine_forest[d])) pull_forest[d] += r.doctrine_forest[d] * r.doctrine[d];
-                    }
-                    if (r.points_on && !std::isnan(r.points_top_region)) tops.push_back(r.points_top_region);
-                }
+                    if (r.span_ran && r.points_on && !std::isnan(r.points_top_region)) tops.push_back(r.points_top_region);
                 std::sort(tops.begin(), tops.end());
                 double med = k_undef, mx = k_undef;
                 if (!tops.empty())
@@ -4467,17 +4141,8 @@ int main(int argc, char** argv)
                     med = n % 2 ? tops[n / 2] : (tops[n / 2 - 1] + tops[n / 2]) / 2.0;
                     mx  = tops.back();
                 }
-                std::printf("     BL-1056  Fuel Doctrine coke/charcoal/neither %d/%d/%d (living polities, pooled);"
-                            " top-region share of points median %.3f, max %.3f (over %zu worlds)\n",
-                            split[0], split[1], split[2], med, mx, tops.size());
-                // BL-1059: the mean pulls by side, pooled over living polities
-                // at the close (each polity's share of held ground clearing
-                // that resource's top-third bar, per mille).
-                const auto pm = [&](const double* sum, int d) { return split[d] > 0 ? sum[d] / split[d] : k_undef; };
-                std::printf("     BL-1059  mean pulls by side (per mille, pooled): ground_fuel coke %.0f / charcoal %.0f /"
-                            " neither %.0f; ground_forest coke %.0f / charcoal %.0f / neither %.0f\n",
-                            pm(pull_fuel, 0), pm(pull_fuel, 1), pm(pull_fuel, 2),
-                            pm(pull_forest, 0), pm(pull_forest, 1), pm(pull_forest, 2));
+                std::printf("     BL-1056  top-region share of points median %.3f, max %.3f (over %zu worlds)\n",
+                            med, mx, tops.size());
             }
             print_spread("Gini of points over living polities (zeros in)",
                          span_collect([](const seed_row& r) { return r.points_polity_gini; }));
@@ -4523,17 +4188,6 @@ int main(int argc, char** argv)
         print_spread("industrial polities per world, at the close",
                      handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.polities_industrial); }));
         if (span_mode)
-        {
-            // BL-1040: the span opens the Industry tree (BL-1038), so its
-            // uptake is evidence the span played the forces it was given --
-            // still not the reading, which reads industry points.
-            std::printf("     Industry tree - evidence, not the reading: the span opens it at 1660 to every living\n"
-                        "     polity; living polities holding any Industry node at the close, and the nodes held:\n");
-            print_spread("polities holding an Industry node, at the close",
-                         handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.polities_industry_nodes); }));
-            print_spread("Industry nodes held, at the close",
-                         handoff_collect([](const seed_row& r) { return static_cast<double>(r.at_close.industry_nodes); }));
-        }
         std::printf("\n");
     }
 
@@ -4695,12 +4349,11 @@ int main(int argc, char** argv)
                 std::fprintf(f, "\"%s\": {\"settled_land_regions\": %d, \"checkered_regions\": %d, \"flows\": %d, "
                                 "\"flows_far\": %d, \"flows_unreadable\": %d, \"volume\": %lld, \"volume_far\": %lld, "
                                 "\"industrialised_regions\": %d, \"polities_industrial\": %d, \"urban_heads\": %lld, "
-                                "\"heads\": %lld, \"subjects\": %d, \"alive_polities\": %d, "
-                                "\"polities_industry_nodes\": %d, \"industry_nodes\": %d}%s",
+                                "\"heads\": %lld, \"subjects\": %d, \"alive_polities\": %d}%s",
                              key, h.settled_land_regions, h.checkered_regions, h.flows, h.flows_far, h.flows_unreadable,
                              (long long)h.volume, (long long)h.volume_far, h.industrialised_regions,
                              h.polities_industrial, (long long)h.urban_heads, (long long)h.heads, h.subjects,
-                             h.alive_polities, h.polities_industry_nodes, h.industry_nodes, tail);
+                             h.alive_polities, tail);
             };
             std::fprintf(f, "{\n \"_note\": \"BL-1029/BL-1040 industrialisation_sim_harness per-seed table. mode 'span' (BL-1040): "
                             "close = the shipped world (default epoch 1960) with the Industrialisation span run as its own call from the "
@@ -4727,22 +4380,15 @@ int main(int argc, char** argv)
                              (long long)r.span_start, (long long)r.span_stop, (long long)r.span_rounds,
                              (long long)r.span_battles, (long long)r.span_conquests, (long long)r.span_foundings,
                              (long long)r.span_ms);
-                // BL-1051: the span-open survey and the Fuel Doctrine.
+                // BL-1051: the span-open survey.
                 std::fprintf(f, "   \"survey_ran\": %s, \"survey_regions\": %d, \"survey_unseen\": %d, "
                                 "\"survey_forest\": [%d, %d, %d, %d, %d], \"survey_forested\": %d, "
-                                "\"survey_wooded\": %d, \"survey_fuel_med\": %d, \"survey_fuel_seam\": %d, "
-                                "\"survey_seam_energy\": %d, \"close_regions\": %d, \"close_unsurveyed\": %d, "
-                                "\"doctrine\": [%d, %d, %d], ",
+                                "\"survey_wooded\": %d, \"survey_fuel_med\": %d, "
+                                "\"close_regions\": %d, \"close_unsurveyed\": %d,\n",
                              r.survey_ran ? "true" : "false", r.survey_regions, r.survey_unseen,
                              r.survey_forest[0], r.survey_forest[1], r.survey_forest[2], r.survey_forest[3],
                              r.survey_forest[4], r.survey_forested, r.survey_wooded, r.survey_fuel_med,
-                             r.survey_fuel_seam, r.survey_seam_energy, r.close_regions, r.close_unsurveyed,
-                             r.doctrine[0], r.doctrine[1], r.doctrine[2]);
-                put_rho("doctrine_forest_coke", r.doctrine_forest[0], ", ");
-                put_rho("doctrine_forest_charcoal", r.doctrine_forest[1], ", ");
-                put_rho("doctrine_forest_neither", r.doctrine_forest[2], ", ");
-                std::fprintf(f, "\"charcoal_seam_seen\": %d, \"charcoal_seam_close\": %d,\n",
-                             r.charcoal_seam_seen, r.charcoal_seam_close);
+                             r.close_regions, r.close_unsurveyed);
                 // BL-1041: reading 8, industry points at the close.
                 std::fprintf(f, "   \"points_on\": %s, \"points_rejected\": %s, \"points_total\": %lld, "
                                 "\"points_scale\": %lld, \"points_treasury\": %lld, \"treasury_debited\": %lld, "
@@ -4844,25 +4490,12 @@ int main(int argc, char** argv)
     // reproduce the span's own ledger, or whose harness-side resume is not
     // the span when the integral was asked for, fails the run -- a '-' in
     // the rho columns must never be the only sign of it.
-    std::size_t split_bad = 0, rerun_bad = 0, bars_bad = 0, bars_empty = 0;
+    std::size_t split_bad = 0, rerun_bad = 0;
     for (const seed_row& r : rows)
     {
-        // BL-1059: a bar that moved on any leg, or a bar that clears no region
-        // while three or more carry the resource (the review's cliff; with a
-        // tie at the cut clearing whole, NR-904, it cannot happen -- a GUARD).
-        if (r.span_ran && (!r.bars_open || !r.bars_close || r.bars_rerun == 0)) ++bars_bad;
-        if (r.span_ran && ((r.fuel_carriers >= 3 && r.fuel_clear == 0)
-                        || (r.forest_carriers >= 3 && r.forest_clear == 0))) ++bars_empty;
-
         if (!r.span_ran || !r.points_on || r.points_rejected) continue;
         if (!r.split_ok) ++split_bad;
         if (integral_stride > 0 && !r.rerun_ok) ++rerun_bad;
-    }
-    if (bars_bad > 0 || bars_empty > 0)
-    {
-        std::printf("FAIL  BL-1059: the top-third bars moved (a leg differs from the span's) on %zu seed(s); a bar"
-                    " cleared no region while 3+ carry the resource on %zu seed(s)\n", bars_bad, bars_empty);
-        return 1;
     }
     if (split_bad > 0 || rerun_bad > 0)
     {

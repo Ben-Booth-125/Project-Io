@@ -7,6 +7,7 @@
 
 #include <bitset>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 struct world;
@@ -44,8 +45,11 @@ class recipe_registry;
 ///     base_rp_per_nation
 ///   + rp_per_research_credit      x credits_spent
 ///   + rp_per_research_credit_sqrt x sqrt(credits_spent)
-///   + rp_per_university x Universities + rp_per_institute x institutes
+///   + rp_per_university x staffed Universities x the University factor
+///   + rp_per_institute  x staffed institutes
 ///
+/// (the University factor: the held national_research multiplies scoped
+/// "building:university"; 1 when none is held)
 /// all times `research_multiplier`. Its SHAPE is a dial change, not a code
 /// change. The defaults are Ben's ruling (2026-10-10): base + sqrt — 120 RP a
 /// quarter for every nation plus 20 x sqrt(credits the line spends), linear 0,
@@ -71,9 +75,10 @@ struct research_params
     float rp_per_research_credit = 0.0f;
     /// RP per sqrt(credit) the line spends (the concave term).
     float rp_per_research_credit_sqrt = 20.0f;
-    /// RP per quarter per completed University standing in the nation's territory.
+    /// RP per quarter per STAFFED University (completed, standing, workforce
+    /// assigned > 0) in the nation's territory (RESEARCH.md § Research points).
     float rp_per_university = 100.0f;
-    /// RP per quarter per completed research institute whose owner corp's home
+    /// RP per quarter per STAFFED research institute whose owner corp's home
     /// nation is this nation (NR-1023: the institute's corp `science` folds in).
     float rp_per_institute = 50.0f;
     /// The RP unit: a node costs `cost_units x rp_per_cost_unit`.
@@ -114,7 +119,7 @@ struct research_accrual
     std::int64_t owed_milli   = 0;    ///< RP the queue still owed before this quarter's accrual.
     int          universities = 0;
     int          institutes   = 0;
-    float        multiplier   = 1.0f; ///< `research_multiplier` (identity until the effect pass).
+    float        multiplier   = 1.0f; ///< `research_multiplier`: 1 + the held national-research shares.
     std::int64_t rp_milli     = 0;    ///< Milli-RP added to the pool.
     int          completed    = 0;    ///< Nodes completed this quarter.
 };
@@ -140,9 +145,12 @@ bool corp_nation_holds(const world& w, entity_id corp, int node);
 /// Whether every requirement group of @p node has a held member for @p nation.
 bool node_requirements_met(const world& w, entity_id nation, int node);
 
-/// Whether a quest's deed is met. EVERY deed reads false until the effect pass
-/// wires them (BL-1274), so quests wait in the queue and never complete yet —
-/// expected. Non-quest nodes: true.
+/// Whether a quest's deed is met. Non-quest nodes: true. A quest's deed has a
+/// machine form or is declared unread (`io::dg::node::deed_waits_on`, from the
+/// store's `deed_effect`); an unread deed reads false, so its quest waits in
+/// the queue. Every one of the nine Digitisation deeds is unread today: each
+/// reads a quantity over quarters (a streak, a first, a demand cover) or a
+/// system (Alarm, unrest, war outcomes) the campaign does not carry.
 bool deed_met(const world& w, entity_id nation, int node);
 
 /// Queue @p node for @p nation with its unheld requirements ahead of it —
@@ -153,27 +161,109 @@ bool deed_met(const world& w, entity_id nation, int node);
 /// other side is held or queued.
 enqueue_result enqueue_node(world& w, entity_id nation, int node);
 
-/// The research multiplier a nation's held nodes give (*+N% national
-/// research*). The effect pass (BL-1274) fills this; identity for now.
+// ---------------------------------------------------------------------------
+// Node effects (BL-1274) — RESEARCH.md § Effects no system reads yet
+// ---------------------------------------------------------------------------
+// The store (docs/economy/tech/digitisation_tree.json) gives every node a list
+// of machine effects, rendered into `io::dg::effects`. Which of them CODE reads
+// is declared HERE (`classify_effect`), and nation_tech_harness's R1 audit
+// fails when the store and this declaration disagree — so a node never
+// silently does nothing: it moves its lever or is listed as waiting for one.
+//
+// FOLD ORDER. A nation's held set is a bitset with no earn order, so every
+// fold over held effects runs in NODE-INDEX order (then the node's own effect
+// order) — deterministic, and it needs nothing saved.
+// ---------------------------------------------------------------------------
+
+/// What a modifier is being asked about: the thing at the read site. A
+/// modifier's scope matches when it is "all", or names this target's resource
+/// ("resource:<good>"), recipe group ("group:<group>"), recipe
+/// ("recipe:<name>"), building type ("building:<type>") or named extraction
+/// site ("site:<farm|fishing_wharf|well>", `extraction_site_name`).
+struct effect_target
+{
+    int              resource = -1;   ///< resource_type index, or -1.
+    std::string_view group;           ///< recipe::group, or empty.
+    std::string_view recipe;          ///< recipe::name, or empty.
+    std::string_view site;            ///< A named extraction site, or empty.
+    building_type    building = building_type::none;
+    /// Match ONLY effects scoped to this target — "all" does not match. The
+    /// University term uses it, so a nation-wide research share is not
+    /// applied to it twice.
+    bool             scoped_only = false;
+};
+
+/// The named site an extraction site of @p target is, where a node can name it:
+/// "farm" (produce from a deposit), "fishing_wharf" (produce with no deposit),
+/// "well" (water with no deposit); empty otherwise (Mines and Oil Platforms are
+/// scoped by their resources). @p depositless is placement_rules'
+/// is_depositless_site for the site's tile.
+std::string_view extraction_site_name(resource_type target, bool depositless);
+
+/// How code treats one effect row. Two states, no third (RESEARCH.md): a
+/// system reads it, or it is declared unread.
+enum class effect_reading : std::uint8_t
+{
+    read = 0,  ///< A consumer reads it: the held node moves its lever.
+    unread,    ///< Declared unread: waits on a system named in `declared_unread_systems`.
+    invalid,   ///< The store and this code disagree (unknown subject/scope/key/system,
+               ///< an unlock naming nothing, a modifier on an unwired subject).
+};
+
+/// The code's declaration for one effect row. @p reg, when given, also checks
+/// that an unlock names a recipe the registry carries and a group/recipe scope
+/// names one; without it those are judged by shape alone.
+effect_reading classify_effect(const io::dg::effect& e, const recipe_registry* reg = nullptr);
+
+/// The systems the code declares effects (and deeds) may wait on — the
+/// closed list an `unread` row's `waits_on` must come from.
+const std::vector<std::string_view>& declared_unread_systems();
+
+/// Whether code reads modifiers on @p subject (extraction_rate,
+/// processing_yield, logistics_cost, national_research).
+bool modifier_subject_read(modifier_subject subject);
+
+/// The research multiplier a nation's held nodes give: 1 + the sum of every
+/// held *+N% national research* share (subject national_research, scope
+/// "all", op add), folded in node-index order.
 float research_multiplier(const world& w, entity_id nation);
 
-/// A nation's held-node multiplier on @p subject, applied to @p base. The hook
-/// the economy calls where a node moves a scalar (the old per-corp
-/// `world::modified_scalar` read site). The effect pass (BL-1274) fills it;
-/// returns @p base untouched for now.
-float nation_scalar(const world& w, entity_id nation, modifier_subject subject, float base);
+/// A nation's held-node modifiers on @p subject whose scope matches @p target,
+/// applied to @p base in node-index order. The hook the economy calls where a
+/// node moves a scalar. A nation holding nothing returns @p base untouched —
+/// the same bits, no arithmetic — so a world where nothing is held is
+/// bit-identical to one with no effect layer at all.
+///
+/// KNOWN GAP: the read sites apply these to the TICK (the draw, the credited
+/// output, the priced leg); the profitability estimates building_profit.cpp and
+/// corp_ai.cpp score with (`estimate_prospective_profit`, the scorer's margins)
+/// do not fold processing_yield in, so the AI under-prices a held yield node.
+/// Deliberate for now (BL-1274 fix round): the AI's margins are not this
+/// item's to move.
+float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
+                    const effect_target& target, float base);
 
-/// Whether @p corp may build @p type: true unless a node that UNLOCKS the type
-/// is not held by the corp's home nation. The single read point the placement
-/// check and the construction door share (they used to share BL-344's
-/// per-corp gate). No node carries a machine unlock effect yet — the effect
-/// pass (BL-1274) gives them one — so every type is open to every nation, which
-/// is NR-1022's ruling for what the retired gates held. `null_entity` = open.
+/// Whether @p nation may use the mechanic @p key: true when no node carries a
+/// read `mechanic` effect with that key, else true only once the nation holds
+/// one that does. `space_dispatch` (Rocketry, Ben 2026-10-10): an inter-body
+/// convoy dispatches only for a corp whose home nation holds it — read in
+/// price_convoy_leg's inter-body branch, beside the launchpad check.
+bool nation_mechanic(const world& w, entity_id nation, std::string_view key);
+
+/// Whether @p corp may build @p type: true unless a node with a read
+/// `unlock_structure` effect naming the type is not held by the corp's home
+/// nation. The single read point the placement check and the construction
+/// door share. No Digitisation node unlocks a structure the registry carries
+/// (the Nuclear Plant and the Container Port are unread), so every type is
+/// open to every nation. `null_entity` = open.
 bool structure_unlocked(const world& w, entity_id corp, building_type type);
 
 /// The recipe counterpart of `structure_unlocked`, same contract: the build
 /// door, the retool door, the corp scorer and the selection panel all ask it.
-/// Open for every recipe until a node carries an `unlock_recipe` effect.
+/// A recipe named by a read `unlock_recipe` effect is closed until the corp's
+/// home nation holds the node. None is named today: the propellant routes are
+/// open to every nation (Ben, 2026-10-10 — Propellant Synthesis is a yield
+/// bonus), and fertiliser, plastics and microchips are unread.
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id);
 
@@ -181,8 +271,8 @@ bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
 /// for every nation (ascending id) accrue RP — the academic-research line pays
 /// min(its share of the treasury, the credits that buy the RP its queue still
 /// owes) as a direct expenditure (the garrison-upkeep precedent), converted by
-/// the `research_params` conversion; Universities, research institutes and the
-/// per-nation base add RP at no treasury cost — scaled by
+/// the `research_params` conversion; STAFFED Universities and research
+/// institutes (workforce_assigned > 0) and the per-nation base add RP at no treasury cost — scaled by
 /// `research_multiplier`, then flow the pool down the queue: the head completes
 /// when its cost is met and the remainder flows on; a quest with an unmet deed
 /// (or an entry whose requirements are not yet held) is passed over and stays
@@ -200,6 +290,55 @@ void advance_research(world& w, const research_params& p = {},
 /// Exposed so a harness can drive the queue semantics with a hand-set pool.
 /// @return Nodes completed.
 int flow_research_queue(world& w, entity_id nation, const research_params& p = {});
+
+// ---------------------------------------------------------------------------
+// The research panel's reads and the queue edits (BL-1276)
+// ---------------------------------------------------------------------------
+
+/// What `enqueue_node` WOULD do for @p nation and @p node, mutating nothing.
+/// On `queued`, @p plan (optional) receives the entries it would append, in
+/// queue order — the node's unheld requirements, then the node. The same
+/// planner `enqueue_node` runs, so the preview cannot disagree with the press.
+enqueue_result preview_enqueue(const world& w, entity_id nation, int node,
+                               std::vector<std::uint16_t>* plan = nullptr);
+
+/// The milli-RP @p nation accrues in a quarter while its queue owes more than
+/// that quarter brings: the base, its buildings and the research line at its
+/// whole share of the current treasury, times the multiplier. Read-only — the
+/// same arithmetic `advance_research` applies, not a second formula.
+std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
+                                           const research_params& p = {});
+
+/// For each entry of @p nation's queue (in queue order), the quarter it is
+/// projected to complete in — 1 = the next quarterly pass — or -1 when it does
+/// not complete within @p horizon_quarters (a quest waits on its deed, and an
+/// entry needing it waits with it). Runs the quarterly pass's own accrual and
+/// queue flow on a COPY of the state, holding the treasury where it stands.
+std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
+                                        const research_params& p = {},
+                                        int horizon_quarters = 480);
+
+/// Drop the LAST entry of @p nation's queue. False (nothing touched) when the
+/// queue is empty. The pool is untouched: it is the head's progress.
+bool remove_last_queued(world& w, entity_id nation);
+
+/// What `unqueue_with_dependents` would take off @p nation's queue for @p node,
+/// in queue order: the node, then every LATER entry that needs it — an entry
+/// with a requirement group whose members include a removed entry and none of
+/// which is held or still queued ahead of it. Empty when @p node is not queued.
+/// Pure: reads the queue, mutates nothing.
+std::vector<std::uint16_t> queued_dependents(const world& w, entity_id nation, int node);
+
+/// Take @p node off @p nation's queue together with every later entry that
+/// needs it (`queued_dependents`) — the toggle a press on a queued node makes
+/// (NR-1033). The rest of the queue keeps its order; the pool stays. Returns how
+/// many entries were removed (0 = nothing touched: the node was not queued).
+int unqueue_with_dependents(world& w, entity_id nation, int node);
+
+/// Empty @p nation's queue. False (nothing touched) when it is already empty.
+/// The pool stays, so nothing researched is stranded (RESEARCH.md § The research
+/// queue: the pool IS the head's progress).
+bool clear_research_queue(world& w, entity_id nation);
 
 /// THE HANDOVER (RESEARCH.md § Who holds technology: no nation opens ahead in
 /// technology). Empties every nation's tech state — pool, queue and held set —

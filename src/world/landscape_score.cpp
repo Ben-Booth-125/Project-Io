@@ -34,6 +34,64 @@ double coeff_of_variation(const std::vector<double>& v)
 
 } // namespace
 
+int close_market_terminals(const recipe_registry& reg, std::array<bool, resource_count> have,
+                           const std::vector<int>& run, const std::vector<std::size_t>& terms)
+{
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (const int i : run)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            bool inputs_ok = true;
+            for (std::size_t r = 0; r < resource_count && inputs_ok; ++r)
+                if (rc.inputs[r] > 0.0f && !have[r])
+                    inputs_ok = false;
+            if (!inputs_ok)
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (rc.outputs[r] > 0.0f && !have[r])
+                {
+                    have[r] = true;
+                    changed = true;
+                }
+        }
+    }
+    int closed = 0;
+    for (const std::size_t r : terms)
+        if (have[r]) ++closed;
+    return closed;
+}
+
+int market_terminals_closed(const world& w, const recipe_registry& reg,
+                            const std::vector<std::size_t>& terms, entity_id market)
+{
+    if (market == null_entity)
+        return 0;
+    const bool processing_available = reg.building_available(building_type::processing_facility);
+    const int  n_allowed = processing_available ? reg.recipe_count(building_type::processing_facility) : 0;
+    std::array<bool, resource_count> mined{};
+    std::vector<int> run;
+    for (const auto& [bid, b] : w.buildings)   // OR and set-insert: order-free
+    {
+        (void)bid;
+        if (market_for_tile(w, b.tile) != market)
+            continue;
+        if (b.type == building_type::processing_facility)
+        {
+            if (b.recipe == no_recipe || b.recipe >= n_allowed)
+                continue;
+            const int rid = static_cast<int>(b.recipe);
+            if (std::find(run.begin(), run.end(), rid) == run.end())
+                run.push_back(rid);
+        }
+        else if (b.type == building_type::extraction_site)
+            mined[static_cast<std::size_t>(b.target_resource)] = true;
+    }
+    return close_market_terminals(reg, mined, run, terms);
+}
+
 landscape_score score_landscape(world& w, const recipe_registry& reg,
                                 const landscape_score_params& p)
 {
@@ -169,31 +227,8 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
 
         for (std::size_t m = 0; m < out.markets.size(); ++m)
         {
-            std::array<bool, resource_count> have = mined[m];
-            bool changed = true;
-            while (changed)
-            {
-                changed = false;
-                for (const int i : run[m])
-                {
-                    const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-                    bool inputs_ok = true;
-                    for (std::size_t r = 0; r < resource_count && inputs_ok; ++r)
-                        if (rc.inputs[r] > 0.0f && !have[r])
-                            inputs_ok = false;
-                    if (!inputs_ok)
-                        continue;
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        if (rc.outputs[r] > 0.0f && !have[r])
-                        {
-                            have[r] = true;
-                            changed = true;
-                        }
-                }
-            }
-            int closed = 0;
-            for (const std::size_t r : terms)
-                if (have[r]) ++closed;
+            // BL-1298 / BL-1283: the one closure the champion test also reads.
+            const int closed = close_market_terminals(reg, mined[m], run[m], terms);
             out.markets[m].actual_closed = closed;
             out.markets[m].actual = terms.empty()
                                   ? 0.0

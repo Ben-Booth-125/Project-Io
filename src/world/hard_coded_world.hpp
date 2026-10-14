@@ -253,10 +253,86 @@ struct world_params
     int culture_profile_lack_max_q  = 250;
     int culture_profile_amenity_div = 4;
 
+    /// BL-1298 -- THE HISTORY BANKS MORE (NATION_GENERATION.md sec Pass 7,
+    /// Ben 2026-10-11/12): the standing levy's per-mille share of the seats'
+    /// stores swept every round, the endowment income rate (a year's income
+    /// for a realm holding its world's AVERAGE share of the held endowment --
+    /// `history_sim_params::treasury_endowment_world_share`, which
+    /// `exploration_sim_params` turns on), the army sized to the earn, and the
+    /// treasury's exchange rate into industry points. Copied into the resumed
+    /// spans by `exploration_sim_params` / `industrialisation_sim_params`.
+    /// Fields here so `treasury_census` can calibrate them on the shipped
+    /// worlds.
+    ///
+    /// THE SAVE: not written by the envelope (`w_world_params`), exactly as
+    /// the BL-1107 pair above. That is sound because these DEFAULTS ARE THE
+    /// SHIPPED VALUES: nothing in the app sets them, the envelope's
+    /// `world_params` is default-constructed before it is read, so a loaded
+    /// descriptor carries these values and rebuilds the world it was saved
+    /// from. Only a tuning world built off a non-default value fails to
+    /// round-trip. `app::same_world_params` compares all four, so the
+    /// wizard's world cache can never adopt a world built under another value.
+    ///
+    /// MEASURED (treasury_census, 16 library seeds, build-only; median nation
+    /// opening in credits; in-world ORDER = per-seed median Spearman of each
+    /// polity's 1200 fold against its close chest / top-3 folds among the
+    /// top-3 chests; main read 0.02 credits and 0.271 / 17 of 48).
+    ///   MEAN endowment (2026-10-11, levy 100): 700k -> pooled 1,560,
+    ///     13 of 16 seeds in band, order 0.218 / 14 -- the order lost.
+    ///   SUMMED endowment (2026-10-12): 80k -> pooled 1,469, order
+    ///     0.555 / 25, but 8 of 16 seeds in band (a small world's realms poor).
+    ///   WORLD-SHARE endowment (2026-10-12, levy 100, rate 30): quick tier
+    ///     (seeds 0/28/46/12) 150k -> 1,026/264/1,685/442; 250k ->
+    ///     1,001/550/2,539/1,278; 400k -> 2,126/1,340/3,274/2,357. Full tier:
+    ///     300k -> median of seed medians 1,613, 11 of 16 in band, order
+    ///     0.557 / 28; 350k -> 1,935, 8 of 16, order 0.601 / 26.
+    ///   The levy SATURATES (levy 25 / 100 at summed 75k: 1,332 / 1,315): the
+    ///   seats' production, not the share, bounds what it sweeps.
+    /// 100 (a tenth of the stores a round) and 300,000 put the most seeds in
+    /// the band with the order better than main's.
+    int treasury_levy_per_mille_q   = 100;
+    int treasury_endowment_income_q = 300000;
+    /// ...and the standing army sized to the realm's earn (EXPLORATION.md sec
+    /// Force persists now, Ben 2026-10-11). On in every shipped world; a field
+    /// only so the census can read the pre-ruling arm.
+    bool standing_army_sized_to_earn = true;
+    /// ...and the treasury's exchange rate into industry points in the
+    /// Industrialisation span, points per THOUSAND treasury units
+    /// (`history_sim_params::industry_points_per_1000_treasury_units`).
+    /// RULED (Ben, 2026-10-12): THE LOWEST RATE THAT KEEPS market_viability's
+    /// G1 AT TICK 50 AT OR ABOVE ITS 85% TARGET. The same-order rate (30,
+    /// treasury share ~0.73 like main's) cost G1 t50 its margin. LADDER (full
+    /// tier, par_seeds; endowment 300k world-share, levy 100) -- rate: G1 t50,
+    /// mean per-seed treasury share of all industry points:
+    ///   30: 83.8, 0.726 | 60: 86.2, 0.824 | 100: 85.1, 0.874 |
+    ///   200: 83.9, 0.919 | 400: 81.5, 0.948   (main: 87.7, ~0.73)
+    /// G1 t50 is NOT monotone in the rate (about +-1.5 between rungs), so the
+    /// line is a reading on this ladder, not a smooth threshold. 60 -- 0.06
+    /// points per unit -- is the lowest rung that holds the target.
+    int64_t industry_points_per_1000_treasury_units = 60;
+
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
-    // Note: there is no nation-count knob. The number of nations on the home body is a
-    // *consequence* of its habitable land area and the minimum-viable-territory floor
-    // (nation_params in world/nation_generation.hpp), not a value the player pre-sets.
+
+    /// THE NATION COUNT IS A TARGET (BL-1278; NATION_GENERATION.md § The
+    /// nation count is a target, Ben 2026-10-10 -- overturning the 2026-07-30
+    /// "count is an outcome, no nations slider" ruling). Two numbers the
+    /// wizard's setup round sets before the Life round builds the world:
+    ///
+    ///   nation_total_target -- nations alive on the homeworld when generation
+    ///                          ends; when set, in [max(1, major_target), 40].
+    ///   major_target        -- nations holding a champion when generation
+    ///                          ends; when set, in [1, 6].
+    ///
+    /// 0 = UNSET, per field: the natural count, uncapped, and no reconciliation
+    /// -- every world built at {0, 0} is the world it was before the fields
+    /// existed, byte for byte. Out-of-range values are REJECTED by the caller
+    /// through `nation_targets_valid` below, never clamped silently.
+    ///
+    /// On the save seam since envelope version 23, written at the envelope's
+    /// TAIL rather than inside `w_world_params`, so the v22 layout is a strict
+    /// prefix and a v22 save reads both as unset (save_game.cpp).
+    int             nation_total_target = 0;
+    int             major_target        = 0;
 
     /// What the player expressed on the New World wizard (BL-167). Preferences,
     /// not parameters: make_hard_coded_world resolves these against the seed —
@@ -264,6 +340,28 @@ struct world_params
     /// floor — and the resolved values land in the generation_report.
     world_preferences preferences{};
 };
+
+/// The upper bounds of the two nation targets (NATION_GENERATION.md § The
+/// nation count is a target).
+inline constexpr int nation_total_target_max = 40;
+inline constexpr int major_target_max        = 6;
+
+/// True when the descriptor's nation targets are legal: each is 0 (unset) or
+/// in range -- total in [1, 40], majors in [1, 6] -- and, when both are set,
+/// total >= majors. Pure; a caller rejects a descriptor that fails it rather
+/// than clamping (an untrusted-input boundary must mutate nothing).
+constexpr bool nation_targets_valid(const world_params& p)
+{
+    const int t = p.nation_total_target;
+    const int m = p.major_target;
+    if (t < 0 || t > nation_total_target_max)
+        return false;
+    if (m < 0 || m > major_target_max)
+        return false;
+    if (t > 0 && m > 0 && t < m)
+        return false;
+    return true;
+}
 
 /// Coarse progress sink for a caller drawing a loading screen (Ben, 2026-08-12).
 ///
@@ -797,6 +895,18 @@ struct generation_report
         std::vector<int32_t>   nation_absorbed_count;
         std::vector<int32_t>   nation_absorbed;
 
+        /// BL-1286 (history pattern detectors; GENERATION_STRATEGY.md sec History
+        /// patterns) — per nation, parallel to `nation_ids`: the PATTERN TAGS its
+        /// realm and the realms folded into it carried, a mask of
+        /// `history_pattern_bit` (history_pattern_detectors.hpp). Read by the nation card
+        /// (STARTUP.md sec The seat), never by the world. DERIVED, NOT
+        /// SERIALISED: it is a pure function of the records above (the four
+        /// time-lapses, the settlement and the fold's arrays), all of which the
+        /// save carries, so `fill_history_pattern_tags` fills it at generation
+        /// and `r_body_entry` re-derives it on load — no stream byte moves and
+        /// `save_game_version` does not. Empty wherever the fold arrays are.
+        std::vector<uint8_t>   nation_pattern_tags;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276
@@ -998,6 +1108,12 @@ struct generation_report
     bool        handoff_invalid = false;
     std::string handoff_violation;
 };
+
+/// BL-1286: run the history-pattern detectors over @p be's own records and fold
+/// their tags onto its nations (`body_entry::nation_pattern_tags`). Pure in
+/// everything but @p be's tag vector; a body with no fold record gets none. The
+/// ONE derivation both generation and a save load call.
+void fill_history_pattern_tags(generation_report::body_entry& be);
 
 /// Construct and return a world populated with the prototype's authored bodies.
 ///

@@ -770,9 +770,45 @@ Every world has one realm that, early in Empires, grows to the largest share of 
 successive victories and then breaks down within a set window. This overturns the rule below for that
 one realm and that one fact — the window. The fall still happens only by the mechanism of this section:
 supply fails, regions secede, and the reasons stay readable off the map. Everything else collapses as
-before. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
+before.
+
+**How large the rise goes (Ben, 2026-10-11, confirming NR-1034 with a floor).** At its peak the realm
+holds at least a **floor of 25 to 35 percent of the world's held regions** — the exact floor is set
+inside that band by measurement — and stays **under the 50 percent non-hegemony cap**, which is not
+overturned: a hegemon still fails the handoff. Region share, not population share, is the measure.
+The unforced worlds fall well short of the floor: their largest realm peaks at 8 to 23 percent.
+
+**When, and which realm (Ben, 2026-10-12).** The realm that rises is **the one already largest at
+200 BCE** — the lean backs the front-runner, so the rise reads as a lead pressed home. It **peaks by
+400 CE**, the first half of the span, and its share **halves within 300 years of the peak**. The lean
+presses its victories on the way up; the fall comes by this section's mechanism — supply fails and
+regions secede — with the breakdown pressed after the peak. **If the lean misses, it escalates
+in-world in bounded steps until the detector passes, each step a recorded cause** — the same shape as
+the nation totals' closing rounds (`NATION_GENERATION.md` § The nation count is a target).
+**A boxed front-runner gives way (Ben, 2026-10-12).** Where the realm largest at 200 BCE cannot reach
+the floor — an island, or a realm already holding its whole landmass — the rise falls to the largest
+realm at 200 BCE whose reachable ground can hold the floor. The floor is **25 percent** (measured:
+peaks of 25 to 41 percent across the library).
+**The fall acts on the map (Ben, 2026-10-12).** The breakdown is pressed by changes a player can see:
+the overextended realm's roads and works decay — their reach relief falls on the ground itself — and
+its far garrisons thin, so the supply that fails and the regions that secede have a visible cause.
+No private price is paid by this realm alone. **Bare ground relays no supply for the falling realm
+(Ben, 2026-10-13):** held ground its garrisons have left carries no supply onward in its reach walk,
+so a thinned outer march really cuts the network and the ground beyond it secedes. Decay alone left
+compact realms supplied (8 of 16 seeds halved), because supply falls with reach steps, not with roads. The rise keeps its recorded lean — appetite, the
+defensive rally, cohesion on conquest — as the sanctioned exception the targeted pattern is, each step
+a recorded event.
+**The rise's levers (Ben, 2026-10-13, accepting NR-1042):** the lean presses appetite (Organise
+included), the rising realm's armies rally to its attacked ground over its supplied network, its seat
+keeps its guard, and no press falls at a creed fault line. **A region taken this round reads its new
+holder's supply before it may secede — in every span**, not only Empires: a stale reading made
+retaken seats re-secede in a loop. **Ruined roads persist as a visible scar (Ben, 2026-10-13):** a
+road the fall decayed is not rebuilt unless traffic walks it again. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
 only walking away; the deaths are soldiers', plus the famine and displacement mechanism
-`MILITARY_HISTORY.md` owns.
+`MILITARY_HISTORY.md` owns. **What counts as one (Ben, 2026-10-11):** a successor that breaks away
+holding at least a quarter of what its parent kept, and then takes a seat from or ends its parent (or
+is taken back) within fifty years. Secession already produces this on every unforced world, so the
+lean is met by the existing mechanism; what it lacks is only the civilian deaths.
 
 **MECHANICAL, NEVER SCHEDULED.** No collapse fires on a date or a counter. A realm fragments
 because a specific region's supply fell under a floor, for reasons a player could read off the map
@@ -1077,7 +1113,10 @@ backwards into a phase that has no price
 culture, its `speech` — the same pure function of the tongue that coins that people's cities and
 region words, so a realm and everything else in its sound system read as kin
 (`NATION_GENERATION.md` § Pass 5 — Naming holds the register of naming sites). Nothing renames it
-afterwards: not a re-seating, not the loss of its seat, not a span boundary. The seat a polity rose
+afterwards: not a re-seating, not the loss of its seat, not a span boundary. **The one sanctioned
+rename is a revolution** in the Industrialisation span (`INDUSTRIALISATION.md` § Revolution): the realm
+keeps its id and ground and is coined a new name in the same tongue; the record before carries the old
+name by id, and the revolution event links the two. The seat a polity rose
 from is where the name is coined, never what the name IS.
 
 **The record carries the name beside the region table.** The time-lapse record holds a

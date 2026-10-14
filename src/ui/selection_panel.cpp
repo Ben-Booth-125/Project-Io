@@ -205,6 +205,11 @@ void draw_rival_building_summary(const world& w, const recipe_registry& reg,
     if (cit != w.corporations.end())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Owner: %s", cit->second.name.c_str());
+    // BL-1296: a state building's owner is its nation (state industry, public).
+    else if (const auto nit = w.nations.find(owner_nation_of(w, id)); nit != w.nations.end())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "Owner: %s (state industry)%s", nit->second.name.c_str(),
+                           b.state_idle ? " \xc2\xb7 idle: treasury short" : "");
 
     if (god_view)
     {

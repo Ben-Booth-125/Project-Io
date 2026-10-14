@@ -303,6 +303,31 @@ large); for a `design-owed` item, **Design** is the implied first step.
    body — matching actual practice (e.g. the BL-233 terrain-combat measurement and the
    BL-233/234 filing commits).
 
+### Gates run parallel, in two tiers (Ben, 2026-10-12)
+
+The multi-seed gates were the sprint's waits, not its work: every harness swept its seeds serially on
+one core of a 16-thread machine. Run them through the `par-seeds` skill
+(`tools/verify/par_seeds.sh`), which shards the seeds one process per core and recomputes pooled
+figures from the shards' numerators. Two tiers:
+
+- **Quick** (4 seeds: 0, 28, 46, 12) — while iterating, calibrating or in a fix round.
+- **Full** (the 16 library seeds) — once, at the merge gate.
+
+One heavy parallel run per machine at a time; a second only slows the first.
+
+### Sprint throughput rules (Ben, 2026-10-13)
+
+- **Independent lanes start at once.** UI and tech work that does not depend on a running
+  generation lane builds in parallel with it; live clicks are batched for Ben at the end.
+- **Calibration inside a ruled band is the session's call.** Where Ben has ruled a range (a floor
+  within 25-35%, a rate near a third), the session picks the value by measurement and logs a
+  `decision` entry in `NEEDS_REVIEW.json` instead of stopping.
+- **Only invariants block a merge:** determinism, conservation, the seat guard, the history pattern
+  targets, and the item's own requirement. Economy readings already failing before the sprint
+  (market_viability G1b, G1 at tick 50) are reported, not gating, until the sprint's economy pass.
+- **One integration lane re-measures cross-cutting targets** (all five history patterns together)
+  after a wave lands, rather than every lane re-measuring after every merge.
+
 ### The symbol-level dependency contract (`provides` / `consumes`)
 
 `waits_on` / `blocked_on` in `backlog.json` capture *item-level* ordering — coarse, and enough to

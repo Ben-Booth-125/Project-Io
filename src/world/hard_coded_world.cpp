@@ -14,10 +14,12 @@
 #include "grudge_sentiment.hpp"  // BL-898: the Era -1 grudge record's one consumer
 #include "history_ladder.hpp"
 #include "history_sim.hpp"      // BL-271 wired into generation, 2026-08-12
+#include "closing_rounds.hpp"   // BL-1278: the size floor and the total, inside the history
 #include "logistics.hpp"        // BL-910: body_tile_grid, for the close's capital markets
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
 #include "market_fold.hpp"      // BL-1125: markets can die
+#include "history_pattern_detectors.hpp"  // BL-1286: the pattern tags on the report
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -62,6 +64,22 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
 }
 
 } // namespace
+
+// BL-1286: declared in hard_coded_world.hpp. Generation calls it beside the
+// fold record; `r_body_entry` (save_game.cpp) calls it after a load, so the
+// derived tags never cross the save stream.
+void fill_history_pattern_tags(generation_report::body_entry& be)
+{
+    be.nation_pattern_tags.clear();
+    if (be.nation_polity.empty()) return;
+    const history_pattern_reading reading = detect_history_patterns(
+        be.prehistory_timelapse, be.exploration_timelapse, be.industrialisation_timelapse,
+        be.settlement, home_grid_width); // the cradle's settlement grid, not the tile pass's (`tiles.gw`)
+    be.nation_pattern_tags = fold_history_pattern_tags(reading, be.prehistory_timelapse, be.exploration_timelapse,
+                                                       be.industrialisation_timelapse, be.nation_polity,
+                                                       be.nation_absorbed_first,
+                                                       be.nation_absorbed_count, be.nation_absorbed);
+}
 
 // THE MIGRATION'S OWN RECORD, declared in hard_coded_world.hpp: the wizard's
 // Culture round lifts it off a finished report under --verify (BL-919), so it
@@ -833,6 +851,24 @@ void record_handoff_violation(generation_cursor& c, const char* which, const std
     assert(false && "a handoff validator failed on the shipped path (BL-969)");
 }
 
+// A PATTERN OR TARGET MISSED (the history patterns, the nation-count targets)
+// is recorded exactly as a handoff violation is -- onto the report and one line
+// to stderr -- but it NEVER asserts (policy, 2026-10-13): an unlucky seed is a
+// defect to report, not a reason for a debug app to stop. The structural
+// validators above keep their assert; a broken fold is not a seed's luck.
+void record_pattern_miss(generation_cursor& c, const char* which, const std::string& why)
+{
+    generation_report* const report = c.report;
+    const std::string msg = std::string(which) + ": " + why;
+    if (report != nullptr)
+    {
+        report->handoff_invalid = true;
+        if (!report->handoff_violation.empty()) report->handoff_violation += "; ";
+        report->handoff_violation += msg;
+    }
+    std::fprintf(stderr, "make_hard_coded_world: pattern missed (recorded) -- %s\n", msg.c_str());
+}
+
 // ---------------------------------------------------------------------------
 // STAGE 1 -- THE LIFE GATE (bumps 0-5): the star, the system, the homeworld's
 // tiles with their deposits, its rivers. Created here, in this order: the
@@ -1579,6 +1615,20 @@ void run_empires(generation_cursor& c)
             if (!pass_one_output_valid(kepler_pass_one, &why, &kepler_creeds))
                 record_handoff_violation(c, "pass_one_output", why);
         }
+        // BL-1287: THE RISE AND FALL IS ALWAYS HIT (GENERATION_STRATEGY.md sec
+        // History patterns). A miss is a defect, recorded loudly as the
+        // nation totals' is, never shipped as an outcome.
+        if (hs.rise_fall_missed)
+            record_pattern_miss(c, "rise_and_fall",
+                                     "realm " + std::to_string(hs.rise_fall_realm) + " peaked at "
+                                         + std::to_string(hs.rise_fall_peak_pm) + " per mille in "
+                                         + std::to_string(hs.rise_fall_peak_year) + ": " + hs.rise_fall_why);
+        // BL-1288: THE LATE CULTURE IS ALWAYS HIT -- its Empires half (chosen,
+        // holding a realm at the close, lagging). A miss is a recorded defect.
+        if (hs.late_culture_missed)
+            record_pattern_miss(c, "late_culture",
+                                     "culture " + std::to_string(hs.late_culture) + " at the Empires close (level "
+                                         + std::to_string(hs.late_culture_level) + "): " + hs.late_culture_why);
 
         // BL-768/BL-911: the corridors the history walked, filtered to the
         // ones a surviving polity still holds an end of (§ The network is
@@ -1780,6 +1830,13 @@ void run_exploration(generation_cursor& c)
         // BL-956: fold the 1660 handoff while `kepler_exploration_hs`
         // and the now-final `kepler_settlement` ownership are both
         // live, then let world setup read ITS grudges and corridors.
+        // BL-1288: ...and its Exploration half (colonised by another culture).
+        if (kepler_exploration_hs.late_culture_missed)
+            record_pattern_miss(c, "late_culture",
+                                     "culture " + std::to_string(kepler_exploration_hs.late_culture)
+                                         + " in Exploration (level " + std::to_string(kepler_exploration_hs.late_culture_level)
+                                         + "): " + kepler_exploration_hs.late_culture_why);
+
         c.exploration = make_exploration_output(
             kepler_settlement, kepler_exploration_hs, &kepler_creeds);
         const exploration_output& kepler_exploration = c.exploration;
@@ -1955,6 +2012,51 @@ void run_industrialisation(generation_cursor& c)
         dp.resume_universal_creeds = &kepler_exploration.universal_creeds;
         const uint32_t dseed = industrialisation_sim_seed(params);
 
+        // BL-1278 -- THE CLOSING ROUNDS' SPEC (closing_rounds.hpp): the
+        // ground the tail's carve reads, as a value, and the tail's own seed
+        // (run_tail's `params.seed ^ 0x4A71012u`), so the closing rounds plan
+        // the floor and the total against the fold that will actually be
+        // made. Co-owned by the fixture, so a replay closes the same way.
+        auto closing = std::make_shared<closing_rounds_spec>();
+        closing->ground           = nation_carve_ground_of(w, kepler_tiles, home_grid_width, home_grid_height);
+        closing->nation_seed      = params.seed ^ 0x4A71012u;
+        closing->min_nation_tiles = (fixture != nullptr && fixture->harness_floor_tiles > 0)
+                                        ? fixture->harness_floor_tiles // harness-only seam (era_minus_one.hpp)
+                                        : c.kepler_np.min_nation_tiles;
+        closing->keep_city_states = c.kepler_np.keep_city_states;
+        closing->total_target     = params.nation_total_target;
+        dp.closing_rounds = closing.get();
+
+        // BL-1278 -- THE TOTAL'S LEAN (NATION_GENERATION.md sec The nation
+        // count is a target, stage 1; Ben, 2026-10-11): conquest appetite and
+        // secession pressure in this span, keyed on the target against the
+        // count the span OPENS on (the fold of the 1660 map after the floor --
+        // the prediction the closing rounds make at its close). Per mille of
+        // the gap, integer, clamped to +-1000:
+        //   - APPETITE, both ways, at half weight: a world asked for half its
+        //     opening count campaigns 25% harder; one asked for double, 50%
+        //     less hard.
+        //   - SECESSION, only when MORE nations are wanted: this span carries
+        //     no secession floor of its own (0, Empires-only), so the lean
+        //     gives it one -- the Empires span's floor, scaled by the gap. When
+        //     fewer are wanted it stays 0: there is no secession to lower.
+        // Unset target: no lean, dp untouched.
+        if (params.nation_total_target > 0)
+        {
+            const closing_plan open_plan = plan_closing_rounds(
+                kepler_settlement.regions, kepler_exploration.polities,
+                closing_carve_cells(*closing, kepler_settlement.regions), closing->ground.gw,
+                closing->ground.gh, closing->min_nation_tiles, closing->keep_city_states,
+                /*total_target=*/0);
+            const int n_open = std::max(1, open_plan.nations_after_floor);
+            const int gap_q  = std::clamp((n_open - params.nation_total_target) * 1000 / n_open, -1000, 1000);
+            dp.campaign_appetite_q = gap_q / 2;
+            if (gap_q < 0)
+                dp.secession_supply_floor_q = static_cast<int>(
+                    (static_cast<int64_t>(era_minus_one_sim_params(params).secession_supply_floor_q) * (-gap_q))
+                    / 1000);
+        }
+
         // THE SPAN OPENS ON THE STRUCT. The region table the
         // resume reads is the handoff's own (equal to the live one
         // at this line -- the fold copied it -- so this moves
@@ -2021,6 +2123,28 @@ void run_industrialisation(generation_cursor& c)
         const industrialisation_output kepler_industrialisation = make_industrialisation_output(
             kepler_settlement, kepler_industrialisation_hs, &kepler_creeds);
         c.fleet_1960 = kepler_industrialisation.fleet; // BL-1152: the cursor carries the 1960 ledger
+        // BL-1278: the floor ran in the history; Pass 2c stands down, and the
+        // tail holds the fold to the count the closing rounds planned.
+        c.closing_predicted = kepler_industrialisation_hs.closing_predicted;
+        if (c.closing_predicted >= 0) c.kepler_np.floor_in_history = true;
+        // A TARGET MISSED IS A DEFECT, never a reported outcome (sec The
+        // nation count is a target: "both targets are always hit"). The
+        // closing rounds stop short only when no legal step is left -- no
+        // absorber, or no split that keeps both sides above the floor -- and
+        // that is recorded loudly here rather than shipped off target.
+        if (kepler_industrialisation_hs.closing_short_of_target)
+            record_pattern_miss(c, "closing_rounds",
+                                     "the total target " + std::to_string(params.nation_total_target)
+                                         + " was not reached: the closing rounds stopped at "
+                                         + std::to_string(c.closing_predicted) + " nations");
+        // BL-1289: THE WORLD WAR IS ALWAYS HIT (GENERATION_STRATEGY.md sec
+        // History patterns). A miss is a defect, recorded loudly, never an outcome.
+        if (kepler_industrialisation_hs.world_war_missed)
+            record_handoff_violation(c, "world_war",
+                                     "war " + std::to_string(kepler_industrialisation_hs.world_war_year) + "-"
+                                         + std::to_string(kepler_industrialisation_hs.world_war_peace_year) + ", "
+                                         + std::to_string(kepler_industrialisation_hs.world_war_top_engaged)
+                                         + " of the top powers engaged: " + kepler_industrialisation_hs.world_war_why);
         {
             std::string why;
             if (!industrialisation_output_valid(kepler_industrialisation, &why, &kepler_creeds,
@@ -2113,6 +2237,7 @@ void run_industrialisation(generation_cursor& c)
             // BL-1053: no pointer into `kepler_exploration`, which
             // lives on the cursor and dies with it (BL-1084).
             fixture->industrialisation_params  = without_resume_pointers(dp);
+            fixture->industrialisation_closing = closing; // keeps `closing_rounds` valid (BL-1278)
             fixture->industrialisation_seed    = dseed;
             fixture->industrialisation_handoff = kepler_industrialisation;
             fixture->industrialisation_state   = kepler_industrialisation_hs;
@@ -2370,6 +2495,15 @@ void run_tail(generation_cursor& c)
     const std::vector<entity_id> kepler_nations =
         generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,
                          /*seed=*/params.seed ^ 0x4A71012u, progress, &kepler_fold);
+    // BL-1278 -- THE DRIFT GUARD. The closing rounds planned the fold's count
+    // from a preview of this very carve; the fold must produce it. A mismatch
+    // means the preview and the carve have parted, and every target built on
+    // it is then wrong without saying so -- so it is a handoff violation.
+    if (c.closing_predicted >= 0 && static_cast<int>(kepler_nations.size()) != c.closing_predicted)
+        record_pattern_miss(c, "closing_rounds",
+                                 "the fold made " + std::to_string(kepler_nations.size())
+                                     + " nations; the closing rounds planned "
+                                     + std::to_string(c.closing_predicted));
     if (report != nullptr)
         for (generation_report::body_entry& be : report->bodies)
             if (be.id == kepler)
@@ -3603,6 +3737,15 @@ void run_tail(generation_cursor& c)
     // to. Move each into the corp's home market pool (PRODUCTION.md § Stockpile
     // and output flow).
     place_opening_stock(w);
+
+    // BL-1286: THE PATTERN TAGS, LAST. Derived from the report's records, so
+    // they are read here, once every one of them is final -- the settlement is
+    // re-copied onto the report well after the fold record, and a fill taken
+    // beside the fold read a settlement the load path never sees. The load
+    // (`r_body_entry`) re-derives from the same final records.
+    if (report != nullptr)
+        for (generation_report::body_entry& be : report->bodies)
+            if (be.id == kepler) { fill_history_pattern_tags(be); break; }
 }
 
 } // namespace

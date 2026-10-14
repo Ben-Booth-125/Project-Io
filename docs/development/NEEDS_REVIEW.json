@@ -342,7 +342,7 @@
    "title": "DECISION TAKEN: the rise-and-fall realm stays under the non-hegemony cap; the late culture is the world's most isolated",
    "raised": "2026-10-10",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben, 2026-10-10 history-patterns form",
    "what": "Two readings taken on your behalf. (a) 'Grows relatively large' is read as the largest share of its world by a clear margin, still under BL-224's non-hegemony cap - the cap is not overturned, so a pass-1 hegemon still fails the handoff. (b) The late culture is the culture most remote by reach when the Culture round closes, one per world; others may also be colonised naturally. Written: GENERATION_STRATEGY § History patterns, CIVILISATION, EXPLORATION.",
    "why_it_matters": "(a) decides whether the rise-and-fall target fights the non-hegemony invariant; (b) decides whether the late culture is chosen by a reading or emerges.",
@@ -353,7 +353,7 @@
     "docs/generation/EXPLORATION.md",
     "docs/lore/HISTORY.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-11 (sprint 53 form): (a) confirmed with a floor - the realm peaks at 25-35% of held regions, under the 50% cap; (b) confirmed - chosen at the Culture close, kept alive by the same isolation. Written: CIVILISATION.md, EXPLORATION.md."
   },
   {
    "id": "NR-1035",
@@ -417,7 +417,164 @@
     "docs/ui/PLANETARY.md"
    ],
    "resolution": "Accepted, all five; cap 20 characters (Ben, 2026-10-13).",
-   "resolved": "2026-10-13"
+   "resolved": "2026-10-13",
+   "id": "NR-1036",
+   "title": "Quick Start draws no setup round: what seed, abundance and nation targets does it build on?",
+   "raised": "2026-10-11",
+   "kind": "question",
+   "status": "resolved",
+   "source": "Sprint 53 design form, 2026-10-11 (seed and abundance move to the setup round)",
+   "what": "Quick Start built on the main menu's seed and resources. Both now live on the setup round, with the nation targets, and Quick Start draws no round.",
+   "why_it_matters": "Quick Start needs every input the setup round holds; BL-1279 (wizard setup round) cannot move the controls without an answer.",
+   "options": [
+    "Keep a compact seed/abundance/targets strip on the menu for Quick Start only",
+    "Quick Start rolls a seed and uses defaults (Standard abundance, default targets)",
+    "Quick Start opens the setup round alone, then builds straight through"
+   ],
+   "recommendation": "The third: one place for the inputs, and Quick Start still skips every lapse.",
+   "files": [
+    "docs/ui/STARTUP.md"
+   ],
+   "resolution": "Ben, 2026-10-13: Quick Start opens the setup round alone, then builds straight through (STARTUP.md)."
+  },
+  {
+   "id": "NR-1037",
+   "title": "The Drawdown lean no longer shows on the Life pane: does the 2D map need a cue for it?",
+   "raised": "2026-10-11",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1280 (Life round 2D map) build, 2026-10-11",
+   "what": "The retired globe painted decorative scars for the Drawdown (Spend) lean. The Life map draws the real terrain, which Drawdown does not change, so only the Spend chart now shows the lean.",
+   "why_it_matters": "STARTUP.md argues a lean whose effect is not drawn is a slider nobody can judge.",
+   "options": [
+    "The Spend chart is enough",
+    "Draw a cue on the map (e.g. depleted deposits shaded)"
+   ],
+   "recommendation": "The chart is enough until the map has a resource layer; a decorative cue would misstate the ground.",
+   "files": [
+    "docs/ui/STARTUP.md",
+    "src/ui/startup_screens.cpp"
+   ],
+   "resolution": "Ben, 2026-10-11: the Spend chart is enough; no cue on the map."
+  },
+  {
+   "id": "NR-1038",
+   "title": "DECISION TAKEN: the Life map neither pans nor zooms, matching the pass rounds",
+   "raised": "2026-10-11",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1280 (Life round 2D map) build, 2026-10-11",
+   "what": "STARTUP.md left pan/zoom on the Life map open. The pass rounds' map takes no mouse input, so the Life map takes none either. Written into STARTUP.md § The Life map.",
+   "why_it_matters": "Whether a player can read detail on the Life map before the history runs.",
+   "recommendation": "Confirm; revisit for both maps together if reading is hard at the live click.",
+   "files": [
+    "docs/ui/STARTUP.md"
+   ],
+   "resolution": "Ben, 2026-10-11: confirmed - no pan or zoom on the Life map, matching the pass rounds."
+  },
+  {
+   "id": "NR-1039",
+   "title": "DECISION TAKEN: save_game_version 23 reads a v22 save (the nation targets as unset) instead of refusing it",
+   "raised": "2026-10-11",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1278 (nation count targets) lane A, 2026-10-11",
+   "what": "Every earlier envelope bump refused the old version outright. v23 appends the two nation targets at the very end of the envelope, so a v22 file is a v23 file minus 8 bytes; read_save_game now accepts v22 and reads both targets as 0 (natural count). v21 and older are still refused. Tested by save_envelope_roundtrip S9.",
+   "why_it_matters": "It breaks the envelope's strict-equality convention for one version, so a v22 save keeps loading.",
+   "options": [
+    "Keep: v22 loads with unset targets",
+    "Revert to strict refusal (two lines in read_save_game plus test S9)"
+   ],
+   "recommendation": "Keep: nothing in a v22 world depends on a target, and unset is exactly what it was built under.",
+   "files": [
+    "src/core/save_game.cpp",
+    "tools/verify/save_envelope_roundtrip.cpp"
+   ],
+   "resolution": "Ben, 2026-10-11: keep - a v22 save loads with the targets unset."
+  },
+  {
+   "id": "NR-1040",
+   "title": "DECISION TAKEN: inside the history, a city state is a one-region realm with people and a centre on its ground",
+   "raised": "2026-10-11",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1278 (nation count targets) lane B, 2026-10-11",
+   "what": "The size floor now runs in the history, before campaign population centres exist. The old exemption tested a campaign centre in the realm's carve cell; inside the history the only reading is region::centres > 0 with population > 0 on its one anchored region. That reading spares a few more small realms: natural nation counts move 19..73 -> 20..76 (mean 46.1 -> 46.8); majors unchanged.",
+   "why_it_matters": "It is the whole cause of the floor move's count movement on settled worlds with no targets set.",
+   "options": [
+    "Keep the history-grain reading",
+    "Build a centre-placement oracle into the closing rounds so the count is preserved exactly (placement logic before the close; heavy)"
+   ],
+   "recommendation": "Keep: the history-grain test is the doc's own wording, and the movement is about one nation a seed.",
+   "files": [
+    "src/world/closing_rounds.cpp",
+    "docs/generation/NATION_GENERATION.md"
+   ],
+   "resolution": "Ben, 2026-10-13: accepted."
+  },
+  {
+   "id": "NR-1041",
+   "title": "NOVEL WORK: the nation carve now crosses into the history sim as an oracle",
+   "raised": "2026-10-11",
+   "kind": "novel-work",
+   "status": "resolved",
+   "source": "BL-1278 (nation count targets) lane B, 2026-10-11",
+   "what": "To land the total inside the history, the carve was pulled out of generate_nations into a shared carve_from_seeds, and the history's closing rounds call a preview of it to predict the fold's count (with a drift guard in generation). No doc owns a carve that the history reads; NATION_GENERATION.md owns the ruling only.",
+   "why_it_matters": "A new seam between the history sim and nation generation, which every later change to either must respect.",
+   "recommendation": "Accept, and have NATION_GENERATION.md § Pass 2c/2d describe the closing rounds and the shared carve (D1 follow-through).",
+   "files": [
+    "src/world/closing_rounds.cpp",
+    "src/world/nation_generation.cpp"
+   ],
+   "resolution": "Ben, 2026-10-13: accepted; NATION_GENERATION.md to describe the closing rounds and shared carve."
+  },
+  {
+   "id": "NR-1042",
+   "title": "NOVEL WORK: five extra levers BL-1287 (rise and fall) needed to make a rise possible",
+   "raised": "2026-10-12",
+   "kind": "novel-work",
+   "status": "resolved",
+   "source": "BL-1287 build, 2026-10-12",
+   "what": "Appetite and cohesion/supply alone could not lift any realm. The build added, each fixing a measured cause: (1) a defensive network rally - the rising realm's armies march to its own attacked region (BL-921 gather run from the defender's side); (2) the seat keeps its guard; (3) the lean also strengthens Organise, with cultural opposition cut per level; (4) no press at a creed fault line (reasserted alien ground excluded - seeds looped conquest/schism 27-52 times); (5) a stale-reading fix behind secession_waits_for_holder (Empires only): a region conquered this round carried its old holder's supply reading and re-seceded the same round.",
+   "why_it_matters": "Each is new Empires behaviour beyond the ruled levers; (5) is a defect fix that may matter beyond the rise.",
+   "recommendation": "Accept all five and write them into CIVILISATION.md with the rise; consider (5) for every realm, not only behind its flag.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/CIVILISATION.md"
+   ],
+   "resolution": "Ben, 2026-10-13: all five accepted; the stale-reading fix extends to every span (CIVILISATION.md; BL-1303)."
+  },
+  {
+   "id": "NR-1043",
+   "title": "DECISION TAKEN: civil-war refugees do not carry their region's ceiling; flight is bounded by the destination's room",
+   "raised": "2026-10-12",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1290 build, 2026-10-12",
+   "what": "The first build followed the NR-958 stream rule (migrants carry their ceiling), which permanently lowered war-torn regions' ceilings and compounded (seed 9: a struck region ended at 8 per mille of its farmland ceiling). Replaced: flight lands at most the destination's room, exactly that many leave, ceilings unmoved (seed 9 minimum now 134 per mille). 417 of 2,695 strikes found no refuge and moved nobody (counted).",
+   "why_it_matters": "It diverges from NR-958 for civil-war flight only.",
+   "recommendation": "Accept: a war that evicts people should not shrink the ground forever.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/MILITARY_HISTORY.md"
+   ],
+   "resolution": "Ben, 2026-10-13: accepted."
+  },
+  {
+   "id": "NR-1044",
+   "title": "DECISION TAKEN: revolution calibration - Gini city disparity 600, pressure 6000, 3+ cities; fires on 3 of 16 seeds",
+   "raised": "2026-10-13",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1294 build",
+   "what": "The revolution lean's numbers were the builder's: a realm with 3+ cities whose urban Gini spread is at or above 600 per mille accumulates pressure (excess x years x (2000 - cohesion)/1000); at 6000 a splinter takes the nation (new regime, new coined name). Result: 5 revolutions on seeds 31, 32, 40. Old names are read from the Exploration record, so earlier Industrialisation events print the new name (a saved former-name table would need a version bump).",
+   "why_it_matters": "How often revolutions happen, and whether the anachronistic name in earlier events matters on the seat card / ledger.",
+   "recommendation": "Accept 3/16 as the lean; revisit the former-name table only if the History ledger shows the anachronism.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "docs/generation/INDUSTRIALISATION.md"
+   ],
+   "resolution": "Ben, 2026-10-13: more often - about a third of seeds (INDUSTRIALISATION.md; BL-1304)."
   }
  ]
 }

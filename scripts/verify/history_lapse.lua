@@ -10,11 +10,11 @@
 --
 --   ProjectIo --verify scripts/verify/history_lapse.lua
 --
--- WHAT THIS CHECKS, and what it deliberately cannot. A lapse round replaces the
--- wizard's globe with a 2D MAP and plays the recorded Era -1 ownership history
--- across it, with an ordered, capped board of sixteen polities beside it. A
--- globe shows a world; a map shows a FRONTIER (Ben, 2026-09-08, at the live
--- app), and the frontier is this round's whole subject.
+-- WHAT THIS CHECKS, and what it deliberately cannot. A lapse round plays the
+-- recorded Era -1 ownership history across the wizard's 2D MAP, with an
+-- ordered, capped board of sixteen polities beside it. A map shows a FRONTIER
+-- (Ben, 2026-09-08, at the live app), and the frontier is this round's whole
+-- subject.
 --
 -- The review question is the same one ages_replay.lua asks and for the same
 -- reason: the subject is TIME, so a single frame says almost nothing. Three
@@ -30,7 +30,7 @@
 -- affordable. `verify.history_run` adopts the record the harness's own world
 -- already carries (`m_generation_report`) rather than running the project's most
 -- expensive pass a second time to reproduce a record it is holding. Playback is
--- frozen under --verify exactly as the globe's rotation is, so `history_year` is
+-- frozen under --verify, so `history_year` is
 -- the only thing that moves the playhead and no capture can race an animation.
 --
 -- 1920x1080, the design-review resolution.

@@ -218,6 +218,21 @@ enum class lapse_event_kind : uint8_t
     rung_crossed        = 22, ///< BL-1100: a POLITY's materials capacity reached the Industrial rung (`polity::industrial_year`, INDUSTRIALISATION.md sec Beat 1 "The span's industrial moment is the polity's crossing"); `region` = its capital that year, `polity` = the polity, `other` = none. ITS OWN KIND, not a reuse of `furnace_lit` (Ben's either/or, 2026-09-24, R16): a region furnace is Stage 4's ground-by-ground lag and never lights on a generated world, while this is the realm's crossing the sim computes -- one kind per fact, so the ember layer can mark the capital without claiming the region's furnace lit. RECORD-ONLY, noted once per polity (save_game_version 22).
     cradle              = 23, ///< BL-1091: a cradle people's opening — `region` = the cradle seat (the first region it held), `polity` = the culture, dated the migration's start (2400 BCE); its name and package are the settlement's pure-output records, resolved read-side. Emitted by `build_migration_timelapse` alone; the migration record's second kind beside `culture_split` (save_game_version 22).    count
     sea_leg_campaign    = 24, ///< BL-1095: a WET campaign launched — `region` = the target, `polity` = the attacker, `other` = the staging hub it was victualled from (EXPLORATION.md sec Force persists now: "a wet campaign is a moment of its own on the record"). Noted beside the leg's `note_sea_leg`, under the same Exploration/Industrialisation gate, so the Empires record carries none (save_game_version 22).
+    absorbed_at_close   = 25, ///< BL-1278: a CLOSING-ROUND ABSORPTION in Industrialisation (NATION_GENERATION.md sec Pass 2c, sec The nation count is a target): ground below the minimum territory, or surplus to the player's total, absorbed by a neighbour. `region` = the absorbed realm's capital (or the unheld region), `polity` = the absorbed realm (`lapse_event_none` for ground no realm held), `other` = the absorber. The cause is the prose line beside it in the history.
+    seceded_at_close    = 26, ///< BL-1278: a CLOSING-ROUND SECESSION in Industrialisation, closing a total the history left short (sec The nation count is a target); `region` = the new seat, `polity` = the successor, `other` = the parent realm.
+    champion_chartered  = 27, ///< BL-1278 lane C: the major target wanted one more major, and the richest championless minor chartered a NATIONAL CHAMPION from its own centre's budget (`reconcile_majors`, after the landscape search, DATED BACK into Industrialisation's closing round). `region` = the centre's region, `polity` = the minor's realm (the fold's `nation_polity`), `other` = none.
+    state_charter       = 28, ///< BL-1278 lane C: as `champion_chartered`, but the centre's budget fell short of the specialist price and the nation's TREASURY made up the gap (NATION_GENERATION.md: "the event is recorded as a state charter"). Same fields.
+    champion_bought_out = 29, ///< BL-1278 lane C: the major target wanted one fewer major, and the richest major's champion bought the poorest major's specialist whole — a cross-border buy-out; the seller became a minor. A generation event, never a corp verb. `region` = the sold firm's origin region, `polity` = the seller's realm, `other` = the buyer's realm.
+    civil_war_famine    = 30, ///< BL-1290 (MILITARY_HISTORY.md sec Armies are distinct from population, Ben 2026-10-12): a region FOUGHT OVER in a civil war (a battle between a successor and the parent it broke from, inside the window) lost a share of its people to famine this round. `region` = the region, `polity` = its holder when the battle was fought, `other` = the attacking half. Empires record only (save_game LAYOUT 23 note).
+    civil_war_flight    = 31, ///< BL-1290: as above, a further share FLED to the nearest safe region of the same people that could feed them (conserved: exactly the heads landed left; no ceiling moves). `region` = the region fled, `polity` = its holder, `other` = the destination REGION (a region index, as `trade_link_opened`'s `other`).
+    rise_pressed        = 32, ///< BL-1287: the rise and fall's lean pressed the realm largest at 200 BCE one level harder on its way up (CIVILISATION.md sec How an empire actually falls) — its campaigns pressed, its network carrying further, its victories steadying it. `region` = its capital, `polity` = the realm, `other` = the level (1 = the lean, more = the backstop's escalation). Empires record only.
+    overextended        = 33, ///< BL-1287: after its peak the same realm's network was overextended one level further — its roads and works decay on the ground (`work_reach_mod`) and its far garrisons go home to the capital, so far ground falls under the secession floor and walks away (BL-896). `region` = its capital, `polity` = the realm, `other` = the level. Empires record only.
+    late_culture_chosen = 34, ///< BL-1288: at the Culture close (the Empires record's open) the founding culture MOST REMOTE BY REACH was named the late culture (EXPLORATION.md sec A colony is a subject; `late_culture_rules.hpp` says how reach is measured). `region` = its most populous region then, `polity` = the CULTURE index (as `culture_split`), `other` = its remoteness (the cheapest walk to foreign ground, clamped to 0xFFFE; `lapse_event_none` when the network joins it to nobody). Empires record only, once; the detector reads the culture HERE.
+    isolation_pressed   = 35, ///< BL-1288: the late culture's backstop pressed one level further. `other` below 100 is the ISOLATION on its founding ground at that level (every step touching it costs more, for every walker), raised in the Empires record and, until it is bound, in the Exploration record; `other` of 100 + n is the Exploration CONTACT press's level n (the nearest sea power not yet met reaches its realms). `region` = the culture's pinned region, `polity` = the CULTURE index.
+    war_joined          = 36, ///< BL-1289 (INDUSTRIALISATION.md sec A world war in every world): a realm ENTERED the world war -- `region` = its capital, `polity` = the realm, `other` = the realm whose side it took (its mutual-defence partner, its overlord, or the side's leader). The FIRST of the kind in a record is the declaration: `polity` the realm that opened the war, `other` the realm it opened on, `region` the ground it was opened over. Industrialisation record only (save_game LAYOUT 23 note).
+    ground_razed        = 37, ///< BL-1289: a region the world war was FOUGHT OVER was razed (once in the war): its works and port stock cut and every road through it demoted one tier; the front's blockade famine and flight follow while the war stands. `region` = the region, `polity` = its holder, `other` = the enemy realm whose front reached it.
+    war_peace           = 38, ///< BL-1289: peace ended the world war -- `polity` = the realm that opened it, `other` = the realm it opened on, `region` = the ground it was opened over.
+    revolution          = 39, ///< BL-1294 (INDUSTRIALISATION.md sec Revolution, Ben 2026-10-10/12): a splinter rose in a realm whose cities stood far apart and TOOK THE WHOLE NATION -- the same polity id and ground, a NEW REGIME and a newly COINED NAME (the one sanctioned rename, CIVILISATION.md sec A realm's name). `region` = the city the splinter rose in, `polity` = the realm, `other` = its new regime (`polity::regime`, 1 = the first regime after its founding one). The OLD name is the Exploration record's realm name table entry for the same id; the record's own table carries the new. Industrialisation record only (save_game LAYOUT 23 note).
     count};
 
 /// No party in this slot — a founding has no killer, a cradle culture no parent.
@@ -292,7 +307,12 @@ struct era_timelapse
     /// included, so an index that names them stays valid across records.
     /// Empty on the migration record (its owners are cultures) and on a body
     /// the era never ran for; filled from the polity table whether or not the
-    /// playback was recorded, since the names live on the polities. Never read
+    /// playback was recorded, since the names live on the polities. ONE
+    /// SANCTIONED RENAME (BL-1294, INDUSTRIALISATION.md sec Revolution): a
+    /// realm a revolution took carries its NEW name here, and the record's
+    /// `revolution` event names it; its old name is the entry for the same id
+    /// on the record before (the Exploration record's table), so the two
+    /// tables and the event together carry both. Never read
     /// by the sim: record data, not world state. Written after the three
     /// tables above (save_game_version 22).
     std::vector<std::string>     polity_name;
@@ -459,6 +479,18 @@ struct era_lapse_tap
         std::lock_guard<std::mutex> lock(mutex);
         for (std::size_t i = polity_name.size(); i < all_names.size(); ++i)
             polity_name.push_back(all_names[i]);
+        epoch.fetch_add(1, std::memory_order_release);
+    }
+
+    /// Worker side (BL-1294): THE ONE SANCTIONED RENAME. A revolution
+    /// (`lapse_event_kind::revolution`) gives a realm a newly coined name, so
+    /// the entry already copied for id @p id is restated in place -- the only
+    /// write to the table that is not a tail append. Ignored for an id the
+    /// tap does not hold yet (the next `publish_polity_names` copies it).
+    void restate_polity_name(std::size_t id, const std::string& name)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (id < polity_name.size()) polity_name[id] = name;
         epoch.fetch_add(1, std::memory_order_release);
     }
 

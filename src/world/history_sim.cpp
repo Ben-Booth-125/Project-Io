@@ -1,19 +1,24 @@
 #include "history_sim.hpp"
+#include "closing_rounds.hpp" // BL-1278: the size floor and the total, planned for the close
 
 #include "ocean_currents.hpp" // BL-1120: the current field a sea leg is priced with
 
 #include "charter_price.hpp"  // BL-1099: the running charter price the works notes are read against
 #include "unit_roster.hpp"
+#include "history_pattern_detectors.hpp" // BL-1288: the late culture's lag, one reading with the detector
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <climits>
 #include <cstdint>
 #include <cstdlib>
+#include <climits>
 #include <limits>
 #include <map>
 #include <queue>
+#include <set>
 #include <unordered_map>
 
 // ---------------------------------------------------------------------------
@@ -149,11 +154,6 @@ int region_value_q(const region& p)
 /// its scoring site never went through `region_value_q` in the first place
 /// (it reads `w_farm`/`w_ore`/`w_port` against the target directly), so this
 /// term is added there, and there only.
-/// BL-973: a modifier term read for a region's OWNER (defined with the tree
-/// effect surface, below the run loop, in this same unnamed namespace;
-/// declared here because the campaign pricing and resolution sites inside
-/// `run_history_sim` read it).
-int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t);
 
 /// Per-mille of prize one centre's worth of urban heads carries in the
 /// settlement term, saturating at five (50,000 heads). BL-1130 (Ben,
@@ -376,6 +376,74 @@ int64_t stack_size(const std::vector<army_stack_entry>& s)
 }
 
 } // namespace
+
+void apply_coastal_naval_ramp(std::vector<polity>& polities, const std::vector<region>& regions,
+                              const history_sim_params& p, int64_t year)
+{
+    const int64_t techs = coastal_sea_techs_at(p, year);
+    if (techs <= 0) return;
+    std::vector<char> coastal(polities.size(), 0);
+    for (const region& r : regions)
+        if (r.port_q > 0 && r.nation >= 0 && static_cast<std::size_t>(r.nation) < coastal.size())
+            coastal[static_cast<std::size_t>(r.nation)] = 1;
+    for (std::size_t i = 0; i < polities.size(); ++i)
+    {
+        polity& q = polities[i];
+        if (!q.alive || q.id != static_cast<int>(i) || !coastal[i]) continue;
+        q.naval_sea_techs = std::max<int64_t>(q.naval_sea_techs, techs);
+    }
+}
+
+bool polity_naval_capable(const std::vector<region>& regions, const polity& q,
+                          const history_sim_params& p, int64_t year)
+{
+    if (!sea_legs_open(p, year)) return false;
+    const roster_band band = roster_band_for_capacity(
+        clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+    for (const region& r : regions)
+        if (r.nation == q.id && can_field_naval(r, band)) return true;
+    return false;
+}
+
+int64_t sea_legs_navy_floor(const std::vector<region>& regions, const std::vector<polity>& polities,
+                            const history_sim_params& p, int64_t year)
+{
+    if (!sea_legs_open(p, year)) return 0;
+    // One pass over the regions, in index order: a polity is capable once any
+    // region it holds can field a navy at its band (the polity_naval_capable
+    // test, folded so the cost is O(regions), not O(polities x regions)).
+    std::vector<char> capable(polities.size(), 0);
+    for (const region& r : regions)
+    {
+        if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+        const std::size_t i = static_cast<std::size_t>(r.nation);
+        if (capable[i]) continue;
+        const polity& q = polities[i];
+        if (!q.alive || q.id != static_cast<int>(i) || q.overlord >= 0) continue; // free polities only
+        const roster_band band = roster_band_for_capacity(
+            clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+        if (can_field_naval(r, band)) capable[i] = 1;
+    }
+    std::vector<int64_t> navies;
+    for (std::size_t i = 0; i < polities.size(); ++i)
+        if (capable[i]) navies.push_back(polities[i].navy_stock);
+    if (navies.empty()) return 0;
+    std::sort(navies.begin(), navies.end());
+    // THE INDEX RULE: floor((n - 1) x P / 100), integer arithmetic.
+    const std::size_t at = ((navies.size() - 1) * static_cast<std::size_t>(sea_legs_fleet_percentile)) / 100;
+    return navies[at];
+}
+
+bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
+                           const history_sim_params& p, int64_t year, int64_t navy_floor)
+{
+    if (!polity_naval_capable(regions, q, p, year)) return false;
+    // A fleet afloat has a hull (Ben, 2026-10-10), and it stands at or above
+    // the year's 90th-percentile entry (index floor((n-1)*90/100)) of the
+    // free naval-capable navies (Ben, 2026-10-11).
+    return q.navy_stock > 0 && q.navy_stock >= navy_floor;
+}
+
 
 // ---------------------------------------------------------------------------
 
@@ -1035,7 +1103,9 @@ exploration_spend_scores score_exploration_spend(const history_sim_params&     p
     // eligibility reads is the treasury AFTER upkeep) and the levy bound: a
     // step is a whole step of heads the seat's pool can actually lend.
     s.army_eligible = p.standing_army_build_cost_q > 0 && f.treasury >= p.standing_army_build_cost_q
-                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1);
+                   && f.levy_room >= std::max<int64_t>(p.standing_army_build_step_q, 1)
+                   // BL-1298: and the earn carries the step (`earn_room`, -1 = no bound).
+                   && (f.earn_room < 0 || f.earn_room >= std::max<int64_t>(p.standing_army_build_step_q, 1));
     s.army_q = (cons * p.spend_w_consolidator_q + alarm * p.spend_w_alarm_q) / 1000;
 
     // PORT and NAVY share the OUTWARD pull: expansion, and wants only water reaches.
@@ -1336,6 +1406,26 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         }
     }
 
+    // BL-1298 -- THE WORLD'S HELD GROUND, read once before any polity earns
+    // (NATION_GENERATION.md sec Pass 7, Ben 2026-10-12: "a realm earns by the
+    // share of its world's held ground it holds"). The summed endowment of
+    // every region a living polity holds, and how many living polities hold
+    // any. Only read under `treasury_endowment_world_share`.
+    int64_t world_held_endowment_q = 0;
+    int64_t world_holding_realms   = 0;
+    if (params.treasury_endowment_world_share)
+    {
+        std::vector<char> holds(polities.size(), 0);
+        for (const region& r : regions)
+        {
+            if (r.nation < 0 || static_cast<std::size_t>(r.nation) >= polities.size()) continue;
+            if (!polities[static_cast<std::size_t>(r.nation)].alive) continue;
+            world_held_endowment_q += (r.farm_q + r.ore_q + r.energy_q + r.port_q) / 4;
+            holds[static_cast<std::size_t>(r.nation)] = 1;
+        }
+        for (const char h : holds) world_holding_realms += h;
+    }
+
     // BL-932 -- EARN, the first of "earn, then pay stocks, then invest"
     // (EXPLORATION.md sec The engine is shared). PAY and INVEST beyond the
     // ordinary verb are still owed to a later item (BL-933's stocks).
@@ -1376,11 +1466,41 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             folded += seat.material_stock;
             seat.material_stock = 0;
             seat.treasury = clampi64(seat.treasury + folded, 0, 1LL << 48);
+            if (spend) spend->consolidation_folded += folded; // BL-1298, write-only
         }
 
         // BL-1041: the purse as the round's earn finds it -- the base the
         // round's SURPLUS (earn less the army and navy bills) is read against.
         const int64_t purse_before_earn = seat.treasury;
+
+        // ---- BL-1298 -- THE STANDING LEVY: EVERY ROUND AFTER THE FOLD. ----
+        // NATION_GENERATION.md sec Pass 7 (Ben, 2026-10-11): "a realm taxes
+        // its seats' stores every round -- swept into the chest as the 1200
+        // consolidation once swept it, but every round rather than once." The
+        // ground read is the consolidation's (every held seat, plus the
+        // capital); the take is a per-mille share of each seat's stock,
+        // floored per seat. Earned after the purse's opening read, so it is
+        // part of the round's surplus and of what the realm's earn carries.
+        // Out of domain (outside 1-1000) it levies nothing.
+        int64_t levy_income = 0;
+        if (params.treasury_levy_per_mille_q > 0 && params.treasury_levy_per_mille_q <= 1000
+            && params.consolidation_year != INT64_MIN && year > params.consolidation_year)
+        {
+            const int64_t share = params.treasury_levy_per_mille_q;
+            for (std::size_t ri = 0; ri < regions.size(); ++ri)
+            {
+                region& r = regions[ri];
+                const bool is_cap = static_cast<int>(ri) == q.capital;
+                if (!is_cap && !(r.is_seat && r.nation == q.id)) continue;
+                if (r.material_stock <= 0) continue;
+                // material_stock <= 2^48 and share <= 1000: under 2^58.
+                const int64_t take = (r.material_stock * share) / 1000;
+                r.material_stock -= take;
+                levy_income      += take;
+            }
+            seat.treasury = clampi64(seat.treasury + levy_income, 0, 1LL << 48);
+            if (spend) spend->earn_levy += levy_income; // write-only
+        }
 
         // ---- ONGOING EARN: endowment, the inherited network, a market. ----
         // "Fed by what the polity already holds and already reaches" — read
@@ -1406,9 +1526,26 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (a_held || b_held) ++corridor_touch;
         }
 
-        const int64_t endowment_income =
-            (endowment_mean_q * params.treasury_endowment_income_q / 1000)
+        // BL-1298 (Ben, 2026-10-12): summed over held ground where the span
+        // says so, so a larger realm earns more; the mean form otherwise.
+        // sum_q <= regions x 1000 and the rate is an int: far inside int64.
+        const int64_t endowment_base_q =
+            params.treasury_endowment_summed ? endowment_sum_q : endowment_mean_q;
+        int64_t endowment_income =
+            (endowment_base_q * params.treasury_endowment_income_q / 1000)
                 * std::max(step_years, 1);
+        // BL-1298 (Ben, 2026-10-12) -- AS A SHARE OF THE WORLD: the realm's
+        // share of its world's held endowment, times the realms holding any,
+        // so a realm holding the AVERAGE share earns
+        // `treasury_endowment_income_q` a year whatever the world's size.
+        // A larger realm still earns more (the order holds); a small world's
+        // realms are not poorer for the world being small. Products stay far
+        // inside int64: rate (int) x sum_q (<= regions x 1000) x realms.
+        if (params.treasury_endowment_world_share)
+            endowment_income = world_held_endowment_q > 0
+                ? ((static_cast<int64_t>(params.treasury_endowment_income_q) * endowment_sum_q
+                    * world_holding_realms) / world_held_endowment_q) * std::max(step_years, 1)
+                : 0;
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
         // BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING.
@@ -1427,6 +1564,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         seat.treasury = clampi64(
             seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
+        if (spend) // BL-1298 census, write-only
+        {
+            spend->earn_endowment += endowment_income;
+            spend->earn_corridor  += corridor_income;
+            spend->earn_trade     += trade_income;
+        }
 
         // ---- BL-972 -- THE BILL, before any purchase. ----------------------
         // EXPLORATION.md sec Force persists now: each stock is one "the
@@ -1441,10 +1584,72 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         const int64_t years_q = std::max(step_years, 1);
         const std::size_t pi = static_cast<std::size_t>(&q - polities.data());
         const bool had_navy = q.navy_stock > 0; // the round's OPENING fleet, for the lapse record
+        int64_t earn_carry_cap = -1; // BL-1298: -1 = no bound (sizing off, or no bill)
         {
-            const int64_t heads = realm_paid[pi];
+            int64_t heads = realm_paid[pi];
             const int64_t rate  =
                 std::max<int64_t>(params.standing_army_upkeep_per_1000_heads_year_q, 0) * years_q;
+            // BL-1298: what the round's earn carries, read once -- the sizing
+            // below disbands down to it and the army step may not buy past it.
+            // It excludes the 1200 fold (a one-off windfall is not an earn the
+            // realm can pay a standing army from), by construction: the fold
+            // is credited above, before `purse_before_earn`, and is not in
+            // these terms.
+            if (params.standing_army_sized_to_earn && rate > 0)
+            {
+                const int64_t round_earn_all = std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                earn_carry_cap = round_earn_all >= (INT64_MAX / 1000) ? INT64_MAX
+                                                                      : (round_earn_all * 1000) / rate;
+            }
+            // ---- BL-1298 -- THE ARMY IS SIZED TO WHAT THE REALM EARNS. ----
+            // EXPLORATION.md sec Force persists now (Ben, 2026-10-11,
+            // overturning NR-878 for the standing army): "a realm keeps only
+            // the standing army its earn can carry". Where the round's bill
+            // exceeds the round's earn, every region carrying this realm's
+            // paid heads keeps the same per-mille share -- the share the earn
+            // carries -- and the rest go home to that ground's pool, capped
+            // at its ceiling, as the unpaid decay's men do. The bill below is
+            // then within the earn, so the chest is never drawn down by it.
+            if (params.standing_army_sized_to_earn && heads > 0 && rate > 0)
+            {
+                const int64_t round_earn = std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                // heads <= 2^48 and rate <= ~2^34 at any sane constant; the
+                // division form keeps the comparison free of the product.
+                const int64_t carried = std::min<int64_t>(heads,
+                    round_earn >= (INT64_MAX / 1000) ? heads : (round_earn * 1000) / rate);
+                if (carried < heads)
+                {
+                    // carried < heads <= 2^48, so carried * 1000 < 2^58.
+                    const int64_t keep_q = (carried * 1000) / heads; // 0..999
+                    int64_t kept_sum = 0, gone_sum = 0;
+                    for (region& r : regions)
+                    {
+                        if (r.nation != q.id) continue;
+                        const int64_t paid = standing_army_heads(r);
+                        if (paid <= 0) continue;
+                        const int64_t kept = (paid * keep_q) / 1000;
+                        const int64_t gone = paid - kept;
+                        r.standing_army = kept;
+                        r.army_stock    = std::max<int64_t>(r.army_stock - gone, 0);
+                        // Clamped at the pool's ceiling exactly as BL-972's
+                        // unpaid decay and `muster_garrison`'s disband are: a
+                        // head past the ceiling is not returned (known, kept).
+                        const int64_t ceiling = manpower_ceiling(r.population, r.work_manpower_mod);
+                        r.manpower_stock = clampi64(r.manpower_stock + gone, 0, ceiling);
+                        kept_sum += kept;
+                        gone_sum += gone;
+                    }
+                    heads = kept_sum;
+                    realm_paid[pi] = kept_sum;
+                    if (spend)
+                    {
+                        spend->army_disbanded_by_earn += gone_sum;
+                        ++spend->army_sized_rounds;
+                    }
+                }
+            }
             if (heads > 0 && rate > 0)
             {
                 const int64_t due = (heads * rate) / 1000;
@@ -1512,8 +1717,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // there is nowhere for its works to stand: no debit, no credit, and the
         // treasury keeps the round's share. (It used to land the whole credit on
         // the capital's region, townless ground no campaign centre can receive.)
-        // A treasury unit is `industry_points_per_treasury_unit` points (a
-        // unit choice, history_sim.hpp says why). Only inside the span (the switch,
+        // A thousand treasury units are `industry_points_per_1000_treasury_units`
+        // points (a unit choice, history_sim.hpp says why). Only inside the span (the switch,
         // from its open year) and only on in-domain constants; a conversion
         // that would carry ANY receiving region past `industry_points_ceiling`,
         // or whose heads leave the apportionment's domain, is refused whole and
@@ -1523,12 +1728,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         {
             const int64_t surplus = std::max<int64_t>(seat.treasury - purse_before_earn, 0);
             // surplus <= 2^48 (the treasury's own clamp) and share <= 1000, so
-            // the product stays under 2^58; `paid_in` <= 2^48, and times the
-            // exchange rate (<= 10^4 < 2^14) the credit stays under 2^62.
+            // the product stays under 2^58; `paid_in` <= 2^48.
             const int64_t paid_in = (surplus * params.industry_points_treasury_share_q) / 1000;
             if (paid_in > 0)
             {
-                const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
+                const int64_t credit = industry_points_for_treasury_units(
+                    paid_in, params.industry_points_per_1000_treasury_units);
                 std::vector<std::pair<int, int64_t>> spread;
                 bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread, works);
                 // BL-1169 -- A CROWDED HEARTLAND CONVERTS AT A LOWER RATE
@@ -1543,7 +1748,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 {
                     const int64_t kept = industry_points_crowd_brake(
                         regions, spread, params.industry_points_crowding_k,
-                        params.industry_points_per_treasury_unit, works);
+                        params.industry_points_per_1000_treasury_units, works);
                     if (kept < 0) refuse = true; // out of the brake's domain: refused whole
                     else debit -= kept;
                 }
@@ -1613,6 +1818,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.levy_room           =
             (std::max<int64_t>(seat.manpower_stock, 0)
              * clampi(params.standing_army_levy_per_mille_q, 0, 1000)) / 1000;
+        // BL-1298: the earn's room, after the sizing (`realm_paid` is post-sizing).
+        facts.earn_room = earn_carry_cap < 0 ? -1
+                        : std::max<int64_t>(earn_carry_cap - realm_paid[pi], 0);
         const exploration_spend_scores pick_scores = score_exploration_spend(params, facts);
         const exploration_spend_option pick = choose_exploration_spend(pick_scores);
         if (spend != nullptr) // BL-1152 diagnosis, report only
@@ -1902,23 +2110,6 @@ int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regi
 int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water)
 {
     return met_across_water ? p.treaty_far_sea_penalty_q : p.treaty_far_penalty_q;
-}
-
-/// BL-1147 -- the three coastal sea techs whose taking is a naval deed
-/// (EMPIRE_TREE.md: Deep-Hull Sail, Lateen & Long-Range Rig, Ocean-Rated
-/// Hulls), as a mask over the empire tree's node indices, found by id once.
-static uint64_t coastal_sea_tech_mask()
-{
-    static const uint64_t mask = [] {
-        uint64_t m = 0;
-        for (int i = 0; i < io::empire_tree::node_count; ++i)
-        {
-            const std::string id = io::empire_tree::nodes[i].id;
-            if (id == "EM-RD-2b" || id == "EM-RD-3b" || id == "EM-RD-4a") m |= (1ULL << i);
-        }
-        return m;
-    }();
-    return mask;
 }
 
 void update_coast_cells(coast_cells& c, const std::vector<region>& regions,
@@ -3016,8 +3207,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // and gated by `road_tier1_uses`/`road_tier2_uses` below. A plain
     // `unordered_map` is safe here (unlike the ownership/political state)
     // because nothing iterates it — every read is a point lookup on a key
-    // computed from region indices, never a walk in map order.
+    // computed from region indices, never a walk in map order. (Two readers
+    // walk it to COLLECT keys and then sort them before acting: `capture_state`
+    // and the world war's demotions, BL-1289.)
     std::unordered_map<uint64_t, int> road_uses_live;
+    // BL-1289 -- POST ROADS THE WORLD WAR DEMOTED. A Post Road is bought, never
+    // walked into existence (BL-940): once the war knocks one down to a Road,
+    // ordinary traffic must not walk it back up, so `note_corridor` holds these
+    // edges one use under `road_tier3_uses` until a purchase rebuilds them
+    // (`try_build_post_road` takes the edge out). Membership only.
+    std::set<uint64_t> ww_held_below_post;
 
     // BL-1097 -- THE SEA-LEG RECORD, on the road record's exact footing: a
     // raw (lo, hi) list appended as legs are crossed and folded into
@@ -3368,6 +3567,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int64_t event_year = params.start_year;
     const auto note_event = [&](lapse_event_kind kind, int region_idx, int polity_id,
                                 int other_id) {
+        // BL-1288: a polity's BIRTH SEAT, set once beside the note that first
+        // names it -- before the record gate, so a run without the playback
+        // knows the same seats (`polity::birth_seat`).
+        if ((kind == lapse_event_kind::founded || kind == lapse_event_kind::broke_away
+             || kind == lapse_event_kind::schism || kind == lapse_event_kind::inherited)
+            && polity_id >= 0 && static_cast<std::size_t>(polity_id) < out.polities.size()
+            && out.polities[static_cast<std::size_t>(polity_id)].birth_seat < 0)
+            out.polities[static_cast<std::size_t>(polity_id)].birth_seat = region_idx;
         if (!params.record_playback) return;
         const auto slot = [](int v) {
             return (v < 0 || v >= static_cast<int>(lapse_event_none))
@@ -3421,6 +3628,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
         int& uses = road_uses_live[edge_key(a, b)];
         const int before = road_tier_for_uses(uses);
         ++uses;
+        // BL-1289: a demoted Post Road is not re-promoted by a walk.
+        if (before < 3 && uses >= params.road_tier3_uses && !ww_held_below_post.empty()
+            && ww_held_below_post.count(edge_key(a, b)))
+        {
+            uses = params.road_tier3_uses - 1;
+            ++out.world_war_walks_held_below_post;
+        }
         const int after = road_tier_for_uses(uses);
         if (after == before) return;
 
@@ -3622,6 +3836,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         seat.treasury -= params.post_road_treasury_cost;
         road_uses_live[edge_key(a, b)] = params.road_tier3_uses;
+        if (ww_held_below_post.erase(edge_key(a, b)) > 0) // BL-1289: bought back, it is a Post Road again
+            ++out.world_war_post_roads_rebought;
         ++roads_version;
         ++out.post_roads_built;
         out.treasury_spent_on_roads += params.post_road_treasury_cost;
@@ -3795,13 +4011,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
     /// inheritance. What survives is `realm_ended`, raised from every surviving
     /// polity of the dead realm's people toward its killer, walked in polity-id
     /// order so the set and its order are both deterministic.
-    const auto extinguish_polity = [&](int dead, int killer, int region_idx, int64_t year) {
+    // `note_death` false (BL-1278): a closing-round absorption records the
+    // death as its own `absorbed_at_close` event, which says why; a second
+    // `realm_ended` line would misstate the cause as a conquest.
+    const auto extinguish_polity = [&](int dead, int killer, int region_idx, int64_t year,
+                                       bool note_death = true) {
         const int dead_culture = (dead >= 0 && dead < static_cast<int>(out.polities.size()))
                                ? out.polities[static_cast<std::size_t>(dead)].culture : -1;
         // BL-916: THE DEATH IS RECORDED HERE, at the one site that knows the
         // killer. The step record samples living polities only, so a realm's
         // end used to be an absence a reader had to infer — and inferred wrong.
-        note_event(lapse_event_kind::realm_ended, region_idx, dead, killer);
+        if (note_death) note_event(lapse_event_kind::realm_ended, region_idx, dead, killer);
         out.grudges.erase(
             std::remove_if(out.grudges.begin(), out.grudges.end(),
                            [&](const grudge& g) {
@@ -3844,6 +4064,35 @@ history_sim_state run_history_sim(settlement_state&         ss,
             raise_grudge(kin.id, killer, grudge_kind::realm_ended,
                          region_idx, year, params.grudge_realm_ended);
         }
+    };
+
+    // BL-1287 (a defect the rise exposed) -- GROUND TAKEN THIS ROUND IS NOT
+    // MEASURED UNTIL ITS NEW HOLDER'S NEXT TURN. `region::network_supply_q` is
+    // written in its holder's own turn, so a region conquered this round still
+    // carries its OLD holder's reading (or the conqueror's own stale one from
+    // before it was lost), and the secession walk at the round's end read that:
+    // a seat taken from a successor that stands later in the id order seceded
+    // again the same round, to be retaken the next -- a loop of capture and
+    // breakaway nothing on the map caused. The same rule as a successor born
+    // this round, which does not secede in its birth round. The year each
+    // region last changed hands by conquest; local, never saved.
+    std::vector<int64_t> taken_year(ss.regions.size(), INT64_MIN);
+    // ...and the round each polity last measured its own ground (its turn
+    // reached the supply reading), so a turn that ended early secedes nothing.
+    std::vector<int64_t> supply_read_year;
+
+    // BL-1287 (Ben, 2026-10-13, CIVILISATION.md sec How an empire actually
+    // falls) -- BARE GROUND RELAYS NO SUPPLY, FOR THE FALLING REALM ONLY. The
+    // regions of `rf_relay_realm` marked here are reached by its reach walk
+    // but relay nothing onward (`rebuild_reach`), so a thinned outer march
+    // cuts the network and the ground beyond it secedes by BL-896. Filled at
+    // that realm's turn (below), empty for every other realm and phase.
+    std::vector<char> rf_relay_bare;
+    int               rf_relay_realm = -1;
+    bool              rf_relay_dirty = false;
+    const auto note_taken = [&](std::size_t i) {
+        if (taken_year.size() <= i) taken_year.resize(i + 1, INT64_MIN);
+        taken_year[i] = event_year;
     };
 
     // --- Neighbour index (BL-855: degree-capped) ---------------------------
@@ -4130,10 +4379,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // below and by `campaign_supply`'s last hop onto a target (BL-922) -- the
     // file's standing thesis: a cost authored on one scale and spent on
     // another is the bug, so both ask the identical question.
+    // BL-1288 -- THE LATE CULTURE (late_culture_rules.hpp), declared here
+    // because `edge_step` reads its isolation press: the culture chosen at the
+    // Culture close (-1 none), and the two levels the backstop has raised.
+    int lc_culture   = -1;
+    int lc_level     = 0;
+    // THE ISOLATION PRESS, ON THE GROUND -- one isolation with the two faces
+    // the ruling names (Ben, 2026-10-11: "the isolation that slows its
+    // development also slows its conquest"). Every step touching the late
+    // culture's founding ground costs `late_isolation_step_q` per mille more
+    // per level, plus `late_isolation_step` reach per level (so a short step is
+    // not exempt), for every walker (supply, campaigns, Organise, the
+    // diffusion) -- never a term in a scorer: the ground goes unwalked, as if
+    // the way were that much further and harder. On the approaches it slows
+    // whoever would march in or carry news in (its conquest, its diffusion);
+    // between two of its own regions it keeps its people apart in small holds
+    // (its development). Identity with the press off, so every other run is
+    // digit-identical.
+    const auto lc_step_level = [&](int a, int b) -> int {
+        if (lc_level <= 0 || lc_culture < 0) return 0;
+        const bool la = ss.regions[static_cast<std::size_t>(a)].founding_culture == lc_culture;
+        const bool lb = ss.regions[static_cast<std::size_t>(b)].founding_culture == lc_culture;
+        return (la || lb) ? lc_level : 0;
+    };
+    const auto lc_press_step = [&](int raw, int level) -> int {
+        const int64_t mul = 1000 + static_cast<int64_t>(level) * clampi(params.late_isolation_step_q, 0, 4000);
+        return static_cast<int>(static_cast<int64_t>(raw) * mul / 1000)
+             + level * clampi(params.late_isolation_step, 0, 100);
+    };
     const auto edge_step = [&](int a, int b) {
         const region& ra = ss.regions[static_cast<std::size_t>(a)];
         const region& rb = ss.regions[static_cast<std::size_t>(b)];
-        const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        if (const int lv = lc_step_level(a, b)) raw_step = lc_press_step(raw_step, lv); // BL-1288
         return raw_step > 0 ? std::max(1, road_discounted(raw_step, road_tier_between(a, b))) : 1;
     };
 
@@ -4146,7 +4424,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     const auto edge_step_at_tier = [&](int a, int b, int tier) {
         const region& ra = ss.regions[static_cast<std::size_t>(a)];
         const region& rb = ss.regions[static_cast<std::size_t>(b)];
-        const int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        int raw_step = region_distance(ra, rb, gw) * (tile_cost(ra) + tile_cost(rb)) / 200;
+        if (const int lv = lc_step_level(a, b)) raw_step = lc_press_step(raw_step, lv); // BL-1288
         return raw_step > 0 ? std::max(1, road_discounted(raw_step, tier)) : 1;
     };
 
@@ -4262,6 +4541,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 done[static_cast<std::size_t>(best)] = true;
             }
 
+            // BL-1287: bare outer ground of the falling realm is reached but
+            // relays nothing onward (its garrison has left the march).
+            if (qid == rf_relay_realm && static_cast<std::size_t>(best) < rf_relay_bare.size()
+                && rf_relay_bare[static_cast<std::size_t>(best)])
+                continue;
             const region& bp = ss.regions[static_cast<std::size_t>(best)];
             // THE REBATE. A fraction of what it COST to get here, never a
             // credit against nothing -- the capital sits at `best_c == 0` and
@@ -4519,6 +4803,349 @@ history_sim_state run_history_sim(settlement_state&         ss,
         last_record_year = y_now;
     };
 
+    // --- BL-1287: THE RISE AND FALL (CIVILISATION.md sec How an empire -----
+    // actually falls, THE RISE AND FALL IS TARGETED; Ben 2026-10-10/11/12).
+    //
+    // The realm largest at `rise_fall_pick_year` rises, peaks by
+    // `rise_fall_peak_by_year` above the floor and under hegemony, then breaks
+    // down -- its share halving inside `rise_fall_window_years` -- through the
+    // BL-896 mechanism alone: its far ground falls under the secession floor
+    // and walks away as city states. NO FIAT TRANSFER: nothing here moves a
+    // region. What moves is forces the sim already prices, each leaned for
+    // this one realm at a LEVEL:
+    //
+    //   rising  -- APPETITE: its campaigns' value (the `campaign_appetite_q`
+    //              idiom, harder at a seat, never at a creed fault line) and
+    //              a flat per-level bid scaled by its own odds, read on
+    //              Organise too, with the opposition Organise reads cut (its
+    //              ascendancy draws strangers in); SUPPLY: the terrain price
+    //              of its reach and its burden of breadth cut, so its levy
+    //              gathers more and its frontier stays supplied, and its
+    //              network RALLIES its armies to a region of its own under
+    //              attack (the BL-921 gather from the defender's side, read
+    //              by the attacker's scorer too) while its seat keeps its
+    //              guard; COHESION: each of its conquests steadies it;
+    //   falling -- OVEREXTENSION, ON THE MAP (Ben, 2026-10-12): no private
+    //              price; its roads and works decay on the ground itself
+    //              (`region::work_reach_mod`, read by anyone, kept by the
+    //              next holder) and its far garrisons go home to the
+    //              capital, so ground far from its seat reads cut off and
+    //              secedes (BL-896).
+    //
+    // The level rises one bounded step at a time, read at the recorded steps'
+    // cadence off the same counts the record samples (so the backstop and
+    // `history_patterns`' detector read one quantity), whenever the realm is
+    // behind its course -- and every step is a recorded cause: a history line
+    // and a lapse event (`rise_pressed`, `overextended`). A miss is never
+    // silent: `rise_fall_missed` carries the clause, and the caller records it
+    // as a violation. Integer throughout; the walks are in polity-id order.
+    const bool rf_on = params.rise_fall_target;
+    int     rf_realm      = -1;
+    int     rf_phase      = 0; // 0 before the pick, 1 rising, 2 falling, 3 fallen, 4 lost
+    int     rf_rise_level = 0;
+    int     rf_fall_level = 0;
+    int     rf_start_pm   = 0;
+    int64_t rf_start_year = 0;
+    int     rf_peak_pm    = 0;
+    int64_t rf_peak_year  = 0;
+    int64_t rf_fall_start = 0; // the read the fall was first pressed at
+    int64_t rf_last_read  = INT64_MIN;
+    // Each polity's largest share at any read before the pick, so the realm's
+    // peak counts the steps before it was named (the detector's peak does).
+    // The years successors (secession or schism) left it, for the verdict's
+    // count between its peak and its fall.
+    std::vector<int64_t> rf_breakaway_years;
+    // The overextended realm's outer marches as its last turn read them: the
+    // yearly muster raises no garrison there (the fall acts on the map).
+    std::vector<char>    rf_far_flag;
+    std::vector<int>     rf_pre_peak_pm;
+    std::vector<int64_t> rf_pre_peak_year;
+    // The terrain price of reach for polity @p pid, per mille of the leaned
+    // price: the RISE's recorded lean (its network carries further), 1000 for
+    // every realm but the rising one -- so a run without the target is
+    // digit-identical. THE FALL PAYS NO PRIVATE PRICE (Ben, 2026-10-12, "the
+    // fall acts on the map"): once the realm turns, its price is everyone's,
+    // and what presses it is on the ground (`rf_overextend`, below).
+    const auto rf_reach_factor_q = [&](int pid) -> int {
+        if (!rf_on || pid != rf_realm || rf_phase != 1) return 1000;
+        return std::max(200, 1000 - rf_rise_level * clampi(params.rise_reach_step_q, 0, 1000));
+    };
+    const auto rf_note_level = [&](bool rising, int level, int64_t y_now) {
+        const polity& rq = out.polities[static_cast<std::size_t>(rf_realm)];
+        const std::string seat = (rq.capital >= 0 && static_cast<std::size_t>(rq.capital) < ss.regions.size())
+                                   ? ss.regions[static_cast<std::size_t>(rq.capital)].name : std::string{};
+        const std::string who = rq.name.empty() ? seat : rq.name;
+        std::string line;
+        if (rising)
+            line = level <= 1
+                ? who + " presses its lead from " + seat
+                      + ": its roads carry its armies further, and each victory feeds the next"
+                : who + " presses its conquests harder from " + seat
+                      + ": new roads reach its frontiers, and its victories steady it";
+        else
+            line = level <= 1
+                ? who + " has overreached: its roads and works fall into disrepair, and " + seat
+                      + " calls its far garrisons home"
+                : "The overreach of " + who + " deepens: its roads decay further, and more of its far ground "
+                      "is left bare of soldiers beyond " + seat + "'s reach";
+        out.history.push_back(history_event{
+            years_from_calendar_year(y_now), chain_stage::legacy, line, std::string{}});
+        note_event(rising ? lapse_event_kind::rise_pressed : lapse_event_kind::overextended,
+                   rq.capital, rf_realm, level);
+    };
+
+    // --- BL-1288: THE LATE CULTURE (EXPLORATION.md sec A colony is a -------
+    // subject, THE LATE CULTURE IS TARGETED; Ben 2026-10-10/11).
+    //
+    // CHOSEN AT THE CULTURE CLOSE -- this round's open -- as the founding
+    // culture MOST REMOTE BY REACH, one per world: for each culture with land
+    // standing, the cheapest `edge_step` walk over `supply_neighbours` from any
+    // of its land regions to any land region another culture founded (a
+    // multi-source Dijkstra on (cost, region) pairs, any holder's ground
+    // passable); a culture the network joins to no foreign ground is more
+    // remote than any it does, ranked among itself by its water (grid distance
+    // squared to the nearest foreign region); ties on the lower culture index
+    // (late_culture_rules.hpp). Recorded (`late_culture_chosen`). Nothing about
+    // the choice is read by any scorer: what slows the culture is the DIFFUSION
+    // below, a force every polity feels, and -- only where it is losing the
+    // realm it must carry to Exploration -- the isolation press on its ground.
+    //
+    // A RESUMED SPAN (Exploration) reads the culture off the polity table it
+    // inherits (`polity::late_isolation`), so a harness replaying the span from a
+    // fixture's table reproduces it without a field of its own.
+    const auto birth_culture = [&](const polity& q) -> int {
+        if (q.birth_seat < 0 || static_cast<std::size_t>(q.birth_seat) >= ss.regions.size()) return -1;
+        return ss.regions[static_cast<std::size_t>(q.birth_seat)].founding_culture;
+    };
+    int lc_anchor = -1; // the region the record pins the culture to
+    if (params.late_culture_target && params.resume_polities == nullptr)
+    {
+        std::map<int, std::vector<int>> lc_by_culture;
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        {
+            const region& g = ss.regions[i];
+            if (g.founding_culture < 0 || g.domain != region_domain::land) continue;
+            lc_by_culture[g.founding_culture].push_back(static_cast<int>(i));
+        }
+        // A PEOPLE STANDING AS A POLITY. The late culture develops, lags and
+        // is colonised -- it must be a people that holds a seat at the close
+        // (a city state, BL-920), not a scatter of unorganised ground that no
+        // realm will ever carry to Exploration. Every culture still sets the
+        // reach the others are measured against; only seated ones are ranked.
+        // Where no culture holds a seat at all, every culture is ranked.
+        std::set<int> lc_seated;
+        for (const polity& q : out.polities)
+            if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size()
+                && ss.regions[static_cast<std::size_t>(q.capital)].domain == region_domain::land
+                && ss.regions[static_cast<std::size_t>(q.capital)].founding_culture >= 0)
+                lc_seated.insert(ss.regions[static_cast<std::size_t>(q.capital)].founding_culture);
+        // THE CONTACT A PEOPLE RECEIVES is what remoteness means here, so the
+        // choice reads the same quantity the diffusion spends: for each polity
+        // standing at the close whose seat another people founded, the
+        // cheapest walk d from this culture's ground to that polity's ground,
+        // weighted (horizon - d) / horizon inside `contact_diffusion_horizon`
+        // and summed (per mille). The most remote culture receives the least;
+        // ties on the cheapest walk to any other people's ground (further
+        // first; the network joining it to nobody is furthest), then its water,
+        // then the lower index.
+        struct lc_rank { int64_t contact; int64_t reach; int64_t gap2; int culture; };
+        std::vector<lc_rank> ranks;
+        out.late_culture_seated = static_cast<int32_t>(lc_seated.size());
+        const int lc_h = std::max(1, params.contact_diffusion_horizon);
+        if (lc_by_culture.size() >= 2)
+        {
+            const std::size_t n = ss.regions.size();
+            std::vector<int> dist(n, INT_MAX);
+            std::vector<int> touched;
+            for (const auto& kv : lc_by_culture)
+            {
+                const int c = kv.first;
+                if (!lc_seated.empty() && lc_seated.count(c) == 0) continue;
+                using node = std::pair<int, int>;
+                std::priority_queue<node, std::vector<node>, std::greater<node>> pq;
+                for (const int r : kv.second) { dist[static_cast<std::size_t>(r)] = 0; touched.push_back(r); pq.push({0, r}); }
+                int64_t reach = late_culture_unreached;
+                std::map<int, int> met; // foreign polity -> its cheapest walk (first pop)
+                while (!pq.empty())
+                {
+                    const node top = pq.top(); pq.pop();
+                    const int d = top.first, r = top.second;
+                    if (d > dist[static_cast<std::size_t>(r)]) continue;
+                    if (d >= lc_h && reach < late_culture_unreached) break; // nothing further counts
+                    const region& g = ss.regions[static_cast<std::size_t>(r)];
+                    if (g.domain == region_domain::land && g.founding_culture >= 0 && g.founding_culture != c
+                        && reach >= late_culture_unreached)
+                        reach = d;
+                    // What reaches a people is what a POLITY knows: the
+                    // development the diffusion carries is a polity's ladder,
+                    // so the contact counted is to the ground the close's
+                    // polities hold, of every other people.
+                    const int o = r < static_cast<int>(owner.size()) ? owner[static_cast<std::size_t>(r)] : -1;
+                    if (o >= 0 && static_cast<std::size_t>(o) < out.polities.size())
+                    {
+                        const int oc = out.polities[static_cast<std::size_t>(o)].capital;
+                        const int ocul = (oc >= 0 && static_cast<std::size_t>(oc) < ss.regions.size())
+                                       ? ss.regions[static_cast<std::size_t>(oc)].founding_culture : -1;
+                        if (ocul != c) met.emplace(o, d);
+                    }
+                    for (const int nb : supply_neighbours[static_cast<std::size_t>(r)])
+                    {
+                        const int cand = d + edge_step(r, nb);
+                        if (cand < dist[static_cast<std::size_t>(nb)])
+                        {
+                            if (dist[static_cast<std::size_t>(nb)] == INT_MAX) touched.push_back(nb);
+                            dist[static_cast<std::size_t>(nb)] = cand;
+                            pq.push({cand, nb});
+                        }
+                    }
+                }
+                for (const int t : touched) dist[static_cast<std::size_t>(t)] = INT_MAX;
+                touched.clear();
+                int64_t contact = 0;
+                for (const auto& m : met)
+                    if (m.second < lc_h) contact += static_cast<int64_t>(lc_h - m.second) * 1000 / lc_h;
+                int64_t gap2 = INT64_MAX;
+                for (const int a : kv.second)
+                    for (const auto& other : lc_by_culture)
+                    {
+                        if (other.first == c) continue;
+                        for (const int b : other.second)
+                        {
+                            const region& ra = ss.regions[static_cast<std::size_t>(a)];
+                            const region& rb = ss.regions[static_cast<std::size_t>(b)];
+                            int dx = std::abs(ra.col - rb.col);
+                            if (gw > 0 && dx > gw / 2) dx = gw - dx;
+                            const int dy = ra.row - rb.row;
+                            gap2 = std::min<int64_t>(gap2, static_cast<int64_t>(dx) * dx + static_cast<int64_t>(dy) * dy);
+                        }
+                    }
+                ranks.push_back({contact, reach, gap2, c});
+            }
+            std::sort(ranks.begin(), ranks.end(), [](const lc_rank& a, const lc_rank& b) {
+                if (a.contact != b.contact) return a.contact < b.contact;
+                if (a.reach != b.reach) return a.reach > b.reach;
+                if (a.gap2 != b.gap2) return a.gap2 > b.gap2;
+                return a.culture < b.culture; });
+        }
+        out.late_culture_cultures = static_cast<int32_t>(ranks.size());
+        if (!ranks.empty())
+        {
+            lc_culture = ranks[0].culture;
+            out.late_culture       = lc_culture;
+            out.late_culture_reach = static_cast<int32_t>(std::min<int64_t>(ranks[0].reach, INT32_MAX));
+            out.late_culture_gap2  = static_cast<int32_t>(std::min<int64_t>(ranks[0].gap2, INT32_MAX));
+            out.late_culture_contact = static_cast<int32_t>(std::min<int64_t>(ranks[0].contact, INT32_MAX));
+            if (ranks.size() > 1)
+            {
+                out.late_culture_next       = ranks[1].culture;
+                out.late_culture_next_reach = static_cast<int32_t>(std::min<int64_t>(ranks[1].reach, INT32_MAX));
+                out.late_culture_next_contact = static_cast<int32_t>(std::min<int64_t>(ranks[1].contact, INT32_MAX));
+            }
+            const std::vector<int>& regs = lc_by_culture[lc_culture];
+            out.late_culture_regions = static_cast<int32_t>(regs.size());
+            // The record's pin: its most populous region at the close, ties low.
+            int64_t best_pop = -1;
+            for (const int r : regs)
+                if (ss.regions[static_cast<std::size_t>(r)].population > best_pop)
+                { best_pop = ss.regions[static_cast<std::size_t>(r)].population; lc_anchor = r; }
+            note_event(lapse_event_kind::late_culture_chosen, lc_anchor, lc_culture,
+                       ranks[0].reach >= late_culture_unreached ? -1
+                           : static_cast<int>(std::min<int64_t>(ranks[0].reach, lapse_event_none - 1)));
+            const std::string where = lc_anchor >= 0 ? ss.regions[static_cast<std::size_t>(lc_anchor)].name : std::string{};
+            out.history.push_back(history_event{
+                years_from_calendar_year(params.start_year), chain_stage::legacy,
+                ranks[0].reach >= late_culture_unreached
+                    ? "The people of " + where + " stand apart: no road or march joins their ground to any other people's"
+                    : "The people of " + where + " stand furthest from any other: what the world learns reaches them last",
+                std::string{}});
+        }
+    }
+    if (params.late_culture_colonised && params.resume_polities != nullptr)
+    {
+        // THE ISOLATION IT CARRIES INTO THE AGE stands on its ground until the
+        // voyages bind it: the late culture reaches Exploration still apart,
+        // and what opens it is the colonisation itself (`lc_level` is read by
+        // `edge_step` exactly as in the Empires round; it is raised here only
+        // for the realm the verbs need).
+        for (const polity& q : out.polities)
+            if (q.late_isolation >= 0)
+            {
+                if (lc_culture < 0) lc_culture = birth_culture(q);
+                lc_level = std::max<int>(lc_level, q.late_isolation);
+                if (lc_anchor < 0 && q.alive && q.capital >= 0) lc_anchor = q.capital;
+            }
+        out.late_culture = lc_culture;
+    }
+    const bool lc_target = params.late_culture_target && lc_culture >= 0;
+    const bool lc_colony = params.late_culture_colonised && lc_culture >= 0;
+    int64_t lc_last_read      = INT64_MIN;
+    // DEVELOPMENT SPREADS ONLY BY CONTACT: each polity's contact-sustained
+    // ceiling on the materials ladder, read at the diffusion's cadence (6, no
+    // ceiling, until first read or with the rule off), and which successors
+    // have had theirs applied.
+    std::vector<int>  contact_ceiling;
+    std::vector<char> contact_checked;
+    const auto contact_ceiling_of = [&](int pid) -> int {
+        if (params.contact_early_bands <= 0 || pid < 0) return 6;
+        if (static_cast<std::size_t>(pid) >= contact_ceiling.size()) contact_ceiling.resize(static_cast<std::size_t>(pid) + 1, 6);
+        return contact_ceiling[static_cast<std::size_t>(pid)];
+    };
+    int     lc_contact_level  = 0; // the Exploration press (contact), apart from the Empires ground press
+    int     lc_peak_regions   = 0;
+    // The late culture's living realms and the regions they hold, now.
+    const auto lc_holdings = [&](int& realms, int& regions) {
+        realms = 0; regions = 0;
+        std::vector<int32_t> held(out.polities.size(), 0);
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        for (std::size_t i = 0; i < n_reg; ++i)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < held.size()) ++held[static_cast<std::size_t>(owner[i])];
+        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+            if (held[pi] > 0 && birth_culture(out.polities[pi]) == lc_culture) { ++realms; regions += held[pi]; }
+    };
+    // Its lag AGAINST ITS NEIGHBOURS (Ben, 2026-10-13), x100 (-1 when it
+    // holds no realm or no one is read) -- the detector's own reading
+    // (`read_late_culture_lag`, history_pattern_detectors), handed the live map.
+    const auto lc_lag_reading = [&]() -> late_culture_lag_reading {
+        const std::size_t pc = out.polities.size();
+        std::vector<int32_t> held(pc, 0);
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        for (std::size_t i = 0; i < n_reg; ++i)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < pc) ++held[static_cast<std::size_t>(owner[i])];
+        std::vector<int> cult(pc, -1), band(pc, 0);
+        for (std::size_t pi = 0; pi < pc; ++pi)
+        {
+            cult[pi] = birth_culture(out.polities[pi]);
+            if (held[pi] > 0) band[pi] = clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255);
+        }
+        const std::vector<int> own(owner.begin(), owner.begin() + static_cast<std::ptrdiff_t>(n_reg));
+        return read_late_culture_lag(own, ss.regions, gw, cult, band, lc_culture);
+    };
+    const auto lc_lag_now = [&]() -> int { return lc_lag_reading().lag_x100; };
+    // The world's mean materials band over its living realms, x100.
+    const auto lc_world_band_x100 = [&]() -> int {
+        std::vector<char> live(out.polities.size(), 0);
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        for (std::size_t i = 0; i < n_reg; ++i)
+            if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < live.size()) live[static_cast<std::size_t>(owner[i])] = 1;
+        int64_t sum = 0, n = 0;
+        for (std::size_t pi = 0; pi < out.polities.size(); ++pi)
+            if (live[pi]) { sum += clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255); ++n; }
+        return n > 0 ? static_cast<int>(sum * 100 / n) : 0;
+    };
+    // A level raised, recorded (`isolation_pressed`, `other` = the level).
+    const auto lc_note_level = [&](int64_t y_now) {
+        const std::string where = (lc_anchor >= 0 && static_cast<std::size_t>(lc_anchor) < ss.regions.size())
+                                    ? ss.regions[static_cast<std::size_t>(lc_anchor)].name : std::string("the far people");
+        out.history.push_back(history_event{
+            years_from_calendar_year(y_now), chain_stage::legacy,
+            lc_level <= 1
+                ? "The roads to and among the people of " + where + " go unwalked: their ground grows harder to reach, "
+                  "for armies and for news alike, and they keep to their own holds"
+                : "The ways toward " + where + " fall further out of use, and its people keep further apart",
+            std::string{}});
+        note_event(lapse_event_kind::isolation_pressed, lc_anchor, lc_culture, lc_level);
+    };
+
     const int64_t years = params.stop_year - params.start_year;
     out.battles_per_century.assign(static_cast<std::size_t>(years / 100 + 1), 0);
 
@@ -4528,6 +5155,210 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // band's step. See history_sim.hpp § The stepped decision clock.
     int64_t next_decision = params.start_year;
     int     step_years    = step_for_year(params, params.start_year);
+
+    // ---- BL-1294 (revolution lean): THE DISPARITY, READ AT THE OPEN ----------
+    //
+    // INDUSTRIALISATION.md sec Revolution (Ben, 2026-10-10/12): the disparity
+    // between a realm's cities, read after Exploration -- here, on the map the
+    // span resumes from, before its first year runs. A CITY is a region the
+    // realm holds that carries a centre; the spread is the Gini of their urban
+    // heads, per mille: sum over city pairs of |a - b|, over (cities x heads),
+    // integer throughout. 0 where every city is the same size, near 1000 where
+    // one city holds everything. Walked in region-index order, realms in id
+    // order. Read once: the lean is the open's spread, the pressure below is
+    // what the span does with it.
+    const bool rv_on = params.revolution_lean;
+    std::vector<int32_t> rv_disparity_pm; // by polity id; -1 = not read (too few cities)
+    std::vector<int32_t> rv_cities;
+    std::vector<int64_t> rv_pressure;
+    std::vector<char>    rv_fired;
+    if (rv_on)
+    {
+        const std::size_t np = out.polities.size();
+        rv_disparity_pm.assign(np, -1);
+        rv_cities.assign(np, 0);
+        rv_pressure.assign(np, 0);
+        rv_fired.assign(np, 0);
+        std::vector<std::vector<int64_t>> heads(np);
+        for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+        {
+            const int o = owner[i];
+            if (o < 0 || static_cast<std::size_t>(o) >= np) continue;
+            const region& rg = ss.regions[i];
+            if (rg.centres <= 0 || rg.urban_population <= 0) continue;
+            heads[static_cast<std::size_t>(o)].push_back(rg.urban_population);
+        }
+        const int min_cities = std::max(2, params.revolution_min_cities);
+        for (std::size_t pi = 0; pi < np; ++pi)
+        {
+            const std::vector<int64_t>& h = heads[pi];
+            rv_cities[pi] = static_cast<int32_t>(h.size());
+            if (!out.polities[pi].alive || static_cast<int>(h.size()) < min_cities) continue;
+            int64_t sum = 0, pair_gap = 0;
+            for (std::size_t a = 0; a < h.size(); ++a)
+            {
+                sum += h[a];
+                for (std::size_t b = a + 1; b < h.size(); ++b)
+                    pair_gap += h[a] > h[b] ? h[a] - h[b] : h[b] - h[a];
+            }
+            if (sum <= 0) continue;
+            // pair_gap <= cities^2 x max heads; x1000 stays far inside int64.
+            rv_disparity_pm[pi] = static_cast<int32_t>(
+                (pair_gap * 1000) / (static_cast<int64_t>(h.size()) * sum));
+            ++out.revolution_realms_read;
+            if (rv_disparity_pm[pi] >= params.revolution_disparity_bar_pm) ++out.revolution_realms_wide;
+        }
+        out.revolution_disparity_pm = rv_disparity_pm;
+    }
+
+    // ---- BL-1290 (civil war deaths) ------------------------------------------
+    //
+    // MILITARY_HISTORY.md sec Armies are distinct from population (Ben,
+    // 2026-10-10/11/12). A civil war kills soldiers in its battles as any war
+    // does; what it ADDS is a famine and a flight on the ground it is fought
+    // over, authored here as such and recorded as such -- never a coefficient
+    // inside `resolve_battle`, whose losses stay on the armies alone.
+    //
+    // THE HALVES. A successor (secession or schism) is a civil-war half when,
+    // read the moment its block moved, it holds at least
+    // `civil_war_min_regions` regions and at least `civil_war_min_share_q` per
+    // mille of what its parent kept (CIVILISATION.md, "What counts as one").
+    // Recorded in birth order; read by the battle site below, which treats a
+    // battle between the two halves inside `civil_war_window_years` of the
+    // split as the civil war being fought over the target region.
+    struct civil_war_halves { int child; int parent; int64_t year; };
+    std::vector<civil_war_halves> civil_war_pairs;
+    const bool civil_war_on = params.civil_war_famine_q > 0 || params.civil_war_flight_q > 0;
+    // Per region, the decision year it was last struck / last a battle target.
+    // Grown on demand: the founding schedule appends regions mid-span.
+    std::vector<int64_t> civil_war_struck_year;
+    std::vector<int64_t> battle_target_year;
+    const auto year_slot = [&](std::vector<int64_t>& v, std::size_t i) -> int64_t& {
+        if (v.size() <= i) v.resize(std::max(ss.regions.size(), i + 1), INT64_MIN);
+        return v[i];
+    };
+    const auto note_civil_war_split = [&](int child, int parent) {
+        if (!civil_war_on || child < 0 || parent < 0) return;
+        int child_n = 0, parent_n = 0;
+        for (std::size_t i = 0; i < owner.size(); ++i)
+        {
+            if (owner[i] == child) ++child_n;
+            else if (owner[i] == parent) ++parent_n;
+        }
+        if (child_n < params.civil_war_min_regions || parent_n <= 0) return;
+        if (static_cast<int64_t>(child_n) * 1000
+            < static_cast<int64_t>(parent_n) * params.civil_war_min_share_q) return;
+        civil_war_pairs.push_back({child, parent, event_year});
+        ++out.civil_wars;
+    };
+    // A battle at region @p ti between @p attacker and @p defender, this
+    // decision round. Marks the target, and -- when the two are civil-war
+    // halves inside the window -- strikes the region once this round: famine
+    // first (the dead leave their food, so the ground regrows), then flight
+    // of the survivors to the nearest SAFE region of the same people: held,
+    // land, settled, its plurality the struck region's, not the attacker's,
+    // and neither struck nor a battle target this round. Nearest by region
+    // distance, ties on the lower index -- one destination, named in the record.
+    const auto strike_civil_war = [&](int ti, int attacker, int defender, int64_t yr, int round_years) {
+        if (ti < 0 || static_cast<std::size_t>(ti) >= ss.regions.size()) return;
+        year_slot(battle_target_year, static_cast<std::size_t>(ti)) = yr;
+        if (!civil_war_on || attacker < 0 || defender < 0 || attacker == defender) return;
+        bool civil = false;
+        for (const civil_war_halves& cw : civil_war_pairs)
+        {
+            const bool pair = (cw.child == attacker && cw.parent == defender)
+                           || (cw.child == defender && cw.parent == attacker);
+            if (pair && yr - cw.year <= params.civil_war_window_years) { civil = true; break; }
+        }
+        if (!civil) return;
+        int64_t& struck = year_slot(civil_war_struck_year, static_cast<std::size_t>(ti));
+        if (struck == yr) return; // once per region per round: the per-year bound
+        struck = yr;
+        region& r = ss.regions[static_cast<std::size_t>(ti)];
+        if (r.population <= 0) return;
+        ++out.civil_war_strikes;
+        const int64_t yrs = clampi64(round_years, 1, 1000);
+        const int cap_q = clampi(params.civil_war_round_cap_q, 0, 1000);
+        const int famine_q = static_cast<int>(clampi64(params.civil_war_famine_q * yrs, 0, cap_q));
+        const int flight_q = static_cast<int>(clampi64(params.civil_war_flight_q * yrs, 0, cap_q));
+
+        const int64_t dead = remove_region_people(r, (r.population * famine_q) / 1000);
+        if (dead > 0)
+        {
+            out.civil_war_famine_dead += dead;
+            note_event(lapse_event_kind::civil_war_famine, ti, defender, attacker);
+        }
+
+        const int people = r.culture.plurality();
+        int dest = -1, dest_d = 1 << 30;
+        if (people >= 0 && flight_q > 0)
+            for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+            {
+                if (static_cast<int>(i) == ti) continue;
+                if (owner[i] < 0 || owner[i] == attacker) continue;
+                const region& d = ss.regions[i];
+                if (d.domain != region_domain::land || d.population <= 0) continue;
+                if (d.culture.plurality() != people) continue;
+                if (year_slot(battle_target_year, i) == yr) continue;
+                if (year_slot(civil_war_struck_year, i) == yr) continue;
+                if (refugee_room(d) <= 0) continue; // safe, and able to feed them
+                const int dd = region_distance(r, d, gw);
+                if (dd < dest_d) { dest_d = dd; dest = static_cast<int>(i); }
+            }
+        if (flight_q > 0 && dest < 0) ++out.civil_war_no_refuge;
+        if (dest >= 0)
+        {
+            region& d = ss.regions[static_cast<std::size_t>(dest)];
+            const int64_t d_before = d.population;
+            // Landed first, so the source loses exactly the heads the refuge
+            // could feed: the flight is bounded by the share AND by the room.
+            const int64_t fled = settle_refugees(d, (r.population * flight_q) / 1000);
+            if (fled > 0)
+            {
+                remove_region_people(r, fled);
+                // The arrivals are the struck region's own plurality share of
+                // the fled; their people's weight in the destination's mix
+                // rises by their fraction of its new count.
+                const int64_t arrive_q = (fled * 1000) / (d_before + fled);
+                const int     mix_q    = static_cast<int>(
+                    (arrive_q * r.culture.share_of(people)) / 1000);
+                if (mix_q > 0) d.culture.shift_toward(people, mix_q);
+                out.civil_war_fled += fled;
+                note_event(lapse_event_kind::civil_war_flight, ti, defender, dest);
+            }
+        }
+        // The ceiling a smaller people can field fell with it; nothing is replenished here.
+        r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+    };
+
+    // ---- BL-1289 (the world war) ----------------------------------------------
+    //
+    // INDUSTRIALISATION.md sec A world war in every world; the state the war
+    // block at the end of each decision round reads and writes (the block says
+    // what it does). Here only what the battle site must see: this round's
+    // battles inside the spark's grace (`world_war_spark_deadline`), so the
+    // block can ask whether the treaty graph sparked the war on its own.
+    const bool ww_on = params.world_war_target;
+    int  ww_phase    = 0;     // 0 waiting, 1 at war, 2 peace made
+    bool ww_top_read = false;
+    int64_t ww_last_read = INT64_MIN; // the recorded steps' cadence, kept on its own clock
+    std::vector<int>     ww_top;   // the top powers at the window's open, largest first
+    std::vector<int8_t>  ww_side;  // polity -> 0 none, 1 the side that opened the war, 2 the other
+    std::vector<int64_t> ww_chest; // polity -> the chest it entered with
+    std::vector<int64_t> ww_years; // polity -> years it has fought
+    std::vector<int64_t> ww_dead;  // polity -> its people the war killed (conscripts and famine)
+    std::vector<int64_t> ww_fled;  // polity -> its people the war displaced
+    std::vector<int64_t> ww_spent; // polity -> treasury the war spent
+    std::vector<char>    ww_razed; // region -> razed in the war
+    std::set<uint64_t>   ww_demoted_edges; // corridors demoted (once each in the war); membership only
+    struct ww_battle { int attacker; int defender; int region; };
+    std::vector<ww_battle> ww_round_battles;
+    const auto ww_note_battle = [&](int ti, int attacker, int defender, int64_t yr) {
+        if (!ww_on || ww_phase != 0) return;
+        if (yr < world_war_window_start || yr >= world_war_spark_deadline) return;
+        if (ti < 0 || attacker < 0 || defender < 0 || attacker == defender) return;
+        ww_round_battles.push_back({attacker, defender, ti});
+    };
 
     // BL-953 -- THE ROUND'S LIVE CULTURAL PREFERENCE (EXPLORATION.md sec
     // Preference is read LIVE). Derived AT MOST ONCE per decision round, from
@@ -4594,20 +5425,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                   });
     };
 
-    // BL-1056: did the span-open survey run on the table this call opened on?
-    // Read ONCE, here, so "the span did not run" (the Fuel Doctrine's coal pull
-    // keeps the seam) is never confused with "this polity holds no surveyed
-    // ground" (it reads 0). A pure function of the opening table.
-    const bool span_surveyed = industry_span_survey_ran(ss.regions);
-    // BL-1059 (Ben, 2026-09-19, NR-899): the two top-third bars, fixed ONCE
-    // here from the table the run opened on and never moved: every pull below
-    // reads these. Only regions carrying both span-open scores are read, and
-    // no score is ever rewritten after the open, so a run resumed mid-span
-    // re-derives the same bars. Off the span nothing is surveyed and both
-    // read `industry_ground_bar_none` (and nothing reads them).
-    out.ground_bars = industry_ground_bars_at_open(ss.regions);
-    const industry_ground_bars ground_bars = out.ground_bars;
-
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
         event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
@@ -4639,14 +5456,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
-
-        // ---- BL-973: fold every polity's held nodes into its effect surface
-        // before anything this round reads a term or a key. Re-run the
-        // instant a node is bought (the Invest verb below), so a purchase is
-        // visible to every later reader in the same round. Polity order is
-        // id order; the fold is pure in the masks, so the order is moot.
-        for (polity& q : out.polities)
-            apply_tree_effects(q);
 
         // ---- The founding schedule (BL-846) ------------------------------
         //
@@ -4918,8 +5727,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region a TEMPORARY state: a region stripped by a march away, or
             // by a garrison broken in battle, is rebuilding from the year after
             // it happened, at the pace its own people can pay for.
-            muster_garrison(ss.regions[i], params.garrison_fraction_q,
-                            params.garrison_muster_q, params.garrison_disband_q);
+            // BL-1287 -- AN OVEREXTENDED REALM RAISES NO GARRISON IN ITS OUTER
+            // MARCHES (the fall acts on the map): the holdings its last turn
+            // called home stay bare until it turns, or until another holds them.
+            const bool rf_unraised = rf_on && rf_phase == 2 && i < rf_far_flag.size() && rf_far_flag[i]
+                                  && i < owner.size() && owner[i] == rf_realm;
+            if (!rf_unraised)
+                muster_garrison(ss.regions[i], params.garrison_fraction_q,
+                                params.garrison_muster_q, params.garrison_disband_q);
             total_pop += ss.regions[i].population;
 
             // BL-867 — INDUSTRY FLOWS TO THE SEAT, EVERY REGION, EVERY YEAR.
@@ -5198,6 +6013,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.polities[static_cast<std::size_t>(o)].naval_coastal_years += years;
             }
         }
+        // THE COASTAL SEA TECHS, A DATE RAMP FOR COASTAL POLITIES (TREES.md,
+        // Ben 2026-10-10): `apply_coastal_naval_ramp`. Run again at the
+        // span's close so a polity minted after this round's tally is read.
+        if (params.naval_points_accrue)
+            apply_coastal_naval_ramp(out.polities, ss.regions, params, y);
 
         // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
         //
@@ -5446,6 +6266,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-972: the bill and the levy, summed over the span.
             out.treasury_spent_on_army_upkeep += upkeep_spend.army_upkeep;
             out.treasury_spent_on_navy_upkeep += upkeep_spend.navy_upkeep;
+            out.treasury_earned_endowment     += upkeep_spend.earn_endowment;       // BL-1298
+            out.treasury_earned_corridor      += upkeep_spend.earn_corridor;        // write-only
+            out.treasury_earned_trade         += upkeep_spend.earn_trade;
+            out.treasury_from_consolidation   += upkeep_spend.consolidation_folded;
+            out.treasury_earned_levy          += upkeep_spend.earn_levy;
+            out.army_disbanded_by_earn        += upkeep_spend.army_disbanded_by_earn;
+            out.army_sized_rounds             += upkeep_spend.army_sized_rounds;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
@@ -5485,15 +6312,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // hash), each one's neighbour list read in its own stored
             // (insertion) order — the same discipline `rebuild_reach`'s own
             // walks already hold to.
-            // BL-973: the capability is the store effect keyed `post_roads`
-            // (EX-WY-1a's `upgrade`, today), read off the polity's folded
-            // effect surface — no node id is compared here any more.
-            if (params.post_road_treasury_cost > 0)
+            // THE RUNG OPENS ON A DATE (TREES.md, Ben 2026-10-10): from
+            // `post_roads_year` every polity may buy it; no polity holds
+            // technology, so nothing else distinguishes one buyer's right
+            // from another's.
+            if (params.post_road_treasury_cost > 0 && post_roads_open(params, y))
             {
                 for (polity& q : out.polities)
                 {
                     if (!q.alive) continue;
-                    if (!polity_holds_tree_key(q, io::tree_effect_key::post_roads)) continue;
                     if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
                         continue;
                     if (ss.regions[static_cast<std::size_t>(q.capital)].treasury
@@ -5840,6 +6667,96 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // pruning is order-preserving: the vector stays sorted.
             prune_flows_without_trade_access(out.trade_flows, out.dated_objects);
 
+            // ---- BL-1288: THE LATE CULTURE'S BACKSTOP, EXPLORATION ----------
+            //
+            // It must be colonised by a polity of another people, through the
+            // ordinary subjection verbs below -- which bind only a native the
+            // arriving power has MET. While it stands unbound, each decision
+            // round from the first in which some power holds the sea legs (the
+            // subjection walk's own test, so the press can only add what the
+            // verb could use this very round), the contact that would carry a
+            // voyage to it is pressed one recorded level further: the nearest
+            // such power of another people that has not yet met every one of
+            // its living realms meets them. Nothing is bound here; the verbs
+            // decide, the same round.
+            if (lc_colony && out.late_culture_bound == 0 && lc_contact_level < late_culture_max_level
+                && y > params.start_year)
+            {
+                const int64_t floor_navy = sea_legs_navy_floor(ss.regions, out.polities, params, y);
+                std::vector<int> natives;
+                for (const polity& q : out.polities)
+                    if (q.alive && q.overlord < 0 && birth_culture(q) == lc_culture
+                        && q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                        natives.push_back(q.id);
+                if (!natives.empty())
+                {
+                    const region& anchor = ss.regions[static_cast<std::size_t>(out.polities[static_cast<std::size_t>(natives.front())].capital)];
+                    std::vector<std::pair<int, int>> powers; // (distance, id)
+                    for (const polity& a : out.polities)
+                    {
+                        if (!a.alive || a.overlord >= 0 || birth_culture(a) == lc_culture) continue;
+                        if (a.capital < 0 || static_cast<std::size_t>(a.capital) >= ss.regions.size()) continue;
+                        if (!polity_holds_sea_legs(ss.regions, a, params, y, floor_navy)) continue;
+                        powers.push_back({region_distance(ss.regions[static_cast<std::size_t>(a.capital)], anchor, gw), a.id});
+                    }
+                    std::sort(powers.begin(), powers.end());
+                    // The nearest power that has not yet met every realm --
+                    // first among those the subjection walk would let bind one
+                    // of them (its seat's treasury clears the native's by the
+                    // margin, and no partner in its sphere has met the native
+                    // first), then any: the voyages that reach a far people are
+                    // the ones that can claim it, where any can.
+                    const auto could_bind = [&](int aid, int nid) {
+                        const polity& a = out.polities[static_cast<std::size_t>(aid)];
+                        const polity& n = out.polities[static_cast<std::size_t>(nid)];
+                        const bool dominant = params.subjection_dominance_bands > 0
+                            && a.capacity[static_cast<int>(sim_domain::materials)]
+                               - n.capacity[static_cast<int>(sim_domain::materials)] >= params.subjection_dominance_bands;
+                        if (!dominant && ss.regions[static_cast<std::size_t>(a.capital)].treasury
+                            < ss.regions[static_cast<std::size_t>(n.capital)].treasury + params.subjection_treasury_margin_q)
+                            return false;
+                        for (const polity& o : out.polities)
+                            if (o.id != aid && o.alive && has_treaty_clause(out, aid, o.id, treaty_clause::sphere_of_claim)
+                                && has_contact(out, o.id, nid))
+                                return false;
+                        return true;
+                    };
+                    int met_with = -1;
+                    for (int pass = 0; pass < 2 && met_with < 0; ++pass)
+                        for (const auto& pw : powers)
+                        {
+                            bool unmet = false, able = false;
+                            for (const int nid : natives)
+                                if (!contact_exists(pw.second, nid))
+                                {
+                                    unmet = true;
+                                    if (pass == 0 && could_bind(pw.second, nid)) able = true;
+                                }
+                            if (!unmet || (pass == 0 && !able)) continue;
+                            met_with = pw.second;
+                            break;
+                        }
+                    if (met_with >= 0)
+                    {
+                        ++lc_contact_level;
+                        for (const int nid : natives)
+                            raise_contact(met_with, nid, contact_kind::trade,
+                                          out.polities[static_cast<std::size_t>(nid)].capital, y);
+                        if (lc_anchor < 0) lc_anchor = out.polities[static_cast<std::size_t>(natives.front())].capital;
+                        const polity& mq = out.polities[static_cast<std::size_t>(met_with)];
+                        const std::string who = mq.name.empty() ? std::string("a far power") : mq.name;
+                        const std::string where = ss.regions[static_cast<std::size_t>(lc_anchor)].name;
+                        out.history.push_back(history_event{
+                            years_from_calendar_year(y), chain_stage::legacy,
+                            "The voyages of " + who + " reach " + where + ", whose people the world had passed by",
+                            std::string{}});
+                        // The contact press's level is recorded above 100
+                        // (`isolation_pressed`, era_timelapse.hpp).
+                        note_event(lapse_event_kind::isolation_pressed, lc_anchor, lc_culture, 100 + lc_contact_level);
+                    }
+                }
+            }
+
             // ---- BL-934: SUBJECTION -- trade provinces and subjected polities
             //
             // Snapshot the count: a polity subjected THIS round is not itself
@@ -5848,11 +6765,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // rounds either -- § open question, declined for this wave).
             {
                 const std::size_t pc = out.polities.size();
+                // The fleet-afloat floor, read ONCE per round before the walk:
+                // the 90th percentile of the year's free naval-capable navies
+                // (TREES.md, Ben 2026-10-11). Navies do not move inside the walk.
+                const int64_t sea_legs_floor = sea_legs_navy_floor(ss.regions, out.polities, params, y);
                 for (std::size_t ai = 0; ai < pc; ++ai)
                 {
                     polity& arriving = out.polities[ai];
                     if (!arriving.alive || arriving.overlord >= 0) continue;
-                    if (!polity_holds_exploration_sea_legs(arriving)) continue; // THE NODE, never a rank
+                    // A DATE, NAVAL CAPACITY AND A FLEET IN THE YEAR'S TOP
+                    // TENTH, never a rank (TREES.md, Ben 2026-10-10 / 2026-10-11).
+                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y, sea_legs_floor)) continue;
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
                     ++out.subjection_arrivals_walked; // BL-1171 diagnostic
@@ -5878,7 +6801,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (!native.alive) continue;
                         if (native.capital < 0
                          || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
-                        if (!has_contact(out, arriving.id, native.id)) continue;
+                        const bool lc_native = lc_colony && birth_culture(native) == lc_culture
+                                            && birth_culture(arriving) != lc_culture; // BL-1288 diagnostic
+                        if (lc_native) ++out.late_culture_diag[0];
+                        if (!has_contact(out, arriving.id, native.id)) { if (lc_native) ++out.late_culture_diag[1]; continue; }
                         // The overlord test, read here rather than first: every
                         // test in this walk is a side-effect-free `continue`, so
                         // the order decides nothing but what the diagnostic sees.
@@ -5901,8 +6827,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
                         const int64_t native_treasury =
                             ss.regions[static_cast<std::size_t>(native.capital)].treasury;
-                        const bool treasury_short =
-                            arriving_treasury < native_treasury + params.subjection_treasury_margin_q;
+                        // "The most technologically dominant nations are able to lay
+                        // claim" (Ben, 2026-09-11): a power `subjection_dominance_bands`
+                        // or more materials bands ahead of the native needs no
+                        // treasury margin over it (BL-1288; 0 = the treasury alone).
+                        const bool dominant = params.subjection_dominance_bands > 0
+                            && arriving.capacity[static_cast<int>(sim_domain::materials)]
+                               - native.capacity[static_cast<int>(sim_domain::materials)] >= params.subjection_dominance_bands;
+                        const bool treasury_short = !dominant
+                            && arriving_treasury < native_treasury + params.subjection_treasury_margin_q;
                         if (is_subject && treasury_short) continue; // two tests fail: nothing to read
 
                         // SPHERE OF CLAIM: non-interference over a native
@@ -5920,6 +6853,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                     treaty_clause::sphere_of_claim)) continue;
                             if (has_contact(out, static_cast<int>(oi), native.id))
                                 sphere_blocked = true;
+                        }
+                        if (lc_native)
+                        {
+                            if (is_subject) ++out.late_culture_diag[2];
+                            if (treasury_short) ++out.late_culture_diag[3];
+                            if (sphere_blocked) ++out.late_culture_diag[4];
+                            if (!(is_subject || treasury_short || sphere_blocked)) ++out.late_culture_diag[5];
                         }
                         if (is_subject || treasury_short || sphere_blocked)
                         {
@@ -6013,6 +6953,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                        native.capital, native.id, arriving.id);
                         }
                         ++out.subjections_formed; // one native per arriving power per round
+                        // BL-1288: the late culture colonised -- a realm born of
+                        // its ground bound by one born of another people's.
+                        if (lc_colony && birth_culture(native) == lc_culture && birth_culture(arriving) != lc_culture)
+                        {
+                            if (out.late_culture_bound == 0)
+                            {
+                                out.late_culture_bound_year = static_cast<int32_t>(y);
+                                out.late_culture_bound_by   = arriving.id;
+                                // ITS ISOLATION LIFTS: the voyage that binds it
+                                // opens its ground to every walker.
+                                if (lc_level > 0) { lc_level = 0; ++roads_version; }
+                            }
+                            ++out.late_culture_bound;
+                        }
                     }
                 }
             }
@@ -6292,6 +7246,131 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
+            // ---- BL-1287: THE FALL ACTS ON THE MAP (Ben, 2026-10-12) --------
+            //
+            // The overextended realm pays no private price: what presses its
+            // breakdown is changed on the ground, where anyone can read it and
+            // where it stays for whoever holds that ground next.
+            //   ITS ROADS AND WORKS DECAY -- every region it holds loses reach
+            //   relief (`region::work_reach_mod`, the roads and waystations
+            //   its works bought) at `fall_works_decay_per_year_q` x the level
+            //   a year, so the supply every reader prices from that ground
+            //   (holding, campaign, the purchase scorer, secession) falls by
+            //   the one rule (BL-318: one price);
+            //   ITS FAR GARRISONS THIN -- a holding in its outer half by its
+            //   last supply reading (or at or under `fall_far_supply_q`) sends
+            //   `fall_thin_per_level_q`
+            //   x the level per mille of its army home to the capital each
+            //   round: the heads are conserved, the far ground is left bare.
+            // Run here, before this turn's supply is read, so the reading the
+            // secession walk uses is the decayed ground's.
+            if (rf_on && q.id == rf_realm && rf_phase == 2 && rf_fall_level > 0)
+            {
+                const int decay = rf_fall_level * clampi(params.fall_works_decay_per_year_q, 0, 1000) * step_years;
+                const int thin_q = std::min(1000, rf_fall_level * clampi(params.fall_thin_per_level_q, 0, 1000));
+                // FAR is the realm's OUTER HALF by its own last supply reading
+                // (lowest first, ties to the lower index), the seat excepted --
+                // plus any holding at or under `fall_far_supply_q` -- so even a
+                // compact realm calls in the garrisons of its outer marches.
+                std::vector<int> far_regions;
+                {
+                    std::vector<std::pair<int, int>> by_supply;
+                    for (int hi : held)
+                        if (hi != q.capital)
+                            by_supply.push_back({ ss.regions[static_cast<std::size_t>(hi)].network_supply_q, hi });
+                    std::sort(by_supply.begin(), by_supply.end());
+                    const std::size_t half = (by_supply.size() + 1) / 2;
+                    for (std::size_t k = 0; k < by_supply.size(); ++k)
+                        if (k < half || by_supply[k].first <= params.fall_far_supply_q)
+                            far_regions.push_back(by_supply[k].second);
+                    std::sort(far_regions.begin(), far_regions.end());
+                }
+                rf_far_flag.assign(ss.regions.size(), 0);
+                for (int r : far_regions) rf_far_flag[static_cast<std::size_t>(r)] = 1;
+                int64_t sent_home = 0;
+                for (int hi : held)
+                {
+                    region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                    if (hp.work_reach_mod > 0)
+                    {
+                        hp.work_reach_mod = std::max(0, hp.work_reach_mod - decay);
+                        ++out.rise_fall_works_decayed;
+                    }
+                    if (hi == q.capital || hp.army_stock <= 0) continue;
+                    if (!std::binary_search(far_regions.begin(), far_regions.end(), hi)) continue;
+                    const int64_t take = (hp.army_stock * thin_q) / 1000;
+                    if (take <= 0) continue;
+                    draw_army_with_standing(hp, take);
+                    sent_home += take;
+                }
+                // ITS ROADS DECAY TOO: every walked corridor its own ground
+                // carries (the live use count `rebuild_reach` discounts by)
+                // loses `fall_road_decay_q` x the level per mille of its uses a
+                // round, at least one, so a Road falls back to a Track and a
+                // Track to a path. On the shared record: the close writes each
+                // corridor's tier off this live count, so the next span (and
+                // whoever holds the ground) inherits the decayed rung. Edges
+                // are walked off its held regions in index order, each once.
+                {
+                    const int road_q = std::min(1000, rf_fall_level * clampi(params.fall_road_decay_q, 0, 1000));
+                    bool tier_moved = false;
+                    for (int hi : held)
+                    {
+                        for (int nb : supply_neighbours[static_cast<std::size_t>(hi)])
+                        {
+                            if (owner[static_cast<std::size_t>(nb)] == q.id && nb < hi) continue; // once per edge
+                            const auto it = road_uses_live.find(edge_key(hi, nb));
+                            if (it == road_uses_live.end() || it->second <= 0) continue;
+                            const int before = road_tier_for_uses(it->second);
+                            const int cut = std::max(1, (it->second * road_q) / 1000);
+                            it->second = std::max(0, it->second - cut);
+                            ++out.rise_fall_roads_decayed;
+                            if (road_tier_for_uses(it->second) != before) tier_moved = true;
+                        }
+                    }
+                    if (tier_moved) ++roads_version;
+                }
+                if (sent_home > 0 && q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                {
+                    region& home_seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                    home_seat.army_stock = clampi64(home_seat.army_stock + sent_home, 0, int64_t{1} << 40);
+                    out.rise_fall_heads_sent_home += sent_home;
+                }
+            }
+
+            // BL-1287 (Ben, 2026-10-13) -- WHICH OF THE FALLING REALM'S GROUND
+            // IS LEFT BARE: a holding of its outer marches (`rf_far_flag`,
+            // set by the thinning above), not its seat, whose army now stands
+            // below `fall_bare_share_q` per mille of its garrison target. That
+            // ground relays no supply onward in this realm's reach walk; its
+            // capital and garrisoned core relay as before. Read after the
+            // thinning, before the reach is (re)built; region-index order.
+            if (rf_on && q.id == rf_realm)
+            {
+                std::vector<char> bare;
+                if (rf_phase == 2)
+                {
+                    bare.assign(ss.regions.size(), 0);
+                    for (int hi : held)
+                    {
+                        const std::size_t h = static_cast<std::size_t>(hi);
+                        if (hi == q.capital || h >= rf_far_flag.size() || !rf_far_flag[h]) continue;
+                        const int64_t target = garrison_target(ss.regions[h], params.garrison_fraction_q);
+                        if (ss.regions[h].army_stock * 1000 < target * clampi(params.fall_bare_share_q, 0, 1000))
+                        {
+                            bare[h] = 1;
+                            ++out.rise_fall_bare_region_rounds;
+                        }
+                    }
+                }
+                if (rf_relay_realm != q.id || bare != rf_relay_bare)
+                {
+                    rf_relay_bare.swap(bare);
+                    rf_relay_realm = q.id;
+                    rf_relay_dirty = true;
+                }
+            }
+
             // This polity's own slot, grown on demand: `id` is an index into
             // `out.polities`, and nothing appends a polity mid-run, but sizing
             // here rather than up front keeps the two facts independent.
@@ -6303,8 +7382,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
              || rc.roads_version != roads_version // BL-837: a road crossed a tier
              || rc.owner_version != owner_version_of(q.id) // BL-922: ground changed hands
              || (params.centre_chain_reach
-              && rc.centres_version != centres_version)) // BL-887: a relay moved
+              && rc.centres_version != centres_version) // BL-887: a relay moved
+             || (rf_relay_dirty && q.id == rf_relay_realm)) // BL-1287: bare ground changed
+            {
                 rebuild_reach(rc, q.capital, q.id);
+                if (q.id == rf_relay_realm) rf_relay_dirty = false;
+            }
             else if (rc.cost.size() != ss.regions.size())
                 // BL-922: a region founded by SOMEONE ELSE since the last
                 // build. Not held here, so never expanded here: the vector
@@ -6313,6 +7396,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // branch above.
                 rc.cost.resize(ss.regions.size(), 1 << 28);
             const std::vector<int>& reach = rc.cost;
+
+            // THE TERRAIN PRICE OF THIS REALM'S REACH, read by every supply
+            // reading below (holding, campaign, organise, the supply purchase).
+            // The leaned price, times BL-1287's factor -- exactly 1000 for every
+            // realm the rise and fall does not press, so the product divides
+            // back to the leaned price digit for digit.
+            const int reach_cost_q = static_cast<int>(
+                (static_cast<int64_t>(leaned_terrain_reach_cost_q(params)) * rf_reach_factor_q(q.id)) / 1000);
+            // BL-1287: the rising realm's two further leans -- its seat keeps
+            // its guard, and its ascendancy draws in peoples it would once
+            // have counted strangers (the opposition Organise reads, cut a
+            // level at a time). Off the target both are the identity.
+            const bool rf_rising_here = rf_on && q.id == rf_realm && rf_phase == 1;
+            const bool rf_guard_seat  = rf_rising_here;
+            const auto rf_kin_q = [&](int op) -> int {
+                if (!rf_rising_here) return op;
+                return (op * std::max(0, 1000 - rf_rise_level * clampi(params.rise_kin_step_q, 0, 1000))) / 1000;
+            };
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
             //
@@ -6378,23 +7479,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const std::size_t hidx = static_cast<std::size_t>(hi);
                 const int reach_here = (hidx < reach.size() && reach[hidx] < (1 << 27))
                                       ? reach[hidx] : (1 << 27);
-                // BL-973 FINDING, NOT WIRED: the `reach` term is folded into
-                // `polity::tree_mod_q` but deliberately NOT added here. At
-                // the authored magnitudes (empire reach nodes sum to 540‰,
-                // exploration's to 1380‰, against `work_reach_relief_cap_q`
-                // = 800) technology alone discounts most of the terrain
-                // price, and the BL-872 fixtures — cut-off ground stops
-                // growing, a far campaign starves — stop holding. Whether
-                // the store's magnitudes or the sim's cap moves is a
-                // design call; until it is made, `reach` is on the stated
-                // unread list (`tree_effect_declared_unread`).
                 const int hub_reach_q = clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
                 // 64-BIT ON PURPOSE (BL-922): the unreachable sentinel is
                 // 1 << 27, and sentinel x cost overflowed `int` at any cost
                 // above ~15 -- cut-off ground then read as FULLY supplied
                 // instead of as nothing. Latent under the old 10; live now.
                 const int64_t terrain_cost = static_cast<int64_t>(reach_here)
-                                           * leaned_terrain_reach_cost_q(params) / 100;
+                                           * reach_cost_q / 100;
                 const int64_t terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 const int supply_at_q  = static_cast<int>(clampi64(1000 - terrain_paid, 0, 1000));
                 hp.network_supply_q = supply_at_q;
@@ -6411,6 +7502,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     scale_standing_army(hp, stock_before); // BL-955
                 }
             }
+            // BL-1287: this realm's ground was measured this round (the
+            // secession walk reads only ground its holder has measured).
+            if (supply_read_year.size() <= static_cast<std::size_t>(q.id))
+                supply_read_year.resize(static_cast<std::size_t>(q.id) + 1, INT64_MIN);
+            supply_read_year[static_cast<std::size_t>(q.id)] = y;
 
             // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
             //
@@ -6452,6 +7548,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int relief = clampi(mean_reach_q, 0, params.work_reach_relief_cap_q);
                 burden = burden - (burden * relief) / 1000;
             }
+            // BL-1287: the rising realm administers its breadth by the same
+            // cut its reach takes (`rf_reach_factor_q`, 1000 off the target).
+            if (rf_on && q.id == rf_realm && rf_phase == 1)
+                burden = (burden * rf_reach_factor_q(q.id)) / 1000;
 
             // ONE PRICE FOR SUPPLY, PAID BY BOTH THE SCORER AND THE BATTLE
             // (BL-318). These were two separate expressions, and they disagreed:
@@ -6511,15 +7611,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ? static_cast<int64_t>(reach[hs]) * 1000
                         + static_cast<int64_t>(edge_step(hub, static_cast<int>(ti))) * sea_cost_q
                     : static_cast<int64_t>(1 << 27) * 1000;
-                // (BL-973: the tree's `reach` term is NOT added here either —
-                // see the holdings-supply site above for the finding.)
                 const int hub_reach_q = (hub >= 0)
                     ? clampi(ss.regions[hs].work_reach_mod, 0, params.work_reach_relief_cap_q)
                     : 0;
                 // 64-bit for the same reason as the holdings loop above: the
                 // sentinel times the cost does not fit an `int`.
                 const int64_t terrain_cost = reach_milli
-                                           * leaned_terrain_reach_cost_q(params) / 100 / 1000;
+                                           * reach_cost_q / 100 / 1000;
                 const int64_t terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 return static_cast<int>(clampi64(1000
                             - terrain_paid
@@ -6692,6 +7790,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (int hi : held)
                 {
                     if (hi == hub) continue;
+                    // BL-1287: the rising realm keeps its seat's guard at home
+                    // -- its capital is the headquarters every reading is priced
+                    // from, and a rise that bares it falls with it.
+                    if (rf_guard_seat && hi == q.capital) continue;
                     const std::size_t hii = static_cast<std::size_t>(hi);
                     const int64_t stock = ss.regions[hii].army_stock;
                     if (stock <= 0) continue;
@@ -6710,6 +7812,61 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // Paid heads marched can never exceed the men marched.
                 if (commit && committed_standing > total) committed_standing = total;
                 return total;
+            };
+
+            // BL-1287 -- THE RISING REALM'S RALLY: what its network brings to a
+            // region of its own under attack -- each of its regions' standing
+            // army in proportion to that region's `network_supply_q`, the
+            // gather's own rule (BL-921) asked from the defender's side; the
+            // seat keeps its guard. `commit` takes the men, as the gather does.
+            // Zero for every realm but the rising one, and outside the rise.
+            const auto rf_rally_term = [&](std::size_t i) -> int64_t {
+                const region& r = ss.regions[i];
+                if (r.army_stock <= 0) return 0;
+                return (r.army_stock * clampi(r.network_supply_q, 0, 1000)) / 1000;
+            };
+            // THE RALLY RESPECTS REACH (review fix). The attacked region must
+            // be on the realm's supplied network (its own `network_supply_q`
+            // above zero -- the capital reaches it over held ground, the test
+            // a gather's hub passes), and a contributor whose line to it
+            // crosses sea marches only where it could land a force by the
+            // attacker's own water gate (BL-778: it can field a naval row at
+            // its band; with BL-1152's fleet rule on, its realm's fleet must
+            // also lift someone). The seat keeps its guard.
+            const auto rf_rally = [&](std::size_t ti, bool commit) -> int64_t {
+                if (!rf_on || rf_phase != 1 || rf_realm < 0) return 0;
+                if (ti >= ss.regions.size() || owner[ti] != rf_realm) return 0;
+                if (ss.regions[ti].network_supply_q <= 0) return 0;
+                const polity& rq = out.polities[static_cast<std::size_t>(rf_realm)];
+                const int seat = rq.capital;
+                const roster_band rq_band = roster_band_for_capacity(
+                    clampi(rq.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+                const bool rq_lifts = !fleet_rule_on || params.fleet_men_per_hull <= 0
+                                   || fleet_lift_capacity(rq.navy_stock, params.fleet_men_per_hull) > 0;
+                int64_t total = 0;
+                for (std::size_t i = 0; i < owner.size() && i < ss.regions.size(); ++i)
+                {
+                    if (owner[i] != rf_realm || i == ti || static_cast<int>(i) == seat) continue;
+                    const int64_t take = rf_rally_term(i);
+                    if (take <= 0) continue;
+                    if (line_crosses_sea(ss.regions[i], ss.regions[ti], terrain, gw, gh, params.neighbour_radius)
+                     && !(rq_lifts && can_field_naval(ss.regions[i], rq_band)))
+                        continue;
+                    total += take;
+                    if (commit) draw_army_with_standing(ss.regions[i], take);
+                }
+                return total;
+            };
+            // The scorer's read of the same rally: the very function, asked
+            // without committing, once per target per turn (nothing an
+            // attacker's own scoring does moves another realm's garrisons).
+            std::vector<std::pair<std::size_t, int64_t>> rf_rally_seen;
+            const auto rf_rally_estimate = [&](std::size_t ti) -> int64_t {
+                if (!rf_on || rf_phase != 1 || rf_realm < 0 || q.id == rf_realm) return 0;
+                for (const auto& kv : rf_rally_seen) if (kv.first == ti) return kv.second;
+                const int64_t v = rf_rally(ti, false);
+                rf_rally_seen.push_back({ ti, v });
+                return v;
             };
 
             // The staging holding reaches the target overland (or over its own
@@ -7014,13 +8171,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // again, a cost authored on one scale and paid on another.
                     // The two lines below are `muster_garrison`'s arithmetic
                     // asked as a question instead of applied as a mutation.
-                    const int64_t def_men = defender_levy_estimate(tgt, params);
-                    // BL-973: the DEFENDER's held `defence` nodes stack with
-                    // its ground's works, in the same clamp.
-                    const int def_works   = clampi(tgt.work_defence_mod
-                                                 + nation_tree_mod_q(out.polities, owner[ti],
-                                                                     io::tree_modifier_term::defence),
-                                                   0, 1000);
+                    const int64_t def_men = defender_levy_estimate(tgt, params)
+                                          + (to == rf_realm ? rf_rally_estimate(ti) : 0); // BL-1287
+                    const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
                     const int def_scaled  = static_cast<int>(clampi64(
                         (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
 
@@ -7331,6 +8484,47 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             (params.w_aggr_q * (clampi(q.aggression_q, 0, 1000) - 500)) / 500;
                         value = value + (value * lean) / 1000;
                         if (value < 0) value = 0;
+                    }
+
+                    // BL-1278 -- THE TOTAL'S LEAN (NATION_GENERATION.md sec The
+                    // nation count is a target, stage 1): fewer nations wanted,
+                    // more appetite; more wanted, less. Same idiom and the same
+                    // single application as the creed's appetite above. 0 on
+                    // every span but a targeted Industrialisation one.
+                    if (params.campaign_appetite_q != 0)
+                    {
+                        value = value + (value * params.campaign_appetite_q) / 1000;
+                        if (value < 0) value = 0;
+                    }
+
+                    // BL-1287 -- THE RISE'S APPETITE: the realm the rise and
+                    // fall presses wants its next victory more, a level at a
+                    // time (`rise_pressed` records each). Same idiom and the
+                    // same single application as the two leans above.
+                    // A SEAT IS PRESSED HARDEST: a rise is won by taking the
+                    // cities that hold the land (a seat carries its hinterland,
+                    // BL-866) and the capitals that hold its rivals together,
+                    // not by trading border marches its rivals retake.
+                    // NOT AT A FAULT LINE: ground whose people answered this
+                    // realm's creed with their own (`creed_hold` 3, an alien
+                    // residue) walks away as a schism the round after it is
+                    // taken (BL-944), so the press is never spent there -- the
+                    // realm may still take it on its own unleaned score.
+                    const bool rf_fault_line = q.universal_creed >= 0 && tgt.creed_hold == 3
+                                            && tgt.creed_residue_culture != q.culture;
+                    if (rf_on && q.id == rf_realm && rf_phase == 1 && rf_rise_level > 0 && !rf_fault_line)
+                    {
+                        const int step_q = clampi(params.rise_appetite_step_q, 0, 1000)
+                                         + (tgt.is_seat ? clampi(params.rise_seat_step_q, 0, 2000) : 0);
+                        value = static_cast<int>(clampi64(value + (static_cast<int64_t>(value) * rf_rise_level * step_q) / 1000,
+                                                          0, INT32_MAX / 2));
+                        if (value < 0) value = 0;
+                        // ...and a march it expects to win outbids the quiet
+                        // verbs: a flat per-level appetite, scaled by its own
+                        // estimate of the odds, so a pressed realm still does
+                        // not throw itself at a fight it reads as lost.
+                        if (value > 0)
+                            value += (rf_rise_level * clampi(params.rise_appetite_add_q, 0, 1000) * p_win_q) / 1000;
                     }
 
                     // BL-953 -- A WANT POINTS THE CAMPAIGN OUTWARD
@@ -7651,9 +8845,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int tgt_culture = tgt.culture.plurality();
                         if (tgt_culture < 0) continue;
 
-                        const int op_q = (cs != nullptr)
+                        const int op_q = rf_kin_q((cs != nullptr)
                             ? culture_opposition_q(cs->cultures, q.culture, tgt_culture)
-                            : 0;
+                            : 0);
                         if (op_q >= params.organise_opposition_bar_q) continue;
 
                         // BL-922 -- THE NETWORK MUST SUPPLY THE GROUND, read
@@ -7666,12 +8860,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                               ? reach[hidx] : (1 << 27);
                         const int64_t terrain_cost =
                             static_cast<int64_t>(reach_here + edge_step(hi, tn))
-                                * leaned_terrain_reach_cost_q(params) / 100;
+                                * reach_cost_q / 100;
                         const int supply_here_q =
                             static_cast<int>(clampi64(1000 - terrain_cost, 0, 1000));
                         if (supply_here_q <= params.organise_reach_floor_q) continue;
 
-                        const int s = (region_value_q(tgt) * (1000 - op_q)) / 1000;
+                        int s = (region_value_q(tgt) * (1000 - op_q)) / 1000;
+                        // BL-1287: the rising realm's appetite for ground is the
+                        // campaign's, read on the peaceful verb too (the same
+                        // two terms, applied once).
+                        if (rf_rising_here && s > 0)
+                            s = static_cast<int>(clampi64(s + (static_cast<int64_t>(s) * rf_rise_level
+                                                               * clampi(params.rise_appetite_step_q, 0, 1000)) / 1000
+                                                            + rf_rise_level * clampi(params.rise_appetite_add_q, 0, 1000),
+                                                          0, INT32_MAX / 2));
                         if (s > best_score && s >= params.organise_threshold_q)
                         {
                             best_score = s; best_verb = sim_verb::organise;
@@ -7787,7 +8989,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             hp.work_reach_mod + params.supply_upgrade_reach_gain_q,
                             0, params.work_reach_relief_cap_q);
                         const int64_t terrain_cost = static_cast<int64_t>(reach_here)
-                                                   * leaned_terrain_reach_cost_q(params) / 100;
+                                                   * reach_cost_q / 100;
                         const int64_t terrain_paid =
                             terrain_cost - (terrain_cost * new_hub_reach_q) / 1000;
                         const int new_supply_q =
@@ -7819,7 +9021,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (candidate_reach >= reach_here) continue; // not this region's best path
 
                         const int64_t terrain_cost = candidate_reach
-                                                   * leaned_terrain_reach_cost_q(params) / 100;
+                                                   * reach_cost_q / 100;
                         const int hub_reach_q =
                             clampi(hp.work_reach_mod, 0, params.work_reach_relief_cap_q);
                         const int64_t terrain_paid =
@@ -8162,10 +9364,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
                 const int atk_ready = clampi(1000 - material_penalty_q, 0, 1000);
 
-                const int def_works_q = clampi(tgt.work_defence_mod
-                                             + nation_tree_mod_q(out.polities, owner[ti],
-                                                                 io::tree_modifier_term::defence), // BL-973
-                                               0, 1000);
+                const int def_works_q = clampi(tgt.work_defence_mod, 0, 1000);
                 const int def_ready = (best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000)
                                     + def_works_q;
 
@@ -8200,6 +9399,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // through the transfer bar alone.
                 muster_garrison(tgt, params.garrison_fraction_q,
                                 params.defence_levy_q, params.garrison_disband_q);
+
+                // BL-1287 -- THE RISING REALM RALLIES ALONG ITS NETWORK: its
+                // armies march to meet an invader over the same supplied
+                // network its own levy gathers along (BL-921), and stand with
+                // the garrison they came to relieve. The scorer read the same
+                // rally (`rf_rally_estimate`), so an attacker saw what it faced.
+                int64_t rf_rallied = 0; // the rallied share of the defence, for a lost field below
+                if (rf_on && rf_phase == 1 && dq != nullptr && dq->id == rf_realm)
+                {
+                    rf_rallied = rf_rally(ti, /*commit=*/true);
+                    tgt.army_stock = clampi64(tgt.army_stock + rf_rallied, 0, int64_t{1} << 40);
+                    out.rise_fall_rally_heads += rf_rallied;
+                }
 
                 // THE DEFENDER FIELDS WHAT IS STANDING THERE, all of
                 // it. There is no sense in a garrison holding half itself back
@@ -8261,6 +9473,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     raised > 0 ? (std::min(committed_standing, raised) * atk_survivors) / raised : 0);
 
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
+
+                // BL-1290: the ground a civil war is fought over starves and
+                // flees -- after the battle, never inside it, and before any
+                // conquest moves the flag, so the record names the holder the
+                // fight was over. A no-op for every other battle (it only
+                // marks the target, which the flight's "safe" test reads).
+                strike_civil_war(static_cast<int>(ti), q.id, dq ? dq->id : -1, y, step_years);
+                // BL-1289: and the world war's block asks, at the round's end,
+                // whether this battle was the treaty graph's own spark.
+                ww_note_battle(static_cast<int>(ti), q.id, dq ? dq->id : -1, y);
 
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
                 //
@@ -8353,6 +9575,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         loser.cohesion_q = clampi(loser.cohesion_q - params.cohesion_loss_on_defeat_q,
                                                   params.cohesion_floor_q, 1000);
                     }
+                    // BL-1287: and the rising realm's victory steadies it, a
+                    // level at a time -- the cohesion channel a defeat drains.
+                    if (rf_on && q.id == rf_realm && rf_phase == 1)
+                        q.cohesion_q = clampi(q.cohesion_q + rf_rise_level * clampi(params.rise_cohesion_step_q, 0, 1000),
+                                              params.cohesion_floor_q, 1000);
 
                     // BL-835 — THE COUNTRYSIDE KEEPS ITS PEOPLE. The line that
                     // stood here took `sack_population_loss_q` (22%) off
@@ -8396,6 +9623,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // holding a forward province with an uncovered rear. That
                     // is question A in the shape the item asks for — not "can I
                     // take this" but "can I keep an army there".
+                    // BL-1287 (review fix) -- A LOST DEFENCE DOES NOT ERASE THE
+                    // RALLY. The garrison is dispersed with its province as
+                    // always; the rallied men who survived the battle (their
+                    // share of the defenders' survivors, `tgt.army_stock` as the
+                    // battle left it) march home to their realm's seat -- or,
+                    // where the seat is the ground just lost, to its lowest-index
+                    // other holding -- rather than being overwritten. The
+                    // battle's casualties are the only heads that die.
+                    const int loser_id_rf = dq != nullptr ? dq->id : -1;
+                    if (rf_rallied > 0 && def_men > 0 && loser_id_rf >= 0)
+                    {
+                        const int64_t back = (tgt.army_stock * std::min(rf_rallied, def_men)) / def_men;
+                        int home_r = out.polities[static_cast<std::size_t>(loser_id_rf)].capital;
+                        if (home_r == static_cast<int>(ti) || home_r < 0
+                         || static_cast<std::size_t>(home_r) >= owner.size() || owner[static_cast<std::size_t>(home_r)] != loser_id_rf)
+                        {
+                            home_r = -1;
+                            for (std::size_t ri = 0; ri < owner.size() && ri < ss.regions.size(); ++ri)
+                                if (owner[ri] == loser_id_rf && ri != ti) { home_r = static_cast<int>(ri); break; }
+                        }
+                        if (back > 0 && home_r >= 0)
+                        {
+                            region& hr = ss.regions[static_cast<std::size_t>(home_r)];
+                            hr.army_stock = clampi64(hr.army_stock + back, 0, int64_t{1} << 40);
+                            out.rise_fall_rally_home += back;
+                        }
+                    }
                     tgt.army_stock = atk_survivors;
                     // BL-955: the defender's paid men are gone with the ground;
                     // the conqueror's paid survivors garrison it as its own.
@@ -8432,6 +9686,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
                     void_stale_standing_army(tgt); // BL-955 (the conqueror's paid survivors set above)
+                    note_taken(ti); // BL-1287: unmeasured by its new holder until its next turn
                     touch_owner(loser_id); // BL-922: ground changed hands, both
                     touch_owner(q.id);     // realms' held-only reach is stale
 
@@ -8460,6 +9715,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             owner[hi] = q.id;
                             h.nation  = q.id;
                             void_stale_standing_army(h); // BL-955
+                            note_taken(hi); // BL-1287
                             // BL-922: RECORDED, like every other transfer.
                             // The seat's own change is pushed below; its
                             // hinterland's were not, so a replay of the
@@ -8787,11 +10043,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // mechanism is wired and the boost is zero until that is fixed
                 // — which is a finding about BL-757, not a reason to route this
                 // through a domain it does not belong to.
-                // BL-973: the polity's held `industrial` nodes pull the
-                // same crossing forward, beside its works' mean.
                 const bool  ind_domain = (d == static_cast<int>(sim_domain::materials));
                 const int   ind_boost  = ind_domain
-                    ? clampi(mean_industrial_q + tree_mod_q(q, io::tree_modifier_term::industrial), 0, 1000)
+                    ? clampi(mean_industrial_q, 0, 1000)
                     : 0;
                 const int   progress   = clampi(best_score, 0, 1000) * step_years;
                 q.progress_q[d] += progress + (progress * ind_boost) / 1000;
@@ -8799,454 +10053,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // map, and it never runs away (ANCIENT_TECH_LADDER § diffusion).
                 // The rate is a parameter since BL-767; the value is unchanged.
                 const int cost = params.capacity_band_cost * q.capacity[d];
-                if (q.progress_q[d] >= cost && q.capacity[d] < 6)
+                // DEVELOPMENT SPREADS ONLY BY CONTACT: past the early bands a
+                // realm's own Invest climbs no higher than its contacts sustain.
+                const int ceiling = (d == static_cast<int>(sim_domain::materials)) ? contact_ceiling_of(q.id) : 6;
+                if (q.progress_q[d] >= cost && q.capacity[d] < std::min(6, ceiling))
                 {
                     q.progress_q[d] -= cost;
                     ++q.capacity[d];
-                }
-
-                // ---- BL-912: THE EMPIRE TREE, INVESTED ALONGSIDE THE BAND -
-                //
-                // The domain band above is the DERIVED reading TREES.md keeps
-                // for the works gate and the unit roster boundary; this is
-                // the real state -- "the sim reads nodes, not bands"
-                // (TREES.md sec The sim reads nodes). Same Invest verb, same
-                // round: choosing a node is an argument to the verb the AI
-                // grant register already covers (AI_OPPONENT.md sec 11), not
-                // a new one.
-                {
-                    // Ground means, recomputed here: BL-767's own `ground_q`
-                    // locals above went out of scope with their block, and
-                    // this is cheap over one polity's own holdings.
-                    int64_t farm_sum = 0, ore_sum = 0, energy_sum = 0, port_sum = 0;
-                    for (int hi : held)
-                    {
-                        const region& hp = ss.regions[static_cast<std::size_t>(hi)];
-                        farm_sum   += hp.farm_q;
-                        ore_sum    += hp.ore_q;
-                        energy_sum += hp.energy_q;
-                        port_sum   += hp.port_q;
-                    }
-                    const int ground_farm_q = static_cast<int>(farm_sum   / n_held);
-                    const int ground_ore_q  = static_cast<int>(ore_sum    / n_held);
-                    const int ground_fuel_q = static_cast<int>(energy_sum / n_held);
-                    const int ground_port_q = static_cast<int>(port_sum   / n_held);
-
-                    // "Bound" terms reuse this round's own domain arrears —
-                    // the same shape BL-767's `pull` already reads — for the
-                    // three the empire tree also names.
-                    const int reach_bound_q    = clampi(
-                        (6 - q.capacity[static_cast<int>(sim_domain::transport)]) * 180, 0, 1000);
-                    const int manpower_bound_q = clampi(
-                        (6 - q.capacity[static_cast<int>(sim_domain::military)]) * 180, 0, 1000);
-                    const int food_bound_q     = clampi(
-                        (6 - q.capacity[static_cast<int>(sim_domain::agriculture)]) * 180, 0, 1000);
-
-                    // Stores: how empty the seat sits. A placeholder scale
-                    // (TREES.md sec Effects: "magnitudes are authored by
-                    // judgement"), read off the seat's own stock rather than
-                    // invented from nothing.
-                    const region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
-                    const int stores_low_q = clampi(
-                        1000 - static_cast<int>(clampi64(seat.material_stock / 4, 0, 1000)), 0, 1000);
-                    const int surplus_q = 1000 - std::max(
-                        { reach_bound_q, manpower_bound_q, food_bound_q, stores_low_q });
-
-                    // Re-pick only when nothing is targeted, or the target
-                    // went dark under it (a rival fork side closed, or the
-                    // ring it needs is no longer the frontier — cannot
-                    // happen without diffusion, kept as a real check anyway).
-                    if (q.empire_investing < 0
-                     || !empire_node_available(q.empire_mask, q.empire_investing))
-                    {
-                        q.empire_investing = static_cast<int16_t>(choose_empire_node(
-                            q.empire_mask, q.cohesion_q, stores_low_q, reach_bound_q,
-                            manpower_bound_q, food_bound_q, ground_ore_q, ground_farm_q,
-                            ground_fuel_q, ground_port_q, surplus_q));
-                        q.empire_progress_q = 0;
-                    }
-
-                    if (q.empire_investing >= 0)
-                    {
-                        // RESEARCH IS A FLOW (TREES.md sec State): a fraction
-                        // of the industry slice, scaled by the spire ring
-                        // held and by contact degree. Never a stockpile —
-                        // earned and spent the same round, on the node
-                        // currently targeted.
-                        int64_t industry_sum = 0;
-                        for (int hi : held)
-                            industry_sum += region_industry_output(
-                                ss.regions[static_cast<std::size_t>(hi)]);
-
-                        int spire_ring = 0;
-                        for (int i = 0; i < io::empire_tree::node_count; ++i)
-                        {
-                            const io::empire_tree::node& nd = io::empire_tree::nodes[i];
-                            if (nd.kind == io::empire_tree::node_kind::milestone
-                             && (q.empire_mask & (1ULL << i)))
-                                spire_ring = std::max(spire_ring, static_cast<int>(nd.ring));
-                        }
-
-                        // BL-908's directed contact table ("who has met
-                        // whom") is what TREES.md sec State names as the
-                        // second research scale. The table EXISTS
-                        // (`history_sim_state::contacts`, read through
-                        // `has_contact`; the Industry scorer's `known` term
-                        // reads it, BL-1038), but THIS rate does not:
-                        // contact_degree stays 0 (an inert multiplier,
-                        // `(1000+0*40)/1000 == 1`) because wiring it moves
-                        // every shipped world's empire tree, which is a
-                        // re-bless decision, not a comment fix. (The note
-                        // this replaces said BL-908 had not landed; it had.)
-                        const int contact_degree = 0;
-
-                        // BL-973: the `research` modifier term is the
-                        // tree's own reader of itself — every held
-                        // research node scales the flow (TREES.md sec
-                        // Effects: "the research rate itself").
-                        const int64_t research_q =
-                            (industry_sum * params.empire_research_fraction_q) / 1000
-                                * (1000 + spire_ring * 150) / 1000
-                                * (1000 + clampi(contact_degree, 0, 10) * 40) / 1000
-                                * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::research), 0, 4000)) / 1000;
-                        q.empire_progress_q += static_cast<int32_t>(
-                            clampi64(research_q * step_years, 0, INT32_MAX));
-
-                        const io::empire_tree::node& tn =
-                            io::empire_tree::nodes[q.empire_investing];
-                        const int tn_kind_base =
-                            tn.kind == io::empire_tree::node_kind::minor ? 1
-                          : tn.kind == io::empire_tree::node_kind::major ? 3 : 6;
-                        const int tn_cost =
-                            params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
-                        if (q.empire_progress_q >= tn_cost)
-                        {
-                            q.empire_mask |= (1ULL << q.empire_investing);
-                            // BL-1147: a coastal sea tech taken is a naval deed.
-                            if (params.naval_points_accrue
-                             && (coastal_sea_tech_mask() & (1ULL << q.empire_investing)) != 0)
-                                ++q.naval_sea_techs;
-                            q.empire_progress_q = 0;
-                            q.empire_investing  = -1;
-                            apply_tree_effects(q); // BL-973: the surface follows the mask at once
-                        }
-                    }
-
-                    // ---- BL-930: THE EXPLORATION TREE, invested alongside -
-                    // the empire tree, in the SAME round, on the SAME held-
-                    // ground means computed above. Gated on the empire rim
-                    // (`polity_holds_empire_rim`): EX-SP-1a's own gate is the
-                    // Empire tree's rim milestone (`EXPLORATION_TREE.md` sec
-                    // The spire; CIVILISATION.md sec "Some peoples gain the
-                    // capacity to explore"), so a polity that never reaches
-                    // that rim never invests here at all -- exactly the
-                    // per-polity threshold that doc names, expressed as an
-                    // ordinary availability gate rather than a special case.
-                    if (polity_holds_empire_rim(q))
-                    {
-                        if (q.exploration_investing < 0
-                         || !exploration_node_available(q.exploration_mask, q.exploration_investing))
-                        {
-                            // BL-932 -- PURSE_LOW, same shape as `stores_low_q`
-                            // above (a placeholder scale, TREES.md sec Effects),
-                            // read off the capital's own `treasury` (`seat`,
-                            // declared above in this same block) rather than
-                            // its `material_stock`: how empty the PURSE sits,
-                            // as distinct from how empty the granary does.
-                            const int purse_low_q = clampi(
-                                1000 - static_cast<int>(clampi64(seat.treasury / 4, 0, 1000)),
-                                0, 1000);
-                            // BL-939 -- WANTS_UNMET, read off the capital's
-                            // OWN market (a polity always knows its own
-                            // want, so no contact gate applies here -- that
-                            // gate is `market_scarcity_q`'s, for reading a
-                            // FOREIGN market). Mean over the four goods;
-                            // zero where the capital never stood a market.
-                            int wants_unmet_q = 0;
-                            if (seat.has_market)
-                            {
-                                int sum_q = 0;
-                                for (int g = 0; g < 4; ++g) sum_q += seat.scarcity_q[g];
-                                wants_unmet_q = clampi(sum_q / 4, 0, 1000);
-                            }
-                            // BL-940 -- THROUGHPUT_BOUND: how constrained the
-                            // polity's own network currently runs, read off
-                            // `region::network_supply_q` (already 0-1000,
-                            // terrain-and-road-priced reach from the capital
-                            // over held ground -- EXPLORATION.md sec Goods
-                            // move as throughput: "throughput in everything
-                            // but name") over the SAME `held` set the ground
-                            // means above already walk. Mean supply, inverted:
-                            // a realm whose own roads run thin scores high
-                            // here, which is what makes Post Roads (EX-WY-1a)
-                            // and its ring-2 siblings worth investing in.
-                            int64_t supply_sum_q = 0;
-                            for (int hi : held)
-                                supply_sum_q += ss.regions[static_cast<std::size_t>(hi)].network_supply_q;
-                            const int throughput_bound_q = clampi(
-                                1000 - static_cast<int>(supply_sum_q / n_held), 0, 1000);
-                            // BL-934 -- SUBJECT_HELD, now real: does this
-                            // polity hold at least one live subject? Read off
-                            // ANOTHER polity's `overlord` field, never this
-                            // one's -- a boolean-as-1000, same shape as
-                            // `coastal_holdings`/`ground_port` above.
-                            int subject_held_q = 0;
-                            for (const polity& other : out.polities)
-                                if (other.alive && other.overlord == q.id) { subject_held_q = 1000; break; }
-                            // BL-942 -- TWO WAYS TO BE STRONG. `cs == nullptr`
-                            // (a fixture isolating a different mechanism, same
-                            // guard every other creed read in this file uses)
-                            // reads as no lean either way, which is exactly
-                            // `creed_lean_weight_q`'s own no-op case.
-                            int cons_lean_q = 0, expn_lean_q = 0;
-                            if (cs != nullptr && q.culture >= 0
-                             && static_cast<std::size_t>(q.culture) < cs->cultures.size())
-                            {
-                                const culture& own = cs->cultures[static_cast<std::size_t>(q.culture)];
-                                cons_lean_q = consolidator_lean_q(own);
-                                expn_lean_q = expansion_lean_q(own);
-                            }
-                            q.exploration_investing = static_cast<int16_t>(choose_exploration_node(
-                                q.exploration_mask, stores_low_q, reach_bound_q,
-                                ground_port_q, ground_farm_q, surplus_q,
-                                purse_low_q, wants_unmet_q, throughput_bound_q,
-                                subject_held_q, cons_lean_q, expn_lean_q,
-                                params.exploration_creed_lean_weight_q));
-                            q.exploration_progress_q = 0;
-                        }
-
-                        if (q.exploration_investing >= 0)
-                        {
-                            // Same "research is a flow" shape as the empire
-                            // tree's (TREES.md sec State): a fraction of the
-                            // held ground's industry output, spent the same
-                            // round it is earned.
-                            int64_t industry_sum = 0;
-                            for (int hi : held)
-                                industry_sum += region_industry_output(
-                                    ss.regions[static_cast<std::size_t>(hi)]);
-
-                            const int64_t research_q =
-                                (industry_sum * params.empire_research_fraction_q) / 1000
-                                    * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::research), 0, 4000)) / 1000; // BL-973
-                            q.exploration_progress_q += static_cast<int32_t>(
-                                clampi64(research_q * step_years, 0, INT32_MAX));
-
-                            const io::exploration_tree::node& tn =
-                                io::exploration_tree::nodes[q.exploration_investing];
-                            const int tn_kind_base =
-                                tn.kind == io::exploration_tree::node_kind::minor ? 1
-                              : tn.kind == io::exploration_tree::node_kind::major ? 3 : 6;
-                            const int tn_cost =
-                                params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
-                            if (q.exploration_progress_q >= tn_cost)
-                            {
-                                q.exploration_mask |= (1ULL << q.exploration_investing);
-                                q.exploration_progress_q = 0;
-                                q.exploration_investing  = -1;
-                                apply_tree_effects(q); // BL-973
-                            }
-                        }
-                    }
-
-                    // ---- BL-1038: THE INDUSTRY TREE, behind its switch -----
-                    //
-                    // The third tree on the same Invest verb, same round, same
-                    // held-ground readings. EVERY LIVING POLITY ENTERS AT THE
-                    // ROOT from `industry_open_year` (TREES.md sec Milestones,
-                    // the Industry exception): no rim gate, so a landlocked
-                    // realm Exploration's coast-bound rim would exclude for good
-                    // is only ever BEHIND here. With the switch off (every
-                    // span but the Industrialisation span's own) this block is
-                    // skipped whole and no Industry field is read or written.
-                    //
-                    // The readings below are the Industry scorer's ONLY: the
-                    // empire and exploration scorers above keep their own
-                    // gates (the empire's fuel mean, the exploration's open
-                    // fuel gate) and their own rate (the industry slice).
-                    if (params.industry_tree_enabled && y >= params.industry_open_year)
-                    {
-                        industry_scorer_reading ir;
-                        ir.reach_bound_q    = reach_bound_q;
-                        ir.manpower_bound_q = manpower_bound_q;
-                        ir.food_bound_q     = food_bound_q;
-                        ir.stores_low_q     = stores_low_q;
-                        ir.cohesion_q       = q.cohesion_q;
-                        ir.surplus_q        = surplus_q;
-                        ir.ground_ore_q     = ground_ore_q;
-                        ir.ground_farm_q    = ground_farm_q;
-                        ir.ground_port_q    = ground_port_q;
-
-                        // THE SEAM (INDUSTRY_TREE.md sec Aims): the richest
-                        // held region's fuel -- the span-open survey under
-                        // DEFAULT B below, energy_q with it off or where
-                        // nothing was surveyed -- so a realm holding one
-                        // coalfield passes the GATE however much else it
-                        // holds. The seam is the gate's reading, the re-check's
-                        // and `fuel_seen`'s; the `ground_fuel` TERM is not the
-                        // seam inside the span (BL-1056, NR-896: a share, set
-                        // at the pick below). And
-                        // LABOUR (`labour_bound`): of the held
-                        // non-subsistence surplus (`manpower_ceiling` — the
-                        // budget muster and industry share, settlement.hpp sec
-                        // Materials and labour), the share standing under arms,
-                        // i.e. the hands the works cannot have. A realm with no
-                        // surplus at all reads 0: nothing is being withheld.
-                        // BL-1041 DEFAULT B (RULED, Ben 2026-09-18, wave 1 form):
-                        // the seam reads each held region's FUEL READING -- the
-                        // span-open survey where it has one, energy_q where it
-                        // has none -- so the gate, its re-check and `fuel_seen`
-                        // (all of which read this one field) agree with the
-                        // points' fuel factor. The `ground_fuel` TERM is a
-                        // share over the span-open survey (set at the pick).
-                        // With nothing surveyed (every path but the span) the
-                        // seam IS the energy_q max, and `ground_fuel` reads it.
-                        const bool seam_reads_survey = params.industry_fuel_gate_reads_survey;
-                        int64_t ceiling_sum = 0, under_arms = 0;
-                        int foreign_held = 0;
-                        for (int hi : held)
-                        {
-                            const region& hp = ss.regions[static_cast<std::size_t>(hi)];
-                            ir.fuel_seam_q = std::max(ir.fuel_seam_q,
-                                seam_reads_survey ? industry_fuel_reading_q(hp) : clampi(hp.energy_q, 0, 1000));
-                            const int64_t ceiling = manpower_ceiling(hp.population, hp.work_manpower_mod);
-                            ceiling_sum += ceiling;
-                            under_arms  += std::min(std::max<int64_t>(hp.army_stock, 0), ceiling);
-                            if (q.culture >= 0 && hp.culture.plurality() != q.culture) ++foreign_held;
-                        }
-                        ir.labour_bound_q = ceiling_sum > 0
-                            ? static_cast<int>(clampi64((under_arms * 1000) / ceiling_sum, 0, 1000)) : 0;
-                        // `many_peoples`: the share of held ground whose
-                        // plurality people is not the realm's own — "held
-                        // ground whose shares still charge the holder". A share,
-                        // never a count, so it does not grow with the realm.
-                        ir.many_peoples_q = clampi((foreign_held * 1000) / n_held, 0, 1000);
-                        if (ir.fuel_seam_q >= industry_fuel_seam_bar_q) q.industry_fuel_seen = true;
-
-                        // RE-PICK when nothing is targeted, when the target
-                        // went dark under a fork, OR (Industry only) when its
-                        // gate closed since the pick — a seam region lost to
-                        // conquest or secession closes a `fuel` node that is
-                        // mid-purchase, so "no seam, no Railway" holds on
-                        // every round the target is funded, not only at the
-                        // pick (INDUSTRY_TREE.md sec Aims). The gate reads the
-                        // same `ir` means and seam filled above.
-                        //
-                        // ACCUMULATED PROGRESS IS LOST (reset to 0 below), the
-                        // same thing that happens when a fork closes under the
-                        // target. TREES.md sec State gives a polity ONE progress
-                        // integer, for the node it is investing in: carrying it
-                        // to the re-picked node would hand that node research
-                        // earned toward a different one, and there is no
-                        // per-node store to park it in until the seam returns.
-                        // The loss is the visible price of losing the seam.
-                        if (!industry_target_stands(q.industry_mask, q.industry_investing, ir))
-                        {
-                            // The readings only a re-pick needs, each a walk
-                            // over the polity table or the held set.
-                            //
-                            // `threatened`: the heaviest grudge any LIVING
-                            // polity holds against this one (grudge scale:
-                            // ground taken 300, a seat sacked 700 — clamped at
-                            // 1000). A neighbour's grudge is the visible cause.
-                            // `known`: the Industry masks of every living
-                            // polity this one has met (BL-908's contact table,
-                            // `has_contact(from = q)`), per node in the scorer.
-                            int threat = 0;
-                            for (const polity& other : out.polities)
-                            {
-                                if (!other.alive || other.id == q.id) continue;
-                                threat = std::max(threat, grudge_between(out, other.id, q.id));
-                                if (other.industry_mask != 0 && has_contact(out, q.id, other.id))
-                                    ir.known_mask |= other.industry_mask;
-                            }
-                            ir.threatened_q = clampi(threat, 0, 1000);
-
-                            // THE FUEL DOCTRINE'S TWO PULLS (BL-1056; Ben
-                            // 2026-09-19, NR-896): `ground_forest` and
-                            // `ground_fuel` are each the per-mille SHARE of held
-                            // regions whose span-open share clears its own
-                            // resource's top-third bar (BL-1059, NR-899,
-                            // NR-900), over
-                            // the SAME held regions (those carrying the
-                            // span-open survey) -- like with like, and neither grows with the realm,
-                            // where the best-of-held they replace could only
-                            // rise as it did. No gate reads either, so only a
-                            // pick needs them. Off the Industrialisation span nothing
-                            // was surveyed (`span_surveyed` false): forest reads
-                            // 0 (the old pin) and fuel -1, which leaves the term
-                            // on the seam. Inside it a realm holding no surveyed
-                            // region reads 0 on both.
-                            ir.ground_forest_q = industry_ground_forest_q(ss.regions, held, ground_bars);
-                            ir.ground_fuel_q   = industry_ground_fuel_q(ss.regions, held, ground_bars, span_surveyed);
-
-                            // `colonial_reach`: a held region the seat reaches
-                            // only across water — `line_crosses_sea`, the SAME
-                            // test that makes a campaign a sea leg.
-                            for (int hi : held)
-                            {
-                                if (hi == q.capital) continue;
-                                if (line_crosses_sea(seat, ss.regions[static_cast<std::size_t>(hi)],
-                                                     terrain, gw, gh, params.neighbour_radius))
-                                { ir.colonial_reach_q = 1000; break; }
-                            }
-
-                            // `fuel_bound`: the seat market's UNMET energy want
-                            // (BL-939/954's signal, after inbound trade) — fuel
-                            // demanded beyond what landed. 0 where the seat
-                            // stands no market.
-                            if (seat.has_market)
-                                ir.fuel_bound_q = clampi(
-                                    seat.scarcity_q[scarcity_good_index(region_class::energy)], 0, 1000);
-
-                            // `credit_bound`: how far the seat's purse falls
-                            // short of the one venture the sim prices in capital
-                            // — a post road (`post_road_treasury_cost`), the
-                            // rail head's own predecessor. 1000 with an empty
-                            // purse, 0 once the treasury could pay for it
-                            // outright. A placeholder scale, like `purse_low`'s.
-                            if (params.post_road_treasury_cost > 0)
-                                ir.credit_bound_q = static_cast<int>(clampi64(
-                                    1000 - (std::max<int64_t>(0, seat.treasury) * 1000)
-                                               / params.post_road_treasury_cost, 0, 1000));
-
-                            q.industry_investing = static_cast<int16_t>(
-                                choose_industry_node(q.industry_mask, ir));
-                            q.industry_progress_q = 0;
-                        }
-
-                        if (q.industry_investing >= 0)
-                        {
-                            // THE RATE READS URBAN MASS (TREES.md sec State):
-                            // the k largest held centres, clamped, then the
-                            // integer superlinear transform — never the
-                            // industry slice the other two trees earn from —
-                            // scaled by the Industry spire ring held and the
-                            // research modifier exactly as the empire rate is.
-                            const int64_t research_q = industry_research_per_year_q(
-                                industry_urban_mass(ss.regions, held),
-                                industry_spire_ring(q.industry_mask),
-                                tree_mod_q(q, io::tree_modifier_term::research), params);
-                            q.industry_progress_q = static_cast<int32_t>(clampi64(
-                                static_cast<int64_t>(q.industry_progress_q) + research_q * step_years,
-                                0, INT32_MAX));
-
-                            const io::industry_tree::node& tn =
-                                io::industry_tree::nodes[q.industry_investing];
-                            const int tn_kind_base =
-                                tn.kind == io::industry_tree::node_kind::minor ? 1
-                              : tn.kind == io::industry_tree::node_kind::major ? 3 : 6;
-                            const int tn_cost =
-                                params.capacity_band_cost * tn_kind_base * static_cast<int>(tn.ring);
-                            if (q.industry_progress_q >= tn_cost)
-                            {
-                                q.industry_mask |= (1ULL << q.industry_investing);
-                                q.industry_progress_q = 0;
-                                q.industry_investing  = -1;
-                                apply_tree_effects(q); // the surface follows the mask at once
-                            }
-                        }
-                    }
                 }
                 break;
             }
@@ -9323,8 +10136,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int tgt_culture = tgt.culture.plurality();
                 if (tgt_culture < 0) break;
 
-                const int op_q = (cs != nullptr)
-                    ? culture_opposition_q(cs->cultures, q.culture, tgt_culture) : 0;
+                const int op_q = rf_kin_q((cs != nullptr)
+                    ? culture_opposition_q(cs->cultures, q.culture, tgt_culture) : 0);
                 if (op_q >= params.organise_opposition_bar_q) break; // Opposed -- conquest only.
 
                 // PRICED BY KINSHIP, FROM THE CAPITAL'S OWN STOCKPILE
@@ -9343,6 +10156,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 owner[ti]  = q.id;
                 tgt.nation = q.id;
                 void_stale_standing_army(tgt); // BL-955
+                note_taken(ti); // BL-1287: organised this round, unmeasured by its holder yet
                 touch_owner(q.id); // BL-922: this polity's held-only reach is now stale.
 
                 // A CENTRE ORGANISED ABOVE THE CITY-STATE THRESHOLD IS ITS
@@ -9386,11 +10200,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // documented per year of Consolidate, so a coarse band credits
                 // the interval it actually covers. The clamp still bounds it,
                 // so a 100-year band recovers fully rather than overshooting.
-                // BL-973: held `cohesion` nodes scale the recovery rate
-                // (TREES.md sec Effects: "recovery on Consolidate").
-                q.cohesion_q = clampi(q.cohesion_q
-                                    + params.cohesion_recovery_q * step_years
-                                        * (1000 + clampi(tree_mod_q(q, io::tree_modifier_term::cohesion), 0, 4000)) / 1000,
+                q.cohesion_q = clampi(q.cohesion_q + params.cohesion_recovery_q * step_years,
                                       params.cohesion_floor_q, 1000);
                 break;
             }
@@ -9513,6 +10323,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (!out.polities[pi].alive) continue;
                 const int qid  = out.polities[pi].id;
                 const int qcap = out.polities[pi].capital;
+                // BL-1287 (review fix): a realm whose turn ended before it
+                // measured its ground this round reads its holders' old
+                // readings; nothing of it secedes until it has measured.
+                if (params.secession_waits_for_holder
+                    && (static_cast<std::size_t>(qid) >= supply_read_year.size()
+                        || supply_read_year[static_cast<std::size_t>(qid)] != y))
+                    continue;
 
                 // The cut-off set, in region-index order. The capital is never
                 // in it: a seat is by construction at zero distance from itself
@@ -9522,6 +10339,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     if (owner[i] != qid) continue;
                     if (static_cast<int>(i) == qcap) continue;
+                    if (params.secession_waits_for_holder && i < taken_year.size() && taken_year[i] == y)
+                        continue; // BL-1287: not yet measured by its holder
                     if (ss.regions[i].network_supply_q
                         <= params.secession_supply_floor_q)
                         cut.push_back(static_cast<int>(i));
@@ -9630,6 +10449,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     coin_name_for(np); // BL-1088
                     out.polities.push_back(np);
                     note_event(lapse_event_kind::broke_away, seat, np.id, qid); // BL-916
+                    if (rf_on && qid == rf_realm) rf_breakaway_years.push_back(y); // BL-1287
 
                     // BL-922 -- REPORT-ONLY: was this block cut off by the
                     // MAP or by the GRAPH? A seceding region with a FED region
@@ -9681,6 +10501,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     raise_grudge(qid, np.id, grudge_kind::ground_taken,
                                  seat, y, params.grudge_ground_taken);
 
+                    note_civil_war_split(np.id, qid); // BL-1290: a half, or a city state walking off?
                     ++out.secessions;
                     out.regions_seceded += static_cast<int64_t>(block.size());
                     out.secession_piece_sizes.push_back(static_cast<int32_t>(block.size())); // BL-926
@@ -10016,6 +10837,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         coin_name_for(np); // BL-1088
                         out.polities.push_back(np);
                         note_event(lapse_event_kind::schism, seat, np.id, qid);
+                        if (rf_on && qid == rf_realm) rf_breakaway_years.push_back(y); // BL-1287
 
                         // BL-981 -- A SCHISM MOVES SEATS, IT DOES NOT RAZE
                         // THEM. The block is grouped by residue culture, so
@@ -10109,6 +10931,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         raise_grudge(qid, np.id, grudge_kind::faith_sundered,
                                      seat, y, params.grudge_ground_taken);
 
+                        note_civil_war_split(np.id, qid); // BL-1290: the detector reads a schism as a split too
                         ++out.schisms;
                         out.regions_sundered += static_cast<int64_t>(block.size());
                         out.history.push_back(history_event{
@@ -10140,6 +10963,1116 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (params.record_playback
             && (last_record_year == INT64_MIN || y - last_record_year >= record_interval))
             record_step(y);
+
+        // ---- BL-1287: THE RISE AND FALL, READ AND PRESSED ------------------
+        //
+        // Off the same counts a step samples: every region a living realm
+        // holds, per mille, integer-divided per realm exactly as the record's
+        // reader divides it. The READ -- the pick, the peak, the backstop's
+        // course and the fall -- is taken at the recorded steps' cadence (the
+        // same rule as `record_step`, kept on its own clock so a run without
+        // the playback reads the same years), so it is what the detector
+        // reads. Only the CEILING is watched every round, so the rise turns
+        // the round it reaches it rather than up to a step later. Moves no
+        // region; it only sets the level the forces above read next round,
+        // and records why.
+        if (rf_on)
+        {
+            const bool rec = rf_last_read == INT64_MIN || y - rf_last_read >= record_interval;
+            if (rec) rf_last_read = y;
+            const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+            std::vector<int32_t> held_by(out.polities.size(), 0);
+            int64_t total = 0;
+            for (std::size_t i = 0; i < n_reg; ++i)
+            {
+                const int o = owner[i];
+                if (o < 0 || static_cast<std::size_t>(o) >= held_by.size()) continue;
+                ++held_by[static_cast<std::size_t>(o)];
+                ++total;
+            }
+            const auto share_pm = [&](int pid) -> int {
+                if (total <= 0 || pid < 0 || static_cast<std::size_t>(pid) >= held_by.size()) return 0;
+                return static_cast<int>(static_cast<int64_t>(held_by[static_cast<std::size_t>(pid)]) * 1000 / total);
+            };
+
+            if (rf_phase == 0 && rec)
+            {
+                if (rf_pre_peak_pm.size() < held_by.size())
+                {
+                    rf_pre_peak_pm.resize(held_by.size(), -1);
+                    rf_pre_peak_year.resize(held_by.size(), 0);
+                }
+                for (std::size_t pi = 0; pi < held_by.size(); ++pi)
+                {
+                    if (held_by[pi] <= 0) continue;
+                    const int s = share_pm(static_cast<int>(pi));
+                    if (s > rf_pre_peak_pm[pi]) { rf_pre_peak_pm[pi] = s; rf_pre_peak_year[pi] = y; }
+                }
+                if (y >= rise_fall_pick_year)
+                {
+                    // THE FRONT-RUNNER: the largest share, ties to the lower id
+                    // -- unless it is BOXED (Ben, 2026-10-12, CIVILISATION.md
+                    // sec How an empire actually falls, "A boxed front-runner
+                    // gives way"). Its REACHABLE GROUND is the component of its
+                    // capital in the campaign graph (`neighbours`, the only
+                    // edges a campaign or an Organise can walk), counted in
+                    // regions of any holder; it can hold the floor when that
+                    // count is at least the floor's share of the world's held
+                    // regions now. Where the largest cannot, the rise falls to
+                    // the largest realm whose ground can -- candidates walked
+                    // by share descending, ties to the lower id. Where none
+                    // can, the largest is kept and the miss is recorded.
+                    const auto reachable_regions = [&](int pid) -> int {
+                        const int cap = out.polities[static_cast<std::size_t>(pid)].capital;
+                        std::vector<char> seen(neighbours.size(), 0);
+                        std::vector<int> stack{ cap };
+                        int comp = 0;
+                        while (!stack.empty())
+                        {
+                            const int r = stack.back(); stack.pop_back();
+                            if (r < 0 || static_cast<std::size_t>(r) >= seen.size() || seen[static_cast<std::size_t>(r)]) continue;
+                            seen[static_cast<std::size_t>(r)] = 1; ++comp;
+                            for (int n : neighbours[static_cast<std::size_t>(r)]) stack.push_back(n);
+                        }
+                        return comp;
+                    };
+                    const auto can_hold_floor = [&](int comp) {
+                        return static_cast<int64_t>(comp) * 1000 >= static_cast<int64_t>(rise_fall_floor_pm) * total;
+                    };
+                    std::vector<std::pair<int, int>> ranked; // (-share, id): share descending, ties to the lower id
+                    for (std::size_t pi = 0; pi < held_by.size(); ++pi)
+                        if (held_by[pi] > 0) ranked.push_back({ -share_pm(static_cast<int>(pi)), static_cast<int>(pi) });
+                    std::sort(ranked.begin(), ranked.end());
+                    int best = -1, best_pm = -1, best_room = 0;
+                    const int largest = ranked.empty() ? -1 : ranked.front().second;
+                    for (const auto& rk : ranked)
+                    {
+                        const int room = reachable_regions(rk.second);
+                        if (!can_hold_floor(room)) continue;
+                        best = rk.second; best_pm = -rk.first; best_room = room;
+                        break;
+                    }
+                    if (best < 0 && largest >= 0)
+                    {
+                        best = largest; best_pm = -ranked.front().first; best_room = reachable_regions(largest);
+                    }
+                    if (best < 0)
+                    {
+                        rf_phase = 4;
+                        out.rise_fall_why = "no realm stood at the pick year";
+                    }
+                    else
+                    {
+                        if (best != largest)
+                        {
+                            // THE GIVE-WAY, recorded: who was boxed, and why.
+                            const polity& bq = out.polities[static_cast<std::size_t>(largest)];
+                            const std::string bseat = (bq.capital >= 0 && static_cast<std::size_t>(bq.capital) < ss.regions.size())
+                                                        ? ss.regions[static_cast<std::size_t>(bq.capital)].name : std::string{};
+                            const std::string bwho = bq.name.empty() ? bseat : bq.name;
+                            out.history.push_back(history_event{
+                                years_from_calendar_year(y), chain_stage::legacy,
+                                bwho + " leads the world from " + bseat
+                                    + ", but its reachable ground cannot hold an empire",
+                                std::string{}});
+                            out.rise_fall_boxed_realm = largest;
+                            out.rise_fall_boxed_room  = reachable_regions(largest);
+                        }
+                        rf_realm      = best;
+                        rf_phase      = 1;
+                        rf_start_pm   = best_pm;
+                        rf_start_year = y;
+                        rf_peak_pm    = rf_pre_peak_pm[static_cast<std::size_t>(best)];
+                        rf_peak_year  = rf_pre_peak_year[static_cast<std::size_t>(best)];
+                        rf_rise_level = 1;
+                        rf_note_level(true, rf_rise_level, y);
+                        out.rise_fall_room_regions = best_room;
+                        out.rise_fall_room_total   = static_cast<int32_t>(total);
+                    }
+                }
+            }
+            else if (rf_phase == 1 || rf_phase == 2 || rf_phase == 3)
+            {
+                const int s = share_pm(rf_realm);
+                // THE SIM READS THE DETECTOR'S PREDICATE, BY CONSTRUCTION (review
+                // fix): the peak is the largest share at ANY read of the span,
+                // whatever the phase; a read above it after the realm fell
+                // re-opens the fall (the halving is measured from the peak that
+                // stands), exactly as `history_pattern_detectors` measures it.
+                if (rec && s > rf_peak_pm)
+                {
+                    rf_peak_pm = s; rf_peak_year = y;
+                    if (rf_phase == 3)
+                    {
+                        rf_phase = 2;
+                        out.rise_fall_fall_year = 0;
+                        out.rise_fall_fall_pm   = -1;
+                    }
+                }
+
+                // A REALM THAT HALVES BEFORE IT TURNS has fallen all the same
+                // (the detector reads any later step at or under half the peak).
+                if (rf_phase == 1 && rec && rf_peak_pm >= rise_fall_floor_pm && s * 2 <= rf_peak_pm)
+                {
+                    rf_phase = 3;
+                    out.rise_fall_fall_year = static_cast<int32_t>(y);
+                    out.rise_fall_fall_pm   = s;
+                }
+
+                if (rf_phase == 1)
+                {
+                    if (held_by[static_cast<std::size_t>(rf_realm)] <= 0)
+                    {
+                        rf_phase = 4;
+                        out.rise_fall_why = "the realm was destroyed before it peaked";
+                    }
+                    else
+                    {
+                        // THE TURN: at the ceiling (under hegemony, any round),
+                        // or at a read once the course's year is reached with
+                        // the floor cleared, or at the last read a full step
+                        // before the peak-by year whatever the share.
+                        const bool at_ceiling = s >= params.rise_ceiling_pm;
+                        const bool on_time    = rec && y >= params.rise_stop_year && s >= rise_fall_floor_pm;
+                        const bool last_call  = rec && y + record_interval >= rise_fall_peak_by_year;
+                        // ...or once it stands above the floor and has set no
+                        // new peak for `rise_stall_years`: the rise has run its
+                        // course, and the fall must land inside the window.
+                        const bool stalled    = rec && rf_peak_pm >= rise_fall_floor_pm
+                                             && y - rf_peak_year >= params.rise_stall_years;
+                        if (at_ceiling || on_time || last_call || stalled)
+                        {
+                            rf_phase      = 2;
+                            rf_fall_start = y;
+                            rf_fall_level = 1;
+                            rf_note_level(false, rf_fall_level, y);
+                        }
+                        else if (rec && rf_rise_level < params.rise_max_level)
+                        {
+                            // THE BACKSTOP: behind a straight course from the
+                            // pick to the goal by the stop year, one level more.
+                            const int64_t span = std::max<int64_t>(1, params.rise_stop_year - rf_start_year);
+                            const int64_t done = std::min<int64_t>(span, y - rf_start_year);
+                            const int course = rf_start_pm
+                                + static_cast<int>((static_cast<int64_t>(params.rise_goal_pm - rf_start_pm) * done) / span);
+                            if (s < course)
+                            {
+                                ++rf_rise_level;
+                                rf_note_level(true, rf_rise_level, y);
+                            }
+                        }
+                    }
+                }
+                else if (rf_phase == 2 && rec)
+                {
+                    if (s * 2 <= rf_peak_pm)
+                    {
+                        // FALLEN: the press is released; the breakdown has run.
+                        rf_phase = 3;
+                        out.rise_fall_fall_year = static_cast<int32_t>(y);
+                        out.rise_fall_fall_pm   = s;
+                    }
+                    else if (y - rf_peak_year >= rise_fall_window_years)
+                    {
+                        rf_phase = 4;
+                        out.rise_fall_why = "its share had not halved within the window";
+                    }
+                    else if (rf_fall_level < params.fall_max_level)
+                    {
+                        // THE BACKSTOP: behind a straight course from the peak
+                        // to half of it by two thirds of the window, one level more.
+                        const int64_t span = std::max<int64_t>(1, (rise_fall_window_years * 2) / 3);
+                        const int64_t done = std::min<int64_t>(span, y - rf_peak_year);
+                        const int course = rf_peak_pm
+                            - static_cast<int>((static_cast<int64_t>(rf_peak_pm / 2) * done) / span);
+                        if (s > course)
+                        {
+                            ++rf_fall_level;
+                            rf_note_level(false, rf_fall_level, y);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- BL-1288: DIFFUSION BY CONTACT, AND THE LATE CULTURE'S READ ----
+        //
+        // On its own read clock at the recorded steps' cadence (so a run
+        // without the playback reads the same years), crediting the years
+        // since the last read. DIFFUSION (Ben, 2026-10-11): every living
+        // polity behind another on the materials ladder learns from it in
+        // proportion to the reach between their grounds -- the cheapest
+        // `edge_step` walk from any region it holds to any region the other
+        // holds, any ground passable, inside `contact_diffusion_horizon` --
+        // and the ladder's own band cost turns what it learns into bands.
+        // Every band is read BEFORE any credit lands, so the order the
+        // polities are walked in (ascending id) decides nothing.
+        if (params.contact_diffusion_q > 0 || lc_target || lc_colony)
+        {
+            const bool rec = lc_last_read == INT64_MIN || y - lc_last_read >= record_interval;
+            if (rec)
+            {
+                const int64_t yrs = lc_last_read == INT64_MIN ? 0 : y - lc_last_read;
+                lc_last_read = y;
+                if (params.contact_diffusion_q > 0 && yrs > 0)
+                {
+                    const int H = std::max(1, params.contact_diffusion_horizon);
+                    const int mat = static_cast<int>(sim_domain::materials);
+                    const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+                    const std::size_t pc = out.polities.size();
+                    std::vector<std::vector<int>> held(pc);
+                    for (std::size_t i = 0; i < n_reg; ++i)
+                        if (owner[i] >= 0 && static_cast<std::size_t>(owner[i]) < pc)
+                            held[static_cast<std::size_t>(owner[i])].push_back(static_cast<int>(i));
+                    std::vector<int> band(pc, 1);
+                    for (std::size_t pi = 0; pi < pc; ++pi)
+                        band[pi] = clampi(out.polities[pi].capacity[mat], 1, 6);
+                    std::vector<int>     dist(n_reg, INT_MAX);
+                    std::vector<int>     touched;
+                    std::vector<int>     met_d(pc, INT_MAX);
+                    std::vector<int>     met;
+                    std::vector<int64_t> credit(pc, 0);
+                    if (contact_ceiling.size() < pc) contact_ceiling.resize(pc, 6);
+                    using node = std::pair<int, int>;
+                    for (std::size_t pi = 0; pi < pc; ++pi)
+                    {
+                        if (held[pi].empty()) continue;
+                        std::priority_queue<node, std::vector<node>, std::greater<node>> pq;
+                        for (const int r : held[pi]) { dist[static_cast<std::size_t>(r)] = 0; touched.push_back(r); pq.push({0, r}); }
+                        while (!pq.empty())
+                        {
+                            const node top = pq.top(); pq.pop();
+                            const int d = top.first, r = top.second;
+                            if (d > dist[static_cast<std::size_t>(r)]) continue;
+                            const int o = owner[static_cast<std::size_t>(r)];
+                            if (o >= 0 && static_cast<std::size_t>(o) != pi && static_cast<std::size_t>(o) < pc
+                                && met_d[static_cast<std::size_t>(o)] == INT_MAX)
+                            { met_d[static_cast<std::size_t>(o)] = d; met.push_back(o); }
+                            for (const int nb : supply_neighbours[static_cast<std::size_t>(r)])
+                            {
+                                if (static_cast<std::size_t>(nb) >= n_reg) continue;
+                                const int cand = d + edge_step(r, nb);
+                                if (cand >= H || cand >= dist[static_cast<std::size_t>(nb)]) continue;
+                                if (dist[static_cast<std::size_t>(nb)] == INT_MAX) touched.push_back(nb);
+                                dist[static_cast<std::size_t>(nb)] = cand;
+                                pq.push({cand, nb});
+                            }
+                        }
+                        int64_t learn = 0; // per mille-weighted bands of gap
+                        int best_met = 0;  // the highest band among the realms that reach it
+                        int64_t reached = 0; // how much reaches it: (horizon - reach) / horizon, per mille, summed
+                        for (const int o : met)
+                        {
+                            // What reaches it from OTHER PEOPLES: a realm of its own
+                            // people teaches it nothing its people did not know.
+                            if (birth_culture(out.polities[static_cast<std::size_t>(o)]) != birth_culture(out.polities[pi]))
+                            {
+                                best_met = std::max(best_met, band[static_cast<std::size_t>(o)]);
+                                reached += static_cast<int64_t>(H - met_d[static_cast<std::size_t>(o)]) * 1000 / H;
+                            }
+                            const int gap = band[static_cast<std::size_t>(o)] - band[pi];
+                            if (gap > 0)
+                                learn += static_cast<int64_t>(gap) * (H - met_d[static_cast<std::size_t>(o)]) * 1000 / H;
+                            met_d[static_cast<std::size_t>(o)] = INT_MAX;
+                        }
+                        met.clear();
+                        for (const int t : touched) dist[static_cast<std::size_t>(t)] = INT_MAX;
+                        touched.clear();
+                        if (band[pi] < 6)
+                            credit[pi] = (static_cast<int64_t>(params.contact_diffusion_q) * learn * yrs) / 1000;
+                        // DEVELOPMENT SPREADS ONLY BY CONTACT (Ben, 2026-10-14):
+                        // the band its contacts sustain -- the early bands, plus
+                        // one band for every `contact_band_per_q` of contact that
+                        // reaches it, and never more than one above the best
+                        // realm that does.
+                        if (params.contact_early_bands > 0)
+                        {
+                            const int64_t per = std::max(1, params.contact_band_per_q);
+                            const int by_contact = params.contact_early_bands + static_cast<int>(reached / per);
+                            contact_ceiling[pi] = clampi(std::min(by_contact, std::max(params.contact_early_bands, best_met + 1)), 1, 6);
+                        }
+                    }
+                    for (std::size_t pi = 0; pi < pc; ++pi)
+                    {
+                        if (credit[pi] <= 0) continue;
+                        polity& q = out.polities[pi];
+                        q.progress_q[mat] = static_cast<int>(clampi64(q.progress_q[mat] + credit[pi], 0, INT32_MAX / 2));
+                        out.contact_diffusion_progress += credit[pi];
+                        // The ladder's own rule (Invest's): a band costs more the higher it sits.
+                        while (q.capacity[mat] < std::min(6, contact_ceiling_of(static_cast<int>(pi)))
+                               && q.progress_q[mat] >= params.capacity_band_cost * q.capacity[mat])
+                        {
+                            q.progress_q[mat] -= params.capacity_band_cost * q.capacity[mat];
+                            ++q.capacity[mat];
+                            ++out.contact_diffusion_bands;
+                        }
+                    }
+                    // A BREAKAWAY DOES NOT CARRY ITS PARENT'S BAND PAST WHAT ITS
+                    // OWN CONTACTS SUSTAIN (Ben, 2026-10-14): a successor read for
+                    // the first time stands at most at its own ceiling.
+                    if (params.contact_early_bands > 0)
+                        for (std::size_t pi = 0; pi < pc; ++pi)
+                        {
+                            if (pi < contact_checked.size() && contact_checked[pi]) continue;
+                            if (contact_checked.size() <= pi) contact_checked.resize(pc, 0);
+                            if (held[pi].empty()) continue;
+                            contact_checked[pi] = 1;
+                            polity& q = out.polities[pi];
+                            if (q.parent < 0) continue;
+                            if (q.capacity[mat] > contact_ceiling[pi])
+                            {
+                                out.contact_bands_shed += q.capacity[mat] - contact_ceiling[pi];
+                                q.capacity[mat]   = contact_ceiling[pi];
+                                q.progress_q[mat] = 0;
+                            }
+                        }
+                }
+
+            }
+
+            // THE LATE CULTURE'S BACKSTOP, EMPIRES (Ben, 2026-10-11: the
+            // isolation that slows its development also slows its conquest, so
+            // it reaches Exploration holding a realm). Read the realms born of
+            // its ground EVERY decision round -- a realm lost is answered the
+            // round it falls, while the ground taken is still a holding the
+            // press can cut off rather than a conqueror's new seat -- and the
+            // lag at the recorded cadence. Where it holds no realm, or less
+            // than half its peak, or (once the world has climbed a tenth of a
+            // band off the floor: something to lag behind) lags less than a
+            // straight course from par at the span's open to
+            // `late_culture_lag_course_x100` at its close asks, the isolation on
+            // its ground is pressed one bounded, recorded level further.
+            if (lc_target)
+            {
+                int realms = 0, regions = 0;
+                lc_holdings(realms, regions);
+                lc_peak_regions = std::max(lc_peak_regions, regions);
+                const int64_t span = std::max<int64_t>(1, params.stop_year - params.start_year);
+                const int64_t done = std::clamp<int64_t>(y - params.start_year, 0, span);
+                const int course = 100 - static_cast<int>((100 - late_culture_lag_course_x100) * done / span);
+                const bool losing = realms == 0 || regions * 2 < lc_peak_regions
+                                 || (rec && lc_world_band_x100() >= 110 && lc_lag_now() > course);
+                // THE RISE IS PRESSED FIRST: no isolation level is raised while
+                // the rise and fall is still to pick or is rising (`rf_phase`
+                // 0-1). Measured 2026-10-13: any press in those years tipped the
+                // reference seed's rise under its floor (226 per mille against
+                // 301 unpressed); two always-patterns never press in the same years.
+                if (losing && lc_level < late_culture_max_level && !(rf_on && rf_phase <= 1))
+                {
+                    ++lc_level;
+                    ++roads_version; // every reach walk re-prices the steps the press moved
+                    lc_note_level(y);
+                }
+            }
+            // ...AND THROUGH EXPLORATION UNTIL THE VOYAGES BIND IT: the
+            // subjection verbs need a realm of its own to bind (from the sea
+            // legs' date), so a realm lost before then is answered as in the
+            // Empires round -- the isolation it carried pressed one level
+            // further. The lag clause is the Empires round's alone.
+            else if (lc_colony && out.late_culture_bound == 0)
+            {
+                int realms = 0, regions = 0;
+                lc_holdings(realms, regions);
+                lc_peak_regions = std::max(lc_peak_regions, regions);
+                if ((realms == 0 || regions * 2 < lc_peak_regions) && lc_level < late_culture_max_level)
+                {
+                    ++lc_level;
+                    ++roads_version;
+                    lc_note_level(y);
+                }
+            }
+        }
+
+        // ---- BL-1289: THE WORLD WAR (INDUSTRIALISATION.md sec A world war in ----
+        // every world, sec War kills people; GENERATION_STRATEGY.md sec History
+        // patterns; Ben 2026-09-15, 2026-10-10/11/12).
+        //
+        // AT THE ROUND'S END, after the recorded step, so the top powers are
+        // read off exactly the counts the step at the window's open samples
+        // (population summed over held regions, living realms only, ties to
+        // the lower id) -- the set `history_patterns`' detector judges.
+        //
+        // HOW IT FORMS. Inside the spark's grace, a battle this round between
+        // living realms, a top power on either side, whose defender holds a
+        // living mutual-defence partner not bound by non-aggression to the
+        // attacker, is the treaty graph's own spark. With none by
+        // `world_war_spark_deadline`, the CONTEST FOR A SUBJECT fires: the two
+        // largest powers fight over the subject of one of them nearest the
+        // other's seat (else the province of the smaller nearest the larger's
+        // seat). Either way the war then SPREADS by mutual defence, layer by
+        // layer (a subject stands with its overlord), and where fewer than
+        // `world_war_min_engaged` of the top powers stand in it, it ESCALATES
+        // one recorded step a round: the largest unengaged top power enters
+        // against the side it holds the deeper grudge against, else against
+        // the nearer leader -- the war on its doorstep.
+        //
+        // WHAT IT COSTS, every round it stands (the params' block says each):
+        // the fronts razed once and their people starved and displaced, the
+        // belligerents' conscripts dead across their ground, their treasuries
+        // spent down to no lower than zero. Peace when a side has spent its war
+        // chests (and the top powers are in), at the latest in the window's
+        // last round. Integer throughout; every walk in index order.
+        if (ww_on && ww_phase <= 1)
+        {
+            const std::size_t np    = out.polities.size();
+            const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+            if (ww_side.size() < np)
+            {
+                ww_side.resize(np, 0);
+                ww_chest.resize(np, 0);
+                ww_years.resize(np, 0);
+                ww_dead.resize(np, 0);
+                ww_fled.resize(np, 0);
+                ww_spent.resize(np, 0);
+            }
+            if (ww_razed.size() < n_reg) ww_razed.resize(n_reg, 0);
+            std::vector<int64_t> ww_pop(np, 0);
+            std::vector<int32_t> ww_nreg(np, 0);
+            for (std::size_t i = 0; i < n_reg; ++i)
+            {
+                const int o = owner[i];
+                if (o < 0 || static_cast<std::size_t>(o) >= np) continue;
+                ww_pop[static_cast<std::size_t>(o)] += ss.regions[i].population;
+                ++ww_nreg[static_cast<std::size_t>(o)];
+            }
+            const auto standing = [&](int p) {
+                return p >= 0 && static_cast<std::size_t>(p) < np && out.polities[static_cast<std::size_t>(p)].alive
+                    && ww_nreg[static_cast<std::size_t>(p)] > 0;
+            };
+            const auto in_top = [&](int p) {
+                return std::find(ww_top.begin(), ww_top.end(), p) != ww_top.end();
+            };
+            const auto ww_name = [&](int pid) -> std::string {
+                if (pid < 0 || static_cast<std::size_t>(pid) >= np) return std::string("a realm");
+                const polity& q = out.polities[static_cast<std::size_t>(pid)];
+                if (!q.name.empty()) return q.name;
+                if (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                    return ss.regions[static_cast<std::size_t>(q.capital)].name;
+                return std::string("a realm");
+            };
+            const auto ww_line = [&](const std::string& line) {
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy, line, std::string{}});
+            };
+            const auto md_partners = [&](int p) {
+                std::vector<int> v;
+                for (const dated_object& o : out.dated_objects)
+                {
+                    if (o.kind != static_cast<int32_t>(treaty_clause::mutual_defence)) continue;
+                    if (o.a == p) v.push_back(o.b);
+                    else if (o.b == p) v.push_back(o.a);
+                }
+                std::sort(v.begin(), v.end());
+                v.erase(std::unique(v.begin(), v.end()), v.end());
+                return v;
+            };
+            const auto leader_of = [&](int side) {
+                return side == 1 ? out.world_war_side_a : out.world_war_side_b;
+            };
+            // A realm ENTERS on @p side: its chest is the treasury it entered with.
+            const auto enter = [&](int p, int side) {
+                ww_side[static_cast<std::size_t>(p)] = static_cast<int8_t>(side);
+                const int cap = out.polities[static_cast<std::size_t>(p)].capital;
+                ww_chest[static_cast<std::size_t>(p)] =
+                    (cap >= 0 && static_cast<std::size_t>(cap) < ss.regions.size())
+                        ? std::max<int64_t>(0, ss.regions[static_cast<std::size_t>(cap)].treasury) : 0;
+                ++out.world_war_belligerents;
+            };
+            const auto join = [&](int p, int side, int ally, const std::string& line) {
+                enter(p, side);
+                note_event(lapse_event_kind::war_joined, out.polities[static_cast<std::size_t>(p)].capital, p, ally);
+                ww_line(line);
+            };
+            // THE SPREAD: layer by layer, each engaged realm's living partners
+            // enter on its side (the first side to reach a realm takes it),
+            // unless bound by non-aggression to the other side's leader.
+            const auto spread = [&]() {
+                for (;;)
+                {
+                    std::vector<std::pair<int, int>> layer; // (partner, the engaged realm it answers)
+                    std::vector<char> taken(np, 0);
+                    for (std::size_t p = 0; p < np; ++p)
+                    {
+                        if (ww_side[p] == 0 || !standing(static_cast<int>(p))) continue;
+                        const int enemy = leader_of(ww_side[p] == 1 ? 2 : 1);
+                        for (const int m : md_partners(static_cast<int>(p)))
+                        {
+                            if (!standing(m) || ww_side[static_cast<std::size_t>(m)] != 0
+                                || taken[static_cast<std::size_t>(m)]) continue;
+                            if (enemy >= 0 && has_treaty_clause(out, m, enemy, treaty_clause::non_aggression)) continue;
+                            taken[static_cast<std::size_t>(m)] = 1;
+                            layer.push_back({m, static_cast<int>(p)});
+                        }
+                    }
+                    if (layer.empty()) return;
+                    for (const auto& [m, p] : layer)
+                    {
+                        const int side = ww_side[static_cast<std::size_t>(p)];
+                        join(m, side, p, ww_name(m) + " honours its defence pact with " + ww_name(p)
+                                             + " and enters the war against " + ww_name(leader_of(side == 1 ? 2 : 1)));
+                    }
+                }
+            };
+            const auto top_engaged = [&]() {
+                int n = 0;
+                for (const int p : ww_top)
+                    if (static_cast<std::size_t>(p) < np && ww_side[static_cast<std::size_t>(p)] != 0) ++n;
+                return n;
+            };
+
+            // THE TOP POWERS, read once, at the round the window's step is
+            // taken. ON ITS OWN CLOCK, the record's cadence (`record_step`'s
+            // rule) kept here every round, so a run with the playback
+            // suppressed reads the same year as a recorded one, whatever year
+            // the span opens on -- the rise and fall's `rf_last_read` idiom.
+            const bool ww_rec = ww_last_read == INT64_MIN || y - ww_last_read >= record_interval;
+            if (ww_rec) ww_last_read = y;
+            if (!ww_top_read && y >= world_war_window_start && ww_rec)
+            {
+                ww_top_read = true;
+                std::vector<std::pair<int64_t, int>> by_pop;
+                for (std::size_t p = 0; p < np; ++p)
+                    if (ww_nreg[p] > 0) by_pop.push_back({ww_pop[p], static_cast<int>(p)});
+                std::sort(by_pop.begin(), by_pop.end(), [](const auto& a, const auto& b) {
+                    return a.first != b.first ? a.first > b.first : a.second < b.second; });
+                for (std::size_t k = 0; k < by_pop.size() && k < static_cast<std::size_t>(world_war_top_k); ++k)
+                    ww_top.push_back(by_pop[k].second);
+            }
+
+            // THE SPARK.
+            if (ww_top_read && ww_phase == 0 && y <= world_war_window_end)
+            {
+                int a = -1, b = -1, ground = -1, kind = 0;
+                for (const ww_battle& bt : ww_round_battles)
+                {
+                    if (!standing(bt.attacker) || !standing(bt.defender)) continue;
+                    if (!in_top(bt.attacker) && !in_top(bt.defender)) continue;
+                    bool drawn = false;
+                    for (const int m : md_partners(bt.defender))
+                        if (m != bt.attacker && standing(m)
+                            && !has_treaty_clause(out, m, bt.attacker, treaty_clause::non_aggression))
+                        { drawn = true; break; }
+                    if (!drawn) continue;
+                    a = bt.attacker; b = bt.defender; ground = bt.region; kind = 1;
+                    break;
+                }
+                int subject = -1;
+                if (kind == 0 && y >= world_war_spark_deadline)
+                {
+                    // THE CONTEST FOR A SUBJECT between the two largest powers.
+                    std::vector<int> great;
+                    for (const int p : ww_top)
+                        if (standing(p)) great.push_back(p);
+                    if (great.size() >= 2)
+                    {
+                        const int l1 = great[0], l2 = great[1];
+                        const auto seat_of = [&](int p) -> const region* {
+                            const int c = out.polities[static_cast<std::size_t>(p)].capital;
+                            return (c >= 0 && static_cast<std::size_t>(c) < ss.regions.size())
+                                       ? &ss.regions[static_cast<std::size_t>(c)] : nullptr;
+                        };
+                        int best_d = INT_MAX;
+                        for (std::size_t s = 0; s < np; ++s)
+                        {
+                            const int ov = out.polities[s].overlord;
+                            if ((ov != l1 && ov != l2) || !standing(static_cast<int>(s))) continue;
+                            const region* ss_seat = seat_of(static_cast<int>(s));
+                            const region* rival   = seat_of(ov == l1 ? l2 : l1);
+                            if (ss_seat == nullptr || rival == nullptr) continue;
+                            const int d = region_distance(*ss_seat, *rival, gw);
+                            if (d < best_d) { best_d = d; subject = static_cast<int>(s); }
+                        }
+                        if (subject >= 0)
+                        {
+                            const int ov = out.polities[static_cast<std::size_t>(subject)].overlord;
+                            a = ov == l1 ? l2 : l1; // the power that wants it, or wants it freed
+                            b = ov;
+                            ground = out.polities[static_cast<std::size_t>(subject)].capital;
+                        }
+                        else
+                        {
+                            // No subject between them: the smaller's province
+                            // nearest the larger's seat is what they contest.
+                            a = l1; b = l2;
+                            const region* rival = seat_of(l1);
+                            for (std::size_t i = 0; i < n_reg && rival != nullptr; ++i)
+                            {
+                                if (owner[i] != l2) continue;
+                                const int d = region_distance(ss.regions[i], *rival, gw);
+                                if (d < best_d) { best_d = d; ground = static_cast<int>(i); }
+                            }
+                        }
+                        kind = 2;
+                    }
+                }
+                if (kind != 0)
+                {
+                    ww_phase = 1;
+                    out.world_war_year       = static_cast<int32_t>(y);
+                    out.world_war_spark      = kind;
+                    out.world_war_contested  = ground;
+                    out.world_war_side_a     = a;
+                    out.world_war_side_b     = b;
+                    enter(a, 1);
+                    enter(b, 2);
+                    const std::string where = (ground >= 0 && static_cast<std::size_t>(ground) < ss.regions.size())
+                                                ? ss.regions[static_cast<std::size_t>(ground)].name : std::string("its border");
+                    note_event(lapse_event_kind::war_joined, ground, a, b);
+                    if (kind == 1)
+                        ww_line(ww_name(a) + " marches on " + where + " against " + ww_name(b)
+                                + ", and the pacts that bind " + ww_name(b) + "'s friends turn a border war into a world war");
+                    else if (subject >= 0)
+                        ww_line(ww_name(a) + " and " + ww_name(b) + ", the two great powers of the age, go to war over "
+                                + ww_name(subject) + ", subject of " + ww_name(b));
+                    else
+                        ww_line(ww_name(a) + " and " + ww_name(b) + ", the two great powers of the age, go to war over "
+                                + where);
+                    if (subject >= 0 && ww_side[static_cast<std::size_t>(subject)] == 0)
+                        join(subject, 2, b, ww_name(subject) + " is drawn into the war beside its overlord " + ww_name(b));
+                    spread();
+                }
+            }
+            ww_round_battles.clear();
+
+            if (ww_phase == 1)
+            {
+                // THE BACKSTOP: one recorded step a round while too few of the
+                // top powers stand in the war.
+                if (top_engaged() < world_war_min_engaged)
+                {
+                    int c = -1;
+                    for (const int p : ww_top)
+                        if (standing(p) && ww_side[static_cast<std::size_t>(p)] == 0) { c = p; break; }
+                    if (c >= 0)
+                    {
+                        int ga = 0, gb = 0, gwho_a = -1, gwho_b = -1;
+                        for (std::size_t p = 0; p < np; ++p)
+                        {
+                            if (ww_side[p] == 0) continue;
+                            const int g = grudge_between(out, c, static_cast<int>(p));
+                            if (ww_side[p] == 1 && g > ga) { ga = g; gwho_a = static_cast<int>(p); }
+                            if (ww_side[p] == 2 && g > gb) { gb = g; gwho_b = static_cast<int>(p); }
+                        }
+                        int side = 0, foe = -1;
+                        if (ga != gb)
+                        {
+                            side = ga > gb ? 2 : 1;
+                            foe  = ga > gb ? gwho_a : gwho_b;
+                        }
+                        else
+                        {
+                            const int cc = out.polities[static_cast<std::size_t>(c)].capital;
+                            const int ca = out.polities[static_cast<std::size_t>(out.world_war_side_a)].capital;
+                            const int cb = out.polities[static_cast<std::size_t>(out.world_war_side_b)].capital;
+                            const auto dist_to = [&](int r) {
+                                return (cc >= 0 && r >= 0 && static_cast<std::size_t>(cc) < ss.regions.size()
+                                        && static_cast<std::size_t>(r) < ss.regions.size())
+                                           ? region_distance(ss.regions[static_cast<std::size_t>(cc)],
+                                                             ss.regions[static_cast<std::size_t>(r)], gw)
+                                           : INT_MAX;
+                            };
+                            side = dist_to(ca) < dist_to(cb) ? 2 : 1; // against the nearer leader; a tie, beside the defender
+                        }
+                        ++out.world_war_escalations;
+                        const int ally = leader_of(side);
+                        const std::string line = foe >= 0
+                            ? ww_name(c) + ", its grievance against " + ww_name(foe) + " unpaid, enters the war beside "
+                                  + ww_name(ally)
+                            : ww_name(c) + ", alarmed by " + ww_name(leader_of(side == 1 ? 2 : 1))
+                                  + "'s war on its doorstep, enters the war beside " + ww_name(ally);
+                        join(c, side, ally, line);
+                        spread();
+                    }
+                }
+
+                // THE COSTS of the round the war stands.
+                const int64_t yrs   = clampi64(step_years, 1, 1000);
+                const int     cap_q = clampi(params.world_war_round_cap_q, 0, 1000);
+                std::vector<std::vector<int>> held(np);
+                for (std::size_t i = 0; i < n_reg; ++i)
+                {
+                    const int o = owner[i];
+                    if (o < 0 || static_cast<std::size_t>(o) >= np || ww_side[static_cast<std::size_t>(o)] == 0) continue;
+                    if (ss.regions[i].domain != region_domain::land) continue;
+                    held[static_cast<std::size_t>(o)].push_back(static_cast<int>(i));
+                }
+                std::vector<int> side_a, side_b;
+                for (std::size_t p = 0; p < np; ++p)
+                {
+                    if (!standing(static_cast<int>(p)) || held[p].empty()) continue;
+                    if (ww_side[p] == 1) side_a.push_back(static_cast<int>(p));
+                    else if (ww_side[p] == 2) side_b.push_back(static_cast<int>(p));
+                }
+
+                // THE FRONTS: per opposing pair, each side's ground nearest the other.
+                const int reach = params.world_war_front_reach > 0 ? params.world_war_front_reach
+                                                                    : params.neighbour_radius;
+                const int per_pair = clampi(params.world_war_front_per_pair, 0, 64);
+                std::vector<int> front_enemy(n_reg, -1);
+                const auto nearest_of = [&](const std::vector<int>& mine, const std::vector<int>& theirs,
+                                            bool ports_only, std::vector<std::pair<int, int>>& outv) {
+                    outv.clear();
+                    for (const int i : mine)
+                    {
+                        const region& r = ss.regions[static_cast<std::size_t>(i)];
+                        if (ports_only && r.port_stock_q <= 0 && r.port_q <= 0) continue;
+                        int d = INT_MAX;
+                        for (const int j : theirs)
+                            d = std::min(d, region_distance(r, ss.regions[static_cast<std::size_t>(j)], gw));
+                        outv.push_back({d, i});
+                    }
+                    std::sort(outv.begin(), outv.end());
+                };
+                std::vector<std::pair<int, int>> da, db;
+                for (const int a : side_a)
+                    for (const int b : side_b)
+                    {
+                        const std::vector<int>& ha = held[static_cast<std::size_t>(a)];
+                        const std::vector<int>& hb = held[static_cast<std::size_t>(b)];
+                        nearest_of(ha, hb, false, da);
+                        if (da.empty()) continue;
+                        if (da.front().first <= reach)
+                        {
+                            nearest_of(hb, ha, false, db);
+                            for (int k = 0; k < per_pair && k < static_cast<int>(da.size()) && da[static_cast<std::size_t>(k)].first <= reach; ++k)
+                                if (front_enemy[static_cast<std::size_t>(da[static_cast<std::size_t>(k)].second)] < 0)
+                                    front_enemy[static_cast<std::size_t>(da[static_cast<std::size_t>(k)].second)] = b;
+                            for (int k = 0; k < per_pair && k < static_cast<int>(db.size()) && db[static_cast<std::size_t>(k)].first <= reach; ++k)
+                                if (front_enemy[static_cast<std::size_t>(db[static_cast<std::size_t>(k)].second)] < 0)
+                                    front_enemy[static_cast<std::size_t>(db[static_cast<std::size_t>(k)].second)] = a;
+                        }
+                        else if ((in_top(a) || in_top(b))
+                                 && (out.polities[static_cast<std::size_t>(a)].navy_stock > 0
+                                     || out.polities[static_cast<std::size_t>(b)].navy_stock > 0))
+                        {
+                            // Across water, where a top power is one of the pair
+                        // and either fields a navy: each side's nearest port, blockaded.
+                            nearest_of(ha, hb, true, da);
+                            nearest_of(hb, ha, true, db);
+                            if (!da.empty() && front_enemy[static_cast<std::size_t>(da.front().second)] < 0)
+                                front_enemy[static_cast<std::size_t>(da.front().second)] = b;
+                            if (!db.empty() && front_enemy[static_cast<std::size_t>(db.front().second)] < 0)
+                                front_enemy[static_cast<std::size_t>(db.front().second)] = a;
+                        }
+                    }
+
+                // GROUND FOUGHT OVER: razed once, starved and fled every round.
+                const auto tier_floor = [&](int t) -> int {
+                    return t <= 0 ? 0 : t == 1 ? params.road_tier1_uses
+                         : t == 2 ? params.road_tier2_uses : params.road_tier3_uses;
+                };
+                bool tier_moved = false;
+                std::vector<char> newly_razed(n_reg, 0);
+                const int famine_q = static_cast<int>(clampi64(params.world_war_famine_q * yrs, 0, cap_q));
+                const int flight_q = static_cast<int>(clampi64(params.world_war_flight_q * yrs, 0, cap_q));
+                for (std::size_t i = 0; i < n_reg; ++i)
+                {
+                    const int enemy = front_enemy[i];
+                    if (enemy < 0) continue;
+                    const int holder = owner[i];
+                    region& r = ss.regions[i];
+                    ++out.world_war_front_rounds;
+                    if (!ww_razed[i])
+                    {
+                        ww_razed[i] = 1;
+                        ++out.world_war_regions_razed;
+                        const int rq = clampi(params.world_war_raze_industry_q, 0, 1000);
+                        const int64_t cut_p = (r.industry_points / 1000) * rq + ((r.industry_points % 1000) * rq) / 1000;
+                        const int64_t cut_t = (r.industry_points_from_treasury / 1000) * rq
+                                            + ((r.industry_points_from_treasury % 1000) * rq) / 1000;
+                        r.industry_points               -= cut_p;
+                        r.industry_points_from_treasury -= cut_t;
+                        out.world_war_points_razed_scale    += cut_p - cut_t;
+                        out.world_war_points_razed_treasury += cut_t;
+                        const int pcut = (r.port_stock_q * clampi(params.world_war_raze_port_q, 0, 1000)) / 1000;
+                        r.port_stock_q -= pcut;
+                        out.world_war_port_razed_q += pcut;
+                        newly_razed[i] = 1;
+                        note_event(lapse_event_kind::ground_razed, static_cast<int>(i), holder, enemy);
+                    }
+                    if (r.population <= 0) continue;
+                    // BLOCKADE FAMINE: the front's supply interdicted while the war stands.
+                    const int64_t starved = remove_region_people(r, (r.population * famine_q) / 1000);
+                    out.world_war_famine_dead += starved;
+                    if (holder >= 0 && static_cast<std::size_t>(holder) < np) ww_dead[static_cast<std::size_t>(holder)] += starved;
+                    // DISPLACEMENT: to the nearest safe region of the realm that can feed them.
+                    int dest = -1, dest_d = INT_MAX;
+                    if (flight_q > 0 && holder >= 0)
+                        for (std::size_t j = 0; j < n_reg; ++j)
+                        {
+                            if (j == i || owner[j] != holder || front_enemy[j] >= 0) continue;
+                            const region& d = ss.regions[j];
+                            if (d.domain != region_domain::land || d.population <= 0) continue;
+                            if (refugee_room(d) <= 0) continue;
+                            const int dd = region_distance(r, d, gw);
+                            if (dd < dest_d) { dest_d = dd; dest = static_cast<int>(j); }
+                        }
+                    if (flight_q > 0 && dest < 0) ++out.world_war_no_refuge;
+                    if (dest >= 0)
+                    {
+                        const int64_t fled = settle_refugees(ss.regions[static_cast<std::size_t>(dest)],
+                                                             (r.population * flight_q) / 1000);
+                        if (fled > 0)
+                        {
+                            remove_region_people(r, fled);
+                            out.world_war_fled += fled;
+                            ww_fled[static_cast<std::size_t>(holder)] += fled;
+                        }
+                    }
+                    r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+                }
+                // EVERY ROAD THROUGH RAZED GROUND drops one tier, once in the
+                // war: every corridor the live map holds with an end on a
+                // region razed this round -- the walked network and the wet
+                // campaign corridors beyond the neighbour radius alike. The
+                // map is unordered, so its matching keys are collected and
+                // SORTED by (lo, hi) before anything moves; the order of the
+                // demotions and their events is a property of the integers.
+                // Each lands on the LOWER rung's floor, so the walks of a
+                // whole rung must come back before the road does, and each is
+                // recorded as a `road_promoted` event at the lower tier (0
+                // when a Track falls out of use) so the playback's network
+                // closes on the sim's tiers.
+                {
+                    std::vector<uint64_t> keys;
+                    for (const auto& kv : road_uses_live)
+                    {
+                        const std::size_t lo = static_cast<std::size_t>(kv.first >> 32);
+                        const std::size_t hi = static_cast<std::size_t>(kv.first & 0xFFFFFFFFu);
+                        if ((lo < n_reg && newly_razed[lo]) || (hi < n_reg && newly_razed[hi]))
+                            keys.push_back(kv.first);
+                    }
+                    std::sort(keys.begin(), keys.end());
+                    for (const uint64_t key : keys)
+                    {
+                        if (ww_demoted_edges.count(key)) continue;
+                        int& uses = road_uses_live[key];
+                        const int tier = road_tier_for_uses(uses);
+                        if (tier <= 0) continue;
+                        ww_demoted_edges.insert(key);
+                        uses = tier_floor(tier - 1);
+                        if (tier >= 3) ww_held_below_post.insert(key);
+                        ++out.world_war_roads_demoted;
+                        tier_moved = true;
+                        note_event(lapse_event_kind::road_promoted, static_cast<int>(key >> 32),
+                                   road_tier_for_uses(uses), static_cast<int>(key & 0xFFFFFFFFu));
+                    }
+                }
+                if (tier_moved) ++roads_version;
+
+                // CONSCRIPT DEAD, drawn back from the ground that raised them;
+                // and THE TREASURY, spent down from the chest the realm entered with.
+                const int conscript_q = static_cast<int>(clampi64(params.world_war_conscript_q * yrs, 0, cap_q));
+                const int exhaust_q   = clampi(params.world_war_exhaustion_q, 0, 1000);
+                for (const std::vector<int>* sv : {&side_a, &side_b})
+                    for (const int p : *sv)
+                    {
+                        const std::size_t pi = static_cast<std::size_t>(p);
+                        for (std::size_t i = 0; i < n_reg; ++i)
+                        {
+                            if (owner[i] != p) continue;
+                            region& r = ss.regions[i];
+                            if (r.population <= 0) continue;
+                            const int64_t dead = remove_region_people(r, (r.population * conscript_q) / 1000);
+                            out.world_war_conscript_dead += dead;
+                            ww_dead[pi] += dead;
+                            r.manpower_stock = std::min(r.manpower_stock, manpower_ceiling(r.population, r.work_manpower_mod));
+                        }
+                        ww_years[pi] += yrs;
+                        const int cap = out.polities[pi].capital;
+                        if (cap < 0 || static_cast<std::size_t>(cap) >= ss.regions.size()) continue;
+                        region& seat = ss.regions[static_cast<std::size_t>(cap)];
+                        const int64_t chest = ww_chest[pi];
+                        const int64_t war_chest = (chest / 1000) * exhaust_q + ((chest % 1000) * exhaust_q) / 1000;
+                        const int64_t due = std::min<int64_t>(war_chest - ww_spent[pi],
+                            (chest / 1000) * params.world_war_cost_q * yrs
+                                + ((chest % 1000) * params.world_war_cost_q * yrs) / 1000);
+                        const int64_t pay = std::clamp<int64_t>(std::min(due, seat.treasury), 0, INT64_MAX);
+                        seat.treasury -= pay;
+                        ww_spent[pi] += pay;
+                        out.world_war_treasury_spent += pay;
+                    }
+
+                // PEACE: a side has spent its war chests (`world_war_exhaustion_q`
+                // of what each member entered with) and the top powers
+                // stand in (or no more can be drawn in) -- or the window closes.
+                const auto spent_out = [&](int side) {
+                    for (std::size_t p = 0; p < np; ++p)
+                        if (ww_side[p] == side && standing(static_cast<int>(p))
+                            && ww_years[p] * params.world_war_cost_q < exhaust_q)
+                            return false;
+                    return true;
+                };
+                bool none_left = true;
+                for (const int p : ww_top)
+                    if (standing(p) && ww_side[static_cast<std::size_t>(p)] == 0) none_left = false;
+                const bool drawn_in   = top_engaged() >= world_war_min_engaged || none_left;
+                const bool last_round = y + step_years > world_war_window_end;
+                if (last_round || (drawn_in && (spent_out(1) || spent_out(2))))
+                {
+                    ww_phase = 2;
+                    out.world_war_peace_year = static_cast<int32_t>(y);
+                    note_event(lapse_event_kind::war_peace, out.world_war_contested,
+                               out.world_war_side_a, out.world_war_side_b);
+                    ww_line("Peace ends the world war between " + ww_name(out.world_war_side_a) + " and "
+                            + ww_name(out.world_war_side_b) + ": " + std::to_string(out.world_war_conscript_dead)
+                            + " conscripts dead, " + std::to_string(out.world_war_famine_dead)
+                            + " starved under blockade, " + std::to_string(out.world_war_fled) + " fled the fronts, "
+                            + std::to_string(out.world_war_regions_razed) + " regions razed");
+                    // Each GREAT POWER that fought counts its own war (the
+                    // leaders and the top powers; the dozens of lesser
+                    // belligerents are in the totals above, not a line each).
+                    for (std::size_t p = 0; p < np; ++p)
+                        if (ww_side[p] != 0
+                            && (in_top(static_cast<int>(p)) || static_cast<int>(p) == out.world_war_side_a
+                                || static_cast<int>(p) == out.world_war_side_b))
+                            ww_line(ww_name(static_cast<int>(p)) + " counts its war: " + std::to_string(ww_dead[p])
+                                    + " of its people dead, " + std::to_string(ww_fled[p]) + " driven from their homes, "
+                                    + std::to_string(ww_spent[p]) + " spent from its treasury");
+                }
+            }
+        }
+
+        // ---- BL-1294 (revolution lean): THE PRESSURE, AND THE TAKEOVER -------
+        //
+        // INDUSTRIALISATION.md sec Revolution. Each decision round, every realm
+        // whose cities stood at or over the bar at the open accrues the excess
+        // x the round's years, weighed up as its cohesion falters. At the
+        // threshold a splinter rises in its largest city other than its capital
+        // (most urban heads now, ties to the lower region) and takes the whole
+        // nation: nothing on the map moves -- the polity id, its ground, its
+        // armies and treasury stay -- and the realm takes the next regime and a
+        // name newly coined in its own tongue (`coin_realm_name`, a pure
+        // function of the tongue and (id, the city, the year): no draw from the
+        // sim's stream, so the decision loop is unmoved). A tongue that coins
+        // nothing new raises no takeover. Once per realm per span; realms in
+        // id order. A lean: no backstop, no target, and a quiet span is a
+        // legitimate outcome.
+        if (rv_on)
+        {
+            const int64_t round_years = std::max<int64_t>(1, std::min<int64_t>(step_years, params.stop_year - y));
+            const std::size_t np = std::min(out.polities.size(), rv_disparity_pm.size());
+            for (std::size_t pi = 0; pi < np; ++pi)
+            {
+                polity& q = out.polities[pi];
+                if (rv_fired[pi] || !q.alive || rv_disparity_pm[pi] < params.revolution_disparity_bar_pm) continue;
+                const int64_t excess = rv_disparity_pm[pi] - params.revolution_disparity_bar_pm;
+                const int64_t strain = 2000 - clampi(q.cohesion_q, 0, 1000);
+                rv_pressure[pi] += (excess * round_years * strain) / 1000;
+                if (rv_pressure[pi] < params.revolution_pressure_q) continue;
+                if (cs == nullptr || q.culture < 0 || q.culture >= static_cast<int>(cs->cultures.size())) continue;
+
+                // The city the splinter rises in.
+                int     rise_at = -1;
+                int64_t rise_heads = 0;
+                for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+                {
+                    if (owner[i] != static_cast<int>(pi) || static_cast<int>(i) == q.capital) continue;
+                    const region& rg = ss.regions[i];
+                    if (rg.centres <= 0 || rg.urban_population <= rise_heads) continue;
+                    rise_at = static_cast<int>(i);
+                    rise_heads = rg.urban_population;
+                }
+                if (rise_at < 0) continue; // no provincial city left to rise in: the pressure waits
+
+                // The new name, coined in the realm's own tongue, never the old one.
+                const tongue& speech = cs->cultures[static_cast<std::size_t>(q.culture)].speech;
+                std::string coined;
+                for (uint64_t attempt = 0; attempt < 8; ++attempt)
+                {
+                    const uint64_t salt = (static_cast<uint64_t>(static_cast<uint32_t>(q.id)) << 20)
+                                        ^ static_cast<uint64_t>(static_cast<uint32_t>(rise_at))
+                                        ^ (static_cast<uint64_t>(static_cast<uint32_t>(y)) << 40)
+                                        ^ (0x2E701u + attempt * 0x9E3779B97F4A7C15ull);
+                    coined = coin_realm_name(speech, salt);
+                    if (!coined.empty() && coined != q.name) break;
+                    coined.clear();
+                }
+                if (coined.empty()) continue;
+
+                rv_fired[pi] = 1;
+                const std::string old_name = q.name;
+                const std::string city     = ss.regions[static_cast<std::size_t>(rise_at)].name;
+                const std::string seat     = (q.capital >= 0 && static_cast<std::size_t>(q.capital) < ss.regions.size())
+                                               ? ss.regions[static_cast<std::size_t>(q.capital)].name : std::string{};
+                const std::string was      = old_name.empty() ? seat : old_name;
+                q.name = coined;
+                ++q.regime;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    "A splinter rises at " + city + " and takes " + was
+                        + " whole: its cities stood too far apart, and the realm is " + coined + " now",
+                    std::string{}});
+                note_event(lapse_event_kind::revolution, rise_at, static_cast<int>(pi), q.regime);
+                // The live tap's name table: the realm reads by its new name
+                // from here on (the record's own table is copied whole at the
+                // close, `as_timelapse`).
+                if (tap != nullptr && pi < tap_polity_name.size())
+                {
+                    tap_polity_name[pi] = coined;
+                    tap->restate_polity_name(pi, coined);
+                }
+                history_sim_state::revolution_note n;
+                n.polity       = static_cast<int32_t>(pi);
+                n.year         = static_cast<int32_t>(y);
+                n.region       = rise_at;
+                n.disparity_pm = rv_disparity_pm[pi];
+                n.cities       = rv_cities[pi];
+                n.regime       = q.regime;
+                n.old_name     = old_name;
+                n.new_name     = coined;
+                out.revolutions.push_back(std::move(n));
+            }
+        }
+    }
+
+    // BL-1287: THE VERDICT, clause for clause the detector's (history_patterns
+    // RF). A miss is a defect the caller records, never a quiet outcome.
+    if (rf_on)
+    {
+        out.rise_fall_realm      = rf_realm;
+        out.rise_fall_start_pm   = rf_start_pm;
+        out.rise_fall_peak_pm    = rf_peak_pm;
+        out.rise_fall_peak_year  = static_cast<int32_t>(rf_peak_year);
+        out.rise_fall_rise_level = rf_rise_level;
+        out.rise_fall_fall_level = rf_fall_level;
+        (void)rf_start_year;
+        {
+            const int64_t fall_end = out.rise_fall_fall_year != 0 ? out.rise_fall_fall_year : params.stop_year;
+            for (const int64_t by : rf_breakaway_years)
+                if (by > rf_peak_year && by <= fall_end) ++out.rise_fall_breakaways;
+        }
+        (void)rf_fall_start;
+        if (out.rise_fall_why.empty())
+        {
+            if (rf_realm < 0)                                   out.rise_fall_why = "no realm was named at the pick year";
+            else if (rf_peak_year > rise_fall_peak_by_year)     out.rise_fall_why = "its share peaked after the peak-by year";
+            else if (rf_peak_pm < rise_fall_floor_pm)           out.rise_fall_why = "its peak fell short of the floor";
+            else if (rf_peak_pm >= rise_fall_hegemony_pm)       out.rise_fall_why = "its peak reached hegemony";
+            else if (out.rise_fall_fall_year == 0)              out.rise_fall_why = "its share never halved";
+            else if (out.rise_fall_fall_year - rf_peak_year > rise_fall_window_years)
+                                                                out.rise_fall_why = "its share halved only after the window";
+            else if (out.rise_fall_breakaways < 1)              out.rise_fall_why = "nothing broke away from it in its fall";
+        }
+        out.rise_fall_missed = !out.rise_fall_why.empty();
+    }
+
+    // BL-1289: THE WORLD WAR'S VERDICT, clause for clause the detector's
+    // (history_patterns WW). A miss is a defect the caller records.
+    if (ww_on)
+    {
+        int engaged = 0;
+        for (const int p : ww_top)
+            if (static_cast<std::size_t>(p) < ww_side.size() && ww_side[static_cast<std::size_t>(p)] != 0) ++engaged;
+        out.world_war_top_engaged = engaged;
+        // A span that closes before the window does is owed no war (a
+        // harness's short arc); one that runs past it is owed the whole war.
+        if (params.stop_year <= world_war_window_end)       out.world_war_why.clear();
+        else if (!ww_top_read)                              out.world_war_why = "the top powers were never read at the window";
+        else if (out.world_war_year == 0)                   out.world_war_why = "no war formed inside the window";
+        else if (engaged < world_war_min_engaged)           out.world_war_why = "too few of the top powers were drawn in";
+        else if (out.world_war_peace_year == 0)             out.world_war_why = "no peace was made inside the window";
+        out.world_war_missed = !out.world_war_why.empty();
     }
 
     // BL-1130 (review fix): the span closes on a measured record.
@@ -10154,6 +12087,216 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // stands. A sack's points stay on the ruin (NR-901).
     rehome_stranded_at_close(ss.regions, owner, settlement_ended_by_sack, gw);
 
+    // ---- BL-1278: THE CLOSING ROUNDS (NATION_GENERATION.md sec Pass 2c, ----
+    // sec The nation count is a target; Ben, 2026-10-11). The size floor is an
+    // event of the span now, not a post-pass over the carve: a realm (or ground
+    // no realm held) whose carve cell falls below the minimum territory is
+    // absorbed by a neighbour here. With a total set, the gap the floor leaves
+    // is closed in the same rounds -- absorption where there are too many, a
+    // province seceding where there are too few. The plan is pure
+    // (`plan_closing_rounds`, over the carve `generate_nations` will draw);
+    // this block applies it with the sim's own bookkeeping, so the map, the
+    // change list, the events and the closing step agree. Pass 2c does not run
+    // after it (`nation_params::floor_in_history`).
+    //
+    // THE CAUSE IS IN THE DATE AND THE SLOTS (the event carries five fields
+    // and the wire form is fixed). The floor's steps are dated the span's last
+    // simulated year (stop_year - 1); the total's corrections are dated the
+    // close itself (stop_year), so a reader tells "too small to stand alone"
+    // from "the realms consolidate to the total" by the year alone. Within an
+    // `absorbed_at_close` event: `polity` the absorbed realm and `other` the
+    // absorber; `polity` none for unheld ground absorbed by `other`; and
+    // `other` none where the realm in `polity` was the one too small and took
+    // the larger unheld ground beside it (`closing_step::annex`).
+    if (params.closing_rounds != nullptr)
+    {
+        const closing_rounds_spec& cr = *params.closing_rounds;
+        const std::vector<int> cells = closing_carve_cells(cr, ss.regions);
+        const closing_plan plan = plan_closing_rounds(ss.regions, out.polities, cells, cr.ground.gw, cr.ground.gh,
+                                                      cr.min_nation_tiles, cr.keep_city_states,
+                                                      cr.total_target);
+        const int64_t y_floor = params.stop_year > params.start_year ? params.stop_year - 1 : params.start_year;
+        const int64_t y_total = params.stop_year;
+        const auto realm_label = [&](int pid) -> std::string {
+            if (pid < 0 || pid >= static_cast<int>(out.polities.size())) return std::string("unheld ground");
+            const polity& q = out.polities[static_cast<std::size_t>(pid)];
+            if (!q.name.empty()) return q.name;
+            if (q.capital >= 0 && q.capital < static_cast<int>(ss.regions.size()))
+                return ss.regions[static_cast<std::size_t>(q.capital)].name;
+            return std::string("a realm");
+        };
+        for (const closing_step& st : plan.steps)
+        {
+            const int64_t y = st.kind == closing_step_kind::floor_absorb ? y_floor : y_total;
+            event_year = y;
+            if (st.kind == closing_step_kind::target_secede)
+            {
+                const int qid  = st.from_polity;
+                const int seat = st.region;
+                if (qid < 0 || qid >= static_cast<int>(out.polities.size())) continue;
+                if (out.polities.size() >= owner_index_limit) break;
+                const std::size_t pi = static_cast<std::size_t>(qid);
+                polity np;
+                np.id      = static_cast<int>(out.polities.size());
+                np.culture = ss.regions[static_cast<std::size_t>(seat)].culture.plurality();
+                np.capital = seat;
+                np.aggression_q =
+                    (cs && np.culture >= 0 && np.culture < static_cast<int>(cs->cultures.size()))
+                        ? leaned_aggression_q(params, cs->cultures[static_cast<std::size_t>(np.culture)].aggression_q)
+                        : 500;
+                for (int d = 0; d < sim_domain_count; ++d)
+                {
+                    np.capacity[d]   = out.polities[pi].capacity[d];
+                    np.progress_q[d] = out.polities[pi].progress_q[d];
+                }
+                np.cohesion_q      = out.polities[pi].cohesion_q;
+                np.industrial_year = out.polities[pi].industrial_year;
+                np.parent          = qid;
+                coin_name_for(np);
+                out.polities.push_back(np);
+                note_event(lapse_event_kind::seceded_at_close, seat, np.id, qid);
+                for (const int r : st.moved)
+                {
+                    const std::size_t ri = static_cast<std::size_t>(r);
+                    owner[ri]             = np.id;
+                    ss.regions[ri].nation = np.id;
+                    void_stale_standing_army(ss.regions[ri]);
+                    ss.regions[ri].seat_region = seat;
+                    ss.regions[ri].is_seat     = (r == seat);
+                    out.owner_changes.push_back(owner_change{
+                        static_cast<int32_t>(y), static_cast<uint16_t>(r), static_cast<uint16_t>(np.id)});
+                }
+                touch_owner(qid);
+                touch_owner(np.id);
+                // The realm's CURRENT seat: its capital where it still holds it.
+                int pseat = out.polities[pi].capital;
+                if (pseat < 0 || static_cast<std::size_t>(pseat) >= owner.size() || owner[static_cast<std::size_t>(pseat)] != qid)
+                {
+                    pseat = -1;
+                    for (std::size_t h = 0; h < owner.size(); ++h)
+                        if (owner[h] == qid) { pseat = static_cast<int>(h); break; }
+                }
+                // Ground the realm keeps that pointed at any departing seat
+                // re-points at its own (the plan did the same).
+                for (std::size_t h = 0; h < owner.size(); ++h)
+                    if (owner[h] == qid && ss.regions[h].seat_region >= 0
+                        && std::binary_search(st.moved.begin(), st.moved.end(), ss.regions[h].seat_region))
+                        ss.regions[h].seat_region = pseat;
+                raise_grudge(qid, np.id, grudge_kind::ground_taken, seat, y, params.grudge_ground_taken);
+                ++out.closing_target_secessions;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    ss.regions[static_cast<std::size_t>(seat)].name + " breaks away from "
+                        + realm_label(qid) + " as the realms settle to their number",
+                    std::string{}});
+                continue;
+            }
+
+            const int dead = st.from_polity;
+            const int into = st.into_polity;
+            if (into < 0 || into >= static_cast<int>(out.polities.size())) continue;
+            const std::string ground_name =
+                st.region >= 0 ? ss.regions[static_cast<std::size_t>(st.region)].name : std::string("unheld ground");
+            // The absorber's CURRENT seat, for unheld ground that joins it.
+            int into_seat = out.polities[static_cast<std::size_t>(into)].capital;
+            if (into_seat < 0 || static_cast<std::size_t>(into_seat) >= owner.size()
+                || owner[static_cast<std::size_t>(into_seat)] != into)
+            {
+                into_seat = -1;
+                for (std::size_t h = 0; h < owner.size(); ++h)
+                    if (owner[h] == into) { into_seat = static_cast<int>(h); break; }
+            }
+            for (const int r : st.moved)
+            {
+                const std::size_t ri = static_cast<std::size_t>(r);
+                region& rg = ss.regions[ri];
+                // A market standing on an absorbed realm's ground goes with it
+                // (BL-1125's conquest rule): no shell stands for a dead realm.
+                if (dead >= 0 && rg.has_market)
+                {
+                    rg.has_market = false;
+                    for (int g = 0; g < 4; ++g) { rg.scarcity_q[g] = 0; rg.scarcity_raw_q[g] = 0; }
+                    ++out.markets_destroyed;
+                    out.markets_destroyed_regions.push_back(static_cast<int32_t>(ri));
+                }
+                owner[ri] = into;
+                rg.nation = into;
+                void_stale_standing_army(rg);
+                if (dead < 0 && !rg.is_seat) rg.seat_region = into_seat;
+                out.owner_changes.push_back(owner_change{
+                    static_cast<int32_t>(y), static_cast<uint16_t>(r), static_cast<uint16_t>(into)});
+            }
+            touch_owner(dead);
+            touch_owner(into);
+            if (st.annex)
+                note_event(lapse_event_kind::absorbed_at_close, st.region, into, -1);
+            else
+                note_event(lapse_event_kind::absorbed_at_close, st.region, dead, into);
+            std::string freed;
+            if (dead >= 0 && dead < static_cast<int>(out.polities.size()))
+            {
+                out.polities[static_cast<std::size_t>(dead)].alive = false;
+                extinguish_polity(dead, into, st.region, y, /*note_death=*/false);
+                // Its subjects go free with it, and its tribute clauses end
+                // (the sim's own freeing, ~"refuses renewal", erases the
+                // clause the same way). No `subject_freed` event: the cause is
+                // this absorption, which the event above already records.
+                out.dated_objects.erase(
+                    std::remove_if(out.dated_objects.begin(), out.dated_objects.end(),
+                        [&](const dated_object& o) {
+                            return o.kind == static_cast<int32_t>(treaty_clause::tribute)
+                                && (o.a == static_cast<uint16_t>(dead) || o.b == static_cast<uint16_t>(dead));
+                        }),
+                    out.dated_objects.end());
+                for (polity& sq : out.polities)
+                    if (sq.overlord == dead)
+                    {
+                        sq.overlord     = -1;
+                        sq.subject_kind = -1;
+                        freed += freed.empty() ? realm_label(sq.id) : ", " + realm_label(sq.id);
+                    }
+            }
+            if (st.kind == closing_step_kind::floor_absorb) ++out.closing_floor_absorptions;
+            else                                            ++out.closing_target_absorptions;
+            std::string line;
+            if (st.annex)
+                line = realm_label(into) + ", too small to stand alone, takes the unheld ground at "
+                     + ground_name + " as the old order closes";
+            else if (st.kind == closing_step_kind::floor_absorb)
+                line = (dead >= 0 ? realm_label(dead) : "The unheld ground at " + ground_name)
+                     + ", too small to stand alone, is absorbed by " + realm_label(into)
+                     + " as the old order closes";
+            else
+                line = (dead >= 0 ? realm_label(dead) : "The unheld ground at " + ground_name)
+                     + " is absorbed by " + realm_label(into) + " as the realms settle to their number";
+            out.history.push_back(history_event{
+                years_from_calendar_year(y), chain_stage::legacy, line, std::string{}});
+            if (!freed.empty())
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    freed + " go free as " + realm_label(dead) + " is absorbed", std::string{}});
+        }
+        if (!plan.steps.empty())
+        {
+            // A flow names two living parties (the handoff validator's rule).
+            std::vector<char> live(out.polities.size(), 0);
+            for (const int o : owner)
+                if (o >= 0 && static_cast<std::size_t>(o) < live.size()) live[static_cast<std::size_t>(o)] = 1;
+            out.trade_flows.erase(
+                std::remove_if(out.trade_flows.begin(), out.trade_flows.end(),
+                               [&](const trade_flow& f) {
+                                   return f.seller >= live.size() || f.buyer >= live.size()
+                                       || !live[f.seller] || !live[f.buyer];
+                               }),
+                out.trade_flows.end());
+        }
+        out.closing_nations_before      = plan.nations_before;
+        out.closing_nations_after_floor = plan.nations_after_floor;
+        out.closing_predicted           = plan.nations_after;
+        out.closing_short_of_target     = plan.short_of_target;
+        out.closing_subfloor_secessions = plan.subfloor_secessions;
+    }
+
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval
     // short of the epoch — and a scoreboard would show a standing that is not
@@ -10161,6 +12304,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
     if (params.record_playback
         && (out.steps.empty() || out.steps.back().year != static_cast<int32_t>(params.stop_year)))
         record_step(params.stop_year);
+
+    // BL-1288: THE LATE CULTURE'S VERDICT, clause for clause the detector's
+    // (history_pattern_detectors.cpp, late culture), read off the same counts
+    // the closing step samples. A miss is a defect the caller records.
+    if (params.late_culture_target || params.late_culture_colonised)
+    {
+        out.late_culture_level     = params.late_culture_target ? lc_level : std::max(lc_level, lc_contact_level);
+        if (lc_culture >= 0)
+        {
+            int realms = 0, regions = 0;
+            lc_holdings(realms, regions);
+            out.late_culture_realms        = realms;
+            out.late_culture_realm_regions = regions;
+            out.late_culture_lag_x100 = lc_lag_now();
+            // Stamp the table the next span resumes from.
+            for (polity& q : out.polities)
+                q.late_isolation = birth_culture(q) == lc_culture
+                    ? static_cast<int16_t>(clampi(lc_level, 0, late_culture_max_level)) : int16_t{-1};
+        }
+        if (params.late_culture_target)
+        {
+            if (lc_culture < 0)                                   out.late_culture_why = "no culture could be ranked at the Culture close";
+            else if (out.late_culture_realms <= 0)                out.late_culture_why = "it held no realm at the Empires close";
+            else if (out.late_culture_lag_x100 > late_culture_lag_x100) out.late_culture_why = "it did not lag";
+        }
+        else if (params.late_culture_colonised)
+        {
+            if (lc_culture < 0)                                   out.late_culture_why = "the inherited table names no late culture";
+            else if (out.late_culture_bound <= 0)                 out.late_culture_why = "no polity of another culture bound it";
+        }
+        out.late_culture_missed = !out.late_culture_why.empty();
+    }
 
     // BL-955: the paid standing army's raw invariant, once more at the close.
     if (params.exploration_upkeep_enabled)
@@ -10482,6 +12657,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     }
 
+    // The naval ramp, once more at the close (see the round's tally): a
+    // polity minted during the last round is read on the closing map.
+    if (params.naval_points_accrue && params.stop_year > params.start_year)
+        apply_coastal_naval_ramp(out.polities, ss.regions, params, params.stop_year - 1);
+
     // BL-914: the final flush. The per-year publish above always lags by one
     // year, so the last year simulated is never folded in inside the loop —
     // this is the one place that year's record reaches the tap.
@@ -10501,329 +12681,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 }
 
 // ---------------------------------------------------------------------------
-// The tree effect surface (BL-973) — one fold for every tree
+// Creed leans (BL-942)
 // ---------------------------------------------------------------------------
-//
-// The generated tables (`io::empire_tree`, `io::exploration_tree`, and since
-// BL-1038 `io::industry_tree`) have distinct `node` types with one layout, so the walkers are templates over
-// the node type rather than a per-tree twin — the same reason the generator
-// itself was generalised (BL-930). Walk order is the table's fixed authored
-// order; nothing here depends on anything transient.
-
-namespace {
-
-/// Fold one tree's held effects into the polity's surface.
-template <typename NodeT, int N, int E>
-void fold_tree_effects(uint64_t mask, const NodeT (&nodes)[N],
-                       const io::tree_effect (&effects)[E], polity& q)
-{
-    for (int i = 0; i < N; ++i)
-    {
-        if (!(mask & (1ULL << i))) continue;
-        const NodeT& n = nodes[i];
-        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
-        {
-            const io::tree_effect& e = effects[n.effects_begin + r];
-            if (e.kind == io::tree_effect_kind::modifier
-             && e.term != io::tree_modifier_term::none)
-                q.tree_mod_q[static_cast<int>(e.term)] += e.per_mille;
-            if (e.key != io::tree_effect_key::none)
-                q.tree_keys |= (1u << static_cast<unsigned>(e.key));
-        }
-    }
-}
-
-/// Rule 1's ring lock, read off the store: is there a held node carrying
-/// `open "ring <ring>"`?
-template <typename NodeT, int N, int E>
-bool tree_ring_open(uint64_t mask, int ring, const NodeT (&nodes)[N],
-                    const io::tree_effect (&effects)[E])
-{
-    for (int i = 0; i < N; ++i)
-    {
-        if (!(mask & (1ULL << i))) continue;
-        const NodeT& n = nodes[i];
-        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
-        {
-            const io::tree_effect& e = effects[n.effects_begin + r];
-            if (e.kind == io::tree_effect_kind::open && static_cast<int>(e.open_ring) == ring)
-                return true;
-        }
-    }
-    return false;
-}
-
-/// A term read for a region's OWNER. Every creation site assigns
-/// `id = out.polities.size()`, so the id is the index; that is checked
-/// rather than assumed, with the id walk (`dq`'s idiom) as the fallback.
-/// 0 for unowned ground or an unknown id. Called per candidate target in
-/// campaign pricing, hence O(1) on the common path.
-int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t)
-{
-    if (nation < 0) return 0;
-    const std::size_t ni = static_cast<std::size_t>(nation);
-    if (ni < ps.size() && ps[ni].id == nation) return tree_mod_q(ps[ni], t);
-    for (const polity& o : ps)
-        if (o.id == nation) return tree_mod_q(o, t);
-    return 0;
-}
-
-} // namespace
-
-void apply_tree_effects(polity& q)
-{
-    for (int i = 0; i < io::tree_modifier_term_count; ++i) q.tree_mod_q[i] = 0;
-    q.tree_keys = 0;
-    fold_tree_effects(q.empire_mask,      io::empire_tree::nodes,      io::empire_tree::effects,      q);
-    fold_tree_effects(q.exploration_mask, io::exploration_tree::nodes, io::exploration_tree::effects, q);
-    // BL-1038: the third tree. `industry_mask` is written only behind
-    // `history_sim_params::industry_tree_enabled`, so on every shipped path
-    // this walks a zero mask and sums nothing into the shared surface.
-    fold_tree_effects(q.industry_mask,    io::industry_tree::nodes,    io::industry_tree::effects,    q);
-}
-
-tree_effect_reader tree_effect_reader_of(const io::tree_effect& e)
-{
-    using K = io::tree_effect_kind;
-    using T = io::tree_modifier_term;
-    using Y = io::tree_effect_key;
-
-    // Identity reads first: a keyed effect is read by its key whatever its
-    // kind (the key is the contract; the kind is the doc's classification).
-    switch (e.key)
-    {
-        case Y::sea_legs:   return tree_effect_reader::sea_legs_gate;
-        case Y::post_roads: return tree_effect_reader::post_roads_gate;
-        case Y::none: break;
-    }
-    if (e.kind == K::open)
-    {
-        if (e.open_tree)      return tree_effect_reader::tree_gate;
-        if (e.open_ring > 0)  return tree_effect_reader::ring_gate;
-        return tree_effect_reader::unread;
-    }
-    if (e.kind == K::modifier)
-    {
-        switch (e.term)
-        {
-            // `reach` is folded but unread — see the holdings-supply site in
-            // run_history_sim for the BL-872 finding that keeps it so.
-            case T::defence:    return tree_effect_reader::modifier_defence;
-            case T::industrial: return tree_effect_reader::modifier_industrial;
-            case T::cohesion:   return tree_effect_reader::modifier_cohesion;
-            case T::research:   return tree_effect_reader::modifier_research;
-            default:            return tree_effect_reader::unread;
-        }
-    }
-    return tree_effect_reader::unread;
-}
-
-bool tree_effect_declared_unread(const io::tree_effect& e)
-{
-    using K = io::tree_effect_kind;
-    using T = io::tree_modifier_term;
-    if (e.key != io::tree_effect_key::none) return false; // keyed effects are read by key
-    switch (e.kind)
-    {
-        case K::open:
-            return false; // every open is a gate
-        case K::modifier:
-            switch (e.term)
-            {
-                // Consumers read region fields (`work_capacity_mod`,
-                // `work_manpower_mod`) inside settlement.cpp with no polity
-                // in scope, or the sim carries no such term at all (stores
-                // decay, plague resistance, forage, a labour split). `reach`
-                // HAS a surface (the hub's `work_reach_mod`) and is withheld
-                // on a measured finding — the BL-872 fixtures fail at the
-                // authored magnitudes; see the holdings-supply site.
-                case T::reach:
-                case T::carrying_capacity: case T::manpower: case T::stores:
-                case T::assimilation:      case T::plague:   case T::forage:
-                case T::muster_cost:
-                    return true;
-                default:
-                    return false;
-            }
-        // Works and unit rows still gate on the derived band (TREES.md's open
-        // question); the rest are prose the sim has no term for.
-        case K::unlock: case K::upgrade: case K::retire: case K::access: case K::reach:
-        case K::intel:  case K::institution: case K::doctrine: case K::resource:
-            return true;
-    }
-    return false;
-}
-
-// ---------------------------------------------------------------------------
-// The empire tree (BL-912) — availability, the scorer, the rim
-// ---------------------------------------------------------------------------
-
-bool empire_node_available(uint64_t mask, int node_idx)
-{
-    if (node_idx < 0 || node_idx >= io::empire_tree::node_count) return false;
-    const uint64_t bit = 1ULL << node_idx;
-    if (mask & bit) return false; // already held
-
-    const io::empire_tree::node& n = io::empire_tree::nodes[node_idx];
-
-    // A closed fork side goes dark PERMANENTLY (TREES.md sec Forks): taking
-    // one closes the other's availability window for good, and nothing ever
-    // un-completes, so this is a one-way gate on the mask alone.
-    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
-
-    // Rule 1/the spire: ring r is locked until a held node carries the
-    // store's `open "ring r"` effect — the milestone one ring down, by the
-    // spire's shape (TREES.md sec Milestones). Ring 1 has no gate. BL-973:
-    // read off the effect, not off "a milestone at ring r-1".
-    if (n.ring > 1
-     && !tree_ring_open(mask, static_cast<int>(n.ring), io::empire_tree::nodes, io::empire_tree::effects))
-        return false;
-
-    // Rule 2: travel is OR. Available if it is the tree's true root (its OWN
-    // declared `links` was empty — see `node::is_root`'s comment: every
-    // other ring-1 major names EM-SP-1a as ITS prerequisite, which makes
-    // EM-SP-1a non-isolated in the undirected `neighbours_mask` even though
-    // it has none of its own) or at least one linked neighbour is held.
-    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
-
-    // Rule 4, the AND half: a milestone's `requires` (majors from >=2
-    // branches at its own ring) must ALL be held, plus, if present, one side
-    // of its fork pair (TREES.md sec Milestones: requires_fork, EITHER side).
-    if (n.kind == io::empire_tree::node_kind::milestone)
-    {
-        if ((mask & n.requires_mask) != n.requires_mask) return false;
-        if (n.requires_fork_a >= 0)
-        {
-            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
-            if (!a && !b) return false;
-        }
-    }
-
-    return true;
-}
-
-int choose_empire_node(uint64_t mask, int cohesion_q, int stores_low_q,
-                        int reach_bound_q, int manpower_bound_q, int food_bound_q,
-                        int ground_ore_q, int ground_farm_q, int ground_fuel_q,
-                        int ground_port_q, int surplus_q)
-{
-    using namespace io::empire_tree;
-
-    // THE SCORER (TREES.md sec "The scorer — one shape, three trees"): a
-    // frontier node is scored on the term its `pursued_when` names, plus a
-    // constant per-kind pull that keeps the spire climbing (a milestone opens
-    // the next ring for every branch at once, so it outweighs a lone major),
-    // minus its cost. Every term below reads a quantity the round already
-    // computed (ground means, cohesion, arrears-style binding); terms this
-    // slice cannot cheaply derive (`threatened`, `plague_struck`,
-    // `many_peoples`, `known`) are left at 0 rather than guessed — TREES.md
-    // sec Effects allows placeholder magnitudes, and a 0 term simply never
-    // wins the argmax on its own account, which is honest rather than wrong.
-    //
-    // INTEGER THROUGHOUT, and the tie-break is the LOWER NODE INDEX — the
-    // tree's own fixed authored order (io::empire_tree::nodes), so two
-    // polities scoring a tie always resolve it identically.
-    const int term_value[term_count] = {
-        /* spire             */ 1000,
-        /* stores_low        */ stores_low_q,
-        /* surplus           */ surplus_q,
-        /* reach_bound       */ reach_bound_q,
-        /* coastal_holdings  */ ground_port_q,
-        /* threatened        */ 0,
-        /* ground_ore        */ ground_ore_q,
-        /* manpower_bound    */ manpower_bound_q,
-        /* ground_grass      */ ground_farm_q, // farm_q is the pasture proxy
-                                                // elsewhere in this codebase
-                                                // (unit_roster.hpp), reused here
-        /* cohesion_low      */ 1000 - clampi(cohesion_q, 0, 1000),
-        /* ground_fuel       */ ground_fuel_q,
-        /* food_bound        */ food_bound_q,
-        /* ground_farm       */ ground_farm_q,
-        /* plague_struck     */ 0,
-        /* many_peoples      */ 0,
-    };
-
-    // Endowment gates (TREES.md sec The five rules, rule 2: "A major's
-    // endowment gate... [is an] additional AND condition on top of
-    // availability"). `grassland` has no ground signal of its own in this
-    // codebase and reuses the farm mean, exactly as `unit_roster.hpp` does
-    // for pasture ("PROXY FOR PASTURE — horses have no signal of their own").
-    // A bar of 250/1000 is a placeholder, per TREES.md sec Effects.
-    const auto gate_open = [&](gate_atom g) {
-        switch (g)
-        {
-        case gate_atom::none:       return true;
-        case gate_atom::ore_q:      return ground_ore_q  >= 250;
-        case gate_atom::fuel:       return ground_fuel_q >= 250;
-        case gate_atom::arable:     return ground_farm_q >= 250;
-        case gate_atom::coastal:    return ground_port_q > 0;
-        case gate_atom::grassland:  return ground_farm_q >= 250;
-        }
-        return true;
-    };
-
-    int best_idx = -1;
-    int best_score = INT32_MIN;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!empire_node_available(mask, i)) continue;
-        const node& n = nodes[i];
-        if (!gate_open(n.gate)) continue;
-        const int kind_bonus = n.kind == node_kind::milestone ? 600
-                              : n.kind == node_kind::major     ? 0
-                                                                : -100; // minors trail their major
-        const int term = clampi(term_value[static_cast<int>(node_term[i])], 0, 1000);
-        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
-                          * static_cast<int>(n.ring);
-        const int score = term + kind_bonus - cost_q;
-        if (score > best_score) { best_score = score; best_idx = i; }
-    }
-    return best_idx;
-}
-
-// ---------------------------------------------------------------------------
-// The exploration tree (BL-930) — availability, the scorer, the rim
-// ---------------------------------------------------------------------------
-
-bool exploration_node_available(uint64_t mask, int node_idx)
-{
-    if (node_idx < 0 || node_idx >= io::exploration_tree::node_count) return false;
-    const uint64_t bit = 1ULL << node_idx;
-    if (mask & bit) return false; // already held
-
-    const io::exploration_tree::node& n = io::exploration_tree::nodes[node_idx];
-
-    // A closed fork side goes dark PERMANENTLY (TREES.md sec Forks) — same
-    // one-way gate `empire_node_available` runs.
-    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
-
-    // Rule 1/the spire: ring r is locked until a held node carries the
-    // store's `open "ring r"` effect (BL-973 — the effect, not a counted
-    // milestone). Ring 1 has no gate.
-    if (n.ring > 1
-     && !tree_ring_open(mask, static_cast<int>(n.ring), io::exploration_tree::nodes, io::exploration_tree::effects))
-        return false;
-
-    // Rule 2: travel is OR. Available if it is the tree's true root, or at
-    // least one linked neighbour is held.
-    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
-
-    // Rule 4, the AND half: a milestone's `requires` set must ALL be held,
-    // plus, if present, one side of its fork pair.
-    if (n.kind == io::exploration_tree::node_kind::milestone)
-    {
-        if ((mask & n.requires_mask) != n.requires_mask) return false;
-        if (n.requires_fork_a >= 0)
-        {
-            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
-            if (!a && !b) return false;
-        }
-    }
-
-    return true;
-}
 
 int consolidator_lean_q(const culture& c)
 {
@@ -10852,103 +12711,8 @@ int expansion_lean_q(const culture& c)
     return clampi((sea_q + zeal_q) / 2, 0, 1000);
 }
 
-int choose_exploration_node(uint64_t mask, int stores_low_q, int reach_bound_q,
-                             int ground_port_q, int ground_farm_q, int surplus_q,
-                             int purse_low_q, int wants_unmet_q, int throughput_bound_q,
-                             int subject_held_q, int consolidator_lean_q, int expansion_lean_q,
-                             int creed_lean_weight_q)
-{
-    using namespace io::exploration_tree;
-
-    // THE SCORER (TREES.md sec "The scorer — one shape, four trees"), read
-    // against this tree's own term set (exploration_tree_data.hpp's
-    // `scorer_term`, 12 distinct terms across the 31 nodes).
-    //
-    // `purse_low`/`wants_unmet`/`throughput_bound` are now real, threaded-
-    // through arguments (BL-932/BL-939/BL-940). `subject_held` is now real
-    // too (BL-934): the caller passes 1000 where the polity holds at least
-    // one subject, 0 otherwise (`polity::overlord >= 0` read on ANOTHER
-    // polity, never on this one) — a bare boolean rather than a count,
-    // exactly as `coastal_holdings`/`ground_port` are booleans-as-1000
-    // already. `threatened` and `known` are STILL 0 here for the same reason
-    // `choose_empire_node` leaves `threatened` at 0: this slice has no cheap
-    // "visible capability" or "foreign agent" signal to read yet. A 0 term
-    // never wins the argmax on its own account (it can still lose to one),
-    // which is honest rather than wrong.
-    //
-    // EVERY HARNESS CALL SITE FROM BEFORE THIS ITEM PASSES 0 FOR
-    // `subject_held_q` (the parameter's own default), so BL-934 landing is
-    // visible as a diff only where a caller actually threads a live value
-    // through, never as a silent change to an existing fixture.
-    //
-    // BL-942 -- TWO WAYS TO BE STRONG. `consolidator_lean_q`/
-    // `expansion_lean_q` (0-1000, `consolidator_lean_q`/`expansion_lean_q`
-    // free functions below, derived from the polity's own culture) WEIGHT
-    // the terms EXPLORATION.md sec Two ways to be strong names for each
-    // strategy -- `throughput_bound` for the consolidator (the road ladder,
-    // dense internal throughput: WY branch's own term already, per
-    // exploration_tree_data.hpp), `coastal_holdings`/`ground_port`/
-    // `subject_held` for the expansionist (ports, hulls, subjects: the HL/PT
-    // branches' own terms). This is a WEIGHTING of terms the scorer already
-    // has, never a flag or a branch on which one a polity "is" -- a lean of
-    // 0 on both axes reduces exactly to the pre-BL-942 scorer, and
-    // `creed_lean_weight_q == 0` does the same for every polity at once.
-    const int cons_bonus = clampi(consolidator_lean_q, 0, 1000)
-                          * clampi(creed_lean_weight_q, 0, 1000) / 1000;
-    const int expn_bonus = clampi(expansion_lean_q, 0, 1000)
-                          * clampi(creed_lean_weight_q, 0, 1000) / 1000;
-    const int term_value[term_count] = {
-        /* stores_low       */ stores_low_q,
-        /* spire            */ 1000,
-        /* purse_low        */ purse_low_q,       // BL-932
-        /* surplus          */ surplus_q,
-        /* coastal_holdings */ clampi(ground_port_q + expn_bonus, 0, 1000),      // BL-942
-        /* reach_bound      */ reach_bound_q,
-        /* wants_unmet      */ wants_unmet_q,     // BL-939
-        /* threatened       */ 0,
-        /* ground_port      */ clampi(ground_port_q + expn_bonus, 0, 1000),      // BL-942
-        /* subject_held     */ clampi(clampi(subject_held_q, 0, 1000) + expn_bonus, 0, 1000), // BL-934/942
-        /* throughput_bound */ clampi(throughput_bound_q + cons_bonus, 0, 1000), // BL-940/942
-        /* known            */ 0,
-    };
-
-    // Endowment gates, same shape as `choose_empire_node`'s: `coastal` reads
-    // whether the polity's held ground carries a port endowment, `arable`
-    // whether its farm mean clears the same placeholder 250/1000 bar.
-    const auto gate_open = [&](gate_atom g) {
-        switch (g)
-        {
-        case gate_atom::none:       return true;
-        case gate_atom::ore_q:      return true; // unused by this tree; open rather than blocking
-        case gate_atom::fuel:       return true; // unused by this tree
-        case gate_atom::arable:     return ground_farm_q >= 250;
-        case gate_atom::coastal:    return ground_port_q > 0;
-        case gate_atom::grassland:  return ground_farm_q >= 250;
-        }
-        return true;
-    };
-
-    int best_idx = -1;
-    int best_score = INT32_MIN;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!exploration_node_available(mask, i)) continue;
-        const node& n = nodes[i];
-        if (!gate_open(n.gate)) continue;
-        const int kind_bonus = n.kind == node_kind::milestone ? 600
-                              : n.kind == node_kind::major     ? 0
-                                                                : -100; // minors trail their major
-        const int term = clampi(term_value[static_cast<int>(node_term[i])], 0, 1000);
-        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
-                          * static_cast<int>(n.ring);
-        const int score = term + kind_bonus - cost_q;
-        if (score > best_score) { best_score = score; best_idx = i; }
-    }
-    return best_idx;
-}
-
 // ---------------------------------------------------------------------------
-// The industry tree (BL-1038) — availability, the scorer, the rate
+// Integer square root
 // ---------------------------------------------------------------------------
 
 int64_t isqrt64(int64_t v)
@@ -10971,205 +12735,6 @@ int64_t isqrt64(int64_t v)
     return static_cast<int64_t>(x);
 }
 
-int64_t industry_urban_mass(const std::vector<region>& regions, const std::vector<int>& held)
-{
-    // The k largest, kept descending by bubbling each value down the array.
-    // Only the SUM is returned, and the sum of the k largest values does not
-    // depend on which of several equal values landed where.
-    int64_t top[industry_research_top_k] = {};
-    for (int hi : held)
-    {
-        if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
-        int64_t v = std::max<int64_t>(0, regions[static_cast<std::size_t>(hi)].urban_population);
-        for (int k = 0; k < industry_research_top_k; ++k)
-            if (v > top[k]) std::swap(v, top[k]);
-    }
-    int64_t sum = 0;
-    for (int k = 0; k < industry_research_top_k; ++k) sum += top[k];
-    return sum;
-}
-
-int industry_spire_ring(uint64_t mask)
-{
-    // The empire rate's own loop (the Invest block, BL-912), over this table.
-    int ring = 0;
-    for (int i = 0; i < io::industry_tree::node_count; ++i)
-    {
-        const io::industry_tree::node& nd = io::industry_tree::nodes[i];
-        if (nd.kind == io::industry_tree::node_kind::milestone && (mask & (1ULL << i)))
-            ring = std::max(ring, static_cast<int>(nd.ring));
-    }
-    return ring;
-}
-
-int64_t industry_research_per_year_q(int64_t urban_mass, int spire_ring, int research_mod_q,
-                                     const history_sim_params& params)
-{
-    // CLAMP FIRST, then transform. The cap is the design's own bound (a
-    // param); 2^32 heads is the arithmetic's, so that whatever the param says
-    // Mc * isqrt(Mc) stays under 2^48, and with the spire ring clamped to 6
-    // and the research modifier to 4000 no product below passes 2^62.
-    const int64_t cap = clampi64(params.industry_urban_mass_cap, 0, 1LL << 32);
-    const int64_t mc  = clampi64(urban_mass, 0, cap);
-    const int64_t ref = std::max<int64_t>(1, isqrt64(std::max<int64_t>(1, params.industry_urban_mass_reference)));
-    const int64_t superlinear = (mc * isqrt64(mc)) / ref;      // Mc x sqrt(Mc / reference)
-    const int64_t fraction    = clampi(params.industry_research_fraction_q, 0, 1000);
-    // FROM HERE ON, THE EMPIRE RATE'S OWN SCALING, factor for factor and in
-    // its order (TREES.md sec State: a research rate is scaled by the spire
-    // ring held and by contact degree; the Industry tree swaps only the base,
-    // the industry slice, for urban mass). Contact degree is 0 here as it is
-    // in every tree — the inert `(1000 + 0 * 40) / 1000` is not written out.
-    // The `research` modifier is every tree's reader of itself (BL-973).
-    const int64_t rate = (superlinear * fraction) / 1000
-                             * (1000 + clampi(spire_ring, 0, 6) * 150) / 1000
-                             * (1000 + clampi(research_mod_q, 0, 4000)) / 1000;
-    return rate;
-}
-
-bool industry_node_available(uint64_t mask, int node_idx)
-{
-    if (node_idx < 0 || node_idx >= io::industry_tree::node_count) return false;
-    const uint64_t bit = 1ULL << node_idx;
-    if (mask & bit) return false; // already held
-
-    const io::industry_tree::node& n = io::industry_tree::nodes[node_idx];
-
-    // A closed fork side goes dark permanently (TREES.md sec Forks).
-    if (n.excludes >= 0 && (mask & (1ULL << n.excludes))) return false;
-
-    // Rule 1/the spire: ring r is locked until a held node carries the
-    // store's `open "ring r"` effect. Ring 1 has no gate.
-    if (n.ring > 1
-     && !tree_ring_open(mask, static_cast<int>(n.ring), io::industry_tree::nodes, io::industry_tree::effects))
-        return false;
-
-    // Rule 2: travel is OR — the root is exempt, anything else needs a held
-    // neighbour.
-    if (!n.is_root && n.neighbours_mask != 0 && (mask & n.neighbours_mask) == 0) return false;
-
-    // Rule 4, the AND half: a milestone's `requires` set, plus one side of
-    // its fork pair where it names one (IN-SP-1m: the Fuel Doctrine; IN-SP-2m:
-    // the Works Doctrine).
-    if (n.kind == io::industry_tree::node_kind::milestone)
-    {
-        if ((mask & n.requires_mask) != n.requires_mask) return false;
-        if (n.requires_fork_a >= 0)
-        {
-            const bool a = (mask & (1ULL << n.requires_fork_a)) != 0;
-            const bool b = (mask & (1ULL << n.requires_fork_b)) != 0;
-            if (!a && !b) return false;
-        }
-    }
-
-    return true;
-}
-
-namespace {
-
-/// BL-1056: the Fuel Doctrine's two pulls, taken over ONE region set. A held
-/// region counts only if it carries the span-open survey of BOTH scores -- the
-/// survey writes the two together. Each span-open SHARE is tested against ITS
-/// OWN resource's top-third bar (BL-1059, NR-899, NR-900). A region the span founded has no
-/// forest reading (DEFAULT A inherits fuel only), so it is out of BOTH pulls,
-/// never in one and out of the other. Writes the two clear-counts and the
-/// count read; order-free.
-void industry_ground_pull_counts(const std::vector<region>& regions, const std::vector<int>& held,
-                                 const industry_ground_bars& bars,
-                                 int64_t& read, int64_t& fuel_clear, int64_t& forest_clear)
-{
-    read = fuel_clear = forest_clear = 0;
-    for (int hi : held)
-    {
-        if (hi < 0 || static_cast<std::size_t>(hi) >= regions.size()) continue;
-        const region& r = regions[static_cast<std::size_t>(hi)];
-        if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
-        ++read;
-        if (industry_ground_clears(r.survey_fuel_raw,   bars.fuel_raw))   ++fuel_clear;
-        if (industry_ground_clears(r.survey_forest_raw, bars.forest_raw)) ++forest_clear;
-    }
-}
-
-/// BL-1059: one resource's top-third bar over @p shares (every read region's
-/// span-open share, zeros included; sorted in place). k = floor(n / 3), the
-/// bar is the value at ascending position n - k, and a tie band at that value
-/// clears WHOLE (NR-904) -- see `industry_ground_bars`. A 0 at the cut becomes
-/// a bar of 1: zeros never clear, and every carrier does.
-int industry_top_third_bar(std::vector<int>& shares)
-{
-    const std::size_t n = shares.size();
-    const std::size_t k = n / 3;
-    if (k == 0) return industry_ground_bar_none;
-    std::sort(shares.begin(), shares.end());
-    return std::max(shares[n - k], 1);
-}
-
-} // namespace
-
-industry_ground_bars industry_ground_bars_at_open(const std::vector<region>& regions)
-{
-    // THE TOP-THIRD BARS (BL-1059; Ben, 2026-09-19, NR-899, NR-900;
-    // INDUSTRY_TREE.md sec The scorer). Read over EVERY region carrying both
-    // span-open scores -- the set the pulls read -- zeros included, so both
-    // resources clear at one rate of the world; ranked on the UNCLAMPED share,
-    // so a pile at the score's cap is not one tied value. A region with no
-    // share (a hand-built table only) ranks as 0. The sort makes each bar
-    // independent of region order.
-    std::vector<int> fuel, forest;
-    fuel.reserve(regions.size());
-    forest.reserve(regions.size());
-    for (const region& r : regions)
-    {
-        if (r.survey_fuel_q < 0 || r.survey_forest_q < 0) continue;
-        fuel.push_back(std::max(r.survey_fuel_raw, 0));
-        forest.push_back(std::max(r.survey_forest_raw, 0));
-    }
-    industry_ground_bars b;
-    b.fuel_raw   = industry_top_third_bar(fuel);
-    b.forest_raw = industry_top_third_bar(forest);
-    return b;
-}
-
-bool industry_span_survey_ran(const std::vector<region>& regions)
-{
-    for (const region& r : regions)
-        if (r.survey_forest_q >= 0) return true;
-    return false;
-}
-
-int industry_ground_forest_q(const std::vector<region>& regions, const std::vector<int>& held,
-                             const industry_ground_bars& bars)
-{
-    // THE SHARE OF HELD GROUND IN THE WORLD'S TOP THIRD FOR FOREST (BL-1056,
-    // NR-896; the bar BL-1059, NR-899; INDUSTRY_TREE.md sec The scorer). It
-    // was the BEST held score, which can only rise as a realm grows: breadth,
-    // not ground, decided the Fuel Doctrine. A share of held regions cannot
-    // grow with the realm's size -- a region not clearing the bar only ever lowers it,
-    // and one with no span-open reading leaves it alone. With no read region
-    // held the reading is 0: off the span that is the old pin, and inside it
-    // a realm on ground it has no reading of pulls toward neither side.
-    int64_t read = 0, fuel_clear = 0, forest_clear = 0;
-    industry_ground_pull_counts(regions, held, bars, read, fuel_clear, forest_clear);
-    return read > 0 ? static_cast<int>((forest_clear * 1000) / read) : 0;
-}
-
-int industry_ground_fuel_q(const std::vector<region>& regions, const std::vector<int>& held,
-                           const industry_ground_bars& bars, bool survey_ran)
-{
-    // THE SHARE OF HELD GROUND IN THE WORLD'S TOP THIRD FOR FUEL (BL-1056,
-    // NR-896; the bar BL-1059, NR-899), over EXACTLY the regions the forest
-    // share reads, each against its own resource's bar, so the Fuel Doctrine
-    // compares like with like. -1 only when
-    // the span-open survey never happened (@p survey_ran false: every path but
-    // the Industrialisation span), and the term then keeps the seam, the old
-    // reading. Inside the span a realm with no read region reads 0, never the
-    // seam: a best-of-held fallback there would grow with the realm again.
-    // The GATE is not this -- it still reads any held seam.
-    if (!survey_ran) return -1;
-    int64_t read = 0, fuel_clear = 0, forest_clear = 0;
-    industry_ground_pull_counts(regions, held, bars, read, fuel_clear, forest_clear);
-    return read > 0 ? static_cast<int>((fuel_clear * 1000) / read) : 0;
-}
-
 // ---------------------------------------------------------------------------
 // BL-1041 — industry points
 // ---------------------------------------------------------------------------
@@ -11178,7 +12743,8 @@ bool industry_points_params_valid(const history_sim_params& p)
 {
     return p.industry_points_per_million_urban_heads_year >= 0
         && p.industry_points_per_million_urban_heads_year <= 1000000
-        && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
+        && p.industry_points_per_1000_treasury_units >= 1
+        && p.industry_points_per_1000_treasury_units <= industry_points_per_1000_units_max
         && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
         && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000
         && p.industry_points_crowding_k >= 0 && p.industry_points_crowding_k <= industry_points_crowding_k_max;
@@ -11204,34 +12770,7 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
     return floor_q + ((1000 - floor_q) * f) / 1000;
 }
 
-int industry_tree_industrial_q(uint64_t industry_mask)
-{
-    using namespace io::industry_tree;
-    // KNOWN DRIFT, OPEN (BL-1041 cold review): INDUSTRIALISATION.md sec Beat 1 reads
-    // "Industry tree CAPACITY nodes held", and the store tags every node's
-    // diffusion kind (capacity / practice / artifact; TREES.md sec Diffusion
-    // follows kind). The GENERATED table (`industry_tree_data.hpp`) does not
-    // carry that kind, so this fold cannot filter on it and sums the
-    // `industrial` modifier of every held node -- practice nodes included
-    // (IN-MT-1e +30, IN-LD-1b +80, IN-LD-1c -40, IN-CH-2b +40, IN-CH-2c +20).
-    // Filtering needs the generator to emit the kind first.
-    int sum = 0;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!(industry_mask & (1ULL << i))) continue;
-        const node& n = nodes[i];
-        for (int r = 0; r < static_cast<int>(n.effects_n); ++r)
-        {
-            const io::tree_effect& e = effects[n.effects_begin + r];
-            if (e.kind == io::tree_effect_kind::modifier
-             && e.term == io::tree_modifier_term::industrial)
-                sum += e.per_mille;
-        }
-    }
-    return sum;
-}
-
-int64_t industry_points_scale_credit(const region& r, int industrial_q,
+int64_t industry_points_scale_credit(const region& r,
                                      const history_sim_params& p, int step_years,
                                      int64_t employed_heads)
 {
@@ -11241,17 +12780,12 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
     // BL-1149 — THE WORKS, NOT THE CROWD: the urban heads its works employ.
     const int64_t heads = std::min(r.urban_population, employed_heads);
     if (step_years < 1 || step_years > industry_points_step_years_max) return -1;
-    // The tree multiplier's DOMAIN (see the header): outside it is a table
-    // defect, refused rather than clamped into a plausible number.
-    const int64_t tree_mult_q = 1000 + static_cast<int64_t>(industrial_q);
-    if (tree_mult_q < 100 || tree_mult_q > 5000) return -1;
 
     // Staged so no product leaves int64: heads (<= 2^31) x rate (<= 10^6)
     // x years (<= 10^3) < 2.2e18, then divided before each further factor.
     int64_t pts = (heads * p.industry_points_per_million_urban_heads_year
                    * static_cast<int64_t>(step_years)) / 1000000;
     pts = (pts * industry_points_fuel_factor_q(industry_fuel_reading_q(r), p)) / 1000;
-    pts = (pts * tree_mult_q) / 1000;
     return pts;
 }
 
@@ -11371,10 +12905,11 @@ int64_t industry_points_crowding_q(const region& r, const works_registry* works)
 
 int64_t industry_points_crowd_brake(const std::vector<region>& regions,
                                     std::vector<std::pair<int, int64_t>>& spread,
-                                    int64_t k, int64_t points_per_unit,
+                                    int64_t k, int64_t points_per_1000_units,
                                     const works_registry* works)
 {
-    if (k < 1 || k > industry_points_crowding_k_max || points_per_unit < 1) return -1;
+    if (k < 1 || k > industry_points_crowding_k_max || points_per_1000_units < 1
+        || points_per_1000_units > industry_points_per_1000_units_max) return -1;
     // Each receiving region converts its share at f = K / (K + crowding),
     // held in parts per million (K <= 10^9, so K x 10^6 < 2^60), and the
     // share times f is staged (s / 10^6) x f + ((s % 10^6) x f) / 10^6.
@@ -11399,8 +12934,17 @@ int64_t industry_points_crowd_brake(const std::vector<region>& regions,
     // worth of points a round) still converts, on the least crowded receiver,
     // so every unit either stays or lands at the full exchange rate -- no
     // point is deleted.
-    const int64_t kept_units = kept_points / points_per_unit;
-    spread[best].second += kept_points - kept_units * points_per_unit;
+    // BL-1298: the rate is per THOUSAND units, staged so nothing overflows:
+    // kept_units = floor(kept_points x 1000 / rate), and the points those
+    // units are worth (`industry_points_for_treasury_units`) never exceed
+    // kept_points, so the residue is >= 0. At a rate divisible by 1000 this
+    // is the per-unit arithmetic it replaced, digit for digit.
+    // Below one unit's worth of points the residue still converts on the
+    // least crowded receiver (at most one unit's points a conversion; known,
+    // kept -- the same residue rule as before BL-1298).
+    const int64_t r = points_per_1000_units;
+    const int64_t kept_units = (kept_points / r) * 1000 + ((kept_points % r) * 1000) / r;
+    spread[best].second += kept_points - industry_points_for_treasury_units(kept_units, r);
     return kept_units;
 }
 
@@ -11410,23 +12954,13 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              int                        step_years,
                                              const works_registry*      works)
 {
-    // The holder's capacity, once per polity per round, indexed like the
-    // table (every creation site assigns id = index; checked, and a region
-    // whose holder does not resolve reads 0, like unheld ground).
-    std::vector<int> industrial(polities.size(), 0);
-    for (std::size_t i = 0; i < polities.size(); ++i)
-        if (polities[i].id == static_cast<int>(i))
-            industrial[i] = industry_tree_industrial_q(polities[i].industry_mask);
-
     industry_points_round out;
     for (region& r : regions)
     {
         if (r.centres <= 0) continue;
-        const int ind = (r.nation >= 0 && static_cast<std::size_t>(r.nation) < industrial.size())
-                            ? industrial[static_cast<std::size_t>(r.nation)] : 0;
         // BL-1149: the heads its works employ; no table, no work, none.
         const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
-        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years, employed);
+        const int64_t credit = industry_points_scale_credit(r, p, step_years, employed);
         if (credit < 0 || r.industry_points > industry_points_ceiling - credit)
         {
             ++out.refused; // nothing moves on this region
@@ -11436,177 +12970,6 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
         out.credited      += credit;
     }
     return out;
-}
-
-namespace {
-
-/// Compile-time string equality over the generated table's ids.
-constexpr bool industry_id_is(const char* a, const char* b)
-{
-    while (*a != '\0' && *a == *b) { ++a; ++b; }
-    return *a == *b;
-}
-
-/// A node's index in `io::industry_tree::nodes`, found BY ID at compile time,
-/// or -1. Never a magic index: a store edit that renumbers the table moves
-/// this with it, and one that drops the id fails the static_assert below.
-constexpr int industry_node_by_id(const char* id)
-{
-    for (int i = 0; i < io::industry_tree::node_count; ++i)
-        if (industry_id_is(io::industry_tree::nodes[i].id, id)) return i;
-    return -1;
-}
-
-/// IN-MT-1a, Coke Smelting: the node `furnace_lit` reads.
-constexpr int industry_coke_smelting_index = industry_node_by_id("IN-MT-1a");
-static_assert(industry_coke_smelting_index >= 0 && industry_coke_smelting_index < 64,
-              "IN-MT-1a (Coke Smelting) is not in the Industry store: `furnace_lit` reads it BY ID "
-              "(INDUSTRY_TREE.md sec The scorer) -- re-read the scorer before renaming it");
-
-} // namespace
-
-bool industry_coke_smelting_held(uint64_t mask)
-{
-    // Ben, 2026-09-18 (wave 1 form): `furnace_lit` is COKE SMELTING HELD -- a
-    // coal-fired furnace. It read "a Fuel Doctrine side held" (NR-892), and
-    // that was 1000 at every pick that reads the term: all three readers
-    // (Electrification, Synthetic Chemistry, Plant Registry) sit behind The
-    // Cheap Ton, which requires a side. exploration_sim_harness T8.7.3 pins it.
-    return (mask & (1ULL << industry_coke_smelting_index)) != 0;
-}
-
-void industry_term_values(uint64_t mask, const industry_scorer_reading& r,
-                          int (&out)[io::industry_tree::term_count])
-{
-    using namespace io::industry_tree;
-
-    // THE ORDER GUARD. `out` is written BY NAME through the generated enum
-    // (`at(scorer_term::x)`), never positionally, so a store edit that
-    // reorders the terms cannot put a reading under the wrong term. These
-    // asserts make any such edit LOUD anyway: a new term would otherwise read
-    // a silent 0 here, a removed one fails to compile below, and a reorder
-    // means the store moved under the scorer and somebody should look. If one
-    // fires after `gen_empire_tree_table.js industry`, re-read
-    // INDUSTRY_TREE.md sec The scorer, give the new term a reading (or pin it
-    // at 0 by name, as two are below), then update these lines.
-    static_assert(term_count == 22, "industry scorer terms changed: every term needs a reading here");
-    static_assert(static_cast<int>(scorer_term::spire)           ==  0
-               && static_cast<int>(scorer_term::reach_bound)     ==  1
-               && static_cast<int>(scorer_term::furnace_lit)     ==  2
-               && static_cast<int>(scorer_term::ground_ore)      ==  3
-               && static_cast<int>(scorer_term::ground_fuel)     ==  4
-               && static_cast<int>(scorer_term::ground_forest)   ==  5
-               && static_cast<int>(scorer_term::tariff_pressure) ==  6
-               && static_cast<int>(scorer_term::threatened)      ==  7
-               && static_cast<int>(scorer_term::food_bound)      ==  8
-               && static_cast<int>(scorer_term::plague_struck)   ==  9
-               && static_cast<int>(scorer_term::coastal_holdings)== 10
-               && static_cast<int>(scorer_term::colonial_reach)  == 11
-               && static_cast<int>(scorer_term::cohesion_low)    == 12
-               && static_cast<int>(scorer_term::fuel_bound)      == 13
-               && static_cast<int>(scorer_term::labour_bound)    == 14
-               && static_cast<int>(scorer_term::manpower_bound)  == 15
-               && static_cast<int>(scorer_term::ground_farm)     == 16
-               && static_cast<int>(scorer_term::ground_port)     == 17
-               && static_cast<int>(scorer_term::surplus)         == 18
-               && static_cast<int>(scorer_term::known)           == 19
-               && static_cast<int>(scorer_term::credit_bound)    == 20
-               && static_cast<int>(scorer_term::many_peoples)    == 21,
-                  "industry scorer_term order moved: the store changed under the scorer");
-
-    const auto at = [&out](scorer_term t) -> int& { return out[static_cast<int>(t)]; };
-    for (int& v : out) v = 0;
-
-    // `furnace_lit` — the polity holds Coke Smelting (Ben, 2026-09-18, wave 1
-    // form; before it, a Fuel Doctrine side, which every reader held by
-    // construction). Found by id at compile time, never by a magic index.
-    const bool furnace_lit = industry_coke_smelting_held(mask);
-
-    at(scorer_term::spire)            = 1000;
-    at(scorer_term::reach_bound)      = r.reach_bound_q;
-    at(scorer_term::furnace_lit)      = furnace_lit ? 1000 : 0;
-    at(scorer_term::ground_ore)       = r.ground_ore_q;
-    // BL-1056 (NR-896): both Fuel Doctrine pulls read a SHARE of held ground
-    // clearing that resource's top-third bar (BL-1059, NR-899, NR-900); off
-    // the span no share is taken (-1) and the coal pull keeps the seam, the old
-    // reading. The GATE still reads the seam.
-    at(scorer_term::ground_fuel)      = r.ground_fuel_q >= 0 ? r.ground_fuel_q : r.fuel_seam_q;
-    at(scorer_term::ground_forest)    = r.ground_forest_q;   // the span-open survey, share of held clearing the forest bar
-    at(scorer_term::tariff_pressure)  = 0; // PINNED: no landed price at a market before the campaign
-    at(scorer_term::threatened)       = r.threatened_q;
-    at(scorer_term::food_bound)       = r.food_bound_q;
-    at(scorer_term::plague_struck)    = 0; // PINNED: the history sim runs no plague (the empire scorer pins it too)
-    at(scorer_term::coastal_holdings) = r.ground_port_q;
-    at(scorer_term::colonial_reach)   = r.colonial_reach_q;
-    at(scorer_term::cohesion_low)     = 1000 - clampi(r.cohesion_q, 0, 1000);
-    at(scorer_term::fuel_bound)       = r.fuel_bound_q;
-    at(scorer_term::labour_bound)     = r.labour_bound_q;
-    at(scorer_term::manpower_bound)   = r.manpower_bound_q;
-    at(scorer_term::ground_farm)      = r.ground_farm_q;
-    at(scorer_term::ground_port)      = r.ground_port_q;
-    at(scorer_term::surplus)          = r.surplus_q;
-    at(scorer_term::known)            = 0; // per node: `choose_industry_node` reads `known_mask`
-    at(scorer_term::credit_bound)     = r.credit_bound_q;
-    at(scorer_term::many_peoples)     = r.many_peoples_q;
-
-    for (int& v : out) v = clampi(v, 0, 1000);
-}
-
-bool industry_gate_open(io::industry_tree::gate_atom g, const industry_scorer_reading& r)
-{
-    using io::industry_tree::gate_atom;
-    // The EMPIRE scorer's gate_open, atom for atom, except `fuel`: the seam
-    // (the max over held ground) against the same bar, where the empire reads
-    // the mean. `grassland` reuses the farm mean as the empire's does.
-    switch (g)
-    {
-    case gate_atom::none:       return true;
-    case gate_atom::ore_q:      return r.ground_ore_q  >= 250;
-    case gate_atom::fuel:       return r.fuel_seam_q   >= industry_fuel_seam_bar_q;
-    case gate_atom::arable:     return r.ground_farm_q >= 250;
-    case gate_atom::coastal:    return r.ground_port_q > 0;
-    case gate_atom::grassland:  return r.ground_farm_q >= 250;
-    }
-    return true;
-}
-
-int choose_industry_node(uint64_t mask, const industry_scorer_reading& r)
-{
-    using namespace io::industry_tree;
-
-    int term_value[term_count];
-    industry_term_values(mask, r, term_value);
-
-    // Same shape as the other two scorers: term + kind bonus - cost, integer,
-    // ties to the lower node index.
-    int best_idx = -1;
-    int best_score = INT32_MIN;
-    for (int i = 0; i < node_count; ++i)
-    {
-        if (!industry_node_available(mask, i)) continue;
-        const node& n = nodes[i];
-        if (!industry_gate_open(n.gate, r)) continue;
-        const int kind_bonus = n.kind == node_kind::milestone ? 600
-                              : n.kind == node_kind::major     ? 0
-                                                                : -100; // minors trail their major
-        const int term = node_term[i] == scorer_term::known
-            ? (((r.known_mask >> i) & 1ULL) != 0 ? 1000 : 0)   // a met polity holds THIS node
-            : term_value[static_cast<int>(node_term[i])];
-        const int cost_q = (n.kind == node_kind::minor ? 1 : n.kind == node_kind::major ? 3 : 6)
-                          * static_cast<int>(n.ring);
-        const int score = term + kind_bonus - cost_q;
-        if (score > best_score) { best_score = score; best_idx = i; }
-    }
-    return best_idx;
-}
-
-bool industry_target_stands(uint64_t mask, int investing, const industry_scorer_reading& r)
-{
-    if (investing < 0 || investing >= io::industry_tree::node_count) return false;
-    if (!industry_node_available(mask, investing)) return false; // a fork closed under it
-    // The gate, on THIS round's reading: a seam lost since the pick closes a
-    // `fuel` node exactly as it would have refused it at the pick.
-    return industry_gate_open(io::industry_tree::nodes[investing].gate, r);
 }
 
 // ---------------------------------------------------------------------------
@@ -12531,14 +13894,14 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
     }
 
     // 1b. BL-1147: the naval ledger is a tally of deeds -- never negative, and
-    //     never more coastal sea techs than the tree holds.
+    //     never more coastal sea techs than the ramp has years.
     for (std::size_t i = 0; i < o.polities.size(); ++i)
     {
         const polity& q = o.polities[i];
         if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0)
             return fail("polity " + std::to_string(i) + " carries a negative naval ledger");
-        if (q.naval_sea_techs > 3)
-            return fail("polity " + std::to_string(i) + " took more coastal sea techs than the tree holds");
+        if (q.naval_sea_techs > history_sim_params::coastal_naval_ramp_n)
+            return fail("polity " + std::to_string(i) + " holds more coastal sea techs than the ramp has years");
     }
 
     // 2. The holdings. Ascending polity ids, ascending region indices, every

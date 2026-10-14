@@ -283,18 +283,22 @@ the patterns are named for what they do.
 **They are fixed by design, not player-set (Ben, 2026-10-10).** Every world carries the three targets
 and the two leans; the setup round carries only the nation counts. A target is hit as the counts
 are: a lean conditions the passes, then reconciliation closes any gap with the history's own verbs,
-each recorded with a cause. A lean makes a pattern likely and promises nothing.
+each recorded with a cause. **The backstop escalates the lean in-world (Ben, 2026-10-12):** where a
+target pattern's lean misses, it is pressed harder in bounded steps until the pattern's detector
+passes, each step a recorded cause. A lean makes a pattern likely and promises nothing.
 
 **Every pattern is tracked (Ben, 2026-10-10).** Each pattern has a **detector** — a predicate over the
 history record that proves the target was hit and names the polities it touched. The detector is
 both the gate and the record: the polities it names carry a **pattern tag** into the nation they
-fold into, and the nation selection card shows those tags, a short timeline of the nation's key
+fold into — **a realm that ends passes its tags to whoever ended it, and a successor carries its
+parent line's (Ben, 2026-10-12)**, so a pattern reaches the nation even when its realms died before
+1960 — and the nation selection card shows those tags, a short timeline of the nation's key
 events, and a link into the History ledger filtered to that nation (`../ui/STARTUP.md` § The seat).
 A world's history is told, as the Empires round's causes already are; it is never narrated over.
 ## The world descriptor — seed + generation parameters
 
 Generation is driven by a small **world descriptor** (BL-114, world descriptor) — a master
-**seed** plus a `world_params` struct — chosen on the main-menu **New World** setup and threaded
+**seed** plus a `world_params` struct — chosen on the wizard's setup round (`../ui/STARTUP.md` § Rounds) and threaded
 through `make_hard_coded_world(world_params)`. Same descriptor → identical world on a given
 binary; this is the reproducible key the setup screen surfaces (with a dice-randomise and a
 copyable readout). The descriptor lives in the app, **not** the `world` struct, so it stays off
@@ -314,13 +318,14 @@ the world's serialisation seam; the save file records it so a load rebuilds the 
 | `body_count` (`int`) | **Reserved.** The body set is hand-authored prototype *profiles* (hot inner planet / homeworld / moon / metallic asteroid — their **names** are generated per seed, BL-257, body naming); a true count knob needs the generator to synthesise variable body profiles. The field exists so the descriptor is forward-shaped. | heaviest |
 | `preferences` (`world_preferences`) | The New World wizard's input: eight **leans** (`any`/`low`/`mid`/`high`), resolved against the seed by `resolve_preferences` with reject-and-reroll until the homeworld clears the strict Earth-like floor. Preferences, not parameters — see `PLANETOLOGY.md` § Preferences, not parameters. | cheap |
 
-**There is no nation-count field.** The number of nations on the home body is a *consequence* of
-generation, not a descriptor input: seeds scale with habitable land area, every nation below a
-minimum viable territory is absorbed (`NATION_GENERATION.md` § Pass 1 / Pass 2c), and the seed
-budget itself is **driven by the history ladder's `fragmentation_q`** — a broken, many-cradled
-world seeds more densely and keeps smaller survivors (`nation_params_from_ladder`,
-`history_ladder.cpp`). The New World setup screen therefore has no nations slider — a world's
-political granularity is something the player discovers, not something they dial in.
+**The nation counts are targets the setup round sets (Ben, 2026-10-10).**
+The player chooses a total and a major target before the Life round; both are always hit, by a lean
+on the passes and then reconciliation through the history's own verbs (`NATION_GENERATION.md`
+§ The nation count is a target). Beneath the lean the mechanism is unchanged: seeds scale with
+habitable land area, every nation below a minimum viable territory is absorbed
+(`NATION_GENERATION.md` § Pass 1 / Pass 2c), and the seed budget is driven by the history ladder's
+`fragmentation_q` (`nation_params_from_ladder`, `history_ladder.cpp`). This overturns the
+2026-07-30 rule that the count is a consequence only and the screen carries no nations slider.
 
 **Abundance honours the resource ceiling.** `standard` **is** the earth-like ceiling (1.0×); the
 other tiers step *down* (`lean` 0.65, `sparse` 0.40) — there is no tier above Earth. Determinism

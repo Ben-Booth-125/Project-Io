@@ -56,26 +56,69 @@ not a reported outcome — the reverse of NR-911's report-and-count rule, for th
 **How a target is hit: a lean, then in-world reconciliation (Ben, 2026-10-10, option C).** A count
 is never imposed by deleting, splitting or relabelling a nation. Two stages, in order:
 
-1. **The lean.** Each target conditions the passes that make the number. The total sets the seed
-   density of placement in place of `land_tiles_per_seed` alone, and the major target leans how
-   Industrialisation concentrates charter capital (`INDUSTRIALISATION.md` § 1). A lean lands
-   near the target; it does not promise it.
+1. **The lean.** Each target conditions the passes that make the number. The total leans the
+   history's **conquest appetite and secession pressure** — fewer nations wanted, more appetite and
+   less secession; more wanted, the reverse (Ben, 2026-10-11; seed density cannot carry it, because
+   on a settled world the seeds are the history's region anchors and `land_tiles_per_seed` is never
+   read). The major target leans how Industrialisation concentrates charter capital
+   (`INDUSTRIALISATION.md` § 1). A lean lands near the target; it does not promise it.
 2. **Reconciliation, by the history's own verbs.** Whatever gap the lean leaves is closed by events
    the sim already knows, each recorded in the history with a cause a player can read:
    - **too many nations** — conquest and absorption, the Empires and Exploration verbs;
-   - **too few nations** — a subject freed or a province seceding, the Exploration verbs;
+   - **too few nations** — a province seceding (a subject is already its own nation at the fold, so
+     freeing one adds none);
    - **too few majors** — a **national champion** chartered in the richest minor that lacks one;
    - **too many majors** — a **cross-border buy-out**: one major's champion buys a surplus major's
      specialist whole, and the seller becomes a minor.
 
-The mechanics of each step — which span runs the reconciliation, how the richest minor is read,
-how a buy-out is priced — are open design. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
+**The total is reconciled in Industrialisation's closing rounds; the majors after the landscape
+search (Ben, 2026-10-11).** The two counts come into being at different points of the pipeline, so
+each is reconciled where it can be read:
+- **The total, inside the history.** The size floor moves into the history as **closing-round
+  absorptions** (§ Pass 2c): a realm below the minimum territory is absorbed by its neighbour as an
+  event of the span, and the remaining gap is closed by the verbs above in the same closing rounds.
+  The nations that reach the fold are already on the total.
+- **The majors, after the search.** A major is a nation holding a champion, and champions are
+  chartered by the landscape search, after the history closes. So the majors are reconciled once
+  the search's winner is applied — a champion chartered or bought out — and each correction is
+  recorded as a history event **dated back** into Industrialisation's closing rounds, so the record
+  reads as one history.
+
+**The three readings (Ben, 2026-10-11):**
+- **The richest minor** is the one with the most industry points standing on its ground
+  (`region::industry_points`, summed) — what a charter is built from.
+- **A buy-out** is made by the richest champion, which buys the poorest major's specialist whole at
+  that specialist's charter price; the seller becomes a minor. "Richest" and "poorest" read the same
+  industry-point measure.
+- **The minimum-territory floor runs first.** No nation survives below it; reconciliation then
+  closes whatever gap the floor leaves, adding nations back by secession where the floor took the count
+  under the total.
+- **A state charter where a minor cannot afford its champion (Ben, 2026-10-11).** If the richest
+  championless minor's richest centre cannot meet a specialist's charter price, its treasury makes
+  up the gap, and the event is recorded as a **state charter**. The gap is paid **in credits, at the
+  specialist's real credit price** — the rate a corporation's charter costs — so a state charter is a
+  visible expense on the treasury, never a nominal one (Ben, 2026-10-11).
+- **A champion the reconciliation must charter may take any land tile of its nation (Ben,
+  2026-10-12).** Where no placement window of the minor's centres holds ground, the champion is
+  placed on any land tile its nation holds, so the major target is hit; it may open with weaker
+  holdings. Ordinary chartering keeps its windows. **Where the nation has no free land tile at
+  all** — its own background firms hold every one — the state charter founds the champion by
+  **consolidating those firms**: they merge into it with their holdings, recorded in the same
+  state-charter event, and nothing is destroyed (Ben, 2026-10-12).
+- **The target outranks the floor (Ben, 2026-10-11).** Where no secession can leave both sides
+  above the minimum territory, the closing rounds still split a province, choosing the split that
+  leaves the smallest shortfall, so the total is always hit. A nation below the floor is the cost of
+  a target the ground could not otherwise hold; a target is never missed to keep the floor.
+- **No target, no reconciliation.** A world built without targets — a harness, an old save, any
+  build that skips the setup round — keeps its natural counts, uncapped. The wizard always sets
+  both. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
 holds for everything else. These two counts are its one sanctioned exception: the player sets them,
 and the world's shape inside them stays the world's.
 
-The library spread shows why both stages are needed. Living polities run from about 40 to 115 across
-`seed_library.json`, so the 40 cap sits at the floor of every curated world, and reconciliation
-removes nations on almost every seed.
+The library spread shows why both stages are needed. Unforced, the curated worlds of
+`seed_library.json` end with 20 to 69 nations folded from 37 to 95 living polities, and 3 to 11
+nations holding a planned specialist (measured 2026-10-11). Reconciliation therefore removes nations on
+about half the library and adds them on the rest, and trims majors where more than six would form.
 
 **Same pipeline, all bodies.** Nation generation runs only on bodies with sufficient habitable
 area — the homeworld. The pipeline is body-agnostic; it reads tile
@@ -183,6 +226,11 @@ then the lower tile index). After this pass every non-ocean land tile on the bod
 a nation — there are no unclaimed islands.
 
 ### Pass 2c — Light "in history" merges: the size floor
+
+**Moving into the history (Ben, 2026-10-11; § The nation count is a target).** On a settled world the
+floor becomes closing-round absorptions in Industrialisation, recorded as events, so the total can be
+reconciled after it. What follows describes the rule the absorptions keep, and the post-pass that
+still runs where no history ran.
 
 A deterministic post-pass gives the map a "grown in history" feel without simulating history.
 The body is **over-seeded** in Pass 1, then the smallest nations are repeatedly **absorbed into
@@ -465,6 +513,39 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
+**Every nation opens with real credits, and none opens in debt (Ben, 2026-10-11).** The player is a
+nation and sees its starting credits, so a median nation opening on a fraction of a credit is a
+defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
+across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
+granted at the handoff. No nation, the player's or a rival's, takes on debt before the game starts —
+a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
+more, and through which earnings, is settled by measurement (BL-1298) against these rulings
+(Ben, 2026-10-11):
+- **The target:** a typical (median) nation opens on **1,000 to 2,000 credits** — for now, to be
+  revisited once the campaign shows what a state spends.
+- **Lift the floor, keep the order.** Poor nations gain the most; the realms that inherited empires'
+  chests stay the richest. The spread narrows from the bottom, never by cutting the top.
+- **The lever is earning (Ben, 2026-10-11, on the treasury census).** A realm **taxes its seats'
+  stores every round** — a standing levy on what its own ground produces, swept into the chest as
+  the 1200 consolidation once swept it, but every round rather than once — and **endowment income
+  is rescaled** so a small realm earns too. Not a larger conversion rate, not a reserve granted at
+  the handoff. **The endowment is summed over the ground a realm holds, not averaged (Ben,
+  2026-10-12)**, so a larger realm earns more and the inherited order holds: a flat per-realm
+  endowment reached the band but scrambled which realms were richest. **It is read as a share of the
+  world's ground (Ben, 2026-10-12)**: a realm earns by the share of its world's held ground it holds,
+  so a small world's nations are not poorer for the world being small and every world's median lands
+  near the band. With real chests, the treasury's conversion into industry points (`industry_points_per_1000_treasury_units`, per thousand units since the rate fell below one point a unit) is re-sized toward
+  the scale term — **at the lowest rate that keeps market_viability's G1 at tick 50 at or above its
+  target** (Ben, 2026-10-12; the same-order rate cost it 2.8 points). ("Keep more" was dropped: the treasury-to-industry conversion drew 4 credits across
+  the library, so it is not where the money goes.)
+- **Measured before the ruling** (`tools/verify/treasury_census.cpp`, 16 library seeds): 99.6% of
+  every chest is the one-time 1200 fold of the seats' stores; the ongoing earn after it is about
+  2,200 credits pooled over 760 years against 307,000 folded; the standing-army bill then drains the
+  chests, so the median nation opens on **0.02 credits** and 49 of 77 majors on under one.
+
+The rate's own rationale below was argued against the old median (0.41 credits) and the corporate
+economy as it stood; it is re-read once the measured chests land, rather than kept by inertia.
+
 `nation_component::treasury` opens on **what the history banked, not what the campaign has yet
 earned**. NATIONS.md's rule — a treasury nothing has credited is zero, and a treasury that started
 full would be a balance change smuggled in as a field — still holds for the ONGOING campaign; it
@@ -500,7 +581,8 @@ the skew below is the history's, not the rate's.** Measured on the reference see
   quarterly income at the open — ~7.5 credits a nation in quarter one when the rate was chosen. The
   rate was first argued on the median POLITY chest (~10 million material, ~100 credits: thirteen
   quarters of levy). But a nation opens on its OWN folded chest, and most realms fold small ones:
-  on the reference seed the **median nation opens on 0.41 credits**, 22 of the 38 on under one,
+  on the reference seed the **median nation opened on 0.41 credits** when the rate was chosen (3.64,
+summing 13,683, on the 2026-10-11 census), 22 of the 38 on under one,
   and 14 on 100 or more — thirteen quarters of levy and upward. So the reserve is held by the
   realms that inherited empires' chests, and most realms open on their levy alone. Ten times the
   rate (0.1 ‰) would lift that median to ~4 credits and multiply every hoard with it.

@@ -382,17 +382,27 @@ inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t firm_
 ///
 /// @p centre picks the centre's own price (BL-1168, `firm_price_of`); the
 /// default prices it at the world's.
+///
+/// @p charters_specialist (BL-1283, one specialist per major): false for a
+/// centre that affords a specialist but is not its nation's champion centre —
+/// it sets no price aside and spends its whole budget on firms. The two-argument
+/// form (an instrument's) reads every affording centre as chartering one.
 inline std::int64_t charter_centre_firm_points(std::int32_t points, const charter_spend_params& s,
-                                               entity_id centre = null_entity)
+                                               entity_id centre, bool charters_specialist)
 {
     const std::int64_t fp = s.firm_price_of(centre);
     if (fp <= 0 || points <= 0)
         return 0;
     std::int64_t left = points;
     const std::int64_t sp = s.specialist_price_of(centre);
-    if (sp > 0 && left >= sp)
+    if (charters_specialist && sp > 0 && left >= sp)
         left -= sp;
     return (left / fp) * fp;
+}
+inline std::int64_t charter_centre_firm_points(std::int32_t points, const charter_spend_params& s,
+                                               entity_id centre = null_entity)
+{
+    return charter_centre_firm_points(points, s, centre, /*charters_specialist=*/true);
 }
 
 /// Why a point was not spent. Ordered: a report sorts (centre, reason) on it.
@@ -492,6 +502,10 @@ enum class charter_rung : std::uint8_t
     centre_window = 1, ///< the centre nation's tiles within `window_radius` of the centre tile
     region_window = 2, ///< the centre nation's tiles in the centre's NEAREST region, and
                        ///< only when that region is the centre nation's own
+    nation_wide   = 3, ///< BL-1278 (Ben, 2026-10-12): ANY land tile of the nation, nearest the centre
+                       ///< first -- only for a champion the majors' reconciliation MUST charter
+    consolidated  = 4, ///< BL-1278 (Ben, 2026-10-12): no free land at all -- the champion was founded by
+                       ///< merging the nation's own background firms (`consolidate_champion`)
 };
 
 struct charter_unspent
@@ -526,6 +540,15 @@ struct charter_record
     /// `corporation_component::founded_year`, here so the round-6 close can
     /// flash the report's charters without the world. 0 until dated.
     std::int32_t founded_year = 0;
+
+    /// BL-1278 lane C (a cross-border BUY-OUT, `reconcile_majors`): the row of a
+    /// specialist bought whole by another champion. `corp` is then null — the
+    /// firm no longer exists — `absorbed_into` names the champion that now
+    /// holds its ground, and `absorbed_origin` keeps the firm's origin region so
+    /// `date_chartered_firms` still counts this charter against its region (no
+    /// other firm's founding year shifts). Both unset on every other row.
+    entity_id    absorbed_into   = null_entity;
+    std::int32_t absorbed_origin = -1;
 };
 
 /// One body's density rule, fixed before the walk, and what the walk put on it
@@ -602,6 +625,24 @@ struct charter_spend_report
     /// NR-913: every pooled remainder, ascending (from); empty unless the spend
     /// pools (`charter_spend_params::pool`).
     std::vector<charter_pool_transfer> pool_transfers;
+    /// BL-1283 (Ben, 2026-10-11: a champion falls back down its nation's
+    /// centres): where a nation's champion centre found no ground and a poorer
+    /// affording centre of the same nation took the champion, the points the
+    /// champion centre had set aside travel to it (`from` the champion centre,
+    /// `to` the fallback, at most the fallback's own price). Balanced like a
+    /// pool transfer; ascending walk order.
+    std::vector<charter_pool_transfer> champion_fallbacks;
+    int champions_fallen_back = 0;   ///< champion_fallbacks.size(), for the log
+    /// BL-1298 / BL-1283 (Ben, 2026-10-13): champion centres passed over because
+    /// their market could not stand a processor (`chain_market_can_process`) while
+    /// a later affording centre of the nation remained. Each leaves its set-aside
+    /// pending exactly as a no-ground champion does (booked `chain_infeasible`
+    /// until a fallback takes it). Report-only.
+    int champions_passed_over = 0;
+    /// BL-1298 / BL-1283: passed-over champions chartered back at their own
+    /// centre after the walk because no later centre of the nation landed the
+    /// champion (a nation keeps its champion). Report-only.
+    int champions_restored = 0;
     std::vector<entity_id>       firms;        ///< ascending id
     std::vector<charter_record>  charters;     ///< ascending corp id
     std::vector<charter_unspent> unspent;      ///< ascending (centre, reason); zero rows omitted

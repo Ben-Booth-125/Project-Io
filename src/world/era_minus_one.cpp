@@ -306,6 +306,44 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // A tally of deeds read by nothing in this round, so switching it on moves
     // nothing here; the Exploration open converts it (`exploration_sim_params`).
     hp.naval_points_accrue = true;
+
+    // BL-1287 -- THE RISE AND FALL IS A TARGET OF THIS ROUND (CIVILISATION.md
+    // sec How an empire actually falls; GENERATION_STRATEGY.md sec History
+    // patterns, "always"). The realm largest at 200 BCE is leaned up, peaks by
+    // 400 CE above the floor and under hegemony, and is overextended until its
+    // share halves -- each level a recorded cause. This round only; the later
+    // spans build their params from struct defaults and never lean.
+    hp.rise_fall_target = true;
+    // And the defect its loop exposed: a region taken this round is measured
+    // by its new holder before it can secede from it (history_sim.hpp).
+    hp.secession_waits_for_holder = true;
+
+    // BL-1290 (civil war deaths) -- THIS ROUND'S ALONE (MILITARY_HISTORY.md sec
+    // Armies are distinct from population, Ben 2026-10-12: the civil war is an
+    // Empires pattern; the ruling's exception does not reach Exploration, and
+    // Industrialisation's war deaths are their own mechanism). Per mille of a
+    // fought-over region's people per year of the round: famine 10, flight 15
+    // -- 40 and 60 per mille a 4-year round, capped at 150 each, at most once a
+    // round. Placeholder magnitudes on the same footing as the w_* weights: a
+    // region struck every round of a fifty-year war keeps about half its
+    // people, so a civil war SHOWS on the population map without emptying it.
+    hp.civil_war_famine_q = 10;
+    hp.civil_war_flight_q = 15;
+
+    // BL-1288 -- THE LATE CULTURE IS A TARGET FROM THIS ROUND'S OPEN
+    // (EXPLORATION.md sec A colony is a subject; GENERATION_STRATEGY.md sec
+    // History patterns, "always"). Chosen at the Culture close as the culture
+    // most remote by reach; it lags because development DIFFUSES BY CONTACT --
+    // a force every polity of this round feels -- and where it is losing the
+    // realm it must carry to Exploration, the isolation on its ground is pressed
+    // one recorded level at a time. This round only: the diffusion is the
+    // Culture -> Exploration lag's mechanism, and the later spans build from
+    // struct defaults (Exploration watches the colonisation instead).
+    hp.late_culture_target       = true;
+    hp.contact_diffusion_q       = 10;
+    hp.contact_diffusion_horizon = 30;
+    hp.contact_early_bands       = 2; // Ben 2026-10-14: past band 2 a realm climbs by contact
+    hp.contact_band_per_q        = 1000;
     return hp;
 }
 
@@ -379,6 +417,17 @@ history_sim_params exploration_sim_params(const world_params& params)
     // moves both resumed spans together.
     hp.culture_profile_lack_max_q  = params.culture_profile_lack_max_q;
     hp.culture_profile_amenity_div = params.culture_profile_amenity_div;
+
+    // BL-1298 -- THE HISTORY BANKS MORE (NATION_GENERATION.md sec Pass 7;
+    // EXPLORATION.md sec Force persists now; Ben, 2026-10-11). Both resumed
+    // spans: the standing levy on the seats' stores every round after the
+    // 1200 fold, the rescaled endowment income, and the standing army sized
+    // to what the realm earns (the navy keeps NR-878).
+    hp.treasury_levy_per_mille_q   = params.treasury_levy_per_mille_q;
+    hp.treasury_endowment_income_q = params.treasury_endowment_income_q;
+    hp.standing_army_sized_to_earn = params.standing_army_sized_to_earn;
+    hp.treasury_endowment_summed   = true; // Ben, 2026-10-12: summed over held ground
+    hp.treasury_endowment_world_share = true; // Ben, 2026-10-12: as a share of the world
 
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration
@@ -493,6 +542,17 @@ history_sim_params exploration_sim_params(const world_params& params)
     // ports) or does not move. Industrialisation inherits it.
     hp.trade_road_joins_one_landmass = true;
 
+    // BL-1288 -- THE LATE CULTURE IS COLONISED IN THIS AGE (EXPLORATION.md sec
+    // A colony is a subject): the span reads the culture off the polity table
+    // it resumes (`polity::late_isolation`), watches for a polity of another
+    // culture binding one of its realms by the ordinary subjection verbs, and
+    // presses the contact that would, one recorded level at a time.
+    // Industrialisation copies these params and sets it back off.
+    hp.late_culture_colonised = true;
+    // ...and a power two materials bands ahead of a native needs no treasury
+    // margin to bind it (dominance by development; Industrialisation inherits).
+    hp.subjection_dominance_bands = 1;
+
     return hp;
 }
 
@@ -534,26 +594,18 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // overturned). Re-anchoring them at 1660 would consolidate a second time
     // and call every pair met during Exploration near home.
 
-    // THE INDUSTRY TREE, IN THIS SPAN ONLY (BL-1038; TREES.md sec Milestones:
-    // it opens at its root to every living polity at 1660). Opened at the
-    // span's own start, which is 1660 at the defaults -- the tree belongs to
-    // this span, so a harness that moves the span's open moves the tree's
-    // with it rather than leaving a gap or an overlap.
-    hp.industry_tree_enabled = true;
-    hp.industry_open_year    = hp.start_year;
-
     // BL-1041 — INDUSTRY POINTS, IN THIS SPAN ONLY (INDUSTRIALISATION.md sec Beat
-    // 1). They open with the Industry tree, at the span's own open year, and
-    // accrue on every region with centres plus a share of each capital's
-    // surplus; the constants are the struct's (history_sim.hpp says why each).
-    // Two defaults ride with them (RULED, Ben 2026-09-18, wave 1 form), each
-    // its own switch: A, a region the span founds inherits its parent's
-    // surveyed fuel at a discount; B, every Industry fuel read (the gate, its
-    // re-check, the seam flag, `ground_fuel`) takes the survey rather than
-    // energy_q. Both are inert wherever nothing was surveyed.
+    // 1). They open at the span's own start, which is 1660 at the defaults --
+    // so a harness that moves the span's open moves the points' with it rather
+    // than leaving a gap or an overlap -- and accrue on every region with
+    // centres plus a share of each capital's surplus; the constants are the
+    // struct's (history_sim.hpp says why each). One default rides with them
+    // (RULED, Ben 2026-09-18, wave 1 form, DEFAULT A): a region the span
+    // founds inherits its parent's surveyed fuel at a discount. Inert wherever
+    // nothing was surveyed.
+    hp.industry_open_year                   = hp.start_year;
     hp.industry_points_enabled              = true;
     hp.industry_survey_inherits_at_founding = true; // DEFAULT A
-    hp.industry_fuel_gate_reads_survey      = true; // DEFAULT B
 
     // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
     // Far pairs meet and bind, and this phase makes them: "far pairs bind across
@@ -595,6 +647,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // this span inherits or a sweep sets.
     hp.naval_points_convert_at_open = false;
 
+    // BL-1288: the late culture's colonisation is Exploration's pattern clause
+    // alone; this span neither watches nor presses it.
+    hp.late_culture_colonised = false;
+
     // BL-1152 (Ben, 2026-10-02, option D): THE FLEET RULE IS EXPLORATION'S FOR
     // NOW. At 20 / 10 / 50 this span's realms field too few fleets -- on the
     // review-fixed ladder six seeds first crossed between 1720 and 1868 and two
@@ -612,6 +668,23 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // points (the treasury withheld stays in the purse). It loosens the
     // leader's grip on its own landmass; the top-landmass share stays ~0.89.
     hp.industry_points_crowding_k = 1000;
+
+    // BL-1298 (Ben, 2026-10-12): the exchange rate re-sized against the real
+    // chests the history now banks; history_sim.hpp says why.
+    hp.industry_points_per_1000_treasury_units = params.industry_points_per_1000_treasury_units;
+
+    // BL-1289 (Ben, 2026-10-10/11/12; GENERATION_STRATEGY.md sec History
+    // patterns): THE WORLD WAR IS A TARGET, ALWAYS HIT, in this span alone --
+    // inside 1900-1930, so the world redevelops before 1960. The magnitudes
+    // are the struct's (history_sim.hpp says what each costs).
+    hp.world_war_target = true;
+
+    // BL-1294 (Ben, 2026-10-10/12; INDUSTRIALISATION.md sec Revolution): THE
+    // REVOLUTION LEAN, this span's alone -- it overturns, here and nowhere
+    // else, the Empires rule that no regime resets while the map stands still.
+    // The bar and the pressure are the struct's (history_sim.hpp says how
+    // each reads); a lean, so no backstop rides with it.
+    hp.revolution_lean = true;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

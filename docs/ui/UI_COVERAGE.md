@@ -8,18 +8,18 @@
 
 ## Headline
 
-**110 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**113 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**58 of 110 elements can be changed without any check going red.**
+**55 of 113 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 49 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
-| **CLIP-ONLY** | 15 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 35 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **ASSERTED** | 55 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
+| **CAPTURE-ONLY** | 33 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (49)
+## ASSERTED (55)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -68,13 +68,16 @@ and so is the safety net.
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 33 | 1 | 7 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 21 | 1 | 0 |
 | `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 49 | 1 | 2 |
-| `UI-092` New World wizard | view | `planetology_generation`, `history_lapse_press` | 38 | 0 | 11 |
+| `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 21 | 1 | 11 |
+| `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round` | 51 | 0 | 18 |
+| `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
 | `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
+| `UI-108` Research panel | ledger | `tech_tree_panel` | 15 | 0 | 2 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 21 | 1 | 0 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
@@ -83,8 +86,11 @@ and so is the safety net.
 | `UI-119` New World wizard > Wizard lapse-round top-sixteen board (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press` | 38 | 1 | 11 |
 | `UI-120` New World wizard > Wizard pass round (one of three) | sub-element | `history_lapse_press` | 38 | 0 | 11 |
 | `UI-121` New World wizard > Wizard lapse-round legend (rounds 3-6) | sub-element | `round_legends`, `sea_lanes` | 5 | 0 | 0 |
+| `UI-122` New World wizard > Wizard setup round (round 2) | sub-element | `setup_round`, `quick_start` | 21 | 0 | 10 |
+| `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 42 | 0 | 3 |
+| `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 8 | 0 | 0 |
 
-## CLIP-ONLY (15)
+## CLIP-ONLY (14)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -102,9 +108,8 @@ and so is the safety net.
 | `UI-084` History Ledger (Story/Chain/Ages/Tectonics) | ledger | `history_ledger_and_comms`, `drill_through_fold`, `text_overflow_floor` | 0 | 2 | 0 |
 | `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
 | `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
-| `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `shell_pass` | 0 | 1 | 1 |
 
-## CAPTURE-ONLY (35)
+## CAPTURE-ONLY (33)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -135,12 +140,10 @@ and so is the safety net.
 | `UI-072` Balance Ledger > Cashflow view | view | `budget_ledger_ranked` | 0 | 0 | 0 |
 | `UI-085` History Ledger (Story/Chain/Ages/Tectonics) > Story view | view | `history_ledger_and_comms` | 0 | 0 | 0 |
 | `UI-086` History Ledger (Story/Chain/Ages/Tectonics) > Chain view | view | `drill_through_fold` | 0 | 0 | 0 |
-| `UI-093` New World wizard > Wizard planetology round (one of three) | sub-element | `planetology_generation` | 0 | 0 | 0 |
 | `UI-094` Zoom ladder navigation model | element | `zoom_ladder`, `canvas_levels`, `descend_into_selection` | 0 | 0 | 0 |
 | `UI-095` Zoom ladder navigation model > Keyboard navigation bindings | sub-element | `descend_into_selection` | 0 | 0 | 0 |
 | `UI-106` AI decision feed | ledger | `decision_feed` | 0 | 0 | 0 |
 | `UI-107` Strategy readout | ledger | `strategy_readout` | 0 | 0 | 0 |
-| `UI-108` Research panel (tech-tree design mock) | ledger | `tech_tree_panel` | 0 | 0 | 0 |
 | `UI-109` Frame-budget HUD | element | `frame_budget_hud` | 0 | 0 | 0 |
 | `UI-110` Selection band > Battle card | sub-element | `battle_card` | 0 | 0 | 0 |
 
@@ -183,11 +186,9 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `history_lapse_marks` (7 captures, 2 expects) — THE MARKS THAT EARN THEIR PLACE (BL-1094; Ben, 2026-09-24, sprint 47
 - `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
 - `lens_strip_glyphs` (7 captures, 2 expects) — BL-1225 (every lens on strip): every built lens sits in at least one rung row
-- `life_to_people` (9 captures, 6 expects) — BL-1091 -- FROM LIFE TO PEOPLE: the Life round hands a named world and its
 - `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
 - `owner_multi_select` (6 captures, 17 expects) — Visual verification for the owner multi-select (BL-1240; LENSES.md § Corporation
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
-- `quick_start` (4 captures, 3 expects) — Quick Start on the main menu; loading bars in a top band (Ben, 2026-10-08).
 - `realm_identity` (11 captures, 20 expects) — A realm keeps its identity across the wizard's seams (BL-1087 colour,
 - `refunds_flow_shown` (1 captures, 3 expects) — BL-1215 (refunds flow shown): the Corporation ledger's Balance card names
 - `river_course` (6 captures, 0 expects) — BL-1242 (landforms and rivers baked): a river from source to mouth.
@@ -197,7 +198,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `round6_mid_tail` (2 captures, 11 expects) — BL-1084 (world built once and moved), the K4 cold review -- ROUND 6 WHILE ITS
 - `route_curves` (2 captures, 5 expects) — ROADS AS THINNER CURVES, SEA LANES ON THEIR SEA PATH (Ben, 2026-10-03, playing
 - `routes_and_splits` (10 captures, 16 expects) — BL-1092 -- ROUTES AND SPLITS ON THE MAP: the migration shows its roads
-- `seat_pick` (4 captures, 24 expects) — The corporation selection canvas, and the pick as a reproducible game act
 - `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
 - `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
 - `trade_flow_lens` (8 captures, 5 expects) — Visual verification for the Trade-flow lens (overlay_mode::trade_flow, BL-1222).
