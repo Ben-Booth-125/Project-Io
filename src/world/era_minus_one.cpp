@@ -344,6 +344,7 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     hp.contact_diffusion_horizon = 30;
     hp.contact_early_bands       = 2; // Ben 2026-10-14: past band 2 a realm climbs by contact
     hp.contact_band_per_q        = 1000;
+    hp.late_isolation_floor_level = 8; // BL-1288 alignment: the deep press, from level 8
     return hp;
 }
 
@@ -552,6 +553,11 @@ history_sim_params exploration_sim_params(const world_params& params)
     // ...and a power two materials bands ahead of a native needs no treasury
     // margin to bind it (dominance by development; Industrialisation inherits).
     hp.subjection_dominance_bands = 1;
+    // BL-1303 (Ben accepted, NR-1042): THE STALE READING IN EVERY SPAN -- ground
+    // taken this round is measured by its new holder before it can secede
+    // from it, here as in the Empires round (history_sim.hpp);
+    // Industrialisation inherits it.
+    hp.secession_waits_for_holder = true;
 
     return hp;
 }
@@ -685,6 +691,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // The bar and the pressure are the struct's (history_sim.hpp says how
     // each reads); a lean, so no backstop rides with it.
     hp.revolution_lean = true;
+    // BL-1304: calibrated toward about a third of worlds (in band, the lane's):
+    // the struct's 600 bar caught 1-2 of the 16 library worlds; 560 caught 7,
+    // 580 caught 4, 570 catches 6 (10, 11, 13, 25, 31, 32).
+    hp.revolution_disparity_bar_pm = 570;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

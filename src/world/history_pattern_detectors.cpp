@@ -190,7 +190,14 @@ void read_late_culture(const era_timelapse& emp, const era_timelapse& exp, const
         }
         for (const auto& kv : pc)
             if (kv.first >= 0 && static_cast<std::size_t>(kv.first) < cult.size()) cult[static_cast<std::size_t>(kv.first)] = kv.second;
-        const late_culture_lag_reading lr = read_late_culture_lag(owner, ss.regions, gw, cult, band, c);
+        // THE CONTACT SET, AS THE SIM WALKED IT (`late_culture_contact`, the
+        // close's notes): the peoples in contact by reach. A record without
+        // them falls back to the geometric neighbourhood.
+        std::vector<int> contacts;
+        for (const lapse_event& e : emp.events)
+            if (is(e, K::late_culture_contact) && e.polity != lapse_event_none) contacts.push_back(e.polity);
+        const late_culture_lag_reading lr = read_late_culture_lag(owner, ss.regions, gw, cult, band, c,
+                                                                  contacts.empty() ? nullptr : &contacts);
         r.lc_lag_x100   = lr.lag_x100;
         r.lc_neighbours = lr.neighbours;
         r.lc_nearest    = lr.nearest;
@@ -344,7 +351,8 @@ std::pair<int, int> read_split_wars(const era_timelapse& t, bool must_take_paren
 
 late_culture_lag_reading read_late_culture_lag(const std::vector<int>& owner, const std::vector<region>& regions,
                                                int gw, const std::vector<int>& polity_culture,
-                                               const std::vector<int>& polity_band, int late_culture)
+                                               const std::vector<int>& polity_band, int late_culture,
+                                               const std::vector<int>* contacts)
 {
     late_culture_lag_reading out;
     const std::size_t np = std::min(polity_culture.size(), polity_band.size());
@@ -359,6 +367,23 @@ late_culture_lag_reading read_late_culture_lag(const std::vector<int>& owner, co
     int64_t lc_sum = 0;
     for (std::size_t p = 0; p < np; ++p) if (lc_realm[p]) { lc_sum += polity_band[p]; ++out.realms; }
     if (out.realms == 0) return out;
+    if (contacts != nullptr)
+    {
+        // BY REACH: the set the sim's walk met, living and of another people.
+        std::vector<char> seen(np, 0);
+        int64_t nb = 0;
+        for (const int p : *contacts)
+        {
+            if (!living(p) || ours(p) || seen[static_cast<std::size_t>(p)]) continue;
+            seen[static_cast<std::size_t>(p)] = 1;
+            nb += polity_band[static_cast<std::size_t>(p)];
+            ++out.neighbours;
+        }
+        out.by_reach = true;
+        if (out.neighbours == 0 || nb <= 0) return out;
+        out.lag_x100 = static_cast<int>(lc_sum * 100 * out.neighbours / (static_cast<int64_t>(out.realms) * nb));
+        return out;
+    }
     // Each other living realm's nearest approach to its ground (grid distance squared).
     std::vector<int64_t> near(np, INT64_MAX);
     for (std::size_t i = 0; i < nr; ++i)

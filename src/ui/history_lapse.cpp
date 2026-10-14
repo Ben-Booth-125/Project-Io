@@ -4963,6 +4963,10 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         else
             std::snprintf(buf, sizeof buf, "%s rises at %s.", polity_name_of(h, e.polity), R);
         break;
+    case lapse_event_kind::late_culture_contact:
+        // Ticker-silent (BL-1288): the realms the late culture's lag is read against.
+        std::snprintf(buf, sizeof buf, "%s is in contact with the far people at %s.", polity_name_of(h, e.polity), R);
+        break;
     case lapse_event_kind::inherited:
         // Ticker-silent by design: a resumed span restating a living realm's
         // seat is a fact for the capital fold, not a moment. Never narrated
@@ -5377,6 +5381,8 @@ int ticker_priority(const lapse_event& e)
     // stays silent on it, because nothing rose — a "rises" at 1200 for a
     // realm on round 4's final board told the player it was born that year.
     case lapse_event_kind::inherited:            return -1;
+    // BL-1288: the late culture's contact set, a reading for the detector, not a moment.
+    case lapse_event_kind::late_culture_contact: return -1;
     // BL-1091: A CRADLE OPENS THE ROUND AND THEN GIVES WAY. It takes the
     // COMMON tier, not the rarest: at 2400 BCE nothing else has happened, so
     // the twelve announcements are the ticker's first lines by themselves,

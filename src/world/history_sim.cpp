@@ -5105,6 +5105,62 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // Its lag AGAINST ITS NEIGHBOURS (Ben, 2026-10-13), x100 (-1 when it
     // holds no realm or no one is read) -- the detector's own reading
     // (`read_late_culture_lag`, history_pattern_detectors), handed the live map.
+    // ITS CONTACT SET, BY REACH (Ben 2026-10-13: the lag is read against the
+    // peoples IN CONTACT with it; contact is by reach, as the contact ceiling
+    // reads it). The cheapest `edge_step` walk over `supply_neighbours` from
+    // every region its living realms hold, any ground passable, inside
+    // `contact_diffusion_horizon` -- the diffusion's own walk -- meets the
+    // living realms of other peoples it is in contact with -- and never fewer
+    // than the `late_culture_nearest_peoples` it meets first, however far
+    // (ties: the walk, then the region order). Each entry is
+    // (polity, walk, first region met). Walked in region-index order; pure.
+    struct lc_contact { int polity; int walk; int region; };
+    const auto lc_contact_set = [&]() -> std::vector<lc_contact> {
+        std::vector<lc_contact> got;
+        const std::size_t pc = out.polities.size();
+        const std::size_t n_reg = std::min(ss.regions.size(), owner.size());
+        if (lc_culture < 0) return got;
+        std::vector<int> dist(n_reg, INT_MAX);
+        std::vector<char> met(pc, 0);
+        using node = std::pair<int, int>;
+        std::priority_queue<node, std::vector<node>, std::greater<node>> pq;
+        for (std::size_t i = 0; i < n_reg; ++i)
+        {
+            const int o = owner[i];
+            if (o >= 0 && static_cast<std::size_t>(o) < pc && birth_culture(out.polities[static_cast<std::size_t>(o)]) == lc_culture)
+            { dist[i] = 0; pq.push({0, static_cast<int>(i)}); }
+        }
+        if (pq.empty()) return got;
+        const int H = std::max(1, params.contact_diffusion_horizon);
+        std::vector<lc_contact> all; // in walk order
+        while (!pq.empty())
+        {
+            const node top = pq.top(); pq.pop();
+            const int d = top.first, r = top.second;
+            if (d > dist[static_cast<std::size_t>(r)]) continue;
+            const int o = owner[static_cast<std::size_t>(r)];
+            if (o >= 0 && static_cast<std::size_t>(o) < pc && !met[static_cast<std::size_t>(o)]
+                && birth_culture(out.polities[static_cast<std::size_t>(o)]) != lc_culture)
+            {
+                met[static_cast<std::size_t>(o)] = 1;
+                all.push_back({o, d, r});
+                if (d >= H && static_cast<int>(all.size()) >= late_culture_nearest_peoples) break;
+            }
+            for (const int nb : supply_neighbours[static_cast<std::size_t>(r)])
+            {
+                if (static_cast<std::size_t>(nb) >= n_reg) continue;
+                const int cand = d + edge_step(r, nb);
+                if (cand >= dist[static_cast<std::size_t>(nb)]) continue;
+                dist[static_cast<std::size_t>(nb)] = cand;
+                pq.push({cand, nb});
+            }
+        }
+        // Inside the horizon, and never fewer than the nearest
+        // `late_culture_nearest_peoples` it meets, however far.
+        for (std::size_t k = 0; k < all.size(); ++k)
+            if (all[k].walk < H || k < static_cast<std::size_t>(late_culture_nearest_peoples)) got.push_back(all[k]);
+        return got;
+    };
     const auto lc_lag_reading = [&]() -> late_culture_lag_reading {
         const std::size_t pc = out.polities.size();
         std::vector<int32_t> held(pc, 0);
@@ -5118,7 +5174,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (held[pi] > 0) band[pi] = clampi(out.polities[pi].capacity[static_cast<int>(sim_domain::materials)], 0, 255);
         }
         const std::vector<int> own(owner.begin(), owner.begin() + static_cast<std::ptrdiff_t>(n_reg));
-        return read_late_culture_lag(own, ss.regions, gw, cult, band, lc_culture);
+        std::vector<int> contacts;
+        for (const lc_contact& c : lc_contact_set()) contacts.push_back(c.polity);
+        // A walk that meets no one (an island the network joins to nobody)
+        // records no set; sim and detector then both read the geometric
+        // fallback (the nearest peoples, however far).
+        return read_late_culture_lag(own, ss.regions, gw, cult, band, lc_culture,
+                                     contacts.empty() ? nullptr : &contacts);
     };
     const auto lc_lag_now = [&]() -> int { return lc_lag_reading().lag_x100; };
     // The world's mean materials band over its living realms, x100.
@@ -11290,6 +11352,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             const int64_t per = std::max(1, params.contact_band_per_q);
                             const int by_contact = params.contact_early_bands + static_cast<int>(reached / per);
                             contact_ceiling[pi] = clampi(std::min(by_contact, std::max(params.contact_early_bands, best_met + 1)), 1, 6);
+                            // THE ISOLATION'S DEVELOPMENT FACE, DEEP (BL-1288
+                            // alignment): from `late_isolation_floor_level`
+                            // the press keeps the late culture's people apart
+                            // in holds too small to keep even the early
+                            // bands -- one band under them, and a realm of it
+                            // standing above sheds to it at this read. The
+                            // backstop's, Empires only, recorded by its level.
+                            if (lc_target && params.late_isolation_floor_level > 0
+                                && lc_level >= params.late_isolation_floor_level
+                                && birth_culture(out.polities[pi]) == lc_culture)
+                            {
+                                const int floor_cap = std::max(1, params.contact_early_bands - 1);
+                                contact_ceiling[pi] = std::min(contact_ceiling[pi], std::max(floor_cap, std::min(by_contact, best_met + 1) - 1));
+                                polity& q = out.polities[pi];
+                                if (q.capacity[mat] > contact_ceiling[pi])
+                                {
+                                    out.contact_bands_shed += q.capacity[mat] - contact_ceiling[pi];
+                                    q.capacity[mat]   = contact_ceiling[pi];
+                                    q.progress_q[mat] = 0;
+                                }
+                            }
                         }
                     }
                     for (std::size_t pi = 0; pi < pc; ++pi)
@@ -12318,6 +12401,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.late_culture_realms        = realms;
             out.late_culture_realm_regions = regions;
             out.late_culture_lag_x100 = lc_lag_now();
+            // The set it was read against, recorded for the detector (Empires
+            // record only: the lag clause is the Empires round's).
+            if (params.late_culture_target)
+            {
+                event_year = params.stop_year;
+                for (const lc_contact& c : lc_contact_set())
+                    note_event(lapse_event_kind::late_culture_contact, c.region, c.polity,
+                               std::min(c.walk, static_cast<int>(lapse_event_none) - 1));
+            }
             // Stamp the table the next span resumes from.
             for (polity& q : out.polities)
                 q.late_isolation = birth_culture(q) == lc_culture

@@ -167,10 +167,18 @@ struct late_culture_lag_reading
     int realms     = 0;     ///< its living realms
     int neighbours = 0;     ///< realms in the neighbourhood
     bool nearest   = false; ///< none stood within the tiles: the nearest peoples were read
+    bool by_reach  = false; ///< the neighbourhood was the recorded contact set (by reach)
 };
 late_culture_lag_reading read_late_culture_lag(const std::vector<int>& owner, const std::vector<region>& regions,
                                                int gw, const std::vector<int>& polity_culture,
-                                               const std::vector<int>& polity_band, int late_culture);
+                                               const std::vector<int>& polity_band, int late_culture,
+                                               const std::vector<int>* contacts = nullptr);
+/// @p contacts (BL-1288 alignment, Ben 2026-10-13: "the peoples IN CONTACT
+/// with it", contact by reach): when given, the neighbourhood IS that set of
+/// polity ids -- the realms of other peoples the sim's reach walk met from the
+/// culture's ground (`late_culture_contact`, late_culture_rules.hpp) -- read
+/// living and foreign; the geometric tiles are only the fallback for a record
+/// written before the set was.
 
 /// Run all five detectors over one body's records. @p gw is the settlement
 /// grid's width (columns wrap). Pure.
