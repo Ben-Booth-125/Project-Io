@@ -1419,6 +1419,28 @@
    "files": [],
    "title": "building_profit.cpp hand-copies the construction staffing rule and misprices military_base staff (0.5 vs 0)",
    "design": "FOUND 2026-10-14: building_profit.cpp:152 should call construction_initial_workforce. Moves corp-AI estimates for bases."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-14",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (from the rail construction UI lane)",
+   "id": "BL-1308",
+   "short_name": "STATE_BUILD_UI_READINGS",
+   "category": "UI",
+   "priority": "C",
+   "difficulty": 1,
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [],
+   "files": [
+    "src/ui/hover_content.cpp",
+    "src/world/state_industry.cpp"
+   ],
+   "title": "State builds read wrong in two places: a station under construction doesn't reduce the uncommitted treasury shown, and the player's own state building hovers as \"Competitor - output private\"",
+   "design": "FOUND 2026-10-14 (rail construction UI): check state_uncommitted_treasury accounts for state construction in progress; the hover owner logic must recognise the player's nation's state buildings as the player's own."
   }
  ]
 }
