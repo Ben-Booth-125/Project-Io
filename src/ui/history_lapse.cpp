@@ -5342,6 +5342,12 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
                           R, now_name);
         break;
     }
+    case lapse_event_kind::rail_laid:
+        // BL-1255 (INDUSTRIALISATION.md sec Who lays rail): a works-leaning realm
+        // laid a rail link from `region` (already on its line) to `other`.
+        std::snprintf(buf, sizeof buf, "%s lays a railway from %s to %s.",
+                      polity_name_of(h, e.polity), R, region_name_of(h, e.other));
+        break;
     default:
         // Unreachable on a record this build wrote: every kind above `count`
         // has its own line, and a newer writer's kind is refused with the
@@ -5406,6 +5412,9 @@ int ticker_priority(const lapse_event& e)
     case lapse_event_kind::isolation_pressed:    return 0;
     // BL-1294: a revolution, a handful per world at most -- a realm renamed.
     case lapse_event_kind::revolution:           return 0;
+    // BL-1255: a rail link, one per works-leaning realm per round at most --
+    // churn on an industrial world, like a works note.
+    case lapse_event_kind::rail_laid:            return 2;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

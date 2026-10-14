@@ -130,6 +130,33 @@ construction_result construct_state_building(world& w, const recipe_registry& re
 // @p founding (BL-1296 fix round): the fold's founding — the commitment gate is
 // skipped (the founder pays the capex itself, `hand_over_state_industry`).
 
+/// BL-1255 (LOGISTICS.md § 4c): build a railway STATION for @p nation's state
+/// industry on @p tile — a city tile touching track on the nation's own ground —
+/// committed against the treasury's uncommitted part, built pay-as-you-build like
+/// any state building (construct_for's checks, station placement included).
+construction_result construct_state_station(world& w, const recipe_registry& reg,
+                                            entity_id nation, entity_id tile,
+                                            entity_id& out_building);
+
+/// BL-1255: what laying one track tile on @p tile costs — `rail.track_build_cost`
+/// plus `rail.track_steel_per_tile` steel at the tile market's posted price.
+float track_tile_cost(const world& w, const recipe_registry& reg, entity_id tile);
+
+/// BL-1255: whether a cardinal neighbour of @p tile is track owned by @p owner.
+bool track_tile_extends(world& w, entity_id owner, entity_id tile);
+
+/// BL-1255: LAY ONE TILE OF TRACK for major @p nation (Ben, 2026-10-13: "track
+/// costs the treasury per tile, plus steel per tile, with upkeep per tile").
+/// Instant, like a road; debited up front from the treasury. Refused — nothing
+/// mutated — unless: @p nation is a major (has a champion); the tile exists, is
+/// land, carries no track, and is the nation's own ground; the railway exists in
+/// this era; the tile extends one of the nation's OWN lines (a cardinal
+/// neighbour is its track) or opens a line at a city; the tile's market shelf
+/// holds the steel (it is BOUGHT: drawn off the shelf); and the uncommitted
+/// treasury covers `track_tile_cost`.
+construction_result lay_track(world& w, const recipe_registry& reg, entity_id nation,
+                              entity_id tile);
+
 /// BL-1296: demolish a state building @p nation owns — demolish_building for
 /// the nation owner kind. No refund (the same rule). True on success; false if
 /// the building does not exist or @p nation does not own it.

@@ -62,6 +62,14 @@
    "The command seam only (--serve / MCP `issue_command` with `nation`, and the verify API's `corp_command{as_nation=...}`). No ledger or card control yet: a state building's card names its nation as owner (\"Owner: <nation> (state industry)\") and offers no levers."
   ],
   [
+   "gameplay.lay_track",
+   "The command seam only (--serve / MCP `issue_command` verb `lay_track` with `nation`, and the verify API's `corp_command{verb=lay_track, as_nation=...}`). No canvas control yet: the rail rendering and its build tool are a separate lane (RENDERING.md)."
+  ],
+  [
+   "gameplay.build_station",
+   "The command seam only (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`). No canvas control yet (a separate lane)."
+  ],
+  [
    "gameplay.survey",
    "The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey)."
   ],

@@ -31,7 +31,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::planetary_marketplace; // BL-1266 (v46); BL-615 before it.
+constexpr auto max_building   = building_type::railway_station; // BL-1255 (v49); BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_
@@ -886,6 +886,7 @@ void clear_derived_state(world& w)
     w.leg_flood_fields.clear(); // BL-1186: the leg-confined floods, same footing
     w.leg_path_cache.clear();
     w.body_port_tiles.clear();
+    w.rail_networks.clear(); // BL-1255: the rail network, same footing
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
     w.power_grid_of_province.clear(); // BL-1230: the power grid, same footing
@@ -1096,6 +1097,37 @@ void write_world_snapshot(const world& w, std::ostream& out)
         std::sort(idle.begin(), idle.end());
         w_ids(out, idle);
     }
+
+    // BL-1255 (world_save_version 49): RAILWAYS, their own trailing section after
+    // state industry. The track field — (tile, owner) ascending by tile, as the
+    // std::map holds it — then every convoy riding a rail route, in `w.convoys`
+    // order, as (id, boarding station, alighting station); then the owners whose
+    // track the funding gate idled this tick (`rail_idle`), ascending. A trailing section, so
+    // a v48 (and v47) stream — which ends before it — still reads, as a world with
+    // no rail. The stations themselves are ordinary buildings in the building store.
+    {
+        w_u32(out, static_cast<uint32_t>(w.rail_track.size()));
+        for (const auto& [tile, owner] : w.rail_track)
+        {
+            w_id(out, tile);
+            w_id(out, owner);
+        }
+        uint32_t riding = 0;
+        for (const convoy_component& cv : w.convoys)
+            if (cv.station_a != null_entity || cv.station_b != null_entity)
+                ++riding;
+        w_u32(out, riding);
+        for (const convoy_component& cv : w.convoys)
+        {
+            if (cv.station_a == null_entity && cv.station_b == null_entity)
+                continue;
+            w_u32(out, cv.id);
+            w_id(out, cv.station_a);
+            w_id(out, cv.station_b);
+        }
+        // The fix round: the owners whose track is idle (unfunded upkeep), ascending.
+        w_ids(out, std::vector<entity_id>(w.rail_idle.begin(), w.rail_idle.end()));
+    }
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1110,8 +1142,12 @@ bool read_world_snapshot(world& w, std::istream& in)
     // loads byte-for-byte as before with no state buildings (no nation owns a
     // building outright; every major's strategic plants stay with the firms
     // that held them when it was saved). Every other version is refused whole.
+    // BL-1255: v48 (pre-rail) is read too -- the rail section is v49's trailing
+    // addition and nothing else moved, so v48 is a strict prefix of v49 as v47 is
+    // of v48.
     if (!r_u32(in, version)
-        || (version != world_save_version && version != k_world_save_version_pre_state))
+        || (version != world_save_version && version != k_world_save_version_pre_rail
+            && version != k_world_save_version_pre_state))
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1310,7 +1346,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // the only state the handover and the state build door can write — and an
     // idled building must be a state building. Refused whole otherwise. A v47
     // stream ends before this section: no state industry.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_rail) // v48 and v49 carry it
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -1349,6 +1385,71 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (state_owned.count(bid) == 0)
                 return false;
             s.buildings.at(bid).state_idle = true;
+        }
+    }
+
+    // BL-1255 (v49): the rail section. Untrusted: every track tile exists in the
+    // stream, strictly ascending, and its owner is null (laid, not yet handed over)
+    // or a nation or corporation in the stream; every riding convoy names a convoy
+    // in the stream once, and two distinct tiles in the stream as its stations.
+    // Refused whole otherwise. A v48 / v47 stream ends before it: no rail.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.tiles.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id tile = null_entity, owner = null_entity;
+            if (!r_id(in, tile) || !r_id(in, owner))
+                return false;
+            if (tile == null_entity || (k > 0 && tile <= prev) || s.tiles.count(tile) == 0)
+                return false;
+            prev = tile;
+            if (owner != null_entity && s.nations.count(owner) == 0
+                && s.corporations.count(owner) == 0)
+                return false;
+            s.rail_track.emplace_hint(s.rail_track.end(), tile, owner);
+        }
+        uint32_t riding = 0;
+        if (!r_u32(in, riding) || riding > s.convoys.size())
+            return false;
+        std::set<uint32_t> seen;
+        for (uint32_t k = 0; k < riding; ++k)
+        {
+            uint32_t id = 0;
+            entity_id a = null_entity, b = null_entity;
+            if (!r_u32(in, id) || !r_id(in, a) || !r_id(in, b))
+                return false;
+            if (!seen.insert(id).second || a == null_entity || b == null_entity || a == b
+                || s.tiles.count(a) == 0 || s.tiles.count(b) == 0)
+                return false;
+            convoy_component* hit = nullptr;
+            for (convoy_component& cv : s.convoys)
+                if (cv.id == id) { hit = &cv; break; }
+            if (hit == nullptr)
+                return false;
+            hit->station_a = a;
+            hit->station_b = b;
+        }
+        // Idle track owners: ascending, distinct, each an owner of track in the stream.
+        std::vector<entity_id> idle;
+        if (!r_ids(in, idle))
+            return false;
+        entity_id last = null_entity;
+        for (std::size_t k = 0; k < idle.size(); ++k)
+        {
+            const entity_id o = idle[k];
+            if (o == null_entity || (k > 0 && o <= last))
+                return false;
+            last = o;
+            bool owns = false;
+            for (const auto& [t, own] : s.rail_track)
+                if (own == o) { owns = true; break; }
+            if (!owns)
+                return false;
+            s.rail_idle.insert(o);
         }
     }
 

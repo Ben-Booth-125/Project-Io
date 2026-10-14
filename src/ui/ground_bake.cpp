@@ -742,12 +742,14 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
         s.cls[i]    = static_cast<std::uint8_t>(water ? bake_source::tile_class::water
                                                       : bake_source::tile_class::land);
         // BL-1253: a revealed tile's route (a masked one carries none). Roads
-        // on land, lanes on water, as the world lays them; rail is a tier
-        // value (k_route_rail) no world sets yet.
+        // on land, lanes on water, as the world lays them; rail (k_route_rail)
+        // from the world's track field (BL-1255), over any road on the tile.
         if (!water && t.road_level > 0)
             s.road[i] = static_cast<std::uint8_t>(std::min<int>(t.road_level, k_route_highway));
         if (water && t.lane_level > 0)
             s.lane[i] = t.lane_level;
+        if (!water && w.rail_track.count(id) != 0) // BL-1255: the track field draws as rail
+            s.road[i] = k_route_rail;
         // BL-1256: the baked ground's own khaki / olive-grey palette (the
         // identity fill, palette::tile_colour, stays the vector fallback's).
         s.colour[i] = palette::ground_tile_colour(t.substrate, t.cover, t.cover_density);

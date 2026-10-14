@@ -743,10 +743,38 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     if (champion_of(w, nation) != cmd.corp)
         return corp_command_result::rejected_not_owner;
 
+    // BL-1255 (LOGISTICS.md § 4c): the railway verbs — a station, a tile of track —
+    // are the PLAYER NATION's (Ben, 2026-10-13: "the player builds stations and lays
+    // track in play as its nation's verbs"). No grant lets a rival build rail
+    // (AI_OPPONENT.md § 11), so the seat alone may issue them: a rival champion's
+    // scored layer, or a wire agent acting as one, is refused here. Checked before
+    // anything mutates.
+    const bool rail_verb = cmd.verb == corp_verb::lay_track
+        || (cmd.verb == corp_verb::build && cmd.type == building_type::railway_station);
+    if (rail_verb && cmd.corp != w.player_entity)
+        return corp_command_result::rejected_not_owner;
+
     switch (cmd.verb)
     {
+        case corp_verb::lay_track:
+        {
+            if (w.tiles.find(cmd.tile) == w.tiles.end())
+                return corp_command_result::rejected_invalid;
+            return map_construction(lay_track(w, reg, nation, cmd.tile));
+        }
         case corp_verb::build:
         {
+            if (cmd.type == building_type::railway_station)
+            {
+                if (cmd.recipe != no_recipe || w.tiles.find(cmd.tile) == w.tiles.end())
+                    return corp_command_result::rejected_invalid;
+                entity_id built = null_entity;
+                const construction_result r =
+                    construct_state_station(w, reg, nation, cmd.tile, built);
+                if (r == construction_result::placed && out_building)
+                    *out_building = built;
+                return map_construction(r);
+            }
             // A state building is a processing facility on a strategic recipe
             // the state runs; the recipe must be NAMED (the sector is the recipe).
             if (cmd.type != building_type::processing_facility || cmd.recipe == no_recipe
@@ -1055,8 +1083,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
     switch (cmd.verb)
     {
+        case corp_verb::lay_track:
+            // BL-1255: track is state industry — laid only for a nation (`as_nation`).
+            return corp_command_result::rejected_invalid;
         case corp_verb::build:
         {
+            // BL-1255: a railway station is state industry — built only for a
+            // nation (`as_nation`); a corporation's own book never holds one by
+            // command (a minor's background firms receive theirs at the fold).
+            if (cmd.type == building_type::railway_station)
+                return corp_command_result::rejected_invalid;
             // BL-388: a stated recipe must reach the built processor — reject
 
             // rather than silently coerce. construct_building substitutes steel

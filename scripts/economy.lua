@@ -246,6 +246,21 @@ economy = {
             build_duration_ticks = 6.0,
             resource_costs = { steel = 50.0, refined_fuel = 20.0 },
         },
+        -- BL-1255 (LOGISTICS.md § 4c; PRODUCTION.md § Infrastructure buildings): the
+        -- Railway Station — where goods board and leave the rail network. The port's
+        -- shape on land: produces nothing, staffs at zero, a build cost and upkeep.
+        -- Placement: a city tile touching track (placement_rules). State industry in
+        -- a major. Industrial: rail does not exist in an ancient campaign.
+        railway_station = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 6.0,
+            base_wage   = 0.0,
+            build_cost  = 120.0,
+            build_duration_ticks = 2.0,
+            resource_costs = { steel = 15.0 },
+            requires_centre = true, -- a city tile; touching track is checked at the door
+        },
         -- BL-149: Inland Logistics Hub — a land-mode convoy consolidator. Produces
         -- nothing (base_rate 0, like the port); its value is the logistics-node discount
         -- its tile confers on intra-body hauls that pass through it (see logistics.node_discount).
@@ -1837,6 +1852,30 @@ logistics = {
     -- tiles of land haul (5 x 0.02) per port, so a crossing pays ten tiles' worth to start.
     -- Measure; the loader refuses a negative or non-finite value and keeps 0.10.
     port_handling = 0.10,
+
+    -- BL-1255 (LOGISTICS.md § 4c, railways): a rail leg is priced per TRACK STEP
+    -- (graded track: no terrain weight, no road discount), plus a handling fee at
+    -- each station. SET BY MEASUREMENT (tools/verify/railway_harness --sweep,
+    -- 2026-10-14, seeds 0-11, every ordered land pair of markets on the home body
+    -- priced at one unit through price_market_leg). Pairs SERVED by a line (both
+    -- centres within a land leg of path cost 15 of two joined stations), share on
+    -- rail by all-road path cost at the chosen 0.0025 / 0.05:
+    --     <10: 0/78   10-20: 6/83 (7%)   20-40: 24/37 (65%)   40-80: 14/14 (100%)
+    -- and over EVERY land pair: <20 8/1030 (0.8%), 40-80 230/1051 (22%), 80-160
+    -- 20/120 (17%) -- long hauls shift where a line serves them, short ones stay
+    -- on the road. The neighbours: 0.0020/0.03 puts 9% of served <10 hauls on
+    -- rail (short hauls detouring), 0.0035/0.05 leaves 57% of served 40-80 ones
+    -- on the road. Against a Road (0.010 a plains tile) a step saves 0.0075, so
+    -- the 0.10 of fees is repaid after ~13 tiles of line, before the station legs.
+    -- Track: credits + steel per tile from the treasury, upkeep per tile per econ
+    -- tick (Ben, 2026-10-13).
+    rail = {
+        cost_per_step         = 0.0025,
+        station_handling      = 0.05,
+        track_build_cost      = 20.0,
+        track_steel_per_tile  = 2.0,
+        track_upkeep_per_tile = 0.25,
+    },
 }
 
 print("[Lua] economy.lua loaded")

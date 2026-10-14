@@ -6451,6 +6451,93 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            // ---- BL-1255: RAIL, THE SPAN'S FIRST SINK (INDUSTRIALISATION.md
+            // sec Who lays rail, Ben 2026-10-13). A realm that leans into works
+            // -- crossed its industrial moment -- lays AT MOST ONE link per round
+            // from its capital outward, if the capital's treasury covers it: an
+            // existing road corridor between two of its own regions, one end on
+            // its line already (the capital is the line's start), the busiest by
+            // live traffic, ties to the lower (a, b). Off unless the span set a
+            // cost (`rail_treasury_cost`, industrialisation_sim_params only).
+            //
+            // DETERMINISTIC: polities in stored order; the line found by a BFS
+            // over the links laid (a sorted vector), held regions walked in
+            // ascending index and neighbour lists in stored order.
+            if (params.rail_treasury_cost > 0 && y >= params.rail_open_year)
+            {
+                // Up to `rail_links_per_round` passes, each laying at most one link
+                // per realm (polities in stored order every pass).
+                for (int rail_pass = 0; rail_pass < params.rail_links_per_round; ++rail_pass)
+                for (polity& q : out.polities)
+                {
+                    if (!q.alive || q.industrial_year == k_never_industrialised) continue;
+                    if (q.capital < 0 || static_cast<std::size_t>(q.capital) >= ss.regions.size())
+                        continue;
+                    region& seat = ss.regions[static_cast<std::size_t>(q.capital)];
+                    if (seat.treasury < params.rail_treasury_cost) continue;
+
+                    // The realm's line: regions joined to the capital by the links
+                    // it laid, through anyone's ground (lines cross borders).
+                    std::vector<char> on_line(ss.regions.size(), 0);
+                    on_line[static_cast<std::size_t>(q.capital)] = 1;
+                    for (bool grew = true; grew;)
+                    {
+                        grew = false;
+                        for (const history_rail_link& l : out.rail_links)
+                        {
+                            if (l.a >= ss.regions.size() || l.b >= ss.regions.size()) continue;
+                            if (l.polity != static_cast<int32_t>(q.id)) continue; // its own line, wherever it runs
+                            if (on_line[l.a] != on_line[l.b]) { on_line[l.a] = on_line[l.b] = 1; grew = true; }
+                        }
+                    }
+                    const auto railed = [&](int a, int b) {
+                        const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
+                        const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
+                        for (const history_rail_link& l : out.rail_links)
+                            if (l.a == lo && l.b == hi) return true;
+                        return false;
+                    };
+                    int best_a = -1, best_b = -1, best_uses = -1;
+                    for (std::size_t hi = 0; hi < ss.regions.size(); ++hi)
+                    {
+                        if (!on_line[hi]) continue;
+                        if (hi >= neighbours.size()) continue;
+                        for (int nb : neighbours[hi])
+                        {
+                            if (nb < 0 || static_cast<std::size_t>(nb) >= ss.regions.size()) continue;
+                            // LINES CROSS BORDERS (Ben, 2026-10-14): the next region may be
+                            // any realm's ground along the corridor; the track there is the
+                            // ground owner's at the fold (ownership follows ground).
+                            if (on_line[static_cast<std::size_t>(nb)]) continue; // the line reaches it
+                            if (road_tier_between(static_cast<int>(hi), nb) < 1) continue;
+                            if (railed(static_cast<int>(hi), nb)) continue;
+                            const auto it = road_uses_live.find(edge_key(static_cast<int>(hi), nb));
+                            const int uses = it != road_uses_live.end() ? it->second : 0;
+                            const int lo_i = std::min(static_cast<int>(hi), nb);
+                            const int hi_i = std::max(static_cast<int>(hi), nb);
+                            const int blo = std::min(best_a, best_b), bhi = std::max(best_a, best_b);
+                            if (uses > best_uses
+                                || (uses == best_uses && (lo_i < blo || (lo_i == blo && hi_i < bhi))))
+                            {
+                                best_uses = uses;
+                                best_a    = static_cast<int>(hi);
+                                best_b    = nb;
+                            }
+                        }
+                    }
+                    if (best_a < 0) continue; // nowhere left to lay
+                    seat.treasury -= params.rail_treasury_cost;
+                    out.treasury_spent_on_rail += params.rail_treasury_cost;
+                    history_rail_link link;
+                    link.a      = static_cast<uint16_t>(std::min(best_a, best_b));
+                    link.b      = static_cast<uint16_t>(std::max(best_a, best_b));
+                    link.polity = static_cast<int32_t>(q.id);
+                    link.year   = static_cast<int32_t>(y);
+                    out.rail_links.push_back(link);
+                    note_event(lapse_event_kind::rail_laid, best_a, static_cast<int>(q.id), best_b);
+                }
+            }
+
             // ---- BL-933: TREATY FORMATION, "nobody negotiates" ------------
             //
             // Walk `out.contacts` in its own sorted (from, to) order, taking
@@ -14557,6 +14644,7 @@ industrialisation_output make_industrialisation_output(const settlement_state&  
     // them here would be a second construction of the same value.
     industrialisation_output o;
     static_cast<exploration_output&>(o) = make_exploration_output(ss, hs, cs);
+    o.rail_links = hs.rail_links; // BL-1255: the line crosses whole
     return o;
 }
 

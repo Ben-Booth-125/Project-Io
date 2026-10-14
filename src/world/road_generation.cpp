@@ -2143,3 +2143,39 @@ void stamp_sea_lanes(world& w, entity_id body,
     if (st.laid > 0)
         invalidate_logistics_caches(w);
 }
+
+// ---------------------------------------------------------------------------
+// BL-1255 -- the rail record, carried to the fold (see the header)
+// ---------------------------------------------------------------------------
+rail_stamp_stats stamp_history_rail(world& w, entity_id body,
+                                    const std::vector<history_road_node>& nodes,
+                                    const std::vector<std::pair<int, int>>& links)
+{
+    rail_stamp_stats st;
+    const auto bit = w.bodies.find(body);
+    if (links.empty() || bit == w.bodies.end())
+        return st;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const auto seat_tile = [&](int r) -> entity_id {
+        if (r < 0 || static_cast<std::size_t>(r) >= nodes.size())
+            return null_entity;
+        const int x = nodes[static_cast<std::size_t>(r)].col, y = nodes[static_cast<std::size_t>(r)].row;
+        if (x < 0 || x >= gw || y < 0 || y >= gh)
+            return null_entity;
+        return grid[static_cast<std::size_t>(y) * static_cast<std::size_t>(gw) + static_cast<std::size_t>(x)];
+    };
+    for (const auto& [a, b] : links)
+    {
+        ++st.links;
+        const entity_id ta = seat_tile(a), tb = seat_tile(b);
+        if (ta == null_entity || tb == null_entity || ta == tb)
+        {
+            ++st.skipped;
+            continue;
+        }
+        w.gen_rail_links.emplace_back(ta, tb);
+        ++st.laid;
+    }
+    return st;
+}
