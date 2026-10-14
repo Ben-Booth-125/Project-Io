@@ -49,7 +49,11 @@
 /// people the cheapest `edge_step` walk from the ground its realms hold meets
 /// inside `contact_diffusion_horizon` -- the diffusion's own walk -- and never
 /// fewer than the `late_culture_nearest_peoples` the walk meets first, however
-/// far (a pressed people still has the first it would meet). The sim reads the set live and records it at the Empires close
+/// far (a pressed people still has the first it would meet). AN ISLAND IS
+/// READ ACROSS ITS SEA (Ben, 2026-10-14): where the land walk cannot find
+/// that many, the walk is taken again with sea steps from every coast
+/// (`port_q` > 0) to every coast on another landmass, priced as a sea leg
+/// (tile distance x `sea_leg_cost_q`), and the larger set is read. The sim reads the set live and records it at the Empires close
 /// (`late_culture_contact`); the detector reads the recorded set, so both read
 /// one neighbourhood. `late_culture_neighbour_tiles` is only the detector's
 /// fallback for a record written before the set was. Unweighted means.
