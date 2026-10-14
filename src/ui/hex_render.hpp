@@ -115,7 +115,7 @@ ImVec2 hex_local_centre(int col, int row, float hex_size);
 /// tile and its neighbours out to @p radius rings, with a highlight ring on the
 /// centre tile. The view is centred on @p centre_tile and scaled so the
 /// (2·radius+1)-wide block fills the box — the card's "show the tile you clicked,
-/// zoomed" surface. Until the page is ready it draws a loading bar (BL-1301), never
+/// zoomed" surface. Until the page is ready it draws a loading bar (BL-1313), never
 /// flat per-hex fills (SELECTION.md § The tile element's layout, column 1).
 ///
 /// Does not mutate simulation state. A no-op when @p centre_tile is not a live tile.

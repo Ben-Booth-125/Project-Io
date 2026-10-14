@@ -853,7 +853,7 @@ std::string make_nation_name(std::mt19937& rng, const tongue& t, const tongue_le
     {
         case 0:
             return name;
-        // BL-1306: capped as a realm's name is (tongue.hpp `cap_realm_name`).
+        // BL-1318: capped as a realm's name is (tongue.hpp `cap_realm_name`).
         // The epithet / realm-word draw is made before the cap is read, so
         // `name_rng` advances exactly as it did uncapped.
         case 1:

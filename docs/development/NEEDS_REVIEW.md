@@ -238,8 +238,8 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
 
-### NR-1044 — Sprint 54 tile card: five calls taken filling gaps in Ben's 2026-10-13 form
-*decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1300 tile card split)*
+### NR-1046 — Sprint 54 tile card: five calls taken filling gaps in Ben's 2026-10-13 form
+*decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1312 tile card split)*
 
 Written into SELECTION.md: (1) Selecting a building by any route keeps selected_entity on the building and draws the host tile's card with that stack expanded - so canvas presses, the repeat-click Building rung and ledger rows keep working unchanged. (2) The expanded building card is one card: a status line (running state + reason, or construction ETA) over the profitability charts; a rival's is the status line + owner + private. (3) The capacity tooltip names the ceiling's four sustain inputs (area, infrastructure, habitability, population) with their shares. (4) The table's 'Resource' column is the province's summed deposit of that good, richest first. (5) Only the tile drops the header row; body, market, nation/corporation, unit and battle keep it, since their go-to is not a no-op.
 
@@ -255,9 +255,9 @@ Written into SELECTION.md: (1) Selecting a building by any route keeps selected_
 *Files: `docs/ui/SELECTION.md`*
 
 ### NR-1045 — Sprint 54 market pass: the nation-name cap value and four calls taken filling gaps
-*decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1303..BL-1306, the market notes)*
+*decision · raised 2026-10-13 · from Sprint 54 UI design session, 2026-10-13 (BL-1315..BL-1318, the market notes)*
 
-(1) Nation-name cap: 20 characters recommended. The nation list's name column is ~205 px (3/5 of a 384 px column, less the swatch), about 29 average glyphs at the UI font; 20 leaves room for a wide-glyph name. BL-1306 measures the real distribution first and reports how many names the cap shortens. (2) Market metrics are VALUES per quarter (Sold here, Traded in, Traded out), not quantities — goods of different kinds do not add. (3) The canvas market label is the city's existing label with a market glyph, not a second label. (4) A market with no city in its catchment reads '<body> market N', never the bare body name. (5) The nation list replaces the initials chip row outright.
+(1) Nation-name cap: 20 characters recommended. The nation list's name column is ~205 px (3/5 of a 384 px column, less the swatch), about 29 average glyphs at the UI font; 20 leaves room for a wide-glyph name. BL-1318 measures the real distribution first and reports how many names the cap shortens. (2) Market metrics are VALUES per quarter (Sold here, Traded in, Traded out), not quantities — goods of different kinds do not add. (3) The canvas market label is the city's existing label with a market glyph, not a second label. (4) A market with no city in its catchment reads '<body> market N', never the bare body name. (5) The nation list replaces the initials chip row outright.
 
 **Why it matters.** (1) renames every nation whose name runs over; (2) decides what the metrics column can claim.
 
@@ -265,7 +265,7 @@ Written into SELECTION.md: (1) Selecting a building by any route keeps selected_
 - Accept with a different cap
 - Overturn any by number
 
-> **Recommendation:** Accept, cap 20 — revisit after BL-1306's measurement if it shortens more than a quarter of names.
+> **Recommendation:** Accept, cap 20 — revisit after BL-1318's measurement if it shortens more than a quarter of names.
 
 > **RESOLVED.** Accepted, all five; cap 20 characters (Ben, 2026-10-13).
 

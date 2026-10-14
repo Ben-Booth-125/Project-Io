@@ -1,4 +1,4 @@
--- BL-1310 (WORKFORCE_STEPPED_AUTO): the game sets the player's workforce.
+-- BL-1322 (WORKFORCE_STEPPED_AUTO): the game sets the player's workforce.
 --
 -- PRODUCTION.md § Workforce target and the auto-solver (Ben, 2026-10-13): each
 -- economy tick the target of every player producing building moves ONE 25 %

@@ -905,15 +905,15 @@ struct building_component
     uint16_t      recipe = no_recipe;
 
     /// Workforce target as a percentage of nominal capacity. Range [0, 200] internal,
-    /// SHOWN as target/2 % (BL-1310, Ben 2026-10-13: 100 % is the label for full employment = 200); 100 = nominal
+    /// SHOWN as target/2 % (BL-1322, Ben 2026-10-13: 100 % is the label for full employment = 200); 100 = nominal
     /// staffing. Scales actual output and the labour portion of maintenance.
     /// Applied in economy_system and budget_system. On the PLAYER's buildings the
     /// economy tick sets it — one 50-internal step (25 % shown) a quarter toward the solver's best
-    /// (BL-181/BL-1310); the player has no control over it. A rival's scorer sets
+    /// (BL-181/BL-1322); the player has no control over it. A rival's scorer sets
     /// it through `set_workforce`.
     int  workforce_target = 100;
 
-    /// Kept in the save and the state hash. Since BL-1310 it is NOT read for the
+    /// Kept in the save and the state hash. Since BL-1322 it is NOT read for the
     /// player's corp — the auto-solver steps every player producing building with
     /// no opt-out. On a RIVAL it records that the workforce dial, not the solver,
     /// holds the target (`set_workforce` clears it; `dial_idled` reads it).
@@ -1158,7 +1158,7 @@ struct market_component
     /// (world_save_version 46).
     float trade_lp_spare = 0.0f;
 
-    /// BL-1308 — THE TRADE VALUE RECORD (TRADE.md § The trade value record,
+    /// BL-1320 — THE TRADE VALUE RECORD (TRADE.md § The trade value record,
     /// Ben 2026-10-13). Credits of trade cargo that left this market and landed
     /// on it, every corporation's trades alike:
     ///   * out — at dispatch (`run_trades`' ship), units bought x this market's

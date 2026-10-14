@@ -123,7 +123,7 @@ int main()
         cc.is_player = false;
         w.corporations[corp] = cc;
     }
-    // BL-1310: the game steps the PLAYER's workforce every quarter, so this
+    // BL-1322: the game steps the PLAYER's workforce every quarter, so this
     // fixture's corp is no longer the seat; the seat is an empty corp of its own.
     {
         const entity_id seat = w.create_entity();

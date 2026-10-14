@@ -65,12 +65,12 @@ enum class overlay_mode
     // inserting mid-enum would silently re-point a saved lens.
     company,       ///< Background-firm holdings, drawn exactly as the Corporation lens draws corporations. See LENSES.md § Company lens.
     trade_flow,    ///< The player's dispatcher: market-to-market shipment arrows + a marker per short market coloured by why the surplus did not go. BL-1222. See LENSES.md § Trade-flow lens.
-    // The Nations lens (BL-1311, Ben 2026-10-14) is a NEW value, appended, never
+    // The Nations lens (BL-1323, Ben 2026-10-14) is a NEW value, appended, never
     // a revival of the retired `country` above: the save's view bindings hold
     // the enum's integer, so re-using a slot would re-point a saved lens. It
     // paints each nation's whole territory; the border band stays the plain
     // map's chrome. See LENSES.md § The Nations lens.
-    nations,       ///< Each nation-owned tile filled in its nation's identity colour. BL-1311.
+    nations,       ///< Each nation-owned tile filled in its nation's identity colour. BL-1323.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 
@@ -1070,7 +1070,7 @@ struct ui_state
     /// shut on a second press) only when its own market is this one.
     entity_id market_ledger_aimed_market = null_entity;
 
-    /// Verify-only readout of the tile element AS DRAWN last frame (BL-1300,
+    /// Verify-only readout of the tile element AS DRAWN last frame (BL-1312,
     /// tile card split). Reset by the Selection dispatcher every frame, so
     /// `drawn` is false whenever the tile element did not draw. Exists so a script
     /// can press the tile card's building buttons and back control at their real
@@ -1094,7 +1094,7 @@ struct ui_state
         entity_id   expanded = null_entity; ///< The expanded building, null when the grid shows.
         bool        expanded_player = false;
         bool        charts   = false;       ///< The profit row drew.
-        std::string workforce;              ///< The read-only workforce row as drawn ("75%"), "" when not drawn (BL-1310).
+        std::string workforce;              ///< The read-only workforce row as drawn ("75%"), "" when not drawn (BL-1322).
         int         count    = 1;           ///< The expanded stack's member count.
         std::string title;                  ///< The expanded header's name + " ×N" as drawn.
         std::string method;                 ///< The production method line, "" when none.

@@ -89,7 +89,7 @@ std::string coin_realm_name(const tongue& t, uint64_t salt)
     std::string name = tongue_word(r, t, 2 + r.pick(2));
     if (name.empty()) return name;
 
-    // BL-1306: the chosen form if it is within `k_realm_name_cap`, else the
+    // BL-1318: the chosen form if it is within `k_realm_name_cap`, else the
     // bare name (which always is). The ornamented forms' draws are made either
     // way, so the stream — local to this call regardless — is untouched.
     switch (form)

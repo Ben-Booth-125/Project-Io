@@ -210,7 +210,7 @@ end
 -- C7 — Method and Workforce are not on the card; status + Profitability remain
 -- ===========================================================================
 if map_pick then
-    -- BL-1300: the card is the host tile's, with this building's stack expanded:
+    -- BL-1312: the card is the host tile's, with this building's stack expanded:
     -- a status line over the Profitability charts. Method and Workforce are
     -- nowhere on it (they were pages, and the pager is gone with them).
     verify.frames(2)

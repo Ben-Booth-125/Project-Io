@@ -67,7 +67,7 @@ struct goods_row_record
     float         name_needed = 0.0f;  ///< Px the full name needed at this font.
 };
 
-/// One row of the market top section's nation list (BL-1305; superseding BL-688's chips).
+/// One row of the market top section's nation list (BL-1317; superseding BL-688's chips).
 struct nation_row_record
 {
     entity_id   nation     = null_entity;
@@ -76,7 +76,7 @@ struct nation_row_record
     bool        elided     = false; ///< The name overran and was elided (tooltip carries it).
 };
 
-/// The market's top section (BL-1305; ledgers/market.md § 2), as last drawn.
+/// The market's top section (BL-1317; ledgers/market.md § 2), as last drawn.
 struct market_top_record
 {
     bool      drawn        = false;
@@ -87,7 +87,7 @@ struct market_top_record
     float     sold_here    = 0.0f;
     int       quarter      = -1;    ///< The econ tick the figure is for.
     /// Traded in / Traded out: the market's trade value record for the last
-    /// completed quarter (BL-1308; TRADE.md § The trade value record).
+    /// completed quarter (BL-1320; TRADE.md § The trade value record).
     /// `traded_known` is false until a quarter completes (a loaded game), and
     /// both draw "—" with the reason.
     bool      traded_known = false;
@@ -253,7 +253,7 @@ const std::vector<exchange_row_record>& exchange_rows();
 /// The market the Trades tab last drew for (`null_entity` if it was not on screen).
 entity_id trades_market();
 
-/// The name of a market (BL-1303; MARKETS.md § Market centres and seeding): the
+/// The name of a market (BL-1315; MARKETS.md § Market centres and seeding): the
 /// name of the largest population centre — by scale, then headcount, then lowest
 /// id — whose tile clears to it (`market_for_tile`); a market with no named centre
 /// in its catchment reads "<body> market N", N by ascending market id among the
@@ -268,7 +268,7 @@ entity_id market_naming_centre(const world& w, entity_id market_id);
 
 /// The reverse: the market @p centre names, or `null_entity` if it names none.
 /// The Planetary canvas marks such a centre's label with the market glyph
-/// (BL-1304; PLANETARY.md § Market labels).
+/// (BL-1316; PLANETARY.md § Market labels).
 entity_id centre_named_market(const world& w, entity_id centre);
 
 } // namespace ui

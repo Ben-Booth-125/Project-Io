@@ -4,7 +4,7 @@
 --     Thrives/Valid affordance read as its facts column — no stat block, no lens
 --     supplement;
 --   * a selected player BUILDING draws its host tile's card with the stack
---     expanded (BL-1300): status line and the BL-074 profitability charts;
+--     expanded (BL-1312): status line and the BL-074 profitability charts;
 --   * the minimap carries the seven-glyph lens mode bar along its bottom, and the
 --     bottom-left no longer carries a separate lens strip;
 --   * the selection element occupies the full bottom-left corner.

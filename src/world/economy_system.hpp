@@ -896,7 +896,7 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
                          const building_component& b, float contention,
                          entity_id corp = null_entity);
 
-/// BL-1310 (PRODUCTION.md § Workforce target and the auto-solver, Ben 2026-10-13,
+/// BL-1322 (PRODUCTION.md § Workforce target and the auto-solver, Ben 2026-10-13,
 /// revised the same day: 100 % is the LABEL for full employment, not a cap):
 /// internally every workforce target is 0–200 and is SHOWN as target/2 %. The
 /// player's target moves one 50-internal step (25 % shown) a quarter toward the

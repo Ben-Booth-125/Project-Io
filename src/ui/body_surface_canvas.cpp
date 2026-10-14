@@ -1245,7 +1245,7 @@ void draw_market_key(const world& w, ui_state& state,
                          "Market catchments", rows, "No markets", &state, state);
 }
 
-/// The Nations lens key (BL-1311): one swatch per nation holding ground on this
+/// The Nations lens key (BL-1323): one swatch per nation holding ground on this
 /// body, in ascending id, read from the one pinned table — so the key is the
 /// fill's own colours. Same scroll-list shape as the Market key.
 void draw_nations_key(const world& w, ui_state& state, const std::vector<entity_id>& raster)
@@ -1845,7 +1845,7 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
     {
     case overlay_mode::nations:
     {
-        // BL-1311: under the Nations lens the ground IS the nation, so a press
+        // BL-1323: under the Nations lens the ground IS the nation, so a press
         // anywhere on its territory resolves to it (SELECTION.md § A lens
         // collapses selection to ONE TIER) — the same kind the border band
         // produces, so the click path and its ledger routing are the band's.
@@ -3441,7 +3441,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Nations lens (BL-1311; LENSES.md § The Nations lens): every tile a
+        // Nations lens (BL-1323; LENSES.md § The Nations lens): every tile a
         // nation owns takes that nation's identity colour — the one pinned table,
         // so the fill, the band and every swatch agree. Unowned ground and open
         // ocean (absent from tile_to_nation) keep their terrain hue.
@@ -5551,8 +5551,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // What remains here is the NAME: only City+ centres (scale >= 4, not razed)
     // carry a label, placed where the old skyline's edge stood.
     //
-    // MARKET LABELS (BL-1304; PLANETARY.md § Market labels). A market is named for
-    // a city (market_city_name's rule, BL-1303), and that city's label IS the
+    // MARKET LABELS (BL-1316; PLANETARY.md § Market labels). A market is named for
+    // a city (market_city_name's rule, BL-1315), and that city's label IS the
     // market's label: the market glyph drawn before the name. So a centre that
     // names a market is labelled whatever its scale -- a market's naming centre can
     // be a town (the carve admits scale 2 at a trade junction), and without the
@@ -6272,7 +6272,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 lensed ? null_entity
                        : resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
 
-            // A CANVAS PRESS SELECTS THE TILE (BL-1300 round 2; SELECTION.md
+            // A CANVAS PRESS SELECTS THE TILE (BL-1312 round 2; SELECTION.md
             // § Multi-building tiles — Ben, 2026-10-13: "default tile selection
             // to the list of buildings rather than any individual building").
             // This REVERSES the 2026-07-22 rule that a press on a single-building
@@ -6561,7 +6561,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
 
             // Falling through to the tile means the click hit no unit marker. A
-            // built tile selects the TILE too (BL-1300 round 2, reversing the
+            // built tile selects the TILE too (BL-1312 round 2, reversing the
             // 2026-07-22 whole-hex-is-the-installation call): the tile element
             // opens on its building grid.
             //
@@ -6574,7 +6574,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // as the MIRROR (`selected_province`) the province outline reads.
             const uint32_t hovered_prov = (hovered_tile != null_entity)
                                           ? w.provinces.province_of(hovered_tile) : 0u;
-            // BL-1300 round 2: the fallback is ALWAYS the tile — a built hex
+            // BL-1312 round 2: the fallback is ALWAYS the tile — a built hex
             // opens on its building grid, never on a lone building.
             const entity_id fallback = hovered_tile;
 
@@ -6610,7 +6610,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // ground twice.
                 //
                 // This is the CYCLE order only. The first press lands on the tile
-                // (BL-1300 round 2); the building rung is reached by the repeat
+                // (BL-1312 round 2); the building rung is reached by the repeat
                 // press or by the tile card's own building buttons.
                 //
                 // Rungs 1..3 are entities, so a null check is their liveness test.
@@ -6691,7 +6691,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // "the cycle does not fire", which is how NR-504 was found.)
                     // The fallback is the tile itself since BL-598, so a plain
                     // click on ground seeds the TILE rung.
-                    // A building marker never survives to here (BL-1300 round 2:
+                    // A building marker never survives to here (BL-1312 round 2:
                     // the press lands on the tile), so the only marker rung is the
                     // unit; everything else seeds the TILE rung, and a repeat
                     // click advances to the battle / unit / building rungs.

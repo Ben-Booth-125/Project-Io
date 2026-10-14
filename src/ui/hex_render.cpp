@@ -1,5 +1,5 @@
 #include "hex_render.hpp"
-#include "presentation.hpp" // palette — the loading bar (BL-1301)
+#include "presentation.hpp" // palette — the loading bar (BL-1313)
 
 #include "terrain_palette.hpp" // BL-732: the pure palette both this and ground_bake read
 #include "ui_state.hpp" // ground_view — the baked neighbourhood page (BL-1241)
@@ -409,7 +409,7 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
 
     if (!baked)
     {
-        // BL-1301: until the page is ready, the box shows a LOADING BAR — never
+        // BL-1313: until the page is ready, the box shows a LOADING BAR — never
         // flat per-hex fills, which read as a second, strategic-looking map of
         // the same ground that the bake then contradicts a moment later
         // (SELECTION.md § The tile element's layout, column 1). Indeterminate:

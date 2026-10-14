@@ -352,7 +352,7 @@ int main()
         // Recover scene entity ids (same construction order as make_scene).
         scene probe = make_scene(1000.0f);
         const building_component& plb = w_final.buildings.at(probe.pl_bld);
-        // BL-1310 (PRODUCTION.md § Workforce target and the auto-solver): the
+        // BL-1322 (PRODUCTION.md § Workforce target and the auto-solver): the
         // player's workforce is set by the game alone — one 25 % step a quarter
         // from 100 internal, so it sits on the 0/50/100/150/200 grid. That is the one
         // sanctioned dial (AI_OPPONENT.md § 11, amended 2026-10-13), not the

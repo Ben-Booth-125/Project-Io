@@ -34,7 +34,7 @@ struct building_profit
 building_profit estimate_building_profit(const world& w, const recipe_registry& reg,
                                          const economy_report& report, entity_id building_id);
 
-/// THE PRESENTATION READING of a built building's unit economics (BL-1309;
+/// THE PRESENTATION READING of a built building's unit economics (BL-1321;
 /// SELECTION.md § The building element's layout: "A building with no output
 /// still has costs: its profit row reads its net (negative) and expenses").
 ///

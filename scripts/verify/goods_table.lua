@@ -10,7 +10,7 @@
 
 verify.goto_surface("home")
 
--- 0. BEFORE ANY QUARTER (BL-1308). The verify world is built inline by
+-- 0. BEFORE ANY QUARTER (BL-1320). The verify world is built inline by
 --    setup_world, UNSETTLED (app.cpp, load_economy: "unsearched and unsettled"),
 --    so unlike a campaign — whose twelve warm-up quarters run run_settle_tick ->
 --    clear_markets and publish the trade value record before play opens — no
@@ -142,7 +142,7 @@ verify.expect(fit_without >= fit_with,
     "dropping the body column cannot make the name column narrower (" ..
     fit_with .. " -> " .. fit_without .. " of " .. total_all .. " names fit)")
 
--- 4c. THE MARKET'S TOP SECTION (BL-1305; ledgers/market.md § 2), superseding
+-- 4c. THE MARKET'S TOP SECTION (BL-1317; ledgers/market.md § 2), superseding
 --     BL-688's chip row. "No national presence" is a legitimate state, so this
 --     reports rather than demanding rows — but every row drawn must carry the
 --     nation's FULL name, the one the world holds, or the list is no better than
@@ -186,7 +186,7 @@ if top.sold_known then
 end
 verify.expect(#nations > 0, "the busiest market lists at least one nation")
 
--- 4d. TRADED IN / TRADED OUT (BL-1308; TRADE.md § The trade value record). After
+-- 4d. TRADED IN / TRADED OUT (BL-1320; TRADE.md § The trade value record). After
 --     16 econ steps a quarter has completed, so both carry a figure, not a dash.
 local function finite(x) return x == x and x ~= math.huge and x ~= -math.huge end
 print(string.format("MEASURED busiest market Traded in %.2f, Traded out %.2f (known %s)",

@@ -3250,7 +3250,7 @@ void app::pin_nation_colours_from_report()
     // the greedy walk the realms had, over the world's own tile ownership.
     // In ascending nation-index order, so the walk is deterministic.
     // The carve's nation adjacency is computed for EVERY nation, not only when
-    // ownerless ground needs a slot: the bordering-colour pass below (BL-1311)
+    // ownerless ground needs a slot: the bordering-colour pass below (BL-1323)
     // reads it too.
     std::vector<int32_t> tile_nation; // raster -> nation index, -1 none
     std::vector<std::vector<int32_t>> nbrs(home->nation_ids.size());
@@ -3305,7 +3305,7 @@ void app::pin_nation_colours_from_report()
             table.emplace_back(home->nation_ids[n], chosen);
         }
     }
-    // BORDERING NATIONS NEVER SHARE A SIMILAR COLOUR (BL-1311; LENSES.md
+    // BORDERING NATIONS NEVER SHARE A SIMILAR COLOUR (BL-1323; LENSES.md
     // § The Country lens has retired, the identity colour rule). Run on the
     // finished table, here, so Begin and load take the SAME pass over the SAME
     // inputs: the table is not saved — a load re-derives it from the saved

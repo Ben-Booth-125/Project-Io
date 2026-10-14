@@ -1,4 +1,4 @@
--- BL-1303 (MARKET_NAMES_UNIQUE): every market on a body carries its own name.
+-- BL-1315 (MARKET_NAMES_UNIQUE): every market on a body carries its own name.
 --
 -- MARKETS.md § Market centres and seeding: a market is named for the largest
 -- population centre whose tile clears to it (`market_for_tile`); a market with

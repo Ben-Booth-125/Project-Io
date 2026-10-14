@@ -230,7 +230,7 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         if (convoy.corp == null_entity)
             continue; // no trade route: routes are a corporation's record
 
-        // BL-1308 (TRADE.md § The trade value record): Traded in — the units a
+        // BL-1320 (TRADE.md § The trade value record): Traded in — the units a
         // trade lands here x this market's LAST RESOLVED price, the same price
         // the import tariff below charges on (`dispatch_market_price`). An
         // intercepted cargo was cut above and never reaches this loop, so it is

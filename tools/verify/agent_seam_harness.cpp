@@ -357,7 +357,7 @@ int main()
              + " subject=" + std::to_string(bld)
              + " workforce=" + std::string(wf);
     };
-    // BL-1310: the session acts as the PLAYER, whose set_workforce is refused
+    // BL-1322: the session acts as the PLAYER, whose set_workforce is refused
     // (the game sets the player's workforce) - an in-range value, so the only
     // reason it fails is the player rule, and it still rides the schedule.
     const std::string c1 = line_set_wf(probe.corp, probe.bld, "50");
@@ -407,7 +407,7 @@ int main()
         check(count_of(r.rx, "RESULT result=applied") == 3
                   && count_of(r.rx, "RESULT result=rejected_invalid") == 1,
               "R1.4 three commands answer applied over the wire; the player's set_workforce "
-              "answers rejected_invalid (BL-1310)");
+              "answers rejected_invalid (BL-1322)");
         check(r.rx.find("OK tick=1") != std::string::npos
                   && r.rx.find("OK tick=2") != std::string::npos
                   && r.rx.find("OK tick=3") != std::string::npos,
@@ -430,7 +430,7 @@ int main()
         final_tick  = r.final_tick;
         check(!transcript.empty() && transcript[0].result == corp_command_result::rejected_invalid
                   && s.w.buildings.at(s.bld).workforce_target != 50,
-              "R1.8 the socket-delivered set_workforce for the PLAYER was refused, not applied (BL-1310)");
+              "R1.8 the socket-delivered set_workforce for the PLAYER was refused, not applied (BL-1322)");
     }
 
     // -----------------------------------------------------------------------
@@ -463,7 +463,7 @@ int main()
         };
 
         bool all_applied = true;
-        all_applied &= apply(corp_verb::set_workforce, 0, 0, 0, 50) == corp_command_result::rejected_invalid; // BL-1310
+        all_applied &= apply(corp_verb::set_workforce, 0, 0, 0, 50) == corp_command_result::rejected_invalid; // BL-1322
         step_tick(s.w, reg, 1);
         all_applied &= apply(corp_verb::set_trade_reserve, 1, 20.0f, 2.5f) == corp_command_result::applied;
         all_applied &= apply(corp_verb::idle, 1) == corp_command_result::applied;

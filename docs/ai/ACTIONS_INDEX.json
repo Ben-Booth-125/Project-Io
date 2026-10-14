@@ -51,11 +51,11 @@
   ],
   [
    "gameplay.set_workforce",
-   "No UI (BL-1310, Ben 2026-10-13: the player has no workforce control). The workforce slider on the expanded building card and in the Construction ledger's Buildings view is retired; both now show the target as a read-only bar. A RIVAL-ONLY corp_verb: the background scorer's workforce dial issues it under its grant (AI_OPPONENT.md § 11), and the command seam refuses it for the player's corporation."
+   "No UI (BL-1322, Ben 2026-10-13: the player has no workforce control). The workforce slider on the expanded building card and in the Construction ledger's Buildings view is retired; both now show the target as a read-only bar. A RIVAL-ONLY corp_verb: the background scorer's workforce dial issues it under its grant (AI_OPPONENT.md § 11), and the command seam refuses it for the player's corporation."
   ],
   [
    "gameplay.set_workforce_auto",
-   "No UI (BL-1310, Ben 2026-10-13): the building card's Auto control is retired with player workforce control; its action-grid cell is Reserved. The corp_verb remains in the enum (append-only) and the command seam refuses it for the player's corporation."
+   "No UI (BL-1322, Ben 2026-10-13): the building card's Auto control is retired with player workforce control; its action-grid cell is Reserved. The corp_verb remains in the enum (append-only) and the command seam refuses it for the player's corporation."
   ],
   [
    "gameplay.survey",

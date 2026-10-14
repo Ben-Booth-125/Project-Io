@@ -6,7 +6,7 @@
 -- the BL-431 follow-on and the construction panel is queue-only now (view 0), so
 -- the call still ran but set an int nobody dispatches on — the capture no longer
 -- showed what the script's own comment claimed it verified. The management shell
--- now lives on the expanded building card (BL-1300) and, for the levers, in the
+-- now lives on the expanded building card (BL-1312) and, for the levers, in the
 -- Construction ledger's Buildings view.
 --
 -- Run: ProjectIo --verify scripts/verify/building_management_shell.lua
@@ -29,7 +29,7 @@ local target = processor or player
 assert(target, "building_management_shell.lua: no player building on the home body")
 verify.select_building(target.x, target.y)
 
--- BL-1300 (tile card split): the building card's pager is gone. Selecting a
+-- BL-1312 (tile card split): the building card's pager is gone. Selecting a
 -- building draws its host tile's card with the stack EXPANDED in the tile
 -- column — status line over the Profitability charts — and the action grid
 -- retargeted to the building. Method and Workforce live in the Construction

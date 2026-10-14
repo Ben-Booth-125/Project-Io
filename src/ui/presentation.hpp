@@ -348,7 +348,7 @@ void clear_nation_colour_table();
 bool nation_colour_pinned(entity_id id);
 
 /// THE MINIMUM DISTINGUISHABLE DISTANCE between two bordering nations' colours
-/// (BL-1311), as CIE76 delta-E in CIELAB (D65, sRGB). Why 20: one delta-E unit is
+/// (BL-1323), as CIE76 delta-E in CIELAB (D65, sRGB). Why 20: one delta-E unit is
 /// roughly the just-noticeable difference for two large patches side by side,
 /// and the map does not show patches side by side under study — it shows
 /// territory read at a glance, through the lens wash or as a 3 px border band,
@@ -374,7 +374,7 @@ struct nation_separation_result
     int rounds = 0;                            ///< Rounds run (bounded).
 };
 
-/// BORDERING NATIONS NEVER SHARE A SIMILAR COLOUR (BL-1311; LENSES.md, the
+/// BORDERING NATIONS NEVER SHARE A SIMILAR COLOUR (BL-1323; LENSES.md, the
 /// identity colour rule). @p colour is indexed by nation; @p nbrs[n] lists the
 /// indices that share a border with n; @p territory is each nation's tile count.
 /// For every pair closer than `nation_min_colour_distance`, the nation with the

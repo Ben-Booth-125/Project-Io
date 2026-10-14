@@ -41,7 +41,7 @@
 // never reaches its end early; this function then enters the steps as
 // generation enters its own.
 
-#include "world/campaign_settle.hpp"   // settle_readings (BL-1309)
+#include "world/campaign_settle.hpp"   // settle_readings (BL-1321)
 #include "world/charter_budget.hpp"    // charter_spend_report, charter_spend_params
 #include "world/era_band.hpp"
 #include "world/landscape_search.hpp"  // landscape_search_result, landscape_search_params
@@ -110,7 +110,7 @@ struct finish_campaign_result
     /// runs 50-90 s and the others ~1.5 s, so the slowest is named on the
     /// `[finish_campaign_world]` line for whoever takes the tick tail up.
     std::vector<std::int64_t> settle_tick_ms;
-    /// BL-1309 (STARTUP.md § Handoff, "Their READINGS do have a reader"): the
+    /// BL-1321 (STARTUP.md § Handoff, "Their READINGS do have a reader"): the
     /// settle's per-quarter readings -- its last report and standings, each
     /// tick's market price series -- for Begin to hand to the presentation.
     /// Copies only; the world does not read them.

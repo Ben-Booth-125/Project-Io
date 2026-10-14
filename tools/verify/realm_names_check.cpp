@@ -33,7 +33,7 @@
 //   build_gen/verify/realm_names_check.exe [--seed N] [--names]
 //
 // --names also dumps every realm name on the last record's table and every
-// nation name, tab-separated with its length in code points (BL-1306
+// nation name, tab-separated with its length in code points (BL-1318
 // NATION_NAME_CAP: the distribution, and a before/after diff of the cap).
 
 #include "harness_params.hpp"
@@ -245,7 +245,7 @@ int main(int argc, char** argv)
         check(ownerless_named == ownerless, buf);
     }
 
-    // --- --names: the name dump (BL-1306 NATION_NAME_CAP measurement) --------
+    // --- --names: the name dump (BL-1318 NATION_NAME_CAP measurement) --------
     // One line per realm on the last record's table (every id the run ever
     // coined) and one per nation, each with its length in code points, so a
     // before/after pair diffs name by name and the distribution reads off it.

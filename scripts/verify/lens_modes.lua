@@ -45,7 +45,7 @@ verify.capture("lens_chrome_corporation_collapsed")
 
 -- The header bar is the full width of the right chrome column, its foot on the
 -- minimap's top edge. Aim at the middle of that bar rather than at the caret glyph.
-local mini = { w = 363, h = 280 }   -- minimap_rect at 1280x720 (BL-1302: +27 wide); see shell_metrics.cpp
+local mini = { w = 363, h = 280 }   -- minimap_rect at 1280x720 (BL-1314: +27 wide); see shell_metrics.cpp
 verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
 verify.frames(2)
 verify.capture("lens_chrome_corporation_expanded")

@@ -7,9 +7,9 @@ Measured 2026-10-13 for BL-1277 (tech wave re-bless). This is measurement only: 
 | label | commit | what it contains |
 |---|---|---|
 | BEFORE | `9f97bcfc` | the sprint 54 base |
-| CAP | `92d0caf5` | BEFORE plus BL-1306 (nation name cap), and nothing else in `src/world` |
+| CAP | `92d0caf5` | BEFORE plus BL-1318 (nation name cap), and nothing else in `src/world` |
 | CITY | `14e54de5` | CAP plus unique city names per body (`city_names.*`, `population_generation.cpp`) |
-| AFTER | `aeae0430` | head of `claude/sprint-54-ui-improvements-f2d1ec`: CITY plus BL-1308 (market trade value record) and UI |
+| AFTER | `aeae0430` | head of `claude/sprint-54-ui-improvements-f2d1ec`: CITY plus BL-1320 (market trade value record) and UI |
 
 These four commits are the only ones between BEFORE and AFTER that touch `src/world`. No `scripts/*.lua` data
 file read by generation changed; only verify scripts did.
@@ -28,10 +28,10 @@ copied to their own names. Runs:
 - **D_land, D_settle and D_seat: moved on all 16 seeds.** The snapshot bytes carry names, and all three
   digests hash the snapshot.
 - **Unique city names move all 16 seeds** (CAP -> CITY: every seed moved in all three snapshot digests).
-- **BL-1306 (name cap) alone moves 3 seeds: 31, 43, 10** (BEFORE -> CAP). Those seeds have a realm or
+- **BL-1318 (name cap) alone moves 3 seeds: 31, 43, 10** (BEFORE -> CAP). Those seeds have a realm or
   nation name longer than 20 code points. The other 13 are byte-identical at CAP. On 31, 43 and 10 the city
   change then moves them again.
-- **BL-1308 (trade value record) moves nothing.** CITY -> AFTER is identical on all 16 seeds and all four
+- **BL-1320 (trade value record) moves nothing.** CITY -> AFTER is identical on all 16 seeds and all four
   digests, and in `world_determinism`'s deep digests.
 - **world_determinism:** the deep digests move at CITY only. The name cap does not move them, because seed
   ABCDEF01 has no over-long name. City names move all three worlds, including prehistory OFF.

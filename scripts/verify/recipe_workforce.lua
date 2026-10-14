@@ -1,7 +1,7 @@
 -- Recipe / workforce change acceptance (BL-113, US-007).
 -- Proves an existing building's PRODUCTION follows its recipe and workforce
 -- target: set its recipe via the SAME write the construction panel's recipe combo
--- performs, tick the sim, and assert the output responds. BL-1310 (Ben,
+-- performs, tick the sim, and assert the output responds. BL-1322 (Ben,
 -- 2026-10-13): the player no longer sets workforce - the game moves the target
 -- ONE 25 % step a quarter toward the most profitable level (PRODUCTION.md
 -- § Workforce target and the auto-solver). The workforce half stages a target
@@ -46,7 +46,7 @@ if b.found then
     verify.expect(stocked > 0,
         "the active recipe's inputs are stocked in the building's pool (" .. tostring(stocked) .. " inputs)")
 
-    -- BL-1310: stage the target at 0 % with the verify FIXTURE (no player
+    -- BL-1322: stage the target at 0 % with the verify FIXTURE (no player
     -- control writes it any more), then let the game step it. Each quarter the
     -- economy tick moves it ONE 25 % step toward the solver's best, before
     -- production, so the target read after a step is the one production ran at.

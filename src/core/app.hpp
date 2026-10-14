@@ -433,7 +433,7 @@ private:
     /// presentation on the adopted world; poll_worldgen then seats the player
     /// and `finish_new_game` rebases the clock again and enters play.
     void start_new_game_prelude();
-    /// BL-1309: hand the settle's per-quarter readings (its last report and
+    /// BL-1321: hand the settle's per-quarter readings (its last report and
     /// standings, the price series) to the presentation state at Begin.
     void adopt_settle_readings(settle_readings&& r);
     void finish_new_game();

@@ -235,7 +235,7 @@ int main()
     }
     w.corporations[corp].assets.push_back(control);
 
-    // BL-1310 (workforce stepped auto): the game steps the SEATED player's workforce
+    // BL-1322 (workforce stepped auto): the game steps the SEATED player's workforce
     // each tick, and this fixture has no market, so it would step the Well toward 0.
     // The arithmetic rows pin workforce 100, so the seat moves to an empty corp: the
     // owner stays is_player (the corp AI never steers it) and nothing steps its sites.

@@ -929,7 +929,7 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
 // ignored (inputs valued at the current price); the search is over coarse tiers, so the
 // result can hunt by ±one tier. A finer model + hysteresis is future work (BL-181).
 // Deterministic — reads last tick's market state only. Player corp: the target steps
-// toward this answer one 25 % step a quarter, with no opt-out (BL-1310; AI_OPPONENT.md
+// toward this answer one 25 % step a quarter, with no opt-out (BL-1322; AI_OPPONENT.md
 // § 11, amended 2026-10-13). Rivals: the scorer's workforce dial reuses it.
 // BL-442: the band used to be two constexpr copies here, commented "mirror
 // market_clearing.cpp price band" — a hand-synchronised duplicate of the game's
@@ -1101,7 +1101,7 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
         return revenue - input_cost - opex.maintenance - opex.wages;
     };
 
-    // BL-1310 (PRODUCTION.md § Workforce target and the auto-solver, Ben
+    // BL-1322 (PRODUCTION.md § Workforce target and the auto-solver, Ben
     // 2026-10-13): the grid is 0, 25, 50, 75, 100 % — the maximum is 100 %, and
     // the player's target moves one 25 % step a quarter toward this answer.
     int   best_wt  = 0;
@@ -2256,7 +2256,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         return (it != stack_by_building.end()) ? it->second.rank : 1;
     };
 
-    // ── Pass 3: BL-181 workforce auto-solve, player corp only; BL-1310 (Ben,
+    // ── Pass 3: BL-181 workforce auto-solve, player corp only; BL-1322 (Ben,
     //    2026-10-13): STEPPED and without the opt-out — each tick the target
     //    moves ONE 25 % step toward the solver's best (stays when equal), and
     //    `workforce_auto` is no longer read for the player (the field stays in

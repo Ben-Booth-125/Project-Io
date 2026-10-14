@@ -4,7 +4,7 @@
 --   * a placeholder image box + [x, y] coordinate caption at the top;
 --   * the tile's deposits drawn as vertical bar charts (world-max-relative), each
 --     with a dotted-gridline axis, in a scrollable list;
---   * since BL-1300 (tile card split): no header row; preview | province card |
+--   * since BL-1312 (tile card split): no header row; preview | province card |
 --     tile card (buildings, three across) | 2x3 action grid (Construct, History,
 --     Supply) — History/Supply are stubs, Manage Buildings is gone.
 -- Run with: ProjectIo --verify scripts/verify/selection_tile_layout.lua

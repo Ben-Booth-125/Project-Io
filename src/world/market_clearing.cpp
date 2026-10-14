@@ -1573,7 +1573,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // before the nation — MARKETS.md step 12).
     flush_exchanges(); // NR-1021: the tick's aggregated exchange rows
 
-    // BL-1308 (TRADE.md § The trade value record): PUBLISH the quarter's trade
+    // BL-1320 (TRADE.md § The trade value record): PUBLISH the quarter's trade
     // value, here, beside the flush that writes this quarter's exchange rows.
     // An econ tick is a calendar quarter, and its order is advance convoys ->
     // credit arrivals (Traded in) -> economy -> run_trades (Traded out) -> this

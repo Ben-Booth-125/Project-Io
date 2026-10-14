@@ -34,7 +34,7 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::company:       icons::company(dl, centre, r, colour); break;
         case overlay_mode::trade_flow:    icons::trade_flow(dl, centre, r, colour); break;
         // The shield the retired Country lens wore: the glyph meant "national
-        // territory" then and means it again (BL-1311).
+        // territory" then and means it again (BL-1323).
         case overlay_mode::nations:       icons::country(dl, centre, r, colour); break;
         default: break;
     }

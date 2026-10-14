@@ -2133,7 +2133,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
 
             // Workforce dial: reuse the BL-181 solver as the estimator.
-            // BL-1310: never on the player's corp — even when spectating (the
+            // BL-1322: never on the player's corp — even when spectating (the
             // settle, a spectate session), the economy tick's stepped solver is
             // the only writer of the player's workforce, and the seam refuses
             // set_workforce for it.

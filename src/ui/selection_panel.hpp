@@ -23,7 +23,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
                           std::string* net_out = nullptr, std::string* exp_out = nullptr);
 
 /// One page of the unit Selection card's accordion — the pager the building card
-/// once had (retired BL-1300), kept for the Soldier card (placeholder, BL-393 notes units are largely
+/// once had (retired BL-1312), kept for the Soldier card (placeholder, BL-393 notes units are largely
 /// inert today). Strength: the DERIVED strength (BL-459) with its count/quality/
 /// supply derivation and the BL-454 upkeep line; Roster: roster-type name + owner.
 enum class unit_page_kind { strength, roster };
@@ -59,7 +59,7 @@ void draw_unit_page(const world& w, const recipe_registry& reg,
 /// The content is **polymorphic by selection kind** (selection.hpp): it dispatches
 /// on selection_kind_of to the matching per-entity layout — a **tile** takes the
 /// four-column tile element (preview, province card, tile card, action grid —
-/// BL-1300) and draws NO header row; a **building** takes the same element for
+/// BL-1312) and draws NO header row; a **building** takes the same element for
 /// its host tile with the building's stack expanded in the tile column; the
 /// remaining kinds take their own layouts under a header row: the kind icon +
 /// title and a **'go to'** button (routes through ui::focus_on_entity). There is
@@ -159,7 +159,7 @@ const char* method_grid_status(entity_id id);
 /// drawn frame, `null_entity` when it drew none. Read by the air_gate check.
 entity_id method_grid_status_drawn_for();
 
-/// The WORKFORCE ROW, read-only (BL-1310, Ben 2026-10-13: the game sets the
+/// The WORKFORCE ROW, read-only (BL-1322, Ben 2026-10-13: the game sets the
 /// player's workforce, one 25 % step a quarter (50 internal); the slider and Auto retired). A
 /// filled bar of `workforce_target` over 0-200 (full at 200) with target/2 as the percentage to its right.
 /// Drawn by the expanded building card and the Construction ledger's Buildings

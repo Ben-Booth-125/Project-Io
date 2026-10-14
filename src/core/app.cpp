@@ -891,7 +891,7 @@ void app::poll_worldgen()
     m_generation_report      = std::move(built->report);
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
-    // BL-1309: the settle's readings, taken before the slot is spent.
+    // BL-1321: the settle's readings, taken before the slot is spent.
     settle_readings settle_reads = std::move(built->finish.readings);
     // BL-1246 (STARTUP.md § Handoff): the world is finished. On the wizard's
     // path the home master has been baking since the Life round, re-taking
@@ -1613,7 +1613,7 @@ void app::start_new_game_prelude()
 
 void app::adopt_settle_readings(settle_readings&& r)
 {
-    // BL-1309 (STARTUP.md § Handoff, "Their READINGS do have a reader", Ben
+    // BL-1321 (STARTUP.md § Handoff, "Their READINGS do have a reader", Ben
     // 2026-10-13): every per-quarter figure a surface shows opens on the last
     // settle tick's value, never on a "no data yet" dash. The report feeds the
     // building card's profit row, the header's net and every ledger that reads
@@ -1701,7 +1701,7 @@ void app::finish_new_game()
     // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
     // worker with no presentation half of their own -- no agency comms, no
     // calendar-dated history samples (the ticks have no calendar). Their
-    // READINGS are handed across at adoption (adopt_settle_readings, BL-1309:
+    // READINGS are handed across at adoption (adopt_settle_readings, BL-1321:
     // the last report, the standings, the price series) -- so the header sparkline and the Budget ledger's profit
     // chart are seeded HERE, from the seated corp's own filed returns: the
     // opening capital, then each settle quarter's closing balance, income and

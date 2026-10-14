@@ -1,4 +1,4 @@
--- BL-1311 (Nations lens): the lens paints each nation's whole territory, a press
+-- BL-1323 (Nations lens): the lens paints each nation's whole territory, a press
 -- under it resolves to the nation, and no two bordering nations share a similar
 -- colour (LENSES.md § The Nations lens; the identity colour rule).
 --

@@ -19,7 +19,7 @@ verify.fold()
 shot("fold_band_resting")
 
 -- The band's own full-canvas expansion (the tile metric charts and the
--- building pager) retired with BL-1300 (tile card split): the province and
+-- building pager) retired with BL-1312 (tile card split): the province and
 -- tile cards fit the band, so the band has nothing left to expand.
 
 -- ── R3: expanding a second surface folds the first. The subject was the History

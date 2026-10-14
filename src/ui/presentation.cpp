@@ -21,7 +21,7 @@ namespace {
 // search, and never hashed on an id.
 std::vector<std::pair<entity_id, ImU32>> g_nation_colours;
 std::vector<uint32_t>                    g_realm_colours; ///< By polity id; 0 = no entry.
-std::vector<std::pair<entity_id, entity_id>> g_nation_border_pairs; ///< BL-1311, for the verify hook.
+std::vector<std::pair<entity_id, entity_id>> g_nation_border_pairs; ///< BL-1323, for the verify hook.
 
 constexpr ImU32 k_nation_table[palette::nation_slot_count] = {
     IM_COL32(213,  94,   0, 255), // vermillion
@@ -416,7 +416,7 @@ ImU32 nation_colour(entity_id id)
     // Okabe-Ito colourblind-safe hues with four lightness-shifted variants of the
     // same safe hues (rather than new hues), since varying lightness within a
     // safe hue family is the standard way to extend a small CVD-safe palette.
-    // The table itself sits at file scope (k_nation_table) since BL-1311, so the
+    // The table itself sits at file scope (k_nation_table) since BL-1323, so the
     // bordering-colour pass can offer its slots as re-slot candidates.
     // BL-1089: the per-world table first — a nation's colour is its realm's,
     // pinned at Begin/load from the saved report. The hash is the fallback.

@@ -1097,7 +1097,7 @@
     "docs/generation/seed_library.json"
    ],
    "title": "Sprint 52's one re-bless: the world without generation research, on the industrial band, described by shape and authorised by Ben",
-   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description. CARRIED to sprint 53 (2026-10-10). The wave re-bless; waits on BL-1272 (and BL-1274 if its gates move the opening). MERGE READING (2026-10-11, Ben merged with the move): the tech tree onto main moved market_viability from G1 93.3 / G1 t50 87.5 / G1b 5.7 / G2 113.4 / G3 95.8 to 92.9 / 85.5 / 6.0 / 111.7 / 94.7 (16 seeds, 400 ticks); determinism and the seed sweep pass. Attribute it per cause in the re-bless shape. SPRINT 54 CAUSE (measured 2026-10-13, docs/development/drafts/sprint-54-name-movement.md; Ben folded it into this re-bless): names only. Unique city names per body move D_land/D_settle/D_seat on all 16 library seeds and the three world_determinism deep digests; the nation name cap (BL-1306) also on seeds 31, 43, 10; D_search unmoved; the trade value record (BL-1308) moves nothing. Every printed count, region, market, road and economy reading identical."
+   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description. CARRIED to sprint 53 (2026-10-10). The wave re-bless; waits on BL-1272 (and BL-1274 if its gates move the opening). MERGE READING (2026-10-11, Ben merged with the move): the tech tree onto main moved market_viability from G1 93.3 / G1 t50 87.5 / G1b 5.7 / G2 113.4 / G3 95.8 to 92.9 / 85.5 / 6.0 / 111.7 / 94.7 (16 seeds, 400 ticks); determinism and the seed sweep pass. Attribute it per cause in the re-bless shape. SPRINT 54 CAUSE (measured 2026-10-13, docs/development/drafts/sprint-54-name-movement.md; Ben folded it into this re-bless): names only. Unique city names per body move D_land/D_settle/D_seat on all 16 library seeds and the three world_determinism deep digests; the nation name cap (BL-1318) also on seeds 31, 43, 10; D_search unmoved; the trade value record (BL-1320) moves nothing. Every printed count, region, market, road and economy reading identical."
   },
   {
    "status": "designed",
@@ -1139,7 +1139,7 @@
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "category": "UI",
    "requires": [],
-   "id": "BL-1300",
+   "id": "BL-1312",
    "short_name": "TILE_CARD_SPLIT",
    "priority": "A",
    "difficulty": 4,
@@ -1167,7 +1167,7 @@
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "category": "UI",
    "requires": [],
-   "id": "BL-1301",
+   "id": "BL-1313",
    "short_name": "TILE_PREVIEW_LOADING_BAR",
    "priority": "B",
    "difficulty": 1,
@@ -1189,7 +1189,7 @@
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "category": "UI",
    "requires": [],
-   "id": "BL-1302",
+   "id": "BL-1314",
    "short_name": "BOTTOM_STRIP_TALLER",
    "priority": "B",
    "difficulty": 1,
@@ -1210,7 +1210,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "requires": [],
-   "id": "BL-1303",
+   "id": "BL-1315",
    "short_name": "MARKET_NAMES_UNIQUE",
    "category": "UI",
    "priority": "A",
@@ -1232,9 +1232,9 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "requires": [
-    "BL-1303"
+    "BL-1315"
    ],
-   "id": "BL-1304",
+   "id": "BL-1316",
    "short_name": "MARKET_LABELS_ON_CANVAS",
    "category": "UI",
    "priority": "B",
@@ -1245,7 +1245,7 @@
     "src/ui/icons.cpp"
    ],
    "title": "Each market's name is drawn on its market city: the city label gains a market glyph",
-   "design": "DESIGNED (Ben, 2026-10-13): PLANETARY.md § Market labels. The city that names a market (BL-1303's rule) draws its existing settlement label with a small market glyph before it; same layer, LOD and culling. Needs a live look.",
+   "design": "DESIGNED (Ben, 2026-10-13): PLANETARY.md § Market labels. The city that names a market (BL-1315's rule) draws its existing settlement label with a small market glyph before it; same layer, LOD and culling. Needs a live look.",
    "landed": "2026-10-14"
   },
   {
@@ -1257,7 +1257,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "requires": [],
-   "id": "BL-1305",
+   "id": "BL-1317",
    "short_name": "MARKET_LEDGER_TOP_SECTION",
    "category": "UI",
    "priority": "A",
@@ -1283,7 +1283,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13, the sprint 54 UI session); filed by Claude",
    "requires": [],
-   "id": "BL-1306",
+   "id": "BL-1318",
    "short_name": "NATION_NAME_CAP",
    "category": "Generation",
    "priority": "B",
@@ -1306,7 +1306,7 @@
    "blocked_on": null,
    "author": "Claude (sprint 54 UI session, found verifying), 2026-10-13",
    "requires": [],
-   "id": "BL-1307",
+   "id": "BL-1319",
    "short_name": "FIXTURE_BASE_STALL",
    "category": "Verification",
    "priority": "A",
@@ -1328,7 +1328,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13: build it this sprint); filed by Claude",
    "requires": [],
-   "id": "BL-1308",
+   "id": "BL-1320",
    "short_name": "MARKET_TRADE_VALUE_RECORD",
    "category": "Economy",
    "priority": "B",
@@ -1352,7 +1352,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13); filed by Claude",
    "requires": [],
-   "id": "BL-1309",
+   "id": "BL-1321",
    "short_name": "SETTLE_TICKS_FEED_READINGS",
    "category": "UI",
    "priority": "A",
@@ -1365,7 +1365,7 @@
     "src/ui/market_ledger.cpp"
    ],
    "title": "A fresh campaign opens on the settle ticks' readings: no per-quarter surface shows 'no data yet' at Begin",
-   "design": "DESIGNED (Ben, 2026-10-13): STARTUP.md § Handoff, the paragraph after the twelve pre-game ticks. Sweep every surface that waits on an economy tick (building profit '— / qtr' - seen on a Port in the BL-1300 captures -, the header net and sparkline, market Sold here / Traded in / Traded out, price series, balance series) and make each read the settle's last values at Begin. BL-1308 (market trade value record) does its own figures. Change no simulated value: the settle runs as now; only what the presentation keeps from it changes. Live click at Begin. PULLED INTO THE SPRINT 54 BUILD (Ben, 2026-10-13 live click): the building card showed no method or chart for an Iron Mine before the first tick and for a Port always. Every card shows method + status always (a Port names its trade points); profit rows read the settle's last quarter on a fresh campaign.",
+   "design": "DESIGNED (Ben, 2026-10-13): STARTUP.md § Handoff, the paragraph after the twelve pre-game ticks. Sweep every surface that waits on an economy tick (building profit '— / qtr' - seen on a Port in the BL-1312 captures -, the header net and sparkline, market Sold here / Traded in / Traded out, price series, balance series) and make each read the settle's last values at Begin. BL-1320 (market trade value record) does its own figures. Change no simulated value: the settle runs as now; only what the presentation keeps from it changes. Live click at Begin. PULLED INTO THE SPRINT 54 BUILD (Ben, 2026-10-13 live click): the building card showed no method or chart for an Iron Mine before the first tick and for a Port always. Every card shows method + status always (a Port names its trade points); profit rows read the settle's last quarter on a fresh campaign.",
    "landed": "2026-10-14"
   },
   {
@@ -1377,7 +1377,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-13, from the sprint 54 live click); filed by Claude",
    "requires": [],
-   "id": "BL-1310",
+   "id": "BL-1322",
    "short_name": "WORKFORCE_STEPPED_AUTO",
    "category": "Economy",
    "priority": "A",
@@ -1406,7 +1406,7 @@
    "blocked_on": null,
    "author": "Ben (2026-10-14); filed by Claude",
    "requires": [],
-   "id": "BL-1311",
+   "id": "BL-1323",
    "short_name": "NATIONS_LENS",
    "category": "UI",
    "priority": "A",

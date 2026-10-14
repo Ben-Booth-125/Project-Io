@@ -112,7 +112,7 @@ struct settle_market_sample
     std::array<float, resource_count> demand{};
 };
 
-/// WHAT THE SETTLE'S READINGS HAND TO PLAY (BL-1309; STARTUP.md § Handoff,
+/// WHAT THE SETTLE'S READINGS HAND TO PLAY (BL-1321; STARTUP.md § Handoff,
 /// "Their READINGS do have a reader", Ben 2026-10-13). Write-only from the
 /// settle: copies of what its ticks returned and of a const world after each,
 /// so filling it can move nothing. Begin moves it into the app's presentation

@@ -1,4 +1,4 @@
--- The tile element after the TILE CARD SPLIT (BL-1300). SELECTION.md § The tile
+-- The tile element after the TILE CARD SPLIT (BL-1312). SELECTION.md § The tile
 -- element's layout, § Multi-building tiles, § The building element's layout
 -- (Ben, 2026-10-13). Replaces tile_production.lua and selection_accordion.lua:
 -- the Production section and the six-section nav they drove are retired.
@@ -16,7 +16,7 @@
 --                          tile's grid, never the building (round 2).
 --   (round 2 also asserts the province card's own window never scrolls, and the
 --    expanded card's header count, method, net / expenses figures and the
---    read-only workforce row, BL-1310)
+--    read-only workforce row, BL-1322)
 --   tile_card_built        a player tile: one button per stack, three across,
 --                          glyph + count, name, net profit per quarter.
 --   tile_card_stacked      a tile carrying two or more buildings.
@@ -110,7 +110,7 @@ do
 end
 
 -- A canvas PRESS on a single-building hex selects the TILE, opening its grid
--- (BL-1300 round 2): never the building. A real press through click_tile.
+-- (BL-1312 round 2): never the building. A real press through click_tile.
 do
     local single = nil
     for _, t in ipairs(order) do
@@ -228,9 +228,9 @@ do
             verify.expect(e.title:find(utf8.char(215) .. tostring(e.count), 1, true) ~= nil,
                           "the header shows the stack count: '" .. e.title .. "'")
         end
-        -- BL-1309: every card names its method, whatever the building.
+        -- BL-1321: every card names its method, whatever the building.
         verify.expect(e.method ~= "", "the expanded card names its production method: '" .. e.method .. "'")
-        -- BL-1310: the workforce row is READ-ONLY, drawn for the player's own
+        -- BL-1322: the workforce row is READ-ONLY, drawn for the player's own
         -- completed building whether or not the profit row has data.
         verify.expect(e.workforce:match("^%d+%%$") ~= nil,
                       "the player's completed building shows its workforce read-only: '" .. e.workforce .. "'")
@@ -260,11 +260,11 @@ do
     end
 end
 
--- BL-1309 (SELECTION.md § The building element's layout: "Every card shows its
+-- BL-1321 (SELECTION.md § The building element's layout: "Every card shows its
 -- method and status line, always ... A building with no output still has
 -- costs"). A player PORT, expanded: it names the trade points it makes, and its
 -- profit row reads its (negative) net and expenses — a Port has no report row,
--- so before BL-1309 its card stopped after the status line.
+-- so before BL-1321 its card stopped after the status line.
 do
     local port = nil
     for _, b in ipairs(verify.buildings()) do

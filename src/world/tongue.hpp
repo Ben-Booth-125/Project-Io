@@ -140,7 +140,7 @@ tongue_lexicon coin_lexicon(const tongue& t);
 /// Empty when the tongue cannot coin (the caller falls back to its seat's name).
 std::string coin_realm_name(const tongue& t, uint64_t salt);
 
-/// THE REALM-NAME CAP (BL-1306; NATION_GENERATION.md sec Pass 5, "A realm's
+/// THE REALM-NAME CAP (BL-1318; NATION_GENERATION.md sec Pass 5, "A realm's
 /// name is length-capped"; NR-1045), in Unicode code points. A nation's full
 /// name must fit the lists that print it — the Market ledger's nation list,
 /// at 3/5 of the fold-out column, is the binding one.

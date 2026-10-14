@@ -62,7 +62,7 @@ void draw_selection_band(world& w, const recipe_registry& reg,
     {
         // The content function draws ui.selected_entity, so the resting
         // substitution is applied for the draw and restored after — unless the
-        // content itself re-pointed the selection (e.g. a tile card building button, BL-1300).
+        // content itself re-pointed the selection (e.g. a tile card building button, BL-1312).
         const entity_id real_sel = ui.selected_entity;
         ui.selected_entity       = sel;
         draw_selection_content(w, reg, report, ui);

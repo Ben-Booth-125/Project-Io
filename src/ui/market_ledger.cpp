@@ -47,7 +47,7 @@ std::vector<entity_id> markets_on_body(const world& w, entity_id body)
 
 } // namespace
 
-// --- Market names (BL-1303) ----------------------------------------------------
+// --- Market names (BL-1315) ----------------------------------------------------
 // MARKETS.md § Market centres and seeding: a market is named for the LARGEST
 // population centre whose tile clears to it (`market_for_tile`), by scale, then
 // headcount, then lowest id; a market with no named centre in its catchment reads
@@ -1182,7 +1182,7 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     ImGui::EndChild();
 }
 
-// --- The market's top section (BL-1305; ledgers/market.md § 2) --------------
+// --- The market's top section (BL-1317; ledgers/market.md § 2) --------------
 // Below the Body/Market combos, above the tab strip, about 2/7 of the column's
 // height, split left and right (Ben, 2026-10-13, superseding BL-688's chip row):
 //
@@ -1191,7 +1191,7 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
 //   section. The initials chips asked the player to decode an identity a list can
 //   simply state. Still no flags: `nation_colour` is a palette entry and is all
 //   that exists (ICONS.md § 2b). A name that overruns elides with its tooltip
-//   (the generation-side name cap is BL-1306's).
+//   (the generation-side name cap is BL-1318's).
 //
 //   RIGHT 2/5 — "How much moves through it?" Three stacked metrics, each a
 //   LABEL AND ITS FIGURE ON ONE LINE (Ben, 2026-10-13: label-over-figure overran
@@ -1202,7 +1202,7 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
 //   * Sold here — the exchange record (MARKETS.md § The exchange record): the
 //     newest quarter's SALE rows on this market (`side == 0`, a landing sold to
 //     the shelf at the clearing price), quantity x unit price summed over goods.
-//   * Traded in / Traded out — the market's trade value record (BL-1308; TRADE.md
+//   * Traded in / Traded out — the market's trade value record (BL-1320; TRADE.md
 //     § The trade value record): every corporation's trade cargo landed here
 //     (x the last resolved price) and bought here for dispatch (x the posted
 //     price), published by the clear that writes the same quarter's exchange
@@ -1348,7 +1348,7 @@ void draw_market_top_section(const world& w, entity_id mid, float top_h)
         draw_metric(0, "Sold", g_market_top.sold_known, g_market_top.sold_here,
                     "Nothing has cleared yet: the exchange record holds no quarter.");
         ImGui::Spacing();
-        // BL-1308: the trade value record, last completed quarter. Not saved,
+        // BL-1320: the trade value record, last completed quarter. Not saved,
         // so before a quarter completes there is no figure, not a zero.
         static constexpr const char* k_no_quarter = "No quarter completed yet";
         draw_metric(1, "In", g_market_top.traded_known, g_market_top.traded_in,
@@ -1773,7 +1773,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
         return;
     }
     // The column's whole content height, measured before anything is drawn —
-    // the top section's 2/7 is a share of this (BL-1305).
+    // the top section's 2/7 is a share of this (BL-1317).
     const float column_h = ImGui::GetContentRegionAvail().y;
 
     if (w.markets.empty())
@@ -1907,7 +1907,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
     }
     const market_component& mc = w.markets.at(selected_market);
 
-    // --- The market's top section (BL-1305) ---------------------------------
+    // --- The market's top section (BL-1317) ---------------------------------
     // BELOW the selectors, ABOVE the tab strip: it qualifies the market the
     // combos just chose, before the tabs ask a question about it. About 2/7 of
     // the column's height; the tabs take the rest.

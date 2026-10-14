@@ -274,7 +274,7 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             else
                 ++out.manual_shipments;
             out.units_shipped += sent;
-            // BL-1308 (TRADE.md § The trade value record): Traded out — the
+            // BL-1320 (TRADE.md § The trade value record): Traded out — the
             // units bought here x the source's POSTED price, the price
             // commit_trade_shipment bills the purchase at (`posted_price`;
             // `price` is rewritten only at the end of clear_markets, so it is

@@ -108,7 +108,7 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "supply_routes") return overlay_mode::supply_routes;
     if (s == "throughput")  return overlay_mode::throughput;
     if (s == "trade_flow")  return overlay_mode::trade_flow;
-    // BL-1311: a new name, not the retired "country" (see above).
+    // BL-1323: a new name, not the retired "country" (see above).
     if (s == "nations")     return overlay_mode::nations;
     return overlay_mode::none;
 }
@@ -953,7 +953,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
     });
-    // BL-1311: the bordering-colour rule, checked against the LIVE table every
+    // BL-1323: the bordering-colour rule, checked against the LIVE table every
     // surface reads. Returns { clashes, min_distance, pairs, threshold }.
     v.set_function("nation_colour_clashes", [this]() {
         double min_d = 0.0;
@@ -2891,7 +2891,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.market_goods_show_body = on;
     });
 
-    // The market top section's nation list as drawn (BL-1305, superseding
+    // The market top section's nation list as drawn (BL-1317, superseding
     // BL-688's chips) — "no national presence" is a legitimate state that must be
     // distinguishable from "the list is broken", so each row carries the world's
     // own name for the nation beside the one drawn.
@@ -2912,7 +2912,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // The market top section's metrics and layout as drawn (BL-1305), with an
+    // The market top section's metrics and layout as drawn (BL-1317), with an
     // independent read of Sold here off the exchange record, so a check compares
     // two reads rather than restating one.
     v.set_function("market_top", [this]() {
@@ -2939,7 +2939,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         out["world_sold_here"] = world_sold;
 
-        // BL-1308: Traded in / Traded out as drawn, the one-line layout's
+        // BL-1320: Traded in / Traded out as drawn, the one-line layout's
         // baselines, and an INDEPENDENT walk of Traded out. The walk does not
         // read the trade value record: a convoy still at progress 0 left this
         // tick (advance_convoys moves it at the next tick's start), and a
@@ -3122,7 +3122,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // BL-1303: a market's display name, as every surface shows it
+    // BL-1315: a market's display name, as every surface shows it
     // (`ui::market_city_name`) — so a script can count distinct names per body.
     v.set_function("market_name", [this](entity_id mid) -> std::string {
         return ui::market_city_name(m_world, mid);
@@ -3674,7 +3674,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     // A FIXTURE: set a building's workforce target (0–200 internal; shown as target/2 %) directly. Since
-    // BL-1310 no player control writes it (the game steps it each quarter), so
+    // BL-1322 no player control writes it (the game steps it each quarter), so
     // this is the only way a script can stage a starting target; the next
     // econ step moves a player building one 50-internal step (25 % shown) from here. Returns the
     // applied value.
@@ -4509,7 +4509,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return false;
     });
 
-    // BL-1300 (tile card split): the tile element AS DRAWN last frame — the
+    // BL-1312 (tile card split): the tile element AS DRAWN last frame — the
     // tile card's building buttons ({label, detail, good, open, count, first, x,
     // y}), the expanded building card (expanded, player, status, charts, the back
     // control's position), the province card (capacity standing / ceiling and the
@@ -4533,7 +4533,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["is_expanded"]       = (c.expanded != null_entity);
         out["player"]            = c.expanded_player;
         out["charts"]            = c.charts;
-        out["workforce"]         = c.workforce; // BL-1310: the read-only row ("75%"), "" when not drawn
+        out["workforce"]         = c.workforce; // BL-1322: the read-only row ("75%"), "" when not drawn
         out["count"]             = c.count;
         out["title"]             = c.title;
         out["method"]            = c.method;
@@ -5360,7 +5360,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 // be able to wait for it rather than guess a tick count.
                 rec["tile"]   = static_cast<unsigned>(bld_it->second.tile);
                 rec["complete"] = (bld_it->second.ticks_remaining == 0);
-                // BL-1310: the workforce target, so a script can watch the game
+                // BL-1322: the workforce target, so a script can watch the game
                 // step the player's (workforce_step.lua). Ownership is public; the
                 // target is read by the script, never shown for a rival.
                 rec["workforce"] = bld_it->second.workforce_target;

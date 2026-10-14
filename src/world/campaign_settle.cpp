@@ -13,7 +13,7 @@
 #include "world/supply_system.hpp"     // advance / credit / dispatch convoys
 #include "world/trade.hpp"             // run_trades (BL-1266)
 
-#include <algorithm> // std::sort (BL-1309 readings)
+#include <algorithm> // std::sort (BL-1321 readings)
 #include <atomic>
 
 settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int econ_step,
@@ -152,7 +152,7 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
         tap.step = econ_step;
         settle_tick_result tick =
             run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, use);
-        // BL-1309: the readings are COPIES off the tick's result and a const
+        // BL-1321: the readings are COPIES off the tick's result and a const
         // read of the world after it -- write-only, so keeping them moves
         // nothing. Markets in ascending id (the world's map is unordered).
         if (readings != nullptr)

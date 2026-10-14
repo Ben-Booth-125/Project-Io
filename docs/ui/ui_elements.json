@@ -356,7 +356,7 @@
     "docs/ui/ICONS.md § settlement glyph",
     "docs/ui/PLANETARY.md § Market labels"
    ],
-   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier >= 4). A centre that names a market (BL-1303's rule) is named whatever its tier, its label led by the market glyph (BL-1304; PLANETARY.md § Market labels).",
+   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier >= 4). A centre that names a market (BL-1315's rule) is named whatever its tier, its label led by the market glyph (BL-1316; PLANETARY.md § Market labels).",
    "interesting_question": "Colour is deliberately civic-neutral except under the Country lens — why keep tier (size) always visible but ownership colour lens-gated rather than always shown?",
    "resolution": "Settled as a legibility choice: PLANETARY.md states colour applying only under Country is so 'tier stays carried by size, keeping colour out of ownership' — i.e. two orthogonal signals (scale vs. political ownership) are kept on separate channels deliberately.",
    "checks": [
@@ -783,9 +783,9 @@
     "docs/ui/SELECTION.md § The tile element's layout",
     "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "A dedicated four-column layout for a selected tile, with NO header row (Ben, 2026-10-13, BL-1300): zoomed hex neighbourhood | Province card (one header row - title, narrowed capacity bar with a where-granted tooltip, population count right-aligned with the centre list on hover - then a Built / Max / Resource table that scrolls inside itself; the card never scrolls) | Tile card (the tile's buildings, one button per stack, three across) | 2x3 action grid. A canvas press on a built hex selects the tile (round 2). A selected building draws the same element for its host tile with that stack expanded in the tile column and the action grid retargeted to it.",
+   "summary": "A dedicated four-column layout for a selected tile, with NO header row (Ben, 2026-10-13, BL-1312): zoomed hex neighbourhood | Province card (one header row - title, narrowed capacity bar with a where-granted tooltip, population count right-aligned with the centre list on hover - then a Built / Max / Resource table that scrolls inside itself; the card never scrolls) | Tile card (the tile's buildings, one button per stack, three across) | 2x3 action grid. A canvas press on a built hex selects the tile (round 2). A selected building draws the same element for its host tile with that stack expanded in the tile column and the action grid retargeted to it.",
    "interesting_question": "The province card and the tile card split the former centre half at ~265 px each at 1720x1080 - does the expanded building's Profitability chart still read at that width?",
-   "resolution": "Open: NR-1044 records the width (about 60% of the charts' former width); the BL-1300 live click is where it is judged.",
+   "resolution": "Open: NR-1046 records the width (about 60% of the charts' former width); the BL-1312 live click is where it is judged.",
    "checks": [
     "selection_tile_layout",
     "tile_card",
@@ -834,7 +834,7 @@
     "docs/ui/SELECTION.md § The building element's layout",
     "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "Selecting a building (grid button, repeat-click Building rung, ledger row) draws its host tile's element with that stack expanded in the tile column: an unlabelled back control, the name and stack count; the production method (a building with no recipe names what it does - a Port its trade points) and status line, always; for the player's own completed building a profit row (short net chart beside net and expenses per quarter, expenses split on hover; filled from the settle on a fresh campaign, BL-1309) and the workforce target as a read-only bar (the game sets it, BL-1310). A rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Open in ledger (absent on a rival's); Auto's former cell is Reserved.",
+   "summary": "Selecting a building (grid button, repeat-click Building rung, ledger row) draws its host tile's element with that stack expanded in the tile column: an unlabelled back control, the name and stack count; the production method (a building with no recipe names what it does - a Port its trade points) and status line, always; for the player's own completed building a profit row (short net chart beside net and expenses per quarter, expenses split on hover; filled from the settle on a fresh campaign, BL-1321) and the workforce target as a read-only bar (the game sets it, BL-1322). A rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Open in ledger (absent on a rival's); Auto's former cell is Reserved.",
    "interesting_question": "With the standalone building layout gone, is there any route that selects a building WITHOUT showing its tile?",
    "resolution": "Yes, deliberately reversed in round 2 (Ben, 2026-10-13): a canvas press selects the TILE, so a building is reached from the tile card's grid, the repeat-click Building rung or a ledger row - each drawing the host tile's card expanded.",
    "checks": [
@@ -1320,7 +1320,7 @@
     "docs/ui/ledgers/construction.md § Sub-levels",
     "docs/ui/SELECTION.md (Manage ▸ action)"
    ],
-   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a read-only workforce bar (BL-1310: the game sets workforce), the recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
+   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a read-only workforce bar (BL-1322: the game sets workforce), the recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
    "interesting_question": "See UI-047 — this is the other half of the same unresolved Manage-vs-Selection column-ownership question.",
    "resolution": "See UI-047's resolution citation (docs/ui/ledgers/construction.md § Open questions, same finding).",
    "checks": [

@@ -31,7 +31,7 @@
 #include "world/settlement.hpp"      // BL-785: region_domain_of - the three-domain word for a water tile
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
-#include "world/trade.hpp"           // building_trade_points — a trade building's method line (BL-1309)
+#include "world/trade.hpp"           // building_trade_points — a trade building's method line (BL-1321)
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
@@ -356,7 +356,7 @@ struct province_build_row
     resource_type resource;
     int           built = 0;   ///< Extraction sites in the province targeting it.
     int           max   = 0;   ///< Placement slots the province has for it.
-    float         deposit = 0.0f; ///< Summed deposit across member tiles (a stock, BL-1300).
+    float         deposit = 0.0f; ///< Summed deposit across member tiles (a stock, BL-1312).
 };
 
 struct province_build_table
@@ -433,7 +433,7 @@ province_build_table province_builds(const world& w, entity_id tile_id)
         if (cap[r] > 0 || built[r] > 0)
             t.rows.push_back({ static_cast<resource_type>(r), built[r], cap[r], dep[r] });
 
-    // Richest DEPOSIT first (BL-1300: the table merged the former Deposits
+    // Richest DEPOSIT first (BL-1312: the table merged the former Deposits
     // section, whose order was this); room left breaks a tie. Stable over the
     // resource-index order the rows were built in, so the order is pinned.
     std::stable_sort(t.rows.begin(), t.rows.end(),
@@ -447,7 +447,7 @@ province_build_table province_builds(const world& w, entity_id tile_id)
 
 } // namespace
 
-// The expanded building card's PROFIT ROW (BL-1300 round 2; SELECTION.md § The
+// The expanded building card's PROFIT ROW (BL-1312 round 2; SELECTION.md § The
 // building element's layout, item 1 — Ben, 2026-10-13). LEFT, a short "Net, 6 mo."
 // line chart; RIGHT, the net profit per quarter as one figure coloured by sign,
 // with expenses per quarter below it as one figure whose hover splits it into
@@ -607,7 +607,7 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
         }
 
         // selection_kind::building no longer routes here (this rework) — it takes
-        // the tile element with its stack expanded (draw_tile_selection, BL-1300).
+        // the tile element with its stack expanded (draw_tile_selection, BL-1312).
 
         // selection_kind::unit no longer routes here (this rework) — it takes
         // the dedicated 3-column band (draw_unit_selection_body), same shape
@@ -1059,7 +1059,7 @@ void draw_selection_facts(world& w, const recipe_registry& reg,
             draw_activity_section(w, sel);          // BL-089: commercial pulse
             break;
         // selection_kind::building no longer routes here — see
-        // draw_tile_selection (BL-1300).
+        // draw_tile_selection (BL-1312).
         case selection_kind::corporation:
             // BL-408: a corp's facts column is empty today (its detail lives in
             // the ledgers). Under spectator god view it carries the internals
@@ -1178,7 +1178,7 @@ void glyph_reopen(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 }
 
 // (glyph_auto, the Auto toggle's circular arrow, retired with player workforce
-// control — BL-1310.)
+// control — BL-1322.)
 
 // A simple X — the building card's Dismantle glyph (2026-08-15; the
 // Lifecycle page's Dismantle moved onto the action grid under this name).
@@ -1257,7 +1257,7 @@ bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
 
 } // namespace
 
-// --- The expanded building card (BL-1300, tile card split) -----------------
+// --- The expanded building card (BL-1312, tile card split) -----------------
 //
 // SELECTION.md § The building element's layout (Ben, 2026-10-13): a building is
 // NOT a layout of its own. Selecting one draws its host tile's card with that
@@ -1303,7 +1303,7 @@ static std::string draw_building_status_line(const world& w, const recipe_regist
     return line;
 }
 
-// The WORKFORCE ROW, read-only (BL-1310; SELECTION.md § The building element's
+// The WORKFORCE ROW, read-only (BL-1322; SELECTION.md § The building element's
 // layout; PRODUCTION.md § Workforce target and the auto-solver, Ben 2026-10-13).
 // The game sets the player's workforce — one 25 % step a quarter toward the most
 // profitable level — so the slider and the Auto control retired with player
@@ -1314,7 +1314,7 @@ std::string draw_workforce_bar(const building_component& b)
 {
     const int   target = std::clamp(b.workforce_target, 0, workforce_target_max);
     char        pct[16];
-    std::snprintf(pct, sizeof pct, "%d%%", target / 2); // shown as target/2: 200 internal = 100% (BL-1310)
+    std::snprintf(pct, sizeof pct, "%d%%", target / 2); // shown as target/2: 200 internal = 100% (BL-1322)
     const float pct_w = ImGui::CalcTextSize("100%").x;
     const float bar_w = std::max(40.0f, ImGui::GetContentRegionAvail().x - pct_w
                                             - ImGui::GetStyle().ItemSpacing.x);
@@ -1626,7 +1626,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
     }
 }
 
-// The action grid RETARGETED to an expanded building (BL-1300; SELECTION.md
+// The action grid RETARGETED to an expanded building (BL-1312; SELECTION.md
 // § The building element's layout, item 2). The same 2x3 cell layout as the
 // tile's grid, holding the building's four actions — the element's designated
 // place to ACT, while the cards present. Lifted out of the retired standalone
@@ -1697,7 +1697,7 @@ void draw_building_actions(world& w, const recipe_registry& reg, ui_state& ui, e
         ImGui::EndPopup();
     }
 
-    // Mothball's column one row down was Auto (workforce autosolve). BL-1310
+    // Mothball's column one row down was Auto (workforce autosolve). BL-1322
     // (Ben, 2026-10-13): the game sets the player's workforce with no opt-out,
     // so Auto retired with the slider and its cell is Reserved.
     tile_icon_button("##bld_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
@@ -2108,7 +2108,7 @@ province_pop_table province_population(const world& w, entity_id tile_id)
     return t;
 }
 
-// ── The TILE CARD (BL-1300, tile card split) ──────────────────────────────
+// ── The TILE CARD (BL-1312, tile card split) ──────────────────────────────
 //
 // SELECTION.md § The tile element's layout, item 3 (Ben, 2026-10-13): one
 // titled card, the buildings on this tile and nothing else. TILE GRAIN, because
@@ -2393,7 +2393,7 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
     }
 }
 
-/// What a building DOES, in one line (BL-1309; SELECTION.md § The building
+/// What a building DOES, in one line (BL-1321; SELECTION.md § The building
 /// element's layout: "Every card shows its method and status line, always").
 /// A recipe building names its method; a building with no recipe names what it
 /// does instead, from the real fields that decide it — a trade building its
@@ -2469,17 +2469,17 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
 ///   - the profit row (draw_building_profit): a short net chart beside net and
 ///     expenses per quarter;
 ///   - the workforce row: a read-only bar and percentage (draw_workforce_bar,
-///     BL-1310 — the game sets it).
+///     BL-1322 — the game sets it).
 /// The profit and workforce rows need the player's own COMPLETED building (the
-/// profit row also needs a reading — a fresh campaign has the settle's, BL-1309).
+/// profit row also needs a reading — a fresh campaign has the settle's, BL-1321).
 /// A rival's card is the header, owner and an explicit `private` row; under
 /// spectator god view it opens the method, real rows and profit row (BL-408).
-/// The card holds no lever (BL-1310).
+/// The card holds no lever (BL-1322).
 void draw_expanded_building_card(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui, entity_id tile_id,
                                  entity_id bid, const std::vector<production_stack>& stacks)
 {
-    const building_component& b = w.buildings.at(bid); // the card writes nothing (BL-1310)
+    const building_component& b = w.buildings.at(bid); // the card writes nothing (BL-1322)
     const bool          god  = ui.spectating && ui.god_view;
     const bool          mine = is_player_owned(w, bid);
     const bool          open = mine || god;
@@ -2524,7 +2524,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
     // ── The production method, then the status line ──
     // Open only: a rival's recipe is private (DISCOVERY.md § The operational fog).
-    // BL-1309: drawn always — before the first quarter and for a building with
+    // BL-1321: drawn always — before the first quarter and for a building with
     // no recipe, which names what it does instead (building_method_line).
     if (open)
     {
@@ -2561,7 +2561,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
     }
 
     // ── The workforce row: the player's own building only, READ-ONLY ──
-    // (BL-1310: the game sets it; god view grants sight of a rival's profit row
+    // (BL-1322: the game sets it; god view grants sight of a rival's profit row
     // above, and nothing here was ever a rival's.)
     if (mine)
     {
@@ -2663,7 +2663,7 @@ void draw_water_facts_column(const world& w, entity_id sel, const tile_component
     ImGui::EndChild();
 }
 
-// ── The PROVINCE CARD (BL-1300, tile card split) ──────────────────────────
+// ── The PROVINCE CARD (BL-1312, tile card split) ──────────────────────────
 //
 // SELECTION.md § The tile element's layout, item 2 (Ben, 2026-10-13): one
 // titled card, province grain throughout, the selected tile serving only to
@@ -2895,7 +2895,7 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
     ImGui::EndChild();
 }
 
-// The tile element (BL-1300; SELECTION.md § The tile element's layout): four
+// The tile element (BL-1312; SELECTION.md § The tile element's layout): four
 // columns, left to right — Preview, Province, Tile, Actions — and NO header row:
 // the shared `[icon] Tile [x, y] [>]` row spent a line of the band on a name the
 // canvas already shows and a 'go to' that is a no-op for a tile.
@@ -3101,7 +3101,7 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         }
         ImGui::SameLine();
 
-        // No Manage Buildings (BL-1300): the tile card's building grid IS the
+        // No Manage Buildings (BL-1312): the tile card's building grid IS the
         // tile's buildings, one press from each.
         tile_icon_button("##act_history", bsz, /*enabled=*/false,
                          "History (not yet available)", glyph_clock);
@@ -3251,7 +3251,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // (BL-1241) is re-raised by the two views that draw the zoomed ground (the
     // tile card, the battle card) every frame they draw; dropped here, so a
     // selection that draws neither stops the ground layer baking a stale
-    // region. The tile card's verify readout (BL-1300) is refilled only by a
+    // region. The tile card's verify readout (BL-1312) is refilled only by a
     // frame that draws the tile element.
     ui.ground_neigh_req.valid = false;
     ui.tile_card = {};
@@ -3310,7 +3310,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     if (kind == selection_kind::none)
         return;
 
-    // A selected TILE and a selected BUILDING are one element (BL-1300,
+    // A selected TILE and a selected BUILDING are one element (BL-1312,
     // SELECTION.md § Multi-building tiles): a building draws its host tile's card
     // with its stack expanded. Both are dispatched before the shared header,
     // because the tile element draws none — its 'go to' is a no-op and the
