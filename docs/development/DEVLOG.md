@@ -10,6 +10,40 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-14 — Sprint 54: UI improvements, run beside sprint 53
+
+**Runtime:** 2026-10-12 to 2026-10-14; Design on each of Ben's walks, then Delivery Full in lanes
+(one worktree agent per item), merged and live-clicked the same day.
+
+### Built (BL-1312..BL-1323; ids renumbered +12 at the merge, sprint 53 had minted BL-1300..1307)
+- **Tile card split** (BL-1312): no header for a tile; preview | province card (capacity bar with a
+  where-granted tooltip, Built / Max / Resource, population on hover) | tile card (buildings three
+  across, profit per quarter; a pressed stack expands in place with method, net/expenses beside a short
+  chart, read-only workforce) | actions. A canvas press opens the tile's building list.
+- **Preview loading bar** (BL-1313), **bottom strip +20 px** (BL-1314).
+- **Markets**: unique names from the largest city in each catchment (BL-1315) plus unique city names
+  per body; labels on market cities under the Market lens only (BL-1316); distinct catchment colours;
+  the ledger's nation list and Sold / In / Out (BL-1317) over the new trade value record (BL-1320).
+- **Nation name cap** at 20 (BL-1318); **Nations lens** with no two bordering nations alike (BL-1323).
+- **Settle readings reach play** (BL-1321): a fresh campaign opens on the settle's last quarter.
+- **Workforce stepped auto** (BL-1322): the game steps the player's (and its state industry's) workforce
+  25 % a quarter toward the best; 100 % is the label for full employment; player verbs retired.
+- Lens-paired ledgers disarm on close; the orphaned resource history drill and its chart retired.
+
+### Found and fixed on the way
+- The Debug app died at startup (0xC00000FD) on every `--verify` run: `app` on the 1 MB stack seven
+  times over. Fixed on both branches independently; main's version kept.
+
+### Measured, not re-blessed
+- Names (city uniqueness, the cap) and the workforce step move D_land/D_settle/D_seat; folded into
+  BL-1277 (tech wave re-bless) — `drafts/sprint-54-name-movement.md`. A first workforce build capped at
+  100 halved field income (32.6k -> 16.6k); Ben ruled the cap a label and income returned (32.2k).
+
+### Left open
+- BL-1319 (fixture base stall): 12 verify scripts fail in `stage_ui_fixture`, predating this sprint.
+
+---
+
 ## 2026-10-11 — Sprint 53 designed; sprints 50 and 52 onto main and cut — version 0.1.30
 
 **Runtime:** 2026-10-10 to 2026-10-11; modes Design (the nation identity, the generation targets, the
