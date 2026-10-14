@@ -220,6 +220,7 @@ inline void invalidate_logistics_caches(world& w)
     w.leg_flood_fields.clear();       // BL-1186: the leg-confined floods and pairs, and the
     w.leg_path_cache.clear();         // per-body port set (a port completing or idling moves
     w.body_port_tiles.clear();        // it: building_affects_logistics), on the same contract
+    w.rail_networks.clear();          // BL-1255: stations and track move it, same contract
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
                                       // on exactly the events the three above do
@@ -234,7 +235,8 @@ inline void invalidate_logistics_caches(world& w)
 /// nor traversal, so its completion/idle/demolition needs no cache clear.
 inline bool building_affects_logistics(building_type t)
 {
-    return t == building_type::port || t == building_type::inland_logistics_hub;
+    return t == building_type::port || t == building_type::inland_logistics_hub
+        || t == building_type::railway_station; // BL-1255: a station joins the rail network
 }
 
 // ---------------------------------------------------------------------------
@@ -453,3 +455,51 @@ int convoy_lane_index(const std::vector<float>& at, float progress);
 /// an inter-body leg in transit, an unresolved endpoint, or an unreachable
 /// lane. The interdiction trigger's single question.
 entity_id convoy_tile_at(world& w, const convoy_component& cv);
+
+// ---------------------------------------------------------------------------
+// Railways (BL-1255 — LOGISTICS.md § 4c, Ben 2026-10-13)
+// ---------------------------------------------------------------------------
+// A railway is a network of its own: track laid tile to tile (`world::rail_track`),
+// entered and left only at a railway station. A rail leg runs station to station
+// over connected track; its length is the count of track STEPS (track is graded:
+// terrain does not weight it, and no road discount applies). The grid is the one
+// every traversal reader walks: four cardinal steps, columns wrapping.
+//
+// THE CUT (§ 7, "interdiction cuts a rail line as it cuts a road"): a track tile
+// on which a unit stands whose owner has DECLARED hostility toward the track's
+// operator (the owning corporation, or a nation's champion) is cut — the line does
+// not pass it, so the stations beyond it are stranded. Read fresh on every network
+// read (units move every tick); the derived network rebuilds when the set changes.
+
+/// Whether @p tile carries rail track.
+bool tile_has_track(const world& w, entity_id tile);
+
+/// Whether @p tile has track on it or on one of its four neighbours — a station's
+/// placement condition ("on a city tile touching a rail line").
+bool tile_touches_track(world& w, entity_id tile);
+
+/// The corporation that operates track owned by @p owner: the corporation itself,
+/// or a nation's champion. Null for unowned track.
+entity_id rail_operator(const world& w, entity_id owner);
+
+/// The track tiles on @p body currently cut by a hostile unit, ascending.
+std::vector<entity_id> rail_cut_tiles(const world& w, entity_id body);
+
+/// The rail network of @p body as the router reads it (built, active stations
+/// touching track; steps between each pair over uncut track). Derived, cached.
+const world::rail_network& body_rail_network(world& w, entity_id body);
+
+/// The rail leg from station tile @p a to station tile @p b: the tile sequence
+/// a -> ... -> b over uncut track (both station tiles included), and its cost in
+/// track steps. Unreachable when the stations are not joined.
+/// @p respect_cuts false reads the physical track (a convoy's lane: a hostile unit
+/// standing on the line must still be ON the lane to intercept the cargo).
+logistics_path rail_leg_path(world& w, entity_id body, entity_id a, entity_id b,
+                             bool respect_cuts = true);
+
+/// Travel days for a rail leg of @p steps track steps.
+float rail_travel_days(const world& w, entity_id body, float steps);
+
+/// Rail speed, km per day: a goods train at an era-appropriate average, an
+/// order of magnitude over the caravan (25) and three times the coaster (130).
+inline constexpr float rail_km_per_day = 400.0f;

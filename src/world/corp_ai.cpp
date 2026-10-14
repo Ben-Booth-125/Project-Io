@@ -430,6 +430,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::idle:          return "idle";
         case corp_verb::resume:        return "resume";
         case corp_verb::place_road:    return "road placement";
+        case corp_verb::lay_track:     return "track laying"; // BL-1255
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";
@@ -1999,6 +2000,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 continue;
             if (b.state_idle)
                 continue; // BL-1296: unfunded this tick — nothing ran to judge
+            // BL-1255: no dial on a railway station — no grant lets the AI act on
+            // rail (AI_OPPONENT.md § 11); a station's value is the network's.
+            if (b.type == building_type::railway_station)
+                continue;
             // BL-1235 (dial hold outlasts reflex): the hold on a plant the dial
             // zeroed ends the moment that plant's own forecast recovers — the
             // solver, asked exactly as the dial candidate below asks it, would

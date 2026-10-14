@@ -604,3 +604,29 @@ void stamp_sea_lanes(world& w, entity_id body,
                      sea_lane_stats* stats = nullptr,
                      sea_lane_trace* trace = nullptr,
                      int reuse_cost_q = kSeaLaneReuseCostQ);
+
+// ---------------------------------------------------------------------------
+// Rail track, STAMPED FROM the rail record (BL-1255)
+// ---------------------------------------------------------------------------
+//
+// LOGISTICS.md sec 4c / INDUSTRIALISATION.md sec Who lays rail: a realm that
+// leans into works lays rail links between its regions in the Industrialisation
+// span (`history_sim_state::rail_links`); this pass lays each link onto the tile
+// grid as TRACK (`world::rail_track`) along the cheapest LAND path between the
+// two regions' seats -- the road the corridor already runs, priced as every
+// traversal reader prices it. The track is laid UNOWNED: the fold hands it over
+// (`hand_over_rail`, state_industry.hpp), when majors are known. Deterministic:
+// links in record order, the path a pure function of the grid, the field a set.
+// A link whose seats have no land path between them is skipped and counted.
+// Purely additive; no-op when the record is empty (every span but
+// Industrialisation, and every fixture that runs none).
+struct rail_stamp_stats
+{
+    int links   = 0; ///< links read
+    int laid    = 0; ///< links laid onto the grid
+    int skipped = 0; ///< links with no land path (or a seat off the grid)
+    int tiles   = 0; ///< distinct track tiles on the body afterwards
+};
+rail_stamp_stats stamp_history_rail(world& w, entity_id body,
+                                    const std::vector<history_road_node>& nodes,
+                                    const std::vector<std::pair<int, int>>& links);

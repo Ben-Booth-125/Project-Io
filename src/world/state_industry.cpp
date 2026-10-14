@@ -7,6 +7,8 @@
 #include "market_clearing.hpp" // market_for_tile
 #include "recipe_registry.hpp"
 #include "world.hpp"
+#include "logistics.hpp"       // BL-1255: tile_touches_track, invalidate_logistics_caches
+#include <set>
 
 #include <algorithm>
 #include <cmath>
@@ -36,6 +38,7 @@ strategic_sector strategic_sector_of(const recipe_registry& reg, building_type t
     {
         case building_type::port:
         case building_type::inland_logistics_hub:
+        case building_type::railway_station: // BL-1255: rail is transport infrastructure
             return strategic_sector::transport;
         case building_type::launchpad:
             return strategic_sector::space;
@@ -70,6 +73,11 @@ strategic_sector strategic_sector_of(const recipe_registry& reg, const building_
 
 bool state_runs(const recipe_registry& reg, building_type type, std::uint16_t recipe)
 {
+    // BL-1255: a railway station is state industry outright (LOGISTICS.md § 4c,
+    // NATIONS.md § State industry) — it carries no corporation-only machinery:
+    // the router reads every active station, whoever owns it.
+    if (type == building_type::railway_station)
+        return true;
     return type == building_type::processing_facility
         && strategic_sector_of(reg, type, recipe) != strategic_sector::none;
 }
@@ -428,4 +436,99 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
     if (const auto lit = w.state_ledger.find(nation); lit != w.state_ledger.end())
         committed = lit->second.committed;
     return std::max(0.0f, nit->second.treasury - committed);
+}
+
+// ---------------------------------------------------------------------------
+// BL-1255 -- the rail handover (see the header)
+// ---------------------------------------------------------------------------
+rail_handover_report hand_over_rail(world& w)
+{
+    rail_handover_report out;
+    if (w.rail_track.empty())
+        return out;
+
+    // A minor's background firm: the lowest-id one homed there.
+    std::map<entity_id, entity_id> firm_of;
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [cid, cc] : w.corporations)
+            if (cc.is_background)
+                ids.push_back(cid);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id cid : ids)
+            firm_of.emplace(w.corporations.at(cid).home_nation, cid);
+    }
+    const auto owner_for = [&](entity_id tile) -> entity_id {
+        const auto tn = w.tile_to_nation.find(tile);
+        if (tn == w.tile_to_nation.end() || tn->second == null_entity)
+            return null_entity;
+        if (is_major_nation(w, tn->second))
+            return tn->second;
+        const auto f = firm_of.find(tn->second);
+        return f != firm_of.end() ? f->second : null_entity;
+    };
+
+    std::map<entity_id, int> per_owner;
+    for (auto& [tile, owner] : w.rail_track)
+    {
+        ++out.track_tiles;
+        if (owner == null_entity)
+            owner = owner_for(tile);
+        if (owner == null_entity)
+            ++out.unowned;
+        else
+        {
+            ++per_owner[owner];
+            if (w.nations.count(owner) != 0) ++out.to_nations; else ++out.to_firms;
+        }
+    }
+    out.per_owner_tiles.assign(per_owner.begin(), per_owner.end());
+
+    // Stations: every city tile touching track, ascending tile id.
+    std::vector<entity_id> cities;
+    for (const auto& [centre, ctile] : w.population_centre_tile)
+    {
+        (void)centre;
+        cities.push_back(ctile);
+    }
+    std::sort(cities.begin(), cities.end());
+    cities.erase(std::unique(cities.begin(), cities.end()), cities.end());
+    std::set<entity_id> has_station;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::railway_station)
+            has_station.insert(b.tile);
+    for (const entity_id tile : cities)
+    {
+        if (has_station.count(tile) != 0 || !tile_touches_track(w, tile))
+            continue;
+        const entity_id owner = owner_for(tile);
+        if (owner == null_entity)
+            continue;
+        const entity_id bid = w.create_entity();
+        building_component bc;
+        bc.tile               = tile;
+        bc.type               = building_type::railway_station;
+        bc.workforce_assigned = 0.0f; // zero staff, the port's shape
+        bc.ticks_remaining    = 0;    // stands complete, as every generation holding does
+        w.buildings[bid]  = bc;
+        w.stockpiles[bid] = stockpile_component{};
+        if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        {
+            nit->second.state_assets.push_back(bid);
+            ++out.station_nations;
+        }
+        else
+            w.corporations.at(owner).assets.push_back(bid);
+        ++out.stations;
+    }
+    invalidate_logistics_caches(w);
+    return out;
+}
+
+void print_rail_handover(const rail_handover_report& r)
+{
+    std::printf("[rail] handover: %d track tiles (%d to majors, %d to minors' firms, %d unowned), "
+                "%d stations (%d a major's)\n",
+                r.track_tiles, r.to_nations, r.to_firms, r.unowned, r.stations, r.station_nations);
+    std::fflush(stdout);
 }

@@ -201,6 +201,21 @@ void apply_budget(world& w,
     // that produced it.
     std::map<entity_id, quarterly_return> filed_returns;
 
+    // BL-1255 (LOGISTICS.md § 4c; NATIONS.md § State industry: "upkeep per
+    // tile"): the TRACK'S UPKEEP, a maintenance charge per owned track tile —
+    // a background firm's in the corporation pass below, a major's in the state
+    // pass. Integer tile counts per owner (std::map, ascending), so the bill is a
+    // pure function of the track field. Unowned track bills no one. Empty, and
+    // every term below adds nothing, on a world with no rail.
+    std::map<entity_id, int> rail_tiles_of;
+    for (const auto& [tile, owner] : w.rail_track)
+    {
+        (void)tile;
+        if (owner != null_entity)
+            ++rail_tiles_of[owner];
+    }
+    const float rail_upkeep = reg.rail().track_upkeep_per_tile;
+
     for (auto& [corp, cc] : w.corporations)
     {
         // BL-626: the opening balance, captured before a single flow lands. The
@@ -290,6 +305,15 @@ void apply_budget(world& w,
             delta           -= opex.maintenance;
             bud.wages       += opex.wages;
             delta           -= opex.wages;
+        }
+
+        // BL-1255: a background firm's track (a minor's line), maintenance like
+        // any building's.
+        if (const auto rt = rail_tiles_of.find(corp); rt != rail_tiles_of.end() && rail_upkeep > 0.0f)
+        {
+            const float bill = rail_upkeep * static_cast<float>(rt->second);
+            bud.maintenance += bill;
+            delta           -= bill;
         }
 
         // BL-454: standing-force upkeep — its OWN term, after the buildings and
@@ -459,7 +483,7 @@ void apply_budget(world& w,
     {
         std::vector<entity_id> state_nations;
         for (const auto& [nid, nc] : w.nations)
-            if (!nc.state_assets.empty())
+            if (!nc.state_assets.empty() || rail_tiles_of.count(nid) != 0) // BL-1255: or track
                 state_nations.push_back(nid);
         std::sort(state_nations.begin(), state_nations.end());
         for (const entity_id nid : state_nations)
@@ -499,6 +523,17 @@ void apply_budget(world& w,
                 delta           -= opex.maintenance;
                 led.wages       += opex.wages;
                 delta           -= opex.wages;
+            }
+            // BL-1255: the nation's track, after its buildings. NEVER DEBT: the
+            // funding gate did not commit it, so it pays what the treasury holds
+            // after the rest of the settlement; the shortfall goes unpaid, never
+            // minted (the state's rule).
+            if (const auto rt = rail_tiles_of.find(nid); rt != rail_tiles_of.end() && rail_upkeep > 0.0f)
+            {
+                const float bill = rail_upkeep * static_cast<float>(rt->second);
+                const float paid = std::clamp(bill, 0.0f, std::max(0.0f, nc.treasury + delta));
+                led.maintenance += paid;
+                delta           -= paid;
             }
             nc.treasury       += delta;
             led.treasury_close = nc.treasury;

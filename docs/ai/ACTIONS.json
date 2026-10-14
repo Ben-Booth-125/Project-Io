@@ -394,6 +394,66 @@
    "reason_to_select": "The player runs its nation's strategic sectors — steel, energy, arms, space — beside its champion's private book (NATIONS.md § State industry). Build a state plant where the nation needs strategic capacity its firms will not supply; dial or idle one whose costs the treasury should not carry; demolish one to dispose of it (there is no privatisation verb)."
   },
   {
+   "id": "gameplay.lay_track",
+   "family": "gameplay",
+   "surface": "The command seam only (--serve / MCP `issue_command` verb `lay_track` with `nation`, and the verify API's `corp_command{verb=lay_track, as_nation=...}`). No canvas control yet: the rail rendering and its build tool are a separate lane (RENDERING.md).",
+   "press": "Issue corp_verb 36 (`lay_track`) with `corp` = the seat, `nation` = the seat's home nation and `tile` = the tile to lay.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "entity_id",
+     "meaning": "The tile to lay one tile of rail track on."
+    },
+    {
+     "name": "nation",
+     "type": "entity_id (wire key `nation`; corp_command::as_nation)",
+     "meaning": "The nation laying (and paying for) the track: the seat's home nation. Omitted = the corporation's own book, which lays no track (rejected_invalid)."
+    }
+   ],
+   "preconditions": [
+    "Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).",
+    "`corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): the player's nation lays track; no rival does (no AI_OPPONENT.md § 11 grant covers rail).",
+    "The tile exists (rejected_invalid), is land, carries no track yet, and is the nation's own ground (rejected_placement).",
+    "The tile EXTENDS one of the nation's own lines (a cardinal neighbour is its track) or OPENS a line at a city (rejected_placement otherwise).",
+    "The railway exists in the campaign's era (rejected_era_locked).",
+    "The treasury's UNCOMMITTED part covers `rail.track_build_cost` + `rail.track_steel_per_tile` x the tile market's steel price (rejected_funds).",
+    "A rejection mutates nothing."
+   ],
+   "expected_output": "The tile carries the nation's rail track at once, and the price leaves the treasury up front (like a road). From the next settlement the tile bills `rail.track_upkeep_per_tile` a tick to the treasury (never below zero). Track carries goods only between STATIONS: a haul boards at a station, rides connected track no hostile unit stands on, and leaves at another, chosen by the router only where road -> rail -> road is cheaper than the road alone.",
+   "reason_to_select": "Cheapen the nation's long land hauls: a line between two cities with stations moves goods at a fraction of the road's cost per tile, so markets far apart overland trade where they could not."
+  },
+  {
+   "id": "gameplay.build_station",
+   "family": "gameplay",
+   "surface": "The command seam only (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`). No canvas control yet (a separate lane).",
+   "press": "Issue corp_verb 0 (`build`) with `type` = 11 (railway_station), `tile` = a city tile touching the nation's track, `corp` = the seat and `nation` = the seat's home nation.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "entity_id",
+     "meaning": "A city tile with rail track on it or on a cardinal neighbour."
+    },
+    {
+     "name": "type",
+     "type": "building_type",
+     "meaning": "11 (railway_station)."
+    },
+    {
+     "name": "nation",
+     "type": "entity_id (wire key `nation`)",
+     "meaning": "The seat's home nation; a station is state industry and is never built on a corporation's own book (rejected_invalid)."
+    }
+   ],
+   "preconditions": [
+    "As gameplay.lay_track's wire, seat and champion rules (rejected_invalid / rejected_not_owner); no recipe is named (rejected_invalid).",
+    "The tile is the nation's own ground, a CITY (a population centre) touching track, and holds no station yet (rejected_placement), plus the ordinary era and reach gates.",
+    "Its whole capex fits the treasury's uncommitted part (rejected_funds).",
+    "A rejection mutates nothing."
+   ],
+   "expected_output": "A Railway Station site joins the nation's state industry (zero staff, built pay-as-you-build from the treasury, maintenance once standing). Complete, it is where goods board and leave the rail network.",
+   "reason_to_select": "A line with no station carries nothing: put a station at each city the line should serve."
+  },
+  {
    "id": "gameplay.survey",
    "family": "gameplay",
    "surface": "The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey).",

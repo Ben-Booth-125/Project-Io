@@ -2159,6 +2159,7 @@ void run_industrialisation(generation_cursor& c)
         //     chest and one conquered after 1660 is credited none.
         kepler_corridors         = kepler_industrialisation.surviving_corridors;
         c.kepler_sea_legs        = kepler_industrialisation.sea_legs; // BL-1098: 1960's lanes
+        c.kepler_rail_links      = kepler_industrialisation.rail_links; // BL-1255: the span's rail
         merge_trade_record(c.kepler_trade_record, kepler_industrialisation.trade_record); // BL-1268
         kepler_grudges           = kepler_industrialisation.grudges;
         kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
@@ -2744,6 +2745,28 @@ void run_tail(generation_cursor& c)
         const history_sim_params lp = exploration_sim_params(params);
         stamp_sea_lanes(w, kepler, lane_nodes, c.kepler_sea_legs, kepler_region_polity, lp.sea_lane_tier1_uses,
                         lp.sea_current_weight_q, lp.sea_current_rotation_sense);
+    }
+
+    // RAIL TRACK, STAMPED FROM THE RAIL RECORD (BL-1255; LOGISTICS.md § 4c,
+    // INDUSTRIALISATION.md § Who lays rail). The links works-leaning realms laid in
+    // the Industrialisation span, laid onto the grid along the land road between
+    // the two seats -- after the road stamps, so the line follows the roads the
+    // history built. Unowned until the fold hands it over. No-op when the span did
+    // not run.
+    if (!c.kepler_rail_links.empty())
+    {
+        std::vector<history_road_node> rail_nodes;
+        rail_nodes.reserve(kepler_settlement.regions.size());
+        for (const region& p : kepler_settlement.regions)
+            rail_nodes.push_back(history_road_node{ p.col, p.row, p.work_reach_mod });
+        std::vector<std::pair<int, int>> links;
+        links.reserve(c.kepler_rail_links.size());
+        for (const history_rail_link& l : c.kepler_rail_links)
+            links.emplace_back(static_cast<int>(l.a), static_cast<int>(l.b));
+        const rail_stamp_stats rs = stamp_history_rail(w, kepler, rail_nodes, links);
+        std::printf("[rail] %d links laid of %d (%d skipped), %d track tiles\n",
+                    rs.laid, rs.links, rs.skipped, rs.tiles);
+        std::fflush(stdout);
     }
 
     // Attach installations to the first two land tiles found in raster order.

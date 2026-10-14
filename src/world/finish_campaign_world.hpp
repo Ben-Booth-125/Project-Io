@@ -105,6 +105,7 @@ struct finish_campaign_result
     marketplace_retrofit_report retrofit;
     /// BL-1296: what the state-industry handover passed to the majors.
     state_handover_report   state;
+    rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
     /// Wall clock of the search and of the settle, milliseconds -- REPORTED
     /// ONLY, on the BL-754 footing; the loading bar's weights are re-measured
     /// from these, never read from them at run time.

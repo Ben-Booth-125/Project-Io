@@ -416,7 +416,16 @@ inline constexpr uint32_t world_save_magic =
 /// state industry -- every major's strategic plants stay with the firms that
 /// held them -- and its next save is a v48 stream with an empty section. Every
 /// other version is refused whole.
-inline constexpr uint32_t world_save_version = 48;
+/// Bumped to 49 by BL-1255 (railways; LOGISTICS.md § 4c, Ben 2026-10-13): a
+/// TRAILING SECTION after state industry -- the rail track field (tile, owner)
+/// ascending by tile, then each convoy riding a rail route as (id, boarding
+/// station, alighting station). Nothing else moves, so v48 is a STRICT PREFIX of
+/// v49 and is read too (`k_world_save_version_pre_rail`), as a world with no rail;
+/// v47 still reads (no state industry, no rail). Every other version is refused.
+inline constexpr uint32_t world_save_version = 49;
+
+/// BL-1255: v48, a strict prefix of v49 (the rail section is v49's only addition).
+inline constexpr uint32_t k_world_save_version_pre_rail = 48;
 
 /// BL-1296: the one predecessor `read_world_snapshot` still accepts -- v47, a
 /// strict prefix of v48 (the state-industry section is v48's only addition).

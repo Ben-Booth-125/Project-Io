@@ -2,6 +2,8 @@
 #include "river_generation.hpp"
 #include "hex_neighbors.hpp" // BL-1186: a port reaches its sea across any hex side
 #include "road_generation.hpp" // BL-1230: kMaxCrossingTiles, the strait a road crosses
+#include "stance.hpp" // BL-1255: is_hostile, the rail cut reads declared hostility
+#include <array>
 
 #include <algorithm>
 #include <cmath>
@@ -1400,6 +1402,25 @@ bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_doma
     return true;
 }
 
+/// BL-1255: append a RAIL leg station @p from -> station @p to (rail_leg_path,
+/// already oriented from -> to), at rail speed. Same shared-tile rule as append_leg.
+bool append_rail_leg(world& w, entity_id body, entity_id from, entity_id to,
+                     std::vector<entity_id>& out, std::vector<lane_leg>& legs)
+{
+    const logistics_path lp = rail_leg_path(w, body, from, to, /*respect_cuts=*/false);
+    if (!lp.reachable || lp.tiles.empty())
+        return false;
+    std::size_t k = 0;
+    if (!out.empty() && out.back() == lp.tiles.front())
+        k = 1;
+    lane_leg leg;
+    leg.first = (k == 1) ? out.size() - 1 : out.size();
+    leg.days  = rail_travel_days(w, body, lp.cost);
+    out.insert(out.end(), lp.tiles.begin() + static_cast<std::ptrdiff_t>(k), lp.tiles.end());
+    legs.push_back(leg);
+    return true;
+}
+
 /// THE CLOCK ALONG THE LANE (BL-1195). `at[i]` is the fraction of the whole journey's
 /// time spent when the cargo reaches tile i: 0 at the origin, 1 at the destination.
 /// Each leg takes its own days (caravan overland, coastal by sea — roughly five times
@@ -1531,7 +1552,19 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     // vision beam, interdiction and capture on ground the cargo never crosses. The
     // Ports are fixed at dispatch; each leg's path is read from the network as it
     // stands now.
-    if (cv.port_a != null_entity && cv.port_b != null_entity)
+    if (cv.station_a != null_entity && cv.station_b != null_entity)
+    {
+        // BL-1255: road -> rail -> road through the two stations fixed at dispatch.
+        // The rail leg is the physical track as it stands now, cut or not: a hostile
+        // unit standing on the line is ON the lane, so the sweep intercepts the cargo
+        // there exactly as it would on a road (§ 7). Track since lifted: no lane.
+        if (!append_leg(w, body, st, cv.station_a, leg_domain::land, convoy_mode::land, tiles, legs)
+            || !append_rail_leg(w, body, cv.station_a, cv.station_b, tiles, legs)
+            || !append_leg(w, body, cv.station_b, dt, leg_domain::land, convoy_mode::land, tiles,
+                           legs))
+            return route;
+    }
+    else if (cv.port_a != null_entity && cv.port_b != null_entity)
     {
         if (!append_leg(w, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs)
             || !append_leg(w, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
@@ -1613,4 +1646,222 @@ entity_id convoy_tile_at(world& w, const convoy_component& cv)
     if (head < 0)
         return null_entity;
     return route.tiles[static_cast<std::size_t>(head)];
+}
+
+// ---------------------------------------------------------------------------
+// Railways (BL-1255) — see logistics.hpp
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The four cardinal neighbours of grid cell (x, y) on a gw x gh grid, columns
+/// wrapping; -1 for a step off the top or bottom edge. Fixed order N, E, S, W.
+std::array<int, 4> rail_neighbours(int x, int y, int gw, int gh)
+{
+    std::array<int, 4> n{-1, -1, -1, -1};
+    if (y > 0)      n[0] = (y - 1) * gw + x;
+    n[1] = y * gw + ((x + 1) % gw);
+    if (y + 1 < gh) n[2] = (y + 1) * gw + x;
+    n[3] = y * gw + ((x + gw - 1) % gw);
+    return n;
+}
+
+} // namespace
+
+bool tile_has_track(const world& w, entity_id tile)
+{
+    return tile != null_entity && w.rail_track.count(tile) != 0;
+}
+
+bool tile_touches_track(world& w, entity_id tile)
+{
+    if (tile_has_track(w, tile))
+        return true;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end() || w.rail_track.empty())
+        return false;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return false;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, tit->second.body);
+    for (const int ni : rail_neighbours(tit->second.grid_x, tit->second.grid_y, gw, gh))
+        if (ni >= 0 && static_cast<std::size_t>(ni) < grid.size()
+            && tile_has_track(w, grid[static_cast<std::size_t>(ni)]))
+            return true;
+    return false;
+}
+
+entity_id rail_operator(const world& w, entity_id owner)
+{
+    if (owner == null_entity)
+        return null_entity;
+    if (w.corporations.count(owner) != 0)
+        return owner;
+    if (w.nations.count(owner) != 0)
+        return champion_of(w, owner);
+    return null_entity;
+}
+
+std::vector<entity_id> rail_cut_tiles(const world& w, entity_id body)
+{
+    std::vector<entity_id> cut;
+    if (w.rail_track.empty() || w.units.empty() || w.corp_hostile_pairs.empty())
+        return cut;
+    for (const auto& [uid, uc] : w.units)
+    {
+        (void)uid;
+        if (uc.position == null_entity || uc.owner == null_entity || uc.count <= 0)
+            continue;
+        const auto rt = w.rail_track.find(uc.position);
+        if (rt == w.rail_track.end())
+            continue;
+        const auto tit = w.tiles.find(uc.position);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        const entity_id op = rail_operator(w, rt->second);
+        if (op != null_entity && uc.owner != op && is_hostile(w, uc.owner, op))
+            cut.push_back(uc.position);
+    }
+    // Sorted and unique: the unit walk is unordered, the set is not.
+    std::sort(cut.begin(), cut.end());
+    cut.erase(std::unique(cut.begin(), cut.end()), cut.end());
+    return cut;
+}
+
+namespace {
+
+/// BFS over uncut track from station tile @p from: per raster cell, the step
+/// count (-1 unreached) and the parent cell. Expansion runs from the start and
+/// from track tiles only; a non-track tile beside the line (a station standing
+/// next to it) is reached as a SINK and never expanded, so a train never runs
+/// across open ground. The first step out of the start must land on track
+/// unless the start itself is track. Neighbour order is fixed (N, E, S, W) and
+/// the frontier is FIFO, so the parent chain is a pure function of the grid.
+void rail_bfs(world& w, entity_id body, entity_id from, const std::vector<entity_id>& cut,
+              std::vector<int>& dist, std::vector<int>& parent)
+{
+    const auto bit = w.bodies.find(body);
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    dist.assign(grid.size(), -1);
+    parent.assign(grid.size(), -1);
+    const auto tit = w.tiles.find(from);
+    if (bit == w.bodies.end() || tit == w.tiles.end() || tit->second.body != body)
+        return;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const auto is_cut = [&](entity_id t) { return std::binary_search(cut.begin(), cut.end(), t); };
+    const int start = tit->second.grid_y * gw + tit->second.grid_x;
+    if (start < 0 || static_cast<std::size_t>(start) >= grid.size())
+        return;
+    const bool start_on_track = tile_has_track(w, from) && !is_cut(from);
+    std::vector<int> frontier{start};
+    dist[static_cast<std::size_t>(start)] = 0;
+    for (std::size_t head = 0; head < frontier.size(); ++head)
+    {
+        const int c = frontier[head];
+        const entity_id ct = grid[static_cast<std::size_t>(c)];
+        const bool c_track = tile_has_track(w, ct);
+        if (c != start && !c_track)
+            continue; // a sink: reached, never expanded
+        for (const int n : rail_neighbours(c % gw, c / gw, gw, gh))
+        {
+            if (n < 0 || static_cast<std::size_t>(n) >= grid.size() || dist[static_cast<std::size_t>(n)] >= 0)
+                continue;
+            const entity_id nt = grid[static_cast<std::size_t>(n)];
+            if (nt == null_entity || is_cut(nt))
+                continue;
+            // Off the start: a start beside the line steps only onto track.
+            if (c == start && !start_on_track && !tile_has_track(w, nt))
+                continue;
+            dist[static_cast<std::size_t>(n)]   = dist[static_cast<std::size_t>(c)] + 1;
+            parent[static_cast<std::size_t>(n)] = c;
+            frontier.push_back(n);
+        }
+    }
+}
+
+} // namespace
+
+const world::rail_network& body_rail_network(world& w, entity_id body)
+{
+    std::vector<entity_id> cut = rail_cut_tiles(w, body);
+    const auto it = w.rail_networks.find(body);
+    if (it != w.rail_networks.end() && it->second.cut == cut)
+        return it->second;
+
+    world::rail_network net;
+    net.cut = cut;
+    if (!w.rail_track.empty())
+    {
+        for (const auto& [bid, bc] : w.buildings)
+        {
+            (void)bid;
+            if (bc.type != building_type::railway_station || bc.ticks_remaining > 0 || bc.decommissioned)
+                continue;
+            const auto tit = w.tiles.find(bc.tile);
+            if (tit == w.tiles.end() || tit->second.body != body)
+                continue;
+            if (tile_touches_track(w, bc.tile))
+                net.stations.push_back(bc.tile);
+        }
+        std::sort(net.stations.begin(), net.stations.end());
+        net.stations.erase(std::unique(net.stations.begin(), net.stations.end()), net.stations.end());
+    }
+    const std::size_t n = net.stations.size();
+    net.steps.assign(n, std::vector<int>(n, -1));
+    if (n >= 2)
+    {
+        const int gw = w.bodies.at(body).grid_width;
+        std::vector<int> dist, parent;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            rail_bfs(w, body, net.stations[i], cut, dist, parent);
+            for (std::size_t j = 0; j < n; ++j)
+            {
+                if (j == i)
+                    continue;
+                const tile_component& tj = w.tiles.at(net.stations[j]);
+                const int cj = tj.grid_y * gw + tj.grid_x;
+                if (cj >= 0 && static_cast<std::size_t>(cj) < dist.size())
+                    net.steps[i][j] = dist[static_cast<std::size_t>(cj)];
+            }
+        }
+    }
+    return w.rail_networks.insert_or_assign(body, std::move(net)).first->second;
+}
+
+logistics_path rail_leg_path(world& w, entity_id body, entity_id a, entity_id b,
+                             bool respect_cuts)
+{
+    logistics_path out;
+    if (a == null_entity || b == null_entity || a == b)
+        return out;
+    const auto bit = w.bodies.find(body);
+    const auto bt  = w.tiles.find(b);
+    if (bit == w.bodies.end() || bt == w.tiles.end() || bt->second.body != body)
+        return out;
+    const int gw = bit->second.grid_width;
+    std::vector<int> dist, parent;
+    rail_bfs(w, body, a, respect_cuts ? rail_cut_tiles(w, body) : std::vector<entity_id>{}, dist,
+             parent);
+    const int cb = bt->second.grid_y * gw + bt->second.grid_x;
+    if (cb < 0 || static_cast<std::size_t>(cb) >= dist.size() || dist[static_cast<std::size_t>(cb)] < 0)
+        return out;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    std::vector<entity_id> tiles;
+    for (int c = cb; c >= 0; c = parent[static_cast<std::size_t>(c)])
+        tiles.push_back(grid[static_cast<std::size_t>(c)]);
+    std::reverse(tiles.begin(), tiles.end()); // a -> b
+    out.reachable = true;
+    out.cost      = static_cast<float>(dist[static_cast<std::size_t>(cb)]);
+    out.tiles     = std::move(tiles);
+    return out;
+}
+
+float rail_travel_days(const world& w, entity_id body, float steps)
+{
+    const float km_per_tile = body_km_per_tile(w, body);
+    if (km_per_tile <= 0.0f || !(steps > 0.0f))
+        return 0.0f;
+    return steps * km_per_tile / rail_km_per_day;
 }

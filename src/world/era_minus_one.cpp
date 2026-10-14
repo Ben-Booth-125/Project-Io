@@ -581,6 +581,11 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     hp.industry_points_enabled              = true;
     hp.industry_survey_inherits_at_founding = true; // DEFAULT A
 
+    // BL-1255 -- RAIL, THE SPAN'S FIRST SINK (INDUSTRIALISATION.md sec Who lays
+    // rail, Ben 2026-10-13). On in this span only. The price per link is a dial
+    // read off the sweep (history_sim_harness's rail line): see the field.
+    hp.rail_treasury_cost = 5000000;
+
     // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
     // Far pairs meet and bind, and this phase makes them: "far pairs bind across
     // water, not only across a border"). Exploration carries it too since

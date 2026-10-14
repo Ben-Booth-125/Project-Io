@@ -52,8 +52,8 @@ const char* strategic_sector_name(strategic_sector s);
 /// for the infrastructure the type itself names, by RECIPE OUTPUT for a
 /// processing facility (a recipe IS the named building, PRODUCTION.md):
 ///
-///   transport   type port, inland_logistics_hub (rail and stations join when
-///               they exist as buildings — LOGISTICS.md § 4c)
+///   transport   type port, inland_logistics_hub, railway_station (BL-1255,
+///               LOGISTICS.md § 4c; the track itself is `world::rail_track`)
 ///   space       type launchpad; a processor making spacecraft_components or
 ///               propellant
 ///   energy      a processor making power or refined_fuel
@@ -174,3 +174,31 @@ float state_uncommitted_treasury(const world& w, entity_id nation);
 bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
                          const building_component& before, const building_component& after);
 
+
+/// BL-1255 -- what the rail handover did at the fold.
+struct rail_handover_report
+{
+    int track_tiles     = 0; ///< track tiles on the world
+    int to_nations      = 0; ///< tiles handed to a major as state industry
+    int to_firms        = 0; ///< tiles handed to a minor's background firm
+    int unowned         = 0; ///< tiles on no nation's ground, or a minor with no background firm
+    int stations        = 0; ///< stations stood up
+    int station_nations = 0; ///< of them, a major's
+    std::vector<std::pair<entity_id, int>> per_owner_tiles; ///< ascending owner id
+};
+
+/// THE RAIL HANDOVER (BL-1255; INDUSTRIALISATION.md sec Who lays rail: "the
+/// track and stations pass to the nation at the fold as state industry (a
+/// major's) or to background firms (a minor's)"). Every UNOWNED track tile
+/// passes to the nation whose ground it stands on when that nation is a major,
+/// else to that minor's lowest-id background firm; ground no nation holds, or
+/// a minor with no background firm, keeps it unowned (no upkeep; it carries
+/// traffic all the same). Then a STATION stands, complete, on every city tile
+/// touching track ("a station at each city a line serves"), ascending tile id,
+/// owned by the same rule (no owner: no station). Generation holdings stand
+/// complete and unpaid, as every generation holding does. Idempotent: owned
+/// track and a city already holding a station are skipped.
+rail_handover_report hand_over_rail(world& w);
+
+/// Print the rail handover's one `[rail]` log line.
+void print_rail_handover(const rail_handover_report& r);

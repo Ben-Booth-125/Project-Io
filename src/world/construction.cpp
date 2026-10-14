@@ -105,7 +105,8 @@ int construction_build_ticks(const world& w, const recipe_registry& reg,
 float construction_initial_workforce(building_type type)
 {
     return (type == building_type::port || type == building_type::inland_logistics_hub
-            || type == building_type::military_base) ? 0.0f : 0.5f;
+            || type == building_type::military_base
+            || type == building_type::railway_station) ? 0.0f : 0.5f; // BL-1255: zero staff
 }
 
 namespace {
@@ -165,6 +166,28 @@ construction_result construct_for(world& w, const recipe_registry& reg,
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;
+
+    // BL-1255 (LOGISTICS.md § 4c; PRODUCTION.md § Infrastructure buildings): a
+    // railway station stands on a CITY tile TOUCHING a rail line, one to a tile.
+    // Asked here, at the one build door, so no path can stand a station off the
+    // line — whatever the registry's placement gate says.
+    if (type == building_type::railway_station)
+    {
+        bool city = false;
+        for (const auto& [centre, ctile] : w.population_centre_tile)
+        {
+            (void)centre;
+            if (ctile == tile) { city = true; break; }
+        }
+        if (!city || !tile_touches_track(w, tile))
+            return construction_result::invalid_tile;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)bid;
+            if (b.type == building_type::railway_station && b.tile == tile)
+                return construction_result::invalid_tile;
+        }
+    }
 
     // World-level checks: coastal (Port), body-count cap (Launchpad), and the
     // BL-323 S2 logistics-reach budget. The reach field is built HERE rather than
@@ -309,6 +332,98 @@ construction_result construct_state_building(world& w, const recipe_registry& re
                          founding ? std::numeric_limits<float>::max()
                                   : state_uncommitted_treasury(w, nation),
                          nit->second.state_assets);
+}
+
+construction_result construct_state_station(world& w, const recipe_registry& reg,
+                                            entity_id nation, entity_id tile,
+                                            entity_id& out_building)
+{
+    out_building = null_entity;
+    const auto nit = w.nations.find(nation);
+    const entity_id champion = champion_of(w, nation);
+    if (nit == w.nations.end() || champion == null_entity)
+        return construction_result::no_corp; // no major nation to own it
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end() || tn->second != nation)
+        return construction_result::invalid_tile; // on its own ground
+    return construct_for(w, reg, champion, tile, building_type::railway_station,
+                         resource_type::iron_ore, out_building, no_recipe,
+                         state_uncommitted_treasury(w, nation), nit->second.state_assets);
+}
+
+float track_tile_cost(const world& w, const recipe_registry& reg, entity_id tile)
+{
+    const recipe_registry::rail_params& rp = reg.rail();
+    float steel_price = 0.0f;
+    if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+        {
+            const std::size_t si = static_cast<std::size_t>(resource_type::steel);
+            steel_price = mit->second.price[si] > 0.0f ? mit->second.price[si]
+                                                       : mit->second.base_price[si];
+        }
+    return rp.track_build_cost + rp.track_steel_per_tile * steel_price;
+}
+
+bool track_tile_extends(world& w, entity_id owner, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return false;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return false;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const int x = tit->second.grid_x, y = tit->second.grid_y;
+    const std::vector<entity_id>& grid = body_tile_grid(w, tit->second.body);
+    const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                         y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+    for (const int c : cand)
+    {
+        if (c < 0 || static_cast<std::size_t>(c) >= grid.size())
+            continue;
+        const auto rt = w.rail_track.find(grid[static_cast<std::size_t>(c)]);
+        if (rt != w.rail_track.end() && rt->second == owner)
+            return true;
+    }
+    return false;
+}
+
+construction_result lay_track(world& w, const recipe_registry& reg, entity_id nation,
+                              entity_id tile)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || champion_of(w, nation) == null_entity)
+        return construction_result::no_corp; // a major's state industry lays track
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return construction_result::no_tile;
+    if (!reg.building_available(building_type::railway_station))
+        return construction_result::era_locked; // no railway in this era
+    if (is_water(tit->second.substrate) || w.rail_track.count(tile) != 0)
+        return construction_result::invalid_tile; // land only; once per tile
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end() || tn->second != nation)
+        return construction_result::invalid_tile; // on its own ground
+    // Laid tile to tile: the tile extends the nation's own line, or opens one at a
+    // city (where its station will stand).
+    bool city = false;
+    for (const auto& [centre, ctile] : w.population_centre_tile)
+    {
+        (void)centre;
+        if (ctile == tile) { city = true; break; }
+    }
+    if (!city && !track_tile_extends(w, nation, tile))
+        return construction_result::invalid_tile;
+    const float cost = track_tile_cost(w, reg, tile);
+    if (!std::isfinite(cost) || cost < 0.0f || state_uncommitted_treasury(w, nation) < cost)
+        return construction_result::insufficient_funds;
+    // Commit. Instant, like a road: paid up front from the treasury.
+    nit->second.treasury -= cost;
+    w.state_ledger[nation].construction += cost;
+    w.rail_track.emplace(tile, nation);
+    invalidate_logistics_caches(w);
+    return construction_result::placed;
 }
 
 bool demolish_state_building(world& w, entity_id nation, entity_id building)

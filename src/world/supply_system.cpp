@@ -467,6 +467,9 @@ struct intra_route
     int         ports        = 0; ///< ports the cargo passes through; handling is per port
     entity_id   port_a       = null_entity; ///< BL-1195: the loading Port of a sea route
     entity_id   port_b       = null_entity; ///< BL-1195: the unloading Port of a sea route
+    int         stations     = 0; ///< BL-1255: stations passed (0 or 2); handling is per station
+    entity_id   station_a    = null_entity; ///< BL-1255: the boarding station of a rail route
+    entity_id   station_b    = null_entity; ///< BL-1255: the alighting station of a rail route
     int         travel_ticks = 1;
     convoy_mode mode         = convoy_mode::land; ///< the convoy's mode: sea when any leg is
 };
@@ -634,6 +637,9 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 route.ports   = 2;
                 route.port_a  = ports[i];
                 route.port_b  = ports[j];
+                route.stations  = 0; // BL-1255: the sea search runs first; reset anyway
+                route.station_a = null_entity;
+                route.station_b = null_entity;
                 route.mode    = convoy_mode::sea;
                 // Each leg at its own speed (SUPPLY.md): caravan overland, coastal by sea;
                 // summed, then quantised once.
@@ -643,6 +649,110 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                     + leg_travel_days(w, body, on.leg.dist, convoy_mode::land));
                 best = per_unit;
                 have = true;
+            }
+        }
+    }
+
+    // RAIL (BL-1255, LOGISTICS.md § 4c): land origin -> station A, rail A -> B over
+    // connected uncut track, land station B -> dest. A and B range over every built,
+    // active station touching track; the pair minimising the WHOLE route, both station
+    // fees included, wins, and only when it beats every route above — strictly, so a
+    // tie stays on the road (or the sea). The same cheap exit and the same lower
+    // bounds as the sea search: every rail route pays both fees on three
+    // non-negative legs. With no track on the world the network is empty and this
+    // block does nothing, so a world without rail prices to the same bits.
+    if (!w.rail_track.empty())
+    {
+        const float rail_rate = reg.rail().cost_per_step;
+        const float rfees     = 2.0f * reg.rail().station_handling;
+        const world::rail_network& net = body_rail_network(w, body);
+        // References, not copies: nothing below writes `w.rail_networks` (the land
+        // legs touch only the leg caches), so the std::map node they name stays put.
+        const std::vector<entity_id>& stations = net.stations;
+        const std::vector<std::vector<int>>& steps = net.steps;
+        if (stations.size() >= 2 && !(have && !(rfees < best)))
+        {
+            struct end_leg
+            {
+                bool  ok = false;
+                route_leg leg;
+                float per_unit = 0.0f;
+            };
+            std::vector<end_leg> to_st(stations.size());
+            std::vector<end_leg> from_st(stations.size());
+            std::vector<char>    to_done(stations.size(), 0), from_done(stations.size(), 0);
+            const auto to = [&](std::size_t i) -> const end_leg& {
+                if (!to_done[i])
+                {
+                    to_done[i] = 1;
+                    const logistics_path& a =
+                        intra_body_leg_path(w, body, origin, stations[i], leg_domain::land);
+                    if (a.reachable)
+                    {
+                        to_st[i].ok       = true;
+                        to_st[i].leg      = {convoy_mode::land, land_rate, a.cost,
+                                             node_discount_fraction(a.tiles, nodes, np)};
+                        to_st[i].per_unit = route_leg_per_unit(to_st[i].leg);
+                    }
+                }
+                return to_st[i];
+            };
+            const auto from = [&](std::size_t j) -> const end_leg& {
+                if (!from_done[j])
+                {
+                    from_done[j] = 1;
+                    const logistics_path& b =
+                        intra_body_leg_path(w, body, stations[j], dest, leg_domain::land);
+                    if (b.reachable)
+                    {
+                        from_st[j].ok       = true;
+                        from_st[j].leg      = {convoy_mode::land, land_rate, b.cost,
+                                               node_discount_fraction(b.tiles, nodes, np)};
+                        from_st[j].per_unit = route_leg_per_unit(from_st[j].leg);
+                    }
+                }
+                return from_st[j];
+            };
+            for (std::size_t i = 0; i < stations.size(); ++i)
+            {
+                const end_leg& in = to(i);
+                if (!in.ok)
+                    continue;
+                if (have && !(in.per_unit + rfees < best))
+                    continue;
+                for (std::size_t j = 0; j < stations.size(); ++j)
+                {
+                    if (j == i || steps[i][j] < 0)
+                        continue;
+                    const route_leg rail{convoy_mode::land, rail_rate,
+                                         static_cast<float>(steps[i][j]), 0.0f};
+                    const float rail_pu = route_leg_per_unit(rail);
+                    if (have && !(in.per_unit + rail_pu + rfees < best))
+                        continue;
+                    const end_leg& on = from(j);
+                    if (!on.ok)
+                        continue;
+                    const float per_unit = in.per_unit + rail_pu + on.per_unit + rfees;
+                    if (have && !(per_unit < best))
+                        continue;
+                    route.n_legs    = 3;
+                    route.legs[0]   = in.leg;
+                    route.legs[1]   = rail;
+                    route.legs[2]   = on.leg;
+                    route.ports     = 0;
+                    route.port_a    = null_entity;
+                    route.port_b    = null_entity;
+                    route.stations  = 2;
+                    route.station_a = stations[i];
+                    route.station_b = stations[j];
+                    route.mode      = convoy_mode::land;
+                    route.travel_ticks = travel_ticks_for_days(
+                        leg_travel_days(w, body, in.leg.dist, convoy_mode::land)
+                        + rail_travel_days(w, body, rail.dist)
+                        + leg_travel_days(w, body, on.leg.dist, convoy_mode::land));
+                    best = per_unit;
+                    have = true;
+                }
             }
         }
     }
@@ -660,7 +770,8 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
 /// into handling, which a node of its own may move later without a
 /// double-discount. The identity for a market's own leg.
 template <typename Haul>
-convoy_leg finish_route(const intra_route& route, float qty, float handling, Haul&& haul)
+convoy_leg finish_route(const intra_route& route, float qty, float handling,
+                        float station_handling, Haul&& haul)
 {
     convoy_leg leg;
     float cost = 0.0f;
@@ -672,6 +783,8 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling, Hau
     cost = haul(cost);
     if (route.ports > 0)
         cost += handling * static_cast<float>(route.ports) * qty;
+    if (route.stations > 0) // BL-1255: the station fee, never folded into the haul modifiers
+        cost += station_handling * static_cast<float>(route.stations) * qty;
     // A cost that is not a finite, non-negative number is not a price. Reached
     // by an absurd (but finite) quantity overflowing the product; refused here
     // rather than debited, since `balance -= inf` is unrecoverable.
@@ -684,6 +797,8 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling, Hau
     leg.travel_ticks = route.travel_ticks < 1 ? 1 : route.travel_ticks;
     leg.port_a       = route.n_legs == 3 ? route.port_a : null_entity;
     leg.port_b       = route.n_legs == 3 ? route.port_b : null_entity;
+    leg.station_a    = route.stations > 0 ? route.station_a : null_entity; // BL-1255
+    leg.station_b    = route.stations > 0 ? route.station_b : null_entity;
     return leg;
 }
 
@@ -733,7 +848,7 @@ convoy_leg market_leg_with_haul(world& w, const recipe_registry& reg,
     if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
                           dit->second.centre_tile, route))
         return convoy_leg{};
-    convoy_leg leg = finish_route(route, qty, reg.port_handling(), haul);
+    convoy_leg leg = finish_route(route, qty, reg.port_handling(), reg.rail().station_handling, haul);
     leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
     return leg;
 }
@@ -1051,6 +1166,8 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     c.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the priced legs
     c.port_a         = leg.port_a;
     c.port_b         = leg.port_b;
+    c.station_a      = leg.station_a; // BL-1255: the lane rides the rail it was priced on
+    c.station_b      = leg.station_b;
     w.convoys.push_back(c);
     if (out_sent)
         *out_sent = send;

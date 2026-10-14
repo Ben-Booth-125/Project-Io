@@ -192,6 +192,8 @@ struct convoy_leg
     entity_id   origin_tile  = null_entity;
     entity_id   port_a       = null_entity;
     entity_id   port_b       = null_entity;
+    entity_id   station_a    = null_entity; ///< BL-1255: boarding station tile of a rail route
+    entity_id   station_b    = null_entity; ///< BL-1255: alighting station tile of a rail route
 };
 
 /// Price one trade leg from @p src_market's shelf to @p dest_market_id for

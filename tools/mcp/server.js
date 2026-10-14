@@ -88,6 +88,7 @@ const VERBS = [
   'take_seat',                                         // BL-1076 -- pre-play only: --serve refuses it (rejected_state)
   'set_trade', 'clear_trade', 'set_trade_reserve',     // BL-1266 -- listed so the index stays the enum value; --serve validates the payload
   'queue_research', 'unqueue_research', 'clear_research', // BL-1276 -- the seat's nation's research queue; order = node index
+  'lay_track',                                         // BL-1255 -- the seat's nation lays one tile of rail track; tile + nation
 ];
 
 // io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
@@ -223,7 +224,7 @@ const TOOLS = [
         verb: { type: 'string', enum: VERBS },
         subject: { type: 'integer', description: 'Building (demolish/set_recipe/set_workforce/idle/resume/set_workforce_auto), or body (survey / place_sell_order / request_quote) entity id.' },
         tile: { type: 'integer', description: 'Target tile entity id (build / place_road / hire_unit muster tile).' },
-        type: { type: 'integer', description: 'building_type (build only): 0 none, 1 extraction_site, 2 processing_facility, 3 port, 4 launchpad, 5 inland_logistics_hub, 6 military_base.' },
+        type: { type: 'integer', description: 'building_type (build only): 0 none, 1 extraction_site, 2 processing_facility, 3 port, 4 launchpad, 5 inland_logistics_hub, 6 military_base, 7 research_institute, 8 schooling, 9 university, 10 planetary_marketplace, 11 railway_station (BL-1255: state industry only — with nation, by the seat).' },
         target: { type: 'integer', description: 'resource_type index — the extracted good (build), the good offered (place_sell_order), the good sought (request_quote) or the cargo (dispatch_convoy). See docs/economy/RESOURCES.md.' },
         recipe: { type: 'integer', description: 'Recipe id (set_recipe, and build seed).' },
         workforce: { type: 'integer', description: 'set_workforce value, 0-200.' },
@@ -238,7 +239,7 @@ const TOOLS = [
         order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573). queue_research: the Digitisation node index (0..159). unqueue_research: the queued node to take off with every queued entry that needs it, or -1 / omitted for the last entry (BL-1276).' },
         counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market). Stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral): the other corporation (BL-448). withdraw_from_battle: the opposing corp, null for first-in-sorted-order (BL-467). accept_offer: the client NATION (BL-573 — the one verb whose counterparty is not a corp).' },
         province: { type: 'integer', description: 'march_unit: destination province id (BL-511 — unit position is province grain). withdraw_from_battle: the province the battle is in. raze_centre: unused. Province id 0 is a real province, never a sentinel.' },
-        nation: { type: 'integer', description: 'BL-1296 state industry: the NATION whose state buildings this command acts on, paid from its treasury. Omit (0) for the corporation's own book. Must be the acting corporation's own home nation, and that corporation its champion; only build (a processing_facility on a strategic recipe, on the nation's own ground), demolish, set_recipe, set_workforce, set_workforce_auto, idle and resume are legal. The champion's blackboard lists its nation's state buildings (state_building_* facts) and treasury.' },
+        nation: { type: 'integer', description: 'BL-1296 state industry: the NATION whose state buildings this command acts on, paid from its treasury. Omit (0) for the corporation's own book. Must be the acting corporation's own home nation, and that corporation its champion; only build (a processing_facility on a strategic recipe, on the nation's own ground; or, by the seat only, a railway_station on a city tile touching track), lay_track (the seat only: one tile of rail track at tile), demolish, set_recipe, set_workforce, set_workforce_auto, idle and resume are legal. The champion's blackboard lists its nation's state buildings (state_building_* facts) and treasury.' },
         // NB no `units` arg: agent_protocol.cpp parses no such key, so
         // accept_offer's unit commitment cannot cross the wire yet — the verb
         // is listed (index-is-value demands it) but a wire accept_offer will

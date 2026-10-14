@@ -697,7 +697,9 @@ int main()
             // state-industry section (a world with none writes two empty
             // counts, 8 bytes), stamped 47. It reads, as a world with no state
             // industry. Its own destination, so P3's untouched victim stays so.
-            std::string v47 = bytes_once.substr(0, bytes_once.size() - 2 * sizeof(uint32_t));
+            // BL-1255 (v49): the rail section follows it (a world with no rail
+            // writes two empty counts, 8 more bytes), so the v47 prefix is 16 short.
+            std::string v47 = bytes_once.substr(0, bytes_once.size() - 4 * sizeof(uint32_t));
             const uint32_t pre = k_world_save_version_pre_state;
             std::memcpy(&v47[4], &pre, sizeof pre);
             world old;
@@ -708,6 +710,17 @@ int main()
             for (const auto& [nid, nc] : old.nations)
                 none = none && nc.state_assets.empty();
             check(none, "P20b a v47 stream (the v48 prefix) reads, with no state industry");
+        }
+        {
+            // P20c (BL-1255) -- the v48 stream: this v49 stream less its rail
+            // section (a world with no rail writes two empty counts, 8 bytes),
+            // stamped 48. It reads, as a world with no rail.
+            std::string v48 = bytes_once.substr(0, bytes_once.size() - 2 * sizeof(uint32_t));
+            const uint32_t pre = k_world_save_version_pre_rail;
+            std::memcpy(&v48[4], &pre, sizeof pre);
+            world old;
+            const bool ok48 = w.rail_track.empty() && from_bytes(v48, old) && old.rail_track.empty();
+            check(ok48, "P20c a v48 stream (the v49 prefix) reads, with no rail");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

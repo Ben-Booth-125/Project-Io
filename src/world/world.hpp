@@ -343,6 +343,14 @@ struct world
     /// survive a load. Written only by `fold_market_into`; empty on a body
     /// whose markets never folded.
     std::map<entity_id, folded_market>                     folded_markets;
+    /// BL-1255 (LOGISTICS.md § 4c, railways): RAIL TRACK, a network of its own —
+    /// NOT a road rung. Track tile id -> its owner: a major NATION (state
+    /// industry) or a CORPORATION (a background firm's, in a minor); null while
+    /// generation has laid it but the fold has not yet handed it over. A tile is
+    /// track iff it is a key. Goods board and leave only at a railway station
+    /// (`building_type::railway_station`). Ascending by tile id, so every walk is
+    /// layout-independent. SERIALISED in the v49 rail trailing section.
+    std::map<entity_id, entity_id>                         rail_track;
     faithful_unordered_map<entity_id, unit_component>             units;
 
     /// Population centre entities keyed by their entity ID. Populated by
@@ -748,6 +756,19 @@ struct world
     /// contract already covers a port completing, idling or being demolished
     /// (building_affects_logistics).
     std::map<entity_id, std::vector<entity_id>> body_port_tiles;
+
+    /// BL-1255: per body, the RAIL NETWORK as the router reads it — the built,
+    /// active stations touching live track (ascending tile id), and the track
+    /// steps between every pair of them over track no hostile unit cuts (-1 =
+    /// not joined). Derived; cleared with the logistics caches; rebuilt when the
+    /// cut set it was built under (`cut`, ascending) no longer matches.
+    struct rail_network
+    {
+        std::vector<entity_id>        stations;
+        std::vector<std::vector<int>> steps;
+        std::vector<entity_id>        cut;
+    };
+    std::map<entity_id, rail_network> rail_networks;
 
     /// Per-body LOGISTICS REACH FIELD (BL-323 S2): raster-indexed weighted cost from each
     /// tile to its nearest supply anchor — a city, a port, or an inland logistics hub.

@@ -561,6 +561,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "schooling",            building_type::schooling },            // BL-615
             { "university",           building_type::university },           // BL-615
             { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
+            { "railway_station",      building_type::railway_station },      // BL-1255
         };
         for (const named_type& nt : types)
         {
@@ -739,6 +740,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "schooling",            building_type::schooling },
             { "university",           building_type::university },
             { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
+            { "railway_station",      building_type::railway_station },      // BL-1255
         };
         struct named_band { const char* key; era_band band; };
         const named_band bands[] = {
@@ -1131,5 +1133,22 @@ void recipe_registry::load_from_lua(lua_state& lua)
         sol::optional<float> handling = (*logistics)["port_handling"];
         if (handling && std::isfinite(*handling) && *handling >= 0.0f)
             m_port_handling = *handling;
+
+        // BL-1255: the railway's prices (logistics.rail). Each field independently:
+        // a non-finite or negative value is not a price, refused, default kept.
+        sol::optional<sol::table> rail = (*logistics)["rail"];
+        if (rail)
+        {
+            const auto take = [&](const char* key, float& dst) {
+                sol::optional<float> v = (*rail)[key];
+                if (v && std::isfinite(*v) && *v >= 0.0f)
+                    dst = *v;
+            };
+            take("cost_per_step",         m_rail.cost_per_step);
+            take("station_handling",      m_rail.station_handling);
+            take("track_build_cost",      m_rail.track_build_cost);
+            take("track_steel_per_tile",  m_rail.track_steel_per_tile);
+            take("track_upkeep_per_tile", m_rail.track_upkeep_per_tile);
+        }
     }
 }

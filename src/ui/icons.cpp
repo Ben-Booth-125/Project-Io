@@ -472,6 +472,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
             break;
         case building_type::port:                 triangle(dl, centre, r, fill);  break;
         case building_type::planetary_marketplace: market_stall(dl, centre, r, fill); break; // BL-1269
+        case building_type::railway_station:      hub_node(dl, centre, r, fill);  break; // BL-1255: the hub glyph until one is drawn
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
         case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332

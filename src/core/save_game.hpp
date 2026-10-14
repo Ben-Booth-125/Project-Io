@@ -306,6 +306,12 @@ inline constexpr uint32_t save_game_magic =
 /// the record's existing realm name table (`era_timelapse::polity_name`) and
 /// its old name the Exploration record's entry for the same id, so no string
 /// and no field is added. No field moves, so no version bump.
+/// v23 ALSO admits 40 `rail_laid` in the Industrialisation record (BL-1255,
+/// INDUSTRIALISATION.md sec Who lays rail: a realm that leans into works laid
+/// a rail link out from its capital -- `region` the end already on its line,
+/// `polity` the realm, `other` the region the line now reaches). No field
+/// moves, so no version bump; a build that predates it refuses such a stream
+/// on the kind range check. (The track itself is world state: world_save v49.)
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;
