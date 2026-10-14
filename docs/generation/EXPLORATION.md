@@ -281,6 +281,10 @@ isolation needs only a gentle press, which leaves the rise and fall's empire roo
 what reaches it from others, not by its own investment alone, and a breakaway realm does not carry
 its parent's band past what its own contacts sustain. This holds for every culture — a systemic force
 — and the late culture lags because it is cut off.
+**At its deepest the isolation sinks it below the early floor, and the sea counts (Ben, 2026-10-14).**
+The strongest step of the isolation pressure holds the late culture one band under what its contacts
+sustain, even below the early bands. An island people's contacts include those it could meet across
+water, so an island is read against the peoples beyond its sea.
 
 
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
