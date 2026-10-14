@@ -864,12 +864,12 @@ namespace {
 /// channel, making different nations crave different luxuries.
 ///
 /// A PURE FUNCTION, not stored state: FNV-1a over the nation's entity id, its
-/// generated name and character axes (all fixed at generation, all already
+/// capital tile and character axes (all fixed at generation, all already
 /// persisted), and the resource index. Same inputs after a save/load, so the
 /// craving is fixed for the campaign without touching the serialisation seam,
-/// and no RNG stream runs in the tick loop. Folding the name and the three
+/// and no RNG stream runs in the tick loop. Folding the capital and the three
 /// character axes — not the id alone — is what seeds it from the nation's
-/// GENERATED identity: two worlds whose phonology and settlement record differ
+/// GENERATED identity: two worlds whose settlement record differs
 /// crave differently even where entity ids coincide.
 ///
 /// Shape: uniform in [1 − spread, 1 + spread), mean 1.0 for every spread, so
@@ -886,8 +886,12 @@ float nation_preference(entity_id nation, const nation_component* nc,
         mix_byte(static_cast<std::uint8_t>((static_cast<std::uint64_t>(nation) >> (8 * i)) & 0xFF));
     if (nc != nullptr)
     {
-        for (const char ch : nc->name)
-            mix_byte(static_cast<std::uint8_t>(ch));
+        // BL-1301: the capital's tile id, NEVER the name. A display string must
+        // not steer the world (a revolution's rename moved seed 32's economy
+        // through exactly this fold); the capital is generated content too, so
+        // two worlds with coinciding nation ids still crave differently.
+        for (int i = 0; i < 8; ++i)
+            mix_byte(static_cast<std::uint8_t>((static_cast<std::uint64_t>(nc->capital_tile) >> (8 * i)) & 0xFF));
         mix_byte(static_cast<std::uint8_t>(nc->politics));
         mix_byte(static_cast<std::uint8_t>(nc->posture));
         mix_byte(static_cast<std::uint8_t>(nc->focus));

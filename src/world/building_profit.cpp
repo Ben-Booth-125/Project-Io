@@ -2,6 +2,7 @@
 
 #include "budget_system.hpp"    // compute_building_opex, body_mean_habitability
 #include "components.hpp"
+#include "construction.hpp"     // construction_initial_workforce (BL-1307)
 #include "economy_system.hpp"   // extraction_nominal (BL-346 stack-aware estimate)
 #include "market_clearing.hpp"  // market_for_tile
 #include "placement_rules.hpp"  // stack_members, stack_output_scalar (BL-193)
@@ -191,8 +192,9 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     building_component bc{};
     bc.tile               = tile_id;
     bc.type               = type;
-    bc.workforce_assigned =
-        (type == building_type::port || type == building_type::inland_logistics_hub) ? 0.0f : 0.5f;
+    // BL-1307: the construction door's own staffing rule, never a copy of it
+    // (the copy priced a military_base's staff at 0.5 where it opens at 0).
+    bc.workforce_assigned = construction_initial_workforce(type);
     bc.target_resource    = target;
     bc.recipe             = recipe_id;
     if (existing)

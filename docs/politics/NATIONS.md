@@ -96,7 +96,11 @@ buildings.
   stay the champion's, whatever their sector — only background firms' strategic buildings pass.
 - **Every major founds one if it has none to take over (Ben, 2026-10-14).** A major with no
   strategic plant to inherit founds one at the fold, paid from its treasury and recorded like a state
-  charter, so every major opens with state industry to run.
+  charter, so every major opens with state industry to run. It founds **nearest its feed**, the
+  charter's own order (`../generation/CORPORATION_GENERATION.md`, "the recipe bends before the
+  building goes"): first where its own market makes every input, then where the chain runs by
+  reach, then anywhere on its ground. A founded plant opens with no stock, so one fed only by trade
+  waits out the haul.
 - **A losing building idles.** When its costs exceed what the treasury can pay, a state building
   stops producing and paying until the treasury can pay again. The state never runs into debt.
 - **The player's controls** over a state building are a corporation's building verbs — build,

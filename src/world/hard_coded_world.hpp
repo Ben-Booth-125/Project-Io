@@ -308,8 +308,12 @@ struct world_params
     ///   200: 83.9, 0.919 | 400: 81.5, 0.948   (main: 87.7, ~0.73)
     /// G1 t50 is NOT monotone in the rate (about +-1.5 between rungs), so the
     /// line is a reading on this ladder, not a smooth threshold. 60 -- 0.06
-    /// points per unit -- is the lowest rung that holds the target.
-    int64_t industry_points_per_1000_treasury_units = 60;
+    /// points per unit -- was the lowest rung that held the target.
+    /// RE-LADDERED (sprint 53 economy pass, after BL-1301 and the state
+    /// founding's nearest-feed order; full tier, --ticks 50) -- rate: G1 t50,
+    /// G1b: 30: 83.8, 6.6 | 40: 84.4, 6.7 | 50: 85.1, 7.2 | 60: 85.1, 6.6.
+    /// 50 -- 0.05 points per unit -- is the lowest rung that holds the target.
+    int64_t industry_points_per_1000_treasury_units = 50;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
 

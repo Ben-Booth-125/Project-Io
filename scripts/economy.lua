@@ -1086,7 +1086,11 @@ economy = {
     research = {
         base_rp_per_nation          = 120.0,
         rp_per_research_credit      = 0.0,
-        rp_per_research_credit_sqrt = 20.0,
+        -- BL-1305 (sprint 53): 20 -> 10. Real treasuries (BL-1298) made the
+        -- concave term outrun the band (median 14 quarters, p10 7); re-fit in band
+        -- (nation_tech_harness R0, 16 seeds, 32 q): sqrt 20: p10 7 p50 14 p90 25 |
+        -- 12: 11/18/27 | 10: 12/20/28 | 8: 14/22/28. Base 120 kept (Ben's).
+        rp_per_research_credit_sqrt = 10.0,
         rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
         rp_per_institute            = 50.0,  -- unmeasured: likewise
         rp_per_cost_unit            = 200.0,
@@ -1869,9 +1873,17 @@ logistics = {
     -- the 0.10 of fees is repaid after ~13 tiles of line, before the station legs.
     -- Track: credits + steel per tile from the treasury, upkeep per tile per econ
     -- tick (Ben, 2026-10-13).
+    -- RE-TUNED (sprint 53 economy pass): on seed 2 every 10-20 pair is served by a
+    -- line and 36% of SHORT (<20) hauls rode rail at 0.0025 / 0.05. Fees up, step
+    -- down keeps the rule (long shifts, short stays): railway_harness M, seeds
+    -- 2 / 0 / 12 / 40, short-on-rail and long-on-rail:
+    --   0.0025/0.05: 36.4% 89.7% | 4.8% | 3.7% | 0%   (before)
+    --   0.0020/0.08: 13.6% 86.2% | 4.8% | 3.7% | 0%   (chosen: long 52 -> 50 of 58)
+    --   0.0020/0.10:  9.1% 69.0% | 0%   | 0%   | 0%   (costs the long shift)
+    --   0.0015/0.08 and 0.0018/0.07: 22.7% 86.2%
     rail = {
-        cost_per_step         = 0.0025,
-        station_handling      = 0.05,
+        cost_per_step         = 0.0020,
+        station_handling      = 0.08,
         track_build_cost      = 20.0,
         track_steel_per_tile  = 2.0,
         track_upkeep_per_tile = 0.25,
