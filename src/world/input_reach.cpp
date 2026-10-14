@@ -506,6 +506,19 @@ bool market_within_reach(world& w, const recipe_registry& reg, input_reach& ir,
     }
     if (ir.same_market_only) // the founding's first ask: no trade route at all
         return false;
+    // A FOOD PROCESSOR READS REAL HOUSEHOLD DEMAND (CORPORATION_GENERATION.md,
+    // Ben 2026-10-14). Households clear first, so produce that reaches a market
+    // feeds its people before any plant -- an import as much as the market's
+    // own harvest. In the GENERATION form (no report: every placement pass) a
+    // produce producer elsewhere is therefore no supply for a plant here: the
+    // plant's spare is its own market's produce less that market's household
+    // and background bids (and its standing draws). Measured before the rule:
+    // ~33 food plants per curated set were sited on reach-only produce their
+    // own households ate, and idled at settle tick 3. Play (a report) keeps
+    // the full reach -- there the households' fills are already netted.
+    if (r == static_cast<std::size_t>(resource_type::agricultural_produce)
+        && (ir.report == nullptr || ir.report->buildings.empty()))
+        return false;
     if (reg.grid_goods().grid(r)) // BL-708: a grid good is never cargo
         return false;
     const auto sit = w.markets.find(src_market);
