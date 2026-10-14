@@ -118,9 +118,17 @@ fixture make_fixture(const recipe_registry& reg, bool two_plants)
 
     f.corp = w.create_entity();
     corporation_component cc;
-    cc.name = "Seat"; cc.is_player = true; cc.balance = 1.0e6f; cc.starting_capital = 1.0e6f;
+    cc.name = "Fixture Co"; cc.is_player = false; cc.balance = 1.0e6f; cc.starting_capital = 1.0e6f;
     w.corporations[f.corp] = cc;
-    w.player_entity = f.corp;
+    // BL-1322: the game steps the PLAYER's workforce every quarter, so this
+    // fixture's corp is no longer the seat; the seat is an empty corp of its own.
+    {
+        const entity_id seat = w.create_entity();
+        corporation_component sc;
+        sc.name = "Seat (empty)"; sc.is_player = true;
+        w.corporations[seat] = sc;
+        w.player_entity = seat;
+    }
     f.p1 = add_plant(f, reg);
     if (two_plants)
         f.p2 = add_plant(f, reg);

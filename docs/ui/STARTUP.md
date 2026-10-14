@@ -442,7 +442,7 @@ the span's start. An ownerless founding reads *"A people settle at X"*.
 
 **Colour is lineage, both ways.** A realm's hue is drawn from its founding culture family's
 wedge of the wheel — the lineage palette § Round 3 describes, built for every lapse round —
-with an offset inside the wedge chosen greedily, so kin realms read as kin; and beneath every
+with an offset inside the wedge chosen greedily, so kin realms read as kin — except where two nations border each other at Begin, where the colours must differ and the kin likeness yields (`LENSES.md` § The Country lens has retired, the identity colour rule; Ben, 2026-10-14); and beneath every
 polity fill on rounds 4–6 sits a dull culture base in the lineage hue of each region's
 plurality people, read from the record's culture changes. **Slots are pinned:** a realm's
 colour slot lives on the record from the round that seats it, the greedy table fills only the
@@ -633,6 +633,13 @@ presentation half:
    presentation half of their own — no agency comms, history samples or last report come from
    them (delegated reading, 2026-09-24, NEEDS_REVIEW): the ticks have no calendar and no
    seated corp, so nothing they emit has a reader.
+   **Their READINGS do have a reader** (Ben, 2026-10-13: *"since we simulate a few economy
+   ticks before the game starts, we should be able to use those values for anything that needs
+   an economy tick to update"*). This REVERSES the 2026-09-24 reading for every per-quarter
+   figure a surface shows — a market's sales and trade values, a building's profit, a price
+   series, the balance series: a fresh campaign opens on the last settle tick's values, never
+   on a "no data yet" dash. Calendar-dated records (comms, history samples) still take nothing
+   from the settle, since its ticks have no date.
 **The ground pre-bakes behind the wizard** (Ben, 2026-10-09; started at the Life round on
 Ben's ruling the same day, after the first build measured 36-55 s when the bake began at
 round 6). The homeworld's **ground master** ([RENDERING.md](RENDERING.md) § Level of detail) —

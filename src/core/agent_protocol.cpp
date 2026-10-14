@@ -235,7 +235,7 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         const long long tgt_v  = kv_get_checked(kv, "target", 0, 0,
                                                 static_cast<long long>(resource_count) - 1, &ok);
         const long long rcp_v  = kv_get_checked(kv, "recipe", no_recipe, 0, 0xFFFF, &ok);
-        const long long wf_v   = kv_get_checked(kv, "workforce", 100, 0, 200, &ok);
+        const long long wf_v   = kv_get_checked(kv, "workforce", 100, 0, 200, &ok); // 0-200 internal (BL-1322: 100% shown = 200)
         const long long road_v = kv_get_checked(kv, "road_tier", 1, 1, 3, &ok);
         // unit_type only needs to FIT its uint16 destination:
         // apply_corp_command range-checks it against the live

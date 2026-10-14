@@ -290,7 +290,8 @@ void draw_building_levers(world& w, const recipe_registry& reg, ui_state& ui)
     draw_production_method_section(w, reg, sel); // draws nothing for a non-processing type
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Workforce");
-    draw_building_workforce_page(bit->second);
+    // BL-1322: read-only — the game sets it (the slider retired).
+    (void)draw_workforce_bar(bit->second);
 }
 
 void draw_buildings_view(world& w, const recipe_registry& reg,
@@ -376,7 +377,7 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
             bool published_member = false;
             for (const entity_id id : g.members)
             {
-                const building_profit p = estimate_building_profit(w, reg, report, id);
+                const building_profit p = estimate_building_reading(w, reg, report, id);
                 const ImVec2 mp = ImGui::GetCursorScreenPos();
                 const bool pressed = draw_group_member_row(
                     w, id, p.has_data ? p.net() : 0.0f, p.has_data,
@@ -451,7 +452,7 @@ std::vector<building_group> player_building_groups(const world& w,
         g.members.push_back(id);
         // A building the report has not priced contributes ZERO, never a guess: the
         // total must be the visible sum of the rows behind it.
-        const building_profit p = estimate_building_profit(w, reg, report, id);
+        const building_profit p = estimate_building_reading(w, reg, report, id);
         if (p.has_data)
             g.total += p.net();
     }
@@ -463,8 +464,8 @@ std::vector<building_group> player_building_groups(const world& w,
         std::sort(g.members.begin(), g.members.end(),
                   [&](entity_id a, entity_id b)
                   {
-                      const building_profit pa = estimate_building_profit(w, reg, report, a);
-                      const building_profit pb = estimate_building_profit(w, reg, report, b);
+                      const building_profit pa = estimate_building_reading(w, reg, report, a);
+                      const building_profit pb = estimate_building_reading(w, reg, report, b);
                       const float na = pa.has_data ? pa.net() : 0.0f;
                       const float nb = pb.has_data ? pb.net() : 0.0f;
                       if (na != nb)

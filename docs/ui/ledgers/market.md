@@ -33,21 +33,35 @@ belongs to `SUPPLY.md`.
 | **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
 | **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **All trades here**, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking from this market, best per point, a `+` per row that fills the form; and **Recent exchanges**, over the exchange record. See § 2b |
 
-**Above the tabs, below the selectors: the nation presence row.** A wrapped row of one chip per
-nation operating in the selected market, wrapping to two or three rows if it must. **These are colour chips with initials, not flags**, and for now **placeholder chips at that**
-(Ben, 2026-08-29 — flags and glyphs are a later sprint; reserve the real width, do not size the
-column to the stand-in). — `nation_colour` is all that exists; there is no
-per-nation emblem artwork and inventing one is a generated-identity feature, not a row
-(`ICONS.md` § 2b).
+**Above the tabs, below the selectors: the market's top section** (Ben, 2026-10-13, superseding
+the 2026-08-29 chip row). It takes about **2/7 of the column's height**, leaving about **5/7 to the
+Goods and Trades tabs**, and splits left and right:
+
+- **Left 3/5 — the nations in this market, by full name.** A list, one row per nation operating
+  here (`nations_in_market`: a nation is present exactly when its ground clears here), each row a
+  `nation_colour` swatch and the nation's **full name**, scrolling inside the section if it
+  overruns. Full names replace the initials chips: initials asked the player to decode an identity
+  the list can simply state. A full name fits because nation names are length-capped at generation
+  (`../../generation/NATION_GENERATION.md` § Pass 5 — Naming). Still no flags — `nation_colour`
+  is all that exists (`ICONS.md` § 2b).
+- **Right 2/5 — market metrics, stacked vertically**, each a **label and its figure on one line**
+  (Ben, 2026-10-13: the label-over-figure pairs overran the section at 1280x720), per quarter. The
+  on-screen labels are short — **Sold**, **In**, **Out** — so each figure fits beside its label in
+  the 2/5 column (Ben, 2026-10-13):
+  **Sold here** — the value of goods sold onto this market's shelf (quantity cleared x clearing
+  price, summed over goods); **Traded in** and **Traded out** — the value of goods moved into and
+  out of this market by trades to and from other markets, for the last completed quarter
+  (`../../economy/TRADE.md` § The trade value record).
+  Values, not quantities, because a ton of ore and a ton of electronics do not add.
 
 **Default on open:** **Goods**.
 **Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo and the **Market**
 combo, above the presence row. Both re-point every view.
 
-**Row height is the open measurement.** Ben, 2026-08-29: *"since we are rendering rows, let's
-compare this at 8 rows, 10 rows, and 12 rows."* Build all three and look at them at **1920x1080**,
-which is the screen being reviewed — a density judgement taken at 720p is taken against half the
-content height (NR-719's sibling finding).
+**Row height is condensed to about 2/5 of the 10-row height** (Ben, 2026-10-13, closing the
+2026-08-29 8/10/12-row comparison): at a given window a row takes 0.4 x what a ten-rows-to-the-view
+row took before the top section was added, floored at one frame height so the name and price
+stay legible. The graph shrinks with the row; the shared `price / base_price` axis is unchanged.
 
 **`body_average_price` does not survive, and the expectation was wrong.** The column was
 nominated first-to-drop *if* the row would not fit, on the reasoning that the pressure at 384 px
@@ -129,7 +143,7 @@ so the outer scroller still has somewhere to go.
 explicitly — `CONCEPT.md` § Player identity and Ben's qualification of it the same day.
 
 ## 3. Lens on open
-Arm **`market`** — the per-body price wash keyed to the selected resource — **fixed** across both views. Goods and Trades are both single-market reads that the price wash reinforces, so there is nothing for the lens to follow. The Convoys view that would have wanted `supply_routes` has left for its own ledger, which is where that pairing now lives ([convoys.md](convoys.md) § 3) — one of the quieter arguments for the split, since a tab strip cannot arm two lenses and the old third tab always got the wrong one.
+Arm **`market`** — the per-body price wash keyed to the selected resource — **fixed** across both views, and **disarm it when the ledger closes** (Ben, 2026-10-13; LENSES.md § The other direction). Goods and Trades are both single-market reads that the price wash reinforces, so there is nothing for the lens to follow. The Convoys view that would have wanted `supply_routes` has left for its own ledger, which is where that pairing now lives ([convoys.md](convoys.md) § 3) — one of the quieter arguments for the split, since a tab strip cannot arm two lenses and the old third tab always got the wrong one.
 
 ## 4. Data sources
 Most of it is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for the 8-quarter series (`record_histories` samples once per econ tick and a tick is a calendar quarter, so a "six-month" window would be two points; Ben chose 8 of the 64 retained). `price vs base` is `price[r] / base_price[r]`, already to hand. **`body_average_price` is the one new derivation** — mean `price[r]` across the markets on the selected body, which is a walk the surface can do itself.

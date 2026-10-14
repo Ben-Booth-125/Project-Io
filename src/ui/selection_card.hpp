@@ -1,6 +1,5 @@
 #pragma once
 
-#include "plot_history.hpp"          // resource_history_view (drill-down chart data)
 #include "ui_state.hpp"
 #include "world/economy_system.hpp" // economy_report (passed through to the content)
 #include "world/recipe_registry.hpp"
@@ -52,26 +51,19 @@ namespace ui {
 /// (selection_panel.cpp) for the body — the full per-kind Selection layout (tile
 /// graphs, building operate panel, action|facts), not the terser hover content.
 ///
-/// **Recursive drill-down (BL-196).** When `ui.card_stack` is non-empty the band
-/// shows a drilled view instead of the root content — currently a resource
-/// time-series chart (aggregate-vs-this-tile over time), fed by @p history. A back
-/// button (or Esc, handled by app.cpp) pops one frame; at the root, Esc opens the
-/// system menu (BL-266 — the band itself never hides).
+/// At the root, Esc opens the system menu (BL-266: the band itself never hides).
 ///
 /// @param w            World state (mutable — the building layout operates its
 ///                      building directly; destructive acts still defer through
 ///                      ui_state::construction).
 /// @param reg          Loaded registry (build costs / recipe economics).
 /// @param report       Most recent economy step report (building profit / caps).
-/// @param history      Resource-deposit history for the drill-down chart (BL-198);
-///                      any member may be null when there is no data yet.
-/// @param ui           Shared UI state; read for the selection + drill stack,
-///                      written by the back button and drill clicks.
+/// @param ui           Shared UI state; read for the selection.
 /// @param band_origin  Top-left of the fixed band rect, screen px.
 /// @param band_size     Width and height of the band rect.
 void draw_selection_band(world& w, const recipe_registry& reg,
                          const economy_report& report,
-                         const resource_history_view& history, ui_state& ui,
+                         ui_state& ui,
                          ImVec2 band_origin, ImVec2 band_size);
 
 } // namespace ui

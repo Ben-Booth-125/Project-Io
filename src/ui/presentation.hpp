@@ -250,6 +250,14 @@ inline constexpr int nation_slot_count = 12;
 /// @return   The nation's identity colour.
 ImU32 nation_colour(entity_id id);
 
+/// The Market lens's catchment colour for the @p index-th market on a body (markets
+/// taken in ascending id). NO TWO INDICES SHARE A COLOUR (Ben, 2026-10-13: "it should
+/// not be possible for markets to share the same colour"): the hue steps by the golden
+/// ratio, which never revisits a hue, and value cycles through three levels so markets
+/// whose hues land close still differ in lightness. The corp palette this replaced has
+/// six slots and cycled, so a body with seven markets or more repeated colours.
+ImU32 market_catchment_colour(int index);
+
 /// One rung of a LINEAGE PALETTE (BL-919): the colour a culture is painted in
 /// on the New World wizard's Culture round, given its place on the hue wheel
 /// and its depth below its root cradle. The wheel rule lives here beside the
@@ -338,6 +346,54 @@ void set_nation_colour_table(const std::vector<std::pair<entity_id, ImU32>>& tab
 void clear_nation_colour_table();
 /// True when @p id is in the table (the colour is the realm's, not the hash).
 bool nation_colour_pinned(entity_id id);
+
+/// THE MINIMUM DISTINGUISHABLE DISTANCE between two bordering nations' colours
+/// (BL-1323), as CIE76 delta-E in CIELAB (D65, sRGB). Why 20: one delta-E unit is
+/// roughly the just-noticeable difference for two large patches side by side,
+/// and the map does not show patches side by side under study — it shows
+/// territory read at a glance, through the lens wash or as a 3 px border band,
+/// over terrain. The usual guidance for categorical map palettes is ~20 or
+/// more for "obviously a different class". Measured on the twelve-slot nation
+/// table: its two closest pairs, sky blue vs blue-tinted (16.1) and reddish
+/// purple vs its shaded step (19.7), are exactly the pairs that read as one
+/// colour on the map, and the next pair up is 25.6 — so 20 sits in that gap,
+/// rejecting the near-twins and the kin-wedge offsets (one hue, a small
+/// lightness step) while leaving the rest of the table usable.
+inline constexpr float nation_min_colour_distance = 20.0f;
+
+/// CIE76 delta-E between two colours (alpha ignored), sRGB -> linear -> XYZ
+/// (D65) -> CIELAB.
+float colour_distance(ImU32 a, ImU32 b);
+
+/// What the bordering-colour pass did (for the log line and the verify hook).
+struct nation_separation_result
+{
+    double min_before = 0.0, min_after = 0.0; ///< Smallest bordering-pair distance (0 pairs -> 0).
+    int clashes_before = 0, clashes_after = 0; ///< Pairs under the threshold.
+    int reslotted = 0;                         ///< Re-slot moves made (a nation may move once per round).
+    int rounds = 0;                            ///< Rounds run (bounded).
+};
+
+/// BORDERING NATIONS NEVER SHARE A SIMILAR COLOUR (BL-1323; LENSES.md, the
+/// identity colour rule). @p colour is indexed by nation; @p nbrs[n] lists the
+/// indices that share a border with n; @p territory is each nation's tile count.
+/// For every pair closer than `nation_min_colour_distance`, the nation with the
+/// smaller territory (ties: the higher index) moves to the candidate colour —
+/// the twelve-slot nation table and the twenty-slot fallback table, in that
+/// order — that clears EVERY neighbour and sits nearest its current colour, so
+/// a kin realm keeps as much of its family's hue as it can. Nations are walked
+/// in ascending index each round until a round moves nothing, bounded at eight
+/// rounds. Pure and deterministic: the same inputs give the same table.
+nation_separation_result separate_bordering_nation_colours(
+    std::vector<ImU32>& colour,
+    const std::vector<std::vector<int32_t>>& nbrs,
+    const std::vector<int>& territory);
+
+/// The bordering nation pairs the last pin saw (for the verify hook), and their
+/// live check against `nation_colour`: the count under the threshold and the
+/// minimum distance. Cleared with the table.
+void set_nation_border_pairs(const std::vector<std::pair<entity_id, entity_id>>& pairs);
+int nation_colour_clashes(double* min_distance, int* pair_count);
 
 /// THE REALM -> COLOUR TABLE by polity id (BL-1089), set beside the nation
 /// table from the same derivation, for the surfaces that hold a POLITY id

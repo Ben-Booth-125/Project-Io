@@ -90,21 +90,4 @@ if tx then
     verify.center_tile(tx, ty)
     verify.select_tile(tx, ty)
     verify.capture("sticky_card_04_deposit_tile")
-
-    -- 5) Drill into the tile's first deposited resource → the dual-axis time-series
-    --    chart (BL-196/197/198): the body aggregate (columns, left axis) with this
-    --    tile's own series (line, right axis) over a Year/Quarter X axis. The body
-    --    aggregate already carries ~46 ticks of history; the tile series starts
-    --    recording at the drill, so advance time to build its line, then capture.
-    local drilled = verify.card_drill()
-    if drilled >= 0 then
-        verify.econ_step(24)
-        verify.show_panel("construction", false)
-        verify.show_panel("tile",         false)
-        verify.show_panel("market",       false)
-        verify.show_panel("balance",      false)
-        verify.show_panel("corporation",  false)
-        verify.show_panel("build",        false)
-        verify.capture("sticky_card_05_resource_chart")
-    end
 end

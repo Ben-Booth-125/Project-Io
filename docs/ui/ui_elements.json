@@ -353,14 +353,16 @@
    "parent": "UI-013",
    "source": [
     "docs/ui/PLANETARY.md § Visual elements (Settlement markers row)",
-    "docs/ui/ICONS.md § settlement glyph"
+    "docs/ui/ICONS.md § settlement glyph",
+    "docs/ui/PLANETARY.md § Market labels"
    ],
-   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier ≥ 4).",
+   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier >= 4). A centre that names a market (BL-1315's rule) is named whatever its tier, its label led by the market glyph (BL-1316; PLANETARY.md § Market labels).",
    "interesting_question": "Colour is deliberately civic-neutral except under the Country lens — why keep tier (size) always visible but ownership colour lens-gated rather than always shown?",
    "resolution": "Settled as a legibility choice: PLANETARY.md states colour applying only under Country is so 'tier stays carried by size, keeping colour out of ownership' — i.e. two orthogonal signals (scale vs. political ownership) are kept on separate channels deliberately.",
    "checks": [
     "settlement_labels",
-    "pop_markers"
+    "pop_markers",
+    "market_labels"
    ]
   },
   {
@@ -778,14 +780,15 @@
    "kind": "sub-element",
    "parent": "UI-043",
    "source": [
-    "docs/ui/SELECTION.md § The tile element's layout (BL-123, reshaped BL-213)"
+    "docs/ui/SELECTION.md § The tile element's layout",
+    "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "A dedicated three-column layout for a selected tile (zoomed hex neighbourhood | paged metric accordion | 2x3 action grid), superseding the generic action/facts split used by every other selection kind.",
-   "interesting_question": "Atmospheric pollution and per-tile population have no accordion page at all — is that an intentional scope boundary or a gap the doc itself flags?",
-   "resolution": "Named as a real content gap: SELECTION.md states these are 'not modelled today (population lives on population centres, not arbitrary tiles) and so have no page — a real content gap, not an oversight.'",
+   "summary": "A dedicated four-column layout for a selected tile, with NO header row (Ben, 2026-10-13, BL-1312): zoomed hex neighbourhood | Province card (one header row - title, narrowed capacity bar with a where-granted tooltip, population count right-aligned with the centre list on hover - then a Built / Max / Resource table that scrolls inside itself; the card never scrolls) | Tile card (the tile's buildings, one button per stack, three across) | 2x3 action grid. A canvas press on a built hex selects the tile (round 2). A selected building draws the same element for its host tile with that stack expanded in the tile column and the action grid retargeted to it.",
+   "interesting_question": "The province card and the tile card split the former centre half at ~265 px each at 1720x1080 - does the expanded building's Profitability chart still read at that width?",
+   "resolution": "Open: NR-1046 records the width (about 60% of the charts' former width); the BL-1312 live click is where it is judged.",
    "checks": [
     "selection_tile_layout",
-    "selection_accordion",
+    "tile_card",
     "ui_shell_fixture"
    ]
   },
@@ -824,19 +827,22 @@
   },
   {
    "id": "UI-047",
-   "name": "Building selection action/facts",
+   "name": "Building selection (expanded tile card)",
    "kind": "sub-element",
    "parent": "UI-043",
    "source": [
-    "docs/ui/SELECTION.md § The building element's fact is a profitability readout (BL-074)"
+    "docs/ui/SELECTION.md § The building element's layout",
+    "docs/ui/SELECTION.md § Multi-building tiles"
    ],
-   "summary": "A player building's hero action opens the Construction panel's management surface; its fact column shows a four-line profitability estimate (Revenue/Inputs/Wages/Maintenance/Net); a rival building shows owner-only, production explicitly marked private.",
-   "interesting_question": "The doc itself asks whether Manage's controls should migrate fully into this Selection element instead of routing to the Construction panel, given both currently read/write the same selected entity in the same shared column.",
-   "resolution": "Open — flagged verbatim in the ledger design Q&A: docs/ui/ledgers/construction.md § Open questions asks 'Should selecting a building auto-open Construction/Manage instead of the Selection card, or should Manage's controls migrate into the Selection element' with no resolution recorded.",
+   "summary": "Selecting a building (grid button, repeat-click Building rung, ledger row) draws its host tile's element with that stack expanded in the tile column: an unlabelled back control, the name and stack count; the production method (a building with no recipe names what it does - a Port its trade points) and status line, always; for the player's own completed building a profit row (short net chart beside net and expenses per quarter, expenses split on hover; filled from the settle on a fresh campaign, BL-1321) and the workforce target as a read-only bar (the game sets it, BL-1322). A rival's shows owner and 'private'. The action grid retargets to Mothball / Dismantle / Open in ledger (absent on a rival's); Auto's former cell is Reserved.",
+   "interesting_question": "With the standalone building layout gone, is there any route that selects a building WITHOUT showing its tile?",
+   "resolution": "Yes, deliberately reversed in round 2 (Ben, 2026-10-13): a canvas press selects the TILE, so a building is reached from the tile card's grid, the repeat-click Building rung or a ledger row - each drawing the host tile's card expanded.",
    "checks": [
     "building_element",
-    "sticky_card",
-    "construction_ledger_tabs"
+    "tile_card",
+    "workforce_step",
+    "construction_ledger_tabs",
+    "building_management_shell"
    ]
   },
   {
@@ -1314,7 +1320,7 @@
     "docs/ui/ledgers/construction.md § Sub-levels",
     "docs/ui/SELECTION.md (Manage ▸ action)"
    ],
-   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a live workforce slider, recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
+   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a read-only workforce bar (BL-1322: the game sets workforce), the recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
    "interesting_question": "See UI-047 — this is the other half of the same unresolved Manage-vs-Selection column-ownership question.",
    "resolution": "See UI-047's resolution citation (docs/ui/ledgers/construction.md § Open questions, same finding).",
    "checks": [
@@ -1374,14 +1380,15 @@
     "docs/ui/MENU.md (slot 6)",
     "src/ui/market_ledger.cpp"
    ],
-   "summary": "Rail slot 6: the Goods table (one row per traded good with an inline 8-quarter graph) and Sell Orders, under Body and Market selectors and a nation presence row.",
+   "summary": "Rail slot 6: the Goods table (one row per traded good with an inline 8-quarter graph) and the Trades tab, under Body and Market selectors and the market's top section (nation list + Sold here / Traded in / Traded out).",
    "interesting_question": "The mock CSV exporter emits one row per market_component with no market_id/region column, so a body with 5 markets (Kepler) produces a 5x-inflated join in the Power BI mock — does that gap only affect the design mockup, or could the same ambiguity affect any future per-market export?",
    "resolution": "Named narrowly as an export-only gap, not a live-code bug: market.md states 'the gap is export-only, for the Power BI mock... Fix: add a market_id (and human region label...) column to the exporter' — the live in-app ledger reads w.markets directly and is unaffected.",
    "checks": [
     "market_ledger",
     "lens_structure_pivot",
     "goods_table",
-    "lens_ledger_pairs"
+    "lens_ledger_pairs",
+    "market_names"
    ]
   },
   {
@@ -1392,7 +1399,7 @@
    "source": [
     "docs/ui/ledgers/market.md § Sub-levels"
    ],
-   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction.",
+   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction. Row height is 0.4 x the ten-rows-to-the-view row of the layout before the top section, floored at one frame height (Ben, 2026-10-13).",
    "interesting_question": "The layout it replaces autoscaled every sparkline to its own range, so a good decaying 40% and a flat good drew the same shape — does a shared axis fit at 384 px once the graph is inline, and which column gives way if it does not?",
    "resolution": "It fits, but not with every column. Measured over the real 45-good roster: with the body-average column the name column is 42 px and 13 of 45 names fit; without it, 98 px and 36 of 45. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
    "checks": [
@@ -1654,6 +1661,21 @@
    ]
   },
   {
+   "id": "UI-122",
+   "name": "Nations lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § The Nations lens"
+   ],
+   "summary": "Fills every nation-owned tile in its nation's identity colour from the one pinned table; unowned ground and ocean unfilled; a press resolves to the nation. Bordering nations are kept a minimum colour distance apart by a deterministic re-slot pass at Begin and load.",
+   "interesting_question": "The Country lens was retired for filling territory — why does a territory fill come back?",
+   "resolution": "As a lens rather than the default view (LENSES.md § The Nations lens): the band stays on the plain map, and the fill returns only when chosen, so the retirement's argument — territory must not cost every other reading — still holds.",
+   "checks": [
+    "nations_lens"
+   ]
+  },
+  {
    "id": "UI-099",
    "name": "Star-map inset (Solar minimap)",
    "kind": "sub-element",
@@ -1810,16 +1832,17 @@
   },
   {
    "id": "UI-112",
-   "name": "Nation presence row",
+   "name": "Market top section",
    "kind": "sub-element",
    "parent": "UI-080",
    "source": [
-    "docs/ui/ledgers/market.md § Sub-levels",
+    "docs/ui/ledgers/market.md § 2",
+    "docs/economy/MARKETS.md § The exchange record",
     "src/ui/market_ledger.cpp"
    ],
-   "summary": "A wrapped row of one chip per nation operating in the selected market, between the Body/Market selectors and the tab strip. Each chip is the nation's identity colour carrying up to two initials, named on hover.",
-   "interesting_question": "The design asked for 'a wrapped row of flags for each nation' — but nations have no emblem artwork at all, only a palette colour. Is a stubbed glyph acceptable as a stand-in for a flag?",
-   "resolution": "No. nation_colour is a palette entry and is all that exists; corporations carry an emblem tag and nations do not, so per-nation emblems would be a generated identity system, a feature of its own. A single stubbed glyph would teach a vocabulary the game does not have, so the row is colour chips with initials — honest about being an identity mark and nothing more — and a placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is derived via market_for_tile + tile_to_nation, so a nation appears exactly when its ground really clears at this market.",
+   "summary": "About 2/7 of the column between the Body/Market selectors and the tab strip. Left 3/5: one row per nation operating in the selected market, a nation_colour swatch and the full name (elided with a tooltip if it overruns), scrolling inside the section. Right 2/5: Sold here, Traded in, Traded out, stacked label over figure, values per quarter.",
+   "interesting_question": "The metrics ask for the value goods moved by trades into and out of a market each quarter. Does any record hold that, or would the figure have to be derived from something that is not it?",
+   "resolution": "Sold here has a record: the exchange record's sale rows (side 0) on this market for the newest quarter, quantity x unit price. Traded in and Traded out draw an em dash, its tooltip saying why: no record holds the value trades moved. A trade's goods travel as a convoy erased on arrival, and its purchase and landing fold into the exchange record beside every other shelf draw and landing, so the trade share cannot be told apart. Shown as missing rather than approximated from convoys in flight, which is a different quantity.",
    "checks": [
     "goods_table"
    ]

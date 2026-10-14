@@ -910,18 +910,19 @@ struct building_component
     /// processing_facility. `no_recipe` means none assigned.
     uint16_t      recipe = no_recipe;
 
-    /// Player-authored workforce target as a percentage of nominal capacity.
-    /// Range [0, 200]; 100 = full nominal staffing. Scales actual output and
-    /// the labour portion of maintenance. Applied in economy_system and budget_system.
-    /// When `workforce_auto` is set, the economy tick overwrites this each tick with
-    /// the profit-maximising value (BL-181); a manual override clears the auto flag.
+    /// Workforce target as a percentage of nominal capacity. Range [0, 200] internal,
+    /// SHOWN as target/2 % (BL-1322, Ben 2026-10-13: 100 % is the label for full employment = 200); 100 = nominal
+    /// staffing. Scales actual output and the labour portion of maintenance.
+    /// Applied in economy_system and budget_system. On the PLAYER's buildings the
+    /// economy tick sets it — one 50-internal step (25 % shown) a quarter toward the solver's best
+    /// (BL-181/BL-1322); the player has no control over it. A rival's scorer sets
+    /// it through `set_workforce`.
     int  workforce_target = 100;
 
-    /// BL-181: when true (default), the economy tick auto-solves `workforce_target`
-    /// to maximise this building's estimated net profit (player corp only). A manual
-    /// workforce-target choice in the management UI clears this, pinning the target;
-    /// the "Auto" control re-enables it. Reconciles with the "never auto-act the
-    /// player's corp" rule as an opt-out convenience (see io-standing-rules.md).
+    /// Kept in the save and the state hash. Since BL-1322 it is NOT read for the
+    /// player's corp — the auto-solver steps every player producing building with
+    /// no opt-out. On a RIVAL it records that the workforce dial, not the solver,
+    /// holds the target (`set_workforce` clears it; `dial_idled` reads it).
     bool workforce_auto = true;
 
     /// When true the building produces nothing and is charged only material
@@ -1173,6 +1174,27 @@ struct market_component
     /// shipments the Logistic Point cap would refuse. SERIALISED
     /// (world_save_version 46).
     float trade_lp_spare = 0.0f;
+
+    /// BL-1320 — THE TRADE VALUE RECORD (TRADE.md § The trade value record,
+    /// Ben 2026-10-13). Credits of trade cargo that left this market and landed
+    /// on it, every corporation's trades alike:
+    ///   * out — at dispatch (`run_trades`' ship), units bought x this market's
+    ///     posted price, the price the purchase is billed at;
+    ///   * in  — on landing (`credit_arrived_convoys`), units landed x this
+    ///     market's last resolved price, the import tariff's price. A cargo
+    ///     intercepted on its lane never reaches that loop and is never counted.
+    /// `*_accum` gathers the quarter in progress; `clear_markets` publishes it
+    /// into `*_last` at the end of its clear and zeroes it, so `*_last` is the
+    /// same quarter the exchange record's newest rows ("Sold here") describe.
+    /// A REPORT, NEVER AN INPUT: no simulation step reads these, so they move no
+    /// price, decision or digest. NOT SERIALISED and NOT folded into
+    /// `world::state_hash`: a loaded game reads `trade_value_known == false`
+    /// until its first quarter completes, and the ledger says so.
+    float traded_out_accum = 0.0f;
+    float traded_in_accum  = 0.0f;
+    float traded_out_last  = 0.0f;
+    float traded_in_last   = 0.0f;
+    bool  trade_value_known = false;
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands

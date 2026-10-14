@@ -895,6 +895,28 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
                          const building_component& b, float contention,
                          entity_id corp = null_entity);
 
+/// BL-1322 (PRODUCTION.md § Workforce target and the auto-solver, Ben 2026-10-13,
+/// revised the same day: 100 % is the LABEL for full employment, not a cap):
+/// internally every workforce target is 0–200 and is SHOWN as target/2 %. The
+/// player's target moves one 50-internal step (25 % shown) a quarter toward the
+/// solver's best on the grid 0/50/100/150/200. The rival dial keeps its own
+/// 0..200 step-10 grid (`workforce_dial_grid`), so rivals are unmoved.
+inline constexpr int workforce_target_max = 200;
+inline constexpr int workforce_step       = 50;
+inline constexpr int workforce_dial_grid  = 10;
+
+/// The player's target one quarter on: ONE `workforce_step` from @p current
+/// toward @p best, never past it; unchanged when they are equal. @p current is
+/// clamped into 0–200 first — the range is a ceiling, not a step — so an
+/// out-of-range value from an older save lands in range on its next quarter.
+inline int step_workforce_target(int current, int best)
+{
+    const int cur = current < 0 ? 0 : (current > workforce_target_max ? workforce_target_max : current);
+    if (best > cur) return (best - cur > workforce_step) ? cur + workforce_step : best;
+    if (best < cur) return (cur - best > workforce_step) ? cur - workforce_step : best;
+    return cur;
+}
+
 /// Land one processing run's outputs (`batches` x each output) on @p market
 /// for @p corp (BL-1265: `world::land_goods`) under the BL-708 store ceiling,
 /// each output scaled by @p corp's home nation's held processing_yield
@@ -904,7 +926,7 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
                                 entity_id market, const recipe& rcp, float batches);
 
 /// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
-/// step 10) that maximises this building's estimated net this tick against the
+/// step 25) that maximises this building's estimated net this tick against the
 /// local market's price response. Exported (BL-202) so the strategic scorer can
 /// reuse it as the AI's `set_workforce` estimator — one solver, no drift.
 /// Deterministic; reads last tick's market state only.
@@ -920,8 +942,8 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
 ///                 units and from the same model that chose the target.
 ///
 ///                 Reported as >= 0, but NOT >= 0 by construction: the search
-///                 walks a step-10 grid while `b.workforce_target` may sit off
-///                 it (the player's `set_workforce` verb accepts any 0–200), so
+///                 walks a step-25 grid while `b.workforce_target` may sit off
+///                 it (a rival's `set_workforce` accepts any 0–200), so
 ///                 an off-grid incumbent can genuinely out-score every grid
 ///                 point. That case is a real "the solver's own answer is worse
 ///                 than where you already are", and it is floored at 0 rather
@@ -950,7 +972,7 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
                            int stack_rank = 1, float* out_gain = nullptr,
-                           int bid_hold_ticks = -1);
+                           int bid_hold_ticks = -1, int grid_step = workforce_dial_grid);
 
 /// BL-1235 (dial hold outlasts reflex; AI_OPPONENT.md, "A plant the dial idled
 /// is not losing"): a background plant the workforce dial has set to zero. The

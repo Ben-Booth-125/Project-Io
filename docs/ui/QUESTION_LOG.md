@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**66 surfaces** — 7 settled, 59 awaiting Ben's wording.
+**67 surfaces** — 7 settled, 60 awaiting Ben's wording.
 
 ---
 
@@ -220,13 +220,13 @@ alphabetical order.
 
 *Demanded by BL-452, BL-453, BL-689 · `src/ui/convoys_ledger.cpp` · id `market_ledger_convoys`*
 
-### Market Ledger - nation presence row
+### Market Ledger - the market's top section (nation list + metrics)
 
-**Answers:** Which nations operate in this market?
+**Answers:** Which nations operate in this market, and how much moves through it each quarter?
 
-**Because:** The Body and Market combos name a place but say nothing about who is IN it, and a price is not readable without knowing whose ground feeds it -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things. It earns the space between the selectors and the tabs because it qualifies the market the combos just chose, before the tabs ask a question about it, and it costs one wrapped row. THESE ARE COLOUR CHIPS WITH INITIALS, NOT FLAGS, and that is deliberate: nation_colour is a palette entry and is all that exists -- corporations carry an emblem tag, nations do not -- so real per-nation emblem artwork would be a generated identity system, a feature of its own, and a single stubbed glyph would teach a vocabulary the game does not have. Placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is DERIVED, since no store answers it: a building sits on a tile, market_for_tile resolves that tile's catchment market (the same routing clear_markets uses), and tile_to_nation gives the owner -- so a nation appears exactly when its ground really clears here.
+**Because:** The Body and Market combos name a place but say nothing about who is IN it or how busy it is, and a price is not readable without both -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things, and so do a quiet board and a busy one. It earns ~2/7 of the column, between the selectors and the tabs, because it qualifies the market the combos just chose before the tabs ask a question about it (Ben, 2026-10-13, superseding the 2026-08-29 chip row). LEFT 3/5: one row per nation, its nation_colour swatch and FULL NAME, scrolling inside the section -- the initials chips asked the player to decode an identity a list can simply state; still no flags, since nation_colour is all that exists. Presence is DERIVED (no store answers it): a building sits on a tile, market_for_tile resolves its catchment market, tile_to_nation its owner, so a nation appears exactly when its ground clears here. RIGHT 2/5: Sold here, Traded in, Traded out, each label and figure on one line (Ben, 2026-10-13: label over figure overran the section at 1280x720), VALUES per quarter because goods of different kinds do not add. Sold here is the exchange record's newest quarter of sale rows on this market (quantity x clearing price). Traded in and Traded out are the market's trade value record for the same quarter (TRADE.md § The trade value record): every corporation's trade cargo landed here at the last resolved price, and bought here for dispatch at the posted price -- how much of the market's business is trade. The record is not saved, so a loaded game shows an em dash, "No quarter completed yet", rather than a false zero.
 
-*Demanded by BL-688 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
+*Demanded by BL-688, BL-1317 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
 
 ### Market Ledger - Trades tab (and the market Selection card's 'Trades' door onto it)
 
@@ -249,6 +249,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as plain-canvas chrome instead: a hard edge only - an inset stroke in the nation's muted colour on its side of each boundary, with no wash inside the territory (Ben, 2026-10-10: 'a lot of visual clutter when many nations border each other ... removing shading inside national borders, and just go with the hard edges') - so a nation reads as a bordered region and the whole territory stays free for the ground. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.
 
 *Demanded by BL-601 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `docs/ui/PLANETARY.md` · id `national_border_band`*
+
+### Nations lens — every nation-owned tile filled in its identity colour (Planetary strip)
+
+**Answers:** Whose ground is this — every nation's whole territory, at once?
+
+**Because:** The always-on border band says whose ground lies either side of one edge; reading the whole political map from it means tracing every border by eye. A lens costs no permanent space — it is chosen, so it does not take every other reading from the player, which is why the 2026-08-24 retirement of the Country lens's default fill still holds (Ben, 2026-10-14). It is also the strictest reader of the identity colour rule: a fill makes two similar neighbours one blob, so the bordering-colour pass exists for it as much as for the band.
+
+*Demanded by BL-1323 · `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/presentation.cpp`, `src/ui/startup_screens.cpp`, `scripts/verify/nations_lens.lua` · id `nations_lens`*
 
 ### Nav rail
 
@@ -282,6 +290,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-1242 · `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp` · id `planetary_landforms_rivers`*
 
+### Planetary canvas - market labels (the market glyph on a market city's settlement label)
+
+**Answers:** Where is each market, and what is it called?
+
+**Because:** A market is named for the largest city in its catchment (MARKETS.md, BL-1315), but before this the only place that name could be read was the Market ledger's combo, which says nothing about WHERE the market is. The canvas already labels cities, so the market label IS that city's label marked with the market glyph (the three ascending bars the Market lens and the ledger's rail slot already draw) -- no second label, no new layer, same LOD and culling. A centre that names a market is labelled whatever its scale, since a market's naming city can be a town and its name would otherwise be drawn nowhere on the map.
+
+*Demanded by BL-1315, BL-1316 · `src/ui/body_surface_canvas.cpp`, `src/ui/market_ledger.cpp` · id `planetary_market_labels`*
+
 ### Roads and sea lanes (Planetary canvas, always-on: painted into the ground at every rung; drawn as strokes only under the Throughput lens)
 
 **Answers:** Where can traffic move cheaply on this body - which ground is roaded, at what tier, and which water carries a lane?
@@ -294,7 +310,7 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 **Answers:** What stands on this ground, roughly what is it, and how built-up is this region - without hovering anything?
 
-**Because:** A glyph layer over painterly ground made every built tile read as a label stuck on a picture, and one mark carried four answers on half a hex (type, kinds, count, owner). Ben's sprint 51 form (2026-10-08) moved the answer into the art: one procedural structure per depicted subject - a head-frame over a mine, a hall and stacks over a foundry, a quay toward the water at a port - so WHAT is made here reads by silhouette; a stacked tile stands a cluster of up to three, the dominant stack largest and in front; a settlement steps its footprint and height with scale and bakes as a pale paved patch at the far page, where the density dot stood; a razed centre bakes as a ruin and a site under construction as scaffolding. It earns its space by taking none: it IS the ground the canvas already draws, adds no chrome, no legend and no control, and frees the hex the ring, badge, emblem tag and skyline occupied. Finer questions moved to surfaces built for them - count and running state to the Production section, ownership to the hover card, the player footprint outline and the owner lenses. The Selection band's zoomed neighbourhood view draws the same baked page, so the picture of a selected tile matches the canvas it was pressed on.
+**Because:** A glyph layer over painterly ground made every built tile read as a label stuck on a picture, and one mark carried four answers on half a hex (type, kinds, count, owner). Ben's sprint 51 form (2026-10-08) moved the answer into the art: one procedural structure per depicted subject - a head-frame over a mine, a hall and stacks over a foundry, a quay toward the water at a port - so WHAT is made here reads by silhouette; a stacked tile stands a cluster of up to three, the dominant stack largest and in front; a settlement steps its footprint and height with scale and bakes as a pale paved patch at the far page, where the density dot stood; a razed centre bakes as a ruin and a site under construction as scaffolding. It earns its space by taking none: it IS the ground the canvas already draws, adds no chrome, no legend and no control, and frees the hex the ring, badge, emblem tag and skyline occupied. Finer questions moved to surfaces built for them - count and running state to the Production section, ownership to the hover card, the player footprint outline and the owner lenses. The Selection band's zoomed neighbourhood view draws the same baked page, so the picture of a selected tile matches the canvas it was pressed on. Until that page is ready for the tile, the view shows a loading bar rather than flat per-hex fills (BL-1313, Ben 2026-10-13): the fills read as a second, strategic-looking map that the bake contradicts a moment later, and a bar says the true thing - the picture is coming.
 
 *Demanded by BL-1241 · `src/ui/structure_stamps.cpp`, `src/ui/structure_stamps.hpp`, `src/ui/ground_bake.cpp`, `src/core/ground_layer.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp`, `docs/ui/RENDERING.md` · id `planetary_structures`*
 
@@ -306,13 +322,13 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-090, BL-091 · `src/ui/profile_panel.cpp` · id `profile_panel`*
 
-### The province sections of the tile Selection element (Buildings / Deposits / Population)
+### Selection band - the tile element's PROVINCE card (second column): one header row (title, a narrowed capacity bar, the population count right-aligned), then one Built / Max / Resource table taking the rest of the card and scrolling inside itself
 
 **Answers:** The canvas just blended several tiles into one shape - what is actually IN this locality, how much room is left in it, and who lives there?
 
-**Because:** BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them, and a CARD OF ITS OWN was the answer. BL-598 (Ben, 2026-08-24) reversed the premise rather than the answer: the tile is a click target again, and the province readings are SECTIONS of the tile element's one accordion. The question is unchanged and still earns its space - a player deciding whether a locality is worth a mine asks about the locality, not one hex - but it no longer earns a second element to ask it in. Two surfaces asking about one piece of ground made the player choose a grain before knowing what they wanted to know; one accordion, ordered from what can be acted on to what the ground merely is, does not. What was dropped in the fold is the province's own Buildings ROLL-UP (the same question the Buildings section's Built column answers, at a grain the player does not build at) and its member-tile list (whose job was to give back a tile that is no longer taken away). What was gained is Population, which had no home on either surface.
+**Because:** A player deciding whether a locality is worth a mine asks about the locality, not one hex, and the data model holds population on centres, not tiles - so the province is the grain of the answer, with the selected tile serving only to name which province is meant. BL-598 had made the province readings SECTIONS of a paged tile accordion; Ben's 2026-10-13 tile pass (BL-1312 (tile card split)) gave them one titled card of their own beside the tile card, with no pager, because everything the province answers fits one card. The former Buildings and Deposits sections were two readings of the same rows, so they are one table - Built (extraction sites standing), Max (placement capacity, through the same can_place / stack_capacity the build button uses, so the table cannot disagree with it) and Resource (the summed deposit, a stock) - richest deposit first. Capacity became a BAR because standing-against-ceiling is a proportion, and its hover names WHERE the ceiling is granted - area, habitability, infrastructure and population with their shares, read from measure_province_sustain so the tooltip cannot disagree with the ceiling it explains. Ocean and unpartitioned ground says it has no province and falls back to the tile's own deposits. Round 2 (Ben, 2026-10-13): the card itself never scrolls - the header row carries the title, a narrowed capacity bar and the population figure at its right end, the list of population centres moved into that figure's hover, and the resource table takes the remaining height and scrolls inside its own rows, because the table is the part a player reads down and the centre list is the part they ask about.
 
-*Demanded by BL-511, BL-598 · `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp` · id `province_card`*
+*Demanded by BL-511, BL-598, BL-1312 · `src/ui/selection_panel.cpp`, `src/world/province.hpp` · id `province_card`*
 
 ### Resource lens (Planetary canvas) — the washed-clear map, the toggled deposit set with split tiles, and its search-and-checklist key
 
@@ -330,13 +346,13 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-1295, BL-1281, BL-1076, BL-630, BL-1020, BL-1073 · `src/ui/seat_screen.cpp`, `src/core/app.cpp`, `src/world/spawn_seat.cpp`, `src/ui/nation_history.cpp`, `src/ui/tile_inspector.cpp` · id `seat_canvas`*
 
-### Selection band - Building card (3-column band)
+### Selection band - the expanded building card (the tile card with one stack expanded) and its retargeted action grid
 
 **Answers:** What is this building, what is it earning me, and what can I do about it?
 
-**Because:** The building card takes the SAME 3-column band shape as the tile card (zoomed tile render / paged accordion / action grid), so 'select a thing, get its picture, a pager and its actions' is one shape across the two entity kinds that actually get selected in play. Its CENTRE presents data and never holds levers (Ben, 2026-08-29): a dial that changes the world belongs to a ledger, so Method and Workforce - two pages whose whole content was a control - moved to the Construction ledger's Buildings view, and what remains reports (Profitability, Status). The boundary runs around the CENTRE, not the element: the right-hand action grid is the designated place to act and keeps Mothball, Dismantle and Auto. The move would have left a building selected on the MAP with no route to its own levers, so the grid gained a fourth button that opens the Buildings view AIMED at this building - its type group expanded, the building selected, the levers on screen in one press. That button is a door rather than a toggle (its active state is not visible here), and it is ABSENT on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim. A rival card is Status only, by a short-circuit in building_pages that never tests a player page's own guard - a competitor-visibility guarantee rather than a convenience.
+**Because:** A building is not a layout of its own (Ben, 2026-10-13, BL-1312 (tile card split)): selecting one draws its host tile's card with that building's stack expanded in the tile column, the preview and the province card unmoved, so 'what is this building' is always read beside 'what is this ground'. Round 2 (same day) gave the card its order: an unlabelled back control, the name and the stack count; the production method and the status line (running state with its reason, never a bare 'Operating.'); a profit row - a short net-over-time chart beside net profit per quarter and expenses per quarter as two figures, the expenses hover splitting input cost / maintenance / wages - because one coloured number says what the revenue-against-stacked-expenses columns said in a fraction of the height; and the workforce target as a read-only bar. The method and status line is drawn always, and a building with no recipe names what it does (a Port its trade points, a hub its haul discount); a fresh campaign opens with the profit row filled from the settle's last quarter (BL-1321). The card holds no lever: the workforce slider it carried briefly in round 2 retired with player workforce control (Ben, 2026-10-13, BL-1322 - the game moves the target one 25% step a quarter toward the most profitable level), so the 2026-08-29 centre-presents-only ruling holds without exception. The method switch stays in the ledger, which Open in ledger reaches in one press. A rival's card is the header, owner and 'private', by a short-circuit that never reaches the player's sections; god view opens the sight, never a lever.
 
-*Demanded by BL-683, BL-682, BL-431, BL-430, BL-074 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/selection_card.cpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp` · id `selection_building_card`*
+*Demanded by BL-683, BL-682, BL-431, BL-430, BL-074, BL-1312 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp` · id `selection_building_card`*
 
 ### Selection element
 
@@ -346,21 +362,13 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-067, BL-068, BL-071, BL-367, BL-593 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 
-### Selection band - the tile element's Production section (first in the section nav)
+### Selection band - the tile element's TILE card (third column): the buildings on this tile, one button per stack, three across; a pressed stack expands in place
 
-**Answers:** What stands on this tile, is it running (and if not, why not), and what does what it makes - or what lies in the ground here - fetch at the market that prices it?
+**Answers:** What stands on this tile and what is each stack earning me - and which one do I open?
 
-**Because:** Running state had no home once the canvas art went static (RENDERING.md, installations): a building that sat idle for want of labour or an input looked exactly like one that ran, and the only place that said otherwise was a hover card that has to be found one building at a time. Ben, 2026-10-08 (the sprint 51 visibility pass): the tile opens on what is HAPPENING there - the initial market conditions, read from the ground the player is looking at. Tile grain is the point, not a shortcut: a building stands on a tile and a market's catchment is tile-keyed, so a province sum would blur exactly the two things this section joins. Part one gives one row per stack (the grouping Manage Buildings uses, and where the retired +N badge's count is now read), with output per tick and the running state WITH ITS REASON - labour short, or an input short named with its cause - classified by the one function the hover card and the building card's Status page also read, so the three cannot disagree. A rival's row shows type, count and owner and says 'private' for the rest (DISCOVERY.md). Part two names the market whose catchment holds the tile and prices every good made here, then every good deposited here, with short / balanced / surplus from public aggregates; each row is a drill-through door to the Market ledger aimed at that market and good. An unbuilt tile still earns the section: 'Nothing built here' is stated positively and its deposits are still priced, which on a fresh campaign is the whole read.
+**Because:** A building stands on a tile, so the tile card is tile grain and holds buildings ONLY (Ben, 2026-10-13, BL-1312 (tile card split)). One button per stack - glyph with count, name, net profit per quarter coloured by sign - answers the at-a-glance question ('which of these is losing money?') without a press, which the retired Production section's two-line rows answered only by reading. A rival's profit reads 'private' (DISCOVERY.md); a stack under construction shows its ETA. Running state left the button for the expanded card's status line and the hover card, one press away. The market and price rows ('what it fetches here', 2026-10-08) retired with it: what a good fetches is the Market ledger's question. Pressing a button, or selecting a building any other way, draws this same card with that stack EXPANDED - status line, then the Profitability charts - and retargets the action grid to the building, so a single-building tile and a drilled-into stack reach the identical view and Manage Buildings had nothing left to do. An unbuilt tile states 'Nothing built here' positively. The tile element drew a header row until 2026-10-13; it spent a line of the band on a name the canvas already shows and a go-to that was a no-op for a tile, so the band height went to the four columns. Round 2 (Ben, 2026-10-13): a canvas press now selects the TILE even on a single-building hex - 'default tile selection to the list of buildings rather than any individual building' - so the grid is what a press opens and a building is one more press away; the 2026-07-22 whole-hex-is-the-installation rule is reversed.
 
-*Demanded by BL-1239 · `src/ui/selection_panel.cpp`, `src/ui/building_state.cpp`, `src/ui/building_state.hpp`, `src/ui/hover_content.cpp`, `src/ui/market_ledger.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_production`*
-
-### Selection band - the tile element's section top nav
-
-**Answers:** Everything this ground has to say, opening on what is happening here and then in the order I can act on it: what does this tile make and fetch, what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
-
-**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is. Ben, 2026-10-08 (the sprint 51 visibility pass) put Production in front of it - what is HAPPENING here - so the nav is six sections and wraps at six.
-
-*Demanded by BL-598, BL-1239 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
+*Demanded by BL-1239, BL-1312 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp`, `src/core/verify_api.cpp` · id `selection_tile_card`*
 
 ### Selection band - Unit (Soldier) card (3-column band)
 
@@ -548,7 +556,7 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 **Because:** Comparison is impossible when every selection replaces the last. The card frame is what makes drill-through (BL-214) a shared idiom rather than a per-panel behaviour. Pairs existed here before BL-247's log was removed.
 
-*Demanded by BL-196, BL-213, BL-214 · `src/ui/selection_card.cpp` · id `selection_card`*
+*Demanded by BL-213, BL-214 · `src/ui/selection_card.cpp` · id `selection_card`*
 
 ### New World wizard - the lapse rounds' top-sixteen board
 

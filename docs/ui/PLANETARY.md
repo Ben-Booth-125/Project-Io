@@ -170,8 +170,8 @@ built to answer it:
 | Question the old marks answered | Where it is answered now |
 |---|---|
 | *What kind of building is this?* (the silhouette) | The structure itself, authored per type; the hover card names it |
-| *Which kinds stand here, and which leads?* (the ring, the centre glyph) | A **cluster** of up to three structures, one per stack ([RENDERING.md](RENDERING.md) § Installations), and the tile Selection element's **Production** section ([SELECTION.md](SELECTION.md) § The tile element's layout) |
-| *How many in total?* (the `+N` badge) | The Production section, one row per stack with its count |
+| *Which kinds stand here, and which leads?* (the ring, the centre glyph) | A **cluster** of up to three structures, one per stack ([RENDERING.md](RENDERING.md) § Installations), and the tile Selection element's **tile card**, one button per stack ([SELECTION.md](SELECTION.md) § The tile element's layout) |
+| *How many in total?* (the `+N` badge) | The tile card's building grid, one button per stack with its count |
 | *Whose is it?* (the owner-tinted fill, the emblem tag) | The **Corporation** and **Company** lenses' owner multi-select ([LENSES.md](LENSES.md)), the hover card, and — for the player alone — the always-on footprint outline |
 | *Is it running?* | The Selection element only. **The art is static**: no smoke, light or state cue distinguishes a running plant from an idle one |
 
@@ -381,6 +381,18 @@ is reached: *"click the border itself."*
   do not change.
 
 ---
+
+## Market labels
+
+**Under the Market lens, every market's name is drawn on its market city** (Ben, 2026-10-13; off the lens a market city wears its plain label by the scale rule, with no market glyph). A market is named for the
+city that anchors it (`../economy/MARKETS.md` § Market centres and seeding), and the canvas
+already labels cities, so the market label **is** that city's label, marked as a market: a small
+market glyph before the name, drawn on the settlement-label layer so it shares its LOD and
+culling. A centre that names a market is labelled **whatever its scale** (Ben, 2026-10-13): a
+market named for a town must still show its name on the map. A centre that names no market keeps
+the plain label and its scale rule. Without this the only place a
+market's name could be read was the Market ledger's combo, which says nothing about where the
+market is.
 
 ## Layers — what draws on this canvas
 

@@ -1200,7 +1200,7 @@
     "docs/generation/seed_library.json"
    ],
    "title": "Sprint 52's one re-bless: the world without generation research, on the industrial band, described by shape and authorised by Ben",
-   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description. CARRIED to sprint 53 (2026-10-10). The wave re-bless; waits on BL-1272 (and BL-1274 if its gates move the opening). MERGE READING (2026-10-11, Ben merged with the move): the tech tree onto main moved market_viability from G1 93.3 / G1 t50 87.5 / G1b 5.7 / G2 113.4 / G3 95.8 to 92.9 / 85.5 / 6.0 / 111.7 / 94.7 (16 seeds, 400 ticks); determinism and the seed sweep pass. Attribute it per cause in the re-bless shape."
+   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description. CARRIED to sprint 53 (2026-10-10). The wave re-bless; waits on BL-1272 (and BL-1274 if its gates move the opening). MERGE READING (2026-10-11, Ben merged with the move): the tech tree onto main moved market_viability from G1 93.3 / G1 t50 87.5 / G1b 5.7 / G2 113.4 / G3 95.8 to 92.9 / 85.5 / 6.0 / 111.7 / 94.7 (16 seeds, 400 ticks); determinism and the seed sweep pass. Attribute it per cause in the re-bless shape. SPRINT 54 CAUSE (measured 2026-10-13, docs/development/drafts/sprint-54-name-movement.md; Ben folded it into this re-bless): names only. Unique city names per body move D_land/D_settle/D_seat on all 16 library seeds and the three world_determinism deep digests; the nation name cap (BL-1318) also on seeds 31, 43, 10; D_search unmoved; the trade value record (BL-1320) moves nothing. Every printed count, region, market, road and economy reading identical."
   },
   {
    "status": "designed",
@@ -1233,6 +1233,28 @@
    "renumbered_from": "BL-1278 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where BL-1278 was already taken"
   },
   {
+   "status": "proposed",
+   "glyph": "",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 54 UI session, found verifying), 2026-10-13",
+   "requires": [],
+   "id": "BL-1319",
+   "short_name": "FIXTURE_BASE_STALL",
+   "category": "Verification",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "scripts/verify/lib.lua",
+    "src/world/construction.cpp"
+   ],
+   "title": "stage_ui_fixture fails on every run: the player muster base never completes within 40 ticks, blocking 12 verify scripts",
+   "design": "DEFECT. scripts/verify/lib.lua raise_player_force places a military_base near the player works and waits 40 econ ticks; it never completes (lib.lua:242 error). Seen 2026-10-13 on 7fbb199f (no sprint 54 code) and on the sprint 54 branch, after the Debug stack-overflow at startup (fixed in 8972f540) had hidden every --verify run. 12 scripts call stage_ui_fixture. Find whether construction stalls (materials on the catchment shelf, capacity, the tech gate) or the bound is wrong; BL-1066 was the previous instance. Check against sprint 53 main before fixing - a world mover there may already change it."
+  },
+  {
    "status": "designed",
    "glyph": "○",
    "sprint": null,
@@ -1240,20 +1262,21 @@
    "parked": false,
    "blocked_on": null,
    "author": "Claude (from the BL-1287 seed-13 diagnosis)",
+   "requires": [
+    "BL-1287"
+   ],
    "id": "BL-1300",
    "short_name": "RUINED_ROADS_RECOVER",
    "category": "Generation",
    "priority": "C",
    "difficulty": 2,
    "authority_doc": "docs/generation/CIVILISATION.md",
-   "requires": [
-    "BL-1287"
-   ],
    "files": [
     "src/world/history_sim.cpp"
    ],
    "title": "Do ruined roads recover? A corridor the fall decayed below its traffic rung is never rebuilt unless traffic walks it",
-   "design": "OPEN (design question for Ben). BL-1287's fall decays the falling realm's roads on the ground (Ben, 2026-10-12). Measured 2026-10-13 (tools/verify/rise_fall_roads.cpp): about 6 corridors per seed stay below the rung their own traffic earned from 1200 to 1960, because nothing rebuilds a corridor traffic does not walk and the resumed spans reopen it at the decayed tier. Works relief over-recovers (waystations buy it back). Small effect; not a cause of G1b. Options: ruins recover toward their earned rung over the following span; or ruins persist as a visible scar. RULED (Ben, 2026-10-13): ruins persist as a visible scar - no build; archive at close."
+   "design": "OPEN (design question for Ben). BL-1287's fall decays the falling realm's roads on the ground (Ben, 2026-10-12). Measured 2026-10-13 (tools/verify/rise_fall_roads.cpp): about 6 corridors per seed stay below the rung their own traffic earned from 1200 to 1960, because nothing rebuilds a corridor traffic does not walk and the resumed spans reopen it at the decayed tier. Works relief over-recovers (waystations buy it back). Small effect; not a cause of G1b. Options: ruins recover toward their earned rung over the following span; or ruins persist as a visible scar. RULED (Ben, 2026-10-13): ruins persist as a visible scar - no build; archive at close.",
+   "landed": "2026-10-14"
   },
   {
    "status": "proposed",

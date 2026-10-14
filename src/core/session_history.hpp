@@ -36,11 +36,6 @@ struct history_stores
     std::vector<float>&                                   expenditure;   ///< app::m_expenditure_history
     ui::market_plot_history&                              market;        ///< app::m_market_history
     std::deque<std::unordered_map<entity_id, int>>&       building_rank; ///< app::m_building_rank_hist
-    ui::resource_history&                                 body_resource; ///< app::m_body_resource_hist
-    ui::resource_history&                                 tile_resource; ///< app::m_tile_resource_hist
-    std::unordered_set<entity_id>&                        tracked_tiles; ///< app::m_tracked_tiles
-    std::vector<std::uint64_t>&                           sample_days;   ///< app::m_resource_hist_days
-    std::uint64_t&                                        sample_index;  ///< app::m_resource_sample_index
 };
 
 /// Surface this tick's background-corp agency actions (BL-079) as NATION-voiced
@@ -81,7 +76,7 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
 
 /// The per-tick history recorders: player balance/income/expenditure (BL-063),
 /// the building profit-rank snapshot (BL-171), market price/supply/demand
-/// series, and the resource-deposit series (BL-198, draining st.card_track_tile).
+/// series.
 void record_histories(const world& w, const recipe_registry& reg,
                       const economy_report& report,
                       const std::unordered_map<entity_id, corp_cash_flow>& flows,

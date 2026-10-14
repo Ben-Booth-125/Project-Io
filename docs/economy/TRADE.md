@@ -70,6 +70,25 @@ trade (below) does not choose one.
 body, and each launch burns propellant the trader buys from that body's shelf
 (`PRODUCTION.md` § Launchpad). The network prices and times the lane as it does any leg.
 
+### The trade value record
+
+**Each market records the value trade moved out of and into it, per quarter** (Ben, 2026-10-13),
+so the Market ledger can say how much of a market's business is trade (`../ui/ledgers/market.md`
+§ 2). Two figures per market:
+
+- **Traded out** — at dispatch (step 1), the units a trade buys here, at this market's posted
+  price: the value that left as cargo.
+- **Traded in** — on landing (step 3), the units a trade lands here, at this market's **last
+  resolved price**, the price the import tariff already charges on (`MARKETS.md` § Tariffs). A
+  cargo intercepted on its lane never lands and is never counted in.
+
+Every corporation's trades count, the player's and every AI's alike: the figure describes the
+market, not the trader. Each accumulates through a quarter and is published at the quarter's
+end, so the ledger reads the **last completed quarter**. **It is a report, never an input**: no
+simulation step reads it, so it moves no price, decision or digest. **It is not saved**: a loaded
+game reads zero until its first quarter completes, which the ledger says rather than showing a
+false zero.
+
 ## Auto and reserved trade
 
 Each owner chooses **one reserve** — how much of its trade points to **reserve for manual

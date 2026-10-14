@@ -41,10 +41,10 @@ verify.capture("legend_corporation_collapsed")
 -- ---------------------------------------------------------------------------
 -- The header bar sits directly above the minimap. Derive its position from the
 -- minimap rather than hardcoding pixels, so this survives a window change:
--- minimap_width = max(336, 0.28*min(w,h)) and height = 0.75*width, with the
+-- minimap_width = max(336, 0.28*min(w,h)) + 27 (BL-1314) and height = 0.75*width, with the
 -- right edge flush to the screen edge (BL-312).
 local W, H = 1280, 720
-local mm_w = math.max(336, 0.28 * math.min(W, H))
+local mm_w = math.max(336, 0.28 * math.min(W, H)) + 27
 local mm_h = mm_w * 0.75
 local chrome_margin = 8
 -- The box is PINNED AT ITS TOP, just below the time panel, and grows downward.

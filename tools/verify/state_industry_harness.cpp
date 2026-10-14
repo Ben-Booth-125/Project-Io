@@ -638,9 +638,12 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                 corp_command rs; rs.corp = champ; rs.as_nation = pn; rs.verb = corp_verb::resume; rs.subject = parked;
                 r2 = apply_corp_command(c, reg, rs);
             }
-            check(!run.empty() && r1 == corp_command_result::rejected_funds
+            // BL-1322 (Ben, 2026-10-14): the player has no workforce verb on its state
+            // buildings either - the game steps them - so a raise is refused as invalid;
+            // the resume still meets the treasury gate.
+            check(!run.empty() && r1 == corp_command_result::rejected_invalid
                       && r2 == corp_command_result::rejected_funds && c.state_hash(0) == h0,
-                  "S8a", "with nothing uncommitted, a raised workforce and a resume are rejected_funds, nothing moved");
+                  "S8a", "with nothing uncommitted, the player's workforce verb is refused and a resume is rejected_funds, nothing moved");
         }
         // (b) The auto-solver: every running state building pinned low with
         // auto on, the treasury just covering that; a full live tick follows.
@@ -790,14 +793,17 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         }
         if (own_sb != null_entity)
         {
+            const int before = w.buildings.at(own_sb).workforce_target;
             const std::string o = serve(w, reg, s, P_(fmt("verb=3 subject=%u workforce=80 nation=%u",
                                                           own_sb, pn)));
             const building_component& b = w.buildings.at(own_sb);
-            check(result_is(o, "applied") && b.workforce_target == 80 && !b.workforce_auto, "S5",
-                  "set_workforce on its own state building applies (the dial pins)");
+            // BL-1322 (Ben, 2026-10-14): the game steps the player's state buildings
+            // as it steps its own; both workforce verbs are refused, nothing mutated.
+            check(result_is(o, "rejected_invalid") && b.workforce_target == before, "S5",
+                  "set_workforce on its own state building is refused (the game sets it)");
             const std::string o2 = serve(w, reg, s, P_(fmt("verb=11 subject=%u nation=%u", own_sb, pn)));
-            check(result_is(o2, "applied") && w.buildings.at(own_sb).workforce_auto, "S5",
-                  "set_workforce_auto hands the dial back");
+            check(result_is(o2, "rejected_invalid"), "S5",
+                  "set_workforce_auto is refused too");
         }
         else
             std::printf("    (the player's nation holds no state building on this seed: own-building rows skipped)\n");

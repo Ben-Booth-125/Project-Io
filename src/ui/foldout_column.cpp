@@ -35,7 +35,8 @@ float shell_column_width(float disp_x)
 float minimap_width(float disp_x, float disp_y)
 {
     const float by_display = 0.28f * ((disp_x < disp_y) ? disp_x : disp_y);
-    return (by_display > 336.0f) ? by_display : 336.0f;
+    // `+ 27` (BL-1314): ~20 px more bottom strip at the same 4:3 aspect.
+    return ((by_display > 336.0f) ? by_display : 336.0f) + 27.0f;
 }
 
 float minimap_height(float disp_x, float disp_y)

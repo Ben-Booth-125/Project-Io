@@ -1,14 +1,13 @@
 #include "hex_render.hpp"
+#include "presentation.hpp" // palette — the loading bar (BL-1313)
 
 #include "terrain_palette.hpp" // BL-732: the pure palette both this and ground_bake read
 #include "ui_state.hpp" // ground_view — the baked neighbourhood page (BL-1241)
-#include "world/logistics.hpp" // body_tile_grid — O(1) neighbour lookup (BL-077 raster)
 #include "world/world.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <unordered_set>
 
 namespace ui {
 
@@ -389,19 +388,6 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
     const int       cy0  = cit->second.grid_y;
     const entity_id body = cit->second.body;
 
-    const auto bit = w.bodies.find(body);
-    if (bit == w.bodies.end())
-        return;
-    const int gw = bit->second.grid_width;
-    const int gh = bit->second.grid_height;
-    if (gw <= 0 || gh <= 0)
-        return;
-
-    // Raster index (grid_y*gw + grid_x -> tile id), lazily built once per body.
-    const std::vector<entity_id>& grid = body_tile_grid(w, body);
-    if (grid.size() < static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
-        return; // index not populated (e.g. no tiles) — nothing to draw
-
     // Scale so a (2·radius+1) block fills the box, with a little margin.
     const float span   = static_cast<float>(2 * radius + 1) + 0.75f;
     const float hex_sz = std::max(4.0f, std::min(size.x / (span * kSqrt3),
@@ -413,15 +399,6 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
     const ImVec2 off          = { region_ctr.x - centre_local.x,
                                   region_ctr.y - centre_local.y };
 
-    // Tiles that carry a building. They render as ordinary GROUND with a mark laid
-    // over them (BL-596): the plate that used to swap the hex out is gone here for
-    // the same reason it is gone on the Planetary canvas, and it has to go on BOTH
-    // surfaces at once — this file exists so the two cannot drift.
-    std::unordered_set<entity_id> built;
-    built.reserve(w.buildings.size());
-    for (const auto& [bid, bc] : w.buildings)
-        built.insert(bc.tile);
-
     dl->PushClipRect(origin, {origin.x + size.x, origin.y + size.y}, true);
 
     // BL-1241: the baked neighbourhood page, when it is ready for THIS tile —
@@ -429,96 +406,43 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
     // maps to the box by hex_sz, exactly as hex_local_centre does).
     const bool baked = ground != nullptr && ground->neigh.tex != nullptr
                     && ground->neigh_tile == centre_tile && ground->body == body;
-    if (baked)
-        dl->AddImage((ImTextureID)(intptr_t)ground->neigh.tex,
-                     { off.x + ground->neigh.x0 * hex_sz, off.y + ground->neigh.y0 * hex_sz },
-                     { off.x + ground->neigh.x1 * hex_sz, off.y + ground->neigh.y1 * hex_sz });
 
-    constexpr ImU32 outline_col = IM_COL32(24, 26, 32, 200);
-    constexpr ImU32 built_mark  = IM_COL32(150, 160, 190, 255);
-    constexpr ImU32 hl_col      = IM_COL32(250, 235, 140, 255); // centre-tile highlight ring
-
-    ImVec2 hl_verts[6];
-    bool   have_hl = false;
-
-    for (int dr = -radius; dr <= radius; ++dr)
+    if (!baked)
     {
-        const int row = cy0 + dr;
-        if (row < 0 || row >= gh)
-            continue;
-        for (int dc = -radius; dc <= radius; ++dc)
-        {
-            const int col = cx0 + dc;
-            // Wrap the column for the LOOKUP (the grid wraps), but position with the
-            // unwrapped col so the block stays contiguous around the centre.
-            const int wc  = ((col % gw) + gw) % gw;
-            const entity_id tid =
-                grid[static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
-                     + static_cast<std::size_t>(wc)];
-            if (tid == null_entity)
-                continue;
-
-            const ImVec2 lc = { hex_local_centre(col, row, hex_sz).x + off.x,
-                                hex_local_centre(col, row, hex_sz).y + off.y };
-            ImVec2 verts[6];
-            hex_vertices(verts, lc.x, lc.y, hex_sz * 0.94f);
-
-            const auto tt        = w.tiles.find(tid);
-            const bool have_tile = (tt != w.tiles.end());
-            const bool is_built  = built.count(tid) != 0;
-            if (baked)
-            {
-                // The page carries the ground, its landforms and rivers
-                // (BL-1242) and what stands on it; only the highlight remains.
-                if (tid == centre_tile)
-                {
-                    std::copy(std::begin(verts), std::end(verts), std::begin(hl_verts));
-                    have_hl = true;
-                }
-                continue;
-            }
-            // Ground first, built or not. Same landform channel the Planetary
-            // canvas draws (BL-231) — this view exists so the two surfaces cannot
-            // drift apart.
-            ImU32 fill = have_tile ? terrain_colour(tt->second.substrate, tt->second.cover,
-                                                    tt->second.cover_density)
-                                   : IM_COL32(60, 60, 60, 255);
-            if (have_tile)
-                fill = landform_relief(fill, tt->second.landform);
-            dl->AddConvexPolyFilled(verts, 6, fill);
-            // Terrain texture (BL-520). Drawn here as well as on the Planetary
-            // canvas for the reason this whole file exists: the two surfaces must
-            // not drift. No lens attenuation applies — this view has no lens.
-            if (have_tile)
-            {
-                const float tr = hex_sz * 0.94f;
-                draw_tile_texture(dl, lc, tr, tt->second.grid_x, tt->second.grid_y,
-                                  tt->second.substrate, tt->second.cover,
-                                  tt->second.cover_density, fill, texture_lod_scale(tr));
-            }
-            dl->AddPolyline(verts, 6, outline_col, ImDrawFlags_Closed, 1.0f);
-            if (is_built)
-            {
-                // The installation mark, drawn OVER live ground rather than on a
-                // plate of its own — the neighbourhood view's echo of the canvas's
-                // building silhouette.
-                const float m = hex_sz * 0.30f;
-                dl->AddRectFilled({lc.x - m, lc.y - m}, {lc.x + m, lc.y + m}, built_mark, 1.0f);
-            }
-            // No landform glyph: the Planetary canvas draws none (the dramatic
-            // landforms are baked relief there, RENDERING.md § Mountains, rivers
-            // and terrain variety), and this view draws what the canvas draws.
-            if (tid == centre_tile)
-            {
-                std::copy(std::begin(verts), std::end(verts), std::begin(hl_verts));
-                have_hl = true;
-            }
-        }
+        // BL-1313: until the page is ready, the box shows a LOADING BAR — never
+        // flat per-hex fills, which read as a second, strategic-looking map of
+        // the same ground that the bake then contradicts a moment later
+        // (SELECTION.md § The tile element's layout, column 1). Indeterminate:
+        // a segment sweeps the track. No highlight ring either: with nothing
+        // under it, a lone ring claims a picture that is not there yet.
+        const float bw = std::min(size.x * 0.6f, 160.0f);
+        const float bh = std::max(4.0f, std::min(8.0f, size.y * 0.05f));
+        const ImVec2 b0 = { region_ctr.x - bw * 0.5f, region_ctr.y - bh * 0.5f };
+        const ImVec2 b1 = { region_ctr.x + bw * 0.5f, region_ctr.y + bh * 0.5f };
+        const float  rr = bh * 0.5f;
+        dl->AddRectFilled(b0, b1, palette::dim_rgb(palette::neutral, 0.30f), rr);
+        const float seg = bw * 0.30f;
+        const float t   = static_cast<float>(std::fmod(ImGui::GetTime() * 0.8, 1.0));
+        const float s0  = b0.x - seg + (bw + seg) * t;
+        const float x0  = std::max(b0.x, s0);
+        const float x1  = std::min(b1.x, s0 + seg);
+        if (x1 > x0)
+            dl->AddRectFilled({x0, b0.y}, {x1, b1.y}, palette::hover, rr);
+        dl->AddRect(b0, b1, palette::dim_rgb(palette::neutral, 0.60f), rr);
+        dl->PopClipRect();
+        return;
     }
 
-    // Highlight ring last, so it sits above neighbouring fills.
-    if (have_hl)
-        dl->AddPolyline(hl_verts, 6, hl_col, ImDrawFlags_Closed, 2.5f);
+    // The page carries the ground, its landforms and rivers (BL-1242) and what
+    // stands on it; only the centre-tile highlight is drawn over it.
+    dl->AddImage((ImTextureID)(intptr_t)ground->neigh.tex,
+                 { off.x + ground->neigh.x0 * hex_sz, off.y + ground->neigh.y0 * hex_sz },
+                 { off.x + ground->neigh.x1 * hex_sz, off.y + ground->neigh.y1 * hex_sz });
+
+    constexpr ImU32 hl_col = IM_COL32(250, 235, 140, 255); // centre-tile highlight ring
+    ImVec2 hl_verts[6];
+    hex_vertices(hl_verts, region_ctr.x, region_ctr.y, hex_sz * 0.94f);
+    dl->AddPolyline(hl_verts, 6, hl_col, ImDrawFlags_Closed, 2.5f);
 
     dl->PopClipRect();
 }

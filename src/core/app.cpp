@@ -901,6 +901,8 @@ void app::poll_worldgen()
     m_generation_report      = std::move(built->report);
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
+    // BL-1321: the settle's readings, taken before the slot is spent.
+    settle_readings settle_reads = std::move(built->finish.readings);
     // BL-1246 (STARTUP.md § Handoff): the world is finished. On the wizard's
     // path the home master has been baking since the Life round, re-taking
     // its source at every round boundary; adoption is the last boundary (the
@@ -916,6 +918,7 @@ void app::poll_worldgen()
     m_ground_world_live = true;
     pin_nation_colours_from_report(); // BL-1089: the realms' colours, before the first frame
     start_new_game_prelude();
+    adopt_settle_readings(std::move(settle_reads));
     // BL-568: the cadence key continues from the settle's twelve steps, which
     // the worker stamped 0..11 (`run_settle`); the first live quarter is 12.
     m_econ_steps = static_cast<uint64_t>(k_campaign_settle_ticks);
@@ -1658,6 +1661,45 @@ void app::start_new_game_prelude()
     mark("economy_presentation");
 }
 
+void app::adopt_settle_readings(settle_readings&& r)
+{
+    // BL-1321 (STARTUP.md § Handoff, "Their READINGS do have a reader", Ben
+    // 2026-10-13): every per-quarter figure a surface shows opens on the last
+    // settle tick's value, never on a "no data yet" dash. The report feeds the
+    // building card's profit row, the header's net and every ledger that reads
+    // m_last_econ_report; the standings feed the Corporations panel; each settle
+    // tick's market sample is one point of the price series, sampled exactly as
+    // record_histories samples a live tick. PRESENTATION ONLY: these are copies
+    // the settle took off its own results, and nothing in the world reads them,
+    // so no simulated value moves. Calendar-dated records (comms, the deposit
+    // series' sample days, the rank history) still take nothing from the settle.
+    m_last_econ_report    = std::move(r.last.report);
+    m_last_corp_standings = std::move(r.last.standings);
+    m_market_history.clear();
+    for (const std::vector<settle_market_sample>& row : r.market_ticks)
+        for (const settle_market_sample& ms : row)
+        {
+            const auto mit = m_world.markets.find(ms.market);
+            if (mit == m_world.markets.end())
+                continue;
+            auto& mh = m_market_history[ms.market];
+            for (std::size_t res = 0; res < resource_count; ++res)
+            {
+                if (mit->second.base_price[res] <= 0.0f)
+                    continue; // resource not traded here (record_histories' rule)
+                ui::push_capped(mh[res].price,  ms.price[res]);
+                ui::push_capped(mh[res].supply, ms.supply[res]);
+                ui::push_capped(mh[res].demand, ms.demand[res]);
+            }
+        }
+    std::printf("[begin] settle readings handed to play: %s; %zu building rows, %zu corp budgets, "
+                "%zu standings, %zu quarter(s) of price series on %zu markets\n",
+                r.filled ? "filled" : "EMPTY (no settle ran)",
+                m_last_econ_report.buildings.size(), m_last_econ_report.budgets.size(),
+                m_last_corp_standings.size(), r.market_ticks.size(), m_market_history.size());
+    std::fflush(stdout);
+}
+
 void app::finish_new_game()
 {
     // BL-1246 (STARTUP.md § Handoff — the ground pre-bakes behind the
@@ -1708,9 +1750,9 @@ void app::finish_new_game()
     // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md
     // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
     // worker with no presentation half of their own -- no agency comms, no
-    // history samples, no last report (Ben's delegated reading, 2026-09-24:
-    // the ticks have no calendar and no seated corp, so nothing they emitted
-    // had a reader) -- so the header sparkline and the Budget ledger's profit
+    // calendar-dated history samples (the ticks have no calendar). Their
+    // READINGS are handed across at adoption (adopt_settle_readings, BL-1321:
+    // the last report, the standings, the price series) -- so the header sparkline and the Budget ledger's profit
     // chart are seeded HERE, from the seated corp's own filed returns: the
     // opening capital, then each settle quarter's closing balance, income and
     // expenditure, oldest first, exactly the samples the old validation run
@@ -1944,9 +1986,7 @@ void app::step_economy()
         lap(7); // persona counsel
         session_history::history_stores h{
             m_balance_history, m_income_history, m_expenditure_history,
-            m_market_history, m_building_rank_hist, m_body_resource_hist,
-            m_tile_resource_hist, m_tracked_tiles, m_resource_hist_days,
-            m_resource_sample_index };
+            m_market_history, m_building_rank_hist };
         session_history::record_histories(m_world, m_registry, m_last_econ_report,
                                           flows, m_ui, h);
         // Strategy readout (BL-411): consume this tick's new decision-ring
@@ -2155,32 +2195,22 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
     // corner gear button. Handled before the ImGui keyboard guard so it works even
     // while the popup (or another panel) holds focus. Precedence, highest first: an
-    // armed exit-confirm backs out; an open system menu closes; an open sticky
-    // detail card unwinds one drill level; an open fold overlay folds up (BL-214);
+    // armed exit-confirm backs out; an open system menu closes; an open fold
+    // overlay folds up (BL-214);
     // otherwise the menu opens. The Selection band never hides (BL-266) — its
     // former hide rung is gone, so the system menu is the terminal rung.
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
-    // a level is not a dismissal and `card_stack` already owned the unwind. The
-    // binary model made expanded a full-screen MODE, and a mode with no keyboard exit
-    // is a defect rather than a principle. It sits BELOW the drill so one press never
-    // both unwinds a drill and closes the overlay hosting it — the same rule that put
-    // the drill above the card.
+    // a level is not a dismissal. The binary model made expanded a full-screen MODE,
+    // and a mode with no keyboard exit is a defect rather than a principle.
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
-        // A drill can only exist over a real selection: a valid selection whose
-        // kind actually resolves — so Esc never unwinds an invisible drill. The
-        // band itself is always open (BL-266) and has no hide rung.
-        const bool card_open = m_ui.selected_entity != null_entity &&
-                               ui::selection_kind_of(m_world, m_ui.selected_entity) !=
-                                   ui::selection_kind::none;
+        // The band is always open (BL-266) and has no hide rung.
         if (m_ui.confirm_exit_pending)
             m_ui.confirm_exit_pending = false;
         else if (m_ui.show_system_menu)
             m_ui.show_system_menu = false;
-        else if (card_open && !m_ui.card_stack.empty())
-            m_ui.card_stack.pop_back();                       // unwind one drill level
         else if (m_ui.corp_rollup_drill >= 0)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
@@ -2397,11 +2427,8 @@ bool app::load_game_from(const std::string& path)
     // econ tick overwrote them -- a stale panel is worse than an empty one.
     m_last_econ_report = economy_report{};
     m_last_corp_standings.clear();
-    m_body_resource_hist.clear();
-    m_tile_resource_hist.clear();
 
     // Selection state that indexes into the replaced world.
-    m_ui.card_stack.clear();
     m_ui.clear_battle_selection();
 
     m_screen = app_screen::in_game;
@@ -2685,19 +2712,6 @@ void app::render()
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
 
-    // A *new* entity selection no longer competes with the fold-out ledgers for
-    // screen space (BL-213 — the Selection band lives in its own fixed rect at
-    // the bottom of the screen, sandwiched between the shell column and the
-    // right chrome column), so selecting something leaves whatever ledger is
-    // open untouched. Only the drill-down stack still resets on a new selection.
-    if (m_ui.selected_entity != m_prev_selection)
-    {
-        m_ui.card_stack.clear();        // a new selection resets any drill-down (BL-196)
-        m_ui.card_resource_page = 0;    // ...and its tile resource accordion page
-        m_ui.selection_building_page = 0; // ...and the building card's accordion page
-        m_prev_selection = m_ui.selected_entity;
-    }
-
     ui::draw_tile_inspector(m_world, m_ui, m_generation_report, m_active_world_params,
                             &m_ui.show_tile_ledger);
     // Generation Ledger (BL-303) — regenerates the per-pass record on demand from
@@ -2793,11 +2807,8 @@ void app::render()
         const ui::shell_rect band = ui::selection_band_rect(disp);
         const ImVec2 band_origin = { band.x, band.y };
         const ImVec2 band_size   = { band.w, band.h };
-        const ui::resource_history_view rhist{ &m_body_resource_hist,
-                                               &m_tile_resource_hist,
-                                               &m_resource_hist_days };
         ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
-                                rhist, m_ui, band_origin, band_size);
+                                m_ui, band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195), and it now really is: the

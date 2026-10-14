@@ -231,6 +231,19 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         if (convoy.corp == null_entity)
             continue; // no trade route: routes are a corporation's record
 
+        // BL-1320 (TRADE.md § The trade value record): Traded in — the units a
+        // trade lands here x this market's LAST RESOLVED price, the same price
+        // the import tariff below charges on (`dispatch_market_price`). An
+        // intercepted cargo was cut above and never reaches this loop, so it is
+        // never counted in. Write-only: nothing in the sim reads it.
+        {
+            const float v = convoy.cargo_qty
+                          * dispatch_market_price(mit->second,
+                                                  static_cast<std::size_t>(convoy.cargo_resource));
+            if (std::isfinite(v) && v > 0.0f)
+                mit->second.traded_in_accum += v;
+        }
+
         // THE IMPORT TARIFF (MARKETS.md § Tariffs, Ben 2026-09-15): a convoy
         // arriving at a market whose nation differs from its source market's
         // nation pays the destination nation's enacted import duty on the

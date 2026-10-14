@@ -1245,6 +1245,33 @@ void draw_market_key(const world& w, ui_state& state,
                          "Market catchments", rows, "No markets", &state, state);
 }
 
+/// The Nations lens key (BL-1323): one swatch per nation holding ground on this
+/// body, in ascending id, read from the one pinned table — so the key is the
+/// fill's own colours. Same scroll-list shape as the Market key.
+void draw_nations_key(const world& w, ui_state& state, const std::vector<entity_id>& raster)
+{
+    std::vector<entity_id> ids;
+    for (const entity_id t : raster)
+    {
+        const auto it = w.tile_to_nation.find(t);
+        if (it != w.tile_to_nation.end() && it->second != null_entity)
+            ids.push_back(it->second);
+    }
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    std::vector<key_row> rows;
+    rows.reserve(ids.size());
+    for (const entity_id nid : ids)
+    {
+        const auto nit = w.nations.find(nid);
+        std::string name = (nit != w.nations.end() && !nit->second.name.empty())
+                               ? nit->second.name : std::string("Nation");
+        rows.push_back({ palette::nation_colour(nid), IM_COL32(220, 220, 220, 255), std::move(name),
+                         key_marker::swatch, 0.0f });
+    }
+    draw_scroll_list_key("##lens_key_nations", "Nations", rows, "No nations", nullptr, state);
+}
+
 // The Country lens's per-nation key (BL-133, draw_country_key) RETIRED with the
 // lens (BL-601). A scroll-list of every nation on the body was the legend for a
 // territory-wide tint — it answered "which colour is whose?" for a wash that no
@@ -1816,6 +1843,20 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
 
     switch (state.overlay)
     {
+    case overlay_mode::nations:
+    {
+        // BL-1323: under the Nations lens the ground IS the nation, so a press
+        // anywhere on its territory resolves to it (SELECTION.md § A lens
+        // collapses selection to ONE TIER) — the same kind the border band
+        // produces, so the click path and its ledger routing are the band's.
+        const auto nit = w.tile_to_nation.find(tile);
+        if (nit == w.tile_to_nation.end() || nit->second == null_entity
+            || w.nations.find(nit->second) == w.nations.end())
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = nit->second;
+        return structure_kind::nation;
+    }
     case overlay_mode::market:
     case overlay_mode::scarcity:
     {
@@ -2508,21 +2549,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // normalisation maxima — the only state the pass needs is the selected index.
 
     // Market lens pre-pass (BL-015): assign each market on the active body a
-    // distinct catchment colour (using corp palette slots, cycling if there are
-    // more markets than slots). Tiles are tinted by their catchment market.
-    // The old price-wash readout is relocated to the Market Ledger.
+    // DISTINCT catchment colour (palette::market_catchment_colour — no two indices
+    // share one; Ben, 2026-10-13), markets taken in ascending id so a market keeps
+    // its colour frame to frame. Tiles are tinted by their catchment market.
     std::unordered_map<entity_id, ImU32> market_catchment_colour;
     if (state.overlay == overlay_mode::market)
     {
-        int slot = 0;
+        std::vector<entity_id> body_markets;
         for (const auto& [mid, mk] : w.markets)
-        {
-            if (mk.body != state.active_body)
-                continue;
-            market_catchment_colour[mid] =
-                palette::corp_colour(slot % palette::corp_slot_count);
-            ++slot;
-        }
+            if (mk.body == state.active_body)
+                body_markets.push_back(mid);
+        std::sort(body_markets.begin(), body_markets.end());
+        for (std::size_t i = 0; i < body_markets.size(); ++i)
+            market_catchment_colour[body_markets[i]] =
+                palette::market_catchment_colour(static_cast<int>(i));
     }
 
     // Placement-suitability pre-pass (BL-010). A surface tied to *construction mode*,
@@ -3401,6 +3441,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
+        // Nations lens (BL-1323; LENSES.md § The Nations lens): every tile a
+        // nation owns takes that nation's identity colour — the one pinned table,
+        // so the fill, the band and every swatch agree. Unowned ground and open
+        // ocean (absent from tile_to_nation) keep their terrain hue.
+        else if (state.overlay == overlay_mode::nations)
+        {
+            const auto nit = w.tile_to_nation.find(id);
+            if (nit != w.tile_to_nation.end() && nit->second != null_entity)
+                fill = lerp_colour(fill, palette::nation_colour(nit->second), 0.7f);
+        }
         // Population (Workforce) lens (BL-135, recut to a HEATMAP 2026-08-28 on
         // Ben's instruction: "rework the workforce efficiency lens to be a
         // heatmap, akin to throughput").
@@ -3692,6 +3742,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const auto col_it = market_catchment_colour.find(market_of(id, tile));
             return col_it != market_catchment_colour.end()
                        ? with_alpha(col_it->second, k_lens_wash_categorical) : 0u;
+        }
+        if (ov == overlay_mode::nations)
+        {
+            const auto nit = w.tile_to_nation.find(id);
+            return (nit != w.tile_to_nation.end() && nit->second != null_entity)
+                       ? with_alpha(palette::nation_colour(nit->second), k_lens_wash_categorical) : 0u;
         }
         if (ov == overlay_mode::population)
         {
@@ -5494,6 +5550,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     //
     // What remains here is the NAME: only City+ centres (scale >= 4, not razed)
     // carry a label, placed where the old skyline's edge stood.
+    //
+    // MARKET LABELS (BL-1316; PLANETARY.md § Market labels). A market is named for
+    // a city (market_city_name's rule, BL-1315), and that city's label IS the
+    // market's label: the market glyph drawn before the name. So a centre that
+    // names a market is labelled whatever its scale -- a market's naming centre can
+    // be a town (the carve admits scale 2 at a trade junction), and without the
+    // label the market's name would be drawn nowhere on the map. Same layer, same
+    // vertical culling and horizontal wrap as every other settlement label.
     if (!w.population_centres.empty())
     {
         const float visible_top    = grid_area_origin.y - hit_r;
@@ -5501,11 +5565,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
         // Sorted gather: the store is an unordered_map, and overlapping labels
         // must overdraw in one deterministic order for the capture harness.
-        struct pop_centre { int col; int row; int scale; entity_id centre; };
+        struct pop_centre { int col; int row; int scale; entity_id centre; bool market; };
         std::vector<pop_centre> pcs;
         for (const auto& [pid, pc] : w.population_centres)
         {
-            if (pc.scale < 4 || pc.razed)
+            if (pc.razed)
+                continue;
+            // The market glyph, and a label for a town only because it names a
+            // market, show ONLY under the Market lens (Ben, 2026-10-13); off it a
+            // market city wears its plain label by the scale rule like any other.
+            const bool names_market = state.overlay == overlay_mode::market
+                                   && centre_named_market(w, pid) != null_entity;
+            if (pc.scale < 4 && !names_market)
                 continue;
             const auto tit = w.population_centre_tile.find(pid);
             if (tit == w.population_centre_tile.end())
@@ -5514,7 +5585,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (til == w.tiles.end() || til->second.body != state.active_body)
                 continue;
             pcs.push_back({ til->second.grid_x, til->second.grid_y,
-                            std::clamp(pc.scale, 1, 5), pid });
+                            std::clamp(pc.scale, 1, 5), pid, names_market });
         }
         std::sort(pcs.begin(), pcs.end(),
                   [](const pop_centre& a, const pop_centre& b) { return a.centre < b.centre; });
@@ -5546,7 +5617,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
-                const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                if (a.market)
+                {
+                    // The market glyph sits on the name's line, its own width
+                    // ahead of it, shadowed as the name is so it reads on any ground.
+                    const float  gr = ImGui::GetFontSize() * 0.40f;
+                    const ImVec2 gc{ tp.x + gr, tp.y + ImGui::GetFontSize() * 0.5f };
+                    icons::market(dl, { gc.x + 1.0f, gc.y + 1.0f }, gr, IM_COL32(20, 22, 28, 200));
+                    icons::market(dl, gc, gr, IM_COL32(236, 230, 214, 255));
+                    tp.x += 2.0f * gr + 3.0f;
+                }
                 dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
                 dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
             }
@@ -5837,6 +5918,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_industry_key(dl, state);
     else if (state.overlay == overlay_mode::continent)
         draw_continent_key(dl, state, plates);
+    else if (state.overlay == overlay_mode::nations)
+        draw_nations_key(w, state, raster);
     // BL-606's key joins the same one chrome home. It was authored against the
     // old flush-left anchor and needed the FOREGROUND draw list plus an opaque
     // fill to float over the always-open Selection band; Sprint 17b's minimap-
@@ -6189,24 +6272,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 lensed ? null_entity
                        : resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
 
-            // A SINGLE BUILDING OWNS ITS WHOLE HEX (SELECTION.md § Multi-building
-            // tiles; BL-1241). With the structures baked there is no glyph to aim
-            // at — the hex is the press area — so on a tile carrying exactly one
-            // building the building is resolved HERE, before the border band's
-            // corridor gets a say: a press anywhere on that hex, edge included,
-            // lands on the installation. A unit marker still outranks it (a unit
-            // standing on a built tile must stay reachable on the first press).
-            // A stacked tile is unchanged — it falls through to the tile view —
-            // and so is every lensed press (the lens branch never reaches here).
-            if (!lensed && hovered_tile != null_entity
-                && (marker_hit == null_entity || !w.units.count(marker_hit)))
-            {
-                const auto cnt_it = tile_bld_count.find(hovered_tile);
-                const auto tb     = tile_to_bld.find(hovered_tile);
-                if (cnt_it != tile_bld_count.end() && cnt_it->second == 1
-                    && tb != tile_to_bld.end())
-                    marker_hit = tb->second;
-            }
+            // A CANVAS PRESS SELECTS THE TILE (BL-1312 round 2; SELECTION.md
+            // § Multi-building tiles — Ben, 2026-10-13: "default tile selection
+            // to the list of buildings rather than any individual building").
+            // This REVERSES the 2026-07-22 rule that a press on a single-building
+            // hex lands on the installation: a building marker resolves to the
+            // tile it stands on, so the band opens the tile's building grid, one
+            // press from any building on it. A unit marker still outranks the
+            // tile (a unit standing on built ground stays reachable on the first
+            // press). The repeat-click cycle's Building rung, ledger rows and the
+            // grid's own buttons still select a building. Hover is untouched: it
+            // reads the same zones and still names the installation.
+            if (marker_hit != null_entity && w.buildings.count(marker_hit) != 0)
+                marker_hit = null_entity; // the press falls through to the tile below
+            else if (marker_hit != null_entity && w.tiles.count(marker_hit) != 0)
+                marker_hit = null_entity; // a stacked hex's zone carries its tile: same fall-through
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
             // tile/province fallback. With no lens a marker is a specific thing
@@ -6480,15 +6560,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else
             {
 
-            // Falling through to the tile means the click missed every marker glyph.
-            // On a BUILT tile that still selects the building: the whole hex belongs to
-            // the installation, so the tile element is unreachable there (Ben's
-            // 2026-07-22 call). The tile element is the prospecting view for UNBUILT
-            // ground — routing a built tile to it offers a Construct button that the
-            // placement rules then refuse, which is the bug this closes.
-            // BL-367: that "whole hex is one installation" assumption only holds for
-            // exactly one building — once BL-366 lets a tile stack several, the hex
-            // stays reachable as the grouped-by-stack tile view instead.
+            // Falling through to the tile means the click hit no unit marker. A
+            // built tile selects the TILE too (BL-1312 round 2, reversing the
+            // 2026-07-22 whole-hex-is-the-installation call): the tile element
+            // opens on its building grid.
             //
             // BL-511 made the fallback the hovered tile's PROVINCE rather than
             // the tile; BL-598 puts it back on the tile. The province folded
@@ -6499,15 +6574,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // as the MIRROR (`selected_province`) the province outline reads.
             const uint32_t hovered_prov = (hovered_tile != null_entity)
                                           ? w.provinces.province_of(hovered_tile) : 0u;
-            entity_id fallback = hovered_tile;
-            if (hovered_tile != null_entity)
-            {
-                const auto tb = tile_to_bld.find(hovered_tile);
-                const auto cnt_it = tile_bld_count.find(hovered_tile);
-                const int  count = (cnt_it != tile_bld_count.end()) ? cnt_it->second : 0;
-                if (tb != tile_to_bld.end() && count <= 1)
-                    fallback = tb->second;
-            }
+            // BL-1312 round 2: the fallback is ALWAYS the tile — a built hex
+            // opens on its building grid, never on a lone building.
+            const entity_id fallback = hovered_tile;
 
             // Placeholder unit-cycle scaffolding: a REPEAT click on the same tile the
             // selection already sits on cycles Soldier -> Building -> Tile -> Soldier
@@ -6540,9 +6609,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // tile rung reaches it and a rung of its own selected the same
                 // ground twice.
                 //
-                // This is the CYCLE order only. The hit-test above is unchanged
-                // and still resolves most-specific-first, so a building is still
-                // reachable on the FIRST click.
+                // This is the CYCLE order only. The first press lands on the tile
+                // (BL-1312 round 2); the building rung is reached by the repeat
+                // press or by the tile card's own building buttons.
                 //
                 // Rungs 1..3 are entities, so a null check is their liveness test.
                 // Rung 0 is not — a battle has no entity id — so `stage_live`
@@ -6622,10 +6691,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // "the cycle does not fire", which is how NR-504 was found.)
                     // The fallback is the tile itself since BL-598, so a plain
                     // click on ground seeds the TILE rung.
+                    // A building marker never survives to here (BL-1312 round 2:
+                    // the press lands on the tile), so the only marker rung is the
+                    // unit; everything else seeds the TILE rung, and a repeat
+                    // click advances to the battle / unit / building rungs.
+                    (void)building_here;
                     state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 1
-                                                 : (marker_hit != null_entity) ? 2   // a building marker
-                                                 : (building_here != null_entity && fallback == building_here) ? 2
-                                                                               : 3;  // plain ground = the tile
+                                                                               : 3;  // the tile
                 }
                 else
                 {

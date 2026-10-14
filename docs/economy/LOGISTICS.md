@@ -453,6 +453,9 @@ building that moves nothing.
   builds stations and lays track in play as its nation's verbs. **Track costs the treasury per tile,
   plus steel per tile, with upkeep per tile (Ben, 2026-10-13).**
 - **Interdiction** cuts a rail line as it cuts a road (§ 7); a cut line strands the stations beyond it.
+- **No track is ownerless (Ben, 2026-10-14).** Track laid over ground no nation holds, or through a
+  minor with no background firm, passes to the state of the nation whose ground is nearest along the
+  line, so every tile has an owner who bears its upkeep.
 
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 

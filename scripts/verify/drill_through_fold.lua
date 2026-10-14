@@ -4,7 +4,6 @@
 -- prove the idiom is shared rather than re-invented per surface:
 --
 --   R1  every dense surface folds and expands through the same chevron
---   R2  the overlay composes with BL-196's subject drill (breadcrumb + back)
 --   R3  expanding a second surface folds the first
 --   R5  the Selection band still RESTS expanded-in-place (Ben, 2026-08-01) —
 --       its fixed 260 px rect is never left showing one line over empty space
@@ -15,22 +14,13 @@
 -- ── R5: the Selection band at rest. A tile selection, nothing expanded. ──
 verify.econ_step(4)
 verify.goto_surface("home")
--- A tile with a real deposit, so the metric pages are drillable resources rather
--- than the habitability/hazard fallback (which has no time series to drill into).
 verify.select_tile(110, 79)
 verify.fold()
 shot("fold_band_resting")
 
--- ── R1: the same metric, full screen. The chart gets the height it never had,
---    and carries its question log (BL-247) beneath it. ──
-verify.fold("selection_metric", 0)
-shot("fold_band_expanded")
-
--- ── R2: Depth composes with Subject. Drill from inside the expanded view; the
---    breadcrumb and back control belong to BL-196 and are untouched by the fold. ──
-verify.card_drill(0)
-shot("fold_band_expanded_drilled")
-verify.card_drill(-1)
+-- The band's own full-canvas expansion (the tile metric charts and the
+-- building pager) retired with BL-1312 (tile card split): the province and
+-- tile cards fit the band, so the band has nothing left to expand.
 
 -- ── R3: expanding a second surface folds the first. The subject was the History
 --    ledger's Tiles view until BL-281 retired it; the Story view inherits the same

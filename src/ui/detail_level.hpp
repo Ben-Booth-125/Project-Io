@@ -56,7 +56,7 @@ struct ui_state;
 //
 // Three axes, never conflated (the item's own framing):
 //   DEPTH   how much of this subject do I want   -> here
-//   SUBJECT what am I looking at                 -> ui_state::card_stack (BL-196)
+//   SUBJECT what am I looking at                 -> ui_state::selected_entity
 //   HOST    where does this properly live        -> ui::focus_on_entity, the [>] button
 //
 // Authority: docs/ui/DRILL_THROUGH.md.
@@ -72,8 +72,6 @@ struct ui_state;
 enum class detail_surface : std::uint8_t
 {
     none = 0,          ///< Nothing expanded. The resting value.
-    selection_metric,  ///< The tile Selection band's metric card (key = page index).
-    building_metric,   ///< The building Selection band's accordion page (key = page index).
     history_story,     ///< History ledger, Story view.
     history_chain,     ///< History ledger, Chain view (key = chain_stage).
     generation_stage,  ///< The New World wizard's chain stages (key = chain_stage).

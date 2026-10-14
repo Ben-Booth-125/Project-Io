@@ -101,6 +101,34 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
                                    int day_tick, bool spectating,
                                    const settle_tick_hooks* hooks = nullptr);
 
+/// One market's per-quarter reading after a settle tick: the three arrays the
+/// app's market history samples each live tick (session_history.cpp
+/// § record_histories), copied off a const world.
+struct settle_market_sample
+{
+    entity_id                         market = null_entity;
+    std::array<float, resource_count> price{};
+    std::array<float, resource_count> supply{};
+    std::array<float, resource_count> demand{};
+};
+
+/// WHAT THE SETTLE'S READINGS HAND TO PLAY (BL-1321; STARTUP.md § Handoff,
+/// "Their READINGS do have a reader", Ben 2026-10-13). Write-only from the
+/// settle: copies of what its ticks returned and of a const world after each,
+/// so filling it can move nothing. Begin moves it into the app's presentation
+/// state so a fresh campaign opens on the last settle quarter's values rather
+/// than a "no data yet" dash.
+struct settle_readings
+{
+    /// The LAST settle tick's result: the report (building profit, the
+    /// header's net), the standings, the flows, the trade pass.
+    settle_tick_result last;
+    /// One row per settle tick, oldest first; each row every market in
+    /// ascending id order (the price series).
+    std::vector<std::vector<settle_market_sample>> market_ticks;
+    bool filled = false; ///< true once at least one tick ran
+};
+
 /// THE SETTLE: econ steps 0..@p ticks-1 of `run_settle_tick`, day tick 0,
 /// spectating, on the searched landscape -- phase 6's "validate dynamically,
 /// once" (GENERATION_STRATEGY.md § Three passes). The balances, pools, filed
@@ -110,7 +138,9 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
 /// @p progress, when non-null, has its inner bar counted per LAP
 /// (`report_sub(done, ticks * k_campaign_settle_lap_count)`; NR-932) and
 /// cleared at the end; nothing is read back. @p hooks is handed to every tick,
-/// chained ahead of the lap tap when both are set.
+/// chained ahead of the lap tap when both are set. @p readings, when non-null,
+/// receives the settle's readings (above); nothing is read back from it.
 void run_settle(world& w, const recipe_registry& reg, int ticks = k_campaign_settle_ticks,
                 const settle_tick_hooks* hooks = nullptr,
-                generation_progress* progress = nullptr);
+                generation_progress* progress = nullptr,
+                settle_readings* readings = nullptr);

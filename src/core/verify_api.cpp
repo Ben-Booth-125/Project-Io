@@ -111,6 +111,8 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "supply_routes") return overlay_mode::supply_routes;
     if (s == "throughput")  return overlay_mode::throughput;
     if (s == "trade_flow")  return overlay_mode::trade_flow;
+    // BL-1323: a new name, not the retired "country" (see above).
+    if (s == "nations")     return overlay_mode::nations;
     return overlay_mode::none;
 }
 
@@ -135,6 +137,7 @@ const char* overlay_script_name(overlay_mode m)
         case overlay_mode::supply_routes: return "supply_routes";
         case overlay_mode::throughput:    return "throughput";
         case overlay_mode::trade_flow:    return "trade_flow";
+        case overlay_mode::nations:       return "nations";
         default:                          return "none";
     }
 }
@@ -656,13 +659,7 @@ void app::reset_verify_transients()
     m_expenditure_history.clear();
     m_market_history = {};
     m_building_rank_hist.clear();
-    m_body_resource_hist = {};
-    m_tile_resource_hist = {};
-    m_tracked_tiles.clear();
-    m_resource_hist_days.clear();
-    m_resource_sample_index = 0;
     m_strategy_readout = {};
-    m_prev_selection = null_entity;
     m_last_orbit_days = 0.0;
     m_last_survey_day = 0;
     // BL-521: the synthetic cursor is per-script state. Left held, a click at the
@@ -977,6 +974,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
+    });
+    // BL-1323: the bordering-colour rule, checked against the LIVE table every
+    // surface reads. Returns { clashes, min_distance, pairs, threshold }.
+    v.set_function("nation_colour_clashes", [this]() {
+        double min_d = 0.0;
+        int pairs = 0;
+        const int clashes = ui::palette::nation_colour_clashes(&min_d, &pairs);
+        sol::table t = m_lua.state().create_table();
+        t["clashes"]      = clashes;
+        t["min_distance"] = min_d;
+        t["pairs"]        = pairs;
+        t["threshold"]    = static_cast<double>(ui::palette::nation_min_colour_distance);
+        return t;
     });
     // BL-732: bare-ground judgement captures — hide the national border band
     // (verify-only; the band's weight over painterly ground is BL-734's call).
@@ -1606,9 +1616,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_tech_tree)           panel = "tech_tree";
             out["open_panel"] = std::string(panel);
         }
-        // Which section of the tile Selection element's top nav is showing, so a
-        // check can assert the chevrons MOVED it rather than assuming they did.
-        out["selection_section"] = m_ui.card_tile_view;
         out["hover_card"]        = (m_ui.hover_card_entity != null_entity);
         out["hover_card_stuck"]  = m_ui.hover_card_stuck;
         out["x"]                 = m_pointer_x;
@@ -3061,9 +3068,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         const std::string& n = *name;
         detail_surface s = detail_surface::none;
-        if      (n == "selection_metric") s = detail_surface::selection_metric;
-        else if (n == "building_metric")  s = detail_surface::building_metric;
-        else if (n == "history_story")    s = detail_surface::history_story;
+        if      (n == "history_story")    s = detail_surface::history_story;
         else if (n == "history_chain")    s = detail_surface::history_chain;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
@@ -3072,22 +3077,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else                           ui::expand(m_ui, s, key.value_or(0));
     });
 
-    // Park the building Selection card's pager on one of its pages (NR-246,
-    // 2026-08-16). `fold("building_metric", k)` sets the drill KEY, not the page,
-    // so before this a script had no way to reach the Method or Workforce page and
-    // every capture showed page 1 — which is exactly how the old
-    // building_management_shell.lua came to claim it verified a surface it never
-    // photographed. The page index is clamped by building_pages() at draw time, so
-    // an out-of-range value parks on the last page rather than drawing nothing.
-    v.set_function("building_page", [this](int page) { m_ui.selection_building_page = page; });
-
-    // How many Goods rows fill the Market ledger's column height (BL-686). The
-    // row height is the open measurement Ben asked to compare at 8 / 10 / 12, so
-    // it is a dial a capture script sets rather than three separate builds.
-    // Values <= 0 are ignored; the draw falls back to its own default.
-    v.set_function("goods_rows", [this](int rows) {
-        if (rows > 0) m_ui.market_goods_rows = rows;
-    });
 
     // The rows the Goods table actually DREW last frame, in draw order (BL-686),
     // each carrying a FRESH read of the same figure from `market_component`.
@@ -3139,19 +3128,107 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.market_goods_show_body = on;
     });
 
-    // The nation presence row's chips as drawn (BL-688) — the surface has no
-    // other check, and "no national presence" is a legitimate state that must be
-    // distinguishable from "the row is broken".
-    v.set_function("nation_chips", [this]() {
+    // The market top section's nation list as drawn (BL-1317, superseding
+    // BL-688's chips) — "no national presence" is a legitimate state that must be
+    // distinguishable from "the list is broken", so each row carries the world's
+    // own name for the nation beside the one drawn.
+    v.set_function("nation_rows", [this]() {
         sol::table out = m_lua.state().create_table();
         int i = 1;
-        for (const ui::nation_chip_record& c : ui::nation_chips())
+        for (const ui::nation_row_record& c : ui::nation_rows())
         {
             sol::table row = m_lua.state().create_table();
-            row["name"]     = c.name;
-            row["initials"] = c.initials;
+            row["nation"]     = c.nation;
+            row["name"]       = c.name;
+            row["name_avail"] = c.name_avail;
+            row["elided"]     = c.elided;
+            const auto nit = m_world.nations.find(c.nation);
+            row["world_name"] = (nit != m_world.nations.end()) ? nit->second.name : std::string{};
             out[i++] = row;
         }
+        return out;
+    });
+
+    // The market top section's metrics and layout as drawn (BL-1317), with an
+    // independent read of Sold here off the exchange record, so a check compares
+    // two reads rather than restating one.
+    v.set_function("market_top", [this]() {
+        const ui::market_top_record& t = ui::market_top();
+        sol::table out = m_lua.state().create_table();
+        out["drawn"]        = t.drawn;
+        out["market"]       = t.market;
+        out["sold_known"]   = t.sold_known;
+        out["sold_here"]    = t.sold_here;
+        out["quarter"]      = t.quarter;
+        out["traded_known"] = t.traded_known;
+        out["column_h"]     = t.column_h;
+        out["top_h"]        = t.top_h;
+        out["legacy_row_h"] = t.legacy_row_h;
+        out["goods_row_h"]  = t.goods_row_h;
+        out["frame_h"]      = ImGui::GetFrameHeight();
+        double world_sold = 0.0;
+        const std::size_t n = m_world.exchanges.size();
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            const exchange_record& e = m_world.exchanges.oldest_first(k);
+            if (e.tick == t.quarter && e.market == t.market && e.side == 0)
+                world_sold += static_cast<double>(e.quantity) * static_cast<double>(e.unit_price);
+        }
+        out["world_sold_here"] = world_sold;
+
+        // BL-1320: Traded in / Traded out as drawn, the one-line layout's
+        // baselines, and an INDEPENDENT walk of Traded out. The walk does not
+        // read the trade value record: a convoy still at progress 0 left this
+        // tick (advance_convoys moves it at the next tick's start), and a
+        // trade's purchase is billed at the posted price, which the exchange
+        // record's purchase row for (market, good, quarter) carries as its unit
+        // price (every shelf draw of that good there that tick pays the same
+        // posted price, so the volume-weighted row price is that price).
+        out["traded_in"]  = t.traded_in;
+        out["traded_out"] = t.traded_out;
+        {
+            sol::table ly = m_lua.state().create_table();
+            sol::table fy = m_lua.state().create_table();
+            sol::table fa = m_lua.state().create_table();
+            sol::table fw = m_lua.state().create_table();
+            for (int k = 0; k < 3; ++k)
+            {
+                ly[k + 1] = t.metric_label_y[k];
+                fy[k + 1] = t.metric_figure_y[k];
+                fa[k + 1] = t.metric_figure_avail[k];
+                fw[k + 1] = t.metric_figure_w[k];
+            }
+            out["metric_label_y"]      = ly;
+            out["metric_figure_y"]     = fy;
+            out["metric_figure_avail"] = fa;
+            out["metric_figure_w"]     = fw;
+        }
+        double world_out = 0.0;
+        int    fresh     = 0;
+        int    unpriced  = 0;
+        for (const convoy_component& c : m_world.convoys)
+        {
+            if (c.source_market != t.market || c.corp == null_entity || c.progress != 0.0f)
+                continue;
+            ++fresh;
+            bool found = false;
+            for (std::size_t k = 0; k < n && !found; ++k)
+            {
+                const exchange_record& e = m_world.exchanges.oldest_first(n - 1 - k);
+                if (e.tick != t.quarter)
+                    break; // newest quarter only (chronological ring)
+                if (e.market == t.market && e.side == 1 && e.resource == c.cargo_resource)
+                {
+                    world_out += static_cast<double>(c.cargo_qty) * static_cast<double>(e.unit_price);
+                    found = true;
+                }
+            }
+            if (!found)
+                ++unpriced;
+        }
+        out["world_traded_out"]    = world_out;
+        out["fresh_convoys"]       = fresh;
+        out["fresh_unpriced"]      = unpriced;
         return out;
     });
 
@@ -3280,6 +3357,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (const entity_id m : ids)
             out[i++] = m;
         return out;
+    });
+
+    // BL-1315: a market's display name, as every surface shows it
+    // (`ui::market_city_name`) — so a script can count distinct names per body.
+    v.set_function("market_name", [this](entity_id mid) -> std::string {
+        return ui::market_city_name(m_world, mid);
     });
 
     // Read 2 — every manual trade touching the selected market, whoever owns
@@ -3827,14 +3910,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::string("");
     });
 
-    // Set a building's workforce target (0–200 %) via the SAME clamp+write the
-    // construction panel's workforce slider performs. Returns the applied value.
+    // A FIXTURE: set a building's workforce target (0–200 internal; shown as target/2 %) directly. Since
+    // BL-1322 no player control writes it (the game steps it each quarter), so
+    // this is the only way a script can stage a starting target; the next
+    // econ step moves a player building one 50-internal step (25 % shown) from here. Returns the
+    // applied value.
     v.set_function("set_building_workforce", [this](unsigned tile_u, int pct) -> int {
         const entity_id tile = static_cast<entity_id>(tile_u);
         for (auto& [bid, b] : m_world.buildings)
         {
             if (b.tile != tile) continue;
-            b.workforce_target = std::clamp(pct, 0, 200);
+            b.workforce_target = std::clamp(pct, 0, workforce_target_max);
             SDL_Log("verify.set_building_workforce: tile=%u target=%d",
                     tile_u, b.workforce_target);
             return b.workforce_target;
@@ -3933,7 +4019,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // Range-check BEFORE the narrowing cast, not after — a value that fits a
         // Lua number can still be outside the destination's domain.
         const int wf = t.get_or("workforce", 100);
-        if (wf < 0 || wf > 200) return "rejected_invalid";
+        if (wf < 0 || wf > workforce_target_max) return "rejected_invalid"; // 0-200 internal
         cmd.workforce = wf;
         // BL-1296: the state industry a command acts for (0 = the corp's own book).
         cmd.as_nation = static_cast<entity_id>(t.get_or("as_nation", 0u));
@@ -4667,54 +4753,73 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return false;
     });
 
-    // The building Selection card's accordion PAGE LABELS for the current selection,
-    // read from `building_pages` — the one list both the in-band accordion and the
-    // full-canvas takeover dispatch on.
+    // BL-1312 (tile card split): the tile element AS DRAWN last frame — the
+    // tile card's building buttons ({label, detail, good, open, count, first, x,
+    // y}), the expanded building card (expanded, player, status, charts, the back
+    // control's position), the province card (capacity standing / ceiling and the
+    // bar's position, the resource table's row order) and the four column widths.
+    // `drawn` is false when the tile element did not draw.
     //
-    // It exists to make two properties assertable rather than eyeballed. First, that a
-    // RIVAL building gets Status and nothing else: `building_pages` short-circuits for
-    // a non-player building without testing any player page's guard, and that
-    // short-circuit is a competitor-visibility guarantee, not a convenience. Second,
-    // that the two pages whose whole content was a control are GONE from the card
-    // (2026-08-29) — an absence a capture cannot prove, since a missing page just
-    // renumbers the pager.
-    v.set_function("building_pages", [this]() {
+    // It exists to make two properties assertable rather than eyeballed. First,
+    // that a RIVAL button and card WITHHOLD (DISCOVERY.md § The operational fog):
+    // no recipe group name, no good, profit "private", no running state and no
+    // charts — absences a capture cannot prove. Second, that the button and back
+    // presses are reachable: the positions are published by the draw itself, so
+    // a script presses the real control rather than a coordinate guessed from a
+    // capture.
+    v.set_function("tile_card", [this]() {
         sol::state& st  = m_lua.state();
         sol::table  out = st.create_table();
-        sol::table  labels = st.create_table();
+        const ui_state::tile_card_readout& c = m_ui.tile_card;
+        out["drawn"]             = c.drawn;
+        out["tile"]              = static_cast<unsigned>(c.tile);
+        out["expanded"]          = static_cast<unsigned>(c.expanded);
+        out["is_expanded"]       = (c.expanded != null_entity);
+        out["player"]            = c.expanded_player;
+        out["charts"]            = c.charts;
+        out["workforce"]         = c.workforce; // BL-1322: the read-only row ("75%"), "" when not drawn
+        out["count"]             = c.count;
+        out["title"]             = c.title;
+        out["method"]            = c.method;
+        out["net"]               = c.net;
+        out["expenses"]          = c.expenses;
+        out["population"]        = c.population;
+        out["population_x"]      = c.population_x;
+        out["population_y"]      = c.population_y;
+        out["province_scroll_max"] = c.province_scroll_max;
+        out["status"]            = c.status;
+        out["back_x"]            = c.back_x;
+        out["back_y"]            = c.back_y;
+        out["province_standing"] = c.province_standing;
+        out["province_ceiling"]  = c.province_ceiling;
+        out["capacity_x"]        = c.capacity_x;
+        out["capacity_y"]        = c.capacity_y;
+        out["preview_w"]         = c.preview_w;
+        out["province_w"]        = c.province_w;
+        out["tile_w"]            = c.tile_w;
+        out["actions_w"]         = c.actions_w;
+        out["height"]            = c.height;
+        sol::table rows = st.create_table();
         int n = 0;
-        for (const ui::building_page& bp :
-             ui::building_pages(m_world, m_registry, m_last_econ_report, m_ui.selected_entity,
-                                m_ui.spectating && m_ui.god_view))
-            labels[++n] = bp.label;
-        out["labels"] = labels;
-        out["count"]  = n;
-        out["player"] = (m_ui.selected_entity != null_entity &&
-                         m_world.buildings.count(m_ui.selected_entity) > 0 &&
-                         is_player_owned(m_world, m_ui.selected_entity));
-        return out;
-    });
-
-    // BL-1239 fix round: the tile element's Production section AS DRAWN last
-    // frame — one entry per stack row ({stack=true, label, detail, good, open})
-    // then one per good row ({stack=false, label, detail="made"|"deposited"}).
-    // Empty when the section did not draw. Exists to make a RIVAL row's
-    // withholding assertable (DISCOVERY.md § The operational fog: no recipe
-    // group name, no good, nothing "made here") — an absence no capture proves.
-    v.set_function("tile_production_rows", [this]() {
-        sol::state& st  = m_lua.state();
-        sol::table  out = st.create_table();
-        int n = 0;
-        for (const ui_state::tile_production_row& r : m_ui.tile_production_rows)
+        for (const std::string& r : c.province_rows)
+            rows[++n] = r;
+        out["province_rows"] = rows;
+        sol::table buttons = st.create_table();
+        n = 0;
+        for (const ui_state::tile_card_button& b : c.buttons)
         {
             sol::table row = st.create_table();
-            row["stack"]  = r.stack;
-            row["label"]  = r.label;
-            row["detail"] = r.detail;
-            row["good"]   = r.good;
-            row["open"]   = r.open;
-            out[++n] = row;
+            row["label"]  = b.label;
+            row["detail"] = b.detail;
+            row["good"]   = b.good;
+            row["open"]   = b.open;
+            row["count"]  = b.count;
+            row["first"]  = static_cast<unsigned>(b.first);
+            row["x"]      = b.x;
+            row["y"]      = b.y;
+            buttons[++n] = row;
         }
+        out["buttons"] = buttons;
         return out;
     });
 
@@ -5189,31 +5294,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // gesture it stands in for, and a capture after it shows a stale card.
         m_ui.clear_battle_selection();
     });
-    v.set_function("card_drill", [this]() {
-        // Drive the Selection band's resource drill-down (BL-196) for the currently
-        // selected tile — the equivalent of clicking a resource graph, which
-        // BL-521's injection cannot reach without the graph's screen rect being
-        // published first (see its open question). Drills the tile's first deposited
-        // resource and requests lazy tracking of it (BL-198). Returns the resource
-        // index drilled, or -1 if the selection is not a deposit-bearing tile.
-        const entity_id sel = m_ui.selected_entity;
-        const auto tit = m_world.tiles.find(sel);
-        if (tit == m_world.tiles.end())
-            return -1;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (tit->second.resource_deposit[r] > 0.0f)
-            {
-                m_ui.card_stack.push_back({sel, static_cast<int>(r)});
-                m_ui.card_track_tile = sel;
-                // Acknowledge the selection so render()'s "new selection resets the
-                // drill" does not wipe the stack we just pushed. In live play the
-                // drill click happens frames after the select, so prev is already
-                // current; the harness sets both in one gap, so sync it here.
-                m_prev_selection = sel;
-                return static_cast<int>(r);
-            }
-        return -1;
-    });
     v.set_function("select_building", [this](int col, int row) {
         for (const auto& [bid, bc] : m_world.buildings)
         {
@@ -5237,10 +5317,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // otherwise opens on the queue view. UI state only.
     v.set_function("construction_view", [this](int view) {
         m_ui.construction.panel_view = view;
-        // Acknowledge the current selection so the new-selection panel-close (render()
-        // § "new selection takes the column") does not stomp the panel we're staging
-        // for capture. Harness-only convenience; the interactive path never needs it.
-        m_prev_selection = m_ui.selected_entity;
     });
 
     // Press the construction ledger's Build button on the CURRENT tile selection
@@ -5528,6 +5604,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 // be able to wait for it rather than guess a tick count.
                 rec["tile"]   = static_cast<unsigned>(bld_it->second.tile);
                 rec["complete"] = (bld_it->second.ticks_remaining == 0);
+                // BL-1322: the workforce target, so a script can watch the game
+                // step the player's (workforce_step.lua). Ownership is public; the
+                // target is read by the script, never shown for a rival.
+                rec["workforce"] = bld_it->second.workforce_target;
                 // The building's own net per quarter, and the NAME the Buildings
                 // roster files it under. Both exist so a script can rebuild the
                 // roster's arithmetic FROM THE BUILDINGS and compare, rather than
@@ -5537,7 +5617,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 // the report cannot yet make (a site still under construction).
                 {
                     const building_profit bp =
-                        estimate_building_profit(m_world, m_registry, m_last_econ_report, bld_id);
+                        estimate_building_reading(m_world, m_registry, m_last_econ_report, bld_id);
                     rec["profit"]       = bp.has_data ? bp.net() : 0.0f;
                     rec["profit_known"] = bp.has_data;
                     rec["group"]        = ui::building_group_name(m_world, m_registry, bld_it->second);

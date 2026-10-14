@@ -32,7 +32,7 @@ enum class corp_verb : uint8_t
     build = 0,     ///< construct_building(type, tile, target, recipe) — durative, pay-as-you-build.
     demolish,      ///< demolish_building(building).
     set_recipe,    ///< building_component.recipe := recipe (BL-079 idiom, validated).
-    set_workforce, ///< building_component.workforce_target := value (0–200); clears workforce_auto.
+    set_workforce, ///< building_component.workforce_target := value (0–200 internal); clears workforce_auto. RIVALS ONLY: refused for the player corp (BL-1322).
     idle,          ///< building_component.decommissioned := true.
     resume,        ///< building_component.decommissioned := false.
     place_road,    ///< place_road(tile, tier).
@@ -43,7 +43,7 @@ enum class corp_verb : uint8_t
     // hire_unit already holds its value in main's dictionary and harnesses.
     place_sell_order,   ///< RETIRED (BL-1265), REJECTED. Pushed a standing sell order; the order book retired with corporation pools. The slot is kept by the append-only rule.
     remove_sell_order,  ///< RETIRED (BL-1265), REJECTED. Erased a standing sell order. The slot is kept by the append-only rule.
-    set_workforce_auto, ///< building_component.workforce_auto := true (hand the dial back).
+    set_workforce_auto, ///< building_component.workforce_auto := true. Refused for the player corp (BL-1322: the game sets the player's workforce).
     // --- BL-350: the procurement/contract seam joins the seam (2026-08-11) ---
     // Appended AFTER set_workforce_auto, same append-only rule.
     request_quote,   ///< Ask `counterparty` for a price + lead time on `target`/`quantity` at `subject` (body).
@@ -232,7 +232,7 @@ struct corp_command
     building_type type      = building_type::none;      ///< build only.
     resource_type target    = resource_type::iron_ore;  ///< build (extraction) AND place_sell_order: what to sell.
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
-    int           workforce = 100;                      ///< set_workforce value [0, 200].
+    int           workforce = 100;                      ///< set_workforce value [0, 100] (BL-1322).
     uint8_t       road_tier = 1;                        ///< place_road tier (1–3).
     uint16_t      unit_type = 0;                        ///< hire_unit: index into unit_roster_table().
 

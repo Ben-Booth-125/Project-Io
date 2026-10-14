@@ -101,6 +101,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
 | **Industry** *(keyboard-cycle only)* | — | — | background-firm plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
+| **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
 | **Throughput** | — | — | reach-cost field + per-anchor active-LP ring + key |
@@ -347,6 +348,26 @@ distinct from the corporation mark (§ The strip rotates with the rung).
 
 ---
 
+## The Nations lens — the whole territory, in its nation's colour
+
+**A Nations lens paints every nation's whole territory in its identity colour** (Ben,
+2026-10-14). It answers *whose ground is this, all of it at once* — the reading the border band
+gives one edge at a time. It sits on the Planetary row of the lens bar like any other lens.
+
+- **The always-on border band stays** (§ The Country lens has retired, below): the plain map keeps
+  its national strokes. The lens is the deliberate, map-wide answer; the band is the context.
+  Under the lens the band is suppressed with every other lens, since the fill already says it.
+- **No two bordering nations share a similar colour** — the identity colour rule below, which the
+  lens is the strictest reader of.
+- **Selection is unchanged** (Ben, 2026-10-14): a press on the border band selects the nation,
+  on the plain map as before; under the lens a press resolves as any lens's does (§ A lens
+  collapses selection to ONE TIER), to the nation.
+- Unowned ground and open ocean take no fill.
+
+This reverses the 2026-08-24 retirement (BL-601) only in part: the band it created stays, and
+what returns is the fill as a lens, not as the default view — the argument below, that territory
+must not cost the player every other reading, still holds, because a lens is chosen.
+
 ## The Country lens has retired — national borders are chrome
 
 *(`overlay_mode::country` no longer exists, and since 2026-08-28 neither does its
@@ -381,6 +402,15 @@ border band, the seat map and the Ages view share that one table, so the realm
 the player watched grow through the rounds is met in the same colour at Begin:
 one mapping, never a hash of the nation id and never a second greedy assignment
 of its own.
+
+**Bordering nations never share a similar colour** (Ben, 2026-10-14: *"making sure we don't
+have similarly coloured nations bordering each other"*). At Begin, after the slots are pinned,
+one pass checks every pair of campaign nations that share a border: a pair whose colours sit
+closer than the palette's minimum distinguishable distance re-slots the nation with the smaller
+territory to the nearest free slot that clears every one of its neighbours. **This outranks
+lineage**: kin realms read as kin by hue (`STARTUP.md` § Round 3), except where kin border
+each other, where telling them apart wins. The pass is deterministic, saved in the same pinned
+table, and read by every surface — the band, the lens, the seat map, the swatches — so they agree.
 
 **Why a lens was the wrong home for it, in this system's own terms.** A lens is a
 *mode*: one is active at a time, and it re-skins the map to answer one question at
@@ -512,9 +542,13 @@ that view. This is asserted rather than assumed — `lens_ledger_pairs.lua` chec
 opening History on Story arms nothing, that entering Tectonics arms `continent`, and
 that a lens chosen afterwards survives.
 
-**The semantics, which are `nav_pane.cpp`'s and are still formally unowned (NR-722):**
-arm on **open** only, and **never disarm on close**. A player who closes a ledger keeps
-the canvas they are looking at rather than having it yanked back. What is undecided is
+**The semantics:** arm on **open** (History: on entering Tectonics); **disarm on close**, for
+every pair. Ben, 2026-10-13: *"When the market ledger closes, this should also deactivate the
+lens"*, then for Convoys and History, *"They should match the market."* The disarm is taken on the
+ledger's close edge, whatever closed it, and only while the lens is still the one the ledger arms
+— a lens the player picked meanwhile, or one a newly opened ledger just armed, is left alone. This
+answers NR-722's close half; whether opening a ledger should override a lens the player chose
+deliberately is still open. What is undecided is
 the rest — whether opening a second ledger should re-arm to that one's lens, and whether
 a lens the player *deliberately* chose should be overridden by opening a ledger at all.
 

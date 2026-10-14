@@ -352,8 +352,16 @@ int main()
         // Recover scene entity ids (same construction order as make_scene).
         scene probe = make_scene(1000.0f);
         const building_component& plb = w_final.buildings.at(probe.pl_bld);
-        check(plb.workforce_target == 100 && !plb.decommissioned && plb.ai_cooldown == 0,
-              "BL-202 R2: the player's building is untouched (dials, state, cooldown)");
+        // BL-1322 (PRODUCTION.md § Workforce target and the auto-solver): the
+        // player's workforce is set by the game alone — one 25 % step a quarter
+        // from 100 internal, so it sits on the 0/50/100/150/200 grid. That is the one
+        // sanctioned dial (AI_OPPONENT.md § 11, amended 2026-10-13), not the
+        // scorer; every other dial and state stays as authored.
+        check(plb.workforce_target >= 0 && plb.workforce_target <= 200
+                  && plb.workforce_target % 50 == 0
+                  && !plb.decommissioned && plb.ai_cooldown == 0,
+              "BL-202 R2: the player's building is untouched by the scorer (workforce only on "
+              "the game's 50-internal grid; state, cooldown as authored)");
 
         // Budget: per (corp, tick) at most 1 build and 3 dials.
         bool budget_ok = true;

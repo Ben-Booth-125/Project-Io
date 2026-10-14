@@ -2,12 +2,14 @@
 
 #include "world/era_timelapse.hpp"
 #include "world/rise_fall_rules.hpp" // BL-1287: the RF constants, one place with the sim
+#include "world/late_culture_rules.hpp" // BL-1288: the LC constants, one place with the sim
 #include "world/world_war_rules.hpp" // BL-1289: the WW constants, one place with the sim
 
 #include <cstdint>
 #include <vector>
 
 struct settlement_state;
+struct region;
 
 // ---------------------------------------------------------------------------
 // history_pattern_detectors — the five history-pattern detectors (BL-1286)
@@ -36,9 +38,11 @@ struct settlement_state;
 //                  Where that realm is boxed (Ben, 2026-10-12) the rise falls
 //                  to the largest realm whose reachable ground can hold the
 //                  floor; the record names it (the first `rise_pressed`).
-//   late culture   EXPLORATION.md sec The late culture (Ben, 2026-10-10/11): the
-//                  culture most remote when the Culture round closes, lagging,
-//                  and bound in Exploration by a polity of another culture.
+//   late culture   EXPLORATION.md sec A colony is a subject (Ben, 2026-10-10/11):
+//                  the culture most remote BY REACH when the Culture round
+//                  closes -- as the record's `late_culture_chosen` names it
+//                  (BL-1288) -- lagging, and bound in Exploration by a polity
+//                  of another culture.
 //   world war      INDUSTRIALISATION.md sec A world war in every world (Ben,
 //                  2026-10-11): inside 1900-1930, the top powers drawn in --
 //                  read off the war's own record (BL-1289): the realms named
@@ -78,7 +82,7 @@ inline constexpr int hp_rf_peak_by_year      = rise_fall_peak_by_year; ///< ...w
 inline constexpr int hp_rf_floor_q           = rise_fall_floor_pm;     ///< ruled: 25 percent (Ben, 2026-10-12)
 inline constexpr int hp_rf_hegemony_q        = rise_fall_hegemony_pm;  ///< the non-hegemony cap (BL-224), not overturned
 inline constexpr int hp_rf_fall_window_y     = rise_fall_window_years; ///< share halves within this many years of the peak
-inline constexpr int hp_lc_lag_x100          = 85;   ///< PROVISIONAL: materials mean <= 85% of the world's at the Empires close
+inline constexpr int hp_lc_lag_x100          = late_culture_lag_x100; ///< late_culture_rules.hpp (BL-1288): PROVISIONAL, materials mean <= 85% of the world's at the Empires close
 // The world war's constants ARE the sim's (`world_war_rules.hpp`, BL-1289).
 inline constexpr int hp_ww_window_start      = world_war_window_start;
 inline constexpr int hp_ww_window_end        = world_war_window_end;   ///< inclusive
@@ -112,10 +116,12 @@ struct history_pattern_reading
 
     // --- late culture
     bool lc_hit = false;
-    int  lc_culture = -1;       ///< the most remote founding culture at the Culture close
-    int  lc_gap = 0;            ///< its isolation, grid distance squared to the nearest foreign region
-    int  lc_second_gap = 0;     ///< the next most remote culture's, for scale
-    int  lc_lag_x100 = -1;      ///< its polities' materials mean over the world's at the Empires close; -1 none standing
+    int  lc_culture = -1;       ///< the most remote founding culture at the Culture close (the record's choice)
+    int  lc_reach = -1;         ///< its remoteness by reach as the record names it (-1: the network joined it to nobody)
+    int  lc_level = 0;          ///< the highest level the backstop pressed (`isolation_pressed`)
+    int  lc_lag_x100 = -1;      ///< its realms' materials mean over its NEIGHBOURS' at the Empires close (BL-1288); -1 none
+    int  lc_neighbours = 0;     ///< the neighbourhood read (realms)
+    bool lc_nearest = false;    ///< no one stood around it: its nearest peoples were read
     int  lc_bound = 0;          ///< its polities bound or bought by another culture in Exploration
     std::vector<int32_t> lc_polities;
 
@@ -148,6 +154,31 @@ struct history_pattern_reading
     struct grant { int32_t polity = -1; int32_t year = 0; uint8_t pattern = 0; };
     std::vector<grant> grants;
 };
+
+/// BL-1288 -- THE LATE CULTURE'S LAG, AGAINST ITS NEIGHBOURS (one
+/// implementation: the detector reads it off the record, the sim's backstop off
+/// its live state). @p owner region -> holding polity at the Empires close (-1
+/// none); @p polity_culture polity -> its birth culture (-1 unknown);
+/// @p polity_band polity -> its materials band, 0 for a polity not living. The
+/// neighbourhood rule is `late_culture_rules.hpp`'s. Pure.
+struct late_culture_lag_reading
+{
+    int lag_x100   = -1;    ///< its realms' mean band over the neighbourhood's, x100; -1 no realm or no neighbour
+    int realms     = 0;     ///< its living realms
+    int neighbours = 0;     ///< realms in the neighbourhood
+    bool nearest   = false; ///< none stood within the tiles: the nearest peoples were read
+    bool by_reach  = false; ///< the neighbourhood was the recorded contact set (by reach)
+};
+late_culture_lag_reading read_late_culture_lag(const std::vector<int>& owner, const std::vector<region>& regions,
+                                               int gw, const std::vector<int>& polity_culture,
+                                               const std::vector<int>& polity_band, int late_culture,
+                                               const std::vector<int>* contacts = nullptr);
+/// @p contacts (BL-1288 alignment, Ben 2026-10-13: "the peoples IN CONTACT
+/// with it", contact by reach): when given, the neighbourhood IS that set of
+/// polity ids -- the realms of other peoples the sim's reach walk met from the
+/// culture's ground (`late_culture_contact`, late_culture_rules.hpp) -- read
+/// living and foreign; the geometric tiles are only the fallback for a record
+/// written before the set was.
 
 /// Run all five detectors over one body's records. @p gw is the settlement
 /// grid's width (columns wrap). Pure.

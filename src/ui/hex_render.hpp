@@ -111,15 +111,14 @@ void hex_vertices(ImVec2 out[6], float cx, float cy, float r);
 ImVec2 hex_local_centre(int col, int row, float hex_size);
 
 /// Render a zoomed hex **neighbourhood** around @p centre_tile into [@p origin,
-/// @p origin+@p size], clipped to that rect: terrain-filled hexes for the tile and
-/// its neighbours out to @p radius rings, a marker on built tiles, and a highlight
-/// ring on the centre tile. The view is centred on @p centre_tile and scaled so
-/// the (2·radius+1)-wide block fills the box — the card's "show the tile you
-/// clicked, zoomed" surface. Columns wrap horizontally (the grid wraps); rows clamp.
+/// @p origin+@p size], clipped to that rect: the baked neighbourhood page for the
+/// tile and its neighbours out to @p radius rings, with a highlight ring on the
+/// centre tile. The view is centred on @p centre_tile and scaled so the
+/// (2·radius+1)-wide block fills the box — the card's "show the tile you clicked,
+/// zoomed" surface. Until the page is ready it draws a loading bar (BL-1313), never
+/// flat per-hex fills (SELECTION.md § The tile element's layout, column 1).
 ///
-/// Takes a mutable world only to build the per-body raster index on first use
-/// (body_tile_grid — a deterministic derived cache); it does not mutate simulation
-/// state. A no-op when @p centre_tile is not a live tile.
+/// Does not mutate simulation state. A no-op when @p centre_tile is not a live tile.
 ///
 /// @param dl          Draw list to render into (clip is pushed/popped internally).
 /// @param w           World (mutable for the lazy grid-index cache only).
@@ -131,7 +130,7 @@ ImVec2 hex_local_centre(int col, int row, float hex_size);
 ///                    page is ready for @p centre_tile the view draws THAT — the
 ///                    canvas's own baked ground, structures included — and only the
 ///                    centre highlight over it; until then (or with null) it draws
-///                    the vector hexes as before.
+///                    a loading bar.
 void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
                              ImVec2 origin, ImVec2 size, int radius,
                              const ::ground_view* ground = nullptr);

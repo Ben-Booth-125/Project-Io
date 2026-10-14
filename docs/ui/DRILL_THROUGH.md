@@ -35,7 +35,7 @@ different questions wearing one costume. Naming the three is most of the fix:
 | Axis | Question | Gesture | State |
 |---|---|---|---|
 | **Depth** | *How much of this subject do I want?* | `⌄` in place, `›` full canvas | `ui_state::expanded` (the takeover target **and** the in-place set) |
-| **Subject** (BL-196, resource drill-down) | *What am I looking at?* | click the element; breadcrumb + back | `ui_state::card_stack`, `corp_rollup_drill` |
+| **Subject** | *What am I looking at?* | click the element; breadcrumb + back | `corp_rollup_drill` |
 | **Host** (SELECTION.md) | *Where does this properly live?* | `[>]` go-to | `ui::focus_on_entity` |
 
 Subject is therefore the **sibling axis**, not a competitor and not folded in.
@@ -83,9 +83,10 @@ is what "take the main stage" means on that screen. `takeover_rect` in
    reading preference — both are view state, never serialised.
 5. **A fixed-rect container does not fold to one line, and has no `⌄`.** The Selection band's
    rect is a *derived* 260 px (`selection_band_height`) that cannot shrink, so folding its
-   metric card would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest
+   cards would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest
    **expanded in place already** (Ben, 2026-08-01, asked with the measurements) — there is no
-   in-place state left to reach, so they take the `›` control alone. The same holds for a
+   in-place state left to reach. The band's cards fit it whole (SELECTION.md § The tile
+   element's layout), so the band offers no `›` either; elsewhere such a surface takes `›` alone. The same holds for a
    single-block view that already shows its content in the column (History Story).
    Folded-by-default governs **scrolling** containers, where a fold buys real room back.
 6. **Drill-through adds no eleventh container.** The ten kinds in [LAYOUT.md](LAYOUT.md)
@@ -138,7 +139,7 @@ those codepoints are in the font atlas, and a string literal renders `?`. `draw_
 introduce them as string literals.
 
 **Esc** closes the takeover, one rung **below** the subject drills: exit-confirm → system
-menu → pop `card_stack` → pop `corp_rollup_drill` → **close the takeover** → open menu. A
+menu → pop `corp_rollup_drill` → **close the takeover** → open menu. A
 single press never both unwinds a drill and closes the view hosting it. Esc **does not**
 collapse in-place expansions: that is a reading preference, the kind of state Esc has never
 collapsed, and putting it on the ladder would make Esc unpredictable (sometimes leaving a
@@ -164,7 +165,6 @@ On the ladder, with what each one's takeover shows:
 
 | Surface | `⌄` in place | `›` full canvas |
 |---|---|---|
-| Selection band's metric card | — (rests expanded, invariant 5) | that metric's chart, on the canvas |
 | History ledger — Story | — (already shown in the column) | the whole biography, on the canvas |
 | History ledger — Chain (per stage) | that stage's title, explainer and charts | the **whole round** — every stage open, scrolled |
 | New World wizard — chain stages | that stage's title, explainer and charts | the **whole round**, scrolled (window-wide; no shell yet) |

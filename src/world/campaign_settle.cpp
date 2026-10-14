@@ -13,6 +13,7 @@
 #include "world/supply_system.hpp"     // advance / credit / dispatch convoys
 #include "world/trade.hpp"             // run_trades (BL-1266)
 
+#include <algorithm> // std::sort (BL-1321 readings)
 #include <atomic>
 
 settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int econ_step,
@@ -104,7 +105,8 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
 }
 
 void run_settle(world& w, const recipe_registry& reg, int ticks,
-                const settle_tick_hooks* hooks, generation_progress* progress)
+                const settle_tick_hooks* hooks, generation_progress* progress,
+                settle_readings* readings)
 {
     // BL-1265 (CORPORATION_GENERATION.md § Pass 4b): every opening stock still
     // held — a roster regenerated after the base world placed its own — goes on
@@ -148,7 +150,29 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
     for (int econ_step = 0; econ_step < ticks; ++econ_step)
     {
         tap.step = econ_step;
-        (void)run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, use);
+        settle_tick_result tick =
+            run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, use);
+        // BL-1321: the readings are COPIES off the tick's result and a const
+        // read of the world after it -- write-only, so keeping them moves
+        // nothing. Markets in ascending id (the world's map is unordered).
+        if (readings != nullptr)
+        {
+            std::vector<entity_id> mids;
+            mids.reserve(w.markets.size());
+            for (const auto& kv : w.markets)
+                mids.push_back(kv.first);
+            std::sort(mids.begin(), mids.end());
+            std::vector<settle_market_sample> row;
+            row.reserve(mids.size());
+            for (const entity_id mid : mids)
+            {
+                const market_component& mc = w.markets.at(mid);
+                row.push_back({mid, mc.price, mc.supply, mc.demand});
+            }
+            readings->market_ticks.push_back(std::move(row));
+            readings->last   = std::move(tick);
+            readings->filled = true;
+        }
     }
     // THE HANDOVER (BL-1273; RESEARCH.md: no nation opens ahead in technology).
     // The settle ran the nation step like any tick, so the base and any

@@ -33,6 +33,9 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::throughput:    icons::throughput(dl, centre, r, colour); break;
         case overlay_mode::company:       icons::company(dl, centre, r, colour); break;
         case overlay_mode::trade_flow:    icons::trade_flow(dl, centre, r, colour); break;
+        // The shield the retired Country lens wore: the glyph meant "national
+        // territory" then and means it again (BL-1323).
+        case overlay_mode::nations:       icons::country(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -56,6 +59,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::throughput:    return "Throughput (active Logistic Points)";
         case overlay_mode::company:       return "Company holdings (background firms)";
         case overlay_mode::trade_flow:    return "Trade flow (your shipments and refusals)";
+        case overlay_mode::nations:       return "Nations (whole territory)";
         default:                        return "None";
     }
 }
@@ -77,6 +81,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::throughput:    return "Throughput";
         case overlay_mode::company:       return "Company";
         case overlay_mode::trade_flow:    return "Trade flow";
+        case overlay_mode::nations:       return "Nations";
         default:                        return "None";
     }
 }
@@ -114,7 +119,8 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
         overlay_mode::resource,    overlay_mode::market,
         overlay_mode::scarcity,    overlay_mode::industry,
         overlay_mode::population,  overlay_mode::continent,
-        overlay_mode::throughput,  overlay_mode::trade_flow };
+        overlay_mode::throughput,  overlay_mode::trade_flow,
+        overlay_mode::nations };
 
     static constexpr overlay_mode circumplanetary_modes[] = {
         overlay_mode::market, overlay_mode::scarcity, overlay_mode::supply };

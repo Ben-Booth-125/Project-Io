@@ -11,32 +11,6 @@
 
 namespace ui {
 
-/// One page of the tile Selection band's metric accordion — a single comparable
-/// figure for the selected tile against a reference (the top-decile tile for a
-/// deposited resource, the body average for habitability / hazard).
-///
-/// Extracted from `draw_tile_selection` (BL-214) so the in-band chart and the
-/// full-screen fold overlay chart the *same* page rather than two lists built by
-/// imitation. The pager index into a `tile_metrics` vector is also the fold key,
-/// which is what makes "expand THIS metric" addressable.
-struct tile_metric
-{
-    std::string label;
-    float       tile_val  = 0.0f;
-    float       ref_val   = 0.0f;
-    const char* ref_label = "";
-    float       ceiling   = 1.0f;
-    int         resource_index = -1; ///< -1 = not drillable (no time-series history kept).
-};
-
-/// Every metric page for @p tile, in pager order: each deposited resource, then the
-/// tile's own habitability and hazard. Empty when @p tile is not a tile.
-std::vector<tile_metric> tile_metrics(const world& w, entity_id tile);
-
-/// Draw one metric page's clustered two-column chart into [@p mn, @p mx]. Shared by
-/// the in-band accordion and the fold overlay, so the two cannot drift apart.
-void draw_tile_metric_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const tile_metric& m);
-
 /// Per-building profitability readout (BL-074) — the building's estimated net
 /// per-tick contribution and the lines that make it up.
 ///
@@ -45,65 +19,16 @@ void draw_tile_metric_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const tile_met
 /// the SAME builder the Selection band uses, rather than re-deriving the same sums
 /// a second time and letting the two answers drift.
 void draw_building_profit(const world& w, const recipe_registry& reg,
-                          const economy_report& report, entity_id id);
+                          const economy_report& report, entity_id id,
+                          std::string* net_out = nullptr, std::string* exp_out = nullptr);
 
-/// One page of the building Selection card's accordion (supersedes BL-431's three
-/// independently-toggled Method / Chain / Depth sections — a page IS the opened
-/// state, so there is nothing left inside it to fold). Mirrors `tile_metric`'s role
-/// for the tile card.
-///
-/// Chain, Depth and Lifecycle are gone (2026-08-15 playtest rework): Chain's
-/// input-basket content folded into Profitability as a chart; Depth was cut
-/// outright; Lifecycle's Mothball/Dismantle controls moved onto the building
-/// card's action grid (see draw_building_selection_body) instead of a page.
-///
-/// **Method and Workforce are gone too** (Ben, 2026-08-29 — SELECTION.md § The centre
-/// presents; it does not operate). Both pages' whole content was a control, and the
-/// card's centre presents data and never operates: they are drawn by the Construction
-/// ledger's Buildings view instead (`draw_production_method_section` /
-/// `draw_building_workforce_page`, declared below and called from
-/// `construction_panel.cpp` — the same bodies, relocated, never a second set of
-/// controls writing `workforce_target` and `try_switch_recipe`). What is left here
-/// REPORTS: Profitability, and Status.
-enum class building_page_kind { profitability, status };
-
-/// A titled accordion page — the pager label plus which content to dispatch.
-struct building_page
-{
-    std::string        label;
-    building_page_kind kind;
-};
-
-/// Every accordion page that applies to @p id, in pager order. The one list both
-/// the in-band accordion (draw_building_selection_body) and the full-canvas
-/// takeover (selection_card.cpp) read, so they cannot show different pages for
-/// the same building — the same shared-list precedent as `tile_metrics`.
-///
-/// @p god_view (BL-408): spectator god view — a rival building additionally
-/// offers the read-only Profitability page (pages carrying controls stay off
-/// the rival card even then). Defaults false so every existing caller keeps
-/// today's BL-068 page set unchanged.
-std::vector<building_page> building_pages(const world& w, const recipe_registry& reg,
-                                          const economy_report& report, entity_id id,
-                                          bool god_view = false);
-
-/// Draw one accordion page's content, dispatched by kind. Shared by the in-band
-/// accordion and the full-canvas takeover so the two cannot drift apart. Takes
-/// `ui_state&` (was world+reg+report+id only) because the Lifecycle page's
-/// Dismantle control defers through `ui.construction.pending_demolish` — the
-/// same deferred-erase seam the old construction-panel detail used, needed
-/// here because erasing from `w.buildings` mid-draw would invalidate the
-/// iteration that is drawing it.
-void draw_building_page(world& w, const recipe_registry& reg, const economy_report& report,
-                        entity_id id, building_page_kind kind, ui_state& ui);
-
-/// One page of the unit Selection card's accordion — mirrors building_page_kind's
-/// role for the new Soldier card (placeholder, BL-393 notes units are largely
+/// One page of the unit Selection card's accordion — the pager the building card
+/// once had (retired BL-1312), kept for the Soldier card (placeholder, BL-393 notes units are largely
 /// inert today). Strength: the DERIVED strength (BL-459) with its count/quality/
 /// supply derivation and the BL-454 upkeep line; Roster: roster-type name + owner.
 enum class unit_page_kind { strength, roster };
 
-/// A titled accordion page for the unit card — mirrors `building_page`.
+/// A titled accordion page for the unit card.
 struct unit_page
 {
     std::string   label;
@@ -114,7 +39,7 @@ struct unit_page
 /// pages today — a unit_component always carries strength/count/type/owner —
 /// but kept as a list (not hard-coded two pages) so the shared draw dispatch
 /// below stays the one thing both this and a future full-canvas takeover read,
-/// the same precedent as tile_metrics/building_pages.
+/// one shared page list.
 std::vector<unit_page> unit_pages(const world& w, entity_id id);
 
 /// Draw one unit accordion page's content, dispatched by kind. Read-only —
@@ -133,11 +58,12 @@ void draw_unit_page(const world& w, const recipe_registry& reg,
 ///
 /// The content is **polymorphic by selection kind** (selection.hpp): it dispatches
 /// on selection_kind_of to the matching per-entity layout — a **tile** takes the
-/// BL-123 vertical stack (placeholder image, per-resource production graphs, action
-/// grid); a **player building** takes its operate-the-building layout; the remaining
-/// kinds take the action|facts split. It draws a header row: the kind icon + title
-/// and a **'go to'** button (routes through ui::focus_on_entity). There is no
-/// close button — the Selection band is always open (BL-266).
+/// four-column tile element (preview, province card, tile card, action grid —
+/// BL-1312) and draws NO header row; a **building** takes the same element for
+/// its host tile with the building's stack expanded in the tile column; the
+/// remaining kinds take their own layouts under a header row: the kind icon +
+/// title and a **'go to'** button (routes through ui::focus_on_entity). There is
+/// no close button — the Selection band is always open (BL-266).
 ///
 /// The content draws nothing when there is no valid selection. The band frame
 /// never lets that happen: with no valid selection it substitutes the player's
@@ -162,16 +88,6 @@ void draw_unit_page(const world& w, const recipe_registry& reg,
 ///                 the close button (hide), and the tile "Construct Buildings" button.
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui);
-
-/// Draw the CURRENT page of the building Selection card's accordion (the page
-/// named by ui_state::selection_building_page against that building's own
-/// building_pages() list) at whatever size the caller's container gives it.
-/// The full-canvas takeover (selection_card.cpp, detail_surface::building_metric)
-/// uses this so the overlay renders the exact same page content the in-band
-/// accordion does — the pager index is the fold key, same idiom as the tile
-/// card's card_resource_page / tile_metrics pairing.
-void draw_building_page_expanded(world& w, const recipe_registry& reg,
-                                 const economy_report& report, ui_state& ui);
 
 /// Real name lookup for a unit's roster type (`unit_component::type` indexes
 /// `unit_roster_table()` directly). An out-of-range index falls back to the
@@ -243,10 +159,11 @@ const char* method_grid_status(entity_id id);
 /// drawn frame, `null_entity` when it drew none. Read by the air_gate check.
 entity_id method_grid_status_drawn_for();
 
-/// The **Workforce** lever — the placeholder trend graph plus the 0-100 slider that
-/// writes `workforce_target` and clears `workforce_auto` (a manual edit pins the
-/// target). Relocated off the Selection card by the same 2026-08-29 ruling as
-/// `draw_production_method_section`, and shared for the same reason.
-void draw_building_workforce_page(building_component& b);
+/// The WORKFORCE ROW, read-only (BL-1322, Ben 2026-10-13: the game sets the
+/// player's workforce, one 25 % step a quarter (50 internal); the slider and Auto retired). A
+/// filled bar of `workforce_target` over 0-200 (full at 200) with target/2 as the percentage to its right.
+/// Drawn by the expanded building card and the Construction ledger's Buildings
+/// view; writes nothing. Returns the percentage as drawn ("75%").
+std::string draw_workforce_bar(const building_component& b);
 
 } // namespace ui

@@ -329,6 +329,22 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // people, so a civil war SHOWS on the population map without emptying it.
     hp.civil_war_famine_q = 10;
     hp.civil_war_flight_q = 15;
+
+    // BL-1288 -- THE LATE CULTURE IS A TARGET FROM THIS ROUND'S OPEN
+    // (EXPLORATION.md sec A colony is a subject; GENERATION_STRATEGY.md sec
+    // History patterns, "always"). Chosen at the Culture close as the culture
+    // most remote by reach; it lags because development DIFFUSES BY CONTACT --
+    // a force every polity of this round feels -- and where it is losing the
+    // realm it must carry to Exploration, the isolation on its ground is pressed
+    // one recorded level at a time. This round only: the diffusion is the
+    // Culture -> Exploration lag's mechanism, and the later spans build from
+    // struct defaults (Exploration watches the colonisation instead).
+    hp.late_culture_target       = true;
+    hp.contact_diffusion_q       = 10;
+    hp.contact_diffusion_horizon = 30;
+    hp.contact_early_bands       = 2; // Ben 2026-10-14: past band 2 a realm climbs by contact
+    hp.contact_band_per_q        = 1000;
+    hp.late_isolation_floor_level = 8; // BL-1288 alignment: the deep press, from level 8
     return hp;
 }
 
@@ -527,6 +543,22 @@ history_sim_params exploration_sim_params(const world_params& params)
     // ports) or does not move. Industrialisation inherits it.
     hp.trade_road_joins_one_landmass = true;
 
+    // BL-1288 -- THE LATE CULTURE IS COLONISED IN THIS AGE (EXPLORATION.md sec
+    // A colony is a subject): the span reads the culture off the polity table
+    // it resumes (`polity::late_isolation`), watches for a polity of another
+    // culture binding one of its realms by the ordinary subjection verbs, and
+    // presses the contact that would, one recorded level at a time.
+    // Industrialisation copies these params and sets it back off.
+    hp.late_culture_colonised = true;
+    // ...and a power two materials bands ahead of a native needs no treasury
+    // margin to bind it (dominance by development; Industrialisation inherits).
+    hp.subjection_dominance_bands = 1;
+    // BL-1303 (Ben accepted, NR-1042): THE STALE READING IN EVERY SPAN -- ground
+    // taken this round is measured by its new holder before it can secede
+    // from it, here as in the Empires round (history_sim.hpp);
+    // Industrialisation inherits it.
+    hp.secession_waits_for_holder = true;
+
     return hp;
 }
 
@@ -626,6 +658,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // this span inherits or a sweep sets.
     hp.naval_points_convert_at_open = false;
 
+    // BL-1288: the late culture's colonisation is Exploration's pattern clause
+    // alone; this span neither watches nor presses it.
+    hp.late_culture_colonised = false;
+
     // BL-1152 (Ben, 2026-10-02, option D): THE FLEET RULE IS EXPLORATION'S FOR
     // NOW. At 20 / 10 / 50 this span's realms field too few fleets -- on the
     // review-fixed ladder six seeds first crossed between 1720 and 1868 and two
@@ -660,6 +696,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // The bar and the pressure are the struct's (history_sim.hpp says how
     // each reads); a lean, so no backstop rides with it.
     hp.revolution_lean = true;
+    // BL-1304: calibrated toward about a third of worlds (in band, the lane's):
+    // the struct's 600 bar caught 1-2 of the 16 library worlds; 560 caught 7,
+    // 580 caught 4, 570 catches 6 (10, 11, 13, 25, 31, 32).
+    hp.revolution_disparity_bar_pm = 570;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

@@ -19,7 +19,7 @@ local result = verify.build_first_valid()
 verify.expect(result == "placed", "processing facility placed; got: " .. result)
 
 -- The management section right after placement: default recipe display,
--- workforce slider, and (since 3 recipes exist) the closed recipe combo.
+-- read-only workforce row (BL-1322: the slider retired), and (since 3 recipes exist) the closed recipe combo.
 -- No synthetic mouse in the headless harness, so the combo can't be opened or
 -- an option picked from a script — that gap is itself part of what's being
 -- checked (can the panel communicate a recipe's inputs/outputs without a click?).

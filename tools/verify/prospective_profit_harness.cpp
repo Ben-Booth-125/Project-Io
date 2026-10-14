@@ -120,10 +120,18 @@ int main()
         cc.balance          = 100000.0f;
         // Not AI-driven: BL-202's strategic tier rewrites workforce_target at the end
         // of run_economy_step, which would move the very opex terms being asserted.
-        cc.is_player = true;
+        cc.is_player = false;
         w.corporations[corp] = cc;
     }
-    w.player_entity = corp;
+    // BL-1322: the game steps the PLAYER's workforce every quarter, so this
+    // fixture's corp is no longer the seat; the seat is an empty corp of its own.
+    {
+        const entity_id seat = w.create_entity();
+        corporation_component sc;
+        sc.name = "Seat (empty)"; sc.is_player = true;
+        w.corporations[seat] = sc;
+        w.player_entity = seat;
+    }
 
     // ---------------------------------------------------------------------
     // P.R1 — has_data is false where there is nothing honest to report.

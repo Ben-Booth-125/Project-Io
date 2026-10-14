@@ -3,8 +3,8 @@
 --   * a selected TILE leads with the Build front door (action), with the BL-071
 --     Thrives/Valid affordance read as its facts column — no stat block, no lens
 --     supplement;
---   * a selected player BUILDING leads with Manage, with the BL-074 profitability
---     as its facts;
+--   * a selected player BUILDING draws its host tile's card with the stack
+--     expanded (BL-1312): status line and the BL-074 profitability charts;
 --   * the minimap carries the seven-glyph lens mode bar along its bottom, and the
 --     bottom-left no longer carries a separate lens strip;
 --   * the selection element occupies the full bottom-left corner.
@@ -18,7 +18,7 @@ verify.goto_surface("home")            -- Kepler: fully surveyed, buildings visi
 verify.select_tile(66, 6)
 verify.capture("selection_tile_build")
 
--- A player building: Manage is the hero, the profitability readout the facts.
+-- A player building: its tile's card, the building expanded in place.
 local player
 for _, b in ipairs(verify.buildings()) do
     if b.player then player = b; break end

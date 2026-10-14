@@ -963,8 +963,9 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
 // First-pass heuristic: contention is held at its current value; input-price response is
 // ignored (inputs valued at the current price); the search is over coarse tiers, so the
 // result can hunt by ±one tier. A finer model + hysteresis is future work (BL-181).
-// Deterministic — reads last tick's market state only. Player corp only, opt-out via the
-// building's `workforce_auto` flag (io-standing-rules.md § the player-corp exception).
+// Deterministic — reads last tick's market state only. Player corp: the target steps
+// toward this answer one 25 % step a quarter, with no opt-out (BL-1322; AI_OPPONENT.md
+// § 11, amended 2026-10-13). Rivals: the scorer's workforce dial reuses it.
 // BL-442: the band used to be two constexpr copies here, commented "mirror
 // market_clearing.cpp price band" — a hand-synchronised duplicate of the game's
 // most load-bearing economic tunable. It is now authored once in
@@ -992,7 +993,8 @@ float wf_target_price(float base, float supply, float demand,
 // (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank, float* out_gain, int bid_hold_ticks)
+                           int stack_rank, float* out_gain, int bid_hold_ticks,
+                           int grid_step)
 {
     if (out_gain)
         *out_gain = 0.0f; // every early return below is "no move, so no gain"
@@ -1134,9 +1136,12 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
         return revenue - input_cost - opex.maintenance - opex.wages;
     };
 
+    // BL-1322 (PRODUCTION.md § Workforce target and the auto-solver, Ben
+    // 2026-10-13): the grid is 0, 25, 50, 75, 100 % — the maximum is 100 %, and
+    // the player's target moves one 25 % step a quarter toward this answer.
     int   best_wt  = 0;
     float best_net = -std::numeric_limits<float>::infinity();
-    for (int wt = 0; wt <= 200; wt += 10)
+    for (int wt = 0; wt <= workforce_target_max; wt += (grid_step > 0 ? grid_step : workforce_dial_grid))
     {
         const float net = net_at(wt);
         if (net > best_net) { best_net = net; best_wt = wt; }
@@ -1145,8 +1150,9 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
     if (out_gain)
     {
         // Price the incumbent through the same model. b.workforce_target is not
-        // necessarily on the step-10 grid (the player's set_workforce verb accepts
-        // any 0-200), so it is evaluated directly rather than looked up.
+        // necessarily on the 25-step grid (a rival's set_workforce accepts any
+        // 0-100, and an older save may hold any value), so it is evaluated
+        // directly rather than looked up.
         const float gain = best_net - net_at(b.workforce_target);
         // Floored, not clamped-for-noise: an off-grid incumbent can legitimately
         // beat every grid point, and a negative gain and a zero gain say the same
@@ -2362,8 +2368,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         return (it != stack_by_building.end()) ? it->second.rank : 1;
     };
 
-    // ── Pass 3: BL-181 workforce auto-solve, player corp only (opt-out via
-    //    workforce_auto; io-standing-rules.md § player-corp exception).
+    // ── Pass 3: BL-181 workforce auto-solve, player corp only; BL-1322 (Ben,
+    //    2026-10-13): STEPPED and without the opt-out — each tick the target
+    //    moves ONE 25 % step toward the solver's best (stays when equal), and
+    //    `workforce_auto` is no longer read for the player (the field stays in
+    //    the save and still records a rival's dial pin, `dial_idled`).
+    //    AI_OPPONENT.md § 11, amended 2026-10-13.
     //
     // Runs after contention (which reads workforce_assigned, not the target) and
     // ahead of the stack taper, rather than inline in the production loop where it
@@ -2373,7 +2383,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // else. It is handed the site's rank so it maximises against the curve the site
     // actually rides (BL-346).
     // BL-1296: the player runs its nation's state industry beside its champion
-    // (NATIONS.md § State industry, "Who runs it"), so the same opt-out dial
+    // (NATIONS.md § State industry, "Who runs it"), so the same stepped dial
     // reaches the player's STATE buildings too — the player's own, not a rival's.
     std::vector<std::pair<entity_id, const std::vector<entity_id>*>> auto_solve_sets;
     if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
@@ -2393,8 +2403,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             building_component& b = bit->second; // mutable: the auto-solver sets the target
             if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle)
                 continue;
-            if (!b.workforce_auto)
-                continue;
+            // BL-1322: no opt-out — the player runs these, and the player has no
+            // workforce control, so workforce_auto is not read here.
             // BL-1296 fix round: a STATE building's target is solved like a
             // corporation's, but a raise is taken only when the uncommitted
             // treasury funds what it adds to this tick's bill (committed then);
@@ -2406,18 +2416,22 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             // BL-613/BL-614: the solver optimises against the labour the
             // building can actually reach — its own per-building grant,
             // ordinary and qualified constraints folded.
-            const int solved = solve_workforce_target(
+            // BL-1322: one 50-internal step (25 % shown) toward the solver's best
+            // on the 0/50/100/150/200 grid; a STATE building's raise is still
+            // taken only when the uncommitted treasury funds it (BL-1296).
+            const int best = solve_workforce_target(
                 w, reg, b,
                 labour_for(building_id, solve_owner, building_body(w, b)),
-                rank_of(building_id));
-            if (state_set && solved > b.workforce_target)
+                rank_of(building_id), nullptr, -1, workforce_step); // the 50-grid
+            const int next = step_workforce_target(b.workforce_target, best);
+            if (state_set && next > b.workforce_target)
             {
                 building_component after = b;
-                after.workforce_target = solved;
+                after.workforce_target = next;
                 if (!state_commit_change(w, reg, solve_owner, b, after))
                     continue; // unfunded raise: the funded target stands
             }
-            b.workforce_target = solved;
+            b.workforce_target = next;
         }
     }
 

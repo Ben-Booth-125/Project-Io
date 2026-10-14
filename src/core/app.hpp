@@ -448,6 +448,9 @@ private:
     /// presentation on the adopted world; poll_worldgen then seats the player
     /// and `finish_new_game` rebases the clock again and enters play.
     void start_new_game_prelude();
+    /// BL-1321: hand the settle's per-quarter readings (its last report and
+    /// standings, the price series) to the presentation state at Begin.
+    void adopt_settle_readings(settle_readings&& r);
     void finish_new_game();
     /// The Begin press: wait on round 6's worker if it is still running, adopt
     /// its world if it landed, or build cold. Loads the Lua world-gen config
@@ -1247,13 +1250,7 @@ private:
     // determinism risk; survives the session only). Feeds the Selection band's
     // resource drill-down chart (BL-196/197). The body aggregate is recorded every
     // econ tick; a tile's own series only from the first drill-down into it (lazy).
-    ui::resource_history          m_body_resource_hist;  ///< Σ remaining deposit per body per resource, one sample/tick (always).
-    ui::resource_history          m_tile_resource_hist;  ///< Remaining deposit per tile per resource, recorded only for tracked (drilled) tiles.
-    std::unordered_set<entity_id> m_tracked_tiles;       ///< Tiles whose per-tile series is being recorded (seeded by card drill-downs).
-    std::vector<std::uint64_t>    m_resource_hist_days;  ///< In-game day per resource-history sample; the chart's shared X axis (capped in lockstep).
     ui::strategy_readout_state    m_strategy_readout;    ///< Rolling per-corp decision aggregation (BL-411) — verb mix / spend buckets / reason tally over the last 64 quarters. Same lifetime rules as the histories above: presentation-only, unserialised, advanced once per econ tick.
-    std::uint64_t                 m_resource_sample_index = 0; ///< Monotonic count of resource-history samples taken. Each econ tick is a quarter, so sample i is dated i·econ_tick_days — equal to day_tick in live play (econ ticks are quarterly) but also progressing when the harness steps the economy without the sim clock.
-    entity_id   m_prev_selection = null_entity; ///< selected_entity last frame; a change to a new selection closes any open ledger so the Selection element takes the shared fold-out column.
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.

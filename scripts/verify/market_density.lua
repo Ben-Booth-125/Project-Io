@@ -8,7 +8,7 @@
 -- 0.20 * disp_x clamped to [380, 460], so the column is 380 px at 1280 and 384 px
 -- at 1920 — four pixels wider across the whole common range. But the chrome above
 -- and below it is FIXED: the profile tile, and a bottom band whose height derives
--- from `minimap_width` = max(336, 0.28 * min(disp_x, disp_y)), which is 336 at
+-- from `minimap_width` = max(336, 0.28 * min(disp_x, disp_y)) + 27, which is 363 at
 -- BOTH resolutions. So every pixel of the extra 360 rows at 1080p lands in the
 -- ledger's own content height and nowhere else.
 --

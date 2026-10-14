@@ -33,9 +33,11 @@ float shell_column_width(float disp_x);
 /// minimum display dimension, which is exactly the discordance the bottom row
 /// was reported for (Ben, 2026-07-30).
 ///
-/// `mm_w = max(336, 0.28 * min(disp_x, disp_y))`, `mm_h = 0.75 * mm_w` (the 4:3
-/// ratio of the original 240x180 default). 336x252 at every display whose
-/// smaller dimension is <= 1200.
+/// `mm_w = max(336, 0.28 * min(disp_x, disp_y)) + 27`, `mm_h = 0.75 * mm_w` (the 4:3
+/// ratio of the original 240x180 default). 363x272.25 at every display whose
+/// smaller dimension is <= 1200. The `+ 27` buys the whole bottom strip ~20 px
+/// of height, paid for by the Selection band's width (MINIMAP.md § Sizing and
+/// placement; Ben, 2026-10-13).
 float minimap_width(float disp_x, float disp_y);
 float minimap_height(float disp_x, float disp_y);
 

@@ -36,7 +36,10 @@
 // ownerless nations. Exits non-zero on any FAIL.
 //
 //   bash tools/verify/build_lua_harness.sh realm_names_check --run
-//   build_gen/verify/realm_names_check.exe [--seed N] [--data]
+// --names also dumps every realm name on the last record's table and every
+// nation name, tab-separated with its length in code points (BL-1318
+// NATION_NAME_CAP: the distribution, and a before/after diff of the cap).
+//   build_gen/verify/realm_names_check.exe [--seed N] [--data] [--names]
 //
 // --data loads the shipped data layer first (scripts/world_gen.lua and
 // scripts/works.lua, in app order, as history_patterns does), so the world is
@@ -80,11 +83,14 @@ const std::vector<std::string>& names_of(const era_timelapse& rec) { return rec.
 int main(int argc, char** argv)
 {
     uint32_t seed = 0;
+    bool     dump_names = false;
     bool     data = false;
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--seed") == 0 && i + 1 < argc)
             seed = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10));
+        else if (std::strcmp(argv[i], "--names") == 0)
+            dump_names = true;
         else if (std::strcmp(argv[i], "--data") == 0)
             data = true;
     }
@@ -297,6 +303,33 @@ int main(int argc, char** argv)
         std::snprintf(buf, sizeof buf, "N6 every nation of ownerless ground carries a coined name (%d of %d)",
                       ownerless_named, ownerless);
         check(ownerless_named == ownerless, buf);
+    }
+
+    // --- --names: the name dump (BL-1318 NATION_NAME_CAP measurement) --------
+    // One line per realm on the last record's table (every id the run ever
+    // coined) and one per nation, each with its length in code points, so a
+    // before/after pair diffs name by name and the distribution reads off it.
+    if (dump_names)
+    {
+        auto cps = [](const std::string& s) {
+            std::size_t n = 0;
+            for (const char c : s) if ((static_cast<unsigned char>(c) & 0xC0u) != 0x80u) ++n;
+            return n;
+        };
+        const std::vector<std::string>* names = nullptr;
+        for (int r = 2; r >= 0 && names == nullptr; --r)
+            if (!names_of(*records[r]).empty()) names = &names_of(*records[r]);
+        if (names != nullptr)
+            for (std::size_t i = 0; i < names->size(); ++i)
+                std::printf("NAME\trealm\t%u\t%zu\t%zu\t%s\n", seed, i, cps((*names)[i]), (*names)[i].c_str());
+        for (std::size_t n = 0; n < nn; ++n)
+        {
+            const auto it = w.nations.find(home->nation_ids[n]);
+            if (it == w.nations.end()) continue;
+            const bool ownerless = n < home->nation_polity.size() && home->nation_polity[n] < 0;
+            std::printf("NAME\t%s\t%u\t%zu\t%zu\t%s\n", ownerless ? "ownerless" : "nation", seed, n,
+                        cps(it->second.name), it->second.name.c_str());
+        }
     }
 
     std::printf("realm_names_check: %s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILED",
