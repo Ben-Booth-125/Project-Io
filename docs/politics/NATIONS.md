@@ -101,6 +101,9 @@ buildings.
   building goes"): first where its own market makes every input, then where the chain runs by
   reach, then anywhere on its ground. A founded plant opens with no stock, so one fed only by trade
   waits out the haul.
+- **A major's coastal seat has a state port (Ben, 2026-10-14).** Transport infrastructure is a
+  strategic sector, so a major whose capital stands on the coast holds a port as state industry, with
+  the trade machinery a port needs carried by the state.
 - **A losing building idles.** When its costs exceed what the treasury can pay, a state building
   stops producing and paying until the treasury can pay again. The state never runs into debt.
 - **The player's controls** over a state building are a corporation's building verbs — build,

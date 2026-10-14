@@ -558,6 +558,11 @@ prototype, by design (`TECH_FOUNDATIONS.md` § Prototype scope).
 
 ## Logistic Points
 
+**Trade capacity is raised so goods move between markets (Ben, 2026-10-14).** Measured: most
+processors that starve have their input on another market's shelf on the same body, refused by the
+Logistic Point cap, and some Marketplaces earn no trade points because their upkeep goes unpaid.
+Capacity rises, and a Marketplace's upkeep is met, so the trade the economy needs can flow.
+
 BL-596 (LP active march) and BL-597 (LP passive convoys) own the build, BL-606 (throughput lens)
 the surface — all 2026-08-24, replacing the purged BL-464 umbrella. Ben, 2026-08-18: *"Let's begin codifying Logistic Points
 in this sprint. It's an important layer for military and goods transport."* The reasoning below has
