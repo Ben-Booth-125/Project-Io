@@ -688,6 +688,29 @@ float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
     return base;
 }
 
+float node_scalar_at(int node, modifier_subject subject, const effect_target& target, float base)
+{
+    if (!valid_node(node))
+        return base;
+    const std::size_t si = static_cast<std::size_t>(subject);
+    const effect_tables& t = tables();
+    if (si >= std::size(t.by_subject))
+        return base;
+    // The fold nation_scalar runs, over this one node's read rows (its effect order).
+    for (const resolved_modifier& r : t.by_subject[si])
+        if (r.node == static_cast<std::size_t>(node) && scope_matches(r, target))
+            base = apply_scalar_modifier(base, r.mod);
+    return base;
+}
+
+bool node_has_mechanic(int node, std::string_view key)
+{
+    for (const resolved_mechanic& m : tables().mechanics)
+        if (m.node == static_cast<std::size_t>(node) && m.key == key)
+            return true;
+    return false;
+}
+
 float research_multiplier(const world& w, entity_id nation)
 {
     // 1 + the held "+N% national research" shares (scope "all", op add).

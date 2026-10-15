@@ -304,6 +304,17 @@ float research_multiplier(const world& w, entity_id nation);
 float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
                     const effect_target& target, float base);
 
+/// BL-1275: what node @p node's OWN read modifiers on @p subject do to @p base
+/// at @p target — the `nation_scalar` fold over that one node's rows, as if it
+/// were the only node held. @p base back untouched for a node with no matching
+/// read row (an unread effect moves nothing, so it relieves nothing). The
+/// nation research AI prices a candidate's relief with it.
+float node_scalar_at(int node, modifier_subject subject, const effect_target& target,
+                     float base = 1.0f);
+
+/// BL-1275: whether node @p node carries a read `mechanic` effect keyed @p key.
+bool node_has_mechanic(int node, std::string_view key);
+
 /// Whether @p nation may use the mechanic @p key: true when no node carries a
 /// read `mechanic` effect with that key, else true only once the nation holds
 /// one that does. `space_dispatch` (Rocketry, Ben 2026-10-10): an inter-body

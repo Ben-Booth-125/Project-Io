@@ -9,6 +9,7 @@
 #include <vector>
 
 struct world;
+class recipe_registry;
 
 // ---------------------------------------------------------------------------
 // The nation scorer (BL-542) — what a nation CARES ABOUT
@@ -195,6 +196,15 @@ struct nation_ai_params
     /// threatened one spends. Both are `nation_budget`'s own dial, not a line.
     float base_reserve       = 0.10f;
     float calm_reserve_bonus = 0.25f;
+
+    // --- The research pick (BL-1275) ----------------------------------------
+    /// RP one unit of relief is worth when it is weighed against a node's
+    /// priced cost. A unit of relief is one home building-equivalent moved by
+    /// 100% (see `choose_research_node`), so at 20000 a +1% lever on ONE home
+    /// building is worth 200 RP — a ring-1 travel node's opening price. A nation
+    /// with more matching buildings than that finds the node worth its price;
+    /// one with none sees only the cost, and takes the cheapest frontier node.
+    float research_relief_rp = 20000.0f;
 };
 
 /// The three terms, per nation, exactly as they were computed. Reported, never
@@ -299,3 +309,51 @@ float nation_grudge(const world& w, entity_id n, entity_id other, const nation_a
 /// nation at all (a landless nation, or an island with no tile-adjacent
 /// neighbour).
 entity_id nation_highest_grudge_neighbour(const world& w, entity_id n, const nation_ai_params& p);
+
+// ---------------------------------------------------------------------------
+// The research pick (BL-1275) — an AI nation fills its own research queue
+// ---------------------------------------------------------------------------
+// The grant (AI_OPPONENT.md § 11, "An AI nation may fill its own research
+// queue", Ben 2026-10-10; RESEARCH.md § The research queue): a non-player
+// nation's scorer appends ONE frontier node at a time to its own queue, chosen
+// by the relief the node's effects give the nation's binding terms, less its
+// cost. One verb (`enqueue_node`), the nation's own state and the tree's public
+// shape; no plan beyond the next node, no deed pursued. Pure choice, seeded by
+// nothing, ties to the lower node index.
+
+/// What the pick weighed for one nation. Reported, never stored.
+struct research_ai_pick
+{
+    entity_id    nation      = null_entity;
+    int          node        = -1; ///< The node queued (or that would be); -1 = none legal.
+    std::int64_t relief_milli = 0; ///< The node's relief, priced in milli-RP.
+    std::int64_t cost_milli   = 0; ///< Its cost at today's price index.
+    std::int64_t score_milli  = 0; ///< relief - cost.
+    int          candidates   = 0; ///< Legal frontier nodes weighed.
+    bool         queued       = false; ///< `enqueue_node` returned `queued`.
+};
+
+/// The frontier node @p nation would queue next, and why — PURE (reads @p w,
+/// writes nothing). The candidates are exactly the nodes `enqueue_node` would
+/// queue ALONE: not held, not queued, every requirement group held (so the plan
+/// is the node itself), not refused by a pick-one pair, and — for a quest — its
+/// deed already met (a deed is read, never acted toward: a quest whose deed is
+/// unmet would sit in the queue forever, so it is never chosen). A pair's two
+/// sides are both candidates until one is held or queued; the score picks the
+/// side. The scoring rule is the comment over the definition (nation_ai.cpp).
+research_ai_pick choose_research_node(const world& w, const recipe_registry& reg,
+                                      entity_id nation, const nation_ai_params& p);
+
+/// Whether @p nation's queue holds no entry research can flow into — empty, or
+/// only quests waiting on unmet deeds. The pick runs only then.
+bool research_queue_idle(const world& w, entity_id nation);
+
+/// The quarterly pass: for every nation (ascending id) whose queue is idle,
+/// queue `choose_research_node`'s pick through `enqueue_node`. NEVER the
+/// player's nation (NATIONS.md: the player's nation is never scored) — unless
+/// @p spectating, where nobody is seated and the session has no player's
+/// nation to protect (AI_OPPONENT.md § 10i). Does nothing in the settle
+/// (`current_econ_tick < k_campaign_settle_ticks`): the handover erases what it
+/// researches, so queuing then only spends treasury. Returns how many nodes it queued.
+int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating,
+                           std::vector<research_ai_pick>* out = nullptr);

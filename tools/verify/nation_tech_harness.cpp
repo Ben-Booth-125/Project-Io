@@ -3,12 +3,18 @@
 // group "nation-tech-state" rows R0-R3 (R3's canonical-world half is
 // save_roundtrip P5).
 //
-// NOTHING IN src/ CALLS enqueue_node YET. That is correct: the nation research
-// AI (BL-1275) is the scorer that queues, and the panel (BL-1276) is the
-// player's verb. Until they land, no nation in a real campaign ever queues, so
-// the line never spends and no node completes in play. R0 therefore SCRIPTS a
-// queue for every nation after the seat; its pacing rows measure what the
-// research arithmetic would do, not what a campaign does today.
+// The nation research AI (BL-1275, nation_ai.cpp run_nation_research_ai) queues
+// for every AI nation whose queue is idle, one frontier node at a time; the
+// panel (BL-1276) is the player's verb. R0 still SCRIPTS a queue for every
+// nation after the seat, so its pacing rows measure the research arithmetic on
+// a fixed path (the AI only acts once that scripted queue has drained).
+//
+//   R6  (BL-1275) the research AI on a fixture: an AI nation with an empty
+//       queue enqueues exactly one frontier node; the player's nation never
+//       (and under spectate, nobody is seated, so it is); a live entry stops
+//       it; deterministic twice; relief to home industry moves the choice; a
+//       whole walk of picks is legal (frontier, unheld, pair rule, no
+//       deed-unmet quest).
 //
 //   R1  accrual: the academic-research line pays min(its share, what the queue
 //       still owes) out of the treasury; an empty queue spends nothing.
@@ -75,6 +81,7 @@
 #include "world/finish_campaign_world.hpp"
 #include "world/logistics.hpp" // invalidate_logistics_caches (T2 live: planted Ports)
 #include "world/placement_rules.hpp" // is_coastal (T2 live)
+#include "world/nation_ai.hpp"   // BL-1275: run_nation_research_ai, choose_research_node
 #include "world/nation_budget.hpp"
 #include "world/nation_tech.hpp"
 #include "world/recipe_registry.hpp"
@@ -204,6 +211,133 @@ const research_accrual* row_for(const std::vector<research_accrual>& rows, entit
     for (const research_accrual& r : rows)
         if (r.nation == n) return &r;
     return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// R6 — the nation research AI (BL-1275; AI_OPPONENT.md § 11)
+// ---------------------------------------------------------------------------
+
+std::string pick_id(int n) { return n >= 0 ? io::dg::nodes[static_cast<std::size_t>(n)].id : "(none)"; }
+
+void rows_r6(const recipe_registry& reg)
+{
+    std::printf("\nR6 the nation research AI (BL-1275)\n");
+
+    // The fixture: `nation` is AI-run; the seat (corp2) is homed in `other`,
+    // so `other` is the player's nation.
+    const auto make = [] {
+        fixture f = make_fixture();
+        f.w.player_entity     = f.corp2;
+        f.w.current_econ_tick = k_campaign_settle_ticks; // the first live quarter
+        return f;
+    };
+
+    {
+        fixture f = make();
+        f.w.current_econ_tick = k_campaign_settle_ticks - 1;
+        check(run_nation_research_ai(f.w, reg, true, nullptr) == 0 && f.w.nation_tech.empty(),
+              "R6s in the settle nothing is queued (the handover would erase it; the treasury keeps the share)");
+    }
+
+    {
+        fixture f = make();
+        std::vector<research_ai_pick> picks;
+        const int queued = run_nation_research_ai(f.w, reg, /*spectating=*/false, &picks);
+        const auto& st = f.w.nation_tech[f.nation];
+        std::printf("     AI nation queued %s (relief %lld, cost %lld milli-RP, %d candidates)\n",
+                    st.queue.empty() ? "nothing" : pick_id(st.queue[0]).c_str(),
+                    picks.empty() ? 0LL : static_cast<long long>(picks[0].relief_milli),
+                    picks.empty() ? 0LL : static_cast<long long>(picks[0].cost_milli),
+                    picks.empty() ? 0 : picks[0].candidates);
+        check(queued == 1 && st.queue.size() == 1,
+              "R6a an AI nation with an empty queue enqueues exactly one node");
+        const bool other_empty = f.w.nation_tech.find(f.other) == f.w.nation_tech.end()
+                              || f.w.nation_tech.at(f.other).queue.empty();
+        bool other_picked = false;
+        for (const research_ai_pick& p : picks) other_picked |= p.nation == f.other;
+        check(other_empty && !other_picked, "R6b the player's nation is never queued for (nor scored)");
+        const int n = st.queue.empty() ? -1 : st.queue[0];
+        check(n >= 0 && io::dg::nodes[static_cast<std::size_t>(n)].is_root,
+              "R6c ...the node is frontier: with nothing held, a root");
+        check(run_nation_research_ai(f.w, reg, false, nullptr) == 0 && st.queue.size() == 1,
+              "R6d a queue with a live entry is left alone: one node at a time");
+
+        fixture g = make();
+        run_nation_research_ai(g.w, reg, false, nullptr);
+        check(g.w.nation_tech[g.nation].queue == st.queue && g.w.state_hash(0) == f.w.state_hash(0),
+              "R6e the choice is deterministic across two runs (same node, same state_hash)");
+
+        fixture s = make();
+        run_nation_research_ai(s.w, reg, /*spectating=*/true, nullptr);
+        check(s.w.nation_tech.count(s.other) && s.w.nation_tech.at(s.other).queue.size() == 1,
+              "R6f under spectate nobody is seated: the seat's nation is queued for like any other");
+    }
+
+    {
+        // Relief moves the choice: home petroleum sites make Drill-Bit
+        // Metallurgy (Oil Platforms +5%) beat Seismic Survey (unread) at equal cost.
+        const int t1 = node("DG-PR-EX-T1"), t2 = node("DG-PR-EX-T2");
+        const int a1 = node("DG-PR-EX-A1"), a2 = node("DG-PR-EX-A2");
+        fixture f = make();
+        nation_budget nb;
+        nb.weights[static_cast<std::size_t>(budget_priority::charters)]     = 0.5f;
+        nb.weights[static_cast<std::size_t>(budget_priority::public_works)] = 0.5f;
+        f.w.nation_budgets[f.nation] = nb;
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(t1));
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(t2));
+        fixture bare = f;
+        for (int i = 0; i < 4; ++i)
+        {
+            const entity_id t = add_tile(f.w, f.body, f.nation);
+            const entity_id b = add_building(f.w, f.corp, t, building_type::extraction_site, 0, false);
+            f.w.buildings.at(b).target_resource = resource_type::petroleum;
+        }
+        const research_ai_pick with = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+        const research_ai_pick none = choose_research_node(bare.w, reg, bare.nation, reg.nation_ai());
+        std::printf("     with 4 home oil sites: %s (relief %lld); with none: %s (relief %lld)\n",
+                    pick_id(with.node).c_str(), static_cast<long long>(with.relief_milli),
+                    pick_id(none.node).c_str(), static_cast<long long>(none.relief_milli));
+        check(with.node == a2 && with.relief_milli > 0 && with.score_milli == with.relief_milli - with.cost_milli,
+              "R6g relief to the home industry picks the node that moves it (A2 over the unread A1)");
+        (void)a1;
+        check(none.node != a2 && none.relief_milli == 0,
+              "R6h ...and with no home industry it is not chosen (nothing relieved: the cheapest node wins)");
+    }
+
+    {
+        // Legality over a whole walk: hold one side of a pair, then let the AI
+        // pick and "complete" node after node until nothing is legal. Every
+        // pick is frontier, unheld, unqueued, not a deed-unmet quest, and the
+        // held pair side's sibling is never chosen.
+        const int ba = node("DG-ST-OR-Ba"), bb = node("DG-ST-OR-Bb");
+        fixture f = make();
+        nation_tech_state& st = f.w.nation_tech[f.nation];
+        st.held.set(static_cast<std::size_t>(bb));
+        int  picks = 0;
+        bool legal = true, took_ba = false, took_quest = false;
+        for (int i = 0; i < io::dg::node_count + 5; ++i)
+        {
+            const research_ai_pick p = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+            if (p.node < 0) break;
+            const auto& nd = io::dg::nodes[static_cast<std::size_t>(p.node)];
+            std::vector<std::uint16_t> plan;
+            legal &= !st.held.test(static_cast<std::size_t>(p.node))
+                  && node_requirements_met(f.w, f.nation, p.node)
+                  && preview_enqueue(f.w, f.nation, p.node, &plan) == enqueue_result::queued
+                  && plan.size() == 1
+                  && (nd.excludes < 0 || !st.held.test(static_cast<std::size_t>(nd.excludes)));
+            took_ba    |= p.node == ba;
+            took_quest |= nd.is_quest;
+            if (enqueue_node(f.w, f.nation, p.node) != enqueue_result::queued) { legal = false; break; }
+            st.held.set(static_cast<std::size_t>(p.node)); // complete it
+            st.queue.clear();
+            ++picks;
+        }
+        std::printf("     walk: %d picks, %zu held at the end of %d\n", picks, st.held.count(), io::dg::node_count);
+        check(picks > 20 && legal, "R6i every pick over a whole walk is legal: frontier, unheld, pair rule kept");
+        check(!took_ba, "R6j ...the held pair side's sibling is never chosen");
+        check(!took_quest, "R6k ...no deed-unmet quest is chosen (a deed is read, never pursued)");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1810,6 +1944,7 @@ int main(int argc, char** argv)
         reg.load_from_lua(lua);
         rows_t1(reg);
         rows_t2(reg);
+        rows_r6(reg);
     }
     {
         // Curated seeds for the rows a hand fixture cannot route: the overland
