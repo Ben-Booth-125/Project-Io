@@ -1187,6 +1187,24 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     economy_report last_settle;
     std::map<entity_id, g5_rec> g5;
     g5_track(w, g5, 0, false, r); // the world as handed to the settle
+    if (g_trace_proc != null_entity)
+        if (const auto tb = w.buildings.find(g_trace_proc); tb != w.buildings.end())
+        {
+            const entity_id m = market_for_tile(w, tb->second.tile);
+            double sc = 0; int n = 0;
+            for (const auto& [cid, pcc] : w.population_centres)
+            {
+                if (pcc.razed) continue;
+                const auto ti = w.population_centre_tile.find(cid);
+                if (ti != w.population_centre_tile.end() && market_for_tile(w, ti->second) == m) { sc += pcc.scale; ++n; }
+            }
+            const std::size_t g = static_cast<std::size_t>(resource_type::agricultural_produce);
+            const market_component& mc = w.markets.at(m);
+            std::printf("TRACE build mkt %llu centres %d scale %.1f gen-form produce %.1f | bid now %.1f price/base %.2f shelf %.1f\n",
+                        static_cast<unsigned long long>(m), n, sc,
+                        sc * reg.population_demand().demand_scale * reg.population_demand_basket()[g],
+                        mc.household_bid[g], mc.base_price[g] > 0 ? mc.price[g] / mc.base_price[g] : 0.0f, mc.inventory[g]);
+        }
     for (int step = 0; step < k_campaign_settle_ticks; ++step)
     {
         settle_tick_hooks shooks;
