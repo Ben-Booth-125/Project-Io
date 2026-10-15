@@ -1039,20 +1039,22 @@ void recipe_registry::load_from_lua(lua_state& lua)
     if (res_tbl)
     {
         const std::string ctx = "economy.research";
-        const double      inf = std::numeric_limits<double>::infinity();
+        // BL-1324 review: every rate has a FINITE ceiling, so no finite double
+        // narrows to a float infinity; out of range is rejected by key.
+        constexpr double  k_dial_max = 1.0e6;
         research_params   rp  = m_research;
         const sol::table& t   = *res_tbl;
 
-        read_checked(t, "base_rp_per_nation",          rp.base_rp_per_nation,          0.0,   inf, ctx);
-        read_checked(t, "rp_per_research_credit",      rp.rp_per_research_credit,      0.0,   inf, ctx);
-        read_checked(t, "rp_per_research_credit_sqrt", rp.rp_per_research_credit_sqrt, 0.0,   inf, ctx);
-        read_checked(t, "rp_per_university",           rp.rp_per_university,           0.0,   inf, ctx);
-        read_checked(t, "rp_per_institute",            rp.rp_per_institute,            0.0,   inf, ctx);
-        read_checked(t, "rp_per_cost_unit",            rp.rp_per_cost_unit,            1e-3,  inf, ctx);
+        read_checked(t, "base_rp_per_nation",          rp.base_rp_per_nation,          0.0, k_dial_max, ctx);
+        read_checked(t, "rp_per_research_credit",      rp.rp_per_research_credit,      0.0, k_dial_max, ctx);
+        read_checked(t, "rp_per_research_credit_sqrt", rp.rp_per_research_credit_sqrt, 0.0, k_dial_max, ctx);
+        read_checked(t, "rp_per_university",           rp.rp_per_university,           0.0, k_dial_max, ctx);
+        read_checked(t, "rp_per_institute",            rp.rp_per_institute,            0.0, k_dial_max, ctx);
+        read_checked(t, "rp_per_cost_unit",            rp.rp_per_cost_unit,            1e-3, k_dial_max, ctx);
         // BL-1324: the price index's yearly growth (capped at 10 in the index
         // arithmetic; bounded here so a typo cannot run it away) and the economy term.
         read_checked(t, "price_growth_per_year",       rp.price_growth_per_year,       0.0,   1.0, ctx);
-        read_checked(t, "rp_per_economy_unit",         rp.rp_per_economy_unit,         0.0,   inf, ctx);
+        read_checked(t, "rp_per_economy_unit",         rp.rp_per_economy_unit,         0.0, k_dial_max, ctx);
 
         m_research = rp;
     }

@@ -2397,7 +2397,10 @@ bool app::load_game_from(const std::string& path)
     // The cadence counter resumes where an unsaved campaign would be: the
     // settle's steps plus every live quarter since (BL-568).
     m_econ_steps = static_cast<uint64_t>(k_campaign_settle_ticks) + env.econ_tick;
-    m_world.current_econ_tick = static_cast<int>(m_econ_steps);
+    // BL-1324 review: between passes the counter holds the step the LAST pass
+    // ran at (m_econ_steps - 1), exactly as an unsaved campaign does — the
+    // next pass is the one at m_econ_steps. It used to read one ahead here.
+    m_world.current_econ_tick = econ_tick_after_live_steps(static_cast<long long>(env.econ_tick));
 
     m_balance_history     = std::move(env.balance_history);
     m_income_history      = std::move(env.income_history);

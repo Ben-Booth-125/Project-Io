@@ -100,7 +100,7 @@ struct research_params
     /// holds its standard interval level 1970 -> 2040 (index 1.49 at 2040).
     float price_growth_per_year = 0.005f;
     /// BL-1324: RP a quarter per unit of the nation's economy measure
-    /// (`nation_economy_milli`: its domestic firms' latest filed quarterly
+    /// (`nation_economy_milli`: its domestic firms' previous filed quarterly
     /// income, in credits). The term that lets a GROWING nation outrun the
     /// prices; 0 = none. 0.03: the richest nation (8-12k credits a quarter at
     /// the open, 18-27k by 2040) researches at ~600 -> ~1200 RP a quarter and
@@ -119,15 +119,25 @@ std::int64_t research_price_ppm_at(int age_quarter, const research_params& p = {
 /// opened (`current_econ_tick` less the settle's ticks), never negative.
 int research_age_quarter(const world& w);
 
+/// The age quarter the NEXT quarterly pass will charge: econ step
+/// `current_econ_tick + 1` less the settle's ticks, never negative. Between
+/// passes `current_econ_tick` is the step the last pass ran at — straight
+/// after the settle and after a load alike (`econ_tick_after_live_steps`).
+int research_next_age_quarter(const world& w);
+
 /// The price index the world's current quarter charges (`research_price_ppm_at`
 /// of `research_age_quarter`). Every priced cost the pass, the projection and the
 /// panel show reads this one value.
 std::int64_t research_price_ppm(const world& w, const research_params& p = {});
 
 /// BL-1324: the economy measure RP scale with — the summed `income` of the
-/// latest filed quarterly return of every corporation whose home nation is
-/// @p nation, in milli-credits (integer, so the unordered corporation walk
-/// cannot reorder the sum). Negative incomes count as zero.
+/// PREVIOUS quarter's filed return (`returns[size - 2]`; none before two are
+/// filed) of every corporation whose home nation is @p nation, in
+/// milli-credits (integer and saturating, so the unordered corporation walk
+/// cannot reorder or overflow the sum). Negative incomes count as zero. Not
+/// the latest return: the research pass runs in the tick that filed it, and
+/// FINANCE.md § The quarterly return holds that no branch reads a return
+/// during the tick that writes it.
 std::int64_t nation_economy_milli(const world& w, entity_id nation);
 
 /// RP are held in MILLI-RP, an integer: a pool accrues small increments for

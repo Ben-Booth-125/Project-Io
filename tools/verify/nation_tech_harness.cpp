@@ -989,20 +989,22 @@ void rows_r5()
               "R5f the quarterly pass charges the priced cost (200 RP at index 2: two passes of 100)");
     }
 
-    // The economy term: RP per credit of the home firms' latest filed income;
-    // a loss counts as nothing.
+    // The economy term: RP per credit of the home firms' PREVIOUS quarter's
+    // filed income — the latest return is the one this tick's apply_budget
+    // filed, which FINANCE.md says no branch reads in that tick. A loss counts
+    // as nothing; a firm with a single return has no previous quarter yet.
     {
         research_params p{};
         p.base_rp_per_nation = 0.0f;
         p.rp_per_research_credit_sqrt = 0.0f;
         p.rp_per_economy_unit = 0.2f;
         fixture f = make_fixture(0.0f);
-        quarterly_return old_r{}, r{}, loss{};
-        old_r.income = 9000.0f; // an earlier return: only the latest counts
-        r.income     = 500.0f;
-        loss.income  = -300.0f;
-        f.w.corporations.at(f.corp).returns  = { old_r, r };
-        f.w.corporations.at(f.corp2).returns = { loss };
+        quarterly_return prev{}, latest{}, loss{};
+        prev.income   = 500.0f;
+        latest.income = 9000.0f; // filed this tick: not read
+        loss.income   = -300.0f;
+        f.w.corporations.at(f.corp).returns  = { prev, latest };
+        f.w.corporations.at(f.corp2).returns = { loss, latest };
         std::vector<research_accrual> rows;
         advance_research(f.w, p, &rows);
         const research_accrual* a = row_for(rows, f.nation);
@@ -1010,7 +1012,41 @@ void rows_r5()
         check(a != nullptr && b != nullptr && a->economy == 500.0 && a->rp_milli == milli(100.0)
                   && b->economy == 0.0 && b->rp_milli == 0
                   && nation_economy_milli(f.w, f.nation) == milli(500.0),
-              "R5g RP grow with the economy: 0.2 RP per credit of the latest filed income (500 -> 100 RP); a loss adds none");
+              "R5g RP grow with the economy: 0.2 RP per credit of the PREVIOUS quarter's filed income (500 -> 100 RP), never the return filed this tick; a loss adds none");
+        f.w.corporations.at(f.corp).returns = { latest };
+        check(nation_economy_milli(f.w, f.nation) == 0,
+              "R5g2 ...and a firm with only this tick's return contributes nothing yet");
+    }
+
+    // Saturation (review): no finite input reaches a signed overflow.
+    {
+        research_params huge{};
+        huge.rp_per_cost_unit = 1.0e30f;
+        const std::int64_t c_cap  = node_cost_milli(n, huge, 1'000'000'000'000LL);
+        const std::int64_t c_frac = node_cost_milli(n, huge, 1'500'000);
+        fixture f = make_fixture(0.0f);
+        quarterly_return big{};
+        big.income = 3.0e38f;
+        for (int k = 0; k < 8; ++k)
+        {
+            const entity_id c = f.w.create_entity();
+            corporation_component cc{};
+            cc.home_nation = f.nation;
+            cc.returns = { big, big };
+            f.w.corporations[c] = cc;
+        }
+        const std::int64_t e = nation_economy_milli(f.w, f.nation);
+        research_params p{};
+        p.rp_per_economy_unit = 1.0e6f;
+        std::vector<research_accrual> rows;
+        advance_research(f.w, p, &rows);
+        advance_research(f.w, p, &rows);
+        const std::int64_t pool = f.w.nation_tech.at(f.nation).pool_milli;
+        std::printf("     saturated: cost %lld / %lld, economy %lld, pool %lld\n", static_cast<long long>(c_cap),
+                    static_cast<long long>(c_frac), static_cast<long long>(e), static_cast<long long>(pool));
+        check(c_cap > 0 && c_frac > 0 && e > 0 && pool > 0 && c_cap <= 4'000'000'000'000'000'000LL
+                  && e <= 4'000'000'000'000'000'000LL && pool <= 4'000'000'000'000'000'000LL,
+              "R5i costs, the economy sum and the pool saturate (positive, capped) rather than overflow");
     }
 
     // The projection prices every future quarter as the passes will: stepping
@@ -1044,6 +1080,86 @@ void rows_r5()
         check(!proj.empty() && proj == real && proj.back() > proj_flat.back(),
               "R5h the queue's arrival projection charges the rising price the passes charge (matches stepping; later than flat)");
     }
+}
+
+// R5 live (review): on a real campaign the projection's quarter 1 is the pass
+// the sim will run next, straight after the settle and straight after a load.
+// RP are base-only here (no line, no buildings, no economy term) so the
+// projection's held-constant inputs are exactly constant, and growth is steep
+// (10% a year) so an off-by-one quarter shows in the charged price.
+void rows_r5_live(std::uint32_t seed)
+{
+    std::printf("\nR5 live (seed %u): the projection opens at the pass the sim runs next\n", seed);
+    lua_state lua;
+    world_params wp;
+    wp.seed = seed;
+    auto start = std::make_unique<app_start_world>();
+    try { build_app_start_world(lua, wp, *start); }
+    catch (const std::exception& e) { std::printf("  FAIL  world build threw: %s\n", e.what()); ++g_failures; return; }
+    world& w = start->w;
+    recipe_registry& reg = start->reg;
+    research_params p = reg.research();
+    p.base_rp_per_nation          = 2000.0f;
+    p.rp_per_research_credit      = 0.0f;
+    p.rp_per_research_credit_sqrt = 0.0f;
+    p.rp_per_university           = 0.0f;
+    p.rp_per_institute            = 0.0f;
+    p.rp_per_economy_unit         = 0.0f;
+    p.rp_per_cost_unit            = 300.0f;
+    p.price_growth_per_year       = 0.1f;
+    reg.set_research(p);
+    run_app_validation_settle(w, reg);
+    if (seat_player_corporation(w, seed, start->land.search.winner_score).seated == null_entity)
+    { std::printf("  FAIL  no corporation seated\n"); ++g_failures; return; }
+    entity_id nid = null_entity; // the lowest nation id
+    for (const auto& kv : w.nations) if (nid == null_entity || kv.first < nid) nid = kv.first;
+    const int major = node("DG-PR-EX-A");
+    int day = 0;
+    int live = 0;
+    const auto step = [&] {
+        ++live;
+        day += 90;
+        advance_orbits(w, 90.0);
+        advance_surveys(w, 90);
+        w.current_day_tick = day;
+        return run_settle_tick(w, reg, k_app_validation_ticks + (live - 1), day, /*spectating=*/false);
+    };
+    // Projects on @p from, steps `w` (whose state equals it) and compares.
+    const auto compare = [&](const world& from, const char* label) {
+        const std::int64_t next_price = research_price_ppm_at(research_next_age_quarter(from), p);
+        const std::vector<int> proj = project_queue_arrivals(from, nid, p);
+        const std::vector<std::uint16_t> q = from.nation_tech.at(nid).queue;
+        std::vector<int> real(q.size(), -1);
+        std::int64_t charged = -1;
+        for (int k = 1; k <= 20; ++k)
+        {
+            const settle_tick_result r = step();
+            for (const research_accrual& a : r.report.research)
+                if (a.nation == nid && k == 1) charged = a.price_ppm;
+            for (std::size_t i = 0; i < q.size(); ++i)
+                if (real[i] < 0 && nation_holds(w, nid, q[i])) real[i] = k;
+        }
+        std::printf("     %s: next price %lld charged %lld | projected last q%d, stepped q%d\n", label,
+                    static_cast<long long>(next_price), static_cast<long long>(charged),
+                    proj.empty() ? -1 : proj.back(), real.empty() ? -1 : real.back());
+        return !proj.empty() && proj == real && charged == next_price;
+    };
+
+    // (a) straight after the settle and the seat.
+    enqueue_node(w, nid, major);
+    check(w.current_econ_tick == econ_tick_after_live_steps(0) && compare(w, "fresh"),
+          "R5j fresh: the counter reads the settle's last step and the projection's quarter 1 is the price the next pass charges; arrivals match stepping");
+
+    // (b) straight after a load: the app seeds the counter with
+    // econ_tick_after_live_steps(live) — it must read what the unsaved world reads.
+    clear_research_queue(w, nid);
+    w.nation_tech.at(nid).pool_milli = 0; // a fresh bill, so the arrival is not quarter 1 by leftovers
+    enqueue_node(w, nid, node("DG-PR-PC-A"));
+    world loaded;
+    const bool ok = round_trip(w, loaded);
+    loaded.current_econ_tick = econ_tick_after_live_steps(live); // app::load_game_from
+    check(ok && loaded.current_econ_tick == w.current_econ_tick && compare(loaded, "loaded"),
+          "R5k loaded: the seeded counter equals the unsaved world's, and the projection from the loaded world matches stepping");
 }
 
 // ---------------------------------------------------------------------------
@@ -1604,7 +1720,8 @@ void rows_r4(const std::vector<std::uint32_t>& seeds, int years, const dial_over
                 used.price_growth_per_year, used.rp_per_economy_unit);
     const auto fiv = [](double v) {
         char b[16];
-        if (v >= k_never) std::snprintf(b, sizeof b, " never");
+        // >= half: median_of averages a "never" with a finite middle value.
+        if (v >= k_never / 2) std::snprintf(b, sizeof b, " never");
         else              std::snprintf(b, sizeof b, "%6.2f", v);
         return std::string(b);
     };
@@ -1709,6 +1826,8 @@ int main(int argc, char** argv)
         }
         check(ported, "T2s a ported leg was priced on a curated seed, found or planted (the handling split was measured)");
     }
+    if (seed_count > 0 || !seeds.empty())
+        rows_r5_live(28); // BL-1324 review: fresh-settle and just-loaded projection rows
     } // !age_only
 
     if (seeds.empty() && seed_count > 0)

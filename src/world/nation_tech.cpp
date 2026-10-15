@@ -144,17 +144,64 @@ struct planner
 } // namespace
 
 namespace {
+// Every milli-RP quantity saturates here: far past any real pool, far short
+// of int64's edge, so a sum of a few of them cannot overflow either.
+constexpr std::int64_t k_milli_cap = 4'000'000'000'000'000'000LL;
+
 std::int64_t to_milli(double rp)
 {
     if (!std::isfinite(rp) || rp <= 0.0)
         return 0;
-    return static_cast<std::int64_t>(std::llround(rp * static_cast<double>(k_milli_per_rp)));
+    const double m = rp * static_cast<double>(k_milli_per_rp);
+    if (m >= static_cast<double>(k_milli_cap))
+        return k_milli_cap;
+    return static_cast<std::int64_t>(std::llround(m));
+}
+
+/// a + b for non-negative a, b, saturating at k_milli_cap (BL-1324 review).
+std::int64_t sat_add(std::int64_t a, std::int64_t b)
+{
+    a = std::clamp<std::int64_t>(a, 0, k_milli_cap);
+    b = std::clamp<std::int64_t>(b, 0, k_milli_cap);
+    return a > k_milli_cap - b ? k_milli_cap : a + b;
+}
+
+/// llround(m x mult) for a milli-RP m and the research multiplier, saturating
+/// at k_milli_cap — the pass's own two-step rounding, kept bit for bit.
+std::int64_t scale_milli(std::int64_t m, double mult)
+{
+    const double v = static_cast<double>(m) * mult;
+    if (!std::isfinite(v) || v <= 0.0)
+        return 0;
+    if (v >= static_cast<double>(k_milli_cap))
+        return k_milli_cap;
+    return static_cast<std::int64_t>(std::llround(v));
 }
 } // namespace
 
 namespace {
 constexpr std::int64_t k_price_unit_ppm = 1'000'000;
 constexpr std::int64_t k_price_cap_ppm  = 1'000'000'000'000LL; // a millionfold: overflow guard only
+
+/// The quarterly rate the growth dial compounds at, integer ppm (0 = flat).
+std::int64_t price_rate_ppm(const research_params& p)
+{
+    const double g = static_cast<double>(p.price_growth_per_year);
+    if (!std::isfinite(g) || g <= 0.0)
+        return 0;
+    return std::llround(std::min(g, 10.0) * 1.0e6 / 4.0);
+}
+
+/// One quarter of compounding: the index plus rate/4 of it, integer, capped.
+/// The ONE step both the index at a quarter and the projection's walk take.
+std::int64_t compound_one(std::int64_t idx, std::int64_t rate_ppm)
+{
+    if (rate_ppm <= 0 || idx >= k_price_cap_ppm)
+        return std::min(idx, k_price_cap_ppm);
+    idx += (idx / k_price_unit_ppm) * rate_ppm
+         + ((idx % k_price_unit_ppm) * rate_ppm + k_price_unit_ppm / 2) / k_price_unit_ppm;
+    return std::min(idx, k_price_cap_ppm);
+}
 } // namespace
 
 std::int64_t node_cost_milli(int node, const research_params& p, std::int64_t price_ppm)
@@ -168,32 +215,45 @@ std::int64_t node_cost_milli(int node, const research_params& p, std::int64_t pr
     // charges what it always did.
     if (price_ppm == k_price_unit_ppm)
         return unpriced;
-    const std::int64_t idx = std::clamp<std::int64_t>(price_ppm, 0, k_price_cap_ppm);
-    // Split whole and fractional index so the product stays inside int64.
+    const std::int64_t idx   = std::clamp<std::int64_t>(price_ppm, 0, k_price_cap_ppm);
     const std::int64_t whole = idx / k_price_unit_ppm;
     const std::int64_t frac  = idx % k_price_unit_ppm;
-    return unpriced * whole + (unpriced * frac + k_price_unit_ppm / 2) / k_price_unit_ppm;
+    // unpriced x whole, saturating.
+    if (whole > 0 && unpriced > k_milli_cap / whole)
+        return k_milli_cap;
+    const std::int64_t whole_part = unpriced * whole;
+    // unpriced x frac / 1e6 without forming unpriced x frac: split unpriced into
+    // hi x 1e6 + lo, so hi x frac <= unpriced and lo x frac < 1e12. Exactly the
+    // rounded (unpriced x frac + 5e5) / 1e6.
+    const std::int64_t hi = unpriced / k_price_unit_ppm;
+    const std::int64_t lo = unpriced % k_price_unit_ppm;
+    const std::int64_t frac_part = hi * frac + (lo * frac + k_price_unit_ppm / 2) / k_price_unit_ppm;
+    return sat_add(whole_part, frac_part);
 }
 
 std::int64_t research_price_ppm_at(int age_quarter, const research_params& p)
 {
-    const double g = static_cast<double>(p.price_growth_per_year);
-    if (age_quarter <= 0 || !std::isfinite(g) || g <= 0.0)
-        return k_price_unit_ppm;
     // A nominal annual rate compounded quarterly: each quarter adds rate/4 of
     // the index. The dial becomes an integer ppm rate ONCE; the compounding is
     // integer, so the index is the same on every platform.
-    const std::int64_t rate_ppm = std::llround(std::min(g, 10.0) * 1.0e6 / 4.0);
+    const std::int64_t rate = price_rate_ppm(p);
     std::int64_t idx = k_price_unit_ppm;
-    for (int q = 0; q < age_quarter && idx < k_price_cap_ppm; ++q)
-        idx += (idx / k_price_unit_ppm) * rate_ppm
-             + ((idx % k_price_unit_ppm) * rate_ppm + k_price_unit_ppm / 2) / k_price_unit_ppm;
-    return std::min(idx, k_price_cap_ppm);
+    for (int q = 0; q < age_quarter && rate > 0 && idx < k_price_cap_ppm; ++q)
+        idx = compound_one(idx, rate);
+    return idx;
 }
 
 int research_age_quarter(const world& w)
 {
     return std::max(0, w.current_econ_tick - k_campaign_settle_ticks);
+}
+
+int research_next_age_quarter(const world& w)
+{
+    // Between passes `current_econ_tick` is the step the LAST pass ran at, in a
+    // fresh campaign and after a load alike (`econ_tick_after_live_steps`), so
+    // the next pass runs at one more.
+    return std::max(0, w.current_econ_tick + 1 - k_campaign_settle_ticks);
 }
 
 std::int64_t research_price_ppm(const world& w, const research_params& p)
@@ -203,15 +263,18 @@ std::int64_t research_price_ppm(const world& w, const research_params& p)
 
 namespace {
 // A firm's contribution to its home nation's economy measure: the income of
-// its latest filed return, milli-credits, never negative.
+// its PREVIOUS quarter's return (returns[size - 2]), milli-credits, never
+// negative. Not the latest: the research pass runs in the tick whose
+// apply_budget filed it, and FINANCE.md § The quarterly return holds that no
+// branch reads a return during the tick that writes it.
 std::int64_t economy_milli_of(const corporation_component& c)
 {
-    if (c.returns.empty())
+    if (c.returns.size() < 2)
         return 0;
-    const double inc = static_cast<double>(c.returns.back().income);
+    const double inc = static_cast<double>(c.returns[c.returns.size() - 2].income);
     if (!std::isfinite(inc) || inc <= 0.0)
         return 0;
-    return std::llround(std::min(inc, 1.0e15) * 1000.0);
+    return to_milli(inc); // credits -> milli-credits, the same 1000 and the same cap
 }
 } // namespace
 
@@ -222,7 +285,7 @@ std::int64_t nation_economy_milli(const world& w, entity_id nation)
     std::int64_t sum = 0;
     for (const auto& [cid, c] : w.corporations)
         if (c.home_nation == nation)
-            sum += economy_milli_of(c);
+            sum = sat_add(sum, economy_milli_of(c));
     return sum;
 }
 
@@ -747,7 +810,10 @@ research_buildings count_research_buildings(const world& w)
     for (const auto& [corp, cc] : w.corporations)
     {
         if (cc.home_nation != null_entity)
-            rb.economy_milli[cc.home_nation] += economy_milli_of(cc);
+        {
+            std::int64_t& e = rb.economy_milli[cc.home_nation];
+            e = sat_add(e, economy_milli_of(cc));
+        }
         for (const entity_id bid : cc.assets)
         {
             const auto bit = w.buildings.find(bid);
@@ -812,13 +878,12 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
 
     // The RP that cost no treasury: the base, the buildings and (BL-1324) the
     // economy term — RP that grow with the nation's economy to meet the prices.
-    const std::int64_t free_milli = static_cast<std::int64_t>(std::llround(
-        static_cast<double>(to_milli(static_cast<double>(p.base_rp_per_nation)
-                                     + static_cast<double>(row.universities) * p.rp_per_university
-                                           * uni_factor
-                                     + static_cast<double>(row.institutes) * p.rp_per_institute
-                                     + static_cast<double>(p.rp_per_economy_unit) * row.economy))
-        * mult));
+    const std::int64_t free_milli = scale_milli(
+        to_milli(static_cast<double>(p.base_rp_per_nation)
+                 + static_cast<double>(row.universities) * p.rp_per_university * uni_factor
+                 + static_cast<double>(row.institutes) * p.rp_per_institute
+                 + static_cast<double>(p.rp_per_economy_unit) * row.economy),
+        mult);
 
     // What the queue still owes: every queued node's cost, less the pool
     // and less what the free RP will bring this quarter.
@@ -826,8 +891,10 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
     if (st != nullptr)
     {
         for (const std::uint16_t n : st->queue)
-            owed += node_cost_milli(n, p, price_ppm);
-        owed -= st->pool_milli;
+            owed = sat_add(owed, node_cost_milli(n, p, price_ppm));
+        // Both sides sit inside +-k_milli_cap (the panel's estimate passes a
+        // pool of -1e18), so the difference cannot overflow.
+        owed -= std::clamp<std::int64_t>(st->pool_milli, -k_milli_cap, k_milli_cap);
     }
     row.owed_milli = std::max<std::int64_t>(0, owed);
     const std::int64_t line_need = std::max<std::int64_t>(0, owed - free_milli);
@@ -867,9 +934,8 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
         row.line_spend = static_cast<float>(std::min(static_cast<double>(row.line_share), bill));
     }
 
-    const std::int64_t line_milli = static_cast<std::int64_t>(
-        std::llround(static_cast<double>(line_rp_milli(row.line_spend, p)) * mult));
-    row.rp_milli = free_milli + line_milli;
+    const std::int64_t line_milli = scale_milli(line_rp_milli(row.line_spend, p), mult);
+    row.rp_milli = sat_add(free_milli, line_milli);
     return row;
 }
 
@@ -916,7 +982,7 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         if (row.rp_milli > 0 || sit != w.nation_tech.end())
         {
             nation_tech_state& st = w.nation_tech[nid];
-            st.pool_milli += row.rp_milli;
+            st.pool_milli = sat_add(st.pool_milli, row.rp_milli);
             row.completed = flow_state(w, nid, st, p, price);
         }
 
@@ -984,13 +1050,23 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
     const research_buildings rb = count_research_buildings(w);
     const float treasury = nit->second.treasury; // held: the rate as it stands now
     // BL-1324: the price index RISES through the projection as the passes will
-    // charge it — projected quarter q is the pass at age quarter
-    // `research_age_quarter(w) + q`. The economy is held where it stands, like
-    // the treasury.
-    const int age_now = research_age_quarter(w);
+    // charge it. Projected quarter 1 is the NEXT pass (`research_next_age_quarter`:
+    // econ step current_econ_tick + 1, which reads 0 straight after the settle
+    // and after a load alike), and every later quarter is one more compounding
+    // step — O(horizon), the same `compound_one` the index itself takes. The
+    // economy is held where it stands, like the treasury.
+    const std::int64_t rate = price_rate_ppm(p);
+    // Unclamped, so a projection read mid-settle still opens at the right quarter.
+    int          age   = w.current_econ_tick + 1 - k_campaign_settle_ticks;
+    std::int64_t price = research_price_ppm_at(research_next_age_quarter(w), p);
     for (int q = 1; q <= horizon_quarters && !sim.queue.empty(); ++q)
     {
-        const std::int64_t price = research_price_ppm_at(age_now + q, p);
+        if (q > 1)
+        {
+            ++age; // the age's open charges 1; each quarter after compounds once
+            if (age > 0)
+                price = compound_one(price, rate);
+        }
         const research_accrual row = compute_accrual(w, nation, rb, &sim, treasury, p, price);
         if (row.rp_milli <= 0)
             break;

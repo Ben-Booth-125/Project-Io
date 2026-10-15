@@ -1100,7 +1100,7 @@ economy = {
         -- R4, 16 seeds): the median nation has no firms of its own, so it grows only
         -- through the research line, ~0.5% a year from 1970. Faster prices slow it.
         price_growth_per_year       = 0.005, -- nominal, compounded quarterly: 1.49 by 2040
-        rp_per_economy_unit         = 0.03,  -- RP a quarter per credit of home firms' latest filed income
+        rp_per_economy_unit         = 0.03,  -- RP a quarter per credit of home firms' previous quarter's filed income
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
