@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*163 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 31 chrome.*
+*164 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 32 chrome.*
 
 ---
 
@@ -2372,16 +2372,27 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536).
 
-### `chrome.spectate_cli` — Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do.
+### `chrome.spectate_cli` — Command line. One of the two routes into spectator mode for a human, both at the start of a session; the other is the nation selection screen's Spectate press (chrome.seat_spectate). Before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do.
 
 **Press.** Launch with `ProjectIo --spectate`. Composes with --autostart-play, --autostart-windowed, --autostart, --load and --host-agent.
 
 **Valid when:**
-- Set at launch only. There is no in-game control that enters or leaves spectate — see expected_output.
+- Set at the start of a session only (this flag, or the seat screen's Spectate press). There is no in-game control that enters or leaves spectate — see expected_output.
 
 **Expected output.** Opens the session with NOBODY SEATED (AI_OPPONENT.md § 10i): corp_ai_params::spectating is true for every economy tick, so the scored-utility layer evaluates the corp at world::player_entity on the same staggered cadence as every rival, and that field degrades to a camera and ledger anchor carrying no ownership meaning. The watcher sees a full field of seven-plus corporations all playing flat out. Also unlocks the spectate-only God view checkbox in the system menu (chrome.sysmenu_god_view), which is rendered only while this flag is set. ENTRY AT START AND ONLY AT START: § 10i removes the standing prohibition's SUBJECT rather than excepting the rule, which is a property of the whole session — a mid-run flip would change, halfway through, which corps the scorer may legally act on, so no control clears it. Off by default: an unspectated session is unchanged, which tools/verify/spectator_determinism.cpp asserts as its load-bearing property.
 
 **Reason to select.** To WATCH the AI play rather than play against it — see what strategies the scored-utility layer actually produces, and whether coalitions brake a runaway leader (AI_OPPONENT.md § Where restraint comes from), which is a question no seated session can answer because a seated corp is excluded from the scorer.
+
+### `chrome.seat_spectate` — The nation selection screen at Begin (STARTUP.md § The seat): the Spectate button under the screen's header, always shown, beside the line that explains it. The screen's third answer to 'which nation are you?' - none.
+
+**Press.** Press Spectate. No row need be pressed first. The launch-time equivalent is `ProjectIo --spectate` (chrome.spectate_cli).
+
+**Valid when:**
+- The nation selection screen is open: the world is built and settled, and no seat has been taken. The press is pre-play, so the mode is still entered at the start of the session (AI_OPPONENT.md § 10i).
+
+**Expected output.** Play opens on the generated world with NOBODY SEATED: spectating is set for the whole session, exactly as --spectate sets it, and no take_seat is issued (gameplay.take_seat is not called). The scored-utility layer evaluates every corporation; world::player_entity, if the generator left one, is a camera and ledger anchor only. The spectate-only God view checkbox (chrome.sysmenu_god_view) is available. A History ledger the card's link opened closes. The log prints `[seat] Spectate: the world opens with nobody seated`.
+
+**Reason to select.** To watch the world just generated play itself, having read its nations on the card, without relaunching under --spectate.
 
 ### `chrome.epoch_cli` — Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920).
 

@@ -19,6 +19,9 @@
 --       ROW KEEPS ITS FULL CARD (Ben, 2026-10-15, live click: the card used to
 --       vanish for the selected nation): the briefing and Confirm sit below
 --       the card, so the _briefing capture shows all seven parts too.
+--   N6  (BL-1334, spectate from seat screen) the screen's Spectate press
+--       opens play with the session spectating and no seat taken; run LAST,
+--       since spectating is a property of the whole session.
 --
 -- The PNGs are the product: look at them. Determinism: frames, never sleeps.
 
@@ -105,3 +108,16 @@ end
 if not any_rev then
   print("[nation_select] NOTE: no surveyed world carried a revolution tag")
 end
+
+-- N6: Spectate, the third answer -- no nation. Last, on the final world.
+verify.show_seat_screen(true)
+verify.frames(2)
+verify.capture("nation_select_spectate_button")
+local in_game, spectating, player = verify.seat_spectate()
+verify.frames(3)
+print(string.format("[nation_select] spectate: in_game %s spectating %s player_entity %d",
+                    tostring(in_game), tostring(spectating), player))
+verify.expect(in_game, "spectate: the Spectate press opens play")
+verify.expect(spectating, "spectate: the session is spectating")
+verify.expect(not select(1, verify.seat_state()), "spectate: the seat screen has closed")
+verify.capture("nation_select_spectate_in_game")
