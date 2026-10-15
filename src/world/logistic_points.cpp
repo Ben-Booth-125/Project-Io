@@ -339,6 +339,42 @@ lp_tick resolve_logistic_points(world& w)
     return out;
 }
 
+float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    const auto nit = w.tile_to_nation.find(tile);
+    if (tit == w.tiles.end() || nit == w.tile_to_nation.end())
+        return 0.0f;
+    const entity_id nation = nit->second, body = tit->second.body;
+    float cov = 0.0f;
+    for (int n = 0; n < static_cast<int>(lp_network_count); ++n)
+    {
+        const auto k = std::make_tuple(nation, n, body);
+        auto fit = memo.fields.find(k);
+        if (fit == memo.fields.end())
+        {
+            std::vector<entity_id> seeds;
+            for (const auto& [bid, b] : w.buildings)
+            {
+                lp_network net;
+                if (!lp_source_network(b.type, net) || static_cast<int>(net) != n || !lp_source_running(b))
+                    continue;
+                const auto st = w.tiles.find(b.tile);
+                const auto sn = w.tile_to_nation.find(b.tile);
+                if (st != w.tiles.end() && st->second.body == body && sn != w.tile_to_nation.end()
+                    && sn->second == nation)
+                    seeds.push_back(b.tile);
+            }
+            // lp_distance_field sorts its seeds, so the unordered walk cannot matter.
+            fit = memo.fields.emplace(k, lp_distance_field(w, body, static_cast<lp_network>(n), seeds)).first;
+        }
+        const auto dit = fit->second.find(tile);
+        if (dit != fit->second.end())
+            cov = std::max(cov, lp_reach(static_cast<lp_network>(n), dit->second));
+    }
+    return cov;
+}
+
 // ---------------------------------------------------------------------------
 // Generation
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 #include "corp_ai.hpp"
+#include "logistic_points.hpp" // BL-1309: lp_coverage_at
 
 #include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "construction.hpp"   // construction_capex (BL-1066: the scorer prices a build as the gate does)
@@ -304,6 +305,10 @@ struct candidate
     float                 spend  = 0.0f; ///< Committed capex (build cost / survey cost).
     corp_decision_reason  reason = corp_decision_reason::best_build;
     corp_priority_bucket  bucket = corp_priority_bucket::nice_to_have;
+    /// BL-1309 grant (AI_OPPONENT.md § 11, Ben 2026-10-15): this producing build
+    /// stands beyond its host nation's Logistic Point reach, so it is scored and
+    /// paid WITH a logistics hub beside it, built right after it applies.
+    bool                  needs_source = false;
 };
 
 /// The BUDGET CLASS a candidate competes in — and, by construction, the only
@@ -1234,6 +1239,23 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             continue;
         report.corps_evaluated.push_back(corp);
 
+        // BL-1309 grant (AI_OPPONENT.md § 11, Ben 2026-10-15): a producing build
+        // beyond its host nation's Logistic Point reach is scored with the capex of
+        // the hub that would bring it into reach, and that hub is built with it.
+        // Never for the player's corporation or its nation's champion.
+        lp_reach_memo lp_memo;
+        const entity_id lp_player_nation = player_nation(w);
+        const bool lp_may_source = corp != w.player_entity && !cc.is_player
+            && (lp_player_nation == null_entity || champion_of(w, lp_player_nation) != corp);
+        const auto source_capex = [&](entity_id tile) -> float {
+            if (!lp_may_source || w.tile_to_nation.find(tile) == w.tile_to_nation.end())
+                return 0.0f;
+            if (lp_coverage_at(w, lp_memo, tile) >= 1.0f)
+                return 0.0f;
+            return construction_capex(w, reg, tile, building_type::inland_logistics_hub,
+                                      resource_type::iron_ore);
+        };
+
         // BL-1187: the producer index describes the buildings when it was
         // built; an earlier corp this tick may have switched, idled, resumed
         // or built since. Forget it (the haul memo stays — markets and nodes
@@ -1489,8 +1511,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // nobody wanted to pay that. Measured distribution over one
                 // industrial warm start, 15,549 build candidates — quadratic
                 // median 13.54 / max 1884.33, linear median 0.106 / max 2.81.
-                c.score  = (net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
-                c.spend  = capex;
+                {
+                    // BL-1309: the hub that brings an out-of-reach site into reach.
+                    const float src = source_capex(s.tile);
+                    c.needs_source  = src > 0.0f;
+                    const float all = capex + src;
+                    c.score  = (net / all) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                    c.spend  = all;
+                }
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
                 if (held)
@@ -1810,8 +1838,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // Same curve as the extraction candidate, deliberately: BL-417
                     // step 2 was taken ONCE for both rather than forked here. See
                     // that candidate for the full reasoning.
-                    c.score  = (net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
-                    c.spend  = capex;
+                    {
+                        // BL-1309: the hub that brings an out-of-reach plant into reach.
+                        const float src = source_capex(tile);
+                        c.needs_source  = src > 0.0f;
+                        const float all = capex + src;
+                        c.score  = (net / all) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                        c.spend  = all;
+                    }
                     c.reason = corp_decision_reason::best_build;
                     c.bucket = bucket_for_reason(c.reason);
                     cands.push_back(c);
@@ -3201,6 +3235,52 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             else
                 committed += c.spend;
             if (is_build)  ++builds;
+            // BL-1309 grant: the hub the build was scored with, beside it — on its
+            // tile, else the first land neighbour (N, E, S, W) on the same nation's
+            // ground that takes it — through the same legal verb, paid by the same
+            // book. Only where the build is still out of reach once it stands.
+            if (is_build && c.needs_source && built != null_entity && lp_may_source
+                && lp_coverage_at(w, lp_memo, c.cmd.tile) < 1.0f)
+            {
+                std::vector<entity_id> spots = {c.cmd.tile};
+                const auto tt = w.tiles.find(c.cmd.tile);
+                const auto tn = w.tile_to_nation.find(c.cmd.tile);
+                if (tt != w.tiles.end() && tn != w.tile_to_nation.end())
+                {
+                    const auto bit = w.bodies.find(tt->second.body);
+                    if (bit != w.bodies.end())
+                    {
+                        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+                        const int x = tt->second.grid_x, y = tt->second.grid_y;
+                        const std::vector<entity_id>& grid = body_tile_grid(w, tt->second.body);
+                        const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                             y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+                        for (const int ci : cand)
+                        {
+                            if (ci < 0 || static_cast<std::size_t>(ci) >= grid.size()) continue;
+                            const entity_id nt = grid[static_cast<std::size_t>(ci)];
+                            const auto nn = w.tile_to_nation.find(nt);
+                            if (nt != null_entity && nn != w.tile_to_nation.end() && nn->second == tn->second)
+                                spots.push_back(nt);
+                        }
+                    }
+                }
+                for (const entity_id spot : spots)
+                {
+                    corp_command hc;
+                    hc.tick = c.cmd.tick; hc.corp = c.cmd.corp; hc.as_nation = c.cmd.as_nation;
+                    hc.verb = corp_verb::build; hc.type = building_type::inland_logistics_hub; hc.tile = spot;
+                    entity_id hub = null_entity;
+                    if (apply_corp_command(w, reg, hc, &hub) == corp_command_result::applied)
+                    {
+                        lp_memo.clear();
+                        agency_event hev{};
+                        hev.corp = corp; hev.building = hub; hev.what = agency_event::kind::built; hev.tile = spot;
+                        report.agency_events.push_back(hev);
+                        break;
+                    }
+                }
+            }
             if (is_dial)   ++(is_state_dial ? state_dials : dials);
 
             if (is_survey) ++surveys;
