@@ -885,6 +885,27 @@
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "title": "Spectator GDP and output charts over the whole run, per nation",
    "design": "SPRINT 55 (Ben, 2026-10-15). Ben chose GDP and output charts. Needs a question_log entry and a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-15",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-15); filed by Claude",
+   "id": "BL-1334",
+   "short_name": "SPECTATE_FROM_SEAT_SCREEN",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [],
+   "files": [
+    "src/ui/seat_screen.cpp"
+   ],
+   "title": "Nation selection offers Spectate: open the generated world with nobody seated",
+   "design": "SPRINT 55 (Ben, 2026-10-15): spectate UI in the nation-selection step of generation. Today spectating is only the --spectate flag; the seat screen gains a Spectate choice beside Confirm that calls spectate_session(). Live click required."
   }
  ]
 }
