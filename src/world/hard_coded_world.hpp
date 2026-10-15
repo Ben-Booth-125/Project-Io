@@ -312,8 +312,15 @@ struct world_params
     /// RE-LADDERED (sprint 53 economy pass, after BL-1301 and the state
     /// founding's nearest-feed order; full tier, --ticks 50) -- rate: G1 t50,
     /// G1b: 30: 83.8, 6.6 | 40: 84.4, 6.7 | 50: 85.1, 7.2 | 60: 85.1, 6.6.
-    /// 50 -- 0.05 points per unit -- is the lowest rung that holds the target.
-    int64_t industry_points_per_1000_treasury_units = 50;
+    /// 50 -- 0.05 points per unit -- was the lowest rung that held the target.
+    /// RE-LADDERED AGAIN (2026-10-15) on main with railways, state ports, the
+    /// food-placement rule and BL-1309's one-pool logistics (full tier,
+    /// --ticks 50) -- rate: G1 t50, G1b:
+    ///   1: 86.2, 3.5 | 10: 85.8, 4.4 | 30: 82.1, 6.0 | 50: 84.2, 5.2 |
+    ///   80: 80.1, 5.7.
+    /// Lower is better on this world; 1 -- the floor history_sim accepts -- is
+    /// the lowest rung and holds both targets.
+    int64_t industry_points_per_1000_treasury_units = 1;
 
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
 
