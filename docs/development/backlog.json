@@ -578,9 +578,7 @@
     "tools/verify/nation_tech_harness.cpp"
    ],
    "title": "An AI nation fills its research queue one frontier node at a time, by its scorer",
-   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274. SPRINT 55 (2026-10-15): restored. The BL-1325 headless 2040 run showed no nation ever queues research (zero tech in 80 years); the grant (AI_OPPONENT.md § 11, Ben 2026-10-10) already covers it.",
-   "cancelled": "2026-10-15",
-   "cancel_reason": "Ben, 2026-10-15: dropped at the sprint 53 close; reinvent if needed"
+   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274. SPRINT 55 (2026-10-15): restored. The BL-1325 headless 2040 run showed no nation ever queues research (zero tech in 80 years); the grant (AI_OPPONENT.md § 11, Ben 2026-10-10) already covers it."
   },
   {
    "status": "proposed",
