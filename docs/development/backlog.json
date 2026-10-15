@@ -313,35 +313,6 @@
    "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware. WORK: a check (a non-verify timing mode of the app, since --verify bakes synchronously and would measure the wrong thing) that reports, on the machine it runs on: the home-body pre-bake time added to generation (budget 15 s); whether any zoom or pan step on the home body shows a stand-in (budget none); time until a first visit to another body is sharp under the view (budget 2 s); frame time at every rung (budget 16.7 ms); time from a building placed to its ground re-baked (budget 1 s). Prints PASS/FAIL per budget with the number. Wrapped as a skill only with Ben's permission (CLAUDE.md § Tool creation is skill creation)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "requires": [
-    "BL-1296"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "category": "Logistics",
-   "priority": "A",
-   "difficulty": 4,
-   "id": "BL-1255",
-   "short_name": "RAIL_RUNG",
-   "author": "Ben (2026-10-10: \"I don't see any rails at all\" — backlog for sprint 52, option A)",
-   "title": "Railways: a network of its own, entered at stations; laid by works-lean realms in Industrialisation; built by the player",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "src/world/components.hpp",
-    "src/world/logistics.cpp",
-    "src/world/history_sim.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/corp_command.cpp",
-    "src/ui/",
-    "docs/ai/ACTIONS.json"
-   ],
-   "design": "RE-DESIGNED (Ben, 2026-10-13, superseding \"the road ladder's next rung\"): LOGISTICS.md § 4c, INDUSTRIALISATION.md (the rail sink, who lays rail), PRODUCTION.md § Infrastructure buildings (the station), RENDERING.md (rail surface). Its own network; goods board and leave only at stations; a haul = road leg + rail leg + road leg; the rail price set by measurement against the haulage readings (long land hauls shift to rail, short stay on roads); stations = port-shaped tile buildings on a city tile touching a line (zero staff, build cost, upkeep); state industry in majors, background firms in minors; generation: works-lean realms spend treasury laying track on their busiest corridors from the city with a station per city served; the PLAYER builds stations and lays track THIS SPRINT (Ben) as its nation's verbs - ACTIONS.json entries, seam validation. Interdiction cuts rail as roads. World-mover: measure haulage and market_viability; re-bless with Ben's go. Depends on BL-1296 (state industry) for ownership in majors. LIVE CLICK 2026-10-15: rail is built like anything else - select a tile, pick track/station from the buildings list (LOGISTICS.md § 4c). Live click 2026-10-15: station row PASSED; track row restyle owed (like road rows, rail glyph boxed left of the cr cost; the \"already has an equal or...\" refusal wraps to two lines)."
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 51,
@@ -361,35 +332,6 @@
     "src/ui/body_surface_canvas.cpp"
    ],
    "design": "Seen in before and after captures of BL-1257 and BL-1292 (pre-existing): the anchor rings (and their dark backing) are not clipped to the canvas rect. Clip them like every other canvas pass; capture rung 1 under Throughput with chrome in frame."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-08",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "author": "Ben (the direction, 2026-10-08); Claude (the open calls)",
-   "id": "BL-1245",
-   "short_name": "PLAYER_IS_A_NATION",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 5,
-   "title": "The player is a nation with a space programme, not a corporation holding a seat",
-   "authority_doc": "docs/CONCEPT.md",
-   "files": [
-    "docs/CONCEPT.md",
-    "docs/ui/STARTUP.md",
-    "docs/politics/NATIONS.md",
-    "docs/ai/AI_OPPONENT.md",
-    "docs/MANUAL.md",
-    "docs/SYSTEMS.md",
-    "docs/generation/NATION_GENERATION.md",
-    "docs/generation/CORPORATION_GENERATION.md",
-    "src/world/space_programme.cpp"
-   ],
-   "design": "DESIGNED (Ben, 2026-10-10; NR-1020 resolved): the player is a MAJOR NATION operating its CHAMPION corporation. Written into CONCEPT.md § Player identity (identity; design test: what the NATION can field / must answer to - other nations, its population, its corporations; territorial existence), NATIONS.md (§ What a nation is; § Major and minor nations; the player's nation is never scored), GLOSSARY (Major nation, Minor nation, Champion), SYSTEMS, MANUAL § 1, ROADMAP, HISTORY, MILITARY § The muster interface (the nation musters and buys equipment on the order book, NR-1028), AI_OPPONENT § 11 (the narrowing; AI acting toward a human nation granted, NR-1026), CORPORATION_GENERATION (one specialist per major; the player's corp is the champion), STARTUP § The seat. The major target IS this item's 'how many nations run a space programme' parameter (NR-1027). The build is split into BL-1278..BL-1284. Original direction (Ben, 2026-10-08, option A): the player becomes a nation with a space programme, reversing NR-885."
   },
   {
    "status": "proposed",
@@ -635,103 +577,6 @@
   },
   {
    "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
-   "id": "BL-1278",
-   "short_name": "NATION_COUNT_TARGETS",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 5,
-   "authority_doc": "docs/generation/NATION_GENERATION.md",
-   "requires": [
-    "BL-1279"
-   ],
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/hard_coded_world.hpp",
-    "src/world/nation_generation.cpp",
-    "src/world/finish_campaign_world.cpp",
-    "src/core/save_game.cpp"
-   ],
-   "title": "Hit the total and major nation targets every time, by a lean and then in-world reconciliation",
-   "design": "DIRECTION RULED (Ben, 2026-10-10, option C; always hit): NATION_GENERATION.md § The nation count is a target. Total <= 40, major 1..6, total >= major. Stage 1, the lean: the total sets placement seed density; the major target leans charter-capital concentration. Stage 2, reconciliation by history verbs: conquest/absorption (too many nations), a subject freed or a province seceding (too few), a national champion chartered in the richest championless minor (too few majors), a cross-border buy-out (too many majors). OPEN before build: which span runs reconciliation; how the richest minor is read; buy-out pricing; how the merge pass's min-territory stop composes with a target. MEASURE FIRST: the natural total and major counts across the 16 library seeds (living polities run ~40-115, so the 40 cap reconciles on nearly every seed). Gate: every library seed lands on both targets across a grid of target pairs, each correction recorded as a history event. RULED (Ben, 2026-10-11): reconciliation runs in the closing rounds of Industrialisation, before the polity fold (NATION_GENERATION.md). Still open: richest-minor reading, buy-out pricing, the min-territory stop. RULED (Ben, 2026-10-11): richest minor = most industry points on its ground; buy-out = the richest champion buys the poorest major's specialist whole at its charter price; the min-territory floor runs first and reconciliation closes the remaining gap (NATION_GENERATION.md § The nation count is a target). No open calls remain. BUILD CALLS (Ben, 2026-10-11, on the build plan): the size floor moves into the history as closing-round absorptions; the total is reconciled in Industrialisation's closing rounds; the majors are reconciled after the landscape search with events dated back; a minor that cannot afford its champion gets a state charter (treasury makes up the gap); unset targets keep the natural count, uncapped; the total's lean acts on conquest appetite and secession pressure. Targets ride world_params + the save (version bump), 0 = unset."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
-   "id": "BL-1279",
-   "short_name": "WIZARD_SETUP_ROUND",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 3,
-   "authority_doc": "docs/ui/STARTUP.md",
-   "requires": [],
-   "files": [
-    "src/ui/generation_screen.cpp",
-    "src/core/app.hpp"
-   ],
-   "title": "A setup round before Life, carrying the total and major nation targets",
-   "design": "RULED (Ben, 2026-10-10): STARTUP.md § Rounds, A SETUP ROUND PRECEDES LIFE. It takes the two nation targets before the Life round builds the world. OPEN: what else it holds (Ben: 'along with the existing choices at each phase' - whether per-round leans move here or stay on their rounds), and where it sits against System. The next design step of sprint 53. RULED (Ben, 2026-10-11): the setup round sits between System and Life and holds the two targets plus the seed (entry, Roll, Copy) and the abundance radio, which leave the main menu; per-round leans stay on their rounds (STARTUP.md § Rounds). The ACTIONS.json chrome.menu_*_seed entries move with the controls. OPEN: what Quick Start builds on (NR-1036). LIVE CLICK 2026-10-15: seed moves to the Life round, hidden from the player; Reroll/Back/Next higher so no round scrolls (STARTUP.md). Ben's live click PASSED 2026-10-15 (seed hidden, rounds fit)."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
-   "id": "BL-1280",
-   "short_name": "LIFE_ROUND_2D_MAP",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 3,
-   "authority_doc": "docs/ui/STARTUP.md",
-   "requires": [],
-   "files": [
-    "src/ui/generation_preview.cpp",
-    "src/ui/generation_screen.cpp"
-   ],
-   "title": "Retire the wizard globe; the Life round draws the homeworld on the pass rounds' 2D map",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The Life map. The globe (48-slice render) is retired; System keeps its system drawing; the Life round draws the Life-gate world on the 2D map the pass rounds use, which holds through the Culture wait. Retire the globe code and its captures; update any golden or verify script that names it. OPEN: whether the Life map may pan/zoom for reading (no steering input either way). Needs a live click. BUILT AND MERGED (e3f049d7, cold-reviewed with a fix round: one frame for the Life and Culture maps at any window size, wait note on Culture); life_to_people.lua passes; Ben's live click PASSED 2026-10-11. Ready to archive at sprint close."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
-   "id": "BL-1281",
-   "short_name": "NATION_SELECTION_SCREEN",
-   "category": "UI",
-   "priority": "S",
-   "difficulty": 4,
-   "authority_doc": "docs/ui/STARTUP.md",
-   "requires": [
-    "BL-1283"
-   ],
-   "files": [
-    "docs/ai/ACTIONS.json",
-    "docs/ui/question_log.json"
-   ],
-   "title": "The seat becomes a nation selection screen: majors only, a six-part nation card, take_seat names a major",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card (seven parts; the seventh, history, is BL-1295): territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Shaped for up to six humans, one major each; the prototype seats one (NR-1025). Needs a live click. LIVE CLICK 2026-10-15: the card shows full nation information only when the nation is NOT selected - inverted; fix. Ben's live click PASSED 2026-10-15."
-  },
-  {
-   "status": "designed",
    "glyph": "✓",
    "sprint": 53,
    "written": "2026-10-10",
@@ -753,29 +598,6 @@
    ],
    "title": "Minor nations run shallow: treasury, budget weights and tariffs on a slow cadence, no law, no specialist",
    "design": "DESIGNED (Ben, 2026-10-10): NATIONS.md § Major and minor nations. A minor keeps treasury, budget weights, tariffs and garrisons; is re-scored on a slower cadence than a major; enacts no law beyond what generation left it; hosts no specialist (background firms stay - NR-1027). Determinism: the cadence keys on the ascending-id set, like the major stagger."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
-   "id": "BL-1283",
-   "short_name": "ONE_CHAMPION_PER_MAJOR",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 4,
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "requires": [
-    "BL-1278"
-   ],
-   "files": [
-    "src/world/corporation_generation.cpp"
-   ],
-   "title": "The specialist roster is the set of champions: exactly one per major nation",
-   "design": "DESIGNED (Ben, 2026-10-10): CORPORATION_GENERATION.md § Pass 1, AMENDED FORWARD 2026-10-10. One specialist per major, chartered in its richest affording centre; none in a minor; other affording centres spend on background firms. Overturns the fixed count of 8 and the 2026-09-17 multi-seat nation rule. Gate: market-viability and the 16-seed sweep - fewer specialists moves the economy, so it waits on the shelf/trade landing and takes a re-bless with Ben's go. BUILD NOTE (2026-10-11): the after-search major reconciliation (BL-1278) and one-champion-per-major share finish_campaign_world; build them as one lane."
   },
   {
    "status": "proposed",
@@ -802,194 +624,6 @@
    "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys their equipment as a real buyer on the order book, NR-1028); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry. RULED (Ben, 2026-10-11): the verb set is everything the scorer sets - budget weights, import tariffs, law, muster - no more, no less (NATIONS.md § What a nation does each tick). The nation commissions a military base and pays a corporation to build it, owning the result (MILITARY.md § The muster interface). OPEN: which corporation takes a commission and its price; the elimination check."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1286",
-   "short_name": "HISTORY_PATTERN_DETECTORS",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 4,
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "requires": [],
-   "files": [
-    "src/world/era_timelapse.hpp",
-    "src/world/history_sim.cpp"
-   ],
-   "title": "Detectors for the five history patterns, measured across the 16 library seeds before any target is built",
-   "design": "DESIGNED (Ben, 2026-10-10): GENERATION_STRATEGY.md § History patterns. One predicate per pattern over the history record (lapse_event + span records), naming the polities it touched; emits pattern tags carried polity -> nation (NATION_GENERATION's fold). FIRST: measure how often each pattern already happens across the 16 library seeds, unforced - it sets each lean's size and whether reconciliation has much to do. The detectors are also the gates of BL-1287, BL-1288, BL-1289. MEASURED (2026-10-11, tools/verify/history_patterns.cpp over the 16 library seeds, provisional thresholds, main 54d462a0): rise and fall 0/16 (largest realm peaks at 7.6-22.6% of held regions, none near the 50% hegemony cap; 9/16 peak in the second half of Empires; none halves with a successor breaking from it); late culture 0/16 (the most isolated founding culture has no living realm at the Empires close on 8/16 seeds and is never bound in Exploration; Exploration binds 0-5 of 28-75 cultures); world war 0/16 (at most 3 of the six most populous realms touched by conflict in any 30-year window; total population never falls in the span); civil war 16/16 under the loose reading (a successor with a quarter of its parent fights it within 50 years: 4-175 per seed - the existing secession already makes it, minus the civilian famine/displacement mechanism); revolution 0/16 (the Industrialisation span records no split at all). BL-1278 reading: nations 20-69 (9/16 over 40), living polities 37-95, nations with a planned specialist 3-11 (3/16 over 6). The src/ detectors and tags remain this item's build. RULED (Ben, 2026-10-11): the detectors take the readings written into CIVILISATION.md (rise size floor, civil war reading) and EXPLORATION.md (late culture at the Culture close). src HALF BUILT AND MERGED (757cbad4): src/world/history_pattern_detectors.*, tags folded onto the report with dead realms passing theirs on; full tier: rise and fall 0/16, late culture 1/16, world war 0/16, civil war 16/16, revolution 0/16 (the targets are BL-1287/1288/1289). Follow-up: one source for the civil-war thresholds shared by sim and detector."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1287",
-   "short_name": "RISE_AND_FALL_TARGET",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 5,
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "requires": [
-    "BL-1286"
-   ],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "title": "The rise and fall: one realm grows largest through successive victories early in Empires and breaks down within a window, every world",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS TARGETED). Overturns 'never scheduled' for one realm's window only; the fall is still breakdown + secession. OPEN: the window's span and how 'early' is read; lean then reconciliation verbs; the non-hegemony cap (NR-1034). RULED (Ben, 2026-10-11): peak at a floor of 25-35% of held regions (set in band by measurement), under the 50% cap; region share is the measure (CIVILISATION.md). Unforced peak 8-23%. RULED (Ben, 2026-10-12): the realm largest at 200 BCE rises; peaks by 400 CE; its share halves within 300 years of the peak; backstop = the lean escalates in bounded recorded steps until the detector passes (CIVILISATION.md)."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1288",
-   "short_name": "LATE_CULTURE_TARGET",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 5,
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "requires": [
-    "BL-1286"
-   ],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "title": "The late culture: one distant culture develops slower from its isolation and is colonised in Exploration, every world",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): EXPLORATION.md § A colony is a subject (THE LATE CULTURE IS TARGETED). A development lag read from remoteness, carried from the Culture round; bound by the ordinary subjection verbs. OPEN: the lag mechanism (no development-lag mechanism exists today), which culture is chosen (NR-1034), reconciliation if the lean misses. RULED (Ben, 2026-10-11): chosen at the Culture close (most remote by reach); the same isolation that lags its development slows its conquest, so it reaches Exploration holding a realm (EXPLORATION.md). Unforced, that culture has no realm by 1200 on 8/16 seeds. RULED (Ben, 2026-10-11): the lag is development diffusing by contact in proportion to reach; every culture feels it, the most remote receives least (EXPLORATION.md). RULED (Ben, 2026-10-12): backstop for every target pattern = the lean escalates in bounded recorded steps until the detector passes (GENERATION_STRATEGY.md)."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1289",
-   "short_name": "WORLD_WAR_TARGET",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 5,
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "requires": [
-    "BL-1286"
-   ],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "title": "A world war in every world: population, industry, roads and ports, and treasuries lost, and the world redevelops before 1960",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § A world war in every world. Overturns 'permitted, never forced'. Builds on the PROPOSED mutual-defence spread (the clause exists in code; no world-war, conscript or refugee code exists). OPEN: razing industry and capital is not designed; war debt; redevelopment pace so 1960 opens on a recovery; Alarm interplay. Moves the 1960 economy: re-bless with Ben's go. RULED (Ben, 2026-10-11): fought inside a fixed 1900-1930 window; razing only on regions fought over (industry_points, port_stock_q cut, roads through them demoted a tier); treasuries drained to no lower than zero, no debt carried into 1960 (INDUSTRIALISATION.md § A world war in every world). RULED (Ben, 2026-10-12): if nothing sparks a general war by the window, a contest for a subject between the two largest powers fires inside it and mutual defence spreads it; backstop escalates in bounded recorded steps (INDUSTRIALISATION.md)."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1290",
-   "short_name": "CIVIL_WAR_LEAN",
-   "category": "Generation",
-   "priority": "B",
-   "difficulty": 4,
-   "authority_doc": "docs/generation/MILITARY_HISTORY.md",
-   "requires": [
-    "BL-1286"
-   ],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "title": "Civil war as a lean: a splitting realm's halves fight; soldiers die, and a famine and displacement mechanism takes civilians",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md and MILITARY_HISTORY.md § Armies are distinct from population. Secession gains a fighting step; civilian deaths only via a separately authored famine/displacement mechanism (the door the 2026-09-09 ruling left open). OPEN: the mechanism itself; guard against the empty-region failure. RULED (Ben, 2026-10-11): the loose reading counts and is already met 16/16 (successor >= 1/4 of parent, fighting within 50 y; CIVILISATION.md). The build is ONLY the civilian famine/displacement mechanism. RULED (Ben, 2026-10-12): contested regions lose a famine share while fought over; a further share flees to safe regions of the same people (conserved); bounded per year, recorded (MILITARY_HISTORY.md). BUILT AND MERGED (757cbad4, cold-reviewed clean; exploration pin re-pinned): famine 10/yr, flight 15/yr per mille, capped 150/round, flight bounded by the destination's room (NR-1043). Gates on main: world_determinism PASS, history_sim_harness R3a2/R3a3 only, exploration ALL PASS after re-pin, realm_names PASS, player_seed_sweep guard PASS, market_viability G1 93.9 / t50 85.7 / G1b 5.1 / G2 109.4 / G3 95.2. Archive at close."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1294",
-   "short_name": "REVOLUTION_LEAN",
-   "category": "Generation",
-   "priority": "B",
-   "difficulty": 4,
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "requires": [
-    "BL-1286"
-   ],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "title": "Revolution as a lean in Industrialisation: post-Exploration disparity between a nation's cities breeds a splinter that can take the whole nation",
-   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § Revolution. Off the post-Exploration city disparity (inequality stays between nations and cities, never households). Overturns 'no regime reset' for this span. OPEN: the splinter verb, what a takeover changes (regime field, name, polity id), its tag. RULED (Ben, 2026-10-12): a takeover keeps the polity and ground; a new regime and a newly coined name; recorded as a revolution event (INDUSTRIALISATION.md). BUILT AND MERGED (06b115f8): Gini city-disparity bar 600 (3+ cities), pressure 6000, one takeover per realm per span; 3/16 seeds (5 revolutions). New name coined in the realm's tongue; old name read from the Exploration record (no saved former-name table - earlier Industrialisation events print the new name). polity::regime is a counter, not yet the nation's Political system field. Follow-ups: BL-1301 (a name moves the economy)."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
-   "id": "BL-1295",
-   "short_name": "NATION_CARD_HISTORY",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 3,
-   "authority_doc": "docs/ui/STARTUP.md",
-   "requires": [
-    "BL-1281",
-    "BL-1286"
-   ],
-   "files": [
-    "docs/ui/question_log.json"
-   ],
-   "title": "The nation card's history: pattern tags, a short key-event timeline, and a link to the History ledger filtered to the nation",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat, the card's seventh item. Reads BL-1286's tags and the lapse events of the polities that folded into the nation. Needs a live click. Ben's live click PASSED 2026-10-15."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-11",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-11, the state-industry form); filed by Claude",
-   "id": "BL-1296",
-   "short_name": "STATE_INDUSTRY",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 5,
-   "authority_doc": "docs/politics/NATIONS.md",
-   "requires": [
-    "BL-1283"
-   ],
-   "files": [
-    "src/world/components.hpp",
-    "src/world/corporation_generation.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/corp_ai.cpp",
-    "src/core/world_save.cpp"
-   ],
-   "title": "State industry: a major owns its strategic-sector buildings outright, the treasury runs their books, and the player runs them beside the champion",
-   "design": "DESIGNED (Ben, 2026-10-11): NATIONS.md § State industry; GLOSSARY State/Private industry; CONCEPT § Player identity; AI_OPPONENT.md § 11 (rival state industry under the champion layer, granted). Buildings owned by a major with no corporation between; sectors energy, steel, arms, transport infrastructure, space; majors only; sales/costs through the treasury (a second market exception beside military equipment); fixed for the prototype (nationalise/privatise later); player runs its state industry and its champion. OPEN before build: how generation hands a major its state buildings (re-owning strategic-sector buildings already placed on its ground vs a pass of its own, and how the champion and background firms are kept whole); the building owner field and save format; treasury solvency when a state building loses money; which verbs (ACTIONS.json) the player gets over a state building - the corp verbs, presumably. Moves the 1960 economy: re-bless with Ben's go. BUILD CALLS RULED (Ben, 2026-10-13, NATIONS.md § State industry): handed over at the fold - background firms' strategic-sector buildings on a major's ground pass to the nation (firms keep the rest; the champion keeps all of its own); a losing state building idles until the treasury can pay, never debt; the player gets a corporation's building verbs (build, recipe, workforce dial, sell) paid from the treasury; rail and stations are state industry (track: treasury + steel per tile, upkeep per tile). No open calls."
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 53,
@@ -1011,28 +645,6 @@
    ],
    "title": "Without the trees, the sphere-of-claim test admits ~6x the pairs it did: redesign it so Industrialisation subjections return toward baseline and Exploration's recover",
    "design": "MEASURED (2026-10-11, the subjection census at c05844d9 vs BL-1272 at the 90th-percentile sea-legs floor, 16 library seeds): with the holder share restored (9.0% vs 9.9%), Industrialisation still forms 96 subjections against the trees' 21 because the sphere-of-claim test (a native is blocked when one of the arriver's sphere partners already met it) passes 0.44% of free-and-funded pairs vs 0.076%; Exploration forms 56 vs 169 (sphere pass 4.5% vs 1.85%, but far fewer arrivers). The new arrivers are outlying coastal polities whose contacts their partners never shared. OPEN (design session): what the sphere test should read - partners' contact, the arriver's own reach, the native's contact with ANY great power - and how Exploration recovers its subjections. Probe: build_gen/verify/subjection_census.cpp on the BL-1272 agent worktree; save it as a committed tool when this is built. A world-mover."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-11",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-11, on the state-charter shortfall); filed by Claude",
-   "id": "BL-1298",
-   "short_name": "HISTORY_BANKS_MORE",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 4,
-   "authority_doc": "docs/generation/NATION_GENERATION.md",
-   "requires": [],
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp"
-   ],
-   "title": "Every nation opens with real credits: the history banks more across the spans, so no nation opens near zero or in debt",
-   "design": "RULED (Ben, 2026-10-11): NATION_GENERATION.md § Pass 7. The median nation opens on 0.41 credits (22 of 38 under one, reference seed, NR-912) at the 0.01 per-mille conversion, so state charters (BL-1278) go unpaid - treasuries covered 3,108 of 7,028 credits owed across the majors grid. Lever: polities earn and keep more across the spans (not a bigger conversion, not a handoff reserve); no pre-game debt. OPEN, by measurement: which earnings (levy, tribute, trade, works) and how much; the target opening distribution (e.g. median nation >= N quarters of levy); its effect on garrison sizing and contract funding, which scale off treasury. A world-mover: measure, re-bless with Ben's go. Until it lands, a short treasury pays what it holds and the champion opens poorer. RULED (Ben, 2026-10-11, the treasury form): median nation opens on 1,000-2,000 credits (for now); lift the floor and keep the order (poor gain most, rich stay richest); levers = earn more (trade, endowment, corridor income) and keep more (less treasury -> industry points in Industrialisation). MEASURE FIRST: tools/verify/treasury_census.cpp (in progress). RULED on the census (Ben, 2026-10-11): income = a standing levy sweeping the seats' stores into the chest every round + endowment income rescaled so small realms earn; the standing army is sized to what the realm earns (overturns NR-878 for the army; EXPLORATION.md § Force persists now); \"keep more\" dropped. Census: tools/verify/treasury_census.cpp (merged b1fca210). Build: calibrate the levy share and endowment rate so the median nation opens on 1,000-2,000 credits with the order kept; report movement; re-bless with Ben's go. BUILT AND MERGED (10cc388f; three calibration rounds, cold-reviewed with a fix round): levy 100, endowment 300k as a share of the world, army sized to the earn with a purchase cap, conversion at 60 per 1000 units (to be re-laddered once on the combined main after BL-1287), champion chartered where a chain to a finished good closes (CORPORATION_GENERATION § Pass 1). Gates on main: world_determinism PASS; history_sim R3a2/R3a3 only; exploration ALL PASS; player_seed_sweep guard 12/12 (shortlisted 60 of 72 vs 40 of 60); market_viability G1 92.8 / t50 85.1 / G1b 6.1 / G2 92.8 / G3 96.1; median nation ~1,200-2,600 credits on the quick seeds."
   },
   {
    "status": "proposed",
@@ -1064,71 +676,6 @@
    "parked": false,
    "blocked_on": null,
    "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
-   "id": "BL-1272",
-   "short_name": "GENERATION_WITHOUT_RESEARCH",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 4,
-   "authority_doc": "docs/generation/trees/TREES.md",
-   "requires": [],
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "src/world/era_minus_one.cpp",
-    "src/world/tree_effect.hpp",
-    "src/world/empire_tree_data.hpp",
-    "src/world/exploration_tree_data.hpp",
-    "src/world/industry_tree_data.hpp",
-    "tools/session/gen_empire_tree_table.js",
-    "tools/session/tree_lint.js",
-    "tools/verify/history_sim_harness.cpp",
-    "tools/verify/exploration_sim_harness.cpp",
-    "tools/verify/industrialisation_sim_harness.cpp",
-    "tools/verify/industry_concentration.cpp",
-    "tools/verify/exploration_sweep.cpp",
-    "tools/verify/history_sweep.cpp",
-    "tools/verify/world_cursor_equivalence.cpp"
-   ],
-   "title": "The pre-game history runs no technology trees: no polity holds, earns or invests in a node, and what the trees gated is gated by measured dates",
-   "design": "DESIGNED: TREES.md (retired; the table of what each gate became). Remove the three invested trees from the Invest verb and every reader; sea legs (Ben: by date), the third road rung and coastal naval points gated by dates MEASURED as the median polity's acquisition year in the last-blessed history; tree modifiers and the industry-tree industry-points credit go. A world-mover: report digest movement, never re-bless (BL-1277 owns the one re-bless). CARRIED to sprint 53 (2026-10-10). Branch worktree-agent-ab01dac630e84f644: dc74f929 (trees removed), a777f4c7 (sea legs need naval capacity; coastal naval ramp re-weighted to 353 - naval points at 1200 match baseline), 6071ed66 WIP (Ben: arrival across water needs a fleet afloat - threshold param mid-edit, unmeasured). Open: Industrialisation subjections 21 -> 440 before the fleet rule. Cold review of dc74f929 done; the fix rounds are unreviewed. RULED (Ben, 2026-10-11): sea legs need a fleet in the top tenth (90th percentile) of free naval-capable navies; median rejected after the census showed a tenth, not half, held the node under the trees. Remaining gap filed as BL-1297 (sphere of claim). BUILT AND MERGED (2026-10-11, bdaf1947 + re-pin 9b2c5bea; cold-reviewed, fix round applied): sea legs = date + naval capacity + a fleet afloat (>0 hulls) at or above the P90 entry of free naval-capable navies. Gates on merged main: history_sim_harness R3a2/R3a3 only; world_determinism ALL PASS; exploration_sim_harness ALL PASS (R3b/R3d.1 re-pinned 5 -> 1 subjections, Ben); player_seed_sweep --guard 12 ALL PASS; market_viability G1 93.4 (was 92.9), G1 t50 85.5 (85.5), G1b 5.6 (6.0, still over 5), G2 108.4 (111.7), G3 93.9 (94.7) - movement for BL-1277 (tech wave re-bless). Ready to archive at sprint close."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
-   "id": "BL-1274",
-   "short_name": "TECH_EFFECTS_WIRED",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 4,
-   "authority_doc": "docs/economy/RESEARCH.md",
-   "requires": [
-    "BL-1273"
-   ],
-   "files": [
-    "docs/economy/tech/digitisation_tree.json",
-    "src/world/nation_tech.cpp",
-    "src/world/modifier_set.hpp",
-    "src/world/economy_system.cpp",
-    "src/world/supply_system.cpp",
-    "src/world/recipe_registry.hpp",
-    "tools/verify/nation_tech_harness.cpp"
-   ],
-   "title": "Every Digitisation node moves the lever it names, or is declared unread and listed by a harness",
-   "design": "DESIGNED: RESEARCH.md § Effects no system reads yet. Give each node a machine effect (recipe unlock, structure unlock, modifier subject x scope x value, mechanic key, or declared unread). Wire the levers the game carries now (extraction_rate, processing_yield, logistics_cost, wage_floor, unit_upkeep, the named recipe unlocks); declare the rest unread with the system each waits on. Never a silent node. CARRIED to sprint 53 (2026-10-10). Branch worktree-agent-a4b4b115f9c2b3fe1: b6a612a5 (61 wired / 127 unread / 3 deferred; harness PASS), 69507722 WIP fix round (Ben: Rocketry gates launch, propellant open as a +20% yield bonus, institutes staffed at construction; review fixes: end-to-end lever rows, prose-direction audit, farm scope, fuel scope, logistics fold excludes handling, store_run_limit) - unbuilt."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
    "id": "BL-1275",
    "short_name": "NATION_RESEARCH_AI",
    "category": "Economy",
@@ -1146,36 +693,6 @@
    ],
    "title": "An AI nation fills its research queue one frontier node at a time, by its scorer",
    "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
-   "id": "BL-1276",
-   "short_name": "TECH_TREE_PANEL",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 4,
-   "authority_doc": "docs/economy/RESEARCH.md",
-   "requires": [
-    "BL-1273"
-   ],
-   "files": [
-    "src/ui/tech_tree_panel.cpp",
-    "src/ui/tech_tree_panel.hpp",
-    "src/core/app.cpp",
-    "src/core/verify_api.cpp",
-    "scripts/verify/tech_tree_panel.lua",
-    "docs/ai/ACTIONS.json",
-    "docs/ui/question_log.json",
-    "docs/ui/ui_elements.json"
-   ],
-   "title": "The research panel draws the Digitisation tree as a ring of three trees, shows every node's exact advantage, and lets me queue a path and see when it arrives",
-   "design": "DESIGNED: RESEARCH.md § The shape of an age's tree and § The research queue; the render approved in the design session (inspect + plan modes). Replaces the F9 constellation of scripts/tech_tree.lua. Tiers distinguishable at a glance; AND links marked; hover/press shows advantage, cost, requirements, deed; plan mode queues a node with its prerequisites and shows arrival quarters. Needs Ben's live click. CARRIED to sprint 53 (2026-10-10). Branch worktree-agent-aa32f1452e155d7d3: 215177de (panel, 10/10 visual expects, cold review clean on the seam), 693a676c WIP (Ben live click: shift+left click queues, the Plan strip goes, a queued node toggles off; review fixes: far-node R2 assertions, sentinel clamp, projection cache, MCP order text) - unbuilt. R2 live click owed after it builds. Ben's live click PASSED 2026-10-15 (\"looks fantastic\")."
   },
   {
    "status": "designed",
@@ -1279,27 +796,6 @@
    "landed": "2026-10-14"
   },
   {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-13",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (from the BL-1294 build)",
-   "id": "BL-1301",
-   "short_name": "NAME_MOVES_ECONOMY",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 2,
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "requires": [],
-   "files": [
-    "src/world/corporation_generation.cpp"
-   ],
-   "title": "A nation's NAME moves the campaign economy: renaming a realm (BL-1294) changes market_viability on that seed",
-   "design": "FOUND 2026-10-13 (BL-1294): with only the revolution rename switched off, seed 32 matches main exactly, so a coined name alone moves the 1960 economy. Likely route: corporation names derived from the nation name (make_corp_name) feeding a hash, seed or sort order. A display string must never steer the world (determinism-by-content). Trace the coupling and cut it; world_determinism and market_viability unchanged on non-renamed seeds after."
-  },
-  {
    "status": "designed",
    "glyph": "✓",
    "sprint": 53,
@@ -1319,106 +815,6 @@
    ],
    "title": "The world war leaves war weariness (cohesion loss) and extra Alarm at 1960",
    "design": "BACKLOGGED (Ben, 2026-10-13): the war ships without them. INDUSTRIALISATION.md § War kills people (war weariness lowers cohesion, raising subjects' refusal) and § A world war leaves the campaign closer to its catastrophe (Alarm). World-mover."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-13",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-13, the sprint 53 decisions form); filed by Claude",
-   "id": "BL-1303",
-   "short_name": "STALE_READING_ALL_SPANS",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 2,
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "requires": [],
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/era_minus_one.cpp"
-   ],
-   "title": "A region taken this round reads its new holder's supply before it may secede, in every span",
-   "design": "RULED (Ben, 2026-10-13, accepting NR-1042): secession_waits_for_holder (BL-1287, Empires only) extends to Exploration and Industrialisation. World-mover: measure, re-pin per the standing rule."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-13",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-13, the sprint 53 decisions form); filed by Claude",
-   "id": "BL-1304",
-   "short_name": "REVOLUTION_A_THIRD",
-   "category": "Generation",
-   "priority": "C",
-   "difficulty": 1,
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "requires": [],
-   "files": [
-    "src/world/history_sim.cpp"
-   ],
-   "title": "Recalibrate the revolution lean to fire on about a third of worlds",
-   "design": "RULED (Ben, 2026-10-13, NR-1044): from 3/16 to about a third of the library; recalibrate the disparity bar / pressure threshold by measurement."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-14",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (from the BL-1274/1276 lane)",
-   "id": "BL-1305",
-   "short_name": "RESEARCH_PACING_RECAL",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/RESEARCH.md",
-   "requires": [],
-   "files": [],
-   "title": "Recalibrate research pacing: nation_tech_harness R0h/R0i fail on main (median 11-14 quarters vs the ruled 16-24)",
-   "design": "FOUND 2026-10-14: richer starting nations (BL-1298) research faster; R0h median 11-14 vs [16,24], R0i p10 6-7 vs >=8 on main alone. In-band calibration (the session's call, DELIVERY sprint rules): re-fit the pacing base/scale to the ruled band; never weaken the rows."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-14",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (from the BL-1274/1276 lane)",
-   "id": "BL-1306",
-   "short_name": "SEAT_PORTS_SPARSE",
-   "category": "Economy",
-   "priority": "M",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "requires": [],
-   "files": [],
-   "title": "Worlds now carry 0-3 active ports and no curated seed routes a market pair by sea",
-   "design": "FOUND 2026-10-14 (BL-1274 harness T2 had to place ports to measure). Possibly world war port razing or the landscape changes; diagnose before the economy pass."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 53,
-   "written": "2026-10-14",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (from the BL-1274/1276 lane)",
-   "id": "BL-1307",
-   "short_name": "PROFIT_STAFFING_COPY",
-   "category": "Economy",
-   "priority": "C",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "requires": [],
-   "files": [],
-   "title": "building_profit.cpp hand-copies the construction staffing rule and misprices military_base staff (0.5 vs 0)",
-   "design": "FOUND 2026-10-14: building_profit.cpp:152 should call construction_initial_workforce. Moves corp-AI estimates for bases."
   },
   {
    "status": "proposed",
@@ -1441,34 +837,6 @@
    ],
    "title": "State builds read wrong in two places: a station under construction doesn't reduce the uncommitted treasury shown, and the player's own state building hovers as \"Competitor - output private\"",
    "design": "FOUND 2026-10-14 (rail construction UI): check state_uncommitted_treasury accounts for state construction in progress; the hover owner logic must recognise the player's nation's state buildings as the player's own."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 53,
-   "written": "2026-10-14",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-14, the logistics form); filed by Claude",
-   "id": "BL-1309",
-   "short_name": "LOGISTICS_ONE_POOL",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 5,
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "requires": [
-    "BL-1255",
-    "BL-1296"
-   ],
-   "files": [
-    "src/world/logistics.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/construction.cpp",
-    "src/world/components.hpp",
-    "src/core/world_save.cpp"
-   ],
-   "title": "Logistic Points become one nation-held pool, made by hubs/stations/ports on their own networks, fading with distance, consumed by production",
-   "design": "DESIGNED (Ben, 2026-10-14): LOGISTICS.md § One pool. Replaces passive/active LP and city generation. Hubs (roads, tier-extended), stations (rail), ports (sea); full strength to a threshold then fade; production consumes LP, proportional output on shortfall; every building draws its host nation's pool; the nation sets shares (state/champion/firms), mechanical default in proportion to need; anyone builds sources; trade points separate; military off-network reach later. Player verb: set LP shares (ACTIONS.json, seam). Generation must seed enough sources that 1960 produces. World-mover + save bump. Then the economy pass re-ladder and the re-bless."
   },
   {
    "status": "proposed",
