@@ -48,6 +48,7 @@
 #include "world/stockpile_budget.hpp"  // stockpile_budget
 #include "world/corporation_generation.hpp" // marketplace_retrofit_report (BL-1268)
 #include "world/state_industry.hpp"         // state_handover_report (BL-1296)
+#include "world/logistic_points.hpp"        // lp_seed_report (BL-1309)
 
 #include <cstdint>
 #include <vector>
@@ -107,6 +108,7 @@ struct finish_campaign_result
     /// BL-1296: what the state-industry handover passed to the majors.
     state_handover_report   state;
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
+    lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
     /// Wall clock of the search and of the settle, milliseconds -- REPORTED
     /// ONLY, on the BL-754 footing; the loading bar's weights are re-measured
     /// from these, never read from them at run time.

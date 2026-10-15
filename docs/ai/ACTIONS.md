@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*162 entries — 37 gameplay · 25 canvas · 20 lens · 49 ledger · 31 chrome.*
+*163 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 31 chrome.*
 
 ---
 
@@ -339,6 +339,27 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The tile carries the nation's rail track at once, and the price leaves the treasury up front (like a road). From the next settlement the tile bills `rail.track_upkeep_per_tile` a tick to the treasury (never below zero). Track carries goods only between STATIONS: a haul boards at a station, rides connected track no hostile unit stands on, and leaves at another, chosen by the router only where road -> rail -> road is cheaper than the road alone.
 
 **Reason to select.** Cheapen the nation's long land hauls: a line between two cities with stations moves goods at a fraction of the road's cost per tile, so markets far apart overland trade where they could not.
+
+### `gameplay.set_logistics_shares` — No UI control yet. The command seam only (--serve / MCP `issue_command` verb `set_logistics_shares` with `nation`; the verify API's `corp_command{verb=set_logistics_shares, as_nation=...}`).
+
+**Press.** Seam: issue corp_verb 37 (`set_logistics_shares`) with `corp` = the seat, `nation` = the seat's home nation, `quantity` = the state's share, `floor_price` = the champion's share (other firms get the rest), `order` 0. `order` 1 with both shares 0 clears the rule.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (wire key `nation`; corp_command::as_nation)` | The nation whose Logistic Points are shared: the seat's home nation. Omitted = the corporation's own book (rejected_invalid). |
+| `quantity` | `float in [0,1]` | The state industry's share of the nation's Logistic Point pool. |
+| `floor_price` | `float in [0,1]` | The champion's share. With `quantity`, at most 1; other firms (foreign ones too) get 1 - both. |
+| `order` | `uint (0 or 1)` | 0 sets the rule; 1 clears it back to the mechanical default (in proportion to need). |
+
+**Valid when:**
+- Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).
+- `corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): no AI nation sets shares (no AI_OPPONENT.md § 11 grant covers it).
+- Both shares finite, each in [0,1], summing to at most 1 (rejected_invalid); `order` is 0 or 1 (rejected_invalid); a clear carries no share (rejected_invalid) and needs a rule set (rejected_state).
+- A rejection mutates nothing.
+
+**Expected output.** From the next tick the nation's Logistic Point pool (made by the hubs, stations and ports on its ground) is granted by class: each of state, champion and other gets its share, pro rata to its buildings' reachable need; a class's unused share spills to the classes still short. Buildings short of points produce in proportion. Cleared, every claim gets the same fraction.
+
+**Reason to select.** Protect the state's or the champion's production when the nation's points are short, at the expense of other (often foreign) firms on its ground.
 
 ### `gameplay.build_station` — Construction ledger > Construction view > Rail group > 'Railway station' (a toggle that arms the station tool; legal tiles are ringed on the Planetary canvas), then a click on a ringed city tile. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`).
 

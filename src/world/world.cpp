@@ -236,6 +236,23 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, o);
     }
 
+    // BL-1309: the Logistic Point share rules a nation has SET — sparse and
+    // sorted, so a world where every nation shares mechanically hashes as before.
+    {
+        std::vector<entity_id> ruled;
+        for (const auto& [nid, nc] : nations)
+            if (nc.lp_shares.set)
+                ruled.push_back(nid);
+        std::sort(ruled.begin(), ruled.end());
+        for (const entity_id nid : ruled)
+        {
+            fnv1a_u32(h, 0x1F09u);
+            fnv1a_u32(h, nid);
+            for (const float f : nations.at(nid).lp_shares.share)
+                fnv1a_f32(h, f);
+        }
+    }
+
     // BL-1265: corporations hold no pools — every good is on a market's shelf,
     // folded with the markets above.
 

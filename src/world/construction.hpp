@@ -134,6 +134,13 @@ construction_result construct_state_building(world& w, const recipe_registry& re
 /// industry on @p tile — a city tile touching track on the nation's own ground —
 /// committed against the treasury's uncommitted part, built pay-as-you-build like
 /// any state building (construct_for's checks, station placement included).
+/// BL-1309 (LOGISTICS.md § Logistic Points, "One pool"): a major nation builds
+/// an inland logistics hub on its own ground, paid from the uncommitted treasury,
+/// joining its state_assets. Any other type is refused (invalid_tile).
+construction_result construct_state_logistics(world& w, const recipe_registry& reg,
+                                              entity_id nation, entity_id tile,
+                                              building_type type, entity_id& out_building);
+
 construction_result construct_state_station(world& w, const recipe_registry& reg,
                                             entity_id nation, entity_id tile,
                                             entity_id& out_building);

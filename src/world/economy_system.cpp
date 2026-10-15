@@ -1,4 +1,5 @@
 #include "economy_system.hpp"
+#include "logistic_points.hpp"
 
 #include "input_reach.hpp"     // recipe_inputs_obtainable (BL-1206 recipe rescue gate)
 
@@ -2287,12 +2288,29 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     /// The labour a building actually runs at this tick: its per-building grant
     /// (ordinary × qualified), falling back to the pool aggregate for a
     /// building the allocation pass never saw.
+    // BL-1309 (LOGISTICS.md § Logistic Points, "One pool"): once the tick's
+    // Logistic Points are resolved (just before production), a producing
+    // building runs at its labour x the share of its point need the host
+    // nation's pool granted — half the points, half the output. Before that
+    // (the stacks and the workforce solve) labour alone is read.
+    bool lp_ready = false;
     auto labour_for = [&](entity_id building_id, entity_id corp, entity_id body) -> float {
+        float lab = 1.0f;
         const auto it = report.building_labour.find(building_id);
         if (it != report.building_labour.end())
-            return it->second;
-        const auto cit = report.workforce_contention.find({corp, body});
-        return (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
+            lab = it->second;
+        else
+        {
+            const auto cit = report.workforce_contention.find({corp, body});
+            lab = (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
+        }
+        if (lp_ready)
+        {
+            const auto lit = report.logistic_points.fraction.find(building_id);
+            if (lit != report.logistic_points.fraction.end())
+                lab *= lit->second;
+        }
+        return lab;
     };
     phase_stamp(3); // labour (supply, pass 1, pass 1b)
 
@@ -2505,6 +2523,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
     phase_stamp(4); // stacks+solve (passes 2-4)
+
+    // ── BL-1309: this tick's Logistic Points — each nation's pool from its
+    // sources, each producing building's claim and grant (logistic_points.hpp).
+    report.logistic_points = resolve_logistic_points(w);
+    lp_ready = true;
 
     // ── Pass 5 pre-pass, BL-1209 (MARKETS.md § Price resolution, "A short shelf
     // is shared pro-rata", Ben 2026-10-07): every processor's draw on its shelf,

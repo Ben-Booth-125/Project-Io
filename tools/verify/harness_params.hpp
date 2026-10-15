@@ -203,6 +203,7 @@ struct shipped_landscape
     /// BL-1296: the state-industry handover the mirror ran after the recipes.
     state_handover_report   state;
     rail_handover_report    rail; ///< BL-1255
+    lp_seed_report          lp;   ///< BL-1309
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -312,6 +313,13 @@ inline shipped_landscape apply_shipped_landscape(
     {
         out.rail = hand_over_rail(w);
         print_rail_handover(out.rail);
+    }
+    // BL-1309: finish_campaign_world's Logistic Point seeding, verbatim, right
+    // after the rail handover (held back with it).
+    if (!charter.skip_rail_handover && !charter.skip_state_handover)
+    {
+        out.lp = seed_logistics_sources(w);
+        print_lp_seed_report(out.lp);
     }
 
     std::vector<entity_id> after;

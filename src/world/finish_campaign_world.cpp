@@ -394,6 +394,12 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // earned with the rail running.
     out.rail = hand_over_rail(w);
     print_rail_handover(out.rail);
+    // BL-1309 -- THE LOGISTIC POINT SOURCES (LOGISTICS.md § Logistic Points,
+    // "One pool"): production consumes its host nation's points, so the fold
+    // stands enough logistics hubs that every producing building is reached and
+    // every pool meets its need. After the rail handover (stations are sources).
+    out.lp = seed_logistics_sources(w);
+    print_lp_seed_report(out.lp);
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

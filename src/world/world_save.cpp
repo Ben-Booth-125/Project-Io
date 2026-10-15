@@ -1,4 +1,5 @@
 #include "world_save.hpp"
+#include "logistic_points.hpp" // BL-1309: lp_share_rule_valid
 
 #include "binary_io.hpp"
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
@@ -1128,6 +1129,25 @@ void write_world_snapshot(const world& w, std::ostream& out)
         // The fix round: the owners whose track is idle (unfunded upkeep), ascending.
         w_ids(out, std::vector<entity_id>(w.rail_idle.begin(), w.rail_idle.end()));
     }
+
+    // BL-1309 (world_save_version 50): THE LOGISTIC POINT SHARE RULES, a trailing
+    // section after rail -- every nation that has SET one, ascending id, as (id,
+    // state, champion, other). A nation with no rule shares by the mechanical
+    // default and writes nothing. A v49 (and older) stream ends before it.
+    {
+        std::vector<entity_id> ruled;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.lp_shares.set)
+                ruled.push_back(nid);
+        std::sort(ruled.begin(), ruled.end());
+        w_u32(out, static_cast<uint32_t>(ruled.size()));
+        for (const entity_id nid : ruled)
+        {
+            w_id(out, nid);
+            for (const float f : w.nations.at(nid).lp_shares.share)
+                w_f32(out, f);
+        }
+    }
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1146,7 +1166,8 @@ bool read_world_snapshot(world& w, std::istream& in)
     // addition and nothing else moved, so v48 is a strict prefix of v49 as v47 is
     // of v48.
     if (!r_u32(in, version)
-        || (version != world_save_version && version != k_world_save_version_pre_rail
+        || (version != world_save_version && version != k_world_save_version_pre_lp
+            && version != k_world_save_version_pre_rail
             && version != k_world_save_version_pre_state))
         return false; // mismatched version -- refuse rather than misread
 
@@ -1393,7 +1414,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // or a nation or corporation in the stream; every riding convoy names a convoy
     // in the stream once, and two distinct tiles in the stream as its stations.
     // Refused whole otherwise. A v48 / v47 stream ends before it: no rail.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_lp) // v49 and v50 carry it
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.tiles.size())
@@ -1450,6 +1471,30 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (!owns)
                 return false;
             s.rail_idle.insert(o);
+        }
+    }
+
+    // BL-1309 (v50): the share rules. Untrusted: each names a nation in the
+    // stream, strictly ascending, with three finite shares in [0,1] summing to 1
+    // (the seam's own rule, `lp_share_rule_valid`). Refused whole otherwise.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            std::array<float, 3> sh{};
+            if (!r_id(in, nid) || !r_f32(in, sh[0]) || !r_f32(in, sh[1]) || !r_f32(in, sh[2]))
+                return false;
+            if (nid == null_entity || (k > 0 && nid <= prev) || s.nations.count(nid) == 0
+                || !lp_share_rule_valid(sh))
+                return false;
+            prev = nid;
+            s.nations.at(nid).lp_shares.set   = true;
+            s.nations.at(nid).lp_shares.share = sh;
         }
     }
 

@@ -2167,6 +2167,19 @@ struct nation_component
     /// is the order the funding gate and every per-owner walk visit it.
     /// SERIALISED in the v48 state-industry trailing section (world_save.cpp).
     std::vector<entity_id> state_assets;
+
+    /// BL-1309 — how this nation's Logistic Points are shared among its state,
+    /// its champion and other firms (LOGISTICS.md § Logistic Points, "One pool").
+    /// `set` false is the mechanical default (in proportion to need) and is the
+    /// only state an AI nation is ever in: no grant lets a scorer set it. Set by
+    /// the player's `set_logistics_shares` verb. SERIALISED in the v50 trailing
+    /// section (world_save.cpp).
+    struct logistics_share_rule
+    {
+        bool set = false;
+        std::array<float, 3> share{}; ///< state, champion, other; each in [0,1], summing to 1
+    };
+    logistics_share_rule lp_shares;
 };
 
 // ---------------------------------------------------------------------------
