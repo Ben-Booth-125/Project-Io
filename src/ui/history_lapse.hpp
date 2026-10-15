@@ -1149,7 +1149,7 @@ uint32_t lapse_owner_colour(const history_lapse& h, uint16_t owner, int year = 0
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged,
-                           int year, int lagged_year);
+                           int year, int lagged_year, int max_rows = 16);
 
 /// BL-916 -- one event as a line of prose, with its region's generated name and
 /// the year. Never an Earth name: every noun here comes off the region table.

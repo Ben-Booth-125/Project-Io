@@ -59,7 +59,9 @@ verify.expect(total ~= t0 and total >= majors and total <= 40 and majors == m0,
               .. t0 .. " / " .. m0 .. " -> " .. total .. " / " .. majors .. ")")
 verify.capture("quick_start_00c_setup_moved")
 
-local BEGIN_X, BEGIN_Y = 603, 995 -- the setup round's Begin under Quick Start
+-- The setup round's Begin under Quick Start, read off the footer (it follows
+-- the round's content, so no fixed coordinate holds; Ben, 2026-10-15).
+local _, _, _, _, BEGIN_X, BEGIN_Y = verify.wizard_buttons()
 verify.click(BEGIN_X, BEGIN_Y)
 verify.frames(2)
 s = verify.screen()

@@ -2001,7 +2001,7 @@
     "App is on the main menu screen."
    ],
    "expected_output": "The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 7 (System, Setup, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.",
-   "reason_to_select": "To start setting up a new world round by round: the nation targets, seed and resources on the setup round, then the planetology and history leans."
+   "reason_to_select": "To start setting up a new world round by round: the nation targets and resources on the setup round, then the planetology and history leans. The seed is hidden: the wizard draws it unseen, and the Life round's Reroll gives another world (Ben, 2026-10-15)."
   },
   {
    "id": "chrome.menu_quick_start",
@@ -2012,7 +2012,7 @@
    "preconditions": [
     "App is on the main menu screen."
    ],
-   "expected_output": "Opens the New World wizard on its setup round alone (STARTUP.md section Rounds, Ben 2026-10-13): the nation targets, the seed and the abundance, which the main menu no longer carries. The setup round's Begin then builds the world straight through with no other wizard round drawn: the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then the nation selection screen (app_screen::choosing_seat), where the player picks a major nation. The same settings give the same world the wizard would have built. Back on that round returns to the menu.",
+   "expected_output": "Opens the New World wizard on its setup round alone (STARTUP.md section Rounds, Ben 2026-10-13): the nation targets and the abundance, which the main menu no longer carries. The seed is drawn hidden (no entry, Roll or Copy; Ben, 2026-10-15). The setup round's Begin then builds the world straight through with no other wizard round drawn: the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then the nation selection screen (app_screen::choosing_seat), where the player picks a major nation. The same settings give the same world the wizard would have built. Back on that round returns to the menu.",
    "reason_to_select": "To start play on chosen settings without walking the wizard's rounds; the seat is still chosen."
   },
   {
@@ -2193,7 +2193,7 @@
     "App is on the wizard screen, on the last round (round 3 of 3)."
    ],
    "expected_output": "The one and only generation call (start_new_game): the sim clock is rebased, the world is built from the pending parameters, the economy loads, a pre-game warm start runs 12 quarterly ticks (~3 in-game years) so play opens onto live markets and non-empty pools, the clock is rebased again, and the screen transitions to in_game. Play opens on the corporation's home planet at the Planetary rung with the home body selected.",
-   "reason_to_select": "To commit the chosen seed and preferences and start the campaign."
+   "reason_to_select": "To commit the chosen preferences and start the campaign (the seed is hidden; Reroll draws another world)."
   },
   {
    "id": "chrome.wizard_continue",
@@ -2558,7 +2558,7 @@
    "id": "gameplay.take_seat",
    "family": "gameplay",
    "surface": "The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, the champion's firm card, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS and which champion they operate - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one.",
-   "press": "Hover a row to point the map at that nation (its territory lit, its champion's HQ, works and home market drawn) and read its card; press the row to open its briefing; press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. On the card, \"Open its history in the History ledger\" opens the History ledger's Ages view filtered to the nation; pressed again (\"Close its history\") it closes the ledger - it reads the record and moves nothing. At launch: `ProjectIo --seat <nation-id>` (the nation's entity id, as the `[seat] major <nation> champion <corp>` log lines print it).",
+   "press": "Hover a row to point the map at that nation (its territory lit, its champion's HQ, works and home market drawn) and read its card; press the row to open its briefing - the full card stays shown for the selected nation, with Confirm and Back heading the pane and the briefing prose below the card (Ben, 2026-10-15); press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. On the card, \"Open its history in the History ledger\" opens the History ledger's Ages view filtered to the nation; pressed again (\"Close its history\") it closes the ledger - it reads the record and moves nothing. At launch: `ProjectIo --seat <nation-id>` (the nation's entity id, as the `[seat] major <nation> champion <corp>` log lines print it).",
    "args": [
     {
      "name": "nation",

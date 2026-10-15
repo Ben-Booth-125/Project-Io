@@ -37,6 +37,7 @@
 #include "ui/history_lapse.hpp"   // lapse_year_label, for the briefing's origin sentence (BL-1099)
 #include "ui/icons.hpp"
 #include "ui/market_ledger.hpp"   // market_city_name
+#include "ui/foldout_column.hpp" // foldout_scroll_child (verify.scroll_panel "seat_card")
 #include "ui/nation_history.hpp"  // the card's history part (BL-1295)
 #include "ui/presentation.hpp"
 #include "ui/tile_inspector.hpp"  // the History ledger the card's link opens (BL-1295)
@@ -849,7 +850,38 @@ void app::draw_seat_screen()
 
     // The card / briefing scrolls inside the rest of the pane.
     ImGui::BeginChild("##seat_card", {0.0f, 0.0f}, ImGuiChildFlags_None);
-    if (m_seat_ui.briefing == null_entity)
+    ui::foldout_scroll_child("##seat_card"); // verify.scroll_panel("seat_card", ...)
+    // Confirm and Back head the pane when a row is selected, so the pick is
+    // reachable without scrolling past the card (Ben, 2026-10-15).
+    const auto confirm_row = [&]() {
+        if (ImGui::Button("Confirm"))
+        {
+            // THE PICK, as a game act: the major, through the seam as
+            // corp_verb::take_seat on its champion.
+            const corp_command_result r = take_seat_pick(sm.nation);
+            if (r == corp_command_result::applied)
+            {
+                // Play opens clean: the history link's ledger and filter close.
+                if (m_seat_ui.history_open) m_ui.show_tile_ledger = false;
+                m_seat_ui.history_open     = false;
+                m_ui.history_nation_filter = null_entity;
+                if (m_seat_ui.from_verify) m_screen = app_screen::in_game;
+                else                       finish_new_game();
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Back"))
+            m_seat_ui.briefing = null_entity; // nothing changed: the world was only read
+    };
+    // THE CARD IS ALWAYS SHOWN for the shown nation (Ben, 2026-10-15, live
+    // click): it used to give way to the briefing the moment a row was
+    // pressed, so the selected nation was the one nation with no card. The
+    // briefing prose sits BELOW the card of the selected row; Confirm heads it.
+    if (m_seat_ui.briefing != null_entity)
+    {
+        confirm_row();
+        ImGui::Separator();
+    }
     {
         // --- THE NATION CARD: seven parts (STARTUP.md § The seat) ------------
         // Its question: which nation am I? Two columns: the nation's own facts
@@ -1019,12 +1051,16 @@ void app::draw_seat_screen()
             ImGui::PopTextWrapPos();
             ImGui::EndTable();
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
-        ImGui::TextUnformatted("Press a row to read its briefing.");
-        ImGui::PopStyleColor();
+        if (m_seat_ui.briefing == null_entity)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
+            ImGui::TextUnformatted("Press a row to read its briefing.");
+            ImGui::PopStyleColor();
+        }
     }
-    else
+    if (m_seat_ui.briefing != null_entity)
     {
+        ImGui::Separator();
         // --- THE BRIEFING: the opening position, in prose -------------------
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
         ImGui::Text("Briefing: %s", nat->name.c_str());
@@ -1078,25 +1114,6 @@ void app::draw_seat_screen()
             ImGui::PopStyleColor();
         }
         ImGui::PopTextWrapPos();
-        ImGui::Dummy({1.0f, 4.0f});
-        if (ImGui::Button("Confirm"))
-        {
-            // THE PICK, as a game act: the major, through the seam as
-            // corp_verb::take_seat on its champion.
-            const corp_command_result r = take_seat_pick(sm.nation);
-            if (r == corp_command_result::applied)
-            {
-                // Play opens clean: the history link's ledger and filter close.
-                if (m_seat_ui.history_open) m_ui.show_tile_ledger = false;
-                m_seat_ui.history_open     = false;
-                m_ui.history_nation_filter = null_entity;
-                if (m_seat_ui.from_verify) m_screen = app_screen::in_game;
-                else                       finish_new_game();
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Back"))
-            m_seat_ui.briefing = null_entity; // nothing changed: the world was only read
     }
     ImGui::EndChild();
 

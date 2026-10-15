@@ -301,30 +301,11 @@ bool app::draw_wizard_setup_controls()
         ImGui::PopStyleColor();
     }
 
-    // ── The seed — hex entry + a one-shot randomise. The random_device draw
-    //    feeds ONLY the seed value; no entropy ever enters world generation,
-    //    which stays a pure function of this seed (same seed + knobs ->
-    //    identical world). Moved here from the menu (Ben, 2026-10-11). ──
-    ImGui::SeparatorText("Seed");
-    {
-        const float roll_w = 64.0f;
-        ImGui::SetNextItemWidth(std::max(80.0f, w - roll_w - ImGui::GetStyle().ItemSpacing.x));
-        if (ImGui::InputScalar("##seed", ImGuiDataType_U32, &wp.seed, nullptr, nullptr,
-                               "%08X", ImGuiInputTextFlags_CharsHexadecimal))
-            changed = true;
-        ImGui::SameLine();
-        if (ImGui::Button("Roll##seedroll", {roll_w, 0.0f}))
-        {
-            std::random_device rd;
-            wp.seed = static_cast<uint32_t>(rd());
-            changed = true;
-        }
-        // Copyable readout of the reproducible key.
-        char seedhex[16];
-        std::snprintf(seedhex, sizeof seedhex, "%08X", wp.seed);
-        if (ImGui::Button("Copy seed##seedcopy", {w, 0.0f}))
-            ImGui::SetClipboardText(seedhex);
-    }
+    // THE SEED IS HIDDEN (Ben, 2026-10-15, at the live click; STARTUP.md
+    // § Rounds). No entry, Roll or Copy: the seed is drawn once, unseen, on
+    // entry to the wizard (prime_wizard_setup) and the Life round's Reroll is
+    // how a player asks for another world. --verify sets seeds through the
+    // verify API, never through this round.
 
     // ── Resource abundance — Earth-like 'Standard' is the ceiling; the leaner
     //    tiers step down (GENERATION_STRATEGY.md § The resource ceiling). ──
@@ -1774,7 +1755,7 @@ void app::draw_main_menu()
         if (ImGui::Button("Quick Start", btn))
             open_quick_start();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Set the nations, seed and resources, then build the world\n"
+            ImGui::SetTooltip("Set the nations and resources, then build the world\n"
                               "straight through, past the rounds, and choose your corporation.");
         ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quit", btn))
@@ -1895,7 +1876,7 @@ wizard_round_head wizard_round_head_at(int r)
     // BL-1279: THE SETUP ROUND (STARTUP.md § Rounds, Ben 2026-10-10/11) --
     // the inputs that shape the whole world rather than one round's subject.
     if (r == setup_round)
-        return { "Setup", "How many nations will this world hold, and from which seed?" };
+        return { "Setup", "How many nations will this world hold, and how rich is it?" };
     static const wizard_round_head passes[pass_rounds] = {
         // THE ROUNDS ARE NOT CONTINUOUS (Ben, 2026-09-09). Round 4 used to fuse
         // the peopling of the world with the empires that followed, and that cut
@@ -1997,6 +1978,7 @@ bool turbulence_row(lean& value)
     const char* names[3] = { "Calm", "Ordinary", "Turbulent" };
 
     ImGui::PushID("turbulence");
+    ImGui::BeginGroup(); // one item, so the caller's hover card reads the whole row
     ImGui::TextUnformatted("History");
 
     bool changed = false;
@@ -2014,6 +1996,7 @@ bool turbulence_row(lean& value)
             changed = true;
         }
     }
+    ImGui::EndGroup();
     ImGui::PopID();
     return changed;
 }
@@ -2280,7 +2263,7 @@ void app::draw_generation_screen()
         const float col_w = (panel_w - style.WindowPadding.x * 2.0f
                              - style.ItemSpacing.x) / 3.0f;
         ImGui::BeginChild("##wiz_left", {col_w, 0.0f}, false,
-                          ImGuiWindowFlags_NoBackground);
+                          ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
         // BL-904: gives verify.scroll_panel("wizard", ...) a real scroller to
         // aim at. The column is a plain BeginChild, not a foldout ledger, but
         // `foldout_scroll_child` only matches on the id string it is handed,
@@ -2349,15 +2332,34 @@ void app::draw_generation_screen()
         // measured rather than guessed (BL-904): it runs to five sentences,
         // well past what a fixed line count could safely predict at every
         // column width the wizard can be shown at.
-        if (m_wiz_round == empires_round)
+        // AT THE 1280x720 FLOOR the five-sentence caption would eat the
+        // board, so a short display folds it into the row's hover card
+        // instead (Ben, 2026-10-15: every round fits without a scroll bar).
+        const bool turbulence_caption_inline = ImGui::GetIO().DisplaySize.y >= 900.0f;
+        if (m_wiz_round == empires_round && !turbulence_caption_inline)
+            decide_h -= frame_h + style.ItemSpacing.y;
+        if (m_wiz_round == empires_round && turbulence_caption_inline)
             decide_h += ImGui::CalcTextSize(kTurbulenceCaption, nullptr, false,
                                              ImGui::GetContentRegionAvail().x).y
                       + style.ItemSpacing.y
                       - (frame_h + style.ItemSpacing.y);
         // Two button rows now: Reroll full-width above, Back / Continue below.
         const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
-        ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
-                          ImGuiWindowFlags_NoBackground);
+        // NO SCROLL BAR, AND THE CONTROLS SIT HIGH (Ben, 2026-10-15, at the
+        // live click; STARTUP.md § Rounds). The charts block takes the height
+        // its content measured last frame, capped at what the column leaves
+        // above the leans and the footer -- so a short round's leans, Reroll,
+        // Back and Next follow its folds rather than sinking to the bottom.
+        // A lapse round fills the cap, and its board and ticker are cut to it
+        // below. The scroll bar is never drawn; the wheel still scrolls an
+        // expanded fold.
+        const float charts_cap = std::max(60.0f, ImGui::GetContentRegionAvail().y
+                                                     - (decide_h + footer_h));
+        const float charts_h   = m_wiz_charts_content_h > 0.0f
+                                     ? std::min(charts_cap, m_wiz_charts_content_h)
+                                     : charts_cap;
+        ImGui::BeginChild("##wiz_charts", {0.0f, charts_h}, false,
+                          ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar);
         // BL-1000: the lapse rounds' board, ticker and arc readout live in THIS
         // child, and at 1080p the arc readout sits below its fold — so
         // verify.scroll_panel("wizard_charts", ...) needs a scroller of its own
@@ -2616,10 +2618,11 @@ void app::draw_generation_screen()
 
                 ui::draw_lapse_scoreboard(rec, hist_slice, hist_lagged,
                                           m_wiz_history_year[lapse_index],
-                                          hist_lagged_year);
+                                          hist_lagged_year, m_wiz_fit_board_rows);
                 // BL-916: the ticker — the named moments at or before the
                 //         playhead, the newest of which is the marker on the map.
-                ui::draw_lapse_ticker(rec, m_wiz_history_year[lapse_index]);
+                ui::draw_lapse_ticker(rec, m_wiz_history_year[lapse_index],
+                                      m_wiz_fit_ticker_rows);
                 // BL-891: the arc, so a rolled world can be judged without
                 //         watching the whole replay.
                 ui::draw_lapse_arc(rec);
@@ -2640,7 +2643,13 @@ void app::draw_generation_screen()
                 // end to end (STARTUP.md § Rounds). The Culture round's is
                 // worded as the record, not the route (BL-1135; STARTUP.md
                 // § Round 3).
-                if (lapse_index == 0)
+                // On a short display (the 1280x720 floor) the footer line
+                // gives way so the board and the arc keep their rows. A fixed
+                // test, never the fit's own row counts, so it cannot feed back.
+                const bool fit_tight = ImGui::GetIO().DisplaySize.y < 900.0f;
+                if (fit_tight)
+                    ;
+                else if (lapse_index == 0)
                     dim_text("2400 to 400 BCE: the first peoples set down their names, their "
                              "gods and their ground, and the ages after inherit what they kept.");
                 else if (lapse_index == 1)
@@ -2655,6 +2664,44 @@ void app::draw_generation_screen()
             }
         }
 
+        // THE FIT (Ben, 2026-10-15). Content height measured here sizes the
+        // block next frame. On a lapse round an overflow cuts board rows down
+        // to five, then ticker rows down to two, then the board to three;
+        // spare room gives them back, ticker last cut first restored. The cut
+        // is whole rows from one frame's measure, so it settles in a frame.
+        {
+            const float content_h = ImGui::GetCursorPosY() + ImGui::GetScrollY();
+            m_wiz_charts_content_h = content_h;
+            if (lapse_round)
+            {
+                const float row_h = ImGui::GetTextLineHeightWithSpacing() + 2.0f;
+                const float over  = content_h - charts_cap;
+                int b = m_wiz_fit_board_rows, t = m_wiz_fit_ticker_rows;
+                if (over > 0.0f)
+                {
+                    int cut = static_cast<int>(std::ceil(over / row_h));
+                    const auto take = [&](int& v, int floor_v) {
+                        const int d = std::min(cut, std::max(0, v - floor_v));
+                        v -= d; cut -= d;
+                    };
+                    take(b, 5); take(t, 2); take(b, 3); take(t, 0);
+                }
+                else if (over < -row_h * 1.5f)
+                {
+                    // One row held back as hysteresis; a ticker coming back
+                    // from none also pays for its heading.
+                    int give = static_cast<int>(std::floor(-over / row_h)) - 1;
+                    if (t == 0) give -= 1;
+                    const auto put = [&](int& v, int ceil_v) {
+                        const int d = std::min(give, std::max(0, ceil_v - v));
+                        v += d; give -= d;
+                    };
+                    put(t, 2); put(b, 5); put(t, 6); put(b, 16);
+                }
+                m_wiz_fit_board_rows  = b;
+                m_wiz_fit_ticker_rows = t;
+            }
+        }
         ImGui::EndChild();
 
         // ── (c) The round's preferences. Named leans and nothing else: no value from
@@ -2745,7 +2792,10 @@ void app::draw_generation_screen()
                     if (lapse_round && !m_wiz_history_future[lapse_index].valid())
                         launch_wizard_history_run(lapse_index);
                 }
-                dim_text(kTurbulenceCaption);
+                if (turbulence_caption_inline)
+                    dim_text(kTurbulenceCaption);
+                else if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", kTurbulenceCaption);
                 break;
 
             default:
@@ -2787,15 +2837,24 @@ void app::draw_generation_screen()
         // The line holds the button's row height, so Back and Next sit where they
         // sit on every other pass round (the footer geometry scripts press).
         const bool culture_round = lapse_round && lapse_index == 0;
+        // The footer's press points, for verify.wizard_buttons (the footer now
+        // follows the round's content, so its height varies by round).
+        {
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            const bool has_reroll = !culture_round && !setup_round;
+            m_wiz_btn_xy[0] = has_reroll ? p0.x + bar_w * 0.5f : -1.0f;
+            m_wiz_btn_xy[1] = has_reroll ? p0.y + 17.0f : -1.0f;
+        }
         if (culture_round)
         {
             const float row_y = ImGui::GetCursorPosY();
             dim_text("These peoples follow the ground. Reroll the Life round to change them.");
             ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
         }
-        // BL-1279: THE SETUP ROUND CARRIES NO REROLL EITHER. Its random draw is
-        // the seed's own Roll, above; a second button beside it would be the
-        // same press under another name. The row holds its height, as Culture's.
+        // BL-1279: THE SETUP ROUND CARRIES NO REROLL EITHER. It draws nothing:
+        // the seed is hidden, and the Life round's Reroll is how a player asks
+        // for another world (Ben, 2026-10-15). The row holds its height, as
+        // Culture's.
         else if (setup_round)
         {
             const float row_y = ImGui::GetCursorPosY();
@@ -2821,6 +2880,13 @@ void app::draw_generation_screen()
         // until "Begin", so leaving costs nothing). Preferences survive the trip, so
         // re-entering resumes the same leans from round 0.
         const float half = (bar_w - style.ItemSpacing.x) * 0.5f;
+        {
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            m_wiz_btn_xy[2] = p0.x + half * 0.5f;
+            m_wiz_btn_xy[3] = p0.y + 17.0f;
+            m_wiz_btn_xy[4] = p0.x + half * 1.5f + style.ItemSpacing.x;
+            m_wiz_btn_xy[5] = p0.y + 17.0f;
+        }
         if (ImGui::Button("Back##wizback", {half, 34.0f}))
         {
             // BL-1279: Quick Start's one round steps straight back to the menu.

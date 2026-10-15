@@ -21,33 +21,24 @@ verify.window(1920, 1080)
 
 verify.generation_stage(2) -- Life (BL-1279: setup is round 1)
 verify.frames(4)
-verify.click(603, 975)            -- round 2's Next, the one press known to land
+do local _, _, _, _, nx, ny = verify.wizard_buttons(); verify.click(nx, ny) end -- Life's Next, off the footer
 verify.frames(6)
 
 local round = select(1, verify.wizard_round())
 verify.expect(round == 3, "parked on round 4, CULTURE (0-based " .. round .. ")")
 verify.capture("arc_00_round3")
 
--- WALK THE FOOTER DOWN THE COLUMN. Each press is real; the first one that
--- changes the round is where the button is. Reported rather than asserted --
--- the point is to LOCATE the control, and a hard-coded expectation here would
--- re-create the brittleness that sent the other script red.
-local found = -1
-for _, y in ipairs({995, 1005, 1017, 1027, 1040, 1055, 1070}) do
-    if found < 0 then
-        verify.click(603, y)
-        verify.frames(4)
-        local r = select(1, verify.wizard_round())
-        if r ~= 3 then
-            found = y
-            verify.capture("arc_01_advanced_at_y" .. y)
-        end
-    end
-end
-
-verify.expect(found > 0,
-              "round 3's Next is reachable somewhere in the column (found at y="
-              .. found .. "; -1 means NO press in 995..1070 advanced the round)")
+-- PRESS THE FOOTER WHERE IT IS DRAWN. The footer follows each round's
+-- content (Ben, 2026-10-15: the controls sit high, no scroll bar), so the press
+-- point is read off verify.wizard_buttons and asserted ON SCREEN -- a Next
+-- pushed off the bottom fails here -- before the real press.
+verify.frames(1)
+local _, _, _, _, nx, ny = verify.wizard_buttons()
+verify.expect(nx > 0 and ny > 0 and ny < 1080,
+              "round 3's Next is drawn on screen (" .. nx .. ", " .. ny .. ")")
+verify.click(nx, ny)
+verify.frames(4)
+verify.capture("arc_01_advanced")
 
 local round2 = select(1, verify.wizard_round())
 verify.expect(round2 == 4,
