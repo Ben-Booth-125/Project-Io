@@ -2091,6 +2091,17 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   holdings beyond what is observable; no deed pursued — a quest's deed is read, never acted toward.
   Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
+  **What a node is worth, and how often it may be picked (Ben, 2026-10-15).** A major scores for
+  what it unlocks — recipes, buildings, the space gate, the next cluster — weighted by the nation's
+  budget lines, not only for its read modifiers; the two sides of a pick-one pair break a tie by the
+  nation's seed, so nations diverge. After a node completes, the scorer may pick again in the same
+  quarter while the pool covers the next node — still one node queued at a time, in a bounded loop.
+
+  **Under spectate, the seat's nation researches too — granted (Ben, 2026-10-15).** A new subject:
+  with nobody seated (§ 10i), the nation at the seat is queued for exactly as any AI nation is.
+  **Not admitted:** any pick for that nation in a seated session.
+  Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
   **The player is a nation — a NARROWING, and one subject RAISED (Ben, 2026-10-10;
   `../CONCEPT.md` § Player identity).** The player plays a major nation and operates its champion.
   Two things follow without a new grant, because each takes behaviour away: the player's nation is
