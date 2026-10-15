@@ -39,6 +39,11 @@ Why: *"our project is too grand to be able to really feel out the gameplay"* —
 *"when making your ideal game, you should first focus on a smaller project with similar design."*
 The ancient product is deliberate practice for the space game, not an abandonment of it.
 
+**Near space is industrial (Ben, 2026-10-15).** Inside Era 1 (1960 → about 2040), nations run
+space programmes in the industrial arc: satellites, rovers, crewed lunar missions and early orbital
+stations, with their launch and ground infrastructure (`../economy/SPACE_ASSETS.md`). What stays
+parked below is the space game proper — corporations operating across the solar system.
+
 **Space — parked for DLC.** **v0.2.0** (the AI opponent), **v0.3.0** (the national private
 militia), **v0.4.0** (politics + the Era → Filter rename) and **v1.0.0** (the playable space game)
 are parked whole, their designs intact, so the DLC resume is a re-triage rather than an archaeology

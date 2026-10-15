@@ -87,6 +87,24 @@
    "risk": "The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).",
    "done_when": "Set at the cut. Proposed: no authority doc describes the player as a corporation holding a seat, and the player can be seated on a nation in a live build.",
    "notes": "Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree."
+  },
+  {
+   "id": "55",
+   "theme": "spectator to the end of Era 1",
+   "state": "proposed",
+   "status_line": "PROPOSED 2026-10-15; CALLS ANSWERED same day (Ben): full space assets, nations launch, AI space grant, prices rise with RP matching, GDP/output charts. Items BL-1324..BL-1333. Former 55 items moved to 56.",
+   "opened_date": null,
+   "author": "Ben (2026-10-15)",
+   "goal": "A spectator run from 1960 to roughly 2040 (80 years) in which nations research at an accelerating rate, grow their economies towards digitisation, and explore other bodies with rovers, satellites and crewed lunar missions, with early orbital stations and the ground infrastructure that supports them.",
+   "planned": [
+    "WAVE 1 - PACING AND RUN LENGTH. BL-1324 (rising tech prices), BL-1325 (Era 1 runs to 2040).",
+    "WAVE 2 - GROWTH. BL-1326 (AI grows to digitisation).",
+    "WAVE 3 - SPACE. BL-1327 (space asset model, Full mode), BL-1328 (launch infrastructure), BL-1329 (satellites and rovers), BL-1330 (crewed lunar missions), BL-1331 (early orbital stations), BL-1332 (nation space AI).",
+    "WAVE 4 - THE SPECTATOR VIEW. BL-1333 (spectator growth charts)."
+   ],
+   "risk": "Wave 3 overturns the DLC parking of all space work (ROADMAP.md, now narrowed to near space). BL-1327 touches the save format. The pacing slider (2.5x) was superseded by Ben's note: no speed-up for the average nation.",
+   "done_when": "Set at the cut. Proposed: an unattended spectator run reaches ~2040 on the curated seeds with every major nation past the Digitisation midpoint, at least one crewed lunar landing and one orbital station.",
+   "notes": "Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11."
   }
  ],
  "next_up": "SPRINTS 50, 51 AND 52 CLOSED and on main; v0.1.30 cut 2026-10-11 (sprints 50 and 52). SPRINT 53 next: the player is a nation and the history patterns, with sprint 52's tech tail; generation first. Handoff: docs/development/NEXT_SESSION.md.",

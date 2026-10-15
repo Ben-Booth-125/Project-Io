@@ -2123,3 +2123,10 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit:** no decision for the player's own state industry, which is the
   player's; no state building for a minor; no verb a corporation lacks. Pure, seeded,
   deterministic, replayable, legal verbs only, never a planner.
+
+  **AI nations run space programmes — granted (Ben, 2026-10-15; `../economy/SPACE_ASSETS.md` § Era 1
+  near space).** A new subject: rival nations may launch satellites, rovers, crewed missions and
+  station modules, and build the launch infrastructure they need, chosen by the scored-utility
+  nation layer over the same legal verbs and paid from the treasury. **Not admitted:** any launch
+  for the player's nation; any corporation owning a space asset; a mission sequence planned ahead
+  of the next launch. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.

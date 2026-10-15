@@ -76,6 +76,23 @@ and/or a version goal (v0.1.1 etc.).
 
 Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree.
 
+### Sprint 55 — spectator to the end of Era 1
+*Proposed · Ben (2026-10-15)*
+
+**Goal.** A spectator run from 1960 to roughly 2040 (80 years) in which nations research at an accelerating rate, grow their economies towards digitisation, and explore other bodies with rovers, satellites and crewed lunar missions, with early orbital stations and the ground infrastructure that supports them.
+
+**Planned.**
+- WAVE 1 - PACING AND RUN LENGTH. BL-1324 (rising tech prices), BL-1325 (Era 1 runs to 2040).
+- WAVE 2 - GROWTH. BL-1326 (AI grows to digitisation).
+- WAVE 3 - SPACE. BL-1327 (space asset model, Full mode), BL-1328 (launch infrastructure), BL-1329 (satellites and rovers), BL-1330 (crewed lunar missions), BL-1331 (early orbital stations), BL-1332 (nation space AI).
+- WAVE 4 - THE SPECTATOR VIEW. BL-1333 (spectator growth charts).
+
+**Done when.** Set at the cut. Proposed: an unattended spectator run reaches ~2040 on the curated seeds with every major nation past the Digitisation midpoint, at least one crewed lunar landing and one orbital station.
+
+**Risk.** Wave 3 overturns the DLC parking of all space work (ROADMAP.md, now narrowed to near space). BL-1327 touches the save format. The pacing slider (2.5x) was superseded by Ben's note: no speed-up for the average nation.
+
+Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -153,9 +170,10 @@ Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important 
 | 52 | the Digitisation tech tree | CLOSED 2026-10-10 (Ben: "cut this sprint as a success on building the tech tree"). The Digitisation tree is designed, written down and checked; every nation holds a tech state, a research pool and a queue from an equal start, paced to an eighty-year age. Generation, effects, the panel, the nation AI, deed state and the re-bless carry to sprint 53 on their branches. |
 | 54 | UI improvements | CLOSED 2026-10-14 (Ben: every live click passed, merge to main). Run beside sprint 53 from origin/main: the tile card split, the market pass, a Nations lens, the trade value record, the workforce stepped auto, the settle's readings handed to play. |
 | 53 | the player is a nation | PROPOSED 2026-10-08; DESIGNED 2026-10-10/11 (Ben): the player is a major nation (BL-1245; build BL-1278..BL-1284), nation counts as always-hit targets, the history patterns (BL-1286..BL-1290, BL-1294, BL-1295), plus sprint 52's tech tail. Opens in a fresh session from docs/development/NEXT_SESSION.md; generation first. |
+| 55 | spectator to the end of Era 1 | PROPOSED 2026-10-15; CALLS ANSWERED same day (Ben): full space assets, nations launch, AI space grant, prices rise with RP matching, GDP/output charts. Items BL-1324..BL-1333. Former 55 items moved to 56. |
 
 **Next up.** SPRINTS 50, 51 AND 52 CLOSED and on main; v0.1.30 cut 2026-10-11 (sprints 50 and 52). SPRINT 53 next: the player is a nation and the history patterns, with sprint 52's tech tail; generation first. Handoff: docs/development/NEXT_SESSION.md.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*72 sprints archived cold; 1 open/gated in the hot store.*
+*72 sprints archived cold; 2 open/gated in the hot store.*

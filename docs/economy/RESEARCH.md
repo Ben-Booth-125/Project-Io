@@ -136,6 +136,14 @@ age. That pacing is the property the price is tuned to and the sweep measures (B
 *"surges in player perceived power levels at similar intervals"*); the node count is never changed
 to meet it.
 
+**Prices rise through the age; research points rise to meet them (Ben, 2026-10-15).** A node's
+cost climbs with its date in the age, not only its ring. A nation's RP grows with its economy, so
+an average nation's unlock cadence stays roughly level from 1960 to the age's close. A nation whose
+economy outgrows the average overtakes the price curve and unlocks faster; one that stagnates falls
+behind. The speed-up is earned by growth, never handed out by the calendar: *"we don't really want
+unlocks to speed up for average games."* The sweep measures the median nation's interval between
+majors as flat, and the spread between richest and median as growth-driven.
+
 ### What technology is for
 
 Three touchpoints the rest of the game already names: the space-access gate (*Rocketry research
