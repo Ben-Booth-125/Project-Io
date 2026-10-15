@@ -4452,8 +4452,11 @@ float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
 void draw_lapse_scoreboard(const history_lapse& h,
                            const std::vector<uint16_t>& slice,
                            const std::vector<uint16_t>& lagged,
-                           int year, int lagged_year)
+                           int year, int lagged_year, int max_rows)
 {
+    // The rows shown: at most k_board_rows, fewer where the column is short
+    // (the wizard fits its rounds without a scroll bar; Ben, 2026-10-15).
+    const int board_rows = std::clamp(max_rows, 1, k_board_rows);
     const std::vector<board_row> now  = rank_slice(h, slice, year);
     const std::vector<board_row> then = rank_slice(h, lagged, lagged_year);
 
@@ -4480,7 +4483,8 @@ void draw_lapse_scoreboard(const history_lapse& h,
     // § Round 3 — Culture); on the three pass rounds they are realms.
     ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
     ImGui::Text("%d %s hold ground; the top %d are listed.",
-                static_cast<int>(now.size()), h.peoples ? "peoples" : "realms", k_board_rows);
+                static_cast<int>(now.size()), h.peoples ? "peoples" : "realms",
+                std::min(board_rows, static_cast<int>(now.size())));
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
@@ -4524,7 +4528,7 @@ void draw_lapse_scoreboard(const history_lapse& h,
         ImGui::TableSetupColumn("Ind", ImGuiTableColumnFlags_WidthFixed, 44.0f);
     ImGui::TableHeadersRow();
 
-    const int shown = std::min(k_board_rows, static_cast<int>(now.size()));
+    const int shown = std::min(board_rows, static_cast<int>(now.size()));
     for (int i = 0; i < shown; ++i)
     {
         const board_row& b = now[static_cast<std::size_t>(i)];

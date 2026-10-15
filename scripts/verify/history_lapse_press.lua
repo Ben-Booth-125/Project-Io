@@ -45,7 +45,6 @@ verify.window(1920, 1080)
 -- Both were read off captures rather than derived, and a pass round's footer is
 -- the same on every one of them because the decision block is empty on all
 -- four (Culture carries its own Drawdown row, the other three carry none).
-local NEXT3_X,  NEXT3_Y  = 603, 975   -- the last planetology round's Next
 -- BL-914 (2026-09-11): Restart is retired on every lapse round -- a scrubber
 -- makes it redundant and its row went to the ranking board. The SAME slot is
 -- now the Pause/Play toggle; a landed round is parked (paused) under --verify
@@ -55,9 +54,16 @@ local NEXT3_X,  NEXT3_Y  = 603, 975   -- the last planetology round's Next
 -- below has always asserted. The scrubber beside it takes no --verify hook
 -- yet and is not exercised by this script; a live click is owed for it.
 local TRANSPORT_X, TRANSPORT_Y = 483, 150
-local REROLL_X, REROLL_Y = 483, 957   -- a pass round's Reroll
-local BACKP_X,  BACKP_Y  = 363, 995   -- a pass round's Back
-local NEXTP_X,  NEXTP_Y  = 603, 995   -- a pass round's Next
+-- The wizard footer's press points move with each round's content (Ben,
+-- 2026-10-15: the controls sit high, no scroll bar), so presses read them off
+-- verify.wizard_buttons rather than a fixed coordinate.
+local function press(which)
+    verify.frames(1)
+    local rx, ry, bx, by, nx, ny = verify.wizard_buttons()
+    if which == "reroll" then verify.click(rx, ry)
+    elseif which == "back" then verify.click(bx, by)
+    else verify.click(nx, ny) end
+end
 
 -- Park on round 3, then walk ONE round by pressing Next for real.
 verify.generation_stage(2)
@@ -77,7 +83,7 @@ verify.capture("press_00_round3_before_next")
 -- --verify the run resolves synchronously (it adopts the record the harness's
 -- own world already carries), so the record is in hand once the frames below
 -- have run.
-verify.click(NEXT3_X, NEXT3_Y)
+press("next")
 verify.frames(6)
 round = select(1, verify.wizard_round())
 verify.expect(round == 3, "NEXT on Life lands on round 4, CULTURE (0-based "
@@ -124,7 +130,7 @@ verify.capture("press_02_after_restart")
 -- pass round lands on the explanatory line: span_seed[0] stays at 0, the round
 -- stays put and keeps its record. (Under --verify a rerun adopts the harness
 -- world's record, so only the seed can tell a reroll from a no-op.)
-verify.click(REROLL_X, REROLL_Y)
+press("reroll")
 verify.frames(6)
 verify.expect(verify.wizard_span_seed(0) == 0,
               "the Culture round has no Reroll: a press on its slot moves no seed (span_seed[0] = "
@@ -140,7 +146,7 @@ verify.capture("press_03_culture_no_reroll")
 -- moves onto round 4 starts round 4's pass exactly as round 3's started
 -- round 3's. `history_powers` reads the round the wizard is ON, so a record
 -- here is round 4's own record and not round 3's showing through.
-verify.click(NEXTP_X, NEXTP_Y)
+press("next")
 verify.frames(6)
 round = select(1, verify.wizard_round())
 verify.expect(round == 4, "NEXT on Culture lands on round 5, EMPIRES (0-based "
@@ -187,7 +193,7 @@ verify.capture("press_04c_round4_break_away")
 
 -- A6 -- ROUND 4's REROLL IS ITS OWN. Same slot, different round: it must leave a
 -- record on round 4 rather than clearing it or acting on round 3's.
-verify.click(REROLL_X, REROLL_Y)
+press("reroll")
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
               "Reroll re-runs round 4's pass and leaves a record on the round")
@@ -202,7 +208,7 @@ verify.capture("press_05_round5_after_reroll")
 -- own span (1200 -> 1660 CE) on arrival, on the SAME auto-start every other
 -- lapse round uses, and its record is its OWN (`exploration_timelapse`), not
 -- the Empires round's showing through.
-verify.click(NEXTP_X, NEXTP_Y)
+press("next")
 verify.frames(6)
 round = select(1, verify.wizard_round())
 verify.expect(round == 5, "NEXT on Empires lands on round 6, EXPLORATION (0-based "
@@ -218,7 +224,7 @@ verify.capture("press_06_round6_exploration")
 
 -- A11 -- EXPLORATION'S OWN REROLL, same slot, same contract as A4/A6: it must
 -- leave a record on THIS round, not clear it or touch Empires' above it.
-verify.click(REROLL_X, REROLL_Y)
+press("reroll")
 verify.frames(6)
 verify.expect(verify.history_powers() > 0,
               "Reroll re-runs round 5's (Exploration) pass and leaves a record "
@@ -231,7 +237,7 @@ verify.capture("press_07_round6_after_reroll")
 -- (`industrialisation_timelapse`), not Exploration's showing through. Its
 -- own press is "Begin" and this script does not touch it -- pressing it
 -- would generate a world and leave the wizard entirely.
-verify.click(NEXTP_X, NEXTP_Y)
+press("next")
 verify.frames(6)
 round = select(1, verify.wizard_round())
 verify.expect(round == 6, "NEXT on Exploration lands on round 7, INDUSTRIALISATION (0-based "
@@ -329,7 +335,7 @@ end
 -- A8 -- BACK WALKS THE LADDER DOWN ONE RUNG AT A TIME, and a finished record is
 -- NOT discarded and re-run on the way past. That guard is the reason the
 -- auto-start is conditioned on the arriving round being empty.
-verify.click(BACKP_X, BACKP_Y)
+press("back")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 5, "Back from Industrialisation lands on EXPLORATION (0-based "
@@ -341,7 +347,7 @@ verify.expect(back_first == exp_first,
               "round 5 shows its OWN record again, not round 6's (" .. back_first
               .. " vs " .. exp_first .. ")")
 
-verify.click(BACKP_X, BACKP_Y)
+press("back")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 4, "Back from Exploration lands on EMPIRES (0-based "
@@ -349,7 +355,7 @@ verify.expect(round == 4, "Back from Exploration lands on EMPIRES (0-based "
 verify.expect(verify.history_powers() > 0,
               "round 4's record survived the walk up to round 6 and back")
 
-verify.click(BACKP_X, BACKP_Y)
+press("back")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 3, "Back from Empires lands on CULTURE (0-based "

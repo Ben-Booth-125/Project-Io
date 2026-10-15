@@ -661,6 +661,13 @@ private:
     /// the menu. (BL-1279 moved the seed from the menu to the setup round; the
     /// menu's first draw used to roll it.)
     bool            m_seed_rolled = false;
+    // THE WIZARD FITS WITHOUT A SCROLL BAR (Ben, 2026-10-15). The lapse
+    // board's and ticker's row counts, cut to the column's height from the
+    // last frame's overflow, and the charts block's measured content height.
+    int             m_wiz_fit_board_rows  = 16;
+    int             m_wiz_fit_ticker_rows = 6;
+    float           m_wiz_charts_content_h = 0.0f;
+    float           m_wiz_btn_xy[6] = {-1, -1, -1, -1, -1, -1}; ///< Reroll, Back, Next centres (verify)
     world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
 

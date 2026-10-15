@@ -1942,6 +1942,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // one that reads it, which is what turns a walk into an assertion.
     // BL-1279: the third value is whether the wizard is on Quick Start's
     // setup round alone (STARTUP.md § Rounds, Ben 2026-10-13).
+    // THE WIZARD FOOTER'S PRESS POINTS (Ben, 2026-10-15: the footer follows
+    // each round's content, so no fixed coordinate is right on every round).
+    // Returns rx, ry, bx, by, nx, ny -- Reroll's centre (-1, -1 where the
+    // round has none), Back's, Next's (or Begin's) -- as last drawn.
+    v.set_function("wizard_buttons", [this]() {
+        const float* b = m_wiz_btn_xy;
+        return std::make_tuple(b[0], b[1], b[2], b[3], b[4], b[5]);
+    });
     v.set_function("wizard_round", [this]() {
         return std::make_tuple(m_wiz_round, wizard_round_count, m_wiz_quick_start);
     });
@@ -3029,6 +3037,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // BL-1000: the pass rounds' chart child inside that column — the lapse
         // board, ticker and arc readout scroll HERE, not in the outer column.
         else if (name == "wizard_charts")        target = "##wiz_charts";
+        // The seat screen's card/briefing child: the briefing and its Confirm
+        // sit below the full card (Ben, 2026-10-15).
+        else if (name == "seat_card")            target = "##seat_card";
         else if (name.empty())                   target = ""; // the documented "clear" call
 
         if (target == nullptr)

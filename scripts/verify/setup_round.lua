@@ -3,8 +3,11 @@
 --   ProjectIo --verify scripts/verify/setup_round.lua
 --
 -- The setup round sits between System and Life and holds the world-wide inputs:
--- the two nation targets (total, majors), the seed (hex entry, Roll, Copy seed)
--- and the abundance radio, which moved here from the main menu. The wizard is
+-- the two nation targets (total, majors) and the abundance radio, which moved
+-- here from the main menu. The SEED IS HIDDEN (Ben, 2026-10-15): no entry, Roll
+-- or Copy anywhere in the wizard -- setup_02_setup_round shows none; the Life
+-- round's Reroll is how a player gets another world, and --verify sets seeds
+-- through the verify API. The wizard is
 -- SEVEN rounds. Claims, each driven by a REAL PRESS where a press exists:
 --
 --   S1. The menu carries no seed and no abundance any more (capture).
@@ -22,8 +25,7 @@
 -- Quick Start's build straight through to the seat, and the census of the
 -- world it lands on, are quick_start.lua's (slow: the cold build).
 --
--- Coordinates are read off the 1920x1080 captures (the wizard's left column
--- footer: Back left, Next right).
+-- The menu coordinates are read off the 1920x1080 captures.
 
 verify.window(1920, 1080)
 verify.show_menu(true)
@@ -32,10 +34,13 @@ verify.capture("setup_00_menu")
 
 local NEWGAME_X, NEWGAME_Y = 958, 574   -- the menu's New Game (see setup_00_menu)
 local QUICK_X,   QUICK_Y   = 958, 628   -- the menu's Quick Start
-local NEXT_SYS_X, NEXT_SYS_Y = 603, 975 -- System's Next (under its lean block)
-local BACK_X, BACK_Y = 363, 995         -- Setup / Life-less footer: Back
-local NEXT_X, NEXT_Y = 603, 995         -- Setup footer: Next (Begin under Quick Start)
-local BACK_LIFE_X, BACK_LIFE_Y = 363, 975 -- Life's Back (under its lean block)
+-- The footer follows each round's content (Ben, 2026-10-15), so Back and
+-- Next are read off verify.wizard_buttons at each press.
+local function press(which)
+    verify.frames(1)
+    local _, _, bx, by, nx, ny = verify.wizard_buttons()
+    if which == "back" then verify.click(bx, by) else verify.click(nx, ny) end
+end
 
 -- S2 -- New Game, then Next onto the setup round.
 verify.click(NEWGAME_X, NEWGAME_Y)
@@ -48,7 +53,7 @@ verify.expect(round == 0 and not quick, "New Game opens on round 1, System (0-ba
               .. round .. ")")
 verify.capture("setup_01_system")
 
-verify.click(NEXT_SYS_X, NEXT_SYS_Y)
+press("next")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 1, "Next on System lands on round 2, SETUP (0-based " .. round .. ")")
@@ -78,16 +83,16 @@ verify.wizard_set_targets(20, 4)
 verify.frames(3)
 
 -- S5 -- causal order, walked both ways.
-verify.click(NEXT_X, NEXT_Y)
+press("next")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 2, "Next on Setup lands on round 3, LIFE (0-based " .. round .. ")")
 verify.capture("setup_05_life")
-verify.click(BACK_LIFE_X, BACK_LIFE_Y)
+press("back")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 1, "Back on Life lands on Setup (0-based " .. round .. ")")
-verify.click(BACK_X, BACK_Y)
+press("back")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 0, "Back on Setup lands on System (0-based " .. round .. ")")
@@ -102,7 +107,7 @@ verify.expect(verify.screen() == "generating" and round == 1 and quick,
               "Quick Start opens the setup round alone (screen " .. verify.screen()
               .. ", round " .. round .. ", quick " .. tostring(quick) .. ")")
 verify.capture("setup_06_quick_start")
-verify.click(BACK_X, BACK_Y)
+press("back")
 verify.frames(3)
 round, rounds, quick = verify.wizard_round()
 verify.expect(verify.screen() == "menu" and not quick,

@@ -50,9 +50,9 @@ in-game days. `run_verify()` jumps straight to `in_game`
 A dark, centred title card — deliberately spare, a launch entry point, not a
 settings hub (no Load/Save on the menu; `--load` is a command-line path). Contents:
 
-- **Seed** — **moved to the wizard's setup round (Ben, 2026-10-11; § Rounds)**; what follows
-  describes the control wherever it is drawn. Hex entry, a one-shot **Roll** (a `random_device` draw feeds *only*
-  the seed value; generation stays a pure function of it), and **Copy seed**.
+- **Seed** — **not on the menu, and not shown anywhere (Ben, 2026-10-15; § Rounds)**: no entry,
+  Roll or Copy. A `random_device` draw feeds *only* the seed value, unseen; generation stays a
+  pure function of it, and `--verify` sets seeds through the verify API.
   **The wizard OPENS on a rolled seed, not on a fixed one (Ben, 2026-09-10):**
   *"Let's lose the framing of seeded worlds... it allows the player to have a higher degree of
   chance when they do choose to reroll, and it gives the player the ability to see if their world
@@ -164,8 +164,8 @@ setup round keeps the nation targets and the abundance. **Every round fits witho
 Reroll, Back and Next sit higher, so the controls never push off the bottom.
 
 **It sits between System and Life, and holds the world-wide inputs too (Ben, 2026-10-11).** The
-setup round carries the two nation targets, the **seed** (hex entry, Roll, Copy seed) and the
-**abundance** radio — the inputs that shape the whole world rather than one round's subject. They
+setup round carries the two nation targets and the **abundance** radio — the inputs that shape the
+whole world rather than one round's subject (the seed, once here too, is drawn hidden; above). They
 move here from the main menu. Every round keeps its own leans: System's and Life's preferences, and
 each pass round's, stay where they are. The order is System, setup, Life, then the four pass rounds.
 **Quick Start opens the setup round alone, then builds straight through (Ben, 2026-10-13)**: the one

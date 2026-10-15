@@ -15,7 +15,10 @@
 --       nation carries);
 --   N4  the history LINK opens the History ledger on its Ages view, filtered
 --       to the nation, and pressing it again closes it (the toggle rule);
---   N5  a press opens the briefing (captured), Back closes it.
+--   N5  a press opens the briefing (captured), Back closes it. THE SELECTED
+--       ROW KEEPS ITS FULL CARD (Ben, 2026-10-15, live click: the card used to
+--       vanish for the selected nation): the briefing and Confirm sit below
+--       the card, so the _briefing capture shows all seven parts too.
 --
 -- The PNGs are the product: look at them. Determinism: frames, never sleeps.
 
@@ -83,6 +86,9 @@ local function survey(tag)
   verify.frames(2)
   verify.expect(select(5, verify.seat_state()) == nation, tag .. ": a press opens that nation's briefing")
   verify.capture(tag .. "_briefing")
+  verify.scroll_panel("seat_card", 1.0)
+  verify.frames(2)
+  verify.capture(tag .. "_briefing_confirm")
   verify.seat_back()
   verify.frames(1)
   verify.expect(select(5, verify.seat_state()) == 0, tag .. ": Back closes the briefing")

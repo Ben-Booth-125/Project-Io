@@ -8,16 +8,16 @@
 
 ## Headline
 
-**113 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**114 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**55 of 113 elements can be changed without any check going red.**
+**55 of 114 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 55 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 56 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 33 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (55)
+## ASSERTED (56)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -68,8 +68,8 @@ and so is the safety net.
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 33 | 1 | 7 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 21 | 1 | 0 |
 | `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 49 | 1 | 2 |
-| `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 21 | 1 | 11 |
-| `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round` | 51 | 0 | 18 |
+| `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 21 | 1 | 8 |
+| `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round`, `wizard_fit` | 51 | 0 | 8 |
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
@@ -82,13 +82,14 @@ and so is the safety net.
 | `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 21 | 1 | 0 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
 | `UI-114` Nav rail slot fit | chrome | `nav_rail_fit`, `shell_pass` | 3 | 1 | 1 |
-| `UI-118` New World wizard > Wizard lapse-round time-lapse map (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press`, `sea_lanes`, `roads_carried` | 48 | 1 | 11 |
-| `UI-119` New World wizard > Wizard lapse-round top-sixteen board (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press` | 38 | 1 | 11 |
-| `UI-120` New World wizard > Wizard pass round (one of three) | sub-element | `history_lapse_press` | 38 | 0 | 11 |
+| `UI-118` New World wizard > Wizard lapse-round time-lapse map (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press`, `sea_lanes`, `roads_carried` | 48 | 1 | 4 |
+| `UI-119` New World wizard > Wizard lapse-round top-sixteen board (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press` | 38 | 1 | 4 |
+| `UI-120` New World wizard > Wizard pass round (one of three) | sub-element | `history_lapse_press` | 38 | 0 | 4 |
 | `UI-121` New World wizard > Wizard lapse-round legend (rounds 3-6) | sub-element | `round_legends`, `sea_lanes` | 5 | 0 | 0 |
-| `UI-122` New World wizard > Wizard setup round (round 2) | sub-element | `setup_round`, `quick_start` | 21 | 0 | 10 |
+| `UI-122` New World wizard > Wizard setup round (round 2) | sub-element | `setup_round`, `quick_start` | 21 | 0 | 7 |
 | `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 42 | 0 | 3 |
 | `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 8 | 0 | 0 |
+| `UI-126` Construction Ledger > Rail group | sub-element | `rail_construction` | 21 | 0 | 13 |
 
 ## CLIP-ONLY (14)
 
