@@ -876,6 +876,19 @@
    ],
    "status": "drafted"
   },
+  "seat_spectate": {
+   "surface": "Nation selection screen - the Spectate button under the header",
+   "answers": "Can I watch this world play itself instead of taking a nation in it?",
+   "because": "The seat screen asks which nation the player is, and 'none' is a real answer: spectator mode (AI_OPPONENT.md section 10i) opens a session with nobody seated, and before this press it was reachable only by relaunching with --spectate - after the player had already waited out a generation and read the nations on the card. One button under the header, always shown, so watching needs no row pressed first; a line beside it says what it does. It earns its space because it is the screen's third answer and the only pre-play route to the mode from inside the app, and it sits on this screen because spectate is entered at the START of a session: the seat screen is the last moment before play, so the press keeps the mode a property of the whole session. It issues no take_seat. Not a toggle: it has no visible active state - it leaves the screen.",
+   "backlog_item": [
+    "BL-1334"
+   ],
+   "files": [
+    "src/ui/seat_screen.cpp",
+    "src/core/app.hpp"
+   ],
+   "status": "drafted"
+  },
   "wizard_round6_tail_caption": {
    "surface": "Round 6 tail caption (under the playing Industrialisation map)",
    "answers": "The map is already playing, but the world I will be handed is still being built - what step is it on?",

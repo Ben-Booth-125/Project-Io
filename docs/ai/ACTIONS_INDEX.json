@@ -623,7 +623,11 @@
   ],
   [
    "chrome.spectate_cli",
-   "Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do."
+   "Command line. One of the two routes into spectator mode for a human, both at the start of a session; the other is the nation selection screen's Spectate press (chrome.seat_spectate). Before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do."
+  ],
+  [
+   "chrome.seat_spectate",
+   "The nation selection screen at Begin (STARTUP.md § The seat): the Spectate button under the screen's header, always shown, beside the line that explains it. The screen's third answer to 'which nation are you?' - none."
   ],
   [
    "chrome.epoch_cli",

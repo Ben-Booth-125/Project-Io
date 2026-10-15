@@ -1143,6 +1143,13 @@ private:
     /// The shared tail of a drawn and a picked seat: rebuild the player-scoped
     /// caches, print the seat lines, frame the launch view.
     void finish_seat(bool picked);
+    /// BL-1334 (spectate from seat screen; STARTUP.md § The seat): the seat
+    /// screen's Spectate press. Opens the generated world in play with NOBODY
+    /// SEATED -- the session `--spectate` opens (AI_OPPONENT.md § 10i) -- and
+    /// never calls take_seat_pick. Still entry at start: the press is on the
+    /// pre-play screen, before the first tick of play, so the mode remains a
+    /// property of the whole session.
+    void spectate_from_seat();
     /// The seat canvas's draw (src/ui/seat_screen.cpp).
     void draw_seat_screen();
 
