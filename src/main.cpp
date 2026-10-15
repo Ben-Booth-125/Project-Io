@@ -576,6 +576,21 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
     const double run_seconds = std::chrono::duration<double>(clk::now() - t_run0).count();
     const unsigned long long final_hash = w.state_hash(w.current_day_tick);
 
+    // BL-1327: the final space-asset store, counted by class then state.
+    int space_count[4][4] = {};
+    for (const auto& [sid, sa] : w.space_assets)
+        ++space_count[static_cast<int>(sa.cls)][static_cast<int>(sa.state)];
+    static const char* const k_space_cls[4] = {"satellite", "rover", "crewed_mission", "station_module"};
+    std::string space_json = "{";
+    for (int c = 0; c < 4; ++c)
+    {
+        space_json += std::string(c ? ", " : "") + "\"" + k_space_cls[c] + "\": [";
+        for (int s = 0; s < 4; ++s)
+            space_json += (s ? ", " : "") + std::to_string(space_count[c][s]);
+        space_json += "]";
+    }
+    space_json += ", \"order\": \"in_transit, active, decaying, lost\"}";
+
     std::filesystem::create_directories(out_dir);
     const std::string path = out_dir + "/run_" + std::to_string(seed) + ".json";
     std::ofstream f(path, std::ios::binary);
@@ -583,7 +598,7 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
       << ",\n  \"until_year\": " << until_year << ",\n  \"econ_ticks\": " << total_ticks
       << ",\n  \"seat\": " << seat.seated
       << ",\n  \"first_live_econ_step\": " << first_live_step
-      << ",\n  \"space_assets\": null,\n  \"space_assets_note\": \"world has no space_assets store\""
+      << ",\n  \"space_assets\": " << space_json
       << ",\n  \"final_state_hash\": \"";
     char hbuf[24];
     std::snprintf(hbuf, sizeof hbuf, "%016llX", final_hash);
