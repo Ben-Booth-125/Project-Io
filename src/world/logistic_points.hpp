@@ -51,6 +51,8 @@
 #include "world.hpp"
 
 #include <array>
+#include <map>
+#include <tuple>
 #include <cstddef>
 #include <unordered_map>
 #include <vector>
@@ -157,6 +159,18 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
 
 /// Resolve this tick's pools, claims and grants. Pure; mutates only caches.
 lp_tick resolve_logistic_points(world& w);
+
+/// Per-evaluation memo for `lp_coverage_at`: the host nation's source fields,
+/// keyed (nation, network, body). Clear it after any source is built.
+struct lp_reach_memo
+{
+    std::map<std::tuple<entity_id, int, entity_id>, std::unordered_map<entity_id, float>> fields;
+    void clear() { fields.clear(); }
+};
+
+/// The coverage a building standing on @p tile would get from the running
+/// sources of the nation whose ground it is ([0,1]; 0 on nobody's ground).
+float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile);
 
 /// Validate a share rule as the value that lands (each finite, in [0,1], summing
 /// to 1 within 1e-4). The seam rejects anything else whole.
