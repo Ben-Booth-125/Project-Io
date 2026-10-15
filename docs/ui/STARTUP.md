@@ -158,6 +158,11 @@ and how many of them are **majors** (1 to 6). Both are always hit
 They are the wizard's one sanctioned exception to *preferences, not parameters*: a count a player
 plainly wants to set, hit by in-world events rather than by fiat.
 
+**The seed is drawn on the Life round and hidden (Ben, 2026-10-15, at the live click).** The player
+never sees or types a seed: the Life round rolls it, and Reroll is how a player gets another world. The
+setup round keeps the nation targets and the abundance. **Every round fits without a scroll bar:**
+Reroll, Back and Next sit higher, so the controls never push off the bottom.
+
 **It sits between System and Life, and holds the world-wide inputs too (Ben, 2026-10-11).** The
 setup round carries the two nation targets, the **seed** (hex entry, Roll, Copy seed) and the
 **abundance** radio — the inputs that shape the whole world rather than one round's subject. They
