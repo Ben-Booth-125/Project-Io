@@ -84,7 +84,8 @@ the tile assembly block in `tile_generation.cpp`.
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
 `trade_routes_harness`, **`nation_tech_harness`** (BL-1273: every nation's Digitisation tree
-state — accrual, the queue, the save seam, a 16-seed campaign run; it replaced
+state — accrual, the queue, the save seam, a 16-seed campaign run; BL-1324's rising prices
+in R5, and `--age 80 --age-only` runs R4, the 80-year per-decade pacing table; it replaced
 `tech_gate_harness`, `tech_effect_union_harness` and `military_capability_harness`), **`province_partition_harness`** (BL-466 — the
 province partition's invariants plus the three serialisation-seam properties over the HISTORY-LOG
 stream: the pre-BL-466 stream is a byte-exact prefix, an older stream still loads, and the round

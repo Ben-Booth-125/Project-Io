@@ -1049,6 +1049,10 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "rp_per_university",           rp.rp_per_university,           0.0,   inf, ctx);
         read_checked(t, "rp_per_institute",            rp.rp_per_institute,            0.0,   inf, ctx);
         read_checked(t, "rp_per_cost_unit",            rp.rp_per_cost_unit,            1e-3,  inf, ctx);
+        // BL-1324: the price index's yearly growth (capped at 10 in the index
+        // arithmetic; bounded here so a typo cannot run it away) and the economy term.
+        read_checked(t, "price_growth_per_year",       rp.price_growth_per_year,       0.0,   1.0, ctx);
+        read_checked(t, "rp_per_economy_unit",         rp.rp_per_economy_unit,         0.0,   inf, ctx);
 
         m_research = rp;
     }

@@ -1,5 +1,6 @@
 #include "nation_tech.hpp"
 
+#include "campaign_settle.hpp" // k_campaign_settle_ticks (BL-1324: the age quarter)
 #include "components.hpp"
 #include "nation_budget.hpp"
 #include "recipe_registry.hpp"
@@ -151,12 +152,78 @@ std::int64_t to_milli(double rp)
 }
 } // namespace
 
-std::int64_t node_cost_milli(int node, const research_params& p)
+namespace {
+constexpr std::int64_t k_price_unit_ppm = 1'000'000;
+constexpr std::int64_t k_price_cap_ppm  = 1'000'000'000'000LL; // a millionfold: overflow guard only
+} // namespace
+
+std::int64_t node_cost_milli(int node, const research_params& p, std::int64_t price_ppm)
 {
     if (!valid_node(node))
         return 0;
-    return to_milli(static_cast<double>(node_at(node).cost_units)
-                    * static_cast<double>(p.rp_per_cost_unit));
+    const std::int64_t unpriced = to_milli(static_cast<double>(node_at(node).cost_units)
+                                           * static_cast<double>(p.rp_per_cost_unit));
+    // BL-1324: the price index, in integer arithmetic. At the opening price
+    // (1'000'000 ppm) this is the unpriced cost exactly, so a flat-price world
+    // charges what it always did.
+    if (price_ppm == k_price_unit_ppm)
+        return unpriced;
+    const std::int64_t idx = std::clamp<std::int64_t>(price_ppm, 0, k_price_cap_ppm);
+    // Split whole and fractional index so the product stays inside int64.
+    const std::int64_t whole = idx / k_price_unit_ppm;
+    const std::int64_t frac  = idx % k_price_unit_ppm;
+    return unpriced * whole + (unpriced * frac + k_price_unit_ppm / 2) / k_price_unit_ppm;
+}
+
+std::int64_t research_price_ppm_at(int age_quarter, const research_params& p)
+{
+    const double g = static_cast<double>(p.price_growth_per_year);
+    if (age_quarter <= 0 || !std::isfinite(g) || g <= 0.0)
+        return k_price_unit_ppm;
+    // A nominal annual rate compounded quarterly: each quarter adds rate/4 of
+    // the index. The dial becomes an integer ppm rate ONCE; the compounding is
+    // integer, so the index is the same on every platform.
+    const std::int64_t rate_ppm = std::llround(std::min(g, 10.0) * 1.0e6 / 4.0);
+    std::int64_t idx = k_price_unit_ppm;
+    for (int q = 0; q < age_quarter && idx < k_price_cap_ppm; ++q)
+        idx += (idx / k_price_unit_ppm) * rate_ppm
+             + ((idx % k_price_unit_ppm) * rate_ppm + k_price_unit_ppm / 2) / k_price_unit_ppm;
+    return std::min(idx, k_price_cap_ppm);
+}
+
+int research_age_quarter(const world& w)
+{
+    return std::max(0, w.current_econ_tick - k_campaign_settle_ticks);
+}
+
+std::int64_t research_price_ppm(const world& w, const research_params& p)
+{
+    return research_price_ppm_at(research_age_quarter(w), p);
+}
+
+namespace {
+// A firm's contribution to its home nation's economy measure: the income of
+// its latest filed return, milli-credits, never negative.
+std::int64_t economy_milli_of(const corporation_component& c)
+{
+    if (c.returns.empty())
+        return 0;
+    const double inc = static_cast<double>(c.returns.back().income);
+    if (!std::isfinite(inc) || inc <= 0.0)
+        return 0;
+    return std::llround(std::min(inc, 1.0e15) * 1000.0);
+}
+} // namespace
+
+std::int64_t nation_economy_milli(const world& w, entity_id nation)
+{
+    if (nation == null_entity)
+        return 0;
+    std::int64_t sum = 0;
+    for (const auto& [cid, c] : w.corporations)
+        if (c.home_nation == nation)
+            sum += economy_milli_of(c);
+    return sum;
 }
 
 std::int64_t line_rp_milli(float credits, const research_params& p)
@@ -623,7 +690,8 @@ namespace {
 // The queue half of the quarterly pass over one nation's state. Shared by
 // `flow_research_queue` (the live state) and `project_queue_arrivals` (a copy):
 // one loop, so the projection cannot disagree with what the pass will do.
-int flow_state(const world& w, entity_id nation, nation_tech_state& st, const research_params& p)
+int flow_state(const world& w, entity_id nation, nation_tech_state& st, const research_params& p,
+               std::int64_t price_ppm)
 {
     int completed = 0;
     bool moved = true;
@@ -647,7 +715,7 @@ int flow_state(const world& w, entity_id nation, nation_tech_state& st, const re
             if (!groups_met(st.held, n) || !deed_met(w, nation, n))
                 continue;
 
-            const std::int64_t cost = node_cost_milli(n, p);
+            const std::int64_t cost = node_cost_milli(n, p, price_ppm);
             if (st.pool_milli < cost)
                 return completed; // the head waits for funding; RP stay in the pool
 
@@ -669,6 +737,8 @@ struct research_buildings
 {
     std::map<entity_id, int> universities;
     std::map<entity_id, int> institutes;
+    /// BL-1324: `nation_economy_milli` per home nation, summed in integers.
+    std::map<entity_id, std::int64_t> economy_milli;
 };
 
 research_buildings count_research_buildings(const world& w)
@@ -676,6 +746,8 @@ research_buildings count_research_buildings(const world& w)
     research_buildings rb;
     for (const auto& [corp, cc] : w.corporations)
     {
+        if (cc.home_nation != null_entity)
+            rb.economy_milli[cc.home_nation] += economy_milli_of(cc);
         for (const entity_id bid : cc.assets)
         {
             const auto bit = w.buildings.find(bid);
@@ -711,7 +783,7 @@ research_buildings count_research_buildings(const world& w)
 // quarterly pass applies it; the research panel's projection reads it.
 research_accrual compute_accrual(const world& w, entity_id nid, const research_buildings& rb,
                                  const nation_tech_state* st, float treasury,
-                                 const research_params& p)
+                                 const research_params& p, std::int64_t price_ppm)
 {
     const std::size_t ai = static_cast<std::size_t>(budget_priority::academic_research);
     research_accrual row;
@@ -721,6 +793,11 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
         row.universities = u->second;
     if (const auto r = rb.institutes.find(nid); r != rb.institutes.end())
         row.institutes = r->second;
+    std::int64_t econ_milli = 0;
+    if (const auto e = rb.economy_milli.find(nid); e != rb.economy_milli.end())
+        econ_milli = e->second;
+    row.economy   = static_cast<double>(econ_milli) / 1000.0;
+    row.price_ppm = price_ppm;
     row.multiplier = research_multiplier(w, nid);
     const double mult = std::isfinite(row.multiplier) && row.multiplier > 0.0f
                             ? static_cast<double>(row.multiplier) : 0.0;
@@ -733,12 +810,14 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
     const double uni_factor = static_cast<double>(
         nation_scalar(w, nid, modifier_subject::national_research, uni, 1.0f));
 
-    // The RP that cost no treasury: the base and the buildings.
+    // The RP that cost no treasury: the base, the buildings and (BL-1324) the
+    // economy term — RP that grow with the nation's economy to meet the prices.
     const std::int64_t free_milli = static_cast<std::int64_t>(std::llround(
         static_cast<double>(to_milli(static_cast<double>(p.base_rp_per_nation)
                                      + static_cast<double>(row.universities) * p.rp_per_university
                                            * uni_factor
-                                     + static_cast<double>(row.institutes) * p.rp_per_institute))
+                                     + static_cast<double>(row.institutes) * p.rp_per_institute
+                                     + static_cast<double>(p.rp_per_economy_unit) * row.economy))
         * mult));
 
     // What the queue still owes: every queued node's cost, less the pool
@@ -747,7 +826,7 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
     if (st != nullptr)
     {
         for (const std::uint16_t n : st->queue)
-            owed += node_cost_milli(n, p);
+            owed += node_cost_milli(n, p, price_ppm);
         owed -= st->pool_milli;
     }
     row.owed_milli = std::max<std::int64_t>(0, owed);
@@ -801,7 +880,7 @@ int flow_research_queue(world& w, entity_id nation, const research_params& p)
     const auto it = w.nation_tech.find(nation);
     if (it == w.nation_tech.end())
         return 0;
-    return flow_state(w, nation, it->second, p);
+    return flow_state(w, nation, it->second, p, research_price_ppm(w, p));
 }
 
 void clear_research_at_handover(world& w)
@@ -815,6 +894,7 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         return;
 
     const research_buildings rb = count_research_buildings(w);
+    const std::int64_t price    = research_price_ppm(w, p); // one index for the whole pass
 
     std::vector<entity_id> ids;
     ids.reserve(w.nations.size());
@@ -827,7 +907,7 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         nation_component& nc = w.nations.at(nid);
         const auto sit = w.nation_tech.find(nid);
         research_accrual row = compute_accrual(
-            w, nid, rb, sit != w.nation_tech.end() ? &sit->second : nullptr, nc.treasury, p);
+            w, nid, rb, sit != w.nation_tech.end() ? &sit->second : nullptr, nc.treasury, p, price);
         if (row.line_spend > 0.0f)
             nc.treasury -= row.line_spend;
 
@@ -837,7 +917,7 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         {
             nation_tech_state& st = w.nation_tech[nid];
             st.pool_milli += row.rp_milli;
-            row.completed = flow_research_queue(w, nid, p);
+            row.completed = flow_state(w, nid, st, p, price);
         }
 
         if (out != nullptr)
@@ -886,7 +966,7 @@ std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
     owing.queue.assign(1, 0);
     owing.pool_milli = -1'000'000'000'000'000LL; // a trillion RP owed: no quarter meets it
     return compute_accrual(w, nation, count_research_buildings(w), &owing,
-                           nit->second.treasury, p).rp_milli;
+                           nit->second.treasury, p, research_price_ppm(w, p)).rp_milli;
 }
 
 std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
@@ -903,13 +983,19 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
     nation_tech_state sim = *existing;
     const research_buildings rb = count_research_buildings(w);
     const float treasury = nit->second.treasury; // held: the rate as it stands now
+    // BL-1324: the price index RISES through the projection as the passes will
+    // charge it — projected quarter q is the pass at age quarter
+    // `research_age_quarter(w) + q`. The economy is held where it stands, like
+    // the treasury.
+    const int age_now = research_age_quarter(w);
     for (int q = 1; q <= horizon_quarters && !sim.queue.empty(); ++q)
     {
-        const research_accrual row = compute_accrual(w, nation, rb, &sim, treasury, p);
+        const std::int64_t price = research_price_ppm_at(age_now + q, p);
+        const research_accrual row = compute_accrual(w, nation, rb, &sim, treasury, p, price);
         if (row.rp_milli <= 0)
             break;
         sim.pool_milli += row.rp_milli;
-        flow_state(w, nation, sim, p);
+        flow_state(w, nation, sim, p, price);
         for (std::size_t i = 0; i < existing->queue.size(); ++i)
             if (arrival[i] < 0 && sim.held.test(existing->queue[i]))
                 arrival[i] = q;

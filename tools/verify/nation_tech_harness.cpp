@@ -48,8 +48,17 @@
 //       Rocketry's space_dispatch; logistics_cost through price_trade_leg on
 //       one generated world (haul only, never port handling).
 //
+// BL-1324, rising tech prices (RESEARCH.md § Cost, Ben 2026-10-15):
+//   R5  fixture rows: the price index (integer, compounded quarterly from the
+//       age's open), the priced cost the pass charges, the economy term, and
+//       the queue projection charging the same rising price the passes do.
+//   R4  (--age Y) the age run: every nation queues every major for Y years;
+//       per decade the median nation's interval between majors (standard =
+//       price against RP; scripted = what its queue completed) and the richest.
+//
 // Usage: nation_tech_harness [--seeds N | --seed-list a,b,...] [--quarters Q] [--once]
 //                            [--base X] [--lin Y] [--sqrt Z] [--unit U]
+//                            [--growth G] [--econ E] [--age Y] [--age-only]
 //   --seeds 0   fixture rows (R1-R3, T1, T2) plus T2-live's one generated world — the ctest invocation.
 //   default     all 16 library seeds, 32 live quarters, each seed built twice,
 //               on the registry's research dials (scripts/economy.lua) unless
@@ -924,6 +933,120 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
 }
 
 // ---------------------------------------------------------------------------
+// R5 — rising prices and the economy term (BL-1324; RESEARCH.md § Cost)
+// ---------------------------------------------------------------------------
+
+void rows_r5()
+{
+    std::printf("\nR5 prices rise through the age; RP grow with the economy (BL-1324)\n");
+    research_params g{};
+    g.price_growth_per_year = 0.04f;
+    research_params flat = g;
+    flat.price_growth_per_year = 0.0f;
+    check(research_price_ppm_at(0, g) == 1'000'000 && research_price_ppm_at(-5, g) == 1'000'000
+              && research_price_ppm_at(320, flat) == 1'000'000,
+          "R5a the index opens at 1 (ppm 1'000'000) and a zero growth dial holds it flat");
+    check(research_price_ppm_at(1, g) == 1'010'000 && research_price_ppm_at(4, g) == 1'040'604,
+          "R5b 4% a year compounds quarterly in integers: 1.01 after a quarter, 1.040604 after a year");
+    bool mono = true;
+    for (int q = 1; q <= 400; ++q)
+        if (research_price_ppm_at(q, g) <= research_price_ppm_at(q - 1, g)) mono = false;
+    check(mono, "R5c ...and rises every quarter of a long age");
+
+    const int n = node("DG-PR-EX-A");
+    check(node_cost_milli(n, g, 1'000'000) == node_cost_milli(n, g)
+              && node_cost_milli(n, g, 2'000'000) == 2 * node_cost_milli(n, g)
+              && node_cost_milli(n, g, 1'500'000) == node_cost_milli(n, g) * 3 / 2,
+          "R5d a node's cost is its unpriced cost x the index, exactly at the opening price");
+
+    {
+        fixture f = make_fixture(0.0f);
+        f.w.current_econ_tick = k_campaign_settle_ticks - 1;
+        const bool settle_flat = research_age_quarter(f.w) == 0 && research_price_ppm(f.w, g) == 1'000'000;
+        f.w.current_econ_tick = k_campaign_settle_ticks + 4;
+        check(settle_flat && research_age_quarter(f.w) == 4
+                  && research_price_ppm(f.w, g) == research_price_ppm_at(4, g),
+              "R5e the world's age quarter counts live quarters from the campaign's open (the settle charges the opening price)");
+    }
+
+    // The pass charges the index: a root that costs 100 RP at the opening price
+    // costs 200 at an index of 2, so 100 RP a quarter takes two passes.
+    {
+        research_params p{};
+        p.base_rp_per_nation = 100.0f;
+        p.rp_per_research_credit_sqrt = 0.0f;
+        p.rp_per_cost_unit = 100.0f;
+        p.price_growth_per_year = 4.0f; // +100% a quarter: an index of 2 after one quarter
+        fixture f = make_fixture(0.0f);
+        const int root = node("DG-PR-EX-T1");
+        enqueue_node(f.w, f.nation, root);
+        f.w.current_econ_tick = k_campaign_settle_ticks + 1;
+        std::vector<research_accrual> rows;
+        advance_research(f.w, p, &rows);
+        const bool first = !nation_holds(f.w, f.nation, root) && row_for(rows, f.nation)->price_ppm == 2'000'000;
+        advance_research(f.w, p);
+        check(first && nation_holds(f.w, f.nation, root) && f.w.nation_tech.at(f.nation).pool_milli == 0,
+              "R5f the quarterly pass charges the priced cost (200 RP at index 2: two passes of 100)");
+    }
+
+    // The economy term: RP per credit of the home firms' latest filed income;
+    // a loss counts as nothing.
+    {
+        research_params p{};
+        p.base_rp_per_nation = 0.0f;
+        p.rp_per_research_credit_sqrt = 0.0f;
+        p.rp_per_economy_unit = 0.2f;
+        fixture f = make_fixture(0.0f);
+        quarterly_return old_r{}, r{}, loss{};
+        old_r.income = 9000.0f; // an earlier return: only the latest counts
+        r.income     = 500.0f;
+        loss.income  = -300.0f;
+        f.w.corporations.at(f.corp).returns  = { old_r, r };
+        f.w.corporations.at(f.corp2).returns = { loss };
+        std::vector<research_accrual> rows;
+        advance_research(f.w, p, &rows);
+        const research_accrual* a = row_for(rows, f.nation);
+        const research_accrual* b = row_for(rows, f.other);
+        check(a != nullptr && b != nullptr && a->economy == 500.0 && a->rp_milli == milli(100.0)
+                  && b->economy == 0.0 && b->rp_milli == 0
+                  && nation_economy_milli(f.w, f.nation) == milli(500.0),
+              "R5g RP grow with the economy: 0.2 RP per credit of the latest filed income (500 -> 100 RP); a loss adds none");
+    }
+
+    // The projection prices every future quarter as the passes will: stepping
+    // the real pass quarter by quarter completes the queue in the quarter the
+    // panel projected.
+    {
+        research_params p{};
+        p.base_rp_per_nation = 100.0f;
+        p.rp_per_research_credit_sqrt = 0.0f;
+        p.rp_per_cost_unit = 100.0f;
+        p.price_growth_per_year = 0.02f;
+        fixture f = make_fixture(0.0f);
+        f.w.current_econ_tick = k_campaign_settle_ticks + 7;
+        enqueue_node(f.w, f.nation, n);
+        const std::vector<int> proj = project_queue_arrivals(f.w, f.nation, p);
+        research_params pf = p;
+        pf.price_growth_per_year = 0.0f;
+        const std::vector<int> proj_flat = project_queue_arrivals(f.w, f.nation, pf);
+        const std::vector<std::uint16_t> q = f.w.nation_tech.at(f.nation).queue;
+        std::vector<int> real(q.size(), -1);
+        for (int k = 1; k <= 200; ++k)
+        {
+            ++f.w.current_econ_tick;
+            advance_research(f.w, p);
+            for (std::size_t i = 0; i < q.size(); ++i)
+                if (real[i] < 0 && nation_holds(f.w, f.nation, q[i])) real[i] = k;
+        }
+        std::printf("     2%%/yr: projected last entry q%d, flat q%d, stepped q%d\n",
+                    proj.empty() ? -1 : proj.back(), proj_flat.empty() ? -1 : proj_flat.back(),
+                    real.empty() ? -1 : real.back());
+        check(!proj.empty() && proj == real && proj.back() > proj_flat.back(),
+              "R5h the queue's arrival projection charges the rising price the passes charge (matches stepping; later than flat)");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // R0 — the campaign run
 // ---------------------------------------------------------------------------
 
@@ -963,6 +1086,8 @@ struct dial_override
 {
     bool  set_base = false, set_lin = false, set_sqrt = false, set_unit = false;
     float base = 0.0f, lin = 0.0f, sqrt_k = 0.0f, unit = 0.0f;
+    bool  set_growth = false, set_econ = false; // BL-1324
+    float growth = 0.0f, econ = 0.0f;
 };
 
 struct nation_row
@@ -1009,6 +1134,8 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
         if (ov.set_lin)  rp.rp_per_research_credit = ov.lin;
         if (ov.set_sqrt) rp.rp_per_research_credit_sqrt = ov.sqrt_k;
         if (ov.set_unit) rp.rp_per_cost_unit = ov.unit;
+        if (ov.set_growth) rp.price_growth_per_year = ov.growth;
+        if (ov.set_econ)   rp.rp_per_economy_unit = ov.econ;
         reg.set_research(rp);
         out.params = rp;
     }
@@ -1101,10 +1228,12 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
             nation_row& r = rows[a.nation];
             r.rp_live    += static_cast<double>(a.rp_milli) / 1000.0;
             r.spend_live += a.line_spend;
-            {   // the whole-tree rate: the base plus the line spending its WHOLE share
+            {   // the whole-tree rate: the base, the economy term (BL-1324) and the line
+                // spending its WHOLE share
                 const double sh = std::max(0.0, static_cast<double>(a.line_share));
                 r.full_rp += p.base_rp_per_nation + p.rp_per_research_credit * sh
-                           + p.rp_per_research_credit_sqrt * std::sqrt(sh);
+                           + p.rp_per_research_credit_sqrt * std::sqrt(sh)
+                           + p.rp_per_economy_unit * a.economy;
             }
         }
         for (const entity_id nid : nids)
@@ -1200,9 +1329,10 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
                     static_cast<unsigned long long>(a.digest), twice ? (same ? "twice-equal" : "DIFFERS") : "",
                     a.secs);
     }
-    std::printf("  dials: base %.3g  linear %.4g RP/credit  sqrt %.4g RP/sqrt(credit)  unit %.4g RP\n",
+    std::printf("  dials: base %.3g  linear %.4g RP/credit  sqrt %.4g RP/sqrt(credit)  unit %.4g RP"
+                "  price growth %.4g/yr  economy %.4g RP/credit\n",
                 used.base_rp_per_nation, used.rp_per_research_credit, used.rp_per_research_credit_sqrt,
-                used.rp_per_cost_unit);
+                used.rp_per_cost_unit, used.price_growth_per_year, used.rp_per_economy_unit);
 
     check(fails == 0, "R0a every seed builds, settles and seats");
     check(all_band, "R0b STRUCTURAL: every seed opens on the industrial band (campaign_band_from_world is a constant)");
@@ -1233,7 +1363,7 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     for (int n = 0; n < io::dg::node_count; ++n) tree_units += io::dg::nodes[static_cast<std::size_t>(n)].cost_units;
     const double tree_q = best_full > 0.0 ? tree_units * used.rp_per_cost_unit / best_full : -1.0;
     std::printf("  the richest nation, spending its whole research share every quarter, converts %.1f RP a quarter:\n"
-                "  the whole tree (%.0f units, %.0f RP) in %.0f quarters (%.1f years).\n",
+                "  the whole tree (%.0f units, %.0f RP at the opening price; R4 runs the rising one) in %.0f quarters (%.1f years).\n",
                 best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / 4.0);
     std::printf("  thresholds: >= %.0f%% reach it in %d; median in [%.0f, %.0f]; p10 >= %.0f\n",
                 100.0 * k_min_reach, static_cast<int>(16 * sc), 8 * sc, 12 * sc, 4 * sc);
@@ -1243,11 +1373,280 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     check(fast_q >= 4.0 * sc, "R0i PACING: the fastest decile takes no fewer than ~4 x scale quarters");
 }
 
+// ---------------------------------------------------------------------------
+// R4 — the age run (BL-1324, rising tech prices; RESEARCH.md § Cost, Ben
+// 2026-10-15): prices rise through the age and RP grow with the economy, so the
+// MEDIAN nation's interval between majors stays roughly level 1960 -> 2040.
+// Every nation queues EVERY major, cheapest first (cost, then store index), so
+// it researches without pause and meets the ring-4 costs only once the ring-2
+// majors are held. Per decade: each nation's interval = the mean gap between
+// its consecutive majors over those COMPLETED that decade (none = never,
+// sorted last); the median over every nation of every seed; the richest (the
+// nation with the largest economy measure that decade, per seed) beside it.
+// Run: nation_tech_harness --age 80 --age-only [--seed-list ...] [--growth G] [--econ E]
+// ---------------------------------------------------------------------------
+
+struct age_nation
+{
+    std::vector<int>    major_q;  ///< The live quarter each major completed in, ascending.
+    std::vector<double> economy;  ///< Per decade: mean economy measure (research_accrual::economy).
+    std::vector<double> rp;       ///< Per decade: mean RP a quarter.
+    std::vector<double> pop;      ///< Per decade: mean population (thousands) in the nation's centres.
+    std::vector<double> bld;      ///< Per decade: mean staffed buildings standing on its ground (workforce-weighted).
+    std::vector<double> treasury; ///< Per decade: mean treasury.
+};
+
+struct age_run
+{
+    std::string                     fail;
+    std::map<entity_id, age_nation> nations;
+    std::vector<double>             price;      ///< Per decade: the price index the decade's last quarter charged.
+    std::vector<double>             price_mean; ///< Per decade: the mean index its quarters charged.
+    std::uint64_t                   digest = 0;
+    double                          secs   = 0.0;
+    research_params                 params{};
+};
+
+age_run run_age(std::uint32_t seed, int years, const dial_override& ov)
+{
+    age_run out;
+    const auto t0 = std::chrono::steady_clock::now();
+    lua_state lua;
+    world_params wp;
+    wp.seed = seed;
+    auto start = std::make_unique<app_start_world>();
+    try { build_app_start_world(lua, wp, *start); }
+    catch (const std::exception& e) { out.fail = std::string("world build threw: ") + e.what(); return out; }
+    world& w = start->w;
+    recipe_registry& reg = start->reg;
+    {
+        research_params rp = reg.research();
+        if (ov.set_base) rp.base_rp_per_nation = ov.base;
+        if (ov.set_lin)  rp.rp_per_research_credit = ov.lin;
+        if (ov.set_sqrt) rp.rp_per_research_credit_sqrt = ov.sqrt_k;
+        if (ov.set_unit) rp.rp_per_cost_unit = ov.unit;
+        if (ov.set_growth) rp.price_growth_per_year = ov.growth;
+        if (ov.set_econ)   rp.rp_per_economy_unit = ov.econ;
+        reg.set_research(rp);
+        out.params = rp;
+    }
+    run_app_validation_settle(w, reg);
+    const spawn_seat_result seat = seat_player_corporation(w, seed, start->land.search.winner_score);
+    if (seat.seated == null_entity) { out.fail = "no corporation seated"; return out; }
+
+    // Every major, cheapest first (cost units, then store index).
+    std::vector<int> majors;
+    for (int n = 0; n < io::dg::node_count; ++n)
+        if (io::dg::nodes[static_cast<std::size_t>(n)].t == io::dg::tier::major) majors.push_back(n);
+    std::stable_sort(majors.begin(), majors.end(), [](int a, int b) {
+        return io::dg::nodes[static_cast<std::size_t>(a)].cost_units
+             < io::dg::nodes[static_cast<std::size_t>(b)].cost_units;
+    });
+    std::vector<entity_id> nids;
+    for (const auto& kv : w.nations) nids.push_back(kv.first);
+    std::sort(nids.begin(), nids.end());
+    const std::size_t decades = static_cast<std::size_t>((years + 9) / 10);
+    for (const entity_id nid : nids)
+    {
+        for (const int m : majors) enqueue_node(w, nid, m);
+        age_nation& a = out.nations[nid];
+        a.economy.assign(decades, 0.0);
+        a.rp.assign(decades, 0.0);
+        a.pop.assign(decades, 0.0);
+        a.bld.assign(decades, 0.0);
+        a.treasury.assign(decades, 0.0);
+    }
+    out.price.assign(decades, 1.0);
+    out.price_mean.assign(decades, 0.0);
+    std::map<entity_id, int> held_majors;
+
+    const int first = k_app_validation_ticks;
+    constexpr int k_econ_tick_days = 90;
+    const int quarters = years * 4;
+    for (int qtr = 1; qtr <= quarters; ++qtr)
+    {
+        const std::size_t d   = static_cast<std::size_t>((qtr - 1) / 40);
+        const double      per = 1.0 / std::min(40, quarters - static_cast<int>(d) * 40);
+        const int day = qtr * k_econ_tick_days;
+        advance_orbits(w, static_cast<double>(k_econ_tick_days));
+        advance_surveys(w, k_econ_tick_days);
+        w.current_day_tick = day;
+        const settle_tick_result res = run_settle_tick(w, reg, first + (qtr - 1), day, /*spectating=*/false);
+        out.price_mean[d] += static_cast<double>(research_price_ppm(w, reg.research())) / 1.0e6 * per;
+        for (const research_accrual& r : res.report.research)
+        {
+            age_nation& a = out.nations[r.nation];
+            a.rp[d]       += static_cast<double>(r.rp_milli) / 1000.0 * per;
+            a.economy[d]  += r.economy * per;
+            a.treasury[d] += static_cast<double>(w.nations.at(r.nation).treasury) * per;
+            out.price[d]   = static_cast<double>(r.price_ppm) / 1.0e6;
+        }
+        std::map<entity_id, double> pop, bld;
+        for (const auto& [cid, pc] : w.population_centres)
+        {
+            if (pc.razed) continue;
+            const auto t = w.population_centre_tile.find(cid);
+            if (t == w.population_centre_tile.end()) continue;
+            const auto tn = w.tile_to_nation.find(t->second);
+            if (tn != w.tile_to_nation.end()) pop[tn->second] += pc.population;
+        }
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.ticks_remaining > 0 || b.decommissioned || !(b.workforce_assigned > 0.0f)) continue;
+            const auto tn = w.tile_to_nation.find(b.tile);
+            if (tn != w.tile_to_nation.end()) bld[tn->second] += std::min(1.0f, b.workforce_assigned);
+        }
+        for (const entity_id nid : nids)
+        {
+            age_nation& a = out.nations[nid];
+            a.pop[d] += pop[nid] * per;
+            a.bld[d] += bld[nid] * per;
+            int held = 0;
+            if (const auto it = w.nation_tech.find(nid); it != w.nation_tech.end())
+                for (const int m : majors) held += it->second.held.test(static_cast<std::size_t>(m)) ? 1 : 0;
+            for (int k = held_majors[nid]; k < held; ++k) a.major_q.push_back(qtr);
+            held_majors[nid] = held;
+        }
+    }
+    out.digest = w.state_hash(w.current_day_tick);
+    for (const auto& [nid, st] : w.nation_tech)
+        out.digest = (out.digest * 1099511628211ull) ^ static_cast<std::uint64_t>(st.pool_milli)
+                   ^ (static_cast<std::uint64_t>(st.held.count()) << 48);
+    out.secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    return out;
+}
+
+void rows_r4(const std::vector<std::uint32_t>& seeds, int years, const dial_override& ov)
+{
+    std::printf("\nR4 the age run: %zu seeds, %d years; every nation queues every major, cheapest first\n",
+                seeds.size(), years);
+    const std::size_t decades = static_cast<std::size_t>((years + 9) / 10);
+    constexpr double k_never = 1.0e9;
+    // THE STANDARD MAJOR. The tree's whole cost over its majors: every node is
+    // bought on the way to some major, so this is what a major costs on average,
+    // its route included. A nation's STANDARD interval in a decade is that cost
+    // at the decade's mean price over its mean RP a year: the price-against-RP
+    // balance the ruling governs, free of which majors its queue happens to
+    // reach that decade (the ring-4 turn, the queue order).
+    double tree_units = 0.0;
+    int    major_n    = 0;
+    for (int n = 0; n < io::dg::node_count; ++n)
+    {
+        tree_units += io::dg::nodes[static_cast<std::size_t>(n)].cost_units;
+        if (io::dg::nodes[static_cast<std::size_t>(n)].t == io::dg::tier::major) ++major_n;
+    }
+    const double std_units = tree_units / std::max(1, major_n);
+    // The SCRIPTED interval: the mean gap (years) between a nation's consecutive
+    // majors over those COMPLETED in the decade (the first from the age's open);
+    // none completed = never (sorted last).
+    std::vector<std::vector<double>> iv(decades), iv_rich(decades), sd(decades), sd_rich(decades),
+                                     econ(decades), econ_rich(decades), rp(decades), rp_rich(decades),
+                                     pop(decades), bld(decades), tre(decades);
+    std::vector<double> price(decades, 1.0), price_mean(decades, 1.0);
+    std::vector<double> total_majors;
+    int fails = 0;
+    research_params used{};
+    for (const std::uint32_t s : seeds)
+    {
+        const age_run a = run_age(s, years, ov);
+        if (!a.fail.empty()) { std::printf("  seed %u FAIL %s\n", s, a.fail.c_str()); ++fails; continue; }
+        price      = a.price;
+        price_mean = a.price_mean;
+        used       = a.params;
+        std::vector<double> seed_med(decades), seed_sd(decades);
+        for (std::size_t d = 0; d < decades; ++d)
+        {
+            std::vector<double> this_seed, this_sd;
+            double best_e = -1.0, best_iv = k_never, best_sd = k_never, best_rp = 0.0;
+            for (const auto& [nid, n] : a.nations)
+            {
+                double sum = 0.0;
+                int    cnt = 0;
+                int    prev = 0;
+                for (const int q : n.major_q)
+                {
+                    if (static_cast<std::size_t>((q - 1) / 40) == d) { sum += (q - prev) / 4.0; ++cnt; }
+                    prev = q;
+                }
+                const double v = cnt > 0 ? sum / cnt : k_never;
+                const double s_iv = n.rp[d] > 0.0
+                    ? std_units * used.rp_per_cost_unit * a.price_mean[d] / (4.0 * n.rp[d]) : k_never;
+                iv[d].push_back(v);
+                sd[d].push_back(s_iv);
+                this_seed.push_back(v);
+                this_sd.push_back(s_iv);
+                econ[d].push_back(n.economy[d]);
+                rp[d].push_back(n.rp[d]);
+                pop[d].push_back(n.pop[d]);
+                bld[d].push_back(n.bld[d]);
+                tre[d].push_back(n.treasury[d]);
+                if (n.economy[d] > best_e) { best_e = n.economy[d]; best_iv = v; best_sd = s_iv; best_rp = n.rp[d]; }
+            }
+            iv_rich[d].push_back(best_iv);
+            sd_rich[d].push_back(best_sd);
+            econ_rich[d].push_back(best_e);
+            rp_rich[d].push_back(best_rp);
+            seed_med[d] = pct(this_seed, 0.5);
+            seed_sd[d]  = pct(this_sd, 0.5);
+        }
+        for (const auto& [nid, n] : a.nations) total_majors.push_back(static_cast<double>(n.major_q.size()));
+        std::printf("  seed %-10u nations %2zu  digest %016llx (%.0f s)\n    median standard interval by decade:",
+                    s, a.nations.size(), static_cast<unsigned long long>(a.digest), a.secs);
+        for (const double v : seed_sd)
+            v >= k_never ? std::printf("  never") : std::printf(" %5.1f", v);
+        std::printf("\n    median scripted interval by decade:");
+        for (const double v : seed_med)
+            v >= k_never ? std::printf("  never") : std::printf(" %5.1f", v);
+        std::printf("\n");
+    }
+    std::printf("  dials: base %.4g  sqrt %.4g  unit %.4g  price growth %.4g/yr  economy %.4g RP/credit\n",
+                used.base_rp_per_nation, used.rp_per_research_credit_sqrt, used.rp_per_cost_unit,
+                used.price_growth_per_year, used.rp_per_economy_unit);
+    const auto fiv = [](double v) {
+        char b[16];
+        if (v >= k_never) std::snprintf(b, sizeof b, " never");
+        else              std::snprintf(b, sizeof b, "%6.2f", v);
+        return std::string(b);
+    };
+    std::printf("\n  years between majors, every nation of every seed pooled. STANDARD = a tree-average major (%.1f units)\n"
+                "  at the decade's mean price over the nation's RP; SCRIPTED = the gaps its cheapest-first queue\n"
+                "  actually completed. Richest = the nation with the largest economy measure, median over seeds.\n",
+                std_units);
+    std::printf("  decade     price | std med  std rich | scr med  scr p25  scr rich | econ med  econ rich | RP/q med  RP/q rich | pop(k) med  bld med  treasury med\n");
+    std::vector<double> med(decades, k_never), smed(decades, k_never);
+    for (std::size_t d = 0; d < decades; ++d)
+    {
+        med[d]  = pct(iv[d], 0.5);
+        smed[d] = pct(sd[d], 0.5);
+        std::printf("  %4zu-%4zu  %5.2f | %s   %s | %s  %s   %s | %8.0f  %9.0f | %8.1f  %9.1f | %10.0f  %7.1f  %12.0f\n",
+                    1960 + 10 * d, 1970 + 10 * d, price[d], fiv(smed[d]).c_str(), fiv(median_of(sd_rich[d])).c_str(),
+                    fiv(med[d]).c_str(), fiv(pct(iv[d], 0.25)).c_str(), fiv(median_of(iv_rich[d])).c_str(),
+                    median_of(econ[d]), median_of(econ_rich[d]), median_of(rp[d]), median_of(rp_rich[d]),
+                    median_of(pop[d]), median_of(bld[d]), median_of(tre[d]));
+    }
+    std::printf("  majors held at the close: p10 %.0f  p50 %.0f  p90 %.0f  max %.0f (of %d)\n",
+                pct(total_majors, 0.1), pct(total_majors, 0.5), pct(total_majors, 0.9), pct(total_majors, 1.0),
+                major_n);
+    const auto flat = [&](const std::vector<double>& m) {
+        for (std::size_t d = 1; d < m.size(); ++d)
+            if (!(m[d] < k_never && m[d - 1] < k_never) || m[d] > m[d - 1] * 1.25 || m[d] < m[d - 1] * 0.75)
+                return false;
+        return true;
+    };
+    check(fails == 0, "R4a every seed builds, settles, seats and runs the age");
+    check(flat(smed), "R4b PACING: the median nation's STANDARD interval (price against RP) moves within +/-25% decade to decade");
+    // Reported, never weakened: the scripted interval also carries the tree's
+    // ring-4 turn and the opening treasury's drawdown, which no price dial moves.
+    check(flat(med), "R4c PACING (scripted queue): the median nation's completed-major interval moves within +/-25% decade to decade");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     int  seed_count = 16;
+    int  age_years  = 0;     // BL-1324: --age Y runs R4 over Y years (80 = the age)
+    bool age_only   = false; // --age-only: skip the fixture rows and R0
     int  quarters   = 32; // 16 x the RP-unit scale (200 / 100)
     bool twice      = true;
     dial_override ov;
@@ -1263,18 +1662,26 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--lin") && more)  { ov.set_lin = true; ov.lin = static_cast<float>(std::atof(argv[++i])); }
         else if (!std::strcmp(argv[i], "--sqrt") && more) { ov.set_sqrt = true; ov.sqrt_k = static_cast<float>(std::atof(argv[++i])); }
         else if (!std::strcmp(argv[i], "--unit") && more) { ov.set_unit = true; ov.unit = static_cast<float>(std::atof(argv[++i])); }
+        else if (!std::strcmp(argv[i], "--growth") && more) { ov.set_growth = true; ov.growth = static_cast<float>(std::atof(argv[++i])); }
+        else if (!std::strcmp(argv[i], "--econ") && more)   { ov.set_econ = true; ov.econ = static_cast<float>(std::atof(argv[++i])); }
+        else if (!std::strcmp(argv[i], "--age") && more)    age_years = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--age-only"))       age_only = true;
         else
         {
             std::fprintf(stderr, "usage: nation_tech_harness [--seeds N | --seed-list a,b] [--quarters Q] [--once]"
-                                 " [--base X] [--lin Y] [--sqrt Z] [--unit U]\n");
+                                 " [--base X] [--lin Y] [--sqrt Z] [--unit U] [--growth G] [--econ E]"
+                                 " [--age Y] [--age-only]\n");
             return 2;
         }
     }
 
     std::printf("nation_tech_harness (BL-1273): %d nodes in the Digitisation tree\n", io::dg::node_count);
+    if (!age_only)
+    {
     rows_r1();
     rows_r2();
     rows_r3();
+    rows_r5();
     {
         // The real data layer, as app::load_economy loads it: the audit checks
         // unlock and scope names against the registry the game runs on.
@@ -1302,6 +1709,7 @@ int main(int argc, char** argv)
         }
         check(ported, "T2s a ported leg was priced on a curated seed, found or planted (the handling split was measured)");
     }
+    } // !age_only
 
     if (seeds.empty() && seed_count > 0)
     {
@@ -1309,8 +1717,10 @@ int main(int argc, char** argv)
         if (static_cast<int>(seeds.size()) > seed_count) seeds.resize(static_cast<std::size_t>(seed_count));
         if (seeds.empty()) { std::printf("  FAIL  no library seeds found\n"); ++g_failures; }
     }
-    if (!seeds.empty())
+    if (!seeds.empty() && !age_only)
         rows_r0(seeds, quarters, twice, ov);
+    if (!seeds.empty() && age_years > 0)
+        rows_r4(seeds, age_years, ov);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures,
                 g_failures == 1 ? "" : "s");
