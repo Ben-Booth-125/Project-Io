@@ -424,6 +424,27 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_u32(h, n);
             }
         }
+        // BL-1327: the space assets, on the nation_tech precedent — folded only
+        // when the store is non-empty, so a world that never launched hashes as
+        // it did before. A std::map: ascending id, no sort.
+        if (!space_assets.empty())
+        {
+            fnv1a_u32(h, 0x5ACEu); // tag: cannot alias the tech run above
+            fnv1a_u32(h, static_cast<uint32_t>(space_assets.size()));
+            for (const auto& [aid, a] : space_assets)
+            {
+                fnv1a_u32(h, aid);
+                fnv1a_u32(h, a.owner);
+                fnv1a_u32(h, static_cast<uint32_t>(a.cls));
+                fnv1a_u32(h, a.dest.body);
+                fnv1a_u32(h, static_cast<uint32_t>(a.dest.slot));
+                fnv1a_u32(h, static_cast<uint32_t>(a.state));
+                fnv1a_i32(h, a.launch_tick);
+                fnv1a_i32(h, a.arrival_tick);
+                fnv1a_f32(h, a.upkeep);
+                fnv1a_i32(h, a.unpaid_quarters);
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

@@ -13,6 +13,7 @@
 #include "network_upkeep.hpp"    // BL-643: the logistics_maintenance line's consumer
 #include "province.hpp"          // BL-572: province_holder_for, province lookup
 #include "recipe_registry.hpp"
+#include "space_assets.hpp"      // BL-1327: the quarterly space-asset step
 #include "space_programme.hpp"   // BL-644: the space_programme line's consumer
 #include "survey_system.hpp"
 #include "unit_roster.hpp" // BL-571: resolve_unit_upkeep, unit_upkeep_params
@@ -178,6 +179,12 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // research institutes, into each nation's pool and down its queue. Once
     // per economy tick, which is the quarter.
     advance_research(w, reg.research(), &report.research);
+
+    // ---- 7. Space assets (BL-1327, SPACE_ASSETS.md) — arrivals, then each
+    // placed asset's quarterly upkeep paid whole from its owner's treasury or
+    // counted unpaid (decaying, then lost). Ascending asset id; an empty store
+    // does nothing, so a world that never launched ticks as before.
+    run_space_asset_step(w, reg.space_assets(), econ_tick);
 }
 
 

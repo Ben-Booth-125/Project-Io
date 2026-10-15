@@ -485,8 +485,9 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         check(rt && r.state_hash(0) == c.state_hash(0) && r.nations.at(pn).lp_shares.set
                   && r.nations.at(pn).lp_shares.share == c.nations.at(pn).lp_shares.share,
               "L7", "v50 round-trips the share rule with an equal state_hash");
-        // v49: the stream less its trailing section (u32 count + 1 x (id + 3 floats)).
-        std::string b49 = b50.substr(0, b50.size() - (4 + 4 + 12));
+        // v49: the stream less its trailing section (u32 count + 1 x (id + 3 floats)),
+        // and less BL-1327's v51 space-asset section after it (one empty count).
+        std::string b49 = b50.substr(0, b50.size() - (4 + 4 + 12) - 4);
         const std::uint32_t v49 = k_world_save_version_pre_lp;
         std::memcpy(&b49[4], &v49, 4);
         world r49;
@@ -495,7 +496,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         // A bad share in the stream refuses it whole.
         std::string bad = b50;
         const float f = 0.9f;
-        std::memcpy(&bad[bad.size() - 4], &f, 4); // other := 0.9: the sum is 1.6
+        std::memcpy(&bad[bad.size() - 8], &f, 4); // other := 0.9: the sum is 1.6 (before v51's 4-byte space count)
         world rb;
         rb.current_econ_tick = 77;
         const bool okb = from_bytes(bad, rb);

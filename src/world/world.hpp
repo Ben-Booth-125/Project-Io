@@ -10,6 +10,7 @@
 #include "nation_budget.hpp" // nation_budget (Sprint N3 T2: the persistent weight map, below)
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
+#include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
 
 #include <atomic>
 #include <cstdint>
@@ -838,6 +839,14 @@ struct world
     /// the four hand-authored tech gates (NR-1022): what they gated is open to
     /// every nation.
     std::map<entity_id, nation_tech_state> nation_tech;
+
+    /// BL-1327 — every space asset, keyed by its entity id (SPACE_ASSETS.md;
+    /// space_assets.hpp). A NATION owns each one. A `std::map` so the quarterly
+    /// step (`run_space_asset_step`, inside the nation step) walks ascending id
+    /// with no sort. Lost assets stay as records. SERIALISED (world_save.cpp, the
+    /// v51 trailing section) and folded into `state_hash` when non-empty, so a
+    /// world that never launched hashes as it did before this store existed.
+    std::map<entity_id, space_asset> space_assets;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it
