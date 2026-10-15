@@ -598,4 +598,14 @@ void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour (caller's redâ†’green ramp sample).
 void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a railway-line glyph — two parallel rails on a diagonal crossed by
+/// sleepers (BL-1255). Distinct from the railway station (the hub node): this
+/// is the LINE, the track a tile carries. Used in the road ladder's Track row.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent (radius) of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

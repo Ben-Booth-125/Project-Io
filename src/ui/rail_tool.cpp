@@ -175,7 +175,11 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             }
         }
         else
+        {
+            ImGui::PushTextWrapPos(0.0f);
             ImGui::TextColored(k_refusal, "%s", refusal);
+            ImGui::PopTextWrapPos();
+        }
         ImGui::EndChild();
         ImGui::Spacing();
     };
@@ -198,9 +202,56 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             else if (!std::isfinite(cost) || cost > treasury)
                 why = "Treasury cannot cover it";
         }
-        bool pressed = false;
-        row("Track", std::isfinite(cost) ? cost : 0.0f, steel, reg.rail().track_upkeep_per_tile,
-            why, pressed, cc.rail_track_x, cc.rail_track_y);
+        // Laid out exactly as the road ladder's rows above it (row_h is the
+        // ladder's glyph-box side here): a boxed glyph left, then name, cost,
+        // and Build or a wrapped refusal. The treasury and upkeep lines the
+        // station row carries go to the hover instead.
+        bool        pressed = false;
+        const float img     = row_h;
+        const float credits = std::isfinite(cost) ? cost : 0.0f;
+        ImGui::BeginChild("rail_track##build", {0.0f, 0.0f},
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList*  cdl = ImGui::GetWindowDrawList();
+        const ImVec2 ip  = ImGui::GetCursorScreenPos();
+        const ImVec2 imx = {ip.x + img, ip.y + img};
+        cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
+        cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
+        icons::rail_line(cdl, {ip.x + img * 0.5f, ip.y + img * 0.5f}, img * 0.38f,
+                         IM_COL32(150, 235, 160, 255));
+        ImGui::Dummy({img, img});
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Track");
+        if (steel > 0.0f)
+            ImGui::TextDisabled("%.0f cr + %.1f steel", static_cast<double>(credits),
+                                static_cast<double>(steel));
+        else
+            ImGui::TextDisabled("%.0f cr", static_cast<double>(credits));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("From the treasury (%.0f cr)\nState industry - upkeep %.2f cr/tick",
+                              static_cast<double>(treasury),
+                              static_cast<double>(reg.rail().track_upkeep_per_tile));
+        if (why == nullptr)
+        {
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            if (ImGui::Button("Build"))
+                pressed = true;
+            if (ImGui::IsItemVisible())
+            {
+                cc.rail_track_x = p.x + ImGui::GetItemRectSize().x * 0.5f;
+                cc.rail_track_y = p.y + ImGui::GetItemRectSize().y * 0.5f;
+            }
+        }
+        else
+        {
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(k_refusal, "%s", why);
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::EndGroup();
+        ImGui::EndChild();
+        ImGui::Spacing();
         if (pressed)
             ui.construction.pending_track_tile = tile;
     }

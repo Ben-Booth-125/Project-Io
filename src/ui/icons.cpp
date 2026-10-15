@@ -1387,4 +1387,27 @@ void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircle(centre, r, IM_COL32(20, 20, 24, 200), 16, 1.2f);
 }
 
+void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two rails along the lower-left -> upper-right diagonal, sleepers across
+    // them: the line itself, never the station's hub node (BL-1255).
+    const float dx = 0.7071f, dy = -0.7071f;     // along the line
+    const float nx = 0.7071f, ny = 0.7071f;      // across the line
+    const float half = r * 0.9f, gauge = r * 0.28f;
+    const float st = std::max(1.0f, r * 0.10f);
+    for (int i = -3; i <= 3; ++i)
+    {
+        const float t = static_cast<float>(i) * half / 3.5f;
+        const ImVec2 c = {centre.x + dx * t, centre.y + dy * t};
+        dl->AddLine({c.x - nx * gauge * 1.6f, c.y - ny * gauge * 1.6f},
+                    {c.x + nx * gauge * 1.6f, c.y + ny * gauge * 1.6f}, colour, st);
+    }
+    for (int s = -1; s <= 1; s += 2)
+    {
+        const float ox = nx * gauge * static_cast<float>(s), oy = ny * gauge * static_cast<float>(s);
+        dl->AddLine({centre.x - dx * half + ox, centre.y - dy * half + oy},
+                    {centre.x + dx * half + ox, centre.y + dy * half + oy}, colour, st * 1.6f);
+    }
+}
+
 } // namespace ui::icons
