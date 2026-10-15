@@ -552,10 +552,11 @@ void hover_body(const world& w, const research_params& p, const nation_view& v, 
         else
         {
             std::int64_t milli = 0;
+            const std::int64_t price = research_price_ppm(w, p); // BL-1324: today's price
             for (const std::uint16_t q : plan)
-                milli += node_cost_milli(q, p);
+                milli += node_cost_milli(q, p, price);
             ImGui::PushStyleColor(ImGuiCol_Text, palette::positive);
-            ImGui::TextWrapped("Shift-click a node to queue it: %d node%s, %lld RP.",
+            ImGui::TextWrapped("Shift-click a node to queue it: %d node%s, %lld RP at today's prices.",
                                static_cast<int>(plan.size()), plan.size() == 1 ? "" : "s",
                                static_cast<long long>(milli / k_milli_per_rp));
             ImGui::PopStyleColor();
@@ -784,7 +785,7 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
             ImGui::TableSetupColumn("#");
             ImGui::TableSetupColumn("Node", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("Tier");
-            ImGui::TableSetupColumn("RP");
+            ImGui::TableSetupColumn("RP (today)"); // BL-1324: costs at today's price index
             ImGui::TableSetupColumn("Arrives");
             ImGui::TableHeadersRow();
             bool after_deed = false;
@@ -802,7 +803,8 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(tier_label(n));
                 ImGui::TableNextColumn();
-                ImGui::Text("%lld", static_cast<long long>(node_cost_milli(i, p) / k_milli_per_rp));
+                ImGui::Text("%lld", static_cast<long long>(
+                                        node_cost_milli(i, p, research_price_ppm(w, p)) / k_milli_per_rp));
                 ImGui::TableNextColumn();
                 const int a = q < arrival.size() ? arrival[q] : -1;
                 if (a > 0)

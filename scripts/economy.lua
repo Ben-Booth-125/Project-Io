@@ -1094,6 +1094,13 @@ economy = {
         rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
         rp_per_institute            = 50.0,  -- unmeasured: likewise
         rp_per_cost_unit            = 200.0,
+        -- BL-1324 (rising tech prices; RESEARCH.md § Cost, Ben 2026-10-15): node
+        -- prices rise through the age and RP grow with the economy. The price is
+        -- calibrated to the MEDIAN nation's RP growth (nation_tech_harness --age 80,
+        -- R4, 16 seeds): the median nation has no firms of its own, so it grows only
+        -- through the research line, ~0.5% a year from 1970. Faster prices slow it.
+        price_growth_per_year       = 0.005, -- nominal, compounded quarterly: 1.49 by 2040
+        rp_per_economy_unit         = 0.03,  -- RP a quarter per credit of home firms' previous quarter's filed income
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each

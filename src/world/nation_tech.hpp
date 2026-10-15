@@ -47,11 +47,13 @@ class recipe_registry;
 ///   + rp_per_research_credit_sqrt x sqrt(credits_spent)
 ///   + rp_per_university x staffed Universities x the University factor
 ///   + rp_per_institute  x staffed institutes
+///   + rp_per_economy_unit x the economy measure (BL-1324: home firms' income)
 ///
 /// (the University factor: the held national_research multiplies scoped
 /// "building:university"; 1 when none is held)
-/// all times `research_multiplier`. Its SHAPE is a dial change, not a code
-/// change. The defaults are Ben's ruling (2026-10-10): base + sqrt — 120 RP a
+/// all times `research_multiplier`. A node's cost is its units x the RP unit
+/// x the price index (`research_price_ppm`, BL-1324), which rises through the
+/// age. Its SHAPE is a dial change, not a code change. The defaults are Ben's ruling (2026-10-10): base + sqrt — 120 RP a
 /// quarter for every nation plus 20 x sqrt(credits the line spends) (re-fit to
 /// 10 x sqrt by BL-1305 once real treasuries landed), linear 0,
 /// 200 RP per cost unit (an age is about 80 years; Ben's correction of the
@@ -82,9 +84,61 @@ struct research_params
     /// RP per quarter per STAFFED research institute whose owner corp's home
     /// nation is this nation (NR-1023: the institute's corp `science` folds in).
     float rp_per_institute = 50.0f;
-    /// The RP unit: a node costs `cost_units x rp_per_cost_unit`.
+    /// The RP unit: a node costs `cost_units x rp_per_cost_unit` x the price index.
     float rp_per_cost_unit = 200.0f;
+
+    /// BL-1324 (rising tech prices; RESEARCH.md § Cost, Ben 2026-10-15): the
+    /// price index's growth a year through the age, compounded quarterly as a
+    /// nominal annual rate (each quarter adds rate/4 of the index, in integer
+    /// ppm — `research_price_ppm`). 0 = flat prices.
+    ///
+    /// CALIBRATED TO THE MEDIAN NATION'S RP GROWTH (nation_tech_harness R4, 16
+    /// seeds, 80 years): the median nation has no firms of its own (its economy
+    /// measure is 0) and a flat population, so its RP grow only through the
+    /// research line on a slowly recovering treasury — about 0.5% a year from
+    /// 1970. A faster price slows the median nation by the difference; 0.5%
+    /// holds its standard interval level 1970 -> 2040 (index 1.49 at 2040).
+    float price_growth_per_year = 0.005f;
+    /// BL-1324: RP a quarter per unit of the nation's economy measure
+    /// (`nation_economy_milli`: its domestic firms' previous filed quarterly
+    /// income, in credits). The term that lets a GROWING nation outrun the
+    /// prices; 0 = none. 0.03: the richest nation (8-12k credits a quarter at
+    /// the open, 18-27k by 2040) researches at ~600 -> ~1200 RP a quarter and
+    /// holds 27 of the 30 majors by 2040 (RESEARCH.md § Cost: the richest
+    /// completes the tree inside the age), while R0's opening pacing holds
+    /// (fastest decile 11 quarters to its first major, floor 8).
+    float rp_per_economy_unit = 0.03f;
 };
+
+/// The price index (ppm: 1'000'000 = the age's opening price) after
+/// @p age_quarter quarters of the age (<= 0: the opening price). Integer
+/// compounding, so every platform reaches the same index.
+std::int64_t research_price_ppm_at(int age_quarter, const research_params& p = {});
+
+/// The age quarter the world stands in: live quarters since the campaign
+/// opened (`current_econ_tick` less the settle's ticks), never negative.
+int research_age_quarter(const world& w);
+
+/// The age quarter the NEXT quarterly pass will charge: econ step
+/// `current_econ_tick + 1` less the settle's ticks, never negative. Between
+/// passes `current_econ_tick` is the step the last pass ran at — straight
+/// after the settle and after a load alike (`econ_tick_after_live_steps`).
+int research_next_age_quarter(const world& w);
+
+/// The price index the world's current quarter charges (`research_price_ppm_at`
+/// of `research_age_quarter`). Every priced cost the pass, the projection and the
+/// panel show reads this one value.
+std::int64_t research_price_ppm(const world& w, const research_params& p = {});
+
+/// BL-1324: the economy measure RP scale with — the summed `income` of the
+/// PREVIOUS quarter's filed return (`returns[size - 2]`; none before two are
+/// filed) of every corporation whose home nation is @p nation, in
+/// milli-credits (integer and saturating, so the unordered corporation walk
+/// cannot reorder or overflow the sum). Negative incomes count as zero. Not
+/// the latest return: the research pass runs in the tick that filed it, and
+/// FINANCE.md § The quarterly return holds that no branch reads a return
+/// during the tick that writes it.
+std::int64_t nation_economy_milli(const world& w, entity_id nation);
 
 /// RP are held in MILLI-RP, an integer: a pool accrues small increments for
 /// years, and a float pool stops registering them once it is large.
@@ -121,12 +175,18 @@ struct research_accrual
     int          universities = 0;
     int          institutes   = 0;
     float        multiplier   = 1.0f; ///< `research_multiplier`: 1 + the held national-research shares.
+    double       economy      = 0.0;  ///< BL-1324: the economy measure, credits (`nation_economy_milli` / 1000).
+    std::int64_t price_ppm    = 1'000'000; ///< BL-1324: the price index this quarter charged.
     std::int64_t rp_milli     = 0;    ///< Milli-RP added to the pool.
     int          completed    = 0;    ///< Nodes completed this quarter.
 };
 
-/// The cost of node @p node under @p p, in milli-RP (0 for an unknown node).
-std::int64_t node_cost_milli(int node, const research_params& p = {});
+/// The cost of node @p node under @p p at the price index @p price_ppm
+/// (`research_price_ppm`; the default is the age's opening price), in milli-RP
+/// (0 for an unknown node). The enqueue planner compares routes at the
+/// opening price: the index scales every node alike, so it cannot change a choice.
+std::int64_t node_cost_milli(int node, const research_params& p = {},
+                             std::int64_t price_ppm = 1'000'000);
 
 /// RP (as milli-RP) the line converts @p credits into, before the multiplier:
 /// the linear and sqrt terms only (no base, no buildings).

@@ -43,6 +43,17 @@ struct generation_progress;
 /// and the seat card's trailing net reads the returns these ticks file.
 inline constexpr int k_campaign_settle_ticks = 12;
 
+/// `world::current_econ_tick` BETWEEN passes after the settle and @p live_steps
+/// live passes: the step the last pass ran at (the settle's last is 11). A
+/// fresh campaign holds it by construction (`run_settle_tick` writes it); a
+/// loaded one is seeded with it (app::load_game_from), so a read between
+/// passes — the research projection's next price (BL-1324) — sees the same
+/// value either way.
+constexpr int econ_tick_after_live_steps(long long live_steps)
+{
+    return k_campaign_settle_ticks + static_cast<int>(live_steps) - 1;
+}
+
 /// The tick's six laps, in order -- the app's own `step_economy` laps 0-5 and
 /// the phase names a timed harness row prints.
 inline constexpr int k_campaign_settle_lap_count = 6;
