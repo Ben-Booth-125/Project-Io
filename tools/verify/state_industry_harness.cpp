@@ -940,6 +940,13 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         for (const auto& [bid, b] : w.buildings) idle_n += b.state_idle ? 1 : 0;
         tail += sizeof(uint32_t) + idle_n * sizeof(entity_id);
         tail += 3 * sizeof(uint32_t); // BL-1255 (v49): the empty rail section after it
+        // The sections written AFTER this one: v50's share rules (count + each set
+        // rule's id and three floats) and v51's space assets (count + 35 bytes each:
+        // id, owner, class, body, slot, state, launch, arrival, upkeep, unpaid, cost).
+        tail += sizeof(uint32_t);
+        for (const auto& [lnid, lnc] : w.nations)
+            if (lnc.lp_shares.set) tail += sizeof(entity_id) + 3 * sizeof(float);
+        tail += sizeof(uint32_t) + w.space_assets.size() * 35u;
         std::string v47 = bytes.substr(0, bytes.size() - tail);
         const uint32_t ver = k_world_save_version_pre_state;
         std::memcpy(&v47[4], &ver, sizeof ver);

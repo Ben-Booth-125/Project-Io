@@ -428,7 +428,16 @@ inline constexpr uint32_t world_save_magic =
 /// Nothing else moves, so v49 is a STRICT PREFIX of v50 and is read too
 /// (`k_world_save_version_pre_lp`), as a world where every nation shares by the
 /// mechanical default; v48 and v47 still read. Every other version is refused.
-inline constexpr uint32_t world_save_version = 50;
+/// Bumped to 51 by BL-1327 (space assets; SPACE_ASSETS.md, Ben 2026-10-15): a
+/// TRAILING SECTION after the share rules -- every space asset, ascending id, as
+/// (id, owner, class, body, slot, state, launch tick, arrival tick, upkeep,
+/// unpaid quarters, launch cost). Nothing else moves, so v50 is a STRICT PREFIX of v51 and is
+/// read too (`k_world_save_version_pre_space`), as a world with no space assets;
+/// v49, v48 and v47 still read. Every other version is refused.
+inline constexpr uint32_t world_save_version = 51;
+
+/// BL-1327: v50, a strict prefix of v51 (the space-asset section is v51's only addition).
+inline constexpr uint32_t k_world_save_version_pre_space = 50;
 
 /// BL-1309: v49, a strict prefix of v50 (the share-rule section is v50's only addition).
 inline constexpr uint32_t k_world_save_version_pre_lp = 49;

@@ -889,6 +889,13 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         for (const convoy_component& k : c.convoys)
             if (k.station_a != null_entity) tail += sizeof(uint32_t) + 2 * sizeof(entity_id);
         tail += sizeof(uint32_t) + c.rail_idle.size() * sizeof(entity_id);
+        // The sections written AFTER this one: v50's share rules (count + each set
+        // rule's id and three floats) and v51's space assets (count + 35 bytes each:
+        // id, owner, class, body, slot, state, launch, arrival, upkeep, unpaid, cost).
+        tail += sizeof(uint32_t);
+        for (const auto& [lnid, lnc] : c.nations)
+            if (lnc.lp_shares.set) tail += sizeof(entity_id) + 3 * sizeof(float);
+        tail += sizeof(uint32_t) + c.space_assets.size() * 35u;
         std::string v48 = b.substr(0, b.size() - tail);
         const uint32_t ver = k_world_save_version_pre_rail;
         std::memcpy(&v48[4], &ver, sizeof ver);

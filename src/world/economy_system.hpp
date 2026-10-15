@@ -488,6 +488,12 @@ struct economy_report
     /// nodes completed. The treasury ledger's explanation of the research debit.
     std::vector<research_accrual> research;
 
+    /// What the space-asset step did this quarter (BL-1327; space_assets.hpp):
+    /// launches and their cost (the launch debit), arrivals, and the upkeep
+    /// paid or unpaid. Both debits are direct treasury expenditures, credited
+    /// to nobody; this is the treasury ledger's line for them.
+    space_asset_step_report space_assets;
+
     /// Which firms the insolvency wind-up erased this tick (BL-743), with the
     /// written-off balance and what was liquidated. Report-only — the lapse
     /// and census read it; nothing feeds it back into the sim.

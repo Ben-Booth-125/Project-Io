@@ -7,6 +7,7 @@
 #include "network_upkeep.hpp"  // BL-643: network_upkeep_params — the logistics_maintenance line's material rates
 #include "nation_tech.hpp"     // BL-1273: research_params — the research dials
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
+#include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
@@ -1212,6 +1213,11 @@ public:
     /// rather than clamped, the nation_ai discipline.
     const space_programme_params& space_programme() const { return m_space_programme; }
 
+    /// BL-1327 space-asset dials (launch cost, reach cost, travel time, upkeep,
+    /// loss). Defaults are space_asset_params' own first-cut calibration; there
+    /// is no Lua key yet, so every registry carries the defaults.
+    const space_asset_params& space_assets() const { return m_space_assets; }
+
     /// BL-643 network-upkeep material rates (economy.network_upkeep in Lua).
     /// All default ZERO — an unauthored registry derives no upkeep draw — and
     /// every authored value is range-checked at load and rejected by key
@@ -1474,6 +1480,7 @@ public:
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
     void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
+    void set_space_assets(const space_asset_params& p) { m_space_assets = p; } // BL-1327
     /// BL-743: the firm-exit trigger (economy.firm_exit in Lua; inert defaults).
     const firm_exit_params& firm_exit() const { return m_firm_exit; }
     void set_firm_exit(const firm_exit_params& p) { m_firm_exit = p; }
@@ -1752,6 +1759,7 @@ private:
     /// Default-constructed — both lumps zero, so a hand-built harness registry
     /// derives no state purchase unless it sets them.
     space_programme_params m_space_programme = {};
+    space_asset_params m_space_assets = {}; // BL-1327
 
     /// BL-743 firm-exit trigger (economy.firm_exit). Inert defaults: an
     /// unloaded registry never winds a firm up.
