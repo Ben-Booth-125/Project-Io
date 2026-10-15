@@ -6,8 +6,8 @@
 {"version":23,"owner":"BL-644 space-programme-budget-line","ts":"2026-09-01T08:43:55.934Z","branch":"bl644-space-line"}
 {"version":10,"owner":"BL-835 civilian-population-armies-apart","ts":"2026-09-09T00:00:00.000Z","branch":"worktree-agent-a7ef836fbf3fe5ec1"}
 {"version":25,"owner":"BL-1003 pools-per-market","ts":"2026-09-23T17:27:57.290Z","branch":"worktree-agent-ad8e879fb72bcee7a"}
-{"version":20,"kind":"envelope","owner":"BL-1047 epoch flip gates","ts":"2026-09-24T16:00:43.317Z","branch":"main"}
-{"version":21,"kind":"envelope","owner":"BL-1080 round six shows industry","ts":"2026-09-24T16:01:25.717Z","branch":"main"}
+{"version":20,"kind":"envelope","owner":"BL-1047 epoch flip gates","ts":"2026-09-24T16:00:43.317Z","branch":"worktree-agent-a5c85c560d705b915"}
+{"version":21,"kind":"envelope","owner":"BL-1080 round six shows industry","ts":"2026-09-24T16:01:25.717Z","branch":"worktree-agent-a5c85c560d705b915"}
 {"version":22,"kind":"envelope","owner":"BL-1083 span seeds","ts":"2026-09-24T21:06:03.271Z","branch":"worktree-wf_ce38c127-8da-1"}
 {"version":26,"kind":"world","owner":"BL-1101 campaign_band","ts":"2026-09-24T21:07:12.230Z","branch":"worktree-wf_ce38c127-8da-4"}
 {"version":22,"kind":"envelope","owner":"BL-1096/1097 kinds (shares sprint 47's one envelope bump with BL-1083)","ts":"2026-09-24T21:11:05.932Z","branch":"worktree-wf_ce38c127-8da-3"}
@@ -35,3 +35,4 @@
 {"version":48,"kind":"world","owner":"BL-1296 state industry","ts":"2026-10-14T12:00:00.000Z","branch":"worktree-agent-a67ee7157697527b4"}
 {"version":49,"kind":"world","owner":"BL-1255 railways","ts":"2026-10-14T18:00:00.000Z","branch":"worktree-agent-a60f1b85dc37011c4"}
 {"version":50,"kind":"world","owner":"BL-1309 logistics one pool","ts":"2026-10-15T09:00:00.000Z","branch":"worktree-agent-a0177c534a83ae78c"}
+{"version":51,"kind":"world","owner":"BL-1327 space asset model","ts":"2026-10-15T14:47:53.841Z","branch":"worktree-agent-a5c85c560d705b915"}
