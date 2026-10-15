@@ -339,7 +339,7 @@
     "src/ui/",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "RE-DESIGNED (Ben, 2026-10-13, superseding \"the road ladder's next rung\"): LOGISTICS.md § 4c, INDUSTRIALISATION.md (the rail sink, who lays rail), PRODUCTION.md § Infrastructure buildings (the station), RENDERING.md (rail surface). Its own network; goods board and leave only at stations; a haul = road leg + rail leg + road leg; the rail price set by measurement against the haulage readings (long land hauls shift to rail, short stay on roads); stations = port-shaped tile buildings on a city tile touching a line (zero staff, build cost, upkeep); state industry in majors, background firms in minors; generation: works-lean realms spend treasury laying track on their busiest corridors from the city with a station per city served; the PLAYER builds stations and lays track THIS SPRINT (Ben) as its nation's verbs - ACTIONS.json entries, seam validation. Interdiction cuts rail as roads. World-mover: measure haulage and market_viability; re-bless with Ben's go. Depends on BL-1296 (state industry) for ownership in majors. LIVE CLICK 2026-10-15: rail is built like anything else - select a tile, pick track/station from the buildings list (LOGISTICS.md § 4c)."
+   "design": "RE-DESIGNED (Ben, 2026-10-13, superseding \"the road ladder's next rung\"): LOGISTICS.md § 4c, INDUSTRIALISATION.md (the rail sink, who lays rail), PRODUCTION.md § Infrastructure buildings (the station), RENDERING.md (rail surface). Its own network; goods board and leave only at stations; a haul = road leg + rail leg + road leg; the rail price set by measurement against the haulage readings (long land hauls shift to rail, short stay on roads); stations = port-shaped tile buildings on a city tile touching a line (zero staff, build cost, upkeep); state industry in majors, background firms in minors; generation: works-lean realms spend treasury laying track on their busiest corridors from the city with a station per city served; the PLAYER builds stations and lays track THIS SPRINT (Ben) as its nation's verbs - ACTIONS.json entries, seam validation. Interdiction cuts rail as roads. World-mover: measure haulage and market_viability; re-bless with Ben's go. Depends on BL-1296 (state industry) for ownership in majors. LIVE CLICK 2026-10-15: rail is built like anything else - select a tile, pick track/station from the buildings list (LOGISTICS.md § 4c). Live click 2026-10-15: station row PASSED; track row restyle owed (like road rows, rail glyph boxed left of the cr cost; the \"already has an equal or...\" refusal wraps to two lines)."
   },
   {
    "status": "proposed",
@@ -682,7 +682,7 @@
     "src/core/app.hpp"
    ],
    "title": "A setup round before Life, carrying the total and major nation targets",
-   "design": "RULED (Ben, 2026-10-10): STARTUP.md § Rounds, A SETUP ROUND PRECEDES LIFE. It takes the two nation targets before the Life round builds the world. OPEN: what else it holds (Ben: 'along with the existing choices at each phase' - whether per-round leans move here or stay on their rounds), and where it sits against System. The next design step of sprint 53. RULED (Ben, 2026-10-11): the setup round sits between System and Life and holds the two targets plus the seed (entry, Roll, Copy) and the abundance radio, which leave the main menu; per-round leans stay on their rounds (STARTUP.md § Rounds). The ACTIONS.json chrome.menu_*_seed entries move with the controls. OPEN: what Quick Start builds on (NR-1036). LIVE CLICK 2026-10-15: seed moves to the Life round, hidden from the player; Reroll/Back/Next higher so no round scrolls (STARTUP.md)."
+   "design": "RULED (Ben, 2026-10-10): STARTUP.md § Rounds, A SETUP ROUND PRECEDES LIFE. It takes the two nation targets before the Life round builds the world. OPEN: what else it holds (Ben: 'along with the existing choices at each phase' - whether per-round leans move here or stay on their rounds), and where it sits against System. The next design step of sprint 53. RULED (Ben, 2026-10-11): the setup round sits between System and Life and holds the two targets plus the seed (entry, Roll, Copy) and the abundance radio, which leave the main menu; per-round leans stay on their rounds (STARTUP.md § Rounds). The ACTIONS.json chrome.menu_*_seed entries move with the controls. OPEN: what Quick Start builds on (NR-1036). LIVE CLICK 2026-10-15: seed moves to the Life round, hidden from the player; Reroll/Back/Next higher so no round scrolls (STARTUP.md). Ben's live click PASSED 2026-10-15 (seed hidden, rounds fit)."
   },
   {
    "status": "designed",
@@ -728,7 +728,7 @@
     "docs/ui/question_log.json"
    ],
    "title": "The seat becomes a nation selection screen: majors only, a six-part nation card, take_seat names a major",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card (seven parts; the seventh, history, is BL-1295): territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Shaped for up to six humans, one major each; the prototype seats one (NR-1025). Needs a live click. LIVE CLICK 2026-10-15: the card shows full nation information only when the nation is NOT selected - inverted; fix."
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card (seven parts; the seventh, history, is BL-1295): territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Shaped for up to six humans, one major each; the prototype seats one (NR-1025). Needs a live click. LIVE CLICK 2026-10-15: the card shows full nation information only when the nation is NOT selected - inverted; fix. Ben's live click PASSED 2026-10-15."
   },
   {
    "status": "designed",
@@ -960,7 +960,7 @@
     "docs/ui/question_log.json"
    ],
    "title": "The nation card's history: pattern tags, a short key-event timeline, and a link to the History ledger filtered to the nation",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat, the card's seventh item. Reads BL-1286's tags and the lapse events of the polities that folded into the nation. Needs a live click."
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat, the card's seventh item. Reads BL-1286's tags and the lapse events of the polities that folded into the nation. Needs a live click. Ben's live click PASSED 2026-10-15."
   },
   {
    "status": "designed",
@@ -1469,6 +1469,44 @@
    ],
    "title": "Logistic Points become one nation-held pool, made by hubs/stations/ports on their own networks, fading with distance, consumed by production",
    "design": "DESIGNED (Ben, 2026-10-14): LOGISTICS.md § One pool. Replaces passive/active LP and city generation. Hubs (roads, tier-extended), stations (rail), ports (sea); full strength to a threshold then fade; production consumes LP, proportional output on shortfall; every building draws its host nation's pool; the nation sets shares (state/champion/firms), mechanical default in proportion to need; anyone builds sources; trade points separate; military off-network reach later. Player verb: set LP shares (ACTIONS.json, seam). Generation must seed enough sources that 1960 produces. World-mover + save bump. Then the economy pass re-ladder and the re-bless."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-15",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-15, at the live click); filed by Claude",
+   "id": "BL-1310",
+   "short_name": "NATIONS_CONTIGUOUS",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 3,
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "requires": [],
+   "files": [],
+   "title": "Every nation holds one contiguous group of tiles, or one contiguous group across water - no borders jumping across other nations",
+   "design": "SPRINT 55 (Ben, 2026-10-15): some nations' territory jumps across other nations; it should be one land-contiguous group, or contiguous via a water crossing. Design the rule in NATION_GENERATION.md (fold/floor/closing rounds interplay) before building; world-mover."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-15",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-15, at the live click); filed by Claude",
+   "id": "BL-1311",
+   "short_name": "GROUND_PAINT_PERF",
+   "category": "Rendering",
+   "priority": "S",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/RENDERING.md",
+   "requires": [],
+   "files": [],
+   "title": "Ground painting takes 3-5 minutes and 12 GB of RAM - cut both drastically",
+   "design": "SPRINT 55 (Ben, 2026-10-15), with rendering improvements again. Measure the bake (time, peak memory, per-chunk) first; target an order of magnitude on both."
   }
  ]
 }
