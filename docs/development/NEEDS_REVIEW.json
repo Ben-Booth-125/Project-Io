@@ -356,6 +356,17 @@
     "src/world/placement_rules.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1047",
+   "title": "Space asset calibration (BL-1327 space asset model): costs, reach, upkeep, decay chosen in-band",
+   "raised": "2026-10-15",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1327 lane + cold review, merged to main 2026-10-15",
+   "what": "Destinations are named slots (body + orbit|surface), tiered from the owner home body: home orbit, moon orbit, moon surface, far orbit, far surface. Launch cost: satellite 10000, rover 20000, crewed 60000, station module 40000; reach 0/8000/15000/30000/45000 + 20000 per AU (far tiers). Travel quarters 0/1/1/2/3 + floor(AU), clamped at 400 extra. Upkeep/quarter: 500/1000/3000/2000. Lost after 4 unpaid quarters (hard ceiling 64). Launch cost and upkeep are pure treasury sinks until BL-1328 (launch infrastructure) buys goods from corporations.",
+   "why_it_matters": "These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.",
+   "call": "Accept, or name the dial to move once the 2040 run is in."
   }
  ]
 }

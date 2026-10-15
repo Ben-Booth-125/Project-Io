@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*24 entries — 24 open, 0 resolved.*
+*25 entries — 25 open, 0 resolved.*
 
 ---
 
@@ -219,6 +219,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 > **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
+
+### NR-1047 — Space asset calibration (BL-1327 space asset model): costs, reach, upkeep, decay chosen in-band
+*decision · raised 2026-10-15 · from BL-1327 lane + cold review, merged to main 2026-10-15*
+
+Destinations are named slots (body + orbit|surface), tiered from the owner home body: home orbit, moon orbit, moon surface, far orbit, far surface. Launch cost: satellite 10000, rover 20000, crewed 60000, station module 40000; reach 0/8000/15000/30000/45000 + 20000 per AU (far tiers). Travel quarters 0/1/1/2/3 + floor(AU), clamped at 400 extra. Upkeep/quarter: 500/1000/3000/2000. Lost after 4 unpaid quarters (hard ceiling 64). Launch cost and upkeep are pure treasury sinks until BL-1328 (launch infrastructure) buys goods from corporations.
+
+**Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
 
 ---
 
