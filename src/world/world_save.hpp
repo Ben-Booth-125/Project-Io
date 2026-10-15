@@ -422,7 +422,16 @@ inline constexpr uint32_t world_save_magic =
 /// station, alighting station), then the idle-track owners (`rail_idle`). Nothing else moves, so v48 is a STRICT PREFIX of
 /// v49 and is read too (`k_world_save_version_pre_rail`), as a world with no rail;
 /// v47 still reads (no state industry, no rail). Every other version is refused.
-inline constexpr uint32_t world_save_version = 49;
+/// Bumped to 50 by BL-1309 (logistics one pool; LOGISTICS.md § Logistic Points,
+/// Ben 2026-10-14): a TRAILING SECTION after rail -- each nation that has SET a
+/// Logistic Point share rule (ascending id) as (id, state, champion, other).
+/// Nothing else moves, so v49 is a STRICT PREFIX of v50 and is read too
+/// (`k_world_save_version_pre_lp`), as a world where every nation shares by the
+/// mechanical default; v48 and v47 still read. Every other version is refused.
+inline constexpr uint32_t world_save_version = 50;
+
+/// BL-1309: v49, a strict prefix of v50 (the share-rule section is v50's only addition).
+inline constexpr uint32_t k_world_save_version_pre_lp = 49;
 
 /// BL-1255: v48, a strict prefix of v49 (the rail section is v49's only addition).
 inline constexpr uint32_t k_world_save_version_pre_rail = 48;

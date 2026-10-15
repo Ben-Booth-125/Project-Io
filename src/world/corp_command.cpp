@@ -1,4 +1,5 @@
 #include "corp_command.hpp"
+#include "logistic_points.hpp" // BL-1309: lp_share_rule_valid
 
 #include "battle_system.hpp" // request_withdraw, unit_in_battle (BL-467)
 
@@ -754,6 +755,37 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     if (rail_verb && cmd.corp != w.player_entity)
         return corp_command_result::rejected_not_owner;
 
+    // BL-1309 (LOGISTICS.md § Logistic Points, "One pool"): the nation's share
+    // rule. The seat's alone — no grant lets an AI nation set one. Every field is
+    // validated as the value that lands before anything mutates.
+    if (cmd.verb == corp_verb::set_logistics_shares)
+    {
+        if (cmd.corp != w.player_entity)
+            return corp_command_result::rejected_not_owner;
+        nation_component& nc = w.nations.at(nation);
+        if (cmd.order == 1)
+        {
+            if (cmd.quantity != 0.0f || cmd.floor_price != 0.0f)
+                return corp_command_result::rejected_invalid;
+            if (!nc.lp_shares.set)
+                return corp_command_result::rejected_state;
+            nc.lp_shares = nation_component::logistics_share_rule{};
+            return corp_command_result::applied;
+        }
+        if (cmd.order != 0)
+            return corp_command_result::rejected_invalid;
+        const float st = cmd.quantity, ch = cmd.floor_price;
+        if (!std::isfinite(st) || !std::isfinite(ch) || st < 0.0f || ch < 0.0f
+            || st > 1.0f || ch > 1.0f || st + ch > 1.0f + 1e-6f)
+            return corp_command_result::rejected_invalid;
+        const std::array<float, 3> sh = {st, ch, std::max(0.0f, 1.0f - st - ch)};
+        if (!lp_share_rule_valid(sh))
+            return corp_command_result::rejected_invalid;
+        nc.lp_shares.set   = true;
+        nc.lp_shares.share = sh;
+        return corp_command_result::applied;
+    }
+
     switch (cmd.verb)
     {
         case corp_verb::lay_track:
@@ -764,13 +796,15 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
         }
         case corp_verb::build:
         {
-            if (cmd.type == building_type::railway_station)
+            if (cmd.type == building_type::railway_station
+                || cmd.type == building_type::inland_logistics_hub) // BL-1309: a nation builds hubs
             {
                 if (cmd.recipe != no_recipe || w.tiles.find(cmd.tile) == w.tiles.end())
                     return corp_command_result::rejected_invalid;
                 entity_id built = null_entity;
-                const construction_result r =
-                    construct_state_station(w, reg, nation, cmd.tile, built);
+                const construction_result r = cmd.type == building_type::railway_station
+                    ? construct_state_station(w, reg, nation, cmd.tile, built)
+                    : construct_state_logistics(w, reg, nation, cmd.tile, cmd.type, built);
                 if (r == construction_result::placed && out_building)
                     *out_building = built;
                 return map_construction(r);
@@ -1086,13 +1120,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         case corp_verb::lay_track:
             // BL-1255: track is state industry — laid only for a nation (`as_nation`).
             return corp_command_result::rejected_invalid;
+        case corp_verb::set_logistics_shares:
+            // BL-1309: a nation's act — only for a nation (`as_nation`).
+            return corp_command_result::rejected_invalid;
         case corp_verb::build:
         {
-            // BL-1255: a railway station is state industry — built only for a
-            // nation (`as_nation`); a corporation's own book never holds one by
-            // command (a minor's background firms receive theirs at the fold).
-            if (cmd.type == building_type::railway_station)
-                return corp_command_result::rejected_invalid;
+            // BL-1309 (LOGISTICS.md § Logistic Points, "One pool": "anyone may build
+            // them — nations and corporations alike"): a corporation may stand a
+            // NEW railway station on its own book (the build door's city-touching-
+            // track rule still applies). No grant lets a rival's scorer build one;
+            // corp_ai.cpp issues no station build.
             // BL-388: a stated recipe must reach the built processor — reject
 
             // rather than silently coerce. construct_building substitutes steel

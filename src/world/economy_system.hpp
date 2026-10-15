@@ -9,6 +9,7 @@
 #include "space_programme.hpp" // space_purchase (BL-644)
 #include "network_upkeep.hpp"  // network_purchase (BL-643)
 #include "corp_command.hpp"    // firm_exit_record (BL-743)
+#include "logistic_points.hpp" // BL-1309: lp_tick
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
@@ -249,6 +250,10 @@ struct shelf_phase_audit
 struct economy_report
 {
     std::vector<building_report> buildings;
+
+    /// BL-1309: this tick's Logistic Points — every nation's pool, every
+    /// producing building's need, coverage and grant (logistic_points.hpp).
+    lp_tick logistic_points;
 
     /// BL-1266 (TRADE.md § The Planetary Marketplace): every building whose goods
     /// UPKEEP went unmet this tick (`run_building_upkeep`). A trade building in

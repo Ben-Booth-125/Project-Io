@@ -370,6 +370,25 @@ construction_result construct_state_station(world& w, const recipe_registry& reg
                          state_uncommitted_treasury(w, nation), nit->second.state_assets);
 }
 
+construction_result construct_state_logistics(world& w, const recipe_registry& reg,
+                                              entity_id nation, entity_id tile,
+                                              building_type type, entity_id& out_building)
+{
+    out_building = null_entity;
+    if (type != building_type::inland_logistics_hub)
+        return construction_result::invalid_tile; // BL-1309: the nation's hub door
+    const auto nit = w.nations.find(nation);
+    const entity_id champion = champion_of(w, nation);
+    if (nit == w.nations.end() || champion == null_entity)
+        return construction_result::no_corp; // no major nation to own it
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end() || tn->second != nation)
+        return construction_result::invalid_tile; // on its own ground
+    return construct_for(w, reg, champion, tile, type, resource_type::iron_ore, out_building,
+                         no_recipe, state_uncommitted_treasury(w, nation),
+                         nit->second.state_assets);
+}
+
 float track_tile_cost(const world& w, const recipe_registry& reg, entity_id tile)
 {
     const recipe_registry::rail_params& rp = reg.rail();

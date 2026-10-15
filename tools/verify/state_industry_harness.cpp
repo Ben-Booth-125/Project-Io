@@ -646,8 +646,18 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         // raised target and a resume are refused (rejected_funds), nothing moved.
         {
             world c = w;
+            // BL-1309: a state plant built in play beyond every Logistic Point
+            // source's reach makes nothing, loses, and the loss reflex parks it; the
+            // fixture wants completed plants, so it un-parks them first.
+            for (const entity_id b : c.nations.at(pn).state_assets)
+                if (c.buildings.at(b).ticks_remaining == 0 && !building_affects_logistics(c.buildings.at(b).type))
+                    c.buildings.at(b).decommissioned = false;
             std::vector<entity_id> run = running(c);
             entity_id parked = null_entity;
+            // BL-1309: the fold now seeds state logistics hubs (zero-staffed, no
+            // workforce dial); park and dial the PRODUCING state buildings only.
+            run.erase(std::remove_if(run.begin(), run.end(), [&](entity_id b) {
+                          return building_affects_logistics(c.buildings.at(b).type); }), run.end());
             if (run.size() >= 2) { parked = run.back(); c.buildings.at(parked).decommissioned = true; run.pop_back(); }
             for (const entity_id b : run) c.buildings.at(b).workforce_target = 50;
             c.nations.at(pn).treasury = 1.0e9f;
@@ -667,6 +677,9 @@ void run_seed(lua_state& lua, std::uint32_t seed)
             // BL-1322 (Ben, 2026-10-14): the player has no workforce verb on its state
             // buildings either - the game steps them - so a raise is refused as invalid;
             // the resume still meets the treasury gate.
+            std::printf("    S8a: %zu running, parked %u, r1 %d r2 %d, hash %s\n", run.size(),
+                        static_cast<unsigned>(parked), static_cast<int>(r1), static_cast<int>(r2),
+                        c.state_hash(0) == h0 ? "unmoved" : "MOVED");
             check(!run.empty() && r1 == corp_command_result::rejected_invalid
                       && r2 == corp_command_result::rejected_funds && c.state_hash(0) == h0,
                   "S8a", "with nothing uncommitted, the player's workforce verb is refused and a resume is rejected_funds, nothing moved");

@@ -1030,55 +1030,14 @@ convoy_leg price_market_leg(world& w, const recipe_registry& reg,
 
 namespace {
 
-/// BL-597's passive-LP gate, shared by a corporation's convoy (commit_convoy) and a
-/// market's own export (BL-1071): the remaining passive LP this tick at the anchor
-/// NEAREST `origin` on `src_body`, as a slot the caller draws from — null when no
-/// anchor is reachable (no passive LP exists to draw against). Reading it builds the
-/// body's pool on first touch and mutates nothing else. The pointer stays valid for
-/// the pass: the per-body pools are node-based maps nothing below erases from.
-float* passive_lp_slot(world& w, const recipe_registry& reg, entity_id src_body,
-                       entity_id origin, lp_pool_map& pools_by_body)
-{
-    const military_capability_params& mil = reg.military();
-    std::unordered_map<entity_id, float>& pools =
-        lp_pool_for_body(pools_by_body, w, src_body, mil.active_lp_per_anchor_tick);
-    const entity_id nearest_anchor =
-        (origin != null_entity) ? nearest_lp_anchor(w, src_body, origin, pools) : null_entity;
-    if (nearest_anchor == null_entity)
-        return nullptr;
-    return &pools.at(nearest_anchor);
-}
-
-/// How much of a `qty` cargo the anchor's remaining passive LP `pool` admits.
-///
-/// WHOLE (BL-597, `allow_partial` false): all of it when the pool holds it (the 1e-6
-/// slack is the original test's), else nothing — the commanded quantity of a player's
-/// verb or a rival's directed dispatch is sent whole or refused, mutating nothing.
-///
-/// PARTIAL (BL-1186 E1, the auto-dispatch passes): what the pool still holds, up to
-/// the cargo. LP stays the CAP (LOGISTICS.md rule 1); it no longer refuses a large
-/// surplus whole — before this no single convoy could carry more than one anchor's
-/// tick, so any cargo above it never moved at all. Not below one unit unless the
-/// cargo itself is smaller: an anchor's last crumbs do not make a convoy.
-float passive_lp_grant(float pool, float qty, bool allow_partial)
-{
-    if (pool + 1e-6f >= qty)
-        return qty;
-    if (!allow_partial)
-        return 0.0f;
-    return (pool >= std::min(qty, 1.0f)) ? pool : 0.0f;
-}
-
 } // namespace
 
 float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id,
                      lp_pool_map& pools)
 {
-    const auto mit = w.markets.find(market_id);
-    if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
-        return 0.0f;
-    const float* slot = passive_lp_slot(w, reg, mit->second.body, mit->second.centre_tile, pools);
-    return (slot != nullptr && std::isfinite(*slot)) ? std::max(0.0f, *slot) : 0.0f;
+    // BL-1309: no passive cap exists any more; nothing is left at an anchor.
+    (void)w; (void)reg; (void)market_id; (void)pools;
+    return 0.0f;
 }
 
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
@@ -1121,29 +1080,13 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     if (!(send > 0.0f))
         return false;
 
-    // BL-597: the passive-LP admissibility gate, before any mutation. THE DRAW IS
-    // CARGO QUANTITY, NOT DISTANCE (Ben, 2026-08-25, ruling on NR-620): the
-    // anchor passes so many units of goods per tick, and credits remain the sole
-    // price of distance. Trade points are the OWNER's capacity; Logistic Points
-    // are the PLACE's, and a shipment passes both (TRADE.md § The Planetary
-    // Marketplace). The cap TRIMS a shipment to what the anchor still admits
-    // (BL-1186 E1); space legs have no tile path and are out of its scope.
-    float* slot = nullptr;
-    if (leg.mode != convoy_mode::space)
-    {
-        lp_pool_map local_pools;
-        slot = passive_lp_slot(w, reg, src_body, src.centre_tile,
-                               shared_lp_pools ? *shared_lp_pools : local_pools);
-        send = slot ? passive_lp_grant(*slot, send, /*allow_partial=*/true) : 0.0f;
-        if (!(send > 0.0f))
-        {
-            if (out_refused_no_lp)
-                *out_refused_no_lp = true;
-            return false;
-        }
-        if (shared_lp_pools == nullptr)
-            slot = nullptr; // a private pool: nothing outlives this call to draw down
-    }
+    // BL-1309 (LOGISTICS.md § Logistic Points, "One pool", Ben 2026-10-14): the
+    // passive-LP cap this gate drew is RETIRED. Logistic Points are a nation's
+    // pool, made by its sources and consumed by production; a shipment spends its
+    // owner's trade points (TRADE.md) and nothing at the anchor.
+    (void)shared_lp_pools;
+    (void)out_refused_no_lp;
+    (void)src_body;
 
     // Cost is linear in quantity (rate x distance x qty, handling x qty), so a
     // trimmed cargo pays its share of the priced leg and no more.
@@ -1161,9 +1104,6 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     if (!(*purse - already >= haul + purchase))
         return false;
 
-    // Granted: consume the anchor's capacity (LP is the CAP, not a second PRICE).
-    if (slot != nullptr)
-        *slot -= send;
 
     // The purchase: off the shelf now, billed at the posted price by the clear
     // (`report.purchases`), and posted as this tick's want on the source market

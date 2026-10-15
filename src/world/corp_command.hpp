@@ -169,6 +169,13 @@ enum class corp_verb : uint8_t
     // rival build rail, so corp_ai.cpp issues neither. The station rides `build`
     // with `type = railway_station`; the track is this verb.
     lay_track,         ///< Lay one tile of rail track at `tile` for nation `as_nation`: land, the nation's own ground, untracked, extending its own line or opening one at a city; costs `rail.track_build_cost` + `rail.track_steel_per_tile` steel (priced at the tile's market) from the treasury, upkeep per tile per tick after. rejected_placement / rejected_funds / rejected_era_locked on the door's refusals.
+    // --- BL-1309: the nation's Logistic Point shares join the seam (2026-10-14) ---
+    // Appended AFTER lay_track, same append-only rule. LOGISTICS.md § Logistic
+    // Points, "One pool": the nation sets how its points are shared among its
+    // state, its champion and other firms; with no rule the share is mechanical.
+    // Acts for `as_nation` and only when `corp` IS the seat and the nation's
+    // champion: no grant lets an AI nation set shares, so corp_ai.cpp never issues it.
+    set_logistics_shares, ///< `order` 0: nation `as_nation` shares its LP: state `quantity`, champion `floor_price`, other 1 - both (each in [0,1], the two summing to <= 1). `order` 1: clear the rule (back to mechanical; both shares 0). rejected_invalid on any other value; rejected_state clearing a rule never set.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -178,7 +185,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::lay_track) + 1;
+    static_cast<uint8_t>(corp_verb::set_logistics_shares) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

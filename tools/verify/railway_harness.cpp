@@ -584,7 +584,9 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
             rows.push_back({P_(fmt("verb=%u tile=%u nation=abc", LT, city)), "rejected_invalid", "a malformed nation id"});
             rows.push_back({P_(fmt("verb=%u tile=%llu nation=%u", LT, 1ull << 40, pn)), "rejected_invalid", "a tile id past the entity domain"});
             rows.push_back({P_(fmt("verb=0 tile=%u type=11 nation=%u", city, pn)), "rejected_placement", "a station on a city touching no track"});
-            rows.push_back({P_(fmt("verb=0 tile=%u type=11", city)), "rejected_invalid", "a station on a corporation's book"});
+            // BL-1309: "anyone may build" a station, so a corporation's book is a
+            // legal door now; off the line the build door still refuses it.
+            rows.push_back({P_(fmt("verb=0 tile=%u type=11", city)), "rejected_placement", "a corporation's station on a city touching no track"});
             rows.push_back({P_(fmt("verb=0 tile=%u type=12 nation=%u", city, pn)), "rejected_invalid", "a building type past the roster"});
         }
         rows.push_back({P_(fmt("verb=%u tile=0 nation=%u", LT, pn)), "rejected_invalid", "track on no tile"});
@@ -684,12 +686,16 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
                 corp_command sc;
                 sc.corp = rc; sc.as_nation = rn; sc.verb = corp_verb::build; sc.type = building_type::railway_station; sc.tile = rt;
                 const corp_command_result r2 = apply_corp_command(w, reg, sc);
+                const bool unmoved = w.state_hash(0) == h0;
+                // BL-1309: a corporation's own-book station is a legal door now
+                // ("anyone may build"); asked on a copy, it is never refused as invalid.
+                world wc = w;
                 corp_command pc;
                 pc.corp = rc; pc.verb = corp_verb::build; pc.type = building_type::railway_station; pc.tile = rt;
-                const corp_command_result r3 = apply_corp_command(w, reg, pc);
+                const corp_command_result r3 = apply_corp_command(wc, reg, pc);
                 check(r1 == corp_command_result::rejected_not_owner && r2 == corp_command_result::rejected_not_owner
-                          && r3 == corp_command_result::rejected_invalid && w.state_hash(0) == h0,
-                      "R4", "a rival champion may not lay track or build a station; no corporation builds one on its own book");
+                          && r3 != corp_command_result::rejected_invalid && unmoved,
+                      "R4", "a rival champion may not lay track or build a state station; a corporation's own station is a legal door (BL-1309)");
             }
         }
     }

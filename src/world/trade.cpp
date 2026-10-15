@@ -394,6 +394,8 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     // Logistic Points a further shipment leaving there could have used. Each
     // market writes only its own field, so the (unordered) walk's order is
     // immaterial; building a body's pool on first touch is deterministic.
+    // BL-1309: RETIRED with passive LP — no anchor caps a shipment, so nothing is
+    // left over; the field stays in the save record (v46) and reads 0.
     for (auto& [mid, mc] : w.markets)
         mc.trade_lp_spare = market_lp_left(w, reg, mid, *lp);
 
