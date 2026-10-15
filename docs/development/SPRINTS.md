@@ -59,23 +59,6 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 53 — the player is a nation
-*Proposed · Ben (2026-10-08: move the player to nations with space programmes, put it in sprint 52, cancel sprint 52's items and every untagged item)*
-
-**Goal.** The player plays a nation that runs a space programme, with a space corporation tied to it that can still acquire and raise funds internationally; generation decides how many nations run a programme.
-
-**Planned.**
-- CARRIED FROM 52 (Ben, 2026-10-10: "the next session is going to address generation again, so we can continue in sprint 53"). Generation first: BL-1272 (generation without research) - the fleet-afloat threshold, then cold review and merge; BL-1277 (tech wave re-bless). Then the tech tail: BL-1274 (tech effects wired), BL-1276 (tech tree panel, live click), BL-1285 (quest deed state), BL-1275 (nation research AI). Branches and checkpoints in NEXT_SESSION.md.
-- WAVE 0 - THE RULING. BL-1245 (player is a nation): Ben answers NR-1020's six calls on one form; the settled design is written into CONCEPT.md § Player identity the moment it is settled.
-- WAVE 1 - THE SWEEP. Every doc that names the player a corporation holding a seat, the NR-885 sweep in reverse; grant register narrowed for the player's nation.
-- WAVE 2 - THE BUILD CUT. Items minted from the swept docs: the seat on a nation, the generation parameter, the nation step skipping the player, the player's verbs on the nation surfaces.
-
-**Done when.** Set at the cut. Proposed: no authority doc describes the player as a corporation holding a seat, and the player can be seated on a nation in a live build.
-
-**Risk.** The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).
-
-Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree.
-
 ### Sprint 55 — spectator to the end of Era 1
 *Proposed · Ben (2026-10-15)*
 
@@ -168,12 +151,12 @@ Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 b
 | 50 | logistics and trade flow | CLOSED 2026-10-11, cut with sprint 52 as v0.1.30. The logistics goal met at its own gate (2026-10-09: G1 96.6, G1b 1.9), then the economy's spine was redesigned mid-close (Ben, 2026-10-10): pools retired for the market shelf, and trade became the only way goods cross markets (BL-1265..BL-1270). One re-bless, authorised against the shape. On main after sprints 51 and 52 joined it: G1 92.9, G1 t50 85.5, G1b 6.0 (over target; 5.7 was accepted at the merge), G2 111.7, G3 94.7; world_determinism and the seed sweep pass. |
 | 51 | visibility: initial market conditions and the ground | CLOSED 2026-10-10, cut as v0.1.29: 20 items built (the six wave-1 lanes, BL-1243, and 12 grown on Ben's walks); ground_bake_check 137/137; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); render-only beyond BL-1218 (wharf placed on shore). All five live clicks passed by Ben the same day (the wharf on a re-try in the Build section); every requirement group complete. Carried to sprint 52: BL-1247 (ground benchmark), BL-1293 (anchor rings clip), BL-1255 (rail rung). Ben called the sprint a SUCCESS (2026-10-10). |
 | 52 | the Digitisation tech tree | CLOSED 2026-10-10 (Ben: "cut this sprint as a success on building the tech tree"). The Digitisation tree is designed, written down and checked; every nation holds a tech state, a research pool and a queue from an equal start, paced to an eighty-year age. Generation, effects, the panel, the nation AI, deed state and the re-bless carry to sprint 53 on their branches. |
+| 53 | the player is a nation | CLOSED 2026-10-15, cut as v0.1.32. The player is a major nation operating its champion: nation counts hit as targets, one champion per major, state industry and state ports, the five history patterns, the setup round and the nation selection screen with history; the sprint-52 tech tail (effects, panel); railways; one-pool Logistic Points; the economy pass re-laddered to rate 1 (all five market_viability targets pass). |
 | 54 | UI improvements | CLOSED 2026-10-14 (Ben: every live click passed, merge to main). Run beside sprint 53 from origin/main: the tile card split, the market pass, a Nations lens, the trade value record, the workforce stepped auto, the settle's readings handed to play. |
-| 53 | the player is a nation | PROPOSED 2026-10-08; DESIGNED 2026-10-10/11 (Ben): the player is a major nation (BL-1245; build BL-1278..BL-1284), nation counts as always-hit targets, the history patterns (BL-1286..BL-1290, BL-1294, BL-1295), plus sprint 52's tech tail. Opens in a fresh session from docs/development/NEXT_SESSION.md; generation first. |
 | 55 | spectator to the end of Era 1 | PROPOSED 2026-10-15; CALLS ANSWERED same day (Ben): full space assets, nations launch, AI space grant, prices rise with RP matching, GDP/output charts. Items BL-1324..BL-1333. Former 55 items moved to 56. |
 
-**Next up.** SPRINTS 50, 51 AND 52 CLOSED and on main; v0.1.30 cut 2026-10-11 (sprints 50 and 52). SPRINT 53 next: the player is a nation and the history patterns, with sprint 52's tech tail; generation first. Handoff: docs/development/NEXT_SESSION.md.
+**Next up.** SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*72 sprints archived cold; 2 open/gated in the hot store.*
+*73 sprints archived cold; 1 open/gated in the hot store.*

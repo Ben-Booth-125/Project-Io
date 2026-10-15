@@ -12,6 +12,52 @@ release.
 
 ## [Unreleased]
 
+## [0.1.32] — 2026-10-15
+
+*The player is a nation. Sprint 53 moved the player from a corporation holding a seat to a major
+nation operating its champion, and taught the history to produce the patterns the nation card tells.
+It also finished sprint 52's tech tail, laid railways and rebuilt Logistic Points as one pool.*
+
+### Added
+
+- **The player is a major nation** (BL-1245 (player is a nation)): it operates its nation's champion
+  corporation directly. The nation counts are always-hit targets (BL-1278 (nation count targets)),
+  and every major has exactly one champion (BL-1283 (one champion per major)).
+- **State industry** (BL-1296 (state industry)): buildings a major owns outright, founded where it has
+  none to take over. A major's coastal seat holds a **state port**, and the state carries its trade.
+- **The five history patterns** (BL-1286 (history pattern detectors)): rise and fall
+  (BL-1287 (rise and fall target)), late culture (BL-1288 (late culture target), 16/16), a world war
+  in every world, 1900–1930 (BL-1289 (world war target)), and two leans — civil war
+  (BL-1290 (civil war lean)) and revolution on about a third of worlds (BL-1294 (revolution lean)).
+- **The setup round** (BL-1279 (wizard setup round)): a seventh wizard round between System and Life
+  holding the targets, seed and abundance; Quick Start opens it alone. The seed is rolled on Life and hidden.
+- **The nation selection screen** (BL-1281 (nation selection screen)): majors only, a seven-part card
+  with the nation's **history** (BL-1295 (nation card history)) — pattern tags, a timeline and a
+  filtered History ledger link.
+- **Tech effects** (BL-1274 (tech effects wired)) and the **tech tree panel** (BL-1276 (tech tree panel)).
+- **Railways** (BL-1255 (rail rung)): a network of its own, entered at stations; generated lines that
+  cross borders and reach minors' markets; the player lays track and builds stations from the tile's
+  building list, on the road ladder. No track is ownerless.
+- **One Logistic Point pool per nation** (BL-1309 (logistics one pool)): made by hubs, stations and
+  ports on their networks, fading with distance, consumed by production; a source dims with its upkeep.
+  Rival AI builds logistics sources where it builds (granted).
+- **The par_seeds runner**: one process per core across a harness's seeds, quick and full tiers.
+
+### Changed
+
+- **History banks more** (BL-1298 (history banks more)): every nation opens with real credits, none in debt.
+- **The economy pass**: a name no longer steers cravings (BL-1301 (name moves economy)); research pacing
+  re-tuned (BL-1305 (research pacing recal)); food processors placed on real surplus; trade capacity
+  raised and Marketplace upkeep met; staffing copy fixed (BL-1307 (profit staffing copy)); the rate
+  ladder re-laddered to `industry_points_per_1000_treasury_units` 1. All five market_viability targets pass.
+- Generation runs without research (BL-1272 (generation without research)); the stale reading is fixed
+  in every span (BL-1303 (stale reading all spans)).
+- World save to v50.
+
+### Measured, not re-blessed
+
+- BL-1277 (tech wave re-bless) is still open; this release's world movers fold into it.
+
 ## [0.1.31] — 2026-10-14
 
 *Read the ground, read the market. Sprint 54 was a UI round run beside sprint 53: Ben played the
@@ -1551,7 +1597,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.31...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.32...HEAD
+[0.1.32]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.31...v0.1.32
 [0.1.31]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.30...v0.1.31
 [0.1.30]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.29...v0.1.30
 [0.1.29]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.28...v0.1.29

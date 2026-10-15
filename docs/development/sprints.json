@@ -71,24 +71,6 @@
  ],
  "sprints": [
   {
-   "id": "53",
-   "theme": "the player is a nation",
-   "state": "proposed",
-   "status_line": "PROPOSED 2026-10-08; DESIGNED 2026-10-10/11 (Ben): the player is a major nation (BL-1245; build BL-1278..BL-1284), nation counts as always-hit targets, the history patterns (BL-1286..BL-1290, BL-1294, BL-1295), plus sprint 52's tech tail. Opens in a fresh session from docs/development/NEXT_SESSION.md; generation first.",
-   "opened_date": null,
-   "author": "Ben (2026-10-08: move the player to nations with space programmes, put it in sprint 52, cancel sprint 52's items and every untagged item)",
-   "goal": "The player plays a nation that runs a space programme, with a space corporation tied to it that can still acquire and raise funds internationally; generation decides how many nations run a programme.",
-   "planned": [
-    "CARRIED FROM 52 (Ben, 2026-10-10: \"the next session is going to address generation again, so we can continue in sprint 53\"). Generation first: BL-1272 (generation without research) - the fleet-afloat threshold, then cold review and merge; BL-1277 (tech wave re-bless). Then the tech tail: BL-1274 (tech effects wired), BL-1276 (tech tree panel, live click), BL-1285 (quest deed state), BL-1275 (nation research AI). Branches and checkpoints in NEXT_SESSION.md.",
-    "WAVE 0 - THE RULING. BL-1245 (player is a nation): Ben answers NR-1020's six calls on one form; the settled design is written into CONCEPT.md § Player identity the moment it is settled.",
-    "WAVE 1 - THE SWEEP. Every doc that names the player a corporation holding a seat, the NR-885 sweep in reverse; grant register narrowed for the player's nation.",
-    "WAVE 2 - THE BUILD CUT. Items minted from the swept docs: the seat on a nation, the generation parameter, the nation step skipping the player, the player's verbs on the nation surfaces."
-   ],
-   "risk": "The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).",
-   "done_when": "Set at the cut. Proposed: no authority doc describes the player as a corporation holding a seat, and the player can be seated on a nation in a live build.",
-   "notes": "Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree."
-  },
-  {
    "id": "55",
    "theme": "spectator to the end of Era 1",
    "state": "proposed",
@@ -107,7 +89,7 @@
    "notes": "Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11."
   }
  ],
- "next_up": "SPRINTS 50, 51 AND 52 CLOSED and on main; v0.1.30 cut 2026-10-11 (sprints 50 and 52). SPRINT 53 next: the player is a nation and the history patterns, with sprint 52's tech tail; generation first. Handoff: docs/development/NEXT_SESSION.md.",
+ "next_up": "SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]

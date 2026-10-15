@@ -1,0 +1,21 @@
+[
+  { "ruling": "The player is a major nation operating its champion corporation", "doc": "docs/CONCEPT.md", "anchor": "major nation, and it operates that nation's champion corporation", "stale": ["\\*\\*The player is a corporation\\*\\*"], "owner": "BL-1245 (player is a nation)" },
+  { "ruling": "A minor runs shallow", "doc": "docs/politics/NATIONS.md", "anchor": "A minor runs shallow", "stale": [], "owner": "BL-1282 (minor nations shallow)" },
+  { "ruling": "The nation counts are targets, and the target outranks the floor", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "The target outranks the floor", "stale": [], "owner": "BL-1278 (nation count targets)" },
+  { "ruling": "A state charter where a minor cannot afford its champion", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "A state charter where a minor cannot afford its champion", "stale": [], "owner": "BL-1283 (one champion per major)" },
+  { "ruling": "Every nation opens with real credits, and none opens in debt", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "Every nation opens with real credits, and none opens in debt", "stale": [], "owner": "BL-1298 (history banks more)" },
+  { "ruling": "State industry: buildings a major owns outright; every major founds one", "doc": "docs/politics/NATIONS.md", "anchor": "State industry — buildings a major owns outright", "stale": [], "owner": "BL-1296 (state industry)" },
+  { "ruling": "A major's coastal seat has a state port", "doc": "docs/politics/NATIONS.md", "anchor": "A major's coastal seat has a state port", "stale": [], "owner": "economy pass (2026-10-14)" },
+  { "ruling": "A setup round precedes Life; Quick Start opens it alone", "doc": "docs/ui/STARTUP.md", "anchor": "A SETUP ROUND PRECEDES LIFE", "stale": [], "owner": "BL-1279 (wizard setup round)" },
+  { "ruling": "The seed is drawn on the Life round and hidden", "doc": "docs/ui/STARTUP.md", "anchor": "The seed is drawn on the Life round and hidden", "stale": [], "owner": "BL-1279 (wizard setup round)" },
+  { "ruling": "The player picks a major nation on a selection screen; the nation card carries history", "doc": "docs/ui/STARTUP.md", "anchor": "The player picks a major nation, on a nation selection screen at Begin", "stale": [], "owner": "BL-1281 (nation selection screen)" },
+  { "ruling": "Rise and fall: window, realm, the fall acts on the map", "doc": "docs/generation/CIVILISATION.md", "anchor": "The fall acts on the map", "stale": [], "owner": "BL-1287 (rise and fall target)" },
+  { "ruling": "Late culture: development spreads only by contact; the sea counts", "doc": "docs/generation/EXPLORATION.md", "anchor": "Development spreads only by contact", "stale": [], "owner": "BL-1288 (late culture target)" },
+  { "ruling": "World war: short, ruinous, half a chest, and the borders stand", "doc": "docs/generation/INDUSTRIALISATION.md", "anchor": "Short, ruinous, and the borders stand", "stale": [], "owner": "BL-1289 (world war target)" },
+  { "ruling": "Revolution fires on roughly a third of worlds", "doc": "docs/generation/INDUSTRIALISATION.md", "anchor": "roughly a third of the library", "stale": [], "owner": "BL-1304 (revolution a third)" },
+  { "ruling": "Railways: a network of its own, entered at stations; lines cross borders; no track is ownerless", "doc": "docs/economy/LOGISTICS.md", "anchor": "No track is ownerless", "stale": [], "owner": "BL-1255 (rail rung)" },
+  { "ruling": "Rail is built like anything else, from the tile's building list", "doc": "docs/economy/LOGISTICS.md", "anchor": "Rail is built like anything else", "stale": [], "owner": "BL-1255 (rail rung)" },
+  { "ruling": "One Logistic Point pool per nation, made by buildings, consumed by production; a source dims with its upkeep", "doc": "docs/economy/LOGISTICS.md", "anchor": "One pool, made by buildings, consumed by production", "stale": [], "owner": "BL-1309 (logistics one pool)" },
+  { "ruling": "AI builds logistics sources where it builds (grant)", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "AI builds logistics sources where it builds", "stale": [], "owner": "BL-1309 (logistics one pool)" },
+  { "ruling": "A food processor reads real household demand", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "A food processor reads real household demand", "stale": [], "owner": "economy pass (2026-10-14)" }
+]

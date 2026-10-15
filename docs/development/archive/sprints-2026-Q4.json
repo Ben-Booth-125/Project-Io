@@ -133,6 +133,31 @@
         "lessons": "The design moved four times in one session (six domains, the 50/4 template, three trees of segments, then connected clusters at 160) before it settled; writing the template into TREES.md before the shape settled cost a rewrite. Cold reviews caught a weakened R0 assertion, a treasury drain with no purchase, unequal settle pools, a dead institute term and a landlocked naval ramp - every lane needed a fix round. Linear research in spending fails when treasuries span orders of magnitude; the base + concave shape was found by measuring all four shapes before asking."
       }
     },
+    "53": {
+      "id": "53",
+      "theme": "the player is a nation",
+      "state": "landed",
+      "status_line": "CLOSED 2026-10-15, cut as v0.1.32. The player is a major nation operating its champion: nation counts hit as targets, one champion per major, state industry and state ports, the five history patterns, the setup round and the nation selection screen with history; the sprint-52 tech tail (effects, panel); railways; one-pool Logistic Points; the economy pass re-laddered to rate 1 (all five market_viability targets pass).",
+      "opened_date": "2026-10-11",
+      "author": "Ben (2026-10-08: move the player to nations with space programmes, put it in sprint 52, cancel sprint 52's items and every untagged item)",
+      "goal": "The player plays a nation that runs a space programme, with a space corporation tied to it that can still acquire and raise funds internationally; generation decides how many nations run a programme.",
+      "planned": [
+        "CARRIED FROM 52 (Ben, 2026-10-10: \"the next session is going to address generation again, so we can continue in sprint 53\"). Generation first: BL-1272 (generation without research) - the fleet-afloat threshold, then cold review and merge; BL-1277 (tech wave re-bless). Then the tech tail: BL-1274 (tech effects wired), BL-1276 (tech tree panel, live click), BL-1285 (quest deed state), BL-1275 (nation research AI). Branches and checkpoints in NEXT_SESSION.md.",
+        "WAVE 0 - THE RULING. BL-1245 (player is a nation): Ben answers NR-1020's six calls on one form; the settled design is written into CONCEPT.md § Player identity the moment it is settled.",
+        "WAVE 1 - THE SWEEP. Every doc that names the player a corporation holding a seat, the NR-885 sweep in reverse; grant register narrowed for the player's nation.",
+        "WAVE 2 - THE BUILD CUT. Items minted from the swept docs: the seat on a nation, the generation parameter, the nation step skipping the player, the player's verbs on the nation surfaces."
+      ],
+      "risk": "The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).",
+      "done_when": "Set at the cut. Proposed: no authority doc describes the player as a corporation holding a seat, and the player can be seated on a nation in a live build.",
+      "notes": "Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree.",
+      "closed_date": "2026-10-15",
+      "retro": {
+        "goal": "The player plays a major nation operating its champion corporation, in a world whose history reliably produces the patterns the nation card tells.",
+        "landed": "BL-1245 (player is a nation) swept and built; BL-1278 (nation count targets); BL-1283 (one champion per major); BL-1296 (state industry) and state ports at a major's coastal seat; BL-1298 (history banks more); the five history patterns - BL-1286 (history pattern detectors), BL-1287 (rise and fall target), BL-1288 (late culture target, 16/16), BL-1289 (world war target), BL-1290 (civil war lean), BL-1294 (revolution lean) with BL-1304 (revolution a third) and BL-1303 (stale reading all spans); BL-1279 (wizard setup round); BL-1280 (Life round 2D map); BL-1281 (nation selection screen) with BL-1295 (nation card history); BL-1272 (generation without research); BL-1274 (tech effects wired) and BL-1276 (tech tree panel, live click passed); BL-1255 (rail rung): network, generated lines across borders, player track and stations from the tile list; BL-1309 (logistics one pool) with the AI hub-building grant; the economy pass (BL-1301 (name moves economy), BL-1305 (research pacing recal), BL-1306 (seat ports sparse) diagnosis, BL-1307 (profit staffing copy), food processors on real surplus, rate ladder 60 -> 1). Tooling: the par_seeds runner and the sprint throughput rules.",
+        "slipped": "BL-1277 (tech wave re-bless) not taken; BL-1275 (nation research AI) and BL-1285 (quest deed state) not started; BL-1282 (minor nations shallow) and BL-1284 (player nation verbs) unbuilt; BL-1297 (sphere of claim gap), BL-1302 (war aftermath), BL-1308 (state build UI readings) open. Live clicks raised BL-1310 (nations contiguous) and BL-1311 (ground paint perf); rail track-per-tile laying is tedious. The rate-1 ladder leaves a treasury-band question for Ben.",
+        "lessons": "par_seeds, batching design calls before builds and delegated in-band calibration cut the waits: gates ran about 7x faster and lanes started at once. The main cost was mid-build pattern conflicts - history targets interfere (one pattern's lever moved another's rate), so lanes merged into each other repeatedly and kind numbers and save versions were renumbered at each merge. Ids collided across the parallel sprint 54; agents still yielded mid-wait and needed resuming."
+      }
+    },
     "54": {
       "id": "54",
       "theme": "UI improvements",
