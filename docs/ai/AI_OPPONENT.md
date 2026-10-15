@@ -2110,6 +2110,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   nation or champion, which stay unscored. Pure, seeded, deterministic, replayable, legal verbs
   only, never a planner.
 
+  **AI builds logistics sources where it builds — granted (Ben, 2026-10-15; `../economy/LOGISTICS.md`
+  § One pool).** Rival corporations and AI nations may build a hub, station or port to bring a building
+  they are placing into Logistic Point reach, scored like any build over the same legal verbs. **Not
+  admitted:** any build for the player's nation or champion; any source built for reach the scorer
+  does not itself need. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
   **A rival major's state industry runs under its champion's layer — granted (Ben, 2026-10-11;
   `../politics/NATIONS.md` § State industry).** State buildings are a new actor grain: buildings a
   nation owns with no corporation between. A rival major's state buildings may take the same
