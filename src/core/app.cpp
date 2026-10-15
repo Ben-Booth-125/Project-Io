@@ -2933,53 +2933,35 @@ void app::render()
         m_ui.construction.pending_road_tile = null_entity; // consume the request
     }
 
-    // BL-1255 (rail construction UI): the Rail group's presses. Track is laid as
-    // ONE lay_track command per planned tile, in lay order, through the same
-    // apply_corp_command seam the wire validates; the player takes no shortcut.
-    // The first refusal stops the run (later tiles extend the refused one) and
-    // is worded; the tiles already laid stay laid and leave the plan.
-    if (m_ui.construction.pending_rail_commit)
+    // BL-1255 (rail construction UI): a Track row's Build press - ONE lay_track
+    // for the seat nation through the same apply_corp_command seam the wire
+    // validates; the player takes no shortcut. A refusal is worded.
+    if (m_ui.construction.pending_track_tile != null_entity)
     {
-        m_ui.construction.pending_rail_commit = false;
-        const entity_id nation = ui::rail_player_nation(m_world);
-        std::vector<entity_id>& run = m_ui.construction.rail_run;
-        std::size_t laid = 0;
-        std::string why;
-        for (; laid < run.size(); ++laid)
-        {
-            const entity_id t = run[laid];
-            // Name the steel shortfall before the seam folds it into rejected_funds.
-            const float steel = m_registry.rail().track_steel_per_tile;
-            const auto mit = m_world.markets.find(market_for_tile(m_world, t));
-            const bool shelf_short = steel > 0.0f
-                && (mit == m_world.markets.end()
-                    || !(mit->second.inventory[static_cast<std::size_t>(resource_type::steel)] >= steel));
-            corp_command cmd;
-            cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
-            cmd.corp      = m_world.player_entity;
-            cmd.verb      = corp_verb::lay_track;
-            cmd.tile      = t;
-            cmd.as_nation = nation;
-            const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
-            if (r == corp_command_result::applied)
-                continue;
-            why = r == corp_command_result::rejected_funds
-                      ? (shelf_short ? "no steel on the shelf" : "the treasury cannot cover it")
-                  : r == corp_command_result::rejected_era_locked ? "no railway in this era"
-                  : r == corp_command_result::rejected_placement  ? "track cannot go there"
-                                                                  : "refused";
-            break;
-        }
-        if (laid > 0)
+        const entity_id t = m_ui.construction.pending_track_tile;
+        m_ui.construction.pending_track_tile = null_entity;
+        // Name the steel shortfall before the seam folds it into rejected_funds.
+        const float steel = m_registry.rail().track_steel_per_tile;
+        const auto mit = m_world.markets.find(market_for_tile(m_world, t));
+        const bool shelf_short = steel > 0.0f
+            && (mit == m_world.markets.end()
+                || !(mit->second.inventory[static_cast<std::size_t>(resource_type::steel)] >= steel));
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::lay_track;
+        cmd.tile      = t;
+        cmd.as_nation = ui::rail_player_nation(m_world);
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        m_ui.construction.rail_message =
+            r == corp_command_result::applied             ? "Track laid."
+          : r == corp_command_result::rejected_funds
+                ? (shelf_short ? "No steel on the shelf." : "The treasury cannot cover the track.")
+          : r == corp_command_result::rejected_era_locked ? "No railway in this era."
+          : r == corp_command_result::rejected_placement  ? "Track cannot go there."
+                                                          : "Track refused.";
+        if (r == corp_command_result::applied)
             m_ground.touch(); // the rail surface re-bakes now
-        char msg[160];
-        if (why.empty())
-            std::snprintf(msg, sizeof msg, "Laid %zu tile%s of track.", laid, laid == 1 ? "" : "s");
-        else
-            std::snprintf(msg, sizeof msg, "Laid %zu tile%s; stopped: %s.", laid,
-                          laid == 1 ? "" : "s", why.c_str());
-        m_ui.construction.rail_message = msg;
-        run.erase(run.begin(), run.begin() + static_cast<std::ptrdiff_t>(laid));
     }
     if (m_ui.construction.pending_station_tile != null_entity)
     {

@@ -4211,10 +4211,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
 
     // === BL-1255 (rail construction UI): rail_construction.lua ===
     //
-    // What the Rail group and its canvas tool left in the world and on screen: the
-    // seat nation's uncommitted treasury, its track tiles and stations, the planned
-    // run, the armed tool, the last outcome line, and where the group's presses
-    // landed this frame (so a check presses the REAL control).
+    // What the tile list's rail rows left in the world and on screen: the seat
+    // nation's uncommitted treasury, its track tiles and stations, the last outcome
+    // line, and where the Track / Railway Station Build presses landed this frame
+    // (-1 when refused; so a check presses the REAL control).
     v.set_function("rail_state", [this]() {
         sol::state& st  = m_lua.state();
         sol::table  out = st.create_table();
@@ -4232,12 +4232,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["treasury"]  = nation != null_entity ? state_uncommitted_treasury(m_world, nation) : 0.0f;
         out["track"]     = track;
         out["stations"]  = stations;
-        out["run"]       = static_cast<int>(m_ui.construction.rail_run.size());
-        out["tool"]      = static_cast<int>(m_ui.construction.rail);
         out["message"]   = m_ui.construction.rail_message;
         out["track_x"]   = c.rail_track_x;   out["track_y"]   = c.rail_track_y;
         out["station_x"] = c.rail_station_x; out["station_y"] = c.rail_station_y;
-        out["commit_x"]  = c.rail_commit_x;  out["commit_y"]  = c.rail_commit_y;
         out["steel_per_tile"] = m_registry.rail().track_steel_per_tile;
         out["track_cost"]     = m_registry.rail().track_build_cost;
         return out;
