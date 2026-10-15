@@ -32,7 +32,7 @@ and every nation opens on the industrial recipe band (`ERAS.md` § Where the lad
 
 ## Research points
 
-**RP accrue to the nation each quarter and are spent only on nodes.** Four sources; the rates are
+**RP accrue to the nation each quarter and are spent only on nodes.** Five sources; the rates are
 dials:
 
 | Source | What it is |
@@ -40,12 +40,15 @@ dials:
 | **A base** | Every nation earns a fixed RP a quarter whatever its treasury, so every nation reaches its power surges |
 | **The research budget line** | The national budget's academic-research priority (`../politics/NATIONS.md`): RP grow with the **square root** of what the line spends, so wealth buys a lead with diminishing returns. The line pays only what the queue still owes; an empty queue spends nothing |
 | **Research institutes** | Each staffed research institute adds RP a quarter to its owner's nation |
+| **The economy** | RP a quarter in proportion to the income its home corporations filed the quarter before (Ben, 2026-10-15). A growing economy buys research; this is what lets RP keep pace with rising prices (§ Cost) |
 | **Universities** | Each staffed University in the nation adds RP per quarter. A University may stand only in a City (4)+ centre (`POPULATION.md` § Strata gate buildings), and it also raises the nation's qualification fraction |
 
 **Why a base and a square root (Ben, 2026-10-10).** National treasuries span orders of magnitude.
 Research linear in spending let the richest nation buy the whole tree in a few years while half the
 field never reached its first major; a base with a concave line keeps every nation on the surge
-cadence and lets spending separate nations by a factor of about three, not a hundred thousand.
+cadence and lets spending separate nations by a factor of about three, not a hundred thousand. The economy
+source widens that with growth: the nation whose firms earn most researches several times faster
+than the median, and only by earning it.
 
 A held node's research modifier (*+N% national research*) scales the total. RP never trade between
 nations.
