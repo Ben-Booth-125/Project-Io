@@ -1780,6 +1780,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
              : r == corp_command_result::rejected_no_corp ? "rejected_no_corp"
                                                     : "rejected_invalid";
     });
+    // BL-1334: the screen's Spectate press (app::spectate_from_seat, the
+    // button's own body). Returns (screen name is in_game, spectating,
+    // player corporation) so a script asserts the session opened unseated.
+    v.set_function("seat_spectate", [this]() {
+        spectate_from_seat();
+        return std::make_tuple(m_screen == app_screen::in_game, m_ui.spectating,
+                               static_cast<long long>(m_world.player_entity));
+    });
     // (open, major count, majors whose champion clears the floor, hovered row,
     //  briefing nation, player corporation)
     v.set_function("seat_state", [this]() {

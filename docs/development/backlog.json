@@ -288,52 +288,6 @@
    "design": "SPRINT 51 ADDITION (Ben, 2026-10-08, the chain-start form): the player sees UNMET WANT - inputs a market's processors want and cannot get - on the market ledger or a lens, in the visibility pass. MOVED (Ben, 2026-10-07, the live walk): sprint 50 -> 51. Built and merged on worktree-sprint-50 (3306c300; R1, R2, R4 complete), but at the live click Ben \"couldn't find what I am looking for in the trade-flow lens\" - saved for sprint 51's visibility pass, which asks first what the player is looking for. SETTLED (Ben, 2026-10-07, the lens form): a PLAYER lens over the player's own flows only; the whole-world diagnosis stays headless (BL-1223, gate logistics row). Refusals: a marker per short market coloured by the best class over the player's sources, hover lists classes by good. Design in docs/ui/LENSES.md § Trade-flow lens. WORK: the dispatcher records the player corporation's shipments and best class per (good, destination market) each pass as a transient output the simulation never reads and the save never holds; the `trade_flow` overlay_mode at the enum's end; the Planetary arrows, markers, hover and class key; the question_log entry; the ACTIONS entry for the lens cycle if it changes. Before mint: Ben's cut form 2026-10-07 set DIAGNOSTIC scope (player polish in sprint 51)."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 51,
-   "written": "2026-10-09",
-   "requires": [
-    "BL-1246"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "category": "Tooling",
-   "priority": "A",
-   "difficulty": 2,
-   "id": "BL-1247",
-   "short_name": "GROUND_BENCHMARK",
-   "author": "Ben (2026-10-09, after walking the sprint 51 build: the ground lag is off-putting; build it now)",
-   "title": "A ground benchmark reports the five target-hardware budgets on the machine it runs on",
-   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
-   "files": [
-    "scripts/verify/ground_benchmark.lua",
-    "src/core/verify_api.cpp",
-    "src/core/ground_layer.cpp"
-   ],
-   "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware. WORK: a check (a non-verify timing mode of the app, since --verify bakes synchronously and would measure the wrong thing) that reports, on the machine it runs on: the home-body pre-bake time added to generation (budget 15 s); whether any zoom or pan step on the home body shows a stand-in (budget none); time until a first visit to another body is sharp under the view (budget 2 s); frame time at every rung (budget 16.7 ms); time from a building placed to its ground re-baked (budget 1 s). Prints PASS/FAIL per budget with the number. Wrapped as a skill only with Ben's permission (CLAUDE.md § Tool creation is skill creation)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 51,
-   "written": "2026-10-10",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 1,
-   "id": "BL-1293",
-   "short_name": "ANCHOR_RINGS_CLIP",
-   "author": "found by the BL-1292 and BL-1257 lanes (2026-10-10)",
-   "title": "Under the Throughput lens, logistics anchor rings draw over the header and comms chrome, outside the canvas",
-   "authority_doc": "docs/ui/LENSES.md",
-   "files": [
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "design": "Seen in before and after captures of BL-1257 and BL-1292 (pre-existing): the anchor rings (and their dark backing) are not clipped to the canvas rect. Clip them like every other canvas pass; capture rung 1 under Throughput with chrome in frame."
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 50,
@@ -442,6 +396,31 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "FOUND (BL-1232 lane, 2026-10-08, seed 43 grid 15125): while power firms are being chartered the grid's need is 12.3-14.1 against the half-plant threshold of 14, so it is \"left to roads\"; it reaches 20 only after the last power firm is placed. Options for Ben: score the test on projected / settled need (after the walk's centres are placed), or let a centre take power for a grid its windows can reach. Ben 2026-10-08: file, not this sprint."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 2,
+   "id": "BL-1247",
+   "short_name": "GROUND_BENCHMARK",
+   "author": "Ben (2026-10-09, after walking the sprint 51 build: the ground lag is off-putting; build it now)",
+   "title": "A ground benchmark reports the five target-hardware budgets on the machine it runs on",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "scripts/verify/ground_benchmark.lua",
+    "src/core/verify_api.cpp",
+    "src/core/ground_layer.cpp"
+   ],
+   "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware. WORK: a check (a non-verify timing mode of the app, since --verify bakes synchronously and would measure the wrong thing) that reports, on the machine it runs on: the home-body pre-bake time added to generation (budget 15 s); whether any zoom or pan step on the home body shows a stand-in (budget none); time until a first visit to another body is sharp under the view (budget 2 s); frame time at every rung (budget 16.7 ms); time from a building placed to its ground re-baked (budget 1 s). Prints PASS/FAIL per budget with the number. Wrapped as a skill only with Ben's permission (CLAUDE.md § Tool creation is skill creation)."
   },
   {
    "status": "proposed",
@@ -576,6 +555,55 @@
    "design": "RULED (Ben, 2026-10-10, the doc-check form): widen the code to match the doc. PRODUCTION.md (~545-549): 'for a building that makes or uses power, the solver reads power's supply and demand pooled over the building's grid'. The code applies the pooled read to OUTPUTS only, and only for processing facilities (economy_system.cpp ~976-992, ~1013-1015); a power input is priced at the plant's own market's posted price (~1082). WORK: price power as an input on the grid too, by the same pooled read; measure the 16-seed gate before/after; a cold review (the dial and the player's auto-solver both call solve_workforce_target)."
   },
   {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 55,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1275",
+   "short_name": "NATION_RESEARCH_AI",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "requires": [
+    "BL-1273"
+   ],
+   "files": [
+    "src/world/nation_ai.cpp",
+    "src/world/nation_ai.hpp",
+    "src/world/nation_tech.cpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "An AI nation fills its research queue one frontier node at a time, by its scorer",
+   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274. SPRINT 55 (2026-10-15): restored. The BL-1325 headless 2040 run showed no nation ever queues research (zero tech in 80 years); the grant (AI_OPPONENT.md § 11, Ben 2026-10-10) already covers it.",
+   "cancelled": "2026-10-15",
+   "cancel_reason": "Ben, 2026-10-15: dropped at the sprint 53 close; reinvent if needed"
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 1,
+   "id": "BL-1293",
+   "short_name": "ANCHOR_RINGS_CLIP",
+   "author": "found by the BL-1292 and BL-1257 lanes (2026-10-10)",
+   "title": "Under the Throughput lens, logistics anchor rings draw over the header and comms chrome, outside the canvas",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Seen in before and after captures of BL-1257 and BL-1292 (pre-existing): the anchor rings (and their dark backing) are not clipped to the canvas rect. Clip them like every other canvas pass; capture rung 1 under Throughput with chrome in frame."
+  },
+  {
    "status": "proposed",
    "glyph": "○",
    "sprint": null,
@@ -596,28 +624,6 @@
    ],
    "title": "Cut the delivery loop's waits beyond the parallel gates: a review checklist in every build brief, a blocker pass before building, one heavy run per machine",
    "design": "FUTURE WORK (Ben, 2026-10-12: build the parallel runner and the two tiers now - done 48a82109 - and consider the others later). (1) Fewer fix rounds: sprint 53's cold reviews repeatedly caught the same classes - replay drift (resume pointers), money conservation, dangling ids after removing an entity, silent target misses, save-format notes, stale prose/event text. Put that checklist in every Full-mode build brief so agents self-check before reporting, and keep the cold reviewer for seam-touching work. (2) Settle calls before building: five sprint-53 builds stopped mid-way on a design conflict (floor vs target, empty treasuries, no free tile, the order vs the band, sea-legs premise); a short pre-build \"what could block this\" pass in planning surfaces them in one form. (3) A machine queue: concurrent agents running heavy harnesses slowed each other (a 16-seed grid took 16 h); serialise heavy runs per machine (a lock file the par-seeds runner and build_lua_harness respect). Measure each against sprint 53's timings."
-  },
-  {
-   "status": "proposed",
-   "glyph": "",
-   "sprint": 54,
-   "written": "2026-10-13",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (sprint 54 UI session, found verifying), 2026-10-13",
-   "requires": [],
-   "id": "BL-1319",
-   "short_name": "FIXTURE_BASE_STALL",
-   "category": "Verification",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-   "files": [
-    "scripts/verify/lib.lua",
-    "src/world/construction.cpp"
-   ],
-   "title": "stage_ui_fixture fails on every run: the player muster base never completes within 40 ticks, blocking 12 verify scripts",
-   "design": "DEFECT. scripts/verify/lib.lua raise_player_force places a military_base near the player works and waits 40 econ ticks; it never completes (lib.lua:242 error). Seen 2026-10-13 on 7fbb199f (no sprint 54 code) and on the sprint 54 branch, after the Debug stack-overflow at startup (fixed in 8972f540) had hidden every --verify run. 12 scripts call stage_ui_fixture. Find whether construction stalls (materials on the catchment shelf, capacity, the tech gate) or the bound is wrong; BL-1066 was the previous instance. Check against sprint 53 main before fixing - a world mover there may already change it."
   },
   {
    "status": "designed",
@@ -680,6 +686,28 @@
    "files": [],
    "title": "Ground painting takes 3-5 minutes and 12 GB of RAM - cut both drastically",
    "design": "SPRINT 56 (Ben, 2026-10-15; moved from 55 the same day), with rendering improvements again. Measure the bake (time, peak memory, per-chunk) first; target an order of magnitude on both."
+  },
+  {
+   "status": "proposed",
+   "glyph": "",
+   "sprint": 54,
+   "written": "2026-10-13",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 54 UI session, found verifying), 2026-10-13",
+   "requires": [],
+   "id": "BL-1319",
+   "short_name": "FIXTURE_BASE_STALL",
+   "category": "Verification",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "scripts/verify/lib.lua",
+    "src/world/construction.cpp"
+   ],
+   "title": "stage_ui_fixture fails on every run: the player muster base never completes within 40 ticks, blocking 12 verify scripts",
+   "design": "DEFECT. scripts/verify/lib.lua raise_player_force places a military_base near the player works and waits 40 econ ticks; it never completes (lib.lua:242 error). Seen 2026-10-13 on 7fbb199f (no sprint 54 code) and on the sprint 54 branch, after the Debug stack-overflow at startup (fixed in 8972f540) had hidden every --verify run. 12 scripts call stage_ui_fixture. Find whether construction stalls (materials on the catchment shelf, capacity, the tech gate) or the bound is wrong; BL-1066 was the previous instance. Check against sprint 53 main before fixing - a world mover there may already change it."
   },
   {
    "status": "proposed",
@@ -885,6 +913,27 @@
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "title": "Spectator GDP and output charts over the whole run, per nation",
    "design": "SPRINT 55 (Ben, 2026-10-15). Ben chose GDP and output charts. Needs a question_log entry and a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-15",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-15); filed by Claude",
+   "id": "BL-1334",
+   "short_name": "SPECTATE_FROM_SEAT_SCREEN",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [],
+   "files": [
+    "src/ui/seat_screen.cpp"
+   ],
+   "title": "Nation selection offers Spectate: open the generated world with nobody seated",
+   "design": "SPRINT 55 (Ben, 2026-10-15): spectate UI in the nation-selection step of generation. Today spectating is only the --spectate flag; the seat screen gains a Spectate choice beside Confirm that calls spectate_session(). Live click required."
   }
  ]
 }

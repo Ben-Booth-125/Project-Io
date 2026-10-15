@@ -2676,14 +2676,54 @@
   {
    "id": "chrome.spectate_cli",
    "family": "chrome",
-   "surface": "Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do.",
+   "surface": "Command line. One of the two routes into spectator mode for a human, both at the start of a session; the other is the nation selection screen's Spectate press (chrome.seat_spectate). Before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do.",
    "press": "Launch with `ProjectIo --spectate`. Composes with --autostart-play, --autostart-windowed, --autostart, --load and --host-agent.",
    "args": [],
    "preconditions": [
-    "Set at launch only. There is no in-game control that enters or leaves spectate — see expected_output."
+    "Set at the start of a session only (this flag, or the seat screen's Spectate press). There is no in-game control that enters or leaves spectate — see expected_output."
    ],
    "expected_output": "Opens the session with NOBODY SEATED (AI_OPPONENT.md § 10i): corp_ai_params::spectating is true for every economy tick, so the scored-utility layer evaluates the corp at world::player_entity on the same staggered cadence as every rival, and that field degrades to a camera and ledger anchor carrying no ownership meaning. The watcher sees a full field of seven-plus corporations all playing flat out. Also unlocks the spectate-only God view checkbox in the system menu (chrome.sysmenu_god_view), which is rendered only while this flag is set. ENTRY AT START AND ONLY AT START: § 10i removes the standing prohibition's SUBJECT rather than excepting the rule, which is a property of the whole session — a mid-run flip would change, halfway through, which corps the scorer may legally act on, so no control clears it. Off by default: an unspectated session is unchanged, which tools/verify/spectator_determinism.cpp asserts as its load-bearing property.",
    "reason_to_select": "To WATCH the AI play rather than play against it — see what strategies the scored-utility layer actually produces, and whether coalitions brake a runaway leader (AI_OPPONENT.md § Where restraint comes from), which is a question no seated session can answer because a seated corp is excluded from the scorer."
+  },
+  {
+   "id": "chrome.seat_spectate",
+   "family": "chrome",
+   "surface": "The nation selection screen at Begin (STARTUP.md § The seat): the Spectate button under the screen's header, always shown, beside the line that explains it. The screen's third answer to 'which nation are you?' - none.",
+   "press": "Press Spectate. No row need be pressed first. The launch-time equivalent is `ProjectIo --spectate` (chrome.spectate_cli).",
+   "args": [],
+   "preconditions": [
+    "The nation selection screen is open: the world is built and settled, and no seat has been taken. The press is pre-play, so the mode is still entered at the start of the session (AI_OPPONENT.md § 10i)."
+   ],
+   "expected_output": "Play opens on the generated world with NOBODY SEATED: spectating is set for the whole session, exactly as --spectate sets it, and no take_seat is issued (gameplay.take_seat is not called). The scored-utility layer evaluates every corporation; world::player_entity, if the generator left one, is a camera and ledger anchor only. The spectate-only God view checkbox (chrome.sysmenu_god_view) is available. A History ledger the card's link opened closes. The log prints `[seat] Spectate: the world opens with nobody seated`.",
+   "reason_to_select": "To watch the world just generated play itself, having read its nations on the card, without relaunching under --spectate."
+  },
+  {
+   "id": "chrome.spectate_headless_cli",
+   "family": "chrome",
+   "surface": "Command line, no window. Dispatched before any SDL window, renderer or ImGui context exists, like --serve and --export-blackboard.",
+   "press": "Launch with `ProjectIo --spectate-headless [--until YEAR] [--seed N] [--out DIR]`.",
+   "args": [
+    {
+     "name": "until",
+     "type": "int",
+     "description": "Calendar year to run to (default 2040). Must be after the epoch (1960); four quarterly econ ticks per year."
+    },
+    {
+     "name": "seed",
+     "type": "int",
+     "description": "world_params::seed (default 0, the world the app opens on)."
+    },
+    {
+     "name": "out",
+     "type": "string",
+     "description": "Directory for run_<seed>.json (default spectate_runs)."
+    }
+   ],
+   "preconditions": [
+    "Launch-time only; does not compose with the rendered entry paths. --epoch does not reach it (the default 1960 world)."
+   ],
+   "expected_output": "Builds the world the app opens on (world_gen.lua's config, make_hard_coded_world, finish_campaign_world, the seat draw), then runs the app's live quarter — orbits and surveys aged 90 days, then run_settle_tick — with spectating true and nobody seated (AI_OPPONENT.md § 10i), uncapped, until the calendar reaches YEAR. Writes DIR/run_<seed>.json: one record per in-game year with each nation's treasury, population, corp sales, tech held and majors held, the final state_hash, and a separate timing object (wall seconds per decade). Prints one line per decade. Deterministic: two runs of one seed differ only inside timing.",
+   "reason_to_select": "To run a spectated campaign to a horizon fast, for balance and pacing checks, without paying for rendering or the 16x speed cap."
   },
   {
    "id": "chrome.epoch_cli",

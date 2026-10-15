@@ -424,6 +424,24 @@ void card_heading(const char* label)
 
 } // namespace
 
+void app::spectate_from_seat()
+{
+    // BL-1334: the same session --spectate opens. The flag is set and the
+    // seat is left empty: take_seat_pick is NOT called, so no take_seat
+    // command is issued and nobody becomes the player. Play opens clean, as
+    // Confirm's does: the history link's ledger and filter close.
+    m_ui.spectating = true;
+    if (m_seat_ui.history_open) m_ui.show_tile_ledger = false;
+    m_seat_ui.history_open     = false;
+    m_seat_ui.briefing         = null_entity;
+    m_ui.history_nation_filter = null_entity;
+    std::printf("[seat] Spectate: the world opens with nobody seated (player_entity %lld kept as the viewpoint anchor only)\n",
+                static_cast<long long>(m_world.player_entity));
+    std::fflush(stdout);
+    if (m_seat_ui.from_verify) m_screen = app_screen::in_game;
+    else                       finish_new_game();
+}
+
 void app::draw_seat_screen()
 {
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
@@ -483,6 +501,19 @@ void app::draw_seat_screen()
                     "Only the majors can be played.",
                     home->nation_ids.size(), realms, absorbed, ownerless);
     }
+    ImGui::PopStyleColor();
+    // BL-1334: the third answer to the screen's question -- no nation. Always
+    // shown, so watching needs no row pressed first.
+    if (ImGui::Button("Spectate"))
+    {
+        spectate_from_seat();
+        ImGui::End();
+        return;
+    }
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
+    ImGui::TextUnformatted("or take no nation: open the world with nobody seated and watch every "
+                           "corporation and nation play itself.");
     ImGui::PopStyleColor();
     ImGui::Dummy({1.0f, 6.0f});
 

@@ -3,6 +3,11 @@
 #include "core/sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"
+#include "world/campaign_settle.hpp"        // BL-1325: run_settle_tick, the app's one world tick
+#include "world/digitisation_tree_data.hpp" // BL-1325: io::dg::nodes (majors held)
+#include "world/nation_tech.hpp"            // BL-1325: nation_tech_state
+#include "world/orbital_system.hpp"         // BL-1325: advance_orbits
+#include "world/spawn_seat.hpp"             // BL-1325: seat_player_corporation
 #include "world/nation_step.hpp"
 #include "world/corp_ai.hpp"
 #include "world/corp_command.hpp"
@@ -27,7 +32,9 @@
 #endif
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <map>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -345,6 +352,274 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     return 0;
 }
 
+// --spectate-headless [--until YEAR] [--seed N] [--out DIR]  (BL-1325)
+//
+// A SPECTATED CAMPAIGN WITH NO WINDOW (Ben, 2026-10-15: "use spectate without
+// rendering ... going over the speed cap for economy ticks"). The world is the
+// one the app opens on -- world_gen.lua's parsed config, make_hard_coded_world,
+// finish_campaign_world (search + settle), then the seat DRAW the app takes
+// when nobody is asked (`seat_player_corporation`, app::seat_player; under
+// spectate the seat is a viewpoint only, AI_OPPONENT.md § 10i). Each quarter
+// then runs the app's live econ boundary: surveys and orbits aged by the
+// quarter's 90 days, the day mirror, and `run_settle_tick` -- the ONE world
+// tick app::step_economy runs -- with spectating=true, so the strategic tier
+// evaluates every corporation. The cadence key continues from the settle's
+// twelve steps, exactly as Begin sets it (app.cpp, m_econ_steps).
+//
+// Uncapped: no sim_loop, no frame pacing; the CPU is the clock. Output is
+// DIR/run_<seed>.json, one record per in-game year; wall-clock readings sit
+// in a separate "timing" object so two runs of one seed compare byte-equal
+// everywhere else.
+std::string json_escape(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (const char c : s)
+    {
+        if (c == '"' || c == '\\') { out += '\\'; out += c; }
+        else if (static_cast<unsigned char>(c) < 0x20)
+        {
+            char buf[8];
+            std::snprintf(buf, sizeof buf, "\\u%04x", static_cast<unsigned>(c));
+            out += buf;
+        }
+        else out += c;
+    }
+    return out;
+}
+
+std::string json_num(double v)
+{
+    if (!std::isfinite(v)) return "null";
+    char buf[48];
+    std::snprintf(buf, sizeof buf, "%.6f", v);
+    return buf;
+}
+
+int run_spectate_headless(int until_year, std::uint32_t seed, const std::string& out_dir)
+{
+    using clk = std::chrono::steady_clock;
+    const auto t_start = clk::now();
+
+    lua_state lua;
+    lua.load("scripts/world_gen.lua");
+    world_gen_config cfg{};
+    cfg.load_from_lua(lua);
+    works_registry works;
+    lua.load("scripts/works.lua");
+    works.load_from_lua(lua);
+    lua.load("scripts/recipes.lua");
+    lua.load("scripts/economy.lua");
+    recipe_registry reg;
+    reg.load_from_lua(lua);
+
+    world_params params{};
+    params.seed = seed;
+    generation_report rep;
+    world w = make_hard_coded_world(params, &rep, cfg, /*progress=*/nullptr, &works);
+    const finish_campaign_result fin =
+        finish_campaign_world(w, rep, reg, params, cfg, /*progress=*/nullptr);
+    // The app's no-player-to-ask route (app::seat_player): the weighted draw.
+    const spawn_seat_result seat =
+        seat_player_corporation(w, params.seed, fin.search.winner_score);
+    const double gen_seconds = std::chrono::duration<double>(clk::now() - t_start).count();
+
+    // THE CADENCE KEY (BL-568), numbered as Begin numbers it: the settle
+    // stamped econ steps 0..k_campaign_settle_ticks-1, and the app's first live
+    // quarter is k_campaign_settle_ticks (app.cpp, `m_econ_steps =
+    // k_campaign_settle_ticks`). Continue from the settled world's own counter
+    // and say so if it ever disagrees with the app's constant.
+    const int first_live_step = w.current_econ_tick + 1;
+    if (first_live_step != k_campaign_settle_ticks)
+        std::fprintf(stderr, "[spectate-headless] WARNING: settled current_econ_tick=%d, so the first "
+                             "live step %d differs from the app's %d\n",
+                     w.current_econ_tick, first_live_step, k_campaign_settle_ticks);
+
+    const int epoch = static_cast<int>(params.epoch_year);
+    if (until_year <= epoch)
+    {
+        std::fprintf(stderr, "ProjectIo: --spectate-headless: --until %d is not after the epoch %d\n",
+                     until_year, epoch);
+        return 1;
+    }
+    std::printf("[spectate-headless] seed=%u epoch=%d until=%d; world built in %.1f s "
+                "(%zu nations, %zu corporations, seat %u%s); state_hash=%016llX\n",
+                seed, epoch, until_year, gen_seconds, w.nations.size(), w.corporations.size(),
+                static_cast<unsigned>(seat.seated), seat.floor_unmet ? " FLOOR UNMET" : "",
+                static_cast<unsigned long long>(w.state_hash(w.current_day_tick)));
+    std::fflush(stdout);
+
+    std::vector<entity_id> nation_ids;
+    for (const auto& kv : w.nations) nation_ids.push_back(kv.first);
+    std::sort(nation_ids.begin(), nation_ids.end());
+
+    // Per-nation corp sales over the year (sum of the four quarters' clear
+    // income, corps keyed by home nation) -- the nearest output measure the
+    // tick already computes; reset at each year record.
+    std::map<entity_id, double> sales_year;
+
+    std::ostringstream years;
+    bool first_year = true;
+    const auto record_year = [&](int year, int econ_ticks_run) {
+        std::map<entity_id, entity_id> tile_nation;
+        for (const entity_id n : nation_ids)
+            for (const entity_id t : w.nations.at(n).tiles) tile_nation[t] = n;
+        std::map<entity_id, long long> pop_k;
+        for (const auto& [cid, pc] : w.population_centres)
+        {
+            const auto tit = w.population_centre_tile.find(cid);
+            if (tit == w.population_centre_tile.end()) continue;
+            const auto nit = tile_nation.find(tit->second);
+            if (nit != tile_nation.end()) pop_k[nit->second] += pc.population;
+        }
+        std::map<entity_id, double> corp_bal;
+        std::map<entity_id, double> corp_inc_q; // latest filed quarterly_return::income
+        std::map<entity_id, double> corp_net_q; // latest filed quarterly_return::net
+        std::map<entity_id, int>    corp_n;
+        for (const auto& [cid, c] : w.corporations)
+        {
+            corp_bal[c.home_nation] += c.balance;
+            corp_n[c.home_nation] += 1;
+            if (!c.returns.empty())
+            {
+                corp_inc_q[c.home_nation] += c.returns.back().income;
+                corp_net_q[c.home_nation] += c.returns.back().net;
+            }
+        }
+
+        years << (first_year ? "\n" : ",\n") << "    {\"year\": " << year
+              << ", \"econ_ticks\": " << econ_ticks_run << ", \"nations\": [";
+        first_year = false;
+        bool first_n = true;
+        for (const entity_id n : nation_ids)
+        {
+            const nation_component& nc = w.nations.at(n);
+            int held = 0, majors = 0, queued = 0;
+            long long pool_milli = 0;
+            if (const auto tit = w.nation_tech.find(n); tit != w.nation_tech.end())
+            {
+                held = static_cast<int>(tit->second.held.count());
+                for (int i = 0; i < io::dg::node_count; ++i)
+                    if (tit->second.held.test(static_cast<std::size_t>(i))
+                        && io::dg::nodes[static_cast<std::size_t>(i)].t == io::dg::tier::major)
+                        ++majors;
+                queued     = static_cast<int>(tit->second.queue.size());
+                pool_milli = tit->second.pool_milli;
+            }
+            years << (first_n ? "\n" : ",\n") << "      {\"id\": " << n
+                  << ", \"name\": \"" << json_escape(nc.name) << "\""
+                  << ", \"major\": " << (is_major_nation(w, n) ? "true" : "false")
+                  << ", \"treasury\": " << json_num(nc.treasury)
+                  << ", \"population_k\": " << pop_k[n]
+                  << ", \"corp_sales_year\": " << json_num(sales_year[n])
+                  << ", \"corp_balance_sum\": " << json_num(corp_bal[n])
+                  << ", \"corporations\": " << corp_n[n]
+                  << ", \"corp_income_last_q\": " << json_num(corp_inc_q[n])
+                  << ", \"corp_net_last_q\": " << json_num(corp_net_q[n])
+                  << ", \"state_assets\": " << nc.state_assets.size()
+                  << ", \"tech_held\": " << held
+                  << ", \"majors_held\": " << majors
+                  << ", \"research_queue\": " << queued
+                  << ", \"rp_pool\": " << json_num(static_cast<double>(pool_milli) / 1000.0)
+                  << "}";
+            first_n = false;
+        }
+        years << "\n    ]}";
+        sales_year.clear();
+    };
+
+    record_year(epoch, 0);
+
+    const int total_ticks = (until_year - epoch) * 4; // 4 quarters of 90 days; 360-day years
+    std::vector<double> decade_seconds;
+    auto decade_t0 = clk::now();
+    const auto t_run0 = decade_t0;
+    for (int k = 1; k <= total_ticks; ++k)
+    {
+        // The app's frame at a quarter boundary (app.cpp, run loop): orbits and
+        // surveys aged to the boundary day, the day mirrored onto the world,
+        // then step_economy's world half.
+        const int day = k * sim_loop::econ_tick_days;
+        advance_orbits(w, static_cast<double>(sim_loop::econ_tick_days));
+        advance_surveys(w, sim_loop::econ_tick_days);
+        w.current_day_tick = day;
+        const settle_tick_result tick =
+            run_settle_tick(w, reg, first_live_step + (k - 1), day, /*spectating=*/true);
+        for (const auto& [cid, f] : tick.flows)
+            if (const auto cit = w.corporations.find(cid); cit != w.corporations.end())
+                sales_year[cit->second.home_nation] += f.income;
+
+        if (k % 4 != 0) continue;
+        const int year = epoch + k / 4;
+        record_year(year, k);
+        if ((year - epoch) % 10 == 0 || year == until_year)
+        {
+            const auto now = clk::now();
+            const double secs = std::chrono::duration<double>(now - decade_t0).count();
+            decade_t0 = now;
+            decade_seconds.push_back(secs);
+            double treas = 0.0;
+            int held = 0, neg = 0;
+            for (const entity_id n : nation_ids)
+            {
+                treas += w.nations.at(n).treasury;
+                if (w.nations.at(n).treasury < 0.0f) ++neg;
+            }
+            for (const auto& [n, ts] : w.nation_tech) held += static_cast<int>(ts.held.count());
+            std::printf("[spectate-headless] %d: %.1f s wall | treasury sum %.0f (%d negative) | "
+                        "tech held %d | corps %zu | state_hash=%016llX\n",
+                        year, secs, treas, neg, held, w.corporations.size(),
+                        static_cast<unsigned long long>(w.state_hash(w.current_day_tick)));
+            std::fflush(stdout);
+        }
+    }
+    const double run_seconds = std::chrono::duration<double>(clk::now() - t_run0).count();
+    const unsigned long long final_hash = w.state_hash(w.current_day_tick);
+
+    // BL-1327: the final space-asset store, counted by class then state.
+    int space_count[4][4] = {};
+    for (const auto& [sid, sa] : w.space_assets)
+        ++space_count[static_cast<int>(sa.cls)][static_cast<int>(sa.state)];
+    static const char* const k_space_cls[4] = {"satellite", "rover", "crewed_mission", "station_module"};
+    std::string space_json = "{";
+    for (int c = 0; c < 4; ++c)
+    {
+        space_json += std::string(c ? ", " : "") + "\"" + k_space_cls[c] + "\": [";
+        for (int s = 0; s < 4; ++s)
+            space_json += (s ? ", " : "") + std::to_string(space_count[c][s]);
+        space_json += "]";
+    }
+    space_json += ", \"order\": \"in_transit, active, decaying, lost\"}";
+
+    std::filesystem::create_directories(out_dir);
+    const std::string path = out_dir + "/run_" + std::to_string(seed) + ".json";
+    std::ofstream f(path, std::ios::binary);
+    f << "{\n  \"seed\": " << seed << ",\n  \"epoch_year\": " << epoch
+      << ",\n  \"until_year\": " << until_year << ",\n  \"econ_ticks\": " << total_ticks
+      << ",\n  \"seat\": " << seat.seated
+      << ",\n  \"first_live_econ_step\": " << first_live_step
+      << ",\n  \"space_assets\": " << space_json
+      << ",\n  \"final_state_hash\": \"";
+    char hbuf[24];
+    std::snprintf(hbuf, sizeof hbuf, "%016llX", final_hash);
+    f << hbuf << "\",\n  \"years\": [" << years.str() << "\n  ],\n  \"timing\": {\"generation_seconds\": "
+      << json_num(gen_seconds) << ", \"run_seconds\": " << json_num(run_seconds)
+      << ", \"seconds_per_decade\": [";
+    for (std::size_t i = 0; i < decade_seconds.size(); ++i)
+        f << (i ? ", " : "") << json_num(decade_seconds[i]);
+    f << "]}\n}\n";
+    f.flush();
+    if (!f)
+    {
+        std::fprintf(stderr, "ProjectIo: --spectate-headless: failed to write %s\n", path.c_str());
+        return 1;
+    }
+    std::printf("[spectate-headless] reached %d after %d econ ticks in %.1f s (+%.1f s generation); "
+                "final state_hash=%s; wrote %s\n",
+                until_year, total_ticks, run_seconds, gen_seconds, hbuf, path.c_str());
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Crash reporting (2026-08-12)
 // ---------------------------------------------------------------------------
@@ -471,6 +746,27 @@ int main(int argc, char* argv[])
                         ticks = std::max(1, std::atoi(argv[j + 1]));
                 }
                 return run_blackboard_export(which, out_dir, ticks);
+            }
+        }
+
+        // --spectate-headless (BL-1325): a spectated campaign to a year, no
+        // window, uncapped. Dispatched before any SDL/renderer/ImGui exists.
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--spectate-headless")
+            {
+                int           until   = 2040;
+                std::uint32_t seed    = 0;
+                std::string   out_dir = "spectate_runs";
+                for (int j = i + 1; j < argc; ++j)
+                {
+                    const std::string a = argv[j];
+                    if (a == "--until" && j + 1 < argc) until = std::atoi(argv[j + 1]);
+                    if (a == "--seed" && j + 1 < argc)
+                        seed = static_cast<std::uint32_t>(std::strtoul(argv[j + 1], nullptr, 10));
+                    if (a == "--out" && j + 1 < argc) out_dir = argv[j + 1];
+                }
+                return run_spectate_headless(until, seed, out_dir);
             }
         }
 

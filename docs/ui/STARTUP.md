@@ -746,7 +746,8 @@ operating its champion. Only majors are offered; a minor cannot be played. Major
 one-to-one, so the screen offers exactly the major target's count of rows. **The screen is shaped for up to
 six humans, each taking one major, and seats one (Ben, 2026-10-10, NR-1025)**: multiplayer stays
 outside the prototype scope (`../tech/TECH_FOUNDATIONS.md`), so the prototype seats a single human
-and nothing in the screen's design assumes there is only one.
+and nothing in the screen's design assumes there is only one. The seat screen also offers
+**Spectate**, which opens the world with nobody seated (`../ai/AI_OPPONENT.md` § 10i).
 
 **The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries seven
 things, and the screen gives the nation more room than the firm card did:

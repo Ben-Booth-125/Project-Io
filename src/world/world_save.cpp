@@ -1148,6 +1148,28 @@ void write_world_snapshot(const world& w, std::ostream& out)
                 w_f32(out, f);
         }
     }
+
+    // BL-1327 (world_save_version 51): SPACE ASSETS, a trailing section after
+    // the share rules -- every asset, ascending id as the std::map holds it,
+    // field by field. A world that never launched writes one empty count. A v50
+    // (and older) stream ends before it.
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_assets.size()));
+        for (const auto& [aid, a] : w.space_assets)
+        {
+            w_id(out, aid);
+            w_id(out, a.owner);
+            w_enum(out, a.cls);
+            w_id(out, a.dest.body);
+            w_enum(out, a.dest.slot);
+            w_enum(out, a.state);
+            w_i32(out, a.launch_tick);
+            w_i32(out, a.arrival_tick);
+            w_f32(out, a.upkeep);
+            w_i32(out, a.unpaid_quarters);
+            w_f32(out, a.launch_cost);
+        }
+    }
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1168,7 +1190,8 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!r_u32(in, version)
         || (version != world_save_version && version != k_world_save_version_pre_lp
             && version != k_world_save_version_pre_rail
-            && version != k_world_save_version_pre_state))
+            && version != k_world_save_version_pre_state
+            && version != k_world_save_version_pre_space))
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1477,7 +1500,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // BL-1309 (v50): the share rules. Untrusted: each names a nation in the
     // stream, strictly ascending, with three finite shares in [0,1] summing to 1
     // (the seam's own rule, `lp_share_rule_valid`). Refused whole otherwise.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_space) // v50 and v51 carry it
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -1495,6 +1518,72 @@ bool read_world_snapshot(world& w, std::istream& in)
             prev = nid;
             s.nations.at(nid).lp_shares.set   = true;
             s.nations.at(nid).lp_shares.share = sh;
+        }
+    }
+
+    // BL-1327 (v51): the space assets. Untrusted: ids strictly ascending, never
+    // null, below the allocator cursor and naming no nation or body; the owner a
+    // nation in the stream; the destination a body in the stream; every enum in
+    // range; arrival at or after launch; upkeep finite and non-negative; the
+    // unpaid count non-negative. Refused whole otherwise. A v50 (and older)
+    // stream ends before it: a world with no space assets.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > max_count)
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            space_asset a;
+            entity_id   aid = null_entity;
+            if (!r_id(in, aid) || !r_id(in, a.owner)
+                || !r_enum(in, a.cls, space_asset_class::station_module)
+                || !r_id(in, a.dest.body)
+                || !r_enum(in, a.dest.slot, space_slot::surface)
+                || !r_enum(in, a.state, space_asset_state::lost)
+                || !r_i32(in, a.launch_tick) || !r_i32(in, a.arrival_tick)
+                || !r_f32(in, a.upkeep) || !r_i32(in, a.unpaid_quarters)
+                || !r_f32(in, a.launch_cost))
+                return false;
+            // The id: ascending, live in the allocator, and owned by NO other
+            // entity kind (every store whose key is an entity's own id).
+            if (aid == null_entity || (k > 0 && aid <= prev) || aid >= next_entity
+                || s.nations.count(aid) != 0 || s.bodies.count(aid) != 0
+                || s.tiles.count(aid) != 0 || s.buildings.count(aid) != 0
+                || s.markets.count(aid) != 0 || s.units.count(aid) != 0
+                || s.population_centres.count(aid) != 0 || s.corporations.count(aid) != 0)
+                return false;
+            prev = aid;
+            // Owner and destination: a nation; a body with a slot (never the star),
+            // in a slot the class can EVER occupy (the home-independent half of
+            // space_launch_legal — the home half needs the owner's capital, which
+            // a legal launch already checked and nothing later moves).
+            const auto dbit = s.bodies.find(a.dest.body);
+            if (s.nations.count(a.owner) == 0 || dbit == s.bodies.end()
+                || dbit->second.type == body_type::star || !space_slot_legal(a.cls, a.dest.slot))
+                return false;
+            if (a.arrival_tick < a.launch_tick || !std::isfinite(a.upkeep) || a.upkeep < 0.0f
+                || !std::isfinite(a.launch_cost) || a.launch_cost < 0.0f)
+                return false;
+            // State and unpaid count agree: the step writes 0 for in-transit and
+            // active, 1..loss-1 for decaying, and the loss count (<= the ceiling)
+            // for lost. The reader cannot see the registry's dial, so it holds the
+            // count to the dial's hard ceiling.
+            const int32_t u = a.unpaid_quarters;
+            const int32_t cap = k_space_quarters_to_loss_ceiling;
+            bool state_ok = false;
+            switch (a.state)
+            {
+                case space_asset_state::in_transit: state_ok = (u == 0); break;
+                case space_asset_state::active:     state_ok = (u == 0); break;
+                case space_asset_state::decaying:   state_ok = (u >= 1 && u <= cap - 1); break;
+                case space_asset_state::lost:       state_ok = (u >= 1 && u <= cap); break;
+            }
+            if (!state_ok)
+                return false;
+            a.id = aid;
+            s.space_assets.emplace_hint(s.space_assets.end(), aid, a);
         }
     }
 
