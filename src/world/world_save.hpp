@@ -431,7 +431,7 @@ inline constexpr uint32_t world_save_magic =
 /// Bumped to 51 by BL-1327 (space assets; SPACE_ASSETS.md, Ben 2026-10-15): a
 /// TRAILING SECTION after the share rules -- every space asset, ascending id, as
 /// (id, owner, class, body, slot, state, launch tick, arrival tick, upkeep,
-/// unpaid quarters). Nothing else moves, so v50 is a STRICT PREFIX of v51 and is
+/// unpaid quarters, launch cost). Nothing else moves, so v50 is a STRICT PREFIX of v51 and is
 /// read too (`k_world_save_version_pre_space`), as a world with no space assets;
 /// v49, v48 and v47 still read. Every other version is refused.
 inline constexpr uint32_t world_save_version = 51;

@@ -33,6 +33,8 @@ struct world;
 // The home body's SURFACE is not a space destination (it is a building's
 // ground), and the star has no slot of either kind; both are illegal pairs.
 //
+// THE LAUNCH-SITE GATE is enforced by the launch infrastructure layer, not here.
+//
 // WHAT IS NOT HERE, deliberately (sibling items own them): the goods a launch
 // consumes (recipes), any scorer that chooses to launch (AI_OPPONENT.md § 11 —
 // no grant exists for it), any UI, and the corp_command dictionary entry. The
@@ -103,7 +105,13 @@ struct space_asset
     int32_t           arrival_tick = 0;    ///< Econ tick it becomes active; >= launch_tick.
     float             upkeep       = 0.0f; ///< Credits per quarter, fixed at launch.
     int32_t           unpaid_quarters = 0; ///< Consecutive unpaid quarters; 0 when paid.
+    float             launch_cost  = 0.0f; ///< Credits the launch debited (the quote), for the quarter's report.
 };
+
+/// The hard ceiling on `space_asset_params::quarters_to_loss`. The step clamps
+/// the dial into [1, this]; the save reader, which cannot see the registry,
+/// validates an asset's unpaid count against it.
+inline constexpr int32_t k_space_quarters_to_loss_ceiling = 64;
 
 /// The dials. Defaults are the BL-1327 first-cut calibration (in-band; see the
 /// report). Credits are the treasury's units; the satellite's launch cost sits
@@ -133,7 +141,12 @@ struct space_asset_params
 
     /// Consecutive unpaid quarters at which a decaying asset is LOST. The first
     /// unpaid quarter makes it decaying; a paid quarter restores it to active.
+    /// Clamped into [1, k_space_quarters_to_loss_ceiling] where it is read.
     int32_t quarters_to_loss = 4;
+
+    /// Far tiers only: the AU-derived extra quarters are clamped to this before
+    /// the integer cast, so no separation can overflow a tick.
+    int32_t max_extra_quarters = 400;
 };
 
 /// May @p cls go to @p reach? The class/destination legality table:
@@ -142,6 +155,11 @@ struct space_asset_params
 ///   crewed_mission  any destination off the home body (moon or far, either slot)
 ///   station_module  home orbit or moon orbit
 bool space_launch_legal(space_asset_class cls, space_reach reach);
+
+/// The home-independent half of the table: may @p cls ever occupy @p slot?
+/// satellite and station_module are orbit-only, rover surface-only, a crewed
+/// mission either. The save reader holds every stored asset to this.
+bool space_slot_legal(space_asset_class cls, space_slot slot);
 
 /// Outcome of a launch, or of a quote.
 enum class space_launch_result : uint8_t
@@ -173,19 +191,26 @@ space_launch_quote quote_space_launch(const world& w, const space_asset_params& 
                                       entity_id nation, space_asset_class cls,
                                       space_destination dest);
 
-/// THE VERB. Launch @p cls to @p dest for @p nation at econ tick @p econ_tick,
-/// paid whole from the nation's treasury. Rejected WHOLE — the world is not
-/// touched, not even the entity allocator — when the quote is not `launched`.
-/// On success: the treasury is debited the cost, one entity id is allocated,
-/// and the asset is stored `in_transit` with `arrival_tick = econ_tick +
-/// travel_quarters`.
+/// THE VERB. Launch @p cls to @p dest for @p nation, paid whole from the
+/// nation's treasury. Rejected WHOLE — the world is not touched, not even the
+/// entity allocator — when the quote is not `launched`.
+///
+/// THE TICK CONTRACT. The launch tick is `w.current_econ_tick`, read from the
+/// world and never passed in: the econ tick ABOUT TO RUN, which every driver
+/// mirrors onto the world before stepping it. The asset is stored `in_transit`
+/// with `arrival_tick = launch_tick + travel_quarters`, and the nation step of
+/// that same tick runs `run_space_asset_step` — so travel 0 is active (and pays
+/// its first upkeep) in the launch quarter, travel 1 in the next, and each
+/// further quarter of travel is exactly one more step.
 space_launch_quote launch_space_asset(world& w, const space_asset_params& p,
                                       entity_id nation, space_asset_class cls,
-                                      space_destination dest, int econ_tick);
+                                      space_destination dest);
 
 /// What one quarterly step did — reported, never stored.
 struct space_asset_step_report
 {
+    int   launched = 0;  ///< Assets whose launch_tick is this quarter.
+    float launch_spent = 0.0f; ///< Their launch costs: the quarter's launch debit.
     int   arrived = 0;   ///< in_transit -> active this quarter.
     int   paid    = 0;   ///< Assets whose upkeep was paid.
     int   unpaid  = 0;   ///< Assets whose upkeep was not.
@@ -198,6 +223,9 @@ struct space_asset_step_report
 /// every active or decaying asset then pays its upkeep WHOLE from its owner's
 /// treasury, or pays nothing and counts an unpaid quarter (decaying; lost at
 /// `quarters_to_loss`). A paid quarter clears the count and restores active.
-/// Lost assets do nothing. An empty store does nothing at all.
+/// Lost assets do nothing. An empty store does nothing at all. @p out, when
+/// given, also receives the quarter's launches (assets whose launch tick is
+/// @p econ_tick) and their summed cost, so the report carries the launch debit
+/// beside the upkeep debit.
 void run_space_asset_step(world& w, const space_asset_params& p, int econ_tick,
                           space_asset_step_report* out = nullptr);

@@ -184,7 +184,7 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // placed asset's quarterly upkeep paid whole from its owner's treasury or
     // counted unpaid (decaying, then lost). Ascending asset id; an empty store
     // does nothing, so a world that never launched ticks as before.
-    run_space_asset_step(w, reg.space_assets(), econ_tick);
+    run_space_asset_step(w, reg.space_assets(), econ_tick, &report.space_assets);
 }
 
 

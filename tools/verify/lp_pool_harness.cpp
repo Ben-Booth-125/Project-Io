@@ -30,8 +30,9 @@
 //       the seat — every malformed or unauthorised command rejected with
 //       state_hash unchanged; a valid one applies; clear applies; a rival
 //       champion (in-process) is refused.
-//   L7  THE SAVE: v50 round-trips a rule with an equal state_hash; a v49 stream
-//       (v50 less its trailing section) reads with no rule; a bad share refuses.
+//   L7  THE SAVE: v51 round-trips a rule with an equal state_hash; a v49 stream
+//       (v51 less its share-rule and space-asset sections) reads with no rule; a
+//       bad share refuses.
 //
 // Build: bash tools/verify/build_lua_harness.sh lp_pool_harness
 // Run:   build_gen/verify/lp_pool_harness.exe [--seeds a,b,...] [seed ...]   (default 0)
@@ -479,22 +480,22 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         world c = w;
         c.nations.at(pn).lp_shares.set = true;
         c.nations.at(pn).lp_shares.share = {0.2f, 0.5f, 0.3f};
-        const std::string b50 = to_bytes(c);
+        const std::string b51 = to_bytes(c);
         world r;
-        const bool rt = from_bytes(b50, r);
+        const bool rt = from_bytes(b51, r);
         check(rt && r.state_hash(0) == c.state_hash(0) && r.nations.at(pn).lp_shares.set
                   && r.nations.at(pn).lp_shares.share == c.nations.at(pn).lp_shares.share,
-              "L7", "v50 round-trips the share rule with an equal state_hash");
+              "L7", "v51 round-trips the share rule with an equal state_hash");
         // v49: the stream less its trailing section (u32 count + 1 x (id + 3 floats)),
         // and less BL-1327's v51 space-asset section after it (one empty count).
-        std::string b49 = b50.substr(0, b50.size() - (4 + 4 + 12) - 4);
+        std::string b49 = b51.substr(0, b51.size() - (4 + 4 + 12) - 4);
         const std::uint32_t v49 = k_world_save_version_pre_lp;
         std::memcpy(&b49[4], &v49, 4);
         world r49;
         const bool ok49 = from_bytes(b49, r49);
         check(ok49 && !r49.nations.at(pn).lp_shares.set, "L7", "a v49 stream reads, every nation on the mechanical default");
         // A bad share in the stream refuses it whole.
-        std::string bad = b50;
+        std::string bad = b51;
         const float f = 0.9f;
         std::memcpy(&bad[bad.size() - 8], &f, 4); // other := 0.9: the sum is 1.6 (before v51's 4-byte space count)
         world rb;

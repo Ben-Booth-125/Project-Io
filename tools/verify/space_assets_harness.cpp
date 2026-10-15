@@ -10,7 +10,9 @@
 //   A2  REACH: further is costlier and slower (home orbit < moon orbit <
 //       moon surface; far orbit costs the per-AU term and its extra quarters).
 //   A3  ARRIVAL: the step leaves an asset in transit before its arrival tick and
-//       makes it active on it; no upkeep is drawn in transit.
+//       makes it active on it; no upkeep is drawn in transit. The tick contract:
+//       the launch tick is w.current_econ_tick, and travel 0 vs travel 1 differ by
+//       exactly one quarter; the step reports the quarter's launches and cost.
 //   A4  UPKEEP: an active asset pays its upkeep whole each quarter.
 //   A5  DECAY: an unpaid quarter makes it decaying; a paid one restores it;
 //       quarters_to_loss consecutive unpaid quarters lose it; a lost asset never
@@ -20,9 +22,13 @@
 //       with state_hash, treasury, the store and the allocator cursor unchanged.
 //   A7  SAVE: a store holding decaying, lost and in-transit assets round-trips with an equal state_hash
 //       and re-serialises byte for byte; a v50 stream (v51 less its section)
-//       reads with no assets; a tampered owner refuses the stream whole.
-//   A8  WIRING: run_nation_step steps the store (an asset arrives through it);
-//       an empty store leaves state_hash as an empty world's.
+//       reads with no assets, and a SET share rule in a v50 stream survives; a
+//       tampered owner, an illegal slot, the star, a state/unpaid mismatch, an
+//       unpaid count past the ceiling or an id another entity owns each refuse
+//       the stream whole.
+//   A8  WIRING: run_nation_step steps the store (an asset arrives through it) and
+//       files the launch and upkeep debit on economy_report::space_assets; an
+//       empty store hashes exactly as a world that never had one.
 //   A9  DETERMINISM: two independently built fixtures driven identically end
 //       with equal state_hash.
 //
@@ -223,7 +229,8 @@ int main()
         for (const reject_case& c : cases)
         {
             const snap before = take(f);
-            const space_launch_quote q = launch_space_asset(w, p, c.nation, c.cls, c.d, 3);
+            w.current_econ_tick = 3;
+            const space_launch_quote q = launch_space_asset(w, p, c.nation, c.cls, c.d);
             const snap after = take(f);
             check(q.result == c.want && q.asset == null_entity && same(before, after), "A6",
                   fmt("%s: refused (code %d), hash/treasuries/store/cursor unchanged", c.what, static_cast<int>(q.result)));
@@ -250,7 +257,8 @@ int main()
         const float before = w.nations.at(f.a).treasury;
         const std::uint32_t cursor = w.next_entity_id();
         const space_launch_quote qq = quote_space_launch(w, p, f.a, space_asset_class::satellite, {f.moon, space_slot::orbit});
-        const space_launch_quote q = launch_space_asset(w, p, f.a, space_asset_class::satellite, {f.moon, space_slot::orbit}, t0);
+        w.current_econ_tick = t0; // the tick about to run: the launch tick
+        const space_launch_quote q = launch_space_asset(w, p, f.a, space_asset_class::satellite, {f.moon, space_slot::orbit});
         sat = q.asset;
         const auto it = w.space_assets.find(sat);
         check(q.result == space_launch_result::launched && it != w.space_assets.end()
@@ -268,7 +276,7 @@ int main()
                   "A1", fmt("record: owner, class, destination, in_transit, launch %d, arrival %d, upkeep %.0f",
                             a.launch_tick, a.arrival_tick, a.upkeep));
         }
-        const space_launch_quote r = launch_space_asset(w, p, f.a, space_asset_class::rover, {f.far, space_slot::surface}, t0);
+        const space_launch_quote r = launch_space_asset(w, p, f.a, space_asset_class::rover, {f.far, space_slot::surface});
         rov = r.asset;
         check(r.result == space_launch_result::launched && w.space_assets.at(rov).arrival_tick == t0 + r.travel_quarters
                   && r.travel_quarters == p.travel_quarters[4],
@@ -296,6 +304,31 @@ int main()
         check(w.space_assets.at(rov).state == space_asset_state::active
                   && w.nations.at(f.a).treasury == t1 - 2 * p.upkeep[0] - p.upkeep[1],
               "A4", fmt("two more quarters: sat x2 + the arrived rover x1 = %.0f debited", 2 * p.upkeep[0] + p.upkeep[1]));
+    }
+
+    // ---- A3b the tick contract ---------------------------------------------
+    std::printf("--- A3b tick contract ---\n");
+    {
+        fixture k;
+        build(k);
+        k.w.current_econ_tick = 5;
+        const space_launch_quote q0 = launch_space_asset(k.w, p, k.a, space_asset_class::satellite, {k.home, space_slot::orbit});
+        const space_launch_quote q1 = launch_space_asset(k.w, p, k.a, space_asset_class::satellite, {k.moon, space_slot::orbit});
+        const space_asset& a0 = k.w.space_assets.at(q0.asset);
+        const space_asset& a1 = k.w.space_assets.at(q1.asset);
+        check(a0.launch_tick == 5 && a1.launch_tick == 5 && q0.travel_quarters == 0 && q1.travel_quarters == 1
+                  && a0.launch_cost == q0.cost && a1.launch_cost == q1.cost,
+              "A3b", "the launch tick is w.current_econ_tick; the record carries the quoted cost");
+        space_asset_step_report r5, r6;
+        run_space_asset_step(k.w, p, 5, &r5);
+        const bool at5 = a0.state == space_asset_state::active && a1.state == space_asset_state::in_transit;
+        run_space_asset_step(k.w, p, 6, &r6);
+        const bool at6 = a1.state == space_asset_state::active;
+        check(at5 && at6, "A3b", "travel 0 is active in the launch quarter's step; travel 1 exactly one step later");
+        check(r5.launched == 2 && r5.launch_spent == q0.cost + q1.cost && r5.upkeep_paid == p.upkeep[0]
+                  && r6.launched == 0 && r6.launch_spent == 0.0f && r6.upkeep_paid == 2 * p.upkeep[0],
+              "A3b", fmt("the step reports the quarter's launches (2, %.0f) then none; upkeep %.0f then %.0f",
+                         q0.cost + q1.cost, p.upkeep[0], 2 * p.upkeep[0]));
     }
 
     // ---- A5 decay ----------------------------------------------------------
@@ -339,11 +372,13 @@ int main()
     std::printf("--- A7 save ---\n");
     {
         // Add one of each remaining state: an in-transit station module.
-        const space_launch_quote st = launch_space_asset(w, p, f.a, space_asset_class::station_module, {f.home, space_slot::orbit}, 50);
+        w.current_econ_tick = 50;
+        const space_launch_quote st = launch_space_asset(w, p, f.a, space_asset_class::station_module, {f.home, space_slot::orbit});
         check(st.result == space_launch_result::launched, "A7", "fixture: a station module in transit");
         // states present: active sat, lost rover, in-transit station; decaying via a fourth
         w.nations.at(f.a).treasury = 500000.0f;
-        const space_launch_quote cm = launch_space_asset(w, p, f.a, space_asset_class::crewed_mission, {f.moon, space_slot::surface}, 20);
+        w.current_econ_tick = 20;
+        const space_launch_quote cm = launch_space_asset(w, p, f.a, space_asset_class::crewed_mission, {f.moon, space_slot::surface});
         check(cm.result == space_launch_result::launched, "A7", "fixture: a crewed mission to the moon surface");
         if (cm.result == space_launch_result::launched)
         {
@@ -365,7 +400,7 @@ int main()
                 eq = eq && x.id == a.id && x.owner == a.owner && x.cls == a.cls && x.dest.body == a.dest.body
                      && x.dest.slot == a.dest.slot && x.state == a.state && x.launch_tick == a.launch_tick
                      && x.arrival_tick == a.arrival_tick && x.upkeep == a.upkeep
-                     && x.unpaid_quarters == a.unpaid_quarters;
+                     && x.unpaid_quarters == a.unpaid_quarters && x.launch_cost == a.launch_cost;
             }
         std::printf("    %zu assets:", w.space_assets.size());
         for (const auto& [id, a] : w.space_assets)
@@ -376,8 +411,8 @@ int main()
         check(ok && to_bytes(r) == b, "A7", "re-serialising the loaded world reproduces the stream byte for byte");
         check(ok && r.next_entity_id() == w.next_entity_id(), "A7", "the allocator cursor round-trips (no id re-issued)");
 
-        // v50: the stream less the space section (count + 4 x 31-byte records), stamped 50.
-        const std::size_t rec = 4 + 4 + 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4;
+        // v50: the stream less the space section (count + n x 35-byte records), stamped 50.
+        const std::size_t rec = 4 + 4 + 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4;
         const std::size_t tail = 4 + w.space_assets.size() * rec;
         std::string v50 = b.substr(0, b.size() - tail);
         const std::uint32_t pre = k_world_save_version_pre_space;
@@ -400,6 +435,66 @@ int main()
         bad2[b.size() - tail + 4 + 4 + 4 + 1 + 4 + 1] = static_cast<char>(9);
         world victim2;
         check(!from_bytes(bad2, victim2) && victim2.nations.empty(), "A7", "an out-of-range state byte refuses the stream whole");
+        // Record field offsets from the first record's start: id 0, owner 4,
+        // class 8, body 9, slot 13, state 14, launch 15, arrival 19, upkeep 23,
+        // unpaid 27, launch cost 31. The first record is the satellite (decaying, 1 unpaid).
+        const std::size_t r0 = b.size() - tail + 4;
+        auto refused = [&](std::size_t off, const void* v, std::size_t n) {
+            std::string t = b;
+            std::memcpy(&t[r0 + off], v, n);
+            world vv;
+            return !from_bytes(t, vv) && vv.nations.empty();
+        };
+        const space_asset& first = w.space_assets.begin()->second;
+        check(first.cls == space_asset_class::satellite && first.state == space_asset_state::decaying
+                  && first.unpaid_quarters == 1,
+              "A7", "fixture: the first record is a decaying satellite at 1 unpaid");
+        const std::uint8_t surface = 1, active = 1, lost = 3, transit = 0;
+        const std::int32_t over = k_space_quarters_to_loss_ceiling + 1, zero = 0;
+        check(refused(13, &surface, 1), "A7", "a satellite stored on a SURFACE slot refuses the stream whole");
+        check(refused(9, &f.star, sizeof f.star), "A7", "an asset stored at the STAR refuses the stream whole");
+        check(refused(14, &active, 1), "A7", "state active with 1 unpaid quarter refuses the stream whole");
+        check(refused(14, &transit, 1), "A7", "state in_transit with 1 unpaid quarter refuses the stream whole");
+        check(refused(27, &zero, 4), "A7", "state decaying with 0 unpaid quarters refuses the stream whole");
+        {
+            std::string t = b;
+            std::memcpy(&t[r0 + 14], &lost, 1);
+            std::memcpy(&t[r0 + 27], &over, 4);
+            world vv;
+            check(!from_bytes(t, vv), "A7", fmt("state lost with %d unpaid (past the ceiling %d) refuses the stream whole",
+                                                over, k_space_quarters_to_loss_ceiling));
+        }
+        {
+            // An id another entity kind owns: a corporation keyed by the first
+            // asset's id. The control — the same corporation under a fresh id — loads.
+            world okc = w;
+            const entity_id fresh = okc.create_entity();
+            okc.corporations.emplace(fresh, corporation_component{});
+            world back_ok;
+            const bool control = from_bytes(to_bytes(okc), back_ok);
+            world clash = w;
+            clash.corporations.emplace(w.space_assets.begin()->first, corporation_component{});
+            world back_clash;
+            const bool clash_refused = !from_bytes(to_bytes(clash), back_clash);
+            check(control && clash_refused, "A7",
+                  "an asset id a corporation also owns refuses the stream whole (control: a fresh-id corporation loads)");
+        }
+        {
+            // A SET share rule in a v50 stream survives: the share section is read
+            // for v50 as for v51.
+            world ws = w;
+            ws.nations.at(f.a).lp_shares.set   = true;
+            ws.nations.at(f.a).lp_shares.share = {0.2f, 0.5f, 0.3f};
+            const std::string bs = to_bytes(ws);
+            std::string s50 = bs.substr(0, bs.size() - tail);
+            std::memcpy(&s50[4], &pre, sizeof pre);
+            world back;
+            const bool ok_s = from_bytes(s50, back);
+            check(ok_s && back.nations.at(f.a).lp_shares.set
+                      && back.nations.at(f.a).lp_shares.share == ws.nations.at(f.a).lp_shares.share
+                      && back.space_assets.empty(),
+                  "A7", "a v50 stream carrying a SET share rule reads with the rule intact (and no assets)");
+        }
         // A version past the current one is refused.
         std::string next = b;
         const std::uint32_t nv = world_save_version + 1;
@@ -419,17 +514,39 @@ int main()
         g.w.current_econ_tick = 1;
         run_nation_step(g.w, reg, rep, 1);
         check(g.w.space_assets.empty(), "A8", "an empty store stays empty through the nation step");
-        (void)empty_hash;
-        const space_launch_quote q = launch_space_asset(g.w, reg.space_assets(), g.a, space_asset_class::satellite, {g.home, space_slot::orbit}, 2);
+        {
+            // The fold is inert when empty: a world whose store held an asset and
+            // was emptied again hashes exactly as it did before (no allocation, so
+            // nothing else moved).
+            fixture h;
+            build(h);
+            const std::uint64_t before = h.w.state_hash(0);
+            check(before == empty_hash, "A8", "two fresh fixtures hash equal");
+            space_asset probe;
+            probe.id = 999;
+            probe.owner = h.a;
+            probe.dest = {h.home, space_slot::orbit};
+            h.w.space_assets.emplace(999, probe);
+            const std::uint64_t with = h.w.state_hash(0);
+            h.w.space_assets.clear();
+            check(with != empty_hash && h.w.state_hash(0) == empty_hash, "A8",
+                  "an emptied store hashes as one that never held an asset (the fold is inert when empty)");
+        }
+        g.w.current_econ_tick = 2; // the tick about to run
+        const space_launch_quote q = launch_space_asset(g.w, reg.space_assets(), g.a, space_asset_class::satellite, {g.home, space_slot::orbit});
         const float t = g.w.nations.at(g.a).treasury;
         economy_report rep2;
-        g.w.current_econ_tick = 2;
         run_nation_step(g.w, reg, rep2, 2);
         const space_asset& a = g.w.space_assets.at(q.asset);
         check(q.result == space_launch_result::launched && a.state == space_asset_state::active
                   && g.w.nations.at(g.a).treasury == t - reg.space_assets().upkeep[0],
               "A8", fmt("a home-orbit satellite (0 quarters) arrives and pays %.0f through run_nation_step",
                         reg.space_assets().upkeep[0]));
+        const space_asset_step_report& sr = rep2.space_assets;
+        check(sr.launched == 1 && sr.launch_spent == q.cost && sr.arrived == 1 && sr.paid == 1
+                  && sr.upkeep_paid == reg.space_assets().upkeep[0],
+              "A8", fmt("economy_report::space_assets files the quarter: 1 launch at %.0f, 1 arrival, %.0f upkeep",
+                        q.cost, reg.space_assets().upkeep[0]));
         // The fold sees the store: flipping one asset's state moves the hash.
         const std::uint64_t h0 = g.w.state_hash(0);
         g.w.space_assets.at(q.asset).state = space_asset_state::decaying;
@@ -442,9 +559,11 @@ int main()
     std::printf("--- A9 determinism ---\n");
     {
         auto drive = [&](fixture& x) {
-            launch_space_asset(x.w, p, x.a, space_asset_class::satellite, {x.moon, space_slot::orbit}, 0);
-            launch_space_asset(x.w, p, x.a, space_asset_class::rover, {x.far, space_slot::surface}, 0);
-            launch_space_asset(x.w, p, x.b, space_asset_class::satellite, {x.home, space_slot::orbit}, 1);
+            x.w.current_econ_tick = 0;
+            launch_space_asset(x.w, p, x.a, space_asset_class::satellite, {x.moon, space_slot::orbit});
+            launch_space_asset(x.w, p, x.a, space_asset_class::rover, {x.far, space_slot::surface});
+            x.w.current_econ_tick = 1;
+            launch_space_asset(x.w, p, x.b, space_asset_class::satellite, {x.home, space_slot::orbit});
             for (int t = 0; t < 30; ++t)
             {
                 if (t == 12) x.w.nations.at(x.a).treasury = 0.0f;

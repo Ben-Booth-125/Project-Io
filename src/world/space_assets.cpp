@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "world.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 // BL-1327 — see space_assets.hpp for the design. This is the arithmetic.
@@ -19,6 +20,18 @@ bool space_launch_legal(space_asset_class cls, space_reach reach)
         case space_asset_class::crewed_mission: return !home;
         case space_asset_class::station_module:
             return reach == space_reach::home_orbit || reach == space_reach::moon_orbit;
+    }
+    return false;
+}
+
+bool space_slot_legal(space_asset_class cls, space_slot slot)
+{
+    switch (cls)
+    {
+        case space_asset_class::satellite:      return slot == space_slot::orbit;
+        case space_asset_class::rover:          return slot == space_slot::surface;
+        case space_asset_class::crewed_mission: return slot == space_slot::orbit || slot == space_slot::surface;
+        case space_asset_class::station_module: return slot == space_slot::orbit;
     }
     return false;
 }
@@ -114,9 +127,12 @@ space_launch_quote quote_space_launch(const world& w, const space_asset_params& 
     const std::size_t ci = static_cast<std::size_t>(cls);
     const std::size_t ri = static_cast<std::size_t>(q.reach);
     q.cost = p.launch_cost[ci] + p.reach_cost[ri] + p.far_cost_per_au * au;
+    // Clamp in float before the cast: a huge separation (or a huge dial) must
+    // never reach an out-of-range int conversion.
+    const float cap     = static_cast<float>(p.max_extra_quarters > 0 ? p.max_extra_quarters : 0);
     const float extra_q = std::floor(p.far_quarters_per_au * au);
-    q.travel_quarters = p.travel_quarters[ri]
-                      + (std::isfinite(extra_q) && extra_q > 0.0f ? static_cast<int32_t>(extra_q) : 0);
+    const float extra_c = (std::isfinite(extra_q) && extra_q > 0.0f) ? std::min(extra_q, cap) : 0.0f;
+    q.travel_quarters = p.travel_quarters[ri] + static_cast<int32_t>(extra_c);
     if (!std::isfinite(q.cost) || q.cost < 0.0f || q.travel_quarters < 0
         || !std::isfinite(p.upkeep[ci]) || p.upkeep[ci] < 0.0f)
     {
@@ -134,8 +150,9 @@ space_launch_quote quote_space_launch(const world& w, const space_asset_params& 
 
 space_launch_quote launch_space_asset(world& w, const space_asset_params& p,
                                       entity_id nation, space_asset_class cls,
-                                      space_destination dest, int econ_tick)
+                                      space_destination dest)
 {
+    const int econ_tick = w.current_econ_tick; // the tick about to run (header)
     space_launch_quote q = quote_space_launch(w, p, nation, cls, dest);
     if (q.result != space_launch_result::launched)
         return q; // rejected whole: nothing above wrote to `w`
@@ -151,6 +168,7 @@ space_launch_quote launch_space_asset(world& w, const space_asset_params& p,
     a.arrival_tick = econ_tick + q.travel_quarters;
     a.upkeep       = p.upkeep[static_cast<std::size_t>(cls)];
     a.unpaid_quarters = 0;
+    a.launch_cost     = q.cost;
 
     w.nations.at(nation).treasury -= q.cost;
     w.space_assets.emplace(a.id, a);
@@ -162,8 +180,15 @@ void run_space_asset_step(world& w, const space_asset_params& p, int econ_tick,
                           space_asset_step_report* out)
 {
     space_asset_step_report r;
+    const int32_t loss_at =
+        std::clamp(p.quarters_to_loss, int32_t{1}, k_space_quarters_to_loss_ceiling);
     for (auto& [id, a] : w.space_assets) // std::map: ascending id
     {
+        if (a.launch_tick == econ_tick)
+        {
+            ++r.launched;
+            r.launch_spent += a.launch_cost;
+        }
         if (a.state == space_asset_state::lost)
             continue;
         if (a.state == space_asset_state::in_transit)
@@ -188,15 +213,20 @@ void run_space_asset_step(world& w, const space_asset_params& p, int econ_tick,
         }
         else
         {
-            ++a.unpaid_quarters;
             ++r.unpaid;
-            if (a.unpaid_quarters >= p.quarters_to_loss)
+            // The bound is tested BEFORE the count moves, so the count never
+            // passes loss_at (<= the ceiling) and can never overflow.
+            if (a.unpaid_quarters >= loss_at - 1)
             {
+                a.unpaid_quarters = loss_at;
                 a.state = space_asset_state::lost;
                 ++r.lost;
             }
             else
+            {
+                ++a.unpaid_quarters;
                 a.state = space_asset_state::decaying;
+            }
         }
     }
     if (out != nullptr)

@@ -443,6 +443,7 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, a.arrival_tick);
                 fnv1a_f32(h, a.upkeep);
                 fnv1a_i32(h, a.unpaid_quarters);
+                fnv1a_f32(h, a.launch_cost);
             }
         }
     }

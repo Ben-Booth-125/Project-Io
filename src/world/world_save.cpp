@@ -1167,6 +1167,7 @@ void write_world_snapshot(const world& w, std::ostream& out)
             w_i32(out, a.arrival_tick);
             w_f32(out, a.upkeep);
             w_i32(out, a.unpaid_quarters);
+            w_f32(out, a.launch_cost);
         }
     }
 }
@@ -1542,16 +1543,44 @@ bool read_world_snapshot(world& w, std::istream& in)
                 || !r_enum(in, a.dest.slot, space_slot::surface)
                 || !r_enum(in, a.state, space_asset_state::lost)
                 || !r_i32(in, a.launch_tick) || !r_i32(in, a.arrival_tick)
-                || !r_f32(in, a.upkeep) || !r_i32(in, a.unpaid_quarters))
+                || !r_f32(in, a.upkeep) || !r_i32(in, a.unpaid_quarters)
+                || !r_f32(in, a.launch_cost))
                 return false;
+            // The id: ascending, live in the allocator, and owned by NO other
+            // entity kind (every store whose key is an entity's own id).
             if (aid == null_entity || (k > 0 && aid <= prev) || aid >= next_entity
-                || s.nations.count(aid) != 0 || s.bodies.count(aid) != 0)
+                || s.nations.count(aid) != 0 || s.bodies.count(aid) != 0
+                || s.tiles.count(aid) != 0 || s.buildings.count(aid) != 0
+                || s.markets.count(aid) != 0 || s.units.count(aid) != 0
+                || s.population_centres.count(aid) != 0 || s.corporations.count(aid) != 0)
                 return false;
             prev = aid;
-            if (s.nations.count(a.owner) == 0 || s.bodies.count(a.dest.body) == 0)
+            // Owner and destination: a nation; a body with a slot (never the star),
+            // in a slot the class can EVER occupy (the home-independent half of
+            // space_launch_legal — the home half needs the owner's capital, which
+            // a legal launch already checked and nothing later moves).
+            const auto dbit = s.bodies.find(a.dest.body);
+            if (s.nations.count(a.owner) == 0 || dbit == s.bodies.end()
+                || dbit->second.type == body_type::star || !space_slot_legal(a.cls, a.dest.slot))
                 return false;
             if (a.arrival_tick < a.launch_tick || !std::isfinite(a.upkeep) || a.upkeep < 0.0f
-                || a.unpaid_quarters < 0)
+                || !std::isfinite(a.launch_cost) || a.launch_cost < 0.0f)
+                return false;
+            // State and unpaid count agree: the step writes 0 for in-transit and
+            // active, 1..loss-1 for decaying, and the loss count (<= the ceiling)
+            // for lost. The reader cannot see the registry's dial, so it holds the
+            // count to the dial's hard ceiling.
+            const int32_t u = a.unpaid_quarters;
+            const int32_t cap = k_space_quarters_to_loss_ceiling;
+            bool state_ok = false;
+            switch (a.state)
+            {
+                case space_asset_state::in_transit: state_ok = (u == 0); break;
+                case space_asset_state::active:     state_ok = (u == 0); break;
+                case space_asset_state::decaying:   state_ok = (u >= 1 && u <= cap - 1); break;
+                case space_asset_state::lost:       state_ok = (u >= 1 && u <= cap); break;
+            }
+            if (!state_ok)
                 return false;
             a.id = aid;
             s.space_assets.emplace_hint(s.space_assets.end(), aid, a);
