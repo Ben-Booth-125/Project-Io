@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*164 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 32 chrome.*
+*165 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 33 chrome.*
 
 ---
 
@@ -2393,6 +2393,23 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Play opens on the generated world with NOBODY SEATED: spectating is set for the whole session, exactly as --spectate sets it, and no take_seat is issued (gameplay.take_seat is not called). The scored-utility layer evaluates every corporation; world::player_entity, if the generator left one, is a camera and ledger anchor only. The spectate-only God view checkbox (chrome.sysmenu_god_view) is available. A History ledger the card's link opened closes. The log prints `[seat] Spectate: the world opens with nobody seated`.
 
 **Reason to select.** To watch the world just generated play itself, having read its nations on the card, without relaunching under --spectate.
+
+### `chrome.spectate_headless_cli` — Command line, no window. Dispatched before any SDL window, renderer or ImGui context exists, like --serve and --export-blackboard.
+
+**Press.** Launch with `ProjectIo --spectate-headless [--until YEAR] [--seed N] [--out DIR]`.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `until` | `int` | undefined |
+| `seed` | `int` | undefined |
+| `out` | `string` | undefined |
+
+**Valid when:**
+- Launch-time only; does not compose with the rendered entry paths. --epoch does not reach it (the default 1960 world).
+
+**Expected output.** Builds the world the app opens on (world_gen.lua's config, make_hard_coded_world, finish_campaign_world, the seat draw), then runs the app's live quarter — orbits and surveys aged 90 days, then run_settle_tick — with spectating true and nobody seated (AI_OPPONENT.md § 10i), uncapped, until the calendar reaches YEAR. Writes DIR/run_<seed>.json: one record per in-game year with each nation's treasury, population, corp sales, tech held and majors held, the final state_hash, and a separate timing object (wall seconds per decade). Prints one line per decade. Deterministic: two runs of one seed differ only inside timing.
+
+**Reason to select.** To run a spectated campaign to a horizon fast, for balance and pacing checks, without paying for rendering or the 16x speed cap.
 
 ### `chrome.epoch_cli` — Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920).
 

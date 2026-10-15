@@ -2698,6 +2698,34 @@
    "reason_to_select": "To watch the world just generated play itself, having read its nations on the card, without relaunching under --spectate."
   },
   {
+   "id": "chrome.spectate_headless_cli",
+   "family": "chrome",
+   "surface": "Command line, no window. Dispatched before any SDL window, renderer or ImGui context exists, like --serve and --export-blackboard.",
+   "press": "Launch with `ProjectIo --spectate-headless [--until YEAR] [--seed N] [--out DIR]`.",
+   "args": [
+    {
+     "name": "until",
+     "type": "int",
+     "description": "Calendar year to run to (default 2040). Must be after the epoch (1960); four quarterly econ ticks per year."
+    },
+    {
+     "name": "seed",
+     "type": "int",
+     "description": "world_params::seed (default 0, the world the app opens on)."
+    },
+    {
+     "name": "out",
+     "type": "string",
+     "description": "Directory for run_<seed>.json (default spectate_runs)."
+    }
+   ],
+   "preconditions": [
+    "Launch-time only; does not compose with the rendered entry paths. --epoch does not reach it (the default 1960 world)."
+   ],
+   "expected_output": "Builds the world the app opens on (world_gen.lua's config, make_hard_coded_world, finish_campaign_world, the seat draw), then runs the app's live quarter — orbits and surveys aged 90 days, then run_settle_tick — with spectating true and nobody seated (AI_OPPONENT.md § 10i), uncapped, until the calendar reaches YEAR. Writes DIR/run_<seed>.json: one record per in-game year with each nation's treasury, population, corp sales, tech held and majors held, the final state_hash, and a separate timing object (wall seconds per decade). Prints one line per decade. Deterministic: two runs of one seed differ only inside timing.",
+   "reason_to_select": "To run a spectated campaign to a horizon fast, for balance and pacing checks, without paying for rendering or the 16x speed cap."
+  },
+  {
    "id": "chrome.epoch_cli",
    "family": "chrome",
    "surface": "Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920).",

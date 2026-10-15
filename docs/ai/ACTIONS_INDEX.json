@@ -630,6 +630,10 @@
    "The nation selection screen at Begin (STARTUP.md § The seat): the Spectate button under the screen's header, always shown, beside the line that explains it. The screen's third answer to 'which nation are you?' - none."
   ],
   [
+   "chrome.spectate_headless_cli",
+   "Command line, no window. Dispatched before any SDL window, renderer or ImGui context exists, like --serve and --export-blackboard."
+  ],
+  [
    "chrome.epoch_cli",
    "Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920)."
   ],

@@ -76,3 +76,6 @@ tools/session/.timer_state
 
 # Save files written by F5 quick-save / verify.save (BL-536).
 *.iosave
+
+# BL-1325: --spectate-headless output
+spectate_runs/
