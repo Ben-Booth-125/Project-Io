@@ -3742,7 +3742,6 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
     // Roads keep their own taller row: their tier glyph box is not replaced by a bar.
     constexpr float img        = 56.0f;
-    const float     road_row_h = img + style.WindowPadding.y * 2.0f + 8.0f;
 
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -3970,7 +3969,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                     road_capex += re.resource_build_cost[i] * price(i);
             const bool affordable = balance >= road_capex;
 
-            ImGui::BeginChild("road##build", {0.0f, road_row_h}, true,
+            // Auto-height: a refusal wraps onto a second line rather than clip.
+            ImGui::BeginChild("road##build", {0.0f, 0.0f},
+                              ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
                               ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
             ImDrawList* cdl = ImGui::GetWindowDrawList();
 
@@ -4007,7 +4008,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             }
             else
             {
+                ImGui::PushTextWrapPos(0.0f);
                 ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
+                ImGui::PopTextWrapPos();
             }
             ImGui::EndGroup();
 
@@ -4016,7 +4019,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             ImGui::PopID();
         }
         // BL-1255: rail track is the road ladder's state-industry rung.
-        draw_rail_rows(w, reg, ui, tile_id, row_h, rail_row::track);
+        draw_rail_rows(w, reg, ui, tile_id, img, rail_row::track);
     }
 
     ImGui::EndChild();
