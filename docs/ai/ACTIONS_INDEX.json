@@ -626,6 +626,10 @@
    "Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do."
   ],
   [
+   "chrome.spectate_headless_cli",
+   "Command line, no window. Dispatched before any SDL window, renderer or ImGui context exists, like --serve and --export-blackboard."
+  ],
+  [
    "chrome.epoch_cli",
    "Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920)."
   ],

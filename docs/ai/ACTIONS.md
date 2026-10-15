@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*163 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 31 chrome.*
+*164 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 32 chrome.*
 
 ---
 
@@ -2382,6 +2382,23 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Opens the session with NOBODY SEATED (AI_OPPONENT.md § 10i): corp_ai_params::spectating is true for every economy tick, so the scored-utility layer evaluates the corp at world::player_entity on the same staggered cadence as every rival, and that field degrades to a camera and ledger anchor carrying no ownership meaning. The watcher sees a full field of seven-plus corporations all playing flat out. Also unlocks the spectate-only God view checkbox in the system menu (chrome.sysmenu_god_view), which is rendered only while this flag is set. ENTRY AT START AND ONLY AT START: § 10i removes the standing prohibition's SUBJECT rather than excepting the rule, which is a property of the whole session — a mid-run flip would change, halfway through, which corps the scorer may legally act on, so no control clears it. Off by default: an unspectated session is unchanged, which tools/verify/spectator_determinism.cpp asserts as its load-bearing property.
 
 **Reason to select.** To WATCH the AI play rather than play against it — see what strategies the scored-utility layer actually produces, and whether coalitions brake a runaway leader (AI_OPPONENT.md § Where restraint comes from), which is a question no seated session can answer because a seated corp is excluded from the scorer.
+
+### `chrome.spectate_headless_cli` — Command line, no window. Dispatched before any SDL window, renderer or ImGui context exists, like --serve and --export-blackboard.
+
+**Press.** Launch with `ProjectIo --spectate-headless [--until YEAR] [--seed N] [--out DIR]`.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `until` | `int` | undefined |
+| `seed` | `int` | undefined |
+| `out` | `string` | undefined |
+
+**Valid when:**
+- Launch-time only; does not compose with the rendered entry paths. --epoch does not reach it (the default 1960 world).
+
+**Expected output.** Builds the world the app opens on (world_gen.lua's config, make_hard_coded_world, finish_campaign_world, the seat draw), then runs the app's live quarter — orbits and surveys aged 90 days, then run_settle_tick — with spectating true and nobody seated (AI_OPPONENT.md § 10i), uncapped, until the calendar reaches YEAR. Writes DIR/run_<seed>.json: one record per in-game year with each nation's treasury, population, corp sales, tech held and majors held, the final state_hash, and a separate timing object (wall seconds per decade). Prints one line per decade. Deterministic: two runs of one seed differ only inside timing.
+
+**Reason to select.** To run a spectated campaign to a horizon fast, for balance and pacing checks, without paying for rendering or the 16x speed cap.
 
 ### `chrome.epoch_cli` — Command line. The only route to a start other than the default 1960 one (BL-705 opened the flag; epoch 0 is retired, NR-920).
 
