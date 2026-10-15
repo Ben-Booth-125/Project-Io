@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*25 entries — 25 open, 0 resolved.*
+*26 entries — 26 open, 0 resolved.*
 
 ---
 
@@ -226,6 +226,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 Destinations are named slots (body + orbit|surface), tiered from the owner home body: home orbit, moon orbit, moon surface, far orbit, far surface. Launch cost: satellite 10000, rover 20000, crewed 60000, station module 40000; reach 0/8000/15000/30000/45000 + 20000 per AU (far tiers). Travel quarters 0/1/1/2/3 + floor(AU), clamped at 400 extra. Upkeep/quarter: 500/1000/3000/2000. Lost after 4 unpaid quarters (hard ceiling 64). Launch cost and upkeep are pure treasury sinks until BL-1328 (launch infrastructure) buys goods from corporations.
 
 **Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
+
+### NR-1048 — The player's nation has its budget scored by nation_ai, against NATIONS.md and AI_OPPONENT.md § 11
+*question · raised 2026-10-15 · from BL-1275 (nation research AI) lane report, confirmed by reading src/world/nation_ai.cpp:543 and nation_step.cpp:54*
+
+score_national_budgets walks every landed nation and run_nation_step writes the result into w.nation_budgets, the player's nation included. The docs say the player's nation is never scored by nation_ai (AI_OPPONENT.md § 11, the 2026-10-10 narrowing). BL-1275's research pass does skip the player's nation; the budget scorer does not. This predates sprint 55.
+
+**Why it matters.** Either the AI is setting the player's national budget every cadence (an act on the player the grant forbids), or the player has no budget control yet and the scored weights stand in as a default. The two readings need different fixes.
 
 ---
 
