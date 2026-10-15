@@ -1407,9 +1407,11 @@ corp on the same staggered cadence.
 - Admitting one more corp **shifts no rival's cadence slot**, because the cadence index is
   over the sorted corp set, which does not change.
 
-**The way in is a launch flag, and only a launch flag** (BL-695, live spectate route).
-`ProjectIo --spectate` opens the session with nobody seated; it composes with the `--autostart`
-family, with `--load` and with `--host-agent`. There is deliberately **no in-game control** that
+**The way in is chosen before play, and only before play** (BL-695, live spectate route; Ben,
+2026-10-15). `ProjectIo --spectate` opens the session with nobody seated; it composes with the
+`--autostart` family, with `--load` and with `--host-agent`. The seat screen offers the same choice
+as **Spectate** in place of a nation (`../ui/STARTUP.md` § The seat). There is deliberately **no
+in-game control** that
 enters or leaves the mode. The reason follows directly from the paragraph above: because the
 prohibition's *precondition* is what spectate removes, having-no-owner is a property of the
 **whole session**, not a view a watcher steps into and out of. A mid-run flip would change,
