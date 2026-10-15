@@ -3746,19 +3746,14 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    ui::foldout_scroll_child("##build_list"); // verify.scroll_panel("build_list", ...)
     // BL-326: candidates are pre-sorted category-then-name, so each category's rows are
     // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom)
     // whenever the category changes, and close it once its rows
     // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
-    // BL-1255 (LOGISTICS.md 4c): rail is built like anything else - Track and
-    // Railway Station are rows of this tile's list, in a Rail fold of their own
-    // because they are the NATION's state industry, paid from its treasury.
-    if (rail_player_nation(w) != null_entity && reg.building_available(building_type::railway_station))
-        if (ImGui::TreeNodeEx("Rail", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            draw_rail_rows(w, reg, ui, tile_id, row_h);
-            ImGui::TreePop();
-        }
+    // BL-1255 (LOGISTICS.md 4c): rail is built like anything else - its rows
+    // join their kin (Ben, 2026-10-15): Track closes the road ladder below,
+    // Railway Station closes the Infrastructure fold beside port and hub.
     std::string open_category;
     bool        category_open = false;
     for (const candidate& c : cands)
@@ -3766,7 +3761,11 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         if (c.category != open_category)
         {
             if (category_open)
+            {
+                if (open_category == "Infrastructure")
+                    draw_rail_rows(w, reg, ui, tile_id, row_h, rail_row::station);
                 ImGui::TreePop();
+            }
             open_category = c.category;
             category_open = ImGui::TreeNodeEx(open_category.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
         }
@@ -3878,7 +3877,11 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         ImGui::Spacing();
     }
     if (category_open)
+    {
+        if (open_category == "Infrastructure")
+            draw_rail_rows(w, reg, ui, tile_id, row_h, rail_row::station);
         ImGui::TreePop();
+    }
 
     // Hire (BL-324, moved onto the base by BL-325 S2) — the campaign roster
     // gated on the player corp's OWN stockpile/market access (unit_roster.hpp),
@@ -4012,6 +4015,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             ImGui::Spacing();
             ImGui::PopID();
         }
+        // BL-1255: rail track is the road ladder's state-industry rung.
+        draw_rail_rows(w, reg, ui, tile_id, row_h, rail_row::track);
     }
 
     ImGui::EndChild();

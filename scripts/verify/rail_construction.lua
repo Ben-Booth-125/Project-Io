@@ -5,7 +5,10 @@
 --
 -- Rail is built like anything else: select a tile, and the Construction view's
 -- list of buildings for that tile carries TRACK and RAILWAY STATION rows, each
--- with its cost and either a Build press or its refusal. No armed tool.
+-- with its cost and either a Build press or its refusal. No armed tool. The rows
+-- sit with their kin (Ben, 2026-10-15): Track at the foot of the road ladder,
+-- Railway Station inside the Infrastructure fold. The list scrolls, and a press
+-- is published only while on screen, so each read sweeps the list's scroll.
 --
 -- WHAT IT PROVES, every claim read back from the world or the surface's own
 -- published press positions (a picture of a ledger proves only that it drew):
@@ -60,11 +63,24 @@ print(string.format("RAIL fixture city=(%d,%d) run=(%d,%d)->(%d,%d) steel %.1f->
 verify.center_tile(f.cx, f.cy, 6.0)
 verify.frames(3)
 
+-- Sweep the building list's scroll until the named row's Build press is on
+-- screen; a row refused (or absent) publishes no press at any scroll.
+local function find(kind)
+    local st
+    for i = 0, 20 do
+        verify.scroll_panel("build_list", i / 20); verify.frames(2)
+        st = verify.rail_state()
+        if st[kind .. "_x"] >= 0 then return st end
+    end
+    return st
+end
+
 -- Select a tile with a real canvas press, and let the ledger redraw for it.
-local function pick(x, y)
+local function pick(x, y, kind)
+    verify.scroll_panel("build_list", 0)
     verify.click_tile(x, y); verify.frames(3)
     verify.show_construction(); verify.construction_view(0); verify.frames(3)
-    return verify.rail_state()
+    return find(kind or "track")
 end
 
 -- R1: the far tile does not touch a line and is no city: refused ----------
@@ -75,8 +91,9 @@ verify.capture("rail_construction_01_refused")
 -- R2: Track on the city ----------------------------------------------------
 s = pick(f.cx, f.cy)
 verify.expect(s.track_x >= 0, "the city's list offers Track with a Build press")
-verify.expect(s.station_x < 0, "the city offers no station before it touches track")
 verify.capture("rail_construction_02_city_track")
+verify.expect(find("station").station_x < 0, "the city offers no station before it touches track")
+s = find("track")
 local steel0 = verify.rail_market_steel(f.cx, f.cy)
 verify.click(s.track_x, s.track_y); verify.frames(3)
 local a = verify.rail_state()
@@ -106,8 +123,8 @@ verify.center_tile(f.cx, f.cy, 6.0)
 verify.frames(3)
 
 -- R4: a station on the city ------------------------------------------------
-local t0 = pick(f.cx, f.cy)
-verify.expect(t0.track_x < 0, "the city already carries track: Track refused")
+verify.expect(pick(f.cx, f.cy, "track").track_x < 0, "the city already carries track: Track refused")
+local t0 = find("station")
 verify.expect(t0.station_x >= 0, "the city on the line offers Railway Station")
 verify.capture("rail_construction_04_station_row")
 verify.click(t0.station_x, t0.station_y); verify.frames(3)
@@ -117,6 +134,6 @@ print(string.format("RAIL station: stations %d->%d treasury %.2f->%.2f msg=%s",
 verify.expect(t1.stations == t0.stations + 1, "the Build press starts a station for the nation")
 -- (a station is paid as it builds, construction.cpp; no up-front charge to assert)
 verify.frames(3)
-verify.expect(verify.rail_state().station_x < 0, "a second station on the tile is refused")
+verify.expect(find("station").station_x < 0, "a second station on the tile is refused")
 verify.frames(30)
 verify.capture("rail_construction_05_station")

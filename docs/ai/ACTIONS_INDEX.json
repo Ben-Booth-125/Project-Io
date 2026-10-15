@@ -63,7 +63,7 @@
   ],
   [
    "gameplay.lay_track",
-   "Select a tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > Rail fold > 'Track' row > 'Build'. No armed tool: rail is built like anything else (LOGISTICS.md § 4c). Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`)."
+   "Select a tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > road ladder (after Highway) > 'Track' row > 'Build'. No armed tool: rail is built like anything else (LOGISTICS.md § 4c). Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`)."
   ],
   [
    "gameplay.set_logistics_shares",
@@ -71,7 +71,7 @@
   ],
   [
    "gameplay.build_station",
-   "Select a city tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > Rail fold > 'Railway Station' row > 'Build'. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`)."
+   "Select a city tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > Infrastructure fold > 'Railway Station' row > 'Build'. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`)."
   ],
   [
    "gameplay.survey",

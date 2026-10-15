@@ -3013,6 +3013,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // instance of the same silence, found only because half 2 of the fix
         // above made the names worth checking against the actual call sites.
         else if (name == "construction")         target = "Construction";
+        // The tile's building list scrolls in its own child (BL-1255: the rail
+        // rows sit at the road ladder's foot and inside Infrastructure).
+        else if (name == "build_list")           target = "##build_list";
         else if (name == "acquisitions")         target = "Acquisitions";
         else if (name == "generation_ledger")    target = "Generation Ledger";
         else if (name == "corporations_table")   target = "Corporations";

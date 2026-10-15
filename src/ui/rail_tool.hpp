@@ -45,7 +45,10 @@ bool rail_tiles_adjacent(const world& w, entity_id a, entity_id b);
 /// refusal. A Build press queues `pending_track_tile` / `pending_station_tile` for
 /// app::render. Publishes the Build presses into `ui.construction_ui`
 /// (`rail_track_*`, `rail_station_*`; -1 when the row is refused or absent).
+/// @p which picks the row: Track draws after the road ladder, Railway Station
+/// inside the Infrastructure fold (Ben, 2026-10-15).
+enum class rail_row { track, station };
 void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, entity_id tile,
-                    float row_h);
+                    float row_h, rail_row which);
 
 } // namespace ui
