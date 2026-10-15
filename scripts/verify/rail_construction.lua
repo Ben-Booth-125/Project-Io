@@ -3,29 +3,28 @@
 --
 --   ProjectIo --verify scripts/verify/rail_construction.lua
 --
+-- Rail is built like anything else: select a tile, and the Construction view's
+-- list of buildings for that tile carries TRACK and RAILWAY STATION rows, each
+-- with its cost and either a Build press or its refusal. No armed tool.
+--
 -- WHAT IT PROVES, every claim read back from the world or the surface's own
 -- published press positions (a picture of a ledger proves only that it drew):
---   R1  the Construction view carries a Rail group whose two tools are REAL
---       presses, and each is a TOGGLE (pressing the armed tool disarms it);
---   R2  with Lay track armed, map clicks PLAN a run without laying anything:
---       the treasury and the track count do not move; a click on the run's
---       last tile un-plans it;
---   R3  the ledger's Lay track press lays the planned run through the seam:
---       the nation's track grows by the run, the treasury pays
---       run x (track_build_cost + steel at the market's price), and the
---       market's shelf gives up run x track_steel_per_tile steel;
---   R4  with Railway station armed, a click on the city (now touching track)
---       starts a station for the nation; a second click there is refused
---       (one to a tile) and changes nothing.
+--   R1  selecting a tile that does not touch the line (the run's far tile)
+--       shows the Track row REFUSED (no Build press published);
+--   R2  selecting the city shows Track buildable; its Build press lays one
+--       tile through the seam: track +1, the treasury pays at least
+--       track_build_cost, the market's shelf gives up track_steel_per_tile;
+--   R3  the next two tiles, each selected then built from the list, extend
+--       the line (the far tile is now legal because it touches the line);
+--   R4  the city (now on track) offers Railway Station; its Build press starts
+--       a station for the nation; after it the row is refused (one to a tile).
 --
--- CAPTURES: 01 tools at rest, 02 run planned (preview), 03 run laid (rail
--- surface), 04 station tool armed (legal tiles ringed), 05 station started.
+-- CAPTURES: 01 far tile refused, 02 city track row, 03 run laid (rail surface),
+-- 04 station row on the city, 05 station started.
 
 verify.window(1600, 900)
 
--- Seat a major, on a world where the railway exists.
 verify.new_world(2)
--- run_verify's roster already seats a major's champion; pick one only if not.
 if verify.rail_state().nation == 0 then
     local r = verify.take_seat(verify.seat_candidate(0))
     verify.expect(r == "applied", "a major is seated (" .. tostring(r) .. ")")
@@ -50,24 +49,8 @@ verify.frames(3)
 local s = verify.rail_state()
 print(string.format("RAIL nation=%d treasury=%.2f track=%d stations=%d", s.nation, s.treasury, s.track, s.stations))
 verify.expect(s.nation ~= 0, "the seat's nation is a major")
-verify.expect(s.track_x >= 0, "the Rail group draws its Lay track tool")
-verify.expect(s.station_x >= 0, "the Rail group draws its Railway station tool")
-verify.capture("rail_construction_01_tools")
+verify.expect(s.track_x < 0 and s.station_x < 0, "no tile selected: no rail rows")
 
--- R1: the toggles -----------------------------------------------------------
-verify.click(s.track_x, s.track_y); verify.frames(2)
-verify.expect(verify.rail_state().tool == 1, "Lay track arms the track tool")
-s = verify.rail_state()
-verify.click(s.track_x, s.track_y); verify.frames(2)
-verify.expect(verify.rail_state().tool == 0, "pressing the armed Lay track disarms it (toggle rule)")
-s = verify.rail_state()
-verify.click(s.station_x, s.station_y); verify.frames(2)
-verify.expect(verify.rail_state().tool == 2, "Railway station arms the station tool")
-s = verify.rail_state()
-verify.click(s.track_x, s.track_y); verify.frames(2)
-verify.expect(verify.rail_state().tool == 1, "the other tool switches, not stacks")
-
--- R2: plan a run ------------------------------------------------------------
 local f = verify.rail_fixture(true)
 verify.expect(f.ok, "the seat nation has a city with a two-tile run of its own land off it")
 if not f.ok then return end
@@ -76,39 +59,45 @@ print(string.format("RAIL fixture city=(%d,%d) run=(%d,%d)->(%d,%d) steel %.1f->
 
 verify.center_tile(f.cx, f.cy, 6.0)
 verify.frames(3)
-local before = verify.rail_state()
-verify.click_tile(f.cx, f.cy); verify.frames(2)
-verify.click_tile(f.x1, f.y1); verify.frames(2)
-verify.click_tile(f.x2, f.y2); verify.frames(2)
-verify.expect(verify.rail_state().run == 3, "three clicks plan three tiles (" .. verify.rail_state().run .. ")")
-verify.click_tile(f.x2, f.y2); verify.frames(2)
-verify.expect(verify.rail_state().run == 2, "a click on the run's last tile un-plans it")
-verify.click_tile(f.x2, f.y2); verify.frames(2)
-local planned = verify.rail_state()
-verify.expect(planned.run == 3, "and a click re-plans it")
-verify.expect(planned.track == before.track and math.abs(planned.treasury - before.treasury) < 1e-3,
-    "planning lays nothing and charges nothing")
-verify.hover_tile(f.x2, f.y2); verify.frames(2)
-verify.capture("rail_construction_02_planned")
 
--- R3: lay it ----------------------------------------------------------------
+-- Select a tile with a real canvas press, and let the ledger redraw for it.
+local function pick(x, y)
+    verify.click_tile(x, y); verify.frames(3)
+    verify.show_construction(); verify.construction_view(0); verify.frames(3)
+    return verify.rail_state()
+end
+
+-- R1: the far tile does not touch a line and is no city: refused ----------
+s = pick(f.x2, f.y2)
+verify.expect(s.track_x < 0, "Track is refused on a tile off the line (no Build press)")
+verify.capture("rail_construction_01_refused")
+
+-- R2: Track on the city ----------------------------------------------------
+s = pick(f.cx, f.cy)
+verify.expect(s.track_x >= 0, "the city's list offers Track with a Build press")
+verify.expect(s.station_x < 0, "the city offers no station before it touches track")
+verify.capture("rail_construction_02_city_track")
 local steel0 = verify.rail_market_steel(f.cx, f.cy)
-s = verify.rail_state()
-verify.expect(s.commit_x >= 0, "the planned run offers its Lay track press")
-verify.click(s.commit_x, s.commit_y); verify.frames(3)
-local laid = verify.rail_state()
+verify.click(s.track_x, s.track_y); verify.frames(3)
+local a = verify.rail_state()
 local steel1 = verify.rail_market_steel(f.cx, f.cy)
-print(string.format("RAIL laid: track %d->%d treasury %.2f->%.2f steel %.2f->%.2f msg=%s",
-    s.track, laid.track, s.treasury, laid.treasury, steel0, steel1, laid.message))
-verify.expect(laid.track == s.track + 3, "the nation's track grows by the three planned tiles")
-verify.expect(laid.run == 0, "the laid tiles leave the plan")
-local paid = s.treasury - laid.treasury
-verify.expect(paid >= 3 * s.track_cost - 1e-3,
-    string.format("the treasury pays at least 3 x %.0f cr (paid %.2f)", s.track_cost, paid))
-verify.expect(math.abs((steel0 - steel1) - 3 * s.steel_per_tile) < 1e-3,
-    string.format("the shelf gives up 3 x %.1f steel (drew %.2f)", s.steel_per_tile, steel0 - steel1))
--- Re-take the ground's snapshot and bake the master, so the capture shows the
--- rail surface the world now carries (the synchronous verify path bakes lazily).
+print(string.format("RAIL city: track %d->%d treasury %.2f->%.2f steel %.2f->%.2f msg=%s",
+    s.track, a.track, s.treasury, a.treasury, steel0, steel1, a.message))
+verify.expect(a.track == s.track + 1, "the Build press lays one tile of track")
+verify.expect(s.treasury - a.treasury >= s.track_cost - 1e-3,
+    string.format("the treasury pays at least %.0f cr (paid %.2f)", s.track_cost, s.treasury - a.treasury))
+verify.expect(math.abs((steel0 - steel1) - s.steel_per_tile) < 1e-3,
+    string.format("the shelf gives up %.1f steel (drew %.2f)", s.steel_per_tile, steel0 - steel1))
+
+-- R3: extend the line tile by tile from the list ---------------------------
+for _, t in ipairs({ { f.x1, f.y1 }, { f.x2, f.y2 } }) do
+    local b = pick(t[1], t[2])
+    verify.expect(b.track_x >= 0, string.format("(%d,%d) touching the line offers Track", t[1], t[2]))
+    verify.click(b.track_x, b.track_y); verify.frames(3)
+    local c = verify.rail_state()
+    verify.expect(c.track == b.track + 1, string.format("(%d,%d) laid (%s)", t[1], t[2], c.message))
+    verify.expect(c.treasury < b.treasury, "the treasury paid for it")
+end
 verify.ground_complete_master(30)
 verify.center_tile(f.x1, f.y1, 14.0)
 verify.frames(10)
@@ -116,17 +105,18 @@ verify.capture("rail_construction_03_laid")
 verify.center_tile(f.cx, f.cy, 6.0)
 verify.frames(3)
 
--- R4: a station on the city -------------------------------------------------
-verify.click(laid.station_x, laid.station_y); verify.frames(2)
-verify.expect(verify.rail_state().tool == 2, "Railway station arms")
-verify.capture("rail_construction_04_station_tool")
-local t0 = verify.rail_state()
-verify.click_tile(f.cx, f.cy); verify.frames(3)
+-- R4: a station on the city ------------------------------------------------
+local t0 = pick(f.cx, f.cy)
+verify.expect(t0.track_x < 0, "the city already carries track: Track refused")
+verify.expect(t0.station_x >= 0, "the city on the line offers Railway Station")
+verify.capture("rail_construction_04_station_row")
+verify.click(t0.station_x, t0.station_y); verify.frames(3)
 local t1 = verify.rail_state()
 print(string.format("RAIL station: stations %d->%d treasury %.2f->%.2f msg=%s",
     t0.stations, t1.stations, t0.treasury, t1.treasury, t1.message))
-verify.expect(t1.stations == t0.stations + 1, "a click on the city starts a station for the nation")
-verify.click_tile(f.cx, f.cy); verify.frames(3)
-verify.expect(verify.rail_state().stations == t1.stations, "a second station on the tile is refused")
+verify.expect(t1.stations == t0.stations + 1, "the Build press starts a station for the nation")
+-- (a station is paid as it builds, construction.cpp; no up-front charge to assert)
+verify.frames(3)
+verify.expect(verify.rail_state().station_x < 0, "a second station on the tile is refused")
 verify.frames(30)
 verify.capture("rail_construction_05_station")

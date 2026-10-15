@@ -1,6 +1,6 @@
 #pragma once
-// BL-1255 (rail construction UI): the Construction ledger's RAIL group and the
-// planetary-canvas tool it arms. Rail is STATE INDUSTRY (NATIONS.md § State
+// BL-1255 (rail construction UI): the rail rows of the Construction view's
+// per-tile building list. Rail is STATE INDUSTRY (NATIONS.md § State
 // industry; LOGISTICS.md § 4c): track and stations are laid for the seat's
 // NATION and paid from its treasury, never the corporation's balance.
 //
@@ -39,10 +39,13 @@ bool rail_station_tile_ok(const world& w, entity_id nation, entity_id tile,
 /// Whether @p a and @p b are cardinal neighbours on the same body (columns wrap).
 bool rail_tiles_adjacent(const world& w, entity_id a, entity_id b);
 
-/// The RAIL group in the Construction view: the two tool toggles (Lay track /
-/// Railway station), the planned run's per-tile and total cost, upkeep and the
-/// steel it buys, and Commit / Clear. Publishes its press positions into
-/// `ui.construction_ui` for verify scripts.
-void draw_rail_group(const world& w, const recipe_registry& reg, ui_state& ui);
+/// The rail rows of the Construction view's per-tile building list (LOGISTICS.md
+/// 4c: rail is built like anything else). Track and Railway Station each draw as a
+/// building row for @p tile - cost (credits + steel), upkeep, and Build or the
+/// refusal. A Build press queues `pending_track_tile` / `pending_station_tile` for
+/// app::render. Publishes the Build presses into `ui.construction_ui`
+/// (`rail_track_*`, `rail_station_*`; -1 when the row is refused or absent).
+void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, entity_id tile,
+                    float row_h);
 
 } // namespace ui

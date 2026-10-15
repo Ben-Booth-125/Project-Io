@@ -35,6 +35,7 @@
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
+#include "rail_tool.hpp" // BL-1255: the Track / Railway Station rows
 #include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger_body
 
 #include <imgui.h>
@@ -3749,6 +3750,15 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom)
     // whenever the category changes, and close it once its rows
     // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
+    // BL-1255 (LOGISTICS.md 4c): rail is built like anything else - Track and
+    // Railway Station are rows of this tile's list, in a Rail fold of their own
+    // because they are the NATION's state industry, paid from its treasury.
+    if (rail_player_nation(w) != null_entity && reg.building_available(building_type::railway_station))
+        if (ImGui::TreeNodeEx("Rail", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            draw_rail_rows(w, reg, ui, tile_id, row_h);
+            ImGui::TreePop();
+        }
     std::string open_category;
     bool        category_open = false;
     for (const candidate& c : cands)

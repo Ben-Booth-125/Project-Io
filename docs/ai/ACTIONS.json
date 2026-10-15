@@ -398,8 +398,8 @@
   {
    "id": "gameplay.lay_track",
    "family": "gameplay",
-   "surface": "Construction ledger > Construction view > Rail group > 'Lay track' (a toggle that arms the track tool on the Planetary canvas), then map clicks/drags plan a run and 'Lay planned track' commits it. Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`).",
-   "press": "UI: press 'Lay track' in the Rail group (pressing it again disarms it); click a start tile (a city of the seat nation, or a tile touching its own line), then click or drag each next tile (cardinal neighbour of the run's last tile; clicking the last tile un-plans it, clicking an earlier one cuts the run back to it); read the per-tile and total cost, steel and upkeep; press 'Lay planned track'. The UI issues corp_verb 36 (`lay_track`) once per planned tile in lay order, `corp` = the seat, `nation` = the seat's home nation, stopping at the first refusal (named inline: no steel on the shelf / the treasury cannot cover it / track cannot go there / no railway in this era). Seam: issue corp_verb 36 with `corp`, `nation` and `tile` directly.",
+   "surface": "Select a tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > Rail fold > 'Track' row > 'Build'. No armed tool: rail is built like anything else (LOGISTICS.md § 4c). Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`).",
+   "press": "UI: select the tile on the map; in the Construction view's building list for it, the Rail fold's Track row shows the cost (credits + steel bought at the tile market), the treasury, and the upkeep per tick, then either 'Build' or the refusal (not your nation's ground / start at a city or your own line / already carries track / no steel on the shelf / treasury cannot cover it). Press 'Build': the UI issues ONE corp_verb 36 (`lay_track`) for that tile, `corp` = the seat, `nation` = the seat's home nation, and words the outcome under the Rail rows. A line is laid tile by tile: select the next tile touching the line and press Build again. Seam: issue corp_verb 36 with `corp`, `nation` and `tile` directly.",
    "args": [
     {
      "name": "tile",
@@ -463,8 +463,8 @@
   {
    "id": "gameplay.build_station",
    "family": "gameplay",
-   "surface": "Construction ledger > Construction view > Rail group > 'Railway station' (a toggle that arms the station tool; legal tiles are ringed on the Planetary canvas), then a click on a ringed city tile. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`).",
-   "press": "UI: press 'Railway station' in the Rail group (pressing it again disarms it), then click a ringed tile - a city of the seat nation with track on it or a cardinal neighbour and no station yet; the ledger shows the station's build cost under the cursor and its upkeep. The UI issues corp_verb 0 (`build`) with `type` = 11 (railway_station), `tile`, `corp` = the seat and `nation` = the seat's home nation, and words the outcome in the Rail group. Seam: issue the same command directly.",
+   "surface": "Select a city tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > Rail fold > 'Railway Station' row > 'Build'. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`).",
+   "press": "UI: select the tile on the map; the Rail fold's Railway Station row shows its build cost, the treasury and its upkeep, then 'Build' when the tile is a city of the seat nation with track on it or a cardinal neighbour and no station yet, else the refusal (a station stands in a city / must touch track / a station stands here / treasury cannot cover it). Press 'Build': the UI issues corp_verb 0 (`build`) with `type` = 11 (railway_station), `tile`, `corp` = the seat and `nation` = the seat's home nation, and words the outcome under the Rail rows. Seam: issue the same command directly.",
    "args": [
     {
      "name": "tile",

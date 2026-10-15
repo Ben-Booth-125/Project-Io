@@ -2001,18 +2001,19 @@
   },
   {
    "id": "UI-126",
-   "name": "Rail group",
+   "name": "Rail rows",
    "kind": "sub-element",
    "parent": "UI-074",
    "source": [
     "docs/economy/LOGISTICS.md § 4c",
     "docs/politics/NATIONS.md § State industry",
     "src/ui/rail_tool.hpp",
-    "src/ui/rail_tool.cpp"
+    "src/ui/rail_tool.cpp",
+    "src/ui/selection_panel.cpp"
    ],
-   "summary": "In the Construction view: the seat nation's uncommitted treasury and two toggle tools. Lay track arms a Planetary-canvas tool that plans a run tile by tile (click or drag; click the last tile to undo), previews it as joined rings, and prices it per tile and in total (credits, steel bought at the tile market, upkeep) with the first refusal named; 'Lay planned track' lays it through lay_track. Railway station rings every legal city tile and builds one on a click. Closing the ledger or switching tab disarms both.",
-   "interesting_question": "A run is laid tile by tile through the seam and stops at the first refusal - does a partly laid run (the shelf ran dry mid-line) read as progress or as a failure?",
-   "resolution": "Open - the laid tiles stay laid and leave the plan, the remainder stays planned, and the outcome line says how many were laid and why it stopped; whether to price the shelf before the press (done) is enough is Ben's call.",
+   "summary": "In the Construction view's building list for the selected tile, a Rail fold (shown when the seat is a major and the railway exists in the era) with two building rows: Track and Railway Station. Each shows its cost (credits, plus steel bought at the tile market for track), the seat nation's uncommitted treasury it is paid from, its upkeep per tick, and Build or the refusal (the lay_track / station rules: own ground; a city or touching the nation's line; a city touching track; no steel; treasury short). Build issues one lay_track, or build type 11 with nation, through apply_corp_command. No armed map tool.",
+   "interesting_question": "A line is laid one selected tile at a time - is selecting and pressing per tile acceptable for a long line, or does a long line want a run gesture inside the same list idiom?",
+   "resolution": "Open - Ben ruled 2026-10-15 that rail is built like anything else from the tile's list; whether long lines later earn a multi-tile press is his call.",
    "checks": [
     "rail_construction"
    ]

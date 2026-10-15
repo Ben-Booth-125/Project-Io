@@ -1,5 +1,6 @@
 #include "rail_tool.hpp"
 
+#include "icons.hpp"
 #include "presentation.hpp"
 #include "ui_state.hpp"
 
@@ -12,7 +13,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 
 namespace ui
 {
@@ -126,142 +126,95 @@ bool rail_station_tile_ok(const world& w, entity_id nation, entity_id tile, cons
     return true;
 }
 
-void draw_rail_group(const world& w, const recipe_registry& reg, ui_state& ui)
+void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, entity_id tile,
+                    float row_h)
 {
-    construction_state&    cs = ui.construction;
     construction_controls& cc = ui.construction_ui;
-
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Rail");
-    ImGui::SameLine();
-    ImGui::TextDisabled("state industry");
-
     const entity_id nation = rail_player_nation(w);
-    if (nation == null_entity)
-    {
-        ImGui::TextDisabled("Rail is laid by a major nation's state.");
-        cs.rail = rail_tool::none;
-        cs.rail_run.clear();
+    // Rail is the seat NATION's state industry: no major seated, or no railway
+    // in this era, and the rows are absent as an era-locked type is absent.
+    if (nation == null_entity || !reg.building_available(building_type::railway_station)
+        || w.tiles.find(tile) == w.tiles.end())
         return;
-    }
-    if (!reg.building_available(building_type::railway_station))
-    {
-        ImGui::TextDisabled("No railway in this era.");
-        cs.rail = rail_tool::none;
-        cs.rail_run.clear();
-        return;
-    }
 
     const float treasury = state_uncommitted_treasury(w, nation);
-    ImGui::TextDisabled("Treasury: %.0f cr uncommitted", static_cast<double>(treasury));
-
-    // The two tools. Each is a TOGGLE (the standing rule): pressing the armed
-    // tool disarms it; pressing the other switches. Arming either disarms
-    // building placement, so one gesture owns the canvas click.
-    const auto tool_button = [&](const char* label, rail_tool t, float& px, float& py) {
-        const bool on = cs.rail == t;
-        if (on)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        const ImVec2 p = ImGui::GetCursorScreenPos();
-        if (ImGui::Button(label))
+    const auto  row = [&](const char* name, float credits, float steel, float upkeep,
+                          const char* refusal, bool& pressed, float& px, float& py) {
+        ImGui::BeginChild(name, {0.0f, row_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
         {
-            cs.rail = on ? rail_tool::none : t;
-            cs.active = false;
-            cs.rail_message.clear();
+            constexpr float gr = 9.0f;
+            const ImVec2    gp = ImGui::GetCursorScreenPos();
+            icons::building(ImGui::GetWindowDrawList(),
+                            {gp.x + gr, gp.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
+                            building_type::railway_station, resource_type::steel,
+                            IM_COL32(150, 235, 160, 255));
+            ImGui::Dummy({gr * 2.0f, ImGui::GetTextLineHeight()});
+            ImGui::SameLine();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", name);
         }
-        px = p.x + ImGui::GetItemRectSize().x * 0.5f;
-        py = p.y + ImGui::GetItemRectSize().y * 0.5f;
-        if (on)
-            ImGui::PopStyleColor();
-    };
-    tool_button("Lay track", rail_tool::track, cc.rail_track_x, cc.rail_track_y);
-    ImGui::SameLine();
-    tool_button("Railway station", rail_tool::station, cc.rail_station_x, cc.rail_station_y);
-
-    if (cs.rail != rail_tool::track && !cs.rail_run.empty())
-        cs.rail_run.clear(); // a disarmed tool plans nothing
-
-    struct { float steel, upkeep; } const rp{reg.rail().track_steel_per_tile, reg.rail().track_upkeep_per_tile};
-
-    if (cs.rail == rail_tool::track)
-    {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped("Click or drag tiles on the map; click the last tile to undo it.");
-        ImGui::TextWrapped("Per tile: %.0f cr + %.1f steel bought at the tile market; upkeep %.2f cr/tick",
-                            static_cast<double>(reg.rail().track_build_cost),
-                            static_cast<double>(rp.steel), static_cast<double>(rp.upkeep));
-        ImGui::PopStyleColor();
-
-        // Price the run as the door would, tile by tile in lay order: the
-        // treasury shrinks, and each market's shelf gives up its steel.
-        float total = 0.0f;
-        int   n_ok  = 0;
-        const char* first_refusal = nullptr;
-        std::map<entity_id, float> shelf_used;
-        for (const entity_id t : cs.rail_run)
-        {
-            const float c = track_tile_cost(w, reg, t);
-            const entity_id mid = market_for_tile(w, t);
-            float shelf = 0.0f;
-            if (const auto mit = w.markets.find(mid); mit != w.markets.end())
-                shelf = mit->second.inventory[static_cast<std::size_t>(resource_type::steel)];
-            float& used = shelf_used[mid];
-            if (first_refusal == nullptr && rp.steel > 0.0f && !(shelf - used >= rp.steel))
-                first_refusal = "No steel on the shelf";
-            if (first_refusal == nullptr && (!std::isfinite(c) || total + c > treasury))
-                first_refusal = "Treasury cannot cover it";
-            if (first_refusal == nullptr)
-            {
-                used  += rp.steel;
-                total += c;
-                ++n_ok;
-            }
-        }
-        const int n = static_cast<int>(cs.rail_run.size());
-        ImGui::Text("Planned: %d tile%s", n, n == 1 ? "" : "s");
-        ImGui::Text("Total: %.0f cr, %.1f steel; upkeep %.2f cr/tick",
-                    static_cast<double>(total), static_cast<double>(rp.steel * n_ok),
-                    static_cast<double>(rp.upkeep * n_ok));
-        if (first_refusal != nullptr)
-            ImGui::TextColored(k_refusal, "%s after %d tile%s", first_refusal, n_ok,
-                               n_ok == 1 ? "" : "s");
-
-        ImGui::BeginDisabled(n_ok == 0);
+        if (steel > 0.0f)
+            ImGui::TextDisabled("%.0f cr + %.1f steel", static_cast<double>(credits),
+                                static_cast<double>(steel));
+        else
+            ImGui::TextDisabled("%.0f cr", static_cast<double>(credits));
+        ImGui::TextDisabled("From the treasury (%.0f cr)", static_cast<double>(treasury));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral),
+                           "State industry - upkeep %.2f cr/tick", static_cast<double>(upkeep));
+        if (refusal == nullptr)
         {
             const ImVec2 p = ImGui::GetCursorScreenPos();
-            if (ImGui::Button("Lay planned track"))
-                cs.pending_rail_commit = true;
-            cc.rail_commit_x = p.x + ImGui::GetItemRectSize().x * 0.5f;
-            cc.rail_commit_y = p.y + ImGui::GetItemRectSize().y * 0.5f;
+            if (ImGui::Button("Build"))
+                pressed = true;
+            px = p.x + ImGui::GetItemRectSize().x * 0.5f;
+            py = p.y + ImGui::GetItemRectSize().y * 0.5f;
         }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(n == 0);
-        if (ImGui::Button("Clear"))
-            cs.rail_run.clear();
-        ImGui::EndDisabled();
-    }
-    else if (cs.rail == rail_tool::station)
-    {
-        const building_economics& ev = reg.economics(building_type::railway_station);
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped("Click a ringed city tile on the map. Upkeep %.1f cr/tick once standing.",
-                           static_cast<double>(ev.maintenance));
-        ImGui::PopStyleColor();
-        if (w.tiles.find(cs.rail_hover) != w.tiles.end())
-        {
-            const char* why = nullptr;
-            if (rail_station_tile_ok(w, nation, cs.rail_hover, &why))
-                ImGui::Text("Here: %.0f cr", static_cast<double>(construction_capex(
-                    w, reg, cs.rail_hover, building_type::railway_station,
-                    resource_type::iron_ore)));
-            else
-                ImGui::TextColored(k_refusal, "%s", why);
-        }
-    }
+        else
+            ImGui::TextColored(k_refusal, "%s", refusal);
+        ImGui::EndChild();
+        ImGui::Spacing();
+    };
 
-    if (!cs.rail_message.empty())
+    // Track: the lay_track rule (own ground; a city of the nation, or touching
+    // its own line), then the two purchases the door makes - steel off the
+    // tile market's shelf, credits off the treasury.
+    {
+        const char* why   = nullptr;
+        const float steel = reg.rail().track_steel_per_tile;
+        const float cost  = track_tile_cost(w, reg, tile);
+        if (rail_track_tile_ok(w, nation, tile, {}, &why))
+        {
+            const auto mit = w.markets.find(market_for_tile(w, tile));
+            const float shelf = mit == w.markets.end()
+                ? 0.0f : mit->second.inventory[static_cast<std::size_t>(resource_type::steel)];
+            if (steel > 0.0f && !(shelf >= steel))
+                why = "No steel on the shelf";
+            else if (!std::isfinite(cost) || cost > treasury)
+                why = "Treasury cannot cover it";
+        }
+        bool pressed = false;
+        row("Track", std::isfinite(cost) ? cost : 0.0f, steel, reg.rail().track_upkeep_per_tile,
+            why, pressed, cc.rail_track_x, cc.rail_track_y);
+        if (pressed)
+            ui.construction.pending_track_tile = tile;
+    }
+    // Railway station: a city tile touching track, one to a tile.
+    {
+        const char* why  = nullptr;
+        const float cost = construction_capex(w, reg, tile, building_type::railway_station,
+                                              resource_type::iron_ore);
+        if (rail_station_tile_ok(w, nation, tile, &why) && (!std::isfinite(cost) || cost > treasury))
+            why = "Treasury cannot cover it";
+        bool pressed = false;
+        row("Railway Station", std::isfinite(cost) ? cost : 0.0f, 0.0f,
+            reg.economics(building_type::railway_station).maintenance, why, pressed,
+            cc.rail_station_x, cc.rail_station_y);
+        if (pressed)
+            ui.construction.pending_station_tile = tile;
+    }
+    if (!ui.construction.rail_message.empty())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "%s",
-                           cs.rail_message.c_str());
+                           ui.construction.rail_message.c_str());
 }
 
 } // namespace ui

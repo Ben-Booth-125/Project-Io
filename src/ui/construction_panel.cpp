@@ -1,5 +1,4 @@
 #include "construction_panel.hpp"
-#include "rail_tool.hpp" // BL-1255: the Rail group
 
 #include <algorithm>
 #include <cmath>   // std::ceil (construction ETA, BL-095)
@@ -504,15 +503,6 @@ void draw_construction_panel(world& w,
     ui.construction_ui.door_recipes.clear();
     ui.construction_ui.rail_track_x = ui.construction_ui.rail_track_y = -1.0f;   // BL-1255
     ui.construction_ui.rail_station_x = ui.construction_ui.rail_station_y = -1.0f;
-    ui.construction_ui.rail_commit_x = ui.construction_ui.rail_commit_y = -1.0f;
-
-    // BL-1255: a rail tool is armed only while its group is on screen — a shut
-    // ledger or the other tab disarms it, so no hidden tool eats a map click.
-    if ((p_open && !*p_open) || ui.construction.panel_view != 0)
-    {
-        ui.construction.rail = rail_tool::none;
-        ui.construction.rail_run.clear();
-    }
 
     if (p_open && !*p_open)
         return;
@@ -548,9 +538,6 @@ void draw_construction_panel(world& w,
         {
             draw_queue_section(w, reg, ui);
             ImGui::Spacing();
-            // BL-1255: the Rail group - state industry, so it needs no selected
-            // tile; its tools act on the planetary canvas.
-            draw_rail_group(w, reg, ui);
             ImGui::Separator();
             draw_construction_ledger_body(w, reg, ui);
         }
