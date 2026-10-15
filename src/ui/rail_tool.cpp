@@ -127,7 +127,7 @@ bool rail_station_tile_ok(const world& w, entity_id nation, entity_id tile, cons
 }
 
 void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, entity_id tile,
-                    float row_h)
+                    float row_h, rail_row which)
 {
     construction_controls& cc = ui.construction_ui;
     const entity_id nation = rail_player_nation(w);
@@ -166,8 +166,13 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             const ImVec2 p = ImGui::GetCursorScreenPos();
             if (ImGui::Button("Build"))
                 pressed = true;
-            px = p.x + ImGui::GetItemRectSize().x * 0.5f;
-            py = p.y + ImGui::GetItemRectSize().y * 0.5f;
+            // Published only while the press is on screen: the rows sit in a
+            // scrolled list, and a position a click cannot reach is no press.
+            if (ImGui::IsItemVisible())
+            {
+                px = p.x + ImGui::GetItemRectSize().x * 0.5f;
+                py = p.y + ImGui::GetItemRectSize().y * 0.5f;
+            }
         }
         else
             ImGui::TextColored(k_refusal, "%s", refusal);
@@ -178,6 +183,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
     // Track: the lay_track rule (own ground; a city of the nation, or touching
     // its own line), then the two purchases the door makes - steel off the
     // tile market's shelf, credits off the treasury.
+    if (which == rail_row::track)
     {
         const char* why   = nullptr;
         const float steel = reg.rail().track_steel_per_tile;
@@ -199,6 +205,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             ui.construction.pending_track_tile = tile;
     }
     // Railway station: a city tile touching track, one to a tile.
+    if (which == rail_row::station)
     {
         const char* why  = nullptr;
         const float cost = construction_capex(w, reg, tile, building_type::railway_station,
@@ -212,7 +219,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         if (pressed)
             ui.construction.pending_station_tile = tile;
     }
-    if (!ui.construction.rail_message.empty())
+    if (which == rail_row::track && !ui.construction.rail_message.empty())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "%s",
                            ui.construction.rail_message.c_str());
 }
