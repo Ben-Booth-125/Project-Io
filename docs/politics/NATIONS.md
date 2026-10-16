@@ -166,14 +166,15 @@ field. **Generation itself is ruled to credit it before the campaign tick ever r
 2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape:
 the Exploration span's 1660 polity treasury, folded across the handoff through one stated
 per-mille (BL-975, 2026-09-15). The rule above is about the ONGOING campaign tick: nothing but the levy,
-the tariff and the budget outflow may ever move this field once play starts.
+the tariff, the tax and the budget outflow may ever move this field once play starts.
 
-Two flows credit it; one pass debits it.
+Three flows credit it; one pass debits it.
 
 | Flow | Direction | Where |
 |---|---|---|
 | **Extraction levy** | in | `apply_budget`, `budget_system.cpp` |
 | **Import tariff** | in | the clearing tick, `market_clearing.cpp` |
+| **Tax** | in | each quarter, a share of home firms' income (§ Taxes and Discontent) |
 | **The national budget** | out | `run_national_budget`, `nation_budget.cpp`, called from `run_nation_step` |
 
 All three are **transfers, not mints**: the payer is debited exactly what the payee is credited, in
@@ -249,6 +250,26 @@ and the goods leave the shelf **without landing anywhere** — state demand is t
 is always a market: a corporation holds no stock (`../economy/MARKETS.md` § The shelf economy), and
 whoever stocked the shelf was paid when the goods landed. The lump sizes are data
 (`economy.space_programme`, scripts/economy.lua).
+
+### Taxes and Discontent (Ben, 2026-10-16)
+
+**A nation taxes its home firms at a tier, I to V.** Each quarter it takes the tier's share of the
+income every corporation headquartered on its ground earned that quarter — a **transfer**, debited
+from the firm and credited to the treasury in the same float and tick. The tier rates are dials in
+`scripts/economy.lua`. The player sets its nation's tier on the Budget ledger's Taxes control; a
+rival nation's scorer sets its own, under the 2026-08-18 grant ("a nation setting a tariff or tax
+rate").
+
+**High taxes breed Discontent, and Discontent costs output.** Every nation carries a Discontent
+reading between 0 and 1. A tier above the middle raises it each quarter; the middle tier holds it;
+a tier below lowers it. At tier IV it takes **two years** of high taxes before Discontent starts to
+bite; tier V bites sooner. Once it bites, every building on the nation's ground loses output in
+proportion, up to **15%** at full Discontent. Cutting taxes lets it ebb at the same pace.
+
+This is the downside of a high budget, and it is a **systemic force with a visible cause**: the
+penalty sits on the ground, not inside any scorer, and the tier that caused it is on the ledger.
+A nation that raises taxes to fund a programme pays for it in output two years on; a scorer that
+weighs the tier sees the same Discontent the player does.
 
 ### 4. Law authorship
 

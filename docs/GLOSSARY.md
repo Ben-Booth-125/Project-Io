@@ -154,6 +154,9 @@ The centre scale ladder — Outpost / Settlement / Town / City / Metropolis (sca
 **Building**
 A surface installation placed on a tile. Buildings are either **extraction** (harvesting raw materials from tile deposits) or **processing** (consuming inputs and producing outputs via a recipe) or **infrastructure** (affecting logistical or economic capacity). Each building holds a `building_component` and a `stockpile_component`.
 
+**Discontent**
+A nation's population mood toward its taxes (Ben, 2026-10-16): one reading per nation between 0 and 1, raised by sustained high tax tiers and lowered by low ones. Above its threshold it cuts output on every building on the nation's ground, up to 15%. Distinct from **Sentiment**, which is a relation between two actors. See `docs/politics/NATIONS.md` § Taxes and Discontent.
+
 **Domain**
 The three exclusive tile sets a province is partitioned over — **land**, **coastal water**, **open ocean** — and the axis a unit's traversal is declared against. A tile's substrate names exactly one, so the domains never mix and **a province never spans two of them**. Domain is derived from the substrate of any member tile, never stored. It answers *what kind of place is this*; ownership and traversal are separate questions asked of it. See `docs/generation/PROVINCES.md` § Who owns water and `docs/military/MILITARY.md` § Domains and traversal.
 
