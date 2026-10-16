@@ -175,6 +175,19 @@ shortfall floor.
 `docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
 shortfall rule; this section owns only the transmission.
 
+### 3b. The off-road leg — membership without spread (Ben, 2026-10-16)
+
+**The network does not spread off the road; market membership does.** A tile with no roaded edge is
+reached by pricing the walk to the nearest tile that has one: **the off-road cost per tile times the
+number of 4-cardinal steps** to it (column wrapped, as every walk here is), added to that tile's own
+network cost. Far-out land is therefore dear rather than unreachable, and it drifts between markets
+as roads move toward it — which is the whole reason the term is per step and not a flat fee.
+
+**Reach (§ 3) is untouched by this.** An off-road tile is in a market's catchment without being in
+anybody's reach: the two answer different questions — *what does this tile sell into* and *where may
+a firm build* — and only the second is a permission. Keeping them apart is what lets a market render
+whole while placement stays honest about the road.
+
 ### 4. Roads — an edge between two tiles, generated then extended by hand
 
 **A road crosses the boundary between two tiles; it is never a property of one.** The player's
@@ -198,6 +211,19 @@ both tiles of every edge would double it.
 **Placement is directional.** Laying a road names a tile **and a side**. A road to nowhere is
 therefore impossible to express, which is the point: the refusal *"there is no neighbour that way"*
 is cheaper to understand than a tile that is roaded while nothing adjoins it.
+
+**A road is laid from a road, across to the next tile (Ben, 2026-10-16).** The named tile must
+already carry a roaded edge, and the new road crosses one of its sides to the neighbour — so every
+road's provenance is unambiguous: *where it comes from and where it goes.* A road cannot be dropped
+in open country, and a frontier is reached by laying one crossing at a time out to it. The root is
+generation's own rule below — every centre's tile gets at least a Track — so no world can begin with
+nowhere to build from, and a nation's first road of a campaign extends the lattice it inherited.
+
+**Generation roads every building site (Ben, 2026-10-16).** A building needs a road on its tile
+(`PRODUCTION.md` § A building needs a road), and that rule binds the generated world as it binds
+play: the road pass lays a crossing to every site it stamps, so the 1960 world contains no building
+the rule would have refused. The alternative — exempting what generation laid — would have made the
+opening world the one place the rule does not hold.
 
 **Pathfinding is unchanged in shape.** A* still walks 4-cardinal neighbours over the body grid and
 still derives the hex side of each step (`hex_side_for_offset`), the two diagonal sides the

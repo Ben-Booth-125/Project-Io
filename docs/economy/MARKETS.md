@@ -132,8 +132,27 @@ budget's planned corporations (Ben, 2026-09-26; BL-1086), its specialists as wel
 ceiling the charter walk honours — so no roster is laid only to be discarded, and the landscape
 search, which scores the carve's markets, still runs after the carve.
 
-**Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
-(`market_for_tile`), measured on the cylinder (the column distance wraps). A folded market's
+**Catchment is an attraction, not a distance (Ben, 2026-10-16).** A tile clears against the market
+it is most **attracted** to: the market whose **logistics cost to its centre, divided by that
+centre's pull**, is lowest (`market_for_tile`). Ties go to the lowest market id. It replaces the
+straight-line rule — nearest `centre_tile` by grid distance on the cylinder — which could not see a
+road, a technology or a building, so no market's reach ever changed.
+
+**The cost** is the traversal cost LOGISTICS.md § 1 owns, so roads shorten it and terrain lengthens
+it. A tile with no road of its own costs the network cost of the nearest roaded tile plus the
+**off-road leg** (LOGISTICS.md § 3b), which is why **every tile belongs to a market** — including
+the land logistics will never spread to, which renders as part of its market like any other.
+
+**The pull** is a multiplier on a centre, 1 unless something raises it, and it raises *that centre's*
+attraction everywhere at once: a pull of 2 reaches twice as far in cost terms. Two things raise it,
+both of them visible in the world — a **technology** the centre's nation holds, and a **building
+standing on the centre** (which also carries trade points, `TRADE.md`). It is a `modifier_set`
+quantity (`../META_LAYER.md`), so it composes and is read, never special-cased.
+
+**Mildly dynamic, and still not saved.** The catchment raster is recomputed when something it reads
+changes — a road laid or cut, a pull gained or lost, a market carved or folded — and never on a
+clock. It stays a pure function of the body's standing state, so a loaded game computes the
+catchment the saved one had. A folded market's
 centre still counts: a tile nearest to it clears against the market that absorbed it, so a
 catchment passes to its absorber whole, never to a third market that happens to stand nearer. **A building clears in its own tile's market** (Ben, 2026-09-15; Ben, 2026-10-10): its
 output lands on that market's shelf and its inputs and upkeep are bought there
