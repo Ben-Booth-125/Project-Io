@@ -1155,6 +1155,27 @@
    ],
    "title": "The build card should show the cost in resources and credits and what the building produces, and drop payback",
    "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"change building tiles in construction to show the cost of building it in both resources and credits, and then the output resource or effect, rather than just the credits expected. And we should remove the 'payback' portion.\" Card: draw_construction_ledger_body (selection_panel.cpp:3758-3875); payback is inline at :3807 as capex / profit.net() and is pessimistic ~2x because the estimate assumes 50% staffing. Everything needed is already in scope: reg.resource_build_cost_for(type, target, recipe) for materials, reg.get_recipe(c.recipe)->inputs/outputs for the output, c.target for extraction. Drop the payback clause and the caption that points at it."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found building BL-1339, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1345",
+   "short_name": "REROLL_LEAKS_VIA_ATTEMPT",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/generation/PLANETOLOGY.md",
+   "files": [
+    "src/world/planetology.cpp"
+   ],
+   "title": "A later round's reroll can move an earlier round's committed draws, through the viability attempt index",
+   "design": "SPRINT 55 (found verifying BL-1339, 2026-10-16). planetology.cpp's comment on the three preference streams claims 'bumping a later round's reroll counter cannot disturb an earlier round's already-committed draw'. That is FALSE: resolve_preferences folds the rejection attempt index k into all three streams (ra/rb/rc), so a Life roll that changes how many attempts the world needs moves the SYSTEM draws too. Observed by tools/verify/life_reroll.cpp: campaign seed 0 roll 7 resolves at attempt 2 and theta moves 1.519 -> 1.462, plate count 9 -> 8; seed 7 roll 3 resolves at attempt 3. Pre-dates BL-1339 (it was already true of the three Life draws) and is only now measured. THE CALL IS BEN'S: either the System draws become attempt-independent (so an accepted round really is committed), or the doc and the comment stop claiming independence. A doc and the code disagree, so one of them is wrong and the fix is work."
   }
  ]
 }
