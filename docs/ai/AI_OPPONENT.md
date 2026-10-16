@@ -2082,7 +2082,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   research queue).** Every nation holds technology and researches from a queue. The grant: a
   non-player nation's scorer may append **one frontier node at a time** to its own queue — a node
   whose requirements it holds or has queued — chosen by the relief the node's effects give the
-  nation's binding terms, less its cost. The player's nation is never queued for.
+  nation's binding terms, less its cost. The player's nation is never queued for in a seated session.
 
   **What it admits.** One verb — *queue a node* — over the nation's own tree, read from the nation's
   own state and the tree's public shape. It may take a side of a pick-one pair by that same score.
@@ -2096,6 +2096,8 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   budget lines, not only for its read modifiers; the two sides of a pick-one pair break a tie by the
   nation's seed, so nations diverge. After a node completes, the scorer may pick again in the same
   quarter while the pool covers the next node — still one node queued at a time, in a bounded loop.
+  A node on the route to a major takes a share of that major's worth, read from the route the queue
+  previews today; this scores the next pick and is not a plan, since nothing is kept between picks.
 
   **Under spectate, the seat's nation researches too — granted (Ben, 2026-10-15).** A new subject:
   with nobody seated (§ 10i), the nation at the seat is queued for exactly as any AI nation is.
