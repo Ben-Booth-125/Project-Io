@@ -1004,8 +1004,8 @@ private:
     /// BL-1108: join every in-flight worker -- the cold build, the four
     /// wizard rounds, the surface build -- before anything they read (the
     /// progress sinks, the works table) is destroyed. Called at the end of
-    /// run() with the window still up (@p on_screen draws "finishing the build
-    /// before quitting" while it waits) and again at the top of ~app for the
+    /// run() with the window still up (@p on_screen: a quit mid-build ends the
+    /// process at once rather than waiting) and again at the top of ~app for the
     /// paths that never ran the frame loop.
     void join_workers(bool on_screen);
     float m_wiz_history_carry[wizard_lapse_round_count]   = {}; ///< Sub-year accumulator for the advance.

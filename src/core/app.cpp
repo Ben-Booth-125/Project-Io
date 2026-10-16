@@ -1,6 +1,7 @@
 #include "app.hpp"
 
 #include "png_writer.hpp"
+#include <cstdlib> // std::_Exit: quitting mid-build
 #include "save_game.hpp" // BL-536 quick save / quick load
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
 
@@ -286,48 +287,26 @@ void app::join_workers(bool on_screen)
     if (!any_pending())
         return;
 
+    // Ben, 2026-10-16: the player may close the game mid-generation. A build
+    // cannot be stopped mid-pass, and the members its worker reads must not be
+    // destroyed under it (BL-1108's crash), so a quit from the window ends the
+    // PROCESS here: no destructor runs, the OS reclaims the worker with
+    // everything else, and nothing a build produces outlives the session
+    // anyway (no save is written from a worker). The off-screen path (~app
+    // after a run that never drew, the verify and autostart paths) still joins.
+    if (on_screen)
+    {
+        std::printf("[exit] quitting mid-build: the unfinished world is discarded\n");
+        std::fflush(stdout);
+        std::fflush(stderr);
+        std::_Exit(0);
+    }
+
     std::printf("[exit] finishing the build before quitting (a worker is still running)\n");
     std::fflush(stdout);
     const auto t0 = std::chrono::steady_clock::now();
     while (any_pending())
     {
-        if (on_screen && m_window != nullptr && m_renderer != nullptr)
-        {
-            // A plain frame with one line on it, so the wait is not a hang:
-            // events are pumped (and ignored -- a second close changes nothing)
-            // and the window repaints, which is what Windows judges us by.
-            SDL_Event ev;
-            while (SDL_PollEvent(&ev))
-                ImGui_ImplSDL3_ProcessEvent(&ev);
-            ImGui_ImplSDLRenderer3_NewFrame();
-            ImGui_ImplSDL3_NewFrame();
-            ImGui::NewFrame();
-            const ImVec2 disp = ImGui::GetIO().DisplaySize;
-            ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always,
-                                    {0.5f, 0.5f});
-            if (ImGui::Begin("##quitwait", nullptr,
-                             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
-                                 | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
-                                 | ImGuiWindowFlags_AlwaysAutoResize
-                                 | ImGuiWindowFlags_NoBackground))
-            {
-                const long long secs = std::chrono::duration_cast<std::chrono::seconds>(
-                                           std::chrono::steady_clock::now() - t0).count();
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
-                ImGui::Text("Finishing the build before quitting... %lld s", secs);
-                ImGui::PopStyleColor();
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-                ImGui::TextUnformatted("A world build cannot be stopped mid-pass; "
-                                       "the window closes when it lands.");
-                ImGui::PopStyleColor();
-            }
-            ImGui::End();
-            ImGui::Render();
-            SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
-            SDL_RenderClear(m_renderer);
-            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-            SDL_RenderPresent(m_renderer);
-        }
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
     std::printf("[exit] workers joined after %lld ms\n",
