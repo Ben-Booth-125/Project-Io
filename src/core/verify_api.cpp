@@ -5,6 +5,7 @@
 
 #include <cfloat>
 #include <cstdio>
+#include <cstdlib> // std::getenv: IO_PLAY_LOG
 #include <functional> // BL-1084: the staged-run hooks' wait
 #include <iterator>
 #include <chrono>
@@ -298,6 +299,12 @@ int app::run_autostart()
     // run() loads init.lua before anything else; start_new_game reads `config`
     // from it, so autostart has to do the same.
     m_lua.load("scripts/init.lua");
+    // The play log (core/play_log.hpp) only on request here, so harness runs
+    // of --autostart do not litter play_logs/: IO_PLAY_LOG=1 opts in.
+    {
+        const char* env = std::getenv("IO_PLAY_LOG");
+        m_play_log_allowed = env && std::string(env) == "1";
+    }
 
     std::printf("[autostart] step 1: generating world (this is the ~25s one)\n");
     std::fflush(stdout);

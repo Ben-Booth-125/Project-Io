@@ -174,7 +174,7 @@ Three flows credit it; one pass debits it.
 |---|---|---|
 | **Extraction levy** | in | `apply_budget`, `budget_system.cpp` |
 | **Import tariff** | in | the clearing tick, `market_clearing.cpp` |
-| **Tax** | in | each quarter, a share of home firms' income (§ Taxes and Discontent) |
+| **Tax** | in | each quarter, a share of home firms' operating profit (§ Taxes and Discontent) |
 | **The national budget** | out | `run_national_budget`, `nation_budget.cpp`, called from `run_nation_step` |
 
 All three are **transfers, not mints**: the payer is debited exactly what the payee is credited, in
@@ -254,7 +254,9 @@ whoever stocked the shelf was paid when the goods landed. The lump sizes are dat
 ### Taxes and Discontent (Ben, 2026-10-16)
 
 **A nation taxes its home firms at a tier, I to V.** Each quarter it takes the tier's share of the
-income every corporation headquartered on its ground earned that quarter — a **transfer**, debited
+**operating profit** every corporation headquartered on its ground made that quarter — what it
+earned less what it spent, floored at zero, so a firm making a loss pays nothing (Ben, 2026-10-16).
+The tax is a **transfer**, debited
 from the firm and credited to the treasury in the same float and tick. The tier rates are dials in
 `scripts/economy.lua`. The player sets its nation's tier on the Budget ledger's Taxes control; a
 rival nation's scorer sets its own, under the 2026-08-18 grant ("a nation setting a tariff or tax

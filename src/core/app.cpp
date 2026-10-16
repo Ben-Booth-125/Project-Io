@@ -1,6 +1,7 @@
 #include "app.hpp"
 
 #include "png_writer.hpp"
+#include <cstdlib> // std::_Exit: quitting mid-build
 #include "save_game.hpp" // BL-536 quick save / quick load
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
 
@@ -75,6 +76,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib> // std::getenv: IO_PLAY_LOG
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -87,6 +89,40 @@
 
 static constexpr int window_w = 1720;
 static constexpr int window_h = 1080;
+
+// The play log's names for the two direct doors' results (core/play_log.hpp):
+// the enumerator's own spelling, so a refusal reads the same in every log.
+static const char* construction_result_name(construction_result r)
+{
+    switch (r)
+    {
+        case construction_result::placed:                 return "applied";
+        case construction_result::invalid_tile:           return "invalid_tile";
+        case construction_result::out_of_range:           return "out_of_range";
+        case construction_result::insufficient_funds:     return "insufficient_funds";
+        case construction_result::no_corp:                return "no_corp";
+        case construction_result::no_tile:                return "no_tile";
+        case construction_result::slot_occupied:          return "slot_occupied";
+        case construction_result::insufficient_materials: return "insufficient_materials";
+        case construction_result::tech_locked:            return "tech_locked";
+        case construction_result::era_locked:             return "era_locked";
+        case construction_result::wrong_air:              return "wrong_air";
+    }
+    return "result?";
+}
+
+static const char* survey_dispatch_result_name(survey_dispatch_result r)
+{
+    switch (r)
+    {
+        case survey_dispatch_result::success:            return "applied";
+        case survey_dispatch_result::insufficient_funds: return "insufficient_funds";
+        case survey_dispatch_result::already_surveyed:   return "already_surveyed";
+        case survey_dispatch_result::in_progress:        return "in_progress";
+        case survey_dispatch_result::invalid:            return "invalid";
+    }
+    return "result?";
+}
 
 // ---------------------------------------------------------------------------
 // Unified key-binding table (BL-062).
@@ -286,48 +322,26 @@ void app::join_workers(bool on_screen)
     if (!any_pending())
         return;
 
+    // Ben, 2026-10-16: the player may close the game mid-generation. A build
+    // cannot be stopped mid-pass, and the members its worker reads must not be
+    // destroyed under it (BL-1108's crash), so a quit from the window ends the
+    // PROCESS here: no destructor runs, the OS reclaims the worker with
+    // everything else, and nothing a build produces outlives the session
+    // anyway (no save is written from a worker). The off-screen path (~app
+    // after a run that never drew, the verify and autostart paths) still joins.
+    if (on_screen)
+    {
+        std::printf("[exit] quitting mid-build: the unfinished world is discarded\n");
+        std::fflush(stdout);
+        std::fflush(stderr);
+        std::_Exit(0);
+    }
+
     std::printf("[exit] finishing the build before quitting (a worker is still running)\n");
     std::fflush(stdout);
     const auto t0 = std::chrono::steady_clock::now();
     while (any_pending())
     {
-        if (on_screen && m_window != nullptr && m_renderer != nullptr)
-        {
-            // A plain frame with one line on it, so the wait is not a hang:
-            // events are pumped (and ignored -- a second close changes nothing)
-            // and the window repaints, which is what Windows judges us by.
-            SDL_Event ev;
-            while (SDL_PollEvent(&ev))
-                ImGui_ImplSDL3_ProcessEvent(&ev);
-            ImGui_ImplSDLRenderer3_NewFrame();
-            ImGui_ImplSDL3_NewFrame();
-            ImGui::NewFrame();
-            const ImVec2 disp = ImGui::GetIO().DisplaySize;
-            ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always,
-                                    {0.5f, 0.5f});
-            if (ImGui::Begin("##quitwait", nullptr,
-                             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
-                                 | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
-                                 | ImGuiWindowFlags_AlwaysAutoResize
-                                 | ImGuiWindowFlags_NoBackground))
-            {
-                const long long secs = std::chrono::duration_cast<std::chrono::seconds>(
-                                           std::chrono::steady_clock::now() - t0).count();
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
-                ImGui::Text("Finishing the build before quitting... %lld s", secs);
-                ImGui::PopStyleColor();
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-                ImGui::TextUnformatted("A world build cannot be stopped mid-pass; "
-                                       "the window closes when it lands.");
-                ImGui::PopStyleColor();
-            }
-            ImGui::End();
-            ImGui::Render();
-            SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
-            SDL_RenderClear(m_renderer);
-            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-            SDL_RenderPresent(m_renderer);
-        }
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
     std::printf("[exit] workers joined after %lld ms\n",
@@ -343,6 +357,12 @@ int app::run(autostart_mode autostart)
     // corporation they are; the windowed autostart walks the wizard for
     // nobody, so its tail draws (and says so).
     m_player_picks_seat = !windowed_autostart;
+    // The play log (core/play_log.hpp): on for a seated session unless the
+    // environment says IO_PLAY_LOG=0.
+    {
+        const char* env = std::getenv("IO_PLAY_LOG");
+        m_play_log_allowed = !(env && std::string(env) == "0");
+    }
     // BL-1246: the live frame loop pumps the ground pool every frame, so the
     // home master can pre-bake behind the seat canvas and play can wait on it.
     m_ground_prebake_on = true;
@@ -500,8 +520,16 @@ int app::run(autostart_mode autostart)
             // Mid-interval application would tie the outcome to the wall-clock
             // day the bytes arrived, which is the property the transcript
             // exists to exclude.
+            const std::size_t agent_seen = m_agent_seam.transcript().size();
             m_agent_seam.drain_boundary(m_world, m_registry,
                                         static_cast<int>(m_last_econ_tick));
+            // An attached agent acts as the seat: its commands are play too.
+            for (std::size_t i = agent_seen; i < m_agent_seam.transcript().size(); ++i)
+            {
+                const agent_transcript_entry& e = m_agent_seam.transcript()[i];
+                m_play_log.command(m_world, e.cmd, e.result, m_sim_loop.day_tick(), "agent",
+                                   e.parse_ok);
+            }
             step_economy();
             ++m_last_econ_tick;
             m_agent_seam.on_tick_stepped(static_cast<int>(m_last_econ_tick));
@@ -1496,6 +1524,25 @@ std::vector<app::seat_major> app::seat_majors() const
     return out;
 }
 
+corp_command_result app::player_command(const corp_command& cmd, entity_id* out_building)
+{
+    const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, out_building);
+    m_play_log.command(m_world, cmd, r, m_sim_loop.day_tick(), "player");
+    return r;
+}
+
+void app::open_play_log(const std::string& loaded_from)
+{
+    // A seated session only: --verify never allows it, and a spectated session
+    // has nobody whose play there is to compare (AI_OPPONENT.md § 10i).
+    if (!m_play_log_allowed || m_ui.spectating
+        || m_world.corporations.find(m_world.player_entity) == m_world.corporations.end())
+        return;
+    m_play_log.open(m_world, m_last_econ_report, m_active_world_params.seed,
+                    static_cast<int>(m_active_world_params.epoch_year), m_sim_loop.day_tick(),
+                    loaded_from.empty() && m_seat_picked_nation != null_entity, loaded_from);
+}
+
 corp_command_result app::take_seat_pick(entity_id nation)
 {
     // THE PICK IS A GAME ACT (Ben, 2026-09-24): it goes through the command
@@ -1788,6 +1835,7 @@ void app::finish_new_game()
         m_last_survey_day = 0;
     }
 
+    open_play_log(std::string());
     m_screen = app_screen::in_game;
 }
 
@@ -1995,6 +2043,9 @@ void app::step_economy()
         // pattern as record_histories — once per econ tick, never per frame —
         // so the ledger's draw path only ever reads prebuilt aggregates.
         ui::record_strategy_readout(m_world, m_strategy_readout);
+        // The play log's quarter line (core/play_log.hpp): an observation of
+        // the world just stepped, read through `const world&` only.
+        m_play_log.quarter(m_world, m_last_econ_report, m_sim_loop.day_tick());
     }
     lap(8); // history recorders
 }
@@ -2436,6 +2487,7 @@ bool app::load_game_from(const std::string& path)
     m_ui.clear_battle_selection();
 
     m_screen = app_screen::in_game;
+    open_play_log(path);
 
     ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
                   ui::chat_state::k_field_channel, "Loaded " + path);
@@ -2832,6 +2884,10 @@ void app::render()
             m_world, m_registry, m_world.player_entity,
             m_ui.construction.pending_tile, m_ui.construction.pending_type,
             m_ui.construction.pending_target, built, m_ui.construction.pending_recipe);
+        m_play_log.direct(m_world, "build", construction_result_name(r), m_sim_loop.day_tick(),
+                          m_ui.construction.pending_tile, built,
+                          static_cast<int>(m_ui.construction.pending_type),
+                          static_cast<int>(m_ui.construction.pending_target), 0);
         switch (r)
         {
             case construction_result::placed:
@@ -2902,7 +2958,7 @@ void app::render()
         cmd.verb         = corp_verb::withdraw_from_battle;
         cmd.province     = m_ui.construction.pending_withdraw_province;
         cmd.counterparty = m_ui.construction.pending_withdraw_against;
-        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        const auto r = player_command(cmd);
         m_ui.construction.last_message =
             (r == corp_command_result::applied)
                 ? "Breaking off — it takes effect next tick."
@@ -2916,6 +2972,9 @@ void app::render()
         const construction_result r = place_road(
             m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile,
             m_ui.construction.pending_road_tier);
+        m_play_log.direct(m_world, "place_road", construction_result_name(r), m_sim_loop.day_tick(),
+                          m_ui.construction.pending_road_tile, null_entity, -1, -1,
+                          static_cast<int>(m_ui.construction.pending_road_tier));
         switch (r)
         {
             case construction_result::placed:
@@ -2955,7 +3014,7 @@ void app::render()
         cmd.verb      = corp_verb::lay_track;
         cmd.tile      = t;
         cmd.as_nation = ui::rail_player_nation(m_world);
-        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        const corp_command_result r = player_command(cmd);
         m_ui.construction.rail_message =
             r == corp_command_result::applied             ? "Track laid."
           : r == corp_command_result::rejected_funds
@@ -2975,7 +3034,7 @@ void app::render()
         cmd.type      = building_type::railway_station;
         cmd.tile      = m_ui.construction.pending_station_tile;
         cmd.as_nation = ui::rail_player_nation(m_world);
-        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        const corp_command_result r = player_command(cmd);
         m_ui.construction.rail_message =
             r == corp_command_result::applied             ? "Railway station started."
           : r == corp_command_result::rejected_funds      ? "The treasury cannot cover the station."
@@ -2998,7 +3057,7 @@ void app::render()
         cmd.tile      = m_ui.construction.pending_hire_tile;
         cmd.unit_type = m_ui.construction.pending_hire_unit_type;
         entity_id hired = null_entity;
-        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, &hired);
+        const corp_command_result r = player_command(cmd, &hired);
         switch (r)
         {
             case corp_command_result::applied:
@@ -3021,7 +3080,10 @@ void app::render()
     if (m_ui.construction.pending_demolish != null_entity)
     {
         const entity_id doomed = m_ui.construction.pending_demolish;
-        if (demolish_building(m_world, m_world.player_entity, doomed))
+        const bool      razed  = demolish_building(m_world, m_world.player_entity, doomed);
+        m_play_log.direct(m_world, "demolish", razed ? "applied" : "refused", m_sim_loop.day_tick(),
+                          null_entity, doomed, -1, -1, 0);
+        if (razed)
         {
             m_ui.construction.last_message = "Demolished.";
             if (m_ui.selected_entity == doomed)
@@ -3044,7 +3106,9 @@ void app::render()
     // mutable world. See survey_system.hpp / SOLAR.md § Survey.
     if (m_ui.pending_survey_dispatch != null_entity)
     {
-        dispatch_survey(m_world, m_ui.pending_survey_dispatch);
+        const survey_dispatch_result sr = dispatch_survey(m_world, m_ui.pending_survey_dispatch);
+        m_play_log.direct(m_world, "survey", survey_dispatch_result_name(sr), m_sim_loop.day_tick(),
+                          null_entity, m_ui.pending_survey_dispatch, -1, -1, 0);
         m_ui.pending_survey_dispatch = null_entity; // consume the request
     }
 
@@ -3063,7 +3127,7 @@ void app::render()
         cmd.verb     = corp_verb::march_unit;
         cmd.subject  = m_ui.pending_march_unit;
         cmd.province = m_ui.pending_march_dest_province;
-        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        const auto r = player_command(cmd);
         switch (r)
         {
             case corp_command_result::applied:
@@ -3088,7 +3152,7 @@ void app::render()
         cmd.corp    = m_world.player_entity;
         cmd.verb    = corp_verb::halt_unit;
         cmd.subject = m_ui.pending_halt_unit;
-        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        const auto r = player_command(cmd);
         m_ui.construction.last_message =
             (r == corp_command_result::applied) ? "Halted." : "Already halted.";
         m_ui.pending_halt_unit = null_entity; // consume the request
@@ -3102,7 +3166,7 @@ void app::render()
         cmd.corp    = m_world.player_entity;
         cmd.verb    = corp_verb::disband_unit;
         cmd.subject = doomed;
-        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        const auto r = player_command(cmd);
         if (r == corp_command_result::applied)
         {
             m_ui.construction.last_message = "Disbanded.";
@@ -3138,7 +3202,7 @@ void app::render()
     for (corp_command& cmd : m_ui.pending_order_commands)
     {
         cmd.tick = static_cast<int>(m_sim_loop.day_tick());
-        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        const corp_command_result r = player_command(cmd);
         const bool applied = (r == corp_command_result::applied);
         switch (cmd.verb)
         {
@@ -3170,7 +3234,7 @@ void app::render()
     for (corp_command& cmd : m_ui.pending_research_commands)
     {
         cmd.tick = static_cast<int>(m_sim_loop.day_tick());
-        if (apply_corp_command(m_world, m_registry, cmd) != corp_command_result::applied)
+        if (player_command(cmd) != corp_command_result::applied)
             m_ui.research_message = "The research queue refused that press.";
     }
     m_ui.pending_research_commands.clear(); // consume the requests

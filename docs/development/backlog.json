@@ -951,6 +951,29 @@
    "files": [],
    "title": "Wire the Taxes tier as a nation tax on home firms, and let sustained high taxes raise Discontent that cuts output",
    "design": "SPRINT 55 (Ben, 2026-10-16; delivered at once). DESIGNED: NATIONS.md § Taxes and Discontent; GLOSSARY.md Discontent. Ben's calls: measure = wire the Taxes tier (the stub on the Budget ledger); term = Discontent; bites after 2 years of high tax at tier IV; max output penalty 15%. Save-format seam (tier + Discontent per nation): world save v52."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": "Ben's live run (play log comparison)",
+   "author": "Ben (2026-10-16); filed by Claude",
+   "id": "BL-1336",
+   "short_name": "AI_TAX_BEHAVIOUR",
+   "category": "AI",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [
+    "BL-1335"
+   ],
+   "files": [
+    "src/world/nation_ai.cpp"
+   ],
+   "title": "AI nations set taxes by real need, so tiers move and Discontent can bite",
+   "design": "SPRINT 55 (Ben, 2026-10-16: leave it for now, revisit after the live run). As built in BL-1335 (taxes and Discontent), the AI tier scorer counts a nation short whenever its research queue owes, so every nation sits at III with one year at IV; Discontent peaks at 0.25 and never bites in 80 years; treasuries end 7x main because the budget does not spend the new revenue. Option offered: raise taxes only when the treasury cannot cover the budget lines, cut them on surplus. Compare against Ben's play log first."
   }
  ]
 }
