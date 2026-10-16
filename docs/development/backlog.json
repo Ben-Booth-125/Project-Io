@@ -1268,6 +1268,28 @@
    ],
    "title": "Provisional Digitisation nodes that raise market pull, for Ben to approve later",
    "design": "SPRINT 55 (Ben, 2026-10-16): \"We can add provisional techs for market pull and approve them later.\" The nodes grant the market-pull modifier BL-1346 reads, and unlock the building family in BL-1349. PROVISIONAL by Ben's own word: file them as the tree's placeholder kind (RESEARCH.md section The grammar of an age's tree) so the tree stays honest about what is authored and what is pending approval. The store is canonical - add them with node tools/session/tech_tree_store.js and re-render DIGITISATION_TREE.md's tables from it; never hand-edit the mirror, and run tech_tree_store.js --check after. Report the node count (160 before) and which branch each node joins."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"); filed by Claude",
+   "id": "BL-1351",
+   "short_name": "GENERATION_SEEDS_LOGISTICS",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [],
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "title": "Generation seeds no inland logistics hub, so with cities making no points a landlocked nation has none at all",
+   "design": "SPRINT 55 (Ben, 2026-10-16). CONFIRMED BY READING: corporation_generation.cpp's building mixes (extraction_mix / processing_mix / trade_mix, around :305) contain ports but NO inland_logistics_hub; the hub appears only as a placement SCORE at :449. hard_coded_world.cpp and landscape_search.cpp never name it. Meanwhile LOGISTICS.md section One pool (Ben, 2026-10-14) made buildings the only source and ruled 'Cities make none' - and the older constraint 4 in the same doc had warned that city generation was 'what makes the rate real' precisely because no corp is seeded a hub. So the 2026-10-14 ruling removed the only source the generated world had: a landlocked nation now has zero Logistic Points, and a coastal one has them only at its ports. THE WORK: generation places logistics sources so every nation has points across its ground - hubs at market centres and the capital, outlying hubs to extend reach, ports where the coast allows, stations where rail runs. This is also what makes Ben's verification picture possible (a centralised capital with high points, diminishing with distance, extended by outlying hubs). Measure per nation before and after: sources seeded, tiles covered, and the LP a nation makes; then market_viability and haulage_measure --far-trade, since production consumes points."
   }
  ]
 }
