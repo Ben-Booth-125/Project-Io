@@ -596,11 +596,16 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
     const uint32_t body_seed = params.seed ^ prototype_body_seed(1);
     const planetology_state st = run_planetology(in, rw.params, body_seed);
 
+    // BL-1339: the Life round's reroll moves the LAND, not the chain. Folded
+    // here exactly as plan_body folds it for the homeworld, so the preview is
+    // still the world (planetology.hpp sec home_land_roll_fold).
+    const uint32_t land_fold = home_land_roll_fold(params.preferences);
+
     continent_state cs = run_continents(st, home_grid_width, home_grid_height,
-                                        body_seed ^ 0xC0117E57u);
+                                        body_seed ^ 0xC0117E57u ^ land_fold);
 
     const uint32_t tile_seed = choose_home_tile_seed(st, cs.height_bias, cs.convergent,
-                                                     params.seed, deposit_scalar);
+                                                     params.seed ^ land_fold, deposit_scalar);
     generation_record record;
     std::vector<entity_id> tiles =
         generate_body_tiles(w, body, home_grid_width, home_grid_height,
@@ -765,7 +770,18 @@ planetology_state plan_body(generation_cursor& c, int proto_index, entity_id bod
     const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
     planetology_state st = run_planetology(in, rw.params, body_seed);
 
-    continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
+    // BL-1339 -- THE LIFE REROLL MOVES THE HOME BODY'S LAND. The fold reaches
+    // the CONTINENTS pass only, and only on the homeworld: the chain above it
+    // has already run, so every value the System round showed the player
+    // (mass, metallicity, theta, mobile_lid, the archetype, the endowments,
+    // and therefore the plate COUNT and drift SPEED derived from the thermal
+    // budget) is bit-identical across any number of Life rolls. What moves is
+    // where the plates sit, which way they drift, which are oceanic, and the
+    // `height_bias` field that follows -- the land shape, which is the Life
+    // round's own subject (planetology.hpp sec home_land_roll_fold). The other
+    // bodies are the System round's drawing and keep their seeds.
+    const uint32_t land_fold = in.is_homeworld ? home_land_roll_fold(params.preferences) : 0u;
+    continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u ^ land_fold);
     st.history.insert(st.history.end(),
                       std::make_move_iterator(cs.history.begin()),
                       std::make_move_iterator(cs.history.end()));
@@ -1039,8 +1055,14 @@ void run_life_gate(generation_cursor& c)
     // Reject-and-reroll acceptance gate (BL-276) — extracted to
     // choose_home_tile_seed above, SHARED with the wizard's real-tile preview
     // so both choose the same seed by running the same code.
+    // The Life reroll is folded into the gate's seed too (BL-1339): the plate
+    // bias is half the coastline and the Pass-1 noise is the other half, so a
+    // reroll that moved only the bias would still hand back a recognisable
+    // raster. Zero-neutral, so attempt 0 of an unrerolled world is the seed it
+    // always was.
     const uint32_t kepler_tile_seed = choose_home_tile_seed(
-        kepler_pl, kepler_bias, kepler_convergent, params.seed, deposit_scalar);
+        kepler_pl, kepler_bias, kepler_convergent,
+        params.seed ^ home_land_roll_fold(params.preferences), deposit_scalar);
 
     // TWO MORE HARDCODED 180/84 LIVED HERE UNTIL 2026-08-12 (this call and the
     // river pass below). They were the ones that actually mattered: setting

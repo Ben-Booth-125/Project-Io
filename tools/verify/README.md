@@ -1035,6 +1035,32 @@ differ while presence does not — the series moves by about a percent over the 
 the check is sized to that honestly rather than to a swing the physics does not give. D7/D8 hold
 the world to still feeding and fuelling itself after the split.
 
+## life_reroll — BL-1339, does the wizard's Life Reroll give another world?
+
+The Life round's Reroll bumps `world_preferences::roll[1]`, whose only consumer was
+`resolve_preferences`' Life stream: `home_ocean`, `oxygenation`, `coal_climate`. The continents pass
+is seeded off the body seed and reads `theta` / `mobile_lid`, which the System round owns — so sea
+level and the oxygen story moved and the LAND did not (Ben, 2026-10-16: "I'm still getting similar
+landmasses either way"). `home_land_roll_fold` (`planetology.hpp`) folds `roll[1]` into the home
+body's continents seed and the BL-276 acceptance gate's tile seed, and nothing else.
+
+R1 the same roll reproduces its world · R2/R4 eight rolls give eight distinct land rasters,
+`height_bias` fields and plate assignments, measured on the shipped
+`generate_home_surface_preview` · **R3 is the load-bearing row** — a different digest is not a
+different map, so every roll must move >= 10% of the land/sea mask (measured 37–58%) · R5 the
+System round's accepted values, the plate COUNT and the drift SPEED are bit-identical across the
+rolls, with the drift speed checked against the value CONTINENTS.md derives from `theta` rather than
+against a sibling roll · R6 roll 0 folds to exactly 0, so goldens, fixtures and the curated seeds
+keep their worlds, and the first 64 rolls fold to 64 distinct values.
+
+R5 is conditioned honestly: `resolve_preferences` folds the ATTEMPT index into all three streams, so
+a Life roll that changes the attempt count moves the System draws too. That is pre-existing — it was
+already true of the three Life draws — and is reported per roll rather than asserted away.
+
+```
+node tools/verify/build_harness.js life_reroll --run
+```
+
 ## continent_drift — BL-763/BL-764, the drift time axis and the Lagrangian frame
 
 C-rows check the drift clock: a stated epoch length and depth, and `continent_snapshot_at`
