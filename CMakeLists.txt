@@ -276,6 +276,27 @@ target_link_libraries(ProjectIo PRIVATE
 # on the compiler command line so it precedes any header parsing.
 target_compile_definitions(ProjectIo PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
 
+# The play log's build stamp (src/core/play_log.cpp): the commit this build tree
+# was CONFIGURED at, written to a generated header so no define moves the PCH.
+# Refreshed on reconfigure only — the header field is named for what it is.
+# No git, no header: play_log.cpp checks __has_include and omits the field.
+find_package(Git QUIET)
+if(GIT_EXECUTABLE)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE IO_BUILD_GIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+    if(IO_BUILD_GIT_HASH)
+        file(WRITE "${CMAKE_BINARY_DIR}/generated/io_build_info.hpp.tmp"
+             "#pragma once\n#define IO_BUILD_GIT_HASH \"${IO_BUILD_GIT_HASH}\"\n")
+        file(COPY_FILE "${CMAKE_BINARY_DIR}/generated/io_build_info.hpp.tmp"
+             "${CMAKE_BINARY_DIR}/generated/io_build_info.hpp" ONLY_IF_DIFFERENT)
+        target_include_directories(ProjectIo PRIVATE "${CMAKE_BINARY_DIR}/generated")
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # Compiler warnings (BL-101) — advisory diagnostics on OWNED targets only
 # ---------------------------------------------------------------------------

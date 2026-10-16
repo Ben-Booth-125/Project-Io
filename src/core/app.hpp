@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include "agent_seam.hpp"
 #include "ground_layer.hpp" // BL-732: baked-ground chunk cache
+#include "play_log.hpp"     // the seated session's write-only play log
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
@@ -1313,6 +1314,19 @@ private:
     /// listener only when --host-agent asks for one). Set via host_agent().
     uint16_t   m_agent_port = 0;
     agent_seam m_agent_seam; ///< The loopback listener + tick-boundary drain.
+
+    // --- The play log (core/play_log.hpp) -----------------------------------
+    /// A seated session's write-only record of the human's commands and every
+    /// nation's quarter, for tools/session/play_vs_ai.js. Never read by the sim.
+    play_log m_play_log;
+    /// Whether this run may open one: app::run (unless IO_PLAY_LOG=0) and the
+    /// headless --autostart (only when IO_PLAY_LOG=1). --verify never sets it.
+    bool     m_play_log_allowed = false;
+    /// Open the play log as play opens, when allowed and somebody is seated.
+    void open_play_log(const std::string& loaded_from);
+    /// apply_corp_command for a HUMAN press, recorded in the play log. Every
+    /// player press in app.cpp goes through here, so the log sees every control.
+    corp_command_result player_command(const corp_command& cmd, entity_id* out_building = nullptr);
 };
 
 namespace ui { class frame_stats; }

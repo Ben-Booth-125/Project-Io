@@ -79,3 +79,6 @@ tools/session/.timer_state
 
 # BL-1325: --spectate-headless output
 spectate_runs/
+
+# The play log: one JSONL per seated session (src/core/play_log.hpp)
+play_logs/
