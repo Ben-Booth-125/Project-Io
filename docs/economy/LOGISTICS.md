@@ -686,9 +686,12 @@ not how far*, distance priced in credits and only in credits (§ Three rules tha
 constraint 3), the rule NR-620 measured at a 73% collapse in convoy traffic when a distance draw
 was tried.
 
-**A march draws on the nation's pool too (Ben, 2026-10-16).** Movement a player or rival directs
-competes with production for the same points, so guns and butter compete in one currency, as the
-single-pool reasoning always argued they should.
+**A march draws on the nation's pool too, and claims first (Ben, 2026-10-16).** Movement a
+player or rival directs draws the same points production does, so guns and butter compete in one
+currency. **The march claims before production does** — Ben's 2026-09-24 ruling kept literally now that
+its other half is gone: it arbitrated the army against *trade*, and trade draws nothing at all any
+more, so first-claim today means a campaign is supplied before the factories behind it. A
+campaign visibly starving its own industry is the intended, legible cost of marching.
 - Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
   **new** stations; generated rail still passes as § 4c says.
 
