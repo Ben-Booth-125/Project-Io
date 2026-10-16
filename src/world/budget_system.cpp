@@ -474,7 +474,10 @@ void apply_budget(world& w,
         qr.upkeep      = bud.upkeep;
         qr.refunds     = refunds;
         qr.taxes       = bud.taxes; // BL-1335
-        qr.net        = cc.balance - opening_balance; // the exact delta applied
+        // The exact delta applied, differenced in DOUBLE (BL-1337): a float
+        // subtraction rounds when the balance crosses zero, and the filed net
+        // then misses the movement by up to an ULP of the larger balance.
+        qr.net = static_cast<double>(cc.balance) - static_cast<double>(opening_balance);
         qr.balance     = cc.balance;
         qr.holdings    = static_cast<uint32_t>(cc.assets.size());
         qr.book_value  = book_value;

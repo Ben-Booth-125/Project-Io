@@ -899,6 +899,7 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         // BL-1335 (v52): the tax section after them (count + 9 bytes a nation
         // whose tier or Discontent moved off the default).
         tail += world_save_tax_section_bytes(c);
+        tail += world_save_net_section_bytes(c); // BL-1337 (v54): the exact nets, last
         std::string v48 = b.substr(0, b.size() - tail);
         const uint32_t ver = k_world_save_version_pre_rail;
         std::memcpy(&v48[4], &ver, sizeof ver);

@@ -1814,7 +1814,8 @@ void app::finish_new_game()
         {
             const std::vector<quarterly_return>& rs = pit->second.returns;
             ui::push_capped(m_balance_history,
-                            rs.empty() ? pit->second.balance : rs.front().balance - rs.front().net);
+                            rs.empty() ? pit->second.balance
+                                       : static_cast<float>(rs.front().balance - rs.front().net));
             for (const quarterly_return& r : rs)
             {
                 ui::push_capped(m_balance_history, r.balance);
