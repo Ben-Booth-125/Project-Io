@@ -1170,6 +1170,27 @@ void write_world_snapshot(const world& w, std::ostream& out)
             w_f32(out, a.launch_cost);
         }
     }
+
+    // BL-1335 (world_save_version 52): TAXES AND DISCONTENT, a trailing section
+    // after the space assets -- every nation whose (tier, Discontent) differs
+    // from the opening default, ascending id, as (id, u8 tier, f32 discontent).
+    // A world where no nation has moved writes one empty count. A v51 (and
+    // older) stream ends before it.
+    {
+        std::vector<entity_id> moved;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f)
+                moved.push_back(nid);
+        std::sort(moved.begin(), moved.end());
+        w_u32(out, static_cast<uint32_t>(moved.size()));
+        for (const entity_id nid : moved)
+        {
+            const nation_component& nc = w.nations.at(nid);
+            w_id(out, nid);
+            w_u8(out, static_cast<uint8_t>(nc.tax_tier));
+            w_f32(out, nc.discontent);
+        }
+    }
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1191,7 +1212,8 @@ bool read_world_snapshot(world& w, std::istream& in)
         || (version != world_save_version && version != k_world_save_version_pre_lp
             && version != k_world_save_version_pre_rail
             && version != k_world_save_version_pre_state
-            && version != k_world_save_version_pre_space))
+            && version != k_world_save_version_pre_space
+            && version != k_world_save_version_pre_tax))
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1527,7 +1549,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // range; arrival at or after launch; upkeep finite and non-negative; the
     // unpaid count non-negative. Refused whole otherwise. A v50 (and older)
     // stream ends before it: a world with no space assets.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_tax) // v51 and v52 carry it
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > max_count)
@@ -1584,6 +1606,32 @@ bool read_world_snapshot(world& w, std::istream& in)
                 return false;
             a.id = aid;
             s.space_assets.emplace_hint(s.space_assets.end(), aid, a);
+        }
+    }
+
+    // BL-1335 (v52): taxes and Discontent. Untrusted: each names a nation in
+    // the stream, strictly ascending, with a tier in 1..5 and a Discontent
+    // finite in [0, 1]. Refused whole otherwise. A v51 (and older) stream ends
+    // before it: every nation at tier III with no Discontent (the defaults).
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid  = null_entity;
+            uint8_t   tier = 0;
+            float     d    = 0.0f;
+            if (!r_id(in, nid) || !r_u8(in, tier) || !r_f32(in, d))
+                return false;
+            if (nid == null_entity || (k > 0 && nid <= prev) || s.nations.count(nid) == 0
+                || !tax_tier_valid(static_cast<int>(tier)) || !discontent_valid(d))
+                return false;
+            prev = nid;
+            s.nations.at(nid).tax_tier   = static_cast<int>(tier);
+            s.nations.at(nid).discontent = d;
         }
     }
 

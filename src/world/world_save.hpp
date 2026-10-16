@@ -434,7 +434,18 @@ inline constexpr uint32_t world_save_magic =
 /// unpaid quarters, launch cost). Nothing else moves, so v50 is a STRICT PREFIX of v51 and is
 /// read too (`k_world_save_version_pre_space`), as a world with no space assets;
 /// v49, v48 and v47 still read. Every other version is refused.
-inline constexpr uint32_t world_save_version = 51;
+/// Bumped to 52 by BL-1335 (taxes and Discontent; NATIONS.md § Taxes and
+/// Discontent, Ben 2026-10-16): a TRAILING SECTION after the space assets --
+/// each nation whose tax state differs from the opening default (tier III,
+/// Discontent 0), ascending id, as (id, u8 tier, f32 discontent). Nothing else
+/// moves, so v51 is a STRICT PREFIX of v52 and is read too
+/// (`k_world_save_version_pre_tax`), as a world where every nation stands at
+/// tier III with no Discontent; v50 down to v47 still read. Every other version
+/// is refused.
+inline constexpr uint32_t world_save_version = 52;
+
+/// BL-1335: v51, a strict prefix of v52 (the tax section is v52's only addition).
+inline constexpr uint32_t k_world_save_version_pre_tax = 51;
 
 /// BL-1327: v50, a strict prefix of v51 (the space-asset section is v51's only addition).
 inline constexpr uint32_t k_world_save_version_pre_space = 50;

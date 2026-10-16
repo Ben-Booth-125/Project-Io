@@ -43,6 +43,7 @@
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
@@ -413,7 +414,10 @@ int main()
 
         // v50: the stream less the space section (count + n x 35-byte records), stamped 50.
         const std::size_t rec = 4 + 4 + 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4;
-        const std::size_t tail = 4 + w.space_assets.size() * rec;
+        // BL-1335 (v52): the tax section follows the space section (count + 9
+        // bytes a nation whose tier or Discontent moved), so both come off; the
+        // record offsets below still count from the space section's start.
+        const std::size_t tail = 4 + w.space_assets.size() * rec + 4 + 9 * static_cast<std::size_t>(std::count_if(w.nations.begin(), w.nations.end(), [](const auto& kv) { return kv.second.tax_tier != k_default_tax_tier || kv.second.discontent != 0.0f; }));
         std::string v50 = b.substr(0, b.size() - tail);
         const std::uint32_t pre = k_world_save_version_pre_space;
         std::memcpy(&v50[4], &pre, sizeof pre);

@@ -2,6 +2,7 @@
 
 #include "entity.hpp"
 #include "nation_budget.hpp"
+#include "nation_tax.hpp" // BL-1335: tax_params, tax_ai_pick (header-only)
 
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 
 struct world;
 class recipe_registry;
+struct economy_report;
 
 // ---------------------------------------------------------------------------
 // The nation scorer (BL-542) — what a nation CARES ABOUT
@@ -378,3 +380,40 @@ int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating
 /// only what the queue owed. Returns how many nodes it queued.
 int run_nation_research_repick(world& w, const recipe_registry& reg, bool spectating,
                                std::vector<research_ai_pick>* out = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-1335 — THE NATION'S TAX TIER (NATIONS.md § Taxes and Discontent; the
+// 2026-08-18 grant: "a nation setting a tariff or tax rate"). One tier step per
+// scoring cadence at most, on the budget scorer's own stagger. Pure, seeded,
+// deterministic, never a planner: the pick reads this quarter's observable
+// state and the one-cadence projection of Discontent at a tier, keeps nothing.
+// ---------------------------------------------------------------------------
+
+/// The next tier for a nation at @p tier with Discontent @p discontent. The
+/// projection of a tier t is `discontent + pressure(t) x cadence_k` — where
+/// Discontent stands at the next scoring if the tier is held — and the limit is
+/// `bite_threshold - ai_headroom`. In order:
+///   1. the current tier's projection passes the limit -> one tier DOWN (lower
+///      as Discontent nears the threshold);
+///   2. @p budget_short and the next tier up stays within the limit -> one UP
+///      (raise when the budget asks for more than the treasury funds and
+///      Discontent is low);
+///   3. not short and above the neutral tier -> one DOWN (no need for it);
+///   4. not short and below the neutral tier -> one UP (back to neutral, if the
+///      projection stays within the limit);
+///   5. otherwise hold.
+int choose_tax_tier(int tier, float discontent, bool budget_short, const tax_params& p,
+                    int cadence_k);
+
+/// Whether @p nation's budget asked for more than its treasury funded this
+/// quarter: a line of the national budget rationed against real demand, or
+/// the research line spending its whole share while the queue still owed.
+bool nation_budget_short(const economy_report& report, entity_id nation);
+
+/// The quarterly pass, after the rest of the nation step: every nation DUE on
+/// `econ_tick` (the budget scorer's stagger over the sorted nation set) moves
+/// to `choose_tax_tier`'s pick through `set_nation_tax_tier`, the verb's own
+/// door. NEVER the player's nation in a seated session; under @p spectating it
+/// is scored like any nation. Returns how many tiers moved.
+int run_nation_tax_ai(world& w, const recipe_registry& reg, const economy_report& report,
+                      int econ_tick, bool spectating, std::vector<tax_ai_pick>* out = nullptr);

@@ -530,6 +530,8 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
                   << ", \"majors_held\": " << majors
                   << ", \"research_queue\": " << queued
                   << ", \"rp_pool\": " << json_num(static_cast<double>(pool_milli) / 1000.0)
+                  << ", \"tax_tier\": " << nc.tax_tier              // BL-1335
+                  << ", \"discontent\": " << json_num(nc.discontent) // BL-1335
                   << "}";
             first_n = false;
         }
@@ -560,6 +562,8 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
 
         if (k % 4 != 0) continue;
         const int year = epoch + k / 4;
+        double sales_sum = 0.0; // BL-1335 readout: the year's corp sales, before record_year resets it
+        for (const auto& [n, v] : sales_year) sales_sum += v;
         record_year(year, k);
         if ((year - epoch) % 10 == 0 || year == until_year)
         {
@@ -575,10 +579,21 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
                 if (w.nations.at(n).treasury < 0.0f) ++neg;
             }
             for (const auto& [n, ts] : w.nation_tech) held += static_cast<int>(ts.held.count());
+            // BL-1335: the tax tiers (median) and how many nations' Discontent bites.
+            std::vector<int> tiers;
+            int biting = 0;
+            for (const entity_id n : nation_ids)
+            {
+                tiers.push_back(w.nations.at(n).tax_tier);
+                if (w.nations.at(n).discontent > 0.5f) ++biting;
+            }
+            std::sort(tiers.begin(), tiers.end());
+            const int median_tier = tiers.empty() ? 0 : tiers[tiers.size() / 2];
             std::printf("[spectate-headless] %d: %.1f s wall | treasury sum %.0f (%d negative) | "
-                        "tech held %d | corps %zu | state_hash=%016llX\n",
-                        year, secs, treas, neg, held, w.corporations.size(),
-                        static_cast<unsigned long long>(w.state_hash(w.current_day_tick)));
+                        "tech held %d | corps %zu | corp sales %.0f | median tax tier %d | "
+                        "discontent>0.5 %d | state_hash=%016llX\n",
+                        year, secs, treas, neg, held, w.corporations.size(), sales_sum, median_tier,
+                        biting, static_cast<unsigned long long>(w.state_hash(w.current_day_tick)));
             std::fflush(stdout);
         }
     }

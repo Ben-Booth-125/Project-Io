@@ -1,6 +1,8 @@
 #include "nation_ai.hpp"
 
 #include "components.hpp"
+#include "economy_system.hpp" // BL-1335: economy_report (the tax scorer's budget read)
+#include "nation_step.hpp"     // BL-1335: set_nation_tax_tier
 #include "hex_neighbors.hpp"
 #include "nation_tech.hpp"     // BL-1275: the research pick's verb and reads
 #include "placement_rules.hpp" // BL-1275: is_depositless_site (the named-site scope)
@@ -1242,4 +1244,77 @@ int run_nation_research_repick(world& w, const recipe_registry& reg, bool specta
         }
     }
     return queued;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1335 — the tax tier scorer. Contract in nation_ai.hpp.
+// ---------------------------------------------------------------------------
+
+int choose_tax_tier(int tier, float discontent, bool budget_short, const tax_params& p,
+                    int cadence_k)
+{
+    const int   t     = tax_tier_valid(tier) ? tier : k_default_tax_tier;
+    const float k     = static_cast<float>(std::max(1, cadence_k));
+    const float limit = p.bite_threshold - p.ai_headroom;
+    const auto  proj  = [&](int at) {
+        return discontent + p.pressure[tax_tier_index(at)] * k;
+    };
+
+    if (proj(t) > limit && t > k_tax_tier_min)
+        return t - 1;
+    if (budget_short)
+        return (t < k_tax_tier_max && proj(t + 1) <= limit) ? t + 1 : t;
+    if (t > k_default_tax_tier)
+        return t - 1;
+    if (t < k_default_tax_tier && proj(t + 1) <= limit)
+        return t + 1;
+    return t;
+}
+
+bool nation_budget_short(const economy_report& report, entity_id nation)
+{
+    for (const nation_budget_result& r : report.national_budget.nations)
+    {
+        if (r.nation != nation)
+            continue;
+        for (const budget_line_result& l : r.lines)
+            if (l.rationed && l.demand > 0.0f)
+                return true;
+    }
+    for (const research_accrual& a : report.research)
+        if (a.nation == nation && a.line_share > 0.0f && a.line_spend >= a.line_share
+            && a.owed_milli > 0)
+            return true;
+    return false;
+}
+
+int run_nation_tax_ai(world& w, const recipe_registry& reg, const economy_report& report,
+                      int econ_tick, bool spectating, std::vector<tax_ai_pick>* out)
+{
+    const std::vector<entity_id> ids = sorted_nation_ids(w);
+    const int k = std::max(1, reg.nation_ai().cadence_k);
+    // The player's nation is never scored in a seated session; under spectate
+    // nobody is seated (AI_OPPONENT.md § 10i) and it is scored like any nation.
+    const entity_id seated = spectating ? null_entity : player_nation(w);
+    int moved = 0;
+    for (std::size_t index = 0; index < ids.size(); ++index)
+    {
+        const entity_id n = ids[index];
+        if (n == seated)
+            continue;
+        if ((econ_tick % k) != (static_cast<int>(index) % k)) // nation_is_due's stagger
+            continue;
+        const nation_component& nc = w.nations.at(n);
+        tax_ai_pick pick;
+        pick.nation     = n;
+        pick.tier_from  = nc.tax_tier;
+        pick.discontent = nc.discontent;
+        pick.short_     = nation_budget_short(report, n);
+        pick.tier_to    = choose_tax_tier(nc.tax_tier, nc.discontent, pick.short_, reg.tax(), k);
+        if (pick.tier_to != pick.tier_from && set_nation_tax_tier(w, n, pick.tier_to))
+            ++moved;
+        if (out)
+            out->push_back(pick);
+    }
+    return moved;
 }

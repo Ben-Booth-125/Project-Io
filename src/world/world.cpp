@@ -253,6 +253,24 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1335: taxes and Discontent — sparse and sorted, only the nations whose
+    // (tier, Discontent) differs from the opening default, so a world where no
+    // tier has moved and no Discontent has built hashes exactly as before.
+    {
+        std::vector<entity_id> moved;
+        for (const auto& [nid, nc] : nations)
+            if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f)
+                moved.push_back(nid);
+        std::sort(moved.begin(), moved.end());
+        for (const entity_id nid : moved)
+        {
+            fnv1a_u32(h, 0x7A8Eu);
+            fnv1a_u32(h, nid);
+            fnv1a_u32(h, static_cast<uint32_t>(nations.at(nid).tax_tier));
+            fnv1a_f32(h, nations.at(nid).discontent);
+        }
+    }
+
     // BL-1265: corporations hold no pools — every good is on a market's shelf,
     // folded with the markets above.
 

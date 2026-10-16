@@ -115,10 +115,17 @@ struct corp_budget
     /// is the line that explains it.
     float subsidies   = 0.0f;
 
+    /// BL-1335: the tax this firm paid its home nation this tick — the tier's
+    /// rate of the money loop's operating profit (NATIONS.md § Taxes and
+    /// Discontent). A TRANSFER: the same float landed in the treasury. Debited
+    /// by the nation step after apply_budget, like `subsidies` is credited.
+    float taxes       = 0.0f;
+
     /// The per-tick balance delta: income less every outflow.
     float net() const
     {
-        return income + subsidies - expenditure - maintenance - wages - interest - levies - upkeep;
+        return income + subsidies - expenditure - maintenance - wages - interest - levies - upkeep
+               - taxes;
     }
 };
 
@@ -497,6 +504,14 @@ struct economy_report
     /// paid or unpaid. Both debits are direct treasury expenditures, credited
     /// to nobody; this is the treasury ledger's line for them.
     space_asset_step_report space_assets;
+
+    /// BL-1335 (NATIONS.md § Taxes and Discontent): each nation's tax quarter —
+    /// tier, credits taken, Discontent before and after. Ascending nation id.
+    std::vector<nation_tax_row> taxes;
+
+    /// BL-1335: what the tax scorer weighed for each nation DUE this quarter
+    /// (the seat's nation never, in play). Ascending nation id.
+    std::vector<tax_ai_pick> tax_picks;
 
     /// Which firms the insolvency wind-up erased this tick (BL-743), with the
     /// written-off balance and what was liquidated. Report-only — the lapse
@@ -937,8 +952,11 @@ inline int step_workforce_target(int current, int best)
 /// each output scaled by @p corp's home nation's held processing_yield
 /// modifiers (BL-1274). Returns the units landed. The one place a processor's
 /// output accrues; exported so a harness can measure a yield node there.
+/// @p ground_tile (BL-1335): the building's tile — its nation's Discontent cuts
+/// every output (`discontent_output_scalar`); `null_entity` applies none.
 float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id corp,
-                                entity_id market, const recipe& rcp, float batches);
+                                entity_id market, const recipe& rcp, float batches,
+                                entity_id ground_tile = null_entity);
 
 /// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
 /// step 25) that maximises this building's estimated net this tick against the

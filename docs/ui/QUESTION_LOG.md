@@ -24,7 +24,7 @@ alphabetical order.
 
 **Answers:** Where is my money going, and how long do I have?
 
-**Because:** apply_budget nets six flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages, interest and levies is what makes bankruptcy something to act on rather than discover. BL-343 added the Laws section beneath the policy levers: the first law that is not a stub sits directly under the two that are, so the difference between a drawn lever and a working one is visible in one glance.
+**Because:** apply_budget nets six flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages, interest and levies is what makes bankruptcy something to act on rather than discover. BL-343 added the Laws section beneath the policy levers: the first law that is not a stub sat directly under the two that were, so the difference between a drawn lever and a working one is visible in one glance. BL-1335 (NATIONS.md § Taxes and Discontent, Ben 2026-10-16) wired Taxes: it is the player's NATION's tax tier, the share of its home firms' income the nation takes each quarter, with the nation's Discontent beside it - because a high tier's cost arrives two years later as lost output on the nation's ground, the cause and its consequence sit on one line. Wages stays the one drawn lever, and the disabled line under it now names only Wages.
 
 *Demanded by BL-074, BL-112, BL-122, BL-343 · `src/ui/balance_ledger.cpp` · id `balance_ledger`*
 

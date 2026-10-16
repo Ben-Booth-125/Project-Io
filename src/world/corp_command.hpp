@@ -176,6 +176,13 @@ enum class corp_verb : uint8_t
     // Acts for `as_nation` and only when `corp` IS the seat and the nation's
     // champion: no grant lets an AI nation set shares, so corp_ai.cpp never issues it.
     set_logistics_shares, ///< `order` 0: nation `as_nation` shares its LP: state `quantity`, champion `floor_price`, other 1 - both (each in [0,1], the two summing to <= 1). `order` 1: clear the rule (back to mechanical; both shares 0). rejected_invalid on any other value; rejected_state clearing a rule never set.
+    // --- BL-1335: the nation's tax tier joins the seam (2026-10-16) ---
+    // Appended AFTER set_logistics_shares, same append-only rule. NATIONS.md
+    // § Taxes and Discontent: the player sets its nation's tax tier on the
+    // Budget ledger's Taxes control. Acts for `as_nation` and only when `corp`
+    // IS the seat and the nation's champion; an AI nation's tier is set by its
+    // own scorer (run_nation_tax_ai, the 2026-08-18 grant), never by corp_ai.
+    set_tax_tier,         ///< Nation `as_nation`'s tax tier := `order` (1..5, I..V). rejected_invalid on any other `order`, or with no `as_nation`; rejected_not_owner unless `corp` is the seat and the nation's champion.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -185,7 +192,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_logistics_shares) + 1;
+    static_cast<uint8_t>(corp_verb::set_tax_tier) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

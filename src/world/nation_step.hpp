@@ -96,6 +96,33 @@ struct earmark_result
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
                      int econ_tick, bool spectating = false);
 
+// ---------------------------------------------------------------------------
+// BL-1335 — TAXES AND DISCONTENT (NATIONS.md § Taxes and Discontent)
+// ---------------------------------------------------------------------------
+
+/// Set @p nation's tax tier to @p tier. The one door both the player's verb
+/// (`set_tax_tier`, corp_command.cpp) and the AI tier scorer (nation_ai.cpp)
+/// write through. False — and nothing mutated — for an unknown nation or a
+/// tier outside 1..5.
+bool set_nation_tax_tier(world& w, entity_id nation, int tier);
+
+/// The quarter's tax and Discontent, the nation step's first move (so the tax
+/// joins what this quarter's budget spends). For every corporation in
+/// `report.budgets` (ascending id) headquartered in a nation: the operating
+/// profit its money loop earned this tick — `income - expenditure -
+/// maintenance - wages - interest - levies - upkeep`, the flows apply_budget
+/// just computed, never the filed return — times its home nation's tier rate,
+/// when positive, is debited from the firm and credited to the treasury, the
+/// same float in the same tick, and booked on `report.budgets[corp].taxes`.
+/// Then every nation (ascending id) takes its tier's Discontent pressure,
+/// clamped to [0, 1]. One `report.taxes` row per nation.
+void run_nation_taxes(world& w, const tax_params& p, economy_report& report);
+
+/// The output multiplier Discontent puts on a building standing on @p tile:
+/// `1 - discontent_penalty(D)` of the nation whose GROUND the tile is (any
+/// owner), exactly 1.0f on ground no nation holds or below the bite threshold.
+float discontent_output_scalar(const world& w, entity_id tile, const tax_params& p);
+
 /// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): record each off-book WANT the
 /// state purchase derivations returned as an unposted bid
 /// (`note_unposted_bid`) at its market, at `w.current_econ_tick`. A row with no

@@ -987,6 +987,32 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_space_programme = sp;
     }
 
+    // BL-1335 the tax tiers and Discontent dials (economy.tax; NATIONS.md
+    // § Taxes and Discontent). The strict read: every value finite and in its
+    // range, rejected by key otherwise; an absent table (or key) keeps the
+    // tax_params default. Flat keys (rate_1..rate_5, pressure_1..pressure_5) so
+    // each is one checked number.
+    sol::optional<sol::table> tax_tbl = (*econ)["tax"];
+    if (tax_tbl)
+    {
+        const std::string ctx = "economy.tax";
+        tax_params        tp  = m_tax;
+        const sol::table& t   = *tax_tbl;
+        static const char* const k_rate[k_tax_tier_count] = {"rate_1", "rate_2", "rate_3", "rate_4", "rate_5"};
+        static const char* const k_press[k_tax_tier_count] = {"pressure_1", "pressure_2", "pressure_3",
+                                                              "pressure_4", "pressure_5"};
+        for (int i = 0; i < k_tax_tier_count; ++i)
+        {
+            read_checked(t, k_rate[i],  tp.rate[static_cast<std::size_t>(i)],     0.0, 1.0, ctx);
+            read_checked(t, k_press[i], tp.pressure[static_cast<std::size_t>(i)], -1.0, 1.0, ctx);
+        }
+        read_checked(t, "bite_threshold", tp.bite_threshold, 0.0, 1.0, ctx);
+        read_checked(t, "max_penalty",    tp.max_penalty,    0.0, 1.0, ctx);
+        read_checked(t, "ai_headroom",    tp.ai_headroom,    0.0, 1.0, ctx);
+
+        m_tax = tp;
+    }
+
     // BL-743 firm-exit trigger (economy.firm_exit). Strict read: the trigger
     // erases actors, so a NaN threshold would be a wind-up nobody can replay.
     // Absent table keeps the inert defaults — an unauthored world never exits

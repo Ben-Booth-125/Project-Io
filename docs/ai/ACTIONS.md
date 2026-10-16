@@ -1425,20 +1425,25 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Sort by Price to find the cheapest firm, by Profit/qtr to find the one whose filed return understates it, or by Ownership to collapse the ~85 undisclosed rows out of the way in one press.
 
-### `ledger.budget_tax_tier` — Balance Ledger (Budget), 'Taxes' tier control
+### `ledger.budget_tax_tier` — Balance Ledger (Budget), 'Taxes' tier control, with the nation's Discontent beside it. Also the command seam (--serve / MCP `issue_command` verb `set_tax_tier` with `nation`; the verify API's `corp_command{verb=set_tax_tier, as_nation=...}`).
 
-**Press.** Click '-' / '+' to step, or a Roman numeral I-V to set, the tax tier
+**Press.** UI: click '-' / '+' to step, or a Roman numeral I-V to set, the tier; the press issues corp_verb 38 (`set_tax_tier`) with `corp` = the seat, `nation` = the seat's home nation and `order` = the tier. Seam: issue the same command directly.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tier` | `int 1-5` | Target tax tier; arrows step by one, numerals jump directly |
+| `nation` | `entity_id (wire key `nation`; corp_command::as_nation)` | The nation whose tax tier is set: the seat's home nation. Omitted = the corporation's own book (rejected_invalid). |
+| `tier` | `uint 1-5 (wire key `order`)` | The tax tier I-V. The rate each tier takes of home firms' quarterly operating profit is a dial (economy.tax: I 0%, II 5%, III 10%, IV 15%, V 20%). |
 
 **Valid when:**
-- Balance Ledger is open
+- Balance Ledger is open (UI). Under spectate the row is shown but not pressable: the seat's nation is scored like any nation.
+- Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).
+- `corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): an AI nation's tier is set by its own tax scorer, never through this verb.
+- `order` is 1..5 (rejected_invalid otherwise).
+- A rejection mutates nothing.
 
-**Expected output.** The displayed tier changes and the active numeral highlights green. HONESTLY: this is a stub - it has NO economic effect yet (tax mechanics are owed to BL-155, the tooltip says so). Nothing else changes.
+**Expected output.** The nation's tier changes at once and the active numeral highlights green. From the next quarter the nation takes the tier's rate of the operating profit (money-loop income less every outflow, when positive) of every firm headquartered on its ground, into its treasury — a transfer, the firm debited what the treasury is credited. Each quarter Discontent moves by the tier's pressure: IV +6.25%, V +12.5%, III holds, II -6.25%, I -12.5%, within 0-100%. Above 50% every building on the nation's ground (any owner) loses output in proportion, up to 15% at 100% — the readout beside the control shows the reading and the cut. Tier IV bites after two years, V after one.
 
-**Reason to select.** Will eventually set fiscal policy; today it only answers 'what tier is dialled in' - selecting it changes no outcome.
+**Reason to select.** Fund the nation's budget (research, the space programme, works) from its own firms' profits; the price is Discontent, which costs the nation's ground output two years on at IV, sooner at V. Cut the tier to let Discontent ebb.
 
 ### `ledger.budget_wage_tier` — Balance Ledger (Budget), 'Wages' tier control
 

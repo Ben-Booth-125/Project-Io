@@ -437,6 +437,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::place_road:    return "road placement";
         case corp_verb::lay_track:     return "track laying"; // BL-1255
         case corp_verb::set_logistics_shares: return "logistics shares"; // BL-1309
+        case corp_verb::set_tax_tier:  return "tax tier"; // BL-1335
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";

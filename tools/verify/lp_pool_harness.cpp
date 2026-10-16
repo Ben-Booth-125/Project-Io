@@ -488,7 +488,10 @@ void mechanics(app_start_world& out, std::uint32_t seed)
               "L7", "v51 round-trips the share rule with an equal state_hash");
         // v49: the stream less its trailing section (u32 count + 1 x (id + 3 floats)),
         // and less BL-1327's v51 space-asset section after it (one empty count).
-        std::string b49 = b51.substr(0, b51.size() - (4 + 4 + 12) - 4);
+        // BL-1335 (v52): and less the tax section after that (count + 9 bytes a
+        // nation whose tier or Discontent moved).
+        const std::size_t tax_tail = 4 + 9 * static_cast<std::size_t>(std::count_if(c.nations.begin(), c.nations.end(), [](const auto& kv) { return kv.second.tax_tier != k_default_tax_tier || kv.second.discontent != 0.0f; }));
+        std::string b49 = b51.substr(0, b51.size() - (4 + 4 + 12) - 4 - tax_tail);
         const std::uint32_t v49 = k_world_save_version_pre_lp;
         std::memcpy(&b49[4], &v49, 4);
         world r49;
@@ -497,7 +500,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         // A bad share in the stream refuses it whole.
         std::string bad = b51;
         const float f = 0.9f;
-        std::memcpy(&bad[bad.size() - 8], &f, 4); // other := 0.9: the sum is 1.6 (before v51's 4-byte space count)
+        std::memcpy(&bad[bad.size() - 8 - tax_tail], &f, 4); // other := 0.9: the sum is 1.6 (before v51's 4-byte space count and v52's tax section)
         world rb;
         rb.current_econ_tick = 77;
         const bool okb = from_bytes(bad, rb);

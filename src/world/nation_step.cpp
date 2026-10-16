@@ -48,6 +48,12 @@ void record_market_wants(world& w, const std::vector<market_want>& wants)
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
                      int econ_tick, bool spectating)
 {
+    // ---- 0. Tax and Discontent (BL-1335, NATIONS.md § Taxes and Discontent):
+    // each nation takes its tier's share of its home firms' operating profit
+    // this quarter — first, so the tax is in the treasury this quarter's budget
+    // spends — and Discontent takes the tier's pressure.
+    run_nation_taxes(w, reg.tax(), report);
+
     // ---- 1. Score: the nations due this tick overwrite their slot -----------
     const nation_ai_params& p = reg.nation_ai();
     const std::map<entity_id, nation_budget> due =
@@ -193,6 +199,83 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // counted unpaid (decaying, then lost). Ascending asset id; an empty store
     // does nothing, so a world that never launched ticks as before.
     run_space_asset_step(w, reg.space_assets(), econ_tick, &report.space_assets);
+
+    // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
+    // whole budget (rationed lines, the research line) and the Discontent the
+    // quarter left. The tier it picks taxes from the next quarter. Never the
+    // player's nation in a seated session.
+    run_nation_tax_ai(w, reg, report, econ_tick, spectating, &report.tax_picks);
+}
+
+bool set_nation_tax_tier(world& w, entity_id nation, int tier)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || !tax_tier_valid(tier))
+        return false;
+    nit->second.tax_tier = tier;
+    return true;
+}
+
+void run_nation_taxes(world& w, const tax_params& p, economy_report& report)
+{
+    if (w.nations.empty())
+        return;
+
+    // The tax: ascending corp id (report.budgets is a std::map), so each
+    // treasury's credits land in a fixed float order.
+    std::map<entity_id, nation_tax_row> rows;
+    for (auto& [cid, b] : report.budgets)
+    {
+        const auto cit = w.corporations.find(cid);
+        if (cit == w.corporations.end())
+            continue;
+        corporation_component& cc = cit->second;
+        const auto nit = w.nations.find(cc.home_nation);
+        if (nit == w.nations.end())
+            continue;
+        const float profit =
+            b.income - b.expenditure - b.maintenance - b.wages - b.interest - b.levies - b.upkeep;
+        if (!std::isfinite(profit) || !(profit > 0.0f))
+            continue;
+        const float tax = profit * p.rate[tax_tier_index(nit->second.tax_tier)];
+        if (!std::isfinite(tax) || !(tax > 0.0f))
+            continue;
+        cc.balance            -= tax; // a TRANSFER: the same float,
+        nit->second.treasury  += tax; // the same tick
+        b.taxes               += tax;
+        nation_tax_row& r = rows[cc.home_nation];
+        r.collected += tax;
+        ++r.firms_taxed;
+    }
+
+    // Discontent: every nation, ascending id.
+    std::vector<entity_id> ids;
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id n : ids)
+    {
+        nation_component& nc = w.nations.at(n);
+        nation_tax_row r = rows.count(n) != 0 ? rows.at(n) : nation_tax_row{};
+        r.nation          = n;
+        r.tier            = nc.tax_tier;
+        r.discontent_from = nc.discontent;
+        nc.discontent     = discontent_after_quarter(nc.discontent, nc.tax_tier, p);
+        r.discontent_to   = nc.discontent;
+        report.taxes.push_back(r);
+    }
+}
+
+float discontent_output_scalar(const world& w, entity_id tile, const tax_params& p)
+{
+    const auto tn = w.tile_to_nation.find(tile);
+    if (tn == w.tile_to_nation.end())
+        return 1.0f;
+    const auto nit = w.nations.find(tn->second);
+    if (nit == w.nations.end())
+        return 1.0f;
+    return 1.0f - discontent_penalty(nit->second.discontent, p);
 }
 
 

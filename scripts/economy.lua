@@ -1051,6 +1051,27 @@ economy = {
         propellant_lump = 50.0, -- propellant per purchase
     },
 
+    -- BL-1335: taxes and Discontent (docs/politics/NATIONS.md § Taxes and
+    -- Discontent, Ben 2026-10-16). Each quarter a nation takes rate_<tier> of
+    -- the operating profit (money-loop income less every outflow, floored at 0)
+    -- of each firm headquartered on its ground — a transfer into its treasury.
+    -- Every nation opens at tier III, the neutral tier. pressure_<tier> is the
+    -- Discontent added per quarter (negative ebbs); binary fractions so tier IV
+    -- reaches the 0.5 bite threshold in exactly 8 quarters (two years) and
+    -- tier V in 4. Above the threshold every building on the nation's ground
+    -- loses max_penalty x (D - threshold) / (1 - threshold) of its output.
+    -- ai_headroom: an AI nation never steps to a tier whose one-year
+    -- projection carries Discontent past threshold - headroom. Loader bounds:
+    -- rates, threshold, penalty, headroom finite in [0, 1]; pressures in [-1, 1].
+    tax = {
+        rate_1 = 0.00, rate_2 = 0.05, rate_3 = 0.10, rate_4 = 0.15, rate_5 = 0.20,
+        pressure_1 = -0.125, pressure_2 = -0.0625, pressure_3 = 0.0,
+        pressure_4 = 0.0625, pressure_5 = 0.125,
+        bite_threshold = 0.5,
+        max_penalty    = 0.15,
+        ai_headroom    = 0.0625,
+    },
+
     -- BL-643: network upkeep — the logistics_maintenance budget line's
     -- consumer and the Infrastructure demand channel (MARKETS.md). Each tick a
     -- nation's road/hub network bills stone and timber at these rates

@@ -1004,12 +1004,12 @@ struct ui_state
     /// to the pre-BL-408 build.
     bool god_view = false;
 
-    // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
-    // The Tax and Wages tier selectors are drawn and selectable, but have NO economic
-    // effect yet — they carry the intended player levers (Tax = a player-set policy;
-    // Wages = a cost↔workforce trade-off) whose mechanics are designed under BL-155.
-    // Tiers run 1–5 (I–V); defaults match the mockup (Tax IV, Wages II).
-    int  budget_tax_tier  = 4;
+    // --- Budget ledger policy levers (BL-171 UI) ---
+    // Taxes is the player's NATION's tax tier (BL-1335): the control reads
+    // `nation_component::tax_tier` and a press is a set_tax_tier command, so it
+    // holds no state here. The Wages selector is still a stub with NO economic
+    // effect (a cost<->workforce trade-off designed under BL-155). Tiers run 1–5
+    // (I–V); the Wages default matches the mockup (II).
     int  budget_wage_tier = 2;
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 

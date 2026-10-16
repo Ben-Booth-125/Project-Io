@@ -786,6 +786,23 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
         return corp_command_result::applied;
     }
 
+    // BL-1335 (NATIONS.md § Taxes and Discontent): the nation's tax tier. The
+    // seat's alone in play — an AI nation's tier is its scorer's
+    // (run_nation_tax_ai), which writes through the same door,
+    // set_nation_tax_tier. `order` is the tier, validated as the value that
+    // lands (1..5) before anything mutates; out of range is rejected whole.
+    if (cmd.verb == corp_verb::set_tax_tier)
+    {
+        if (cmd.corp != w.player_entity)
+            return corp_command_result::rejected_not_owner;
+        if (cmd.order < static_cast<uint32_t>(k_tax_tier_min)
+            || cmd.order > static_cast<uint32_t>(k_tax_tier_max))
+            return corp_command_result::rejected_invalid;
+        return set_nation_tax_tier(w, nation, static_cast<int>(cmd.order))
+                   ? corp_command_result::applied
+                   : corp_command_result::rejected_invalid;
+    }
+
     switch (cmd.verb)
     {
         case corp_verb::lay_track:
@@ -1122,6 +1139,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             return corp_command_result::rejected_invalid;
         case corp_verb::set_logistics_shares:
             // BL-1309: a nation's act — only for a nation (`as_nation`).
+            return corp_command_result::rejected_invalid;
+        case corp_verb::set_tax_tier:
+            // BL-1335: a nation's act — only for a nation (`as_nation`).
             return corp_command_result::rejected_invalid;
         case corp_verb::build:
         {

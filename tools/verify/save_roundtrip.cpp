@@ -702,7 +702,9 @@ int main()
             // BL-1309 (v50) and BL-1327 (v51) each add one more empty count after
             // it (share rules, space assets): 28 bytes in all. The reader ignores
             // trailing bytes, so a stale count here still "passed" -- it is exact now.
-            std::string v47 = bytes_once.substr(0, bytes_once.size() - 7 * sizeof(uint32_t));
+            // BL-1335 (v52): plus the tax section (count + 9 bytes a moved nation).
+            std::string v47 = bytes_once.substr(0, bytes_once.size() - 7 * sizeof(uint32_t)
+                                                       - (4 + 9 * static_cast<std::size_t>(std::count_if(w.nations.begin(), w.nations.end(), [](const auto& kv) { return kv.second.tax_tier != k_default_tax_tier || kv.second.discontent != 0.0f; }))));
             const uint32_t pre = k_world_save_version_pre_state;
             std::memcpy(&v47[4], &pre, sizeof pre);
             world old;
@@ -719,7 +721,8 @@ int main()
             // section (a world with no rail writes three empty counts, 12 bytes),
             // stamped 48. It reads, as a world with no rail. (+2 empty counts:
             // the v50 share rules and the v51 space assets.)
-            std::string v48 = bytes_once.substr(0, bytes_once.size() - 5 * sizeof(uint32_t));
+            std::string v48 = bytes_once.substr(0, bytes_once.size() - 5 * sizeof(uint32_t)
+                                                       - (4 + 9 * static_cast<std::size_t>(std::count_if(w.nations.begin(), w.nations.end(), [](const auto& kv) { return kv.second.tax_tier != k_default_tax_tier || kv.second.discontent != 0.0f; })))); // + BL-1335's v52 tax section
             const uint32_t pre = k_world_save_version_pre_rail;
             std::memcpy(&v48[4], &pre, sizeof pre);
             world old;

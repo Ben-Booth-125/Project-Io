@@ -5,6 +5,8 @@
 #include "presentation.hpp"
 
 #include "world/building_profit.hpp"  // estimate_building_profit (rank table, BL-171)
+#include "world/corp_command.hpp"     // BL-1335: set_tax_tier (the Taxes control's press)
+#include "world/nation_tax.hpp"       // BL-1335: discontent_penalty (the Discontent readout)
 #include "world/recipe_registry.hpp"  // recipe_registry (profit estimate)
 
 #include <imgui.h>
@@ -112,11 +114,15 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
     }
 }
 
-// A stubbed policy-tier selector (BL-171 UI): a centred label over a `– I II III IV V +`
+// A policy-tier selector (BL-171 UI): a centred label over a `– I II III IV V +`
 // row. The active tier is highlighted green; the arrows step it, the numerals select
-// it. Interactive so the control reads as real, but it has NO economic effect yet —
-// the Tax/Wages mechanics are owed to BL-155 (a tooltip says so).
-void draw_tier_control(const char* label, int& tier, const char* what_it_does)
+// it. Returns the tier the press asked for (@p tier when nothing was pressed) — the
+// caller decides what a press does. @p wired: false for a lever with no economic
+// effect yet (Wages, owed to BL-155), whose tooltip says so; true for one that acts
+// (Taxes, BL-1335 — the press is a set_tax_tier command). @p enabled false draws the
+// row disabled (the tier shown, no press).
+int draw_tier_control(const char* label, int tier, const char* what_it_does, bool wired,
+                      bool enabled = true)
 {
     // Scope the button IDs to this control — both tiers draw the same labels
     // ("-"/"I".."V"/"+"), so without a per-control ID they collide (ImGui warns).
@@ -140,13 +146,16 @@ void draw_tier_control(const char* label, int& tier, const char* what_it_does)
     // the tooltip said only "not yet wired", which names the state without ever
     // saying what the lever is FOR. Now it leads with the effect and keeps the
     // honest caveat second.
-    const auto note = [what_it_does] {
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s\n\nRaising a tier moves it up, lowering it down.\n"
-                              "Not yet wired to the economy.", what_it_does);
+    const auto note = [what_it_does, wired] {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s\n\nRaising a tier moves it up, lowering it down.%s", what_it_does,
+                              wired ? "" : "\nNot yet wired to the economy.");
     };
 
-    if (ImGui::Button("-", {bw, bw})) tier = std::max(1, tier - 1);
+    int want = tier;
+    if (!enabled)
+        ImGui::BeginDisabled();
+    if (ImGui::Button("-", {bw, bw})) want = std::max(1, tier - 1);
     note();
     for (int t = 1; t <= 5; ++t)
     {
@@ -154,15 +163,18 @@ void draw_tier_control(const char* label, int& tier, const char* what_it_does)
         const bool active = (tier == t);
         if (active)
             ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::positive));
-        if (ImGui::Button(nums[t - 1], {bw, bw})) tier = t;
+        if (ImGui::Button(nums[t - 1], {bw, bw})) want = t;
         if (active)
             ImGui::PopStyleColor();
         note();
     }
     ImGui::SameLine();
-    if (ImGui::Button("+", {bw, bw})) tier = std::min(5, tier + 1);
+    if (ImGui::Button("+", {bw, bw})) want = std::min(5, tier + 1);
     note();
+    if (!enabled)
+        ImGui::EndDisabled();
     ImGui::PopID();
+    return want;
 }
 
 } // namespace
@@ -244,18 +256,66 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     }
     ImGui::Spacing();
 
-    // --- Policy levers (stubbed UI, mechanics owed to BL-155). ---
-    // BL-177: one visible line names the pair's state, so "these do nothing yet"
-    // is readable without hovering; each lever's tooltip says what it is for.
-    draw_tier_control("Taxes", ui.budget_tax_tier,
-                      "The share of your revenue taken by the host nation.\n"
-                      "A lower tier keeps more margin but costs standing with the nation.");
+    // --- Policy levers. ---
+    // BL-1335 (NATIONS.md § Taxes and Discontent): Taxes is the player's NATION's
+    // tax tier — the share of its home firms' income it takes each quarter. The
+    // control shows the nation's real tier and a press issues a set_tax_tier
+    // command (applied by app::render through apply_corp_command; this ledger
+    // holds a const world). Under spectate the seat's nation is scored like any
+    // nation, so the row is shown but not pressable. Discontent sits beside it.
+    // Wages is still the BL-171 stub (BL-155), and the disabled line says so.
+    {
+        const entity_id pn  = player_nation(w);
+        const auto      pit = w.nations.find(pn);
+        if (pit != w.nations.end())
+        {
+            const nation_component& nc = pit->second;
+            const int want = draw_tier_control(
+                "Taxes", nc.tax_tier,
+                "The share of your home firms' income your nation takes each quarter\n"
+                "(the firms headquartered on its ground; their operating profit).\n"
+                "Sustained high taxes (IV, V) raise Discontent; above half, every\n"
+                "building on your ground loses output, up to 15%. Lower tiers let it ebb.",
+                /*wired=*/true, /*enabled=*/!ui.spectating);
+            if (want != nc.tax_tier && !ui.spectating)
+            {
+                corp_command cmd;
+                cmd.corp      = w.player_entity;
+                cmd.as_nation = pn;
+                cmd.verb      = corp_verb::set_tax_tier;
+                cmd.order     = static_cast<uint32_t>(want);
+                ui.pending_order_commands.push_back(cmd);
+            }
+            // Discontent beside it: the reading, and the cut it is making now.
+            const float pen = discontent_penalty(nc.discontent, reg.tax());
+            const ImVec4 col = ImGui::ColorConvertU32ToFloat4(pen > 0.0f ? palette::negative
+                                                                          : palette::neutral);
+            char dbuf[96];
+            if (pen > 0.0f)
+                std::snprintf(dbuf, sizeof dbuf, "Discontent %.0f%%  -  output -%.1f%%",
+                              static_cast<double>(nc.discontent) * 100.0,
+                              static_cast<double>(pen) * 100.0);
+            else
+                std::snprintf(dbuf, sizeof dbuf, "Discontent %.0f%%",
+                              static_cast<double>(nc.discontent) * 100.0);
+            const ImVec2 dts = ImGui::CalcTextSize(dbuf);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX()
+                                 + std::max(0.0f, (ImGui::GetContentRegionAvail().x - dts.x) * 0.5f));
+            ImGui::TextColored(col, "%s", dbuf);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Your population's mood toward its taxes, 0-100%%.\n"
+                                  "Tier IV raises it 6.25%% a quarter, V 12.5%%; III holds it;\n"
+                                  "II and I lower it. Above 50%% it cuts the output of every\n"
+                                  "building on your nation's ground, up to 15%% at 100%%.");
+        }
+    }
     ImGui::Spacing();
-    draw_tier_control("Wages", ui.budget_wage_tier,
+    ui.budget_wage_tier = draw_tier_control("Wages", ui.budget_wage_tier,
                       "What you pay your workforce, per head.\n"
-                      "A higher tier costs more but competes harder for scarce labour.");
+                      "A higher tier costs more but competes harder for scarce labour.",
+                      /*wired=*/false);
     ImGui::Spacing();
-    ImGui::TextDisabled("Policy levers - not yet wired to the economy");
+    ImGui::TextDisabled("Wages - not yet wired to the economy");
     ImGui::Spacing();
 
     // --- Laws in force (BL-343; read-only since BL-480). ---

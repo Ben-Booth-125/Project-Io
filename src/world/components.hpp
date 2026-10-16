@@ -1,6 +1,7 @@
 #pragma once
 
 #include "entity.hpp"
+#include "nation_tax.hpp" // BL-1335: k_default_tax_tier (header-only, std only)
 
 #include <algorithm>
 #include <array>
@@ -2180,6 +2181,21 @@ struct nation_component
         std::array<float, 3> share{}; ///< state, champion, other; each in [0,1], summing to 1
     };
     logistics_share_rule lp_shares;
+
+    /// BL-1335 — the nation's TAX TIER, I..V (NATIONS.md § Taxes and
+    /// Discontent, Ben 2026-10-16): each quarter the nation takes the tier's
+    /// rate (economy.tax) of the operating profit of every firm headquartered
+    /// on its ground. Opens at the neutral tier III (`k_default_tax_tier`). Set
+    /// by the player's `set_tax_tier` verb for the seat's nation, and by the
+    /// nation tax scorer (nation_ai.cpp) for every other — and for the seat's
+    /// too under spectate. SERIALISED in the v52 trailing section.
+    int tax_tier = k_default_tax_tier;
+
+    /// BL-1335 — DISCONTENT, in [0, 1]: the population's mood toward its taxes.
+    /// Moved once a quarter by the tier's pressure; above the bite threshold
+    /// every building on the nation's ground loses output (nation_tax.hpp).
+    /// SERIALISED in the v52 trailing section.
+    float discontent = 0.0f;
 };
 
 // ---------------------------------------------------------------------------
