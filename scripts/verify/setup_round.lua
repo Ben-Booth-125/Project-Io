@@ -19,6 +19,9 @@
 --       total, zero) and moves nothing; a legal one lands.
 --   S5. Next from Setup lands on Life (round 3); Back from Life lands on Setup;
 --       Back from Setup lands on System.
+--   S7. Reroll, Back and Next are anchored at the bottom of the window (Ben,
+--       2026-10-16): Next sits at the same height on System, Setup and Life,
+--       within 80 px of the panel floor (1080 - 48 at this window).
 --   S6. Quick Start opens the setup round ALONE: same round, flagged quick, the
 --       counter replaced by "Quick Start", Back returns to the menu (capture).
 --
@@ -34,12 +37,20 @@ verify.capture("setup_00_menu")
 
 local NEWGAME_X, NEWGAME_Y = 958, 574   -- the menu's New Game (see setup_00_menu)
 local QUICK_X,   QUICK_Y   = 958, 628   -- the menu's Quick Start
--- The footer follows each round's content (Ben, 2026-10-15), so Back and
+-- The footer is anchored at the window's floor (Ben, 2026-10-16); Back and
 -- Next are read off verify.wizard_buttons at each press.
 local function press(which)
     verify.frames(1)
     local _, _, bx, by, nx, ny = verify.wizard_buttons()
     if which == "back" then verify.click(bx, by) else verify.click(nx, ny) end
+end
+
+-- S7 -- the footer's height, read off the button the press will hit.
+local footer_y = {}
+local function note_footer(name)
+    verify.frames(1)
+    local _, _, _, _, _, ny = verify.wizard_buttons()
+    footer_y[#footer_y + 1] = { name = name, y = ny }
 end
 
 -- S2 -- New Game, then Next onto the setup round.
@@ -52,12 +63,14 @@ verify.expect(rounds == 7, "the wizard walks SEVEN rounds (got " .. rounds .. ")
 verify.expect(round == 0 and not quick, "New Game opens on round 1, System (0-based "
               .. round .. ")")
 verify.capture("setup_01_system")
+note_footer("System")
 
 press("next")
 verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 1, "Next on System lands on round 2, SETUP (0-based " .. round .. ")")
 verify.capture("setup_02_setup_round")
+note_footer("Setup")
 
 -- S3 -- the defaults.
 local total, majors = verify.wizard_targets()
@@ -88,6 +101,16 @@ verify.frames(4)
 round = select(1, verify.wizard_round())
 verify.expect(round == 2, "Next on Setup lands on round 3, LIFE (0-based " .. round .. ")")
 verify.capture("setup_05_life")
+note_footer("Life")
+local FLOOR = 1080 - 48 -- the panel is disp.y - 96 tall, centred
+for _, f in ipairs(footer_y) do
+    verify.expect(f.y > FLOOR - 80 and f.y < FLOOR,
+                  "S7: Next is anchored at the bottom on " .. f.name .. " (y " .. f.y
+                  .. ", floor " .. FLOOR .. ")")
+    verify.expect(math.abs(f.y - footer_y[1].y) < 1.0,
+                  "S7: Next sits at the same height on " .. f.name .. " as on System ("
+                  .. f.y .. " vs " .. footer_y[1].y .. ")")
+end
 press("back")
 verify.frames(4)
 round = select(1, verify.wizard_round())

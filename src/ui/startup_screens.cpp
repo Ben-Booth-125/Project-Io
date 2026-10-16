@@ -2837,8 +2837,21 @@ void app::draw_generation_screen()
         // The line holds the button's row height, so Back and Next sit where they
         // sit on every other pass round (the footer geometry scripts press).
         const bool culture_round = lapse_round && lapse_index == 0;
-        // The footer's press points, for verify.wizard_buttons (the footer now
-        // follows the round's content, so its height varies by round).
+        // THE FOOTER IS ANCHORED AT THE BOTTOM OF THE WINDOW (Ben, 2026-10-16;
+        // STARTUP.md § Rounds). The leans above still follow the round's folds
+        // (the 2026-10-15 "controls sit high" rule keeps the column free of a
+        // scroll bar); only Reroll / Back / Next drop to the column's floor, so
+        // a press lands in the same place on every round. Both footer rows are
+        // 34 px plus one ItemSpacing each; when the content already reaches the
+        // floor the slack is zero and the footer follows it as before.
+        {
+            const float footer_rows_h = (34.0f + style.ItemSpacing.y) * 2.0f;
+            const float slack = ImGui::GetContentRegionAvail().y - footer_rows_h;
+            if (slack > 0.0f)
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + slack);
+        }
+        // The footer's press points, for verify.wizard_buttons (read after the
+        // anchor, so they are where the buttons are actually drawn).
         {
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             const bool has_reroll = !culture_round && !setup_round;

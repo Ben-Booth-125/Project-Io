@@ -1957,8 +1957,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // one that reads it, which is what turns a walk into an assertion.
     // BL-1279: the third value is whether the wizard is on Quick Start's
     // setup round alone (STARTUP.md § Rounds, Ben 2026-10-13).
-    // THE WIZARD FOOTER'S PRESS POINTS (Ben, 2026-10-15: the footer follows
-    // each round's content, so no fixed coordinate is right on every round).
+    // THE WIZARD FOOTER'S PRESS POINTS (the footer is anchored at the window's
+    // floor, Ben 2026-10-16, but content past the floor pushes it, so a script
+    // still reads the press point rather than fixing a coordinate).
     // Returns rx, ry, bx, by, nx, ny -- Reroll's centre (-1, -1 where the
     // round has none), Back's, Next's (or Begin's) -- as last drawn.
     v.set_function("wizard_buttons", [this]() {

@@ -11,7 +11,7 @@
 -- than asserting a coordinate somebody read off a capture two days earlier.
 --
 -- THE SUSPECT IS BL-891 ITSELF. The arc readout adds three lines to the left
--- column, and the footer follows the column's content. A surface that grows can
+-- column, and the footer drops below it when the content passes the floor. A surface that grows can
 -- push its own Next off the bottom at 1920x1080, which would make the readout
 -- unreadable precisely because it exists.
 --
@@ -28,8 +28,8 @@ local round = select(1, verify.wizard_round())
 verify.expect(round == 3, "parked on round 4, CULTURE (0-based " .. round .. ")")
 verify.capture("arc_00_round3")
 
--- PRESS THE FOOTER WHERE IT IS DRAWN. The footer follows each round's
--- content (Ben, 2026-10-15: the controls sit high, no scroll bar), so the press
+-- PRESS THE FOOTER WHERE IT IS DRAWN. The footer is anchored at the window's
+-- floor (Ben, 2026-10-16) and pushed lower by content that passes it, so the press
 -- point is read off verify.wizard_buttons and asserted ON SCREEN -- a Next
 -- pushed off the bottom fails here -- before the real press.
 verify.frames(1)
