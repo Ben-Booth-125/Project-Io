@@ -73,7 +73,7 @@ struct world;
 /// derives no draw and runs bit-identical to the pre-BL-643 build.
 struct network_upkeep_params
 {
-    /// Per road tile, indexed by road_level - 1 (Track / Road / Highway).
+    /// Per road EDGE (BL-1340), indexed by tier - 1 (Track / Road / Highway).
     std::array<float, 3> stone_per_level{};
     std::array<float, 3> timber_per_level{};
     /// Per ACTIVE port or inland logistics hub (complete, not decommissioned).

@@ -2987,7 +2987,10 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
             // Road tier (BL-184): the canvas draws the three tiers by weight
             // alone, with no key, so the card names the tier at the moment of
             // interest. Moved here from the retired header row.
-            if (const char* tier = road_tier_name(tile.road_level))
+            // BL-1340: a road is an EDGE, so the card names the best tier meeting at the
+            // tile. ONE-LINE ADAPTATION ONLY — the road ladder’s build rows (and a per-side
+            // reading of this card) belong to the lane that owns this file.
+            if (const char* tier = road_tier_name(max_road_tier(tile)))
             {
                 ImGui::SameLine();
                 ImGui::TextDisabled("\xc2\xb7 %s", tier);

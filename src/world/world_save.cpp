@@ -2,12 +2,16 @@
 #include "logistic_points.hpp" // BL-1309: lp_share_rule_valid
 
 #include "binary_io.hpp"
+#include "logistics.hpp"        // BL-1340: road_edges_mirrored — the mirror is checked on load
+#include "river_generation.hpp"  // BL-1340: hex_side_for_offset — the pre-v53 migration
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
 
 #include <algorithm>
 #include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
 #include <istream>
 #include <ostream>
+#include <map>
+#include <tuple>
 #include <set>
 #include <string>
 #include <utility>
@@ -64,7 +68,11 @@ constexpr auto max_withdraw   = withdrawing_side::defender;
 // keeping it makes a field addition a two-line diff in one obvious place
 // instead of a hunt.
 
-void w_tile(std::ostream& o, const tile_component& t)
+/// BL-1340: the tile record at @p version. v53 writes the SIX-SIDE road mask (u16); every
+/// older version wrote one road tier a tile (u8), and `write_world_snapshot_pre_road_edges`
+/// still produces that — the one producer of an old stream, so the migration path below has
+/// something to be verified against.
+void w_tile_v(std::ostream& o, const tile_component& t, uint32_t version)
 {
     w_id(o, t.body);
     w_int(o, t.grid_x);
@@ -78,23 +86,115 @@ void w_tile(std::ostream& o, const tile_component& t)
     w_f32(o, t.hazard_level);
     w_f32(o, t.habitability);
     w_f32(o, t.substrate_density);
-    w_u8(o, t.road_level);
+    if (version >= world_save_version)
+        w_u16(o, t.road_edges); // BL-1340 (v53): a tier per hex side, two bits each
+    else
+        w_u8(o, max_road_tier(t)); // the pre-v53 shape: one tier a tile
     w_u8(o, t.river_edges);
     w_u8(o, t.river_downstream);
     w_f32(o, t.height);
     w_u8(o, t.lane_level); // BL-1098 (v28): the sea-lane tier, at the record's tail
 }
 
-bool r_tile(std::istream& i, tile_component& t)
+/// BL-1340: the tile record at @p version. On a pre-v53 stream the one road byte is read
+/// into @p legacy_road (keyed by the tile's own body and grid cell, which the record
+/// carries) rather than into the component — a tier a tile is not expressible any more,
+/// and `migrate_legacy_roads` turns the whole field into edges once every tile is in.
+bool r_tile_v(std::istream& i, tile_component& t, uint32_t version,
+              std::map<std::tuple<entity_id, int, int>, std::uint8_t>* legacy_road)
 {
-    return r_id(i, t.body) && r_int(i, t.grid_x) && r_int(i, t.grid_y)
-        && r_enum(i, t.substrate, max_substrate) && r_enum(i, t.cover, max_cover)
-        && r_u8(i, t.cover_density) && r_enum(i, t.landform, max_landform)
-        && r_f32_array(i, t.resource_deposit) && r_f32_array(i, t.resource_remaining)
-        && r_f32(i, t.hazard_level) && r_f32(i, t.habitability)
-        && r_f32(i, t.substrate_density) && r_u8(i, t.road_level)
-        && r_u8(i, t.river_edges) && r_u8(i, t.river_downstream) && r_f32(i, t.height)
+    if (!(r_id(i, t.body) && r_int(i, t.grid_x) && r_int(i, t.grid_y)
+          && r_enum(i, t.substrate, max_substrate) && r_enum(i, t.cover, max_cover)
+          && r_u8(i, t.cover_density) && r_enum(i, t.landform, max_landform)
+          && r_f32_array(i, t.resource_deposit) && r_f32_array(i, t.resource_remaining)
+          && r_f32(i, t.hazard_level) && r_f32(i, t.habitability)
+          && r_f32(i, t.substrate_density)))
+        return false;
+    if (version >= world_save_version)
+    {
+        if (!r_u16(i, t.road_edges)) // BL-1340 (v53)
+            return false;
+        // Two bits a side can only hold 0-3, so no tier is out of range by construction;
+        // what IS checkable is the mirror, and read_world_snapshot checks it on the whole
+        // field once every tile is present.
+    }
+    else
+    {
+        std::uint8_t legacy = 0;
+        if (!r_u8(i, legacy))
+            return false;
+        if (legacy > 3)
+            return false; // a tier outside the ladder: the stream is corrupt, not old
+        t.road_edges = 0;
+        if (legacy_road != nullptr)
+            legacy_road->emplace(std::make_tuple(t.body, t.grid_y, t.grid_x), legacy);
+    }
+    return r_u8(i, t.river_edges) && r_u8(i, t.river_downstream) && r_f32(i, t.height)
         && r_u8(i, t.lane_level); // BL-1098 (v28)
+}
+
+/// BL-1340 — THE PRE-v53 MIGRATION (LOGISTICS.md § 4, "Older saves"). A save written
+/// before the field existed carried one tier a tile. Between each pair of 4-cardinal
+/// neighbours that BOTH carried a road, lay an edge at the LOWER of their two tiers — a
+/// road crosses only where both ends were roaded. Deterministic (a std::map walk over the
+/// legacy field, both halves of every edge written with the same value, so no visit order
+/// can reach the answer) and it reconstructs the network the generated lattice meant
+/// rather than inventing crossings at its frontier.
+void migrate_legacy_roads(world& s,
+                          const std::map<std::tuple<entity_id, int, int>, std::uint8_t>& legacy)
+{
+    if (legacy.empty())
+        return;
+    // (body, row, col) -> tile, over the same key the legacy field is held on.
+    std::map<std::tuple<entity_id, int, int>, entity_id> cell;
+    for (const auto& [tid, tc] : s.tiles)
+        cell.emplace(std::make_tuple(tc.body, tc.grid_y, tc.grid_x), tid);
+
+    constexpr int dc[4] = {  0,  0, -1,  1 }; // N, S, W, E — the 4-cardinal walk A* makes
+    constexpr int dr[4] = { -1,  1,  0,  0 };
+    for (const auto& [key, lvl] : legacy)
+    {
+        if (lvl == 0)
+            continue;
+        const auto [body, row, col] = key;
+        const auto bit = s.bodies.find(body);
+        const int gw = bit != s.bodies.end() ? bit->second.grid_width  : 0;
+        const int gh = bit != s.bodies.end() ? bit->second.grid_height : 0;
+        const auto tit = cell.find(key);
+        if (tit == cell.end())
+            continue;
+        const auto self = s.tiles.find(tit->second);
+        if (self == s.tiles.end() || is_water(self->second.substrate))
+            continue;
+        for (int k = 0; k < 4; ++k)
+        {
+            int nx = col + dc[k];
+            const int ny = row + dr[k];
+            if (ny < 0 || (gh > 0 && ny >= gh))
+                continue; // the grid does not wrap north-south
+            if (gw > 0)
+                nx = ((nx % gw) + gw) % gw; // the east-west cylinder wrap
+            const auto nlvl = legacy.find(std::make_tuple(body, ny, nx));
+            if (nlvl == legacy.end() || nlvl->second == 0)
+                continue; // the neighbour carried no road: no crossing between them
+            const auto ncell = cell.find(std::make_tuple(body, ny, nx));
+            if (ncell == cell.end())
+                continue;
+            const auto other = s.tiles.find(ncell->second);
+            if (other == s.tiles.end() || is_water(other->second.substrate))
+                continue;
+            // The side is read from the UNWRAPPED step (dc/dr), never the wrapped column
+            // difference, which at the seam would be +-(gw-1) and name no neighbour.
+            const int s_side = hex_side_for_offset(dc[k], dr[k], (row & 1) != 0);
+            if (s_side < 0)
+                continue;
+            const std::uint8_t tier = std::min(lvl, nlvl->second); // THE LOWER OF THE TWO
+            if (road_tier_on_side(self->second, s_side) >= tier)
+                continue;
+            set_road_tier_on_side(self->second, s_side, tier);
+            set_road_tier_on_side(other->second, opposite_hex_side(s_side), tier);
+        }
+    }
 }
 
 void w_body(std::ostream& o, const body_component& b)
@@ -928,10 +1028,14 @@ void clear_derived_state(world& w)
     w.current_econ_tick = 0;
 }
 
-void write_world_snapshot(const world& w, std::ostream& out)
+/// The one writer body. @p version is the stream's version word AND the tile record's
+/// shape (BL-1340): `world_save_version` for a real save,
+/// `k_world_save_version_pre_road_edges` for the verification-only producer of a pre-edge
+/// stream. Nothing else differs — v52 is today's stream with yesterday's tile record.
+void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version)
 {
     w_u32(out, world_save_magic);
-    w_u32(out, world_save_version);
+    w_u32(out, version);
 
     // --- well-known entities, the belt, and the allocator cursor -------------
     w_id(out, w.player_entity);
@@ -951,7 +1055,9 @@ void write_world_snapshot(const world& w, std::ostream& out)
 
     // --- component stores ---------------------------------------------------
     w_store(out, w.bodies, w_body);
-    w_store(out, w.tiles, w_tile);
+    w_store(out, w.tiles, [version](std::ostream& o, const tile_component& t) {
+        w_tile_v(o, t, version);
+    });
     w_store(out, w.buildings, w_building);
     w_store(out, w.stockpiles, w_stockpile);
     w_store(out, w.markets, w_market);
@@ -1228,6 +1334,19 @@ std::size_t world_save_tax_section_bytes(const world& w)
     return n;
 }
 
+void write_world_snapshot(const world& w, std::ostream& out)
+{
+    write_world_snapshot_at(w, out, world_save_version);
+}
+
+void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out)
+{
+    // BL-1340, VERIFICATION ONLY (road_edges harness): the v52 stream shape — one road
+    // tier a tile, the max over its sides — so the migration path has a producer. The
+    // game never writes an old version; `write_world_snapshot` is the only save path.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_road_edges);
+}
+
 bool read_world_snapshot(world& w, std::istream& in)
 {
     uint32_t magic = 0;
@@ -1248,7 +1367,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_rail
             && version != k_world_save_version_pre_state
             && version != k_world_save_version_pre_space
-            && version != k_world_save_version_pre_tax))
+            && version != k_world_save_version_pre_tax
+            && version != k_world_save_version_pre_road_edges)) // BL-1340: v52, migrated
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1284,7 +1404,20 @@ bool read_world_snapshot(world& w, std::istream& in)
 
     if (!r_store(in, s.bodies, r_body))
         return false;
-    if (!r_store(in, s.tiles, r_tile))
+    // BL-1340: a pre-v53 stream's one road byte a tile lands here, keyed by the cell it
+    // was read on, and becomes edges below once every tile is in.
+    std::map<std::tuple<entity_id, int, int>, std::uint8_t> legacy_road;
+    if (!r_store(in, s.tiles, [&](std::istream& i, tile_component& t) {
+            return r_tile_v(i, t, version, &legacy_road);
+        }))
+        return false;
+    if (version < world_save_version)
+        migrate_legacy_roads(s, legacy_road);
+    // THE MIRROR INVARIANT, ON LOAD (LOGISTICS.md § 4). Two bits a side can only hold
+    // 0-3, so a tier is in range by construction; what a stream can still carry is two
+    // halves of one crossing that disagree. A world that fails it is not a world, so the
+    // whole stream is refused and nothing is mutated — `s` is scratch until the tail.
+    if (!road_edges_mirrored(s))
         return false;
     if (!r_store(in, s.buildings, r_building))
         return false;

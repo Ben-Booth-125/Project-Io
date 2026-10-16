@@ -153,15 +153,32 @@ float extractable_deposit(const tile_component& tc);
 /// the tile carries none (callers fall back to a default target).
 resource_type richest_extractable(const tile_component& tc, bool& any);
 
-/// May the player place a road segment on this tile (BL-147)? A road is a per-tile
-/// mutation (raises tile_component.road_level, lowering its A* traversal cost), not a
-/// building. Valid only on a non-ocean land tile that does not already carry a road.
+/// May the player place a road across hex side @p side of @p tile (BL-147, BL-1340)? A
+/// road is an EDGE between two tiles (LOGISTICS.md § 4), not a building and not a tile
+/// property: valid only where both ends are non-ocean land, the side HAS a neighbour, and
+/// @p tier strictly upgrades that crossing.
 ///
-/// @param tc    The candidate tile.
+/// @param w     World (read-only) — the neighbour across @p side.
+/// @param tile  One end of the crossing.
+/// @param side  Hex side 0-5 (0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE).
 /// @param tier  The road tier to place (BL-172): 1=Track, 2=Road, 3=Highway. Upgrade-in-place —
-///              valid only if strictly higher than the tile's current road_level.
-/// @return    `ok`, or `ocean` / `already_road` (already at or above @p tier). Converts to bool.
+///              valid only if strictly higher than the tier the crossing already holds.
+/// @return    `ok`, or `ocean` (either end water, or no neighbour that way) /
+///            `already_road` (the crossing is already at or above @p tier).
+placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier = 1);
+
+/// The WEAK form, for a surface that has a tile but no direction yet: could ANY side of
+/// this tile take a road at @p tier? Refuses water, and refuses a tile every side of
+/// which already stands at or above @p tier. It cannot see neighbours, so it is an
+/// affordance test only — `can_place_road(w, tile, side, tier)` is the real gate and
+/// `place_road` runs it on the side it resolves.
 placement_result can_place_road(const tile_component& tc, std::uint8_t tier = 1);
+
+/// The side `place_road` lays when the caller named none (`k_road_side_auto`, BL-1340):
+/// the cheapest land neighbour of @p tile — lowest `tile_traversal_cost`, ties broken by
+/// the lower side index — among the sides @p tier would actually upgrade. -1 where no
+/// side qualifies. Deterministic and world-order independent.
+int auto_road_side(const world& w, entity_id tile, std::uint8_t tier);
 
 /// Returns true if a population centre may be placed on this tile.
 ///

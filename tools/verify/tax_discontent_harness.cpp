@@ -111,6 +111,18 @@ std::string to_bytes(const world& w)
     return os.str();
 }
 
+/// BL-1340: @p w as a PRE-v53 stream — the tile record before a road became an edge. The
+/// v51 row below truncates a stream's trailing tax section and relabels it, which only
+/// works off a stream whose EARLIER sections are the shape a v51 reader expects; v53
+/// widened the tile record (one road tier a tile became a six-side mask), so the current
+/// writer's stream is no longer that shape and this one is.
+std::string to_bytes_pre_road_edges(const world& w)
+{
+    std::ostringstream os(std::ios::binary);
+    write_world_snapshot_pre_road_edges(w, os);
+    return os.str();
+}
+
 bool from_bytes(const std::string& b, world& w)
 {
     std::istringstream is(b, std::ios::binary);
@@ -493,9 +505,12 @@ void t6_save(const app_start_world& out)
           "T6", fmt("v%u round-trips tiers, Discontent and a return's tax byte-identically (%zu bytes) with an equal state_hash",
                     static_cast<unsigned>(world_save_version), b52.size()));
 
-    // v51: the stream less the tax section (nation rows, then the returns' taxes).
+    // v51: the PRE-EDGE stream less the tax section (nation rows, then the returns'
+    // taxes). BL-1340: taken off `to_bytes_pre_road_edges`, since a v51 reader reads the
+    // old tile record and the current writer no longer writes it.
     const std::size_t tail = world_save_tax_section_bytes(c);
-    std::string b51 = b52.substr(0, b52.size() - tail);
+    const std::string b52_pre_edge = to_bytes_pre_road_edges(c);
+    std::string b51 = b52_pre_edge.substr(0, b52_pre_edge.size() - tail);
     const std::uint32_t v51 = k_world_save_version_pre_tax;
     std::memcpy(&b51[4], &v51, 4);
     world r51;

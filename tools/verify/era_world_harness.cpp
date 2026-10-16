@@ -282,7 +282,7 @@ int main()
 
         int roaded = 0;
         for (const auto& [tid, tc] : wa.tiles)
-            if (tc.body == wa.home_body && tc.road_level > 0 && !is_water(tc.substrate))
+            if (tc.body == wa.home_body && tile_has_road(tc) && !is_water(tc.substrate))
                 ++roaded;
         std::printf("  roaded land tiles on the 0 CE world: %d\n", roaded);
         check(roaded > 0, "R6c the ancient world opens with roads on the ground");

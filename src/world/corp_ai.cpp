@@ -1940,15 +1940,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // unreached tile upgrades it rather than re-requesting a
                     // tier it already holds (which `place_road` refuses as
                     // `invalid_tile`, benign per APPLY THEN COUNT below).
-                    best_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(tc.road_level + 1));
+                    best_tier = std::min<std::uint8_t>(
+                        3, static_cast<std::uint8_t>(max_road_tier(tc) + 1));
                 }
 
                 if (best_tile != null_entity)
                 {
-                    // ROAD candidate: raising this tile's own road_level
-                    // discounts its traversal cost (road_traversal_multiplier),
-                    // which feeds directly into body_reach_field's Dijkstra
-                    // edge costs — the same mechanism the Reach lens reads.
+                    // ROAD candidate: a road is an EDGE (BL-1340), so the command names
+                    // the tile and leaves the SIDE unnamed (`k_road_side_auto`) —
+                    // place_road then lays the cheapest land crossing out of it, lowest
+                    // traversal cost and ties to the lower side index. That discounts the
+                    // edge (road_edge_discount), which feeds directly into
+                    // body_reach_field's Dijkstra — the same mechanism the Reach lens
+                    // reads. The scorer picks a tile and a tier; the geometry is the
+                    // verb's, not a plan.
                     {
                         const road_economics& rex = reg.road_econ(best_tier);
                         candidate c;

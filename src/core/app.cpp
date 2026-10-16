@@ -2944,8 +2944,10 @@ void app::render()
     }
 
     // Execute any road-placement request queued this frame by the build front door's Track/Road/
-    // Highway affordances (BL-147 core, BL-172 tier). A road is a per-tile mutation (raises
-    // road_level, lowers A* cost), not a building, so it routes through place_road.
+    // Highway affordances (BL-147 core, BL-172 tier). A road is an EDGE between two tiles
+    // (BL-1340), not a building, so it routes through place_road — which resolves the side
+    // the front door has not named (`k_road_side_auto`: the cheapest land crossing out of
+    // the tile) until a build row grows a direction of its own.
     // BL-469: the battle card's Withdraw press. Deferred like every other press,
     // because UI surfaces hold only `const world&` — and additionally because the
     // request is HONOURED at the next tick boundary rather than applied here, so
@@ -2971,7 +2973,7 @@ void app::render()
     {
         const construction_result r = place_road(
             m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile,
-            m_ui.construction.pending_road_tier);
+            k_road_side_auto, m_ui.construction.pending_road_tier);
         m_play_log.direct(m_world, "place_road", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_road_tile, null_entity, -1, -1,
                           static_cast<int>(m_ui.construction.pending_road_tier));

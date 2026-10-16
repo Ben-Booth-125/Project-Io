@@ -172,16 +172,23 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     for (auto& kv : w.tiles)
     {
         tile_component& t = kv.second;
-        if (t.road_level > 0 && t.road_level < c.road_tier)
+        // BL-1340: the axis raises EDGES. Each crossing is written from both of its tiles
+        // with the same tier, so the walk still commutes and the mirror invariant holds
+        // whatever order the unordered_map hands the tiles over in.
+        for (int s = 0; s < 6; ++s)
         {
-            t.road_level = c.road_tier;
-            moved = true;
+            const std::uint8_t cur = road_tier_on_side(t, s);
+            if (cur > 0 && cur < c.road_tier)
+            {
+                set_road_tier_on_side(t, s, c.road_tier);
+                moved = true;
+            }
         }
     }
     if (moved)
     {
-        // The reach field, the A* cache and the flood fields are all functions of
-        // road_level. Leaving them warm would score the new tier against the old
+        // The reach field, the A* cache and the flood fields are all functions of the
+        // road field. Leaving them warm would score the new tier against the old
         // network — and, worse, would do so only for a world that had already been
         // scored, which is exactly the order-dependence this search must not have.
         invalidate_logistics_caches(w);
@@ -310,10 +317,14 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     for (auto& kv : w.tiles)
     {
         tile_component& t = kv.second;
-        if (t.road_level > 0 && t.road_level < c.road_tier)
+        for (int s = 0; s < 6; ++s) // BL-1340: the axis raises EDGES (see the legacy body)
         {
-            t.road_level = c.road_tier;
-            moved = true;
+            const std::uint8_t cur = road_tier_on_side(t, s);
+            if (cur > 0 && cur < c.road_tier)
+            {
+                set_road_tier_on_side(t, s, c.road_tier);
+                moved = true;
+            }
         }
     }
     if (moved)

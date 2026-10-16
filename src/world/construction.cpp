@@ -531,7 +531,8 @@ bool demolish_building(world& w, entity_id corp, entity_id building)
 }
 
 construction_result place_road(world& w, const recipe_registry& reg,
-                               entity_id corp, entity_id tile, std::uint8_t tier)
+                               entity_id corp, entity_id tile, std::uint8_t side,
+                               std::uint8_t tier)
 {
     const auto corp_it = w.corporations.find(corp);
     if (corp_it == w.corporations.end())
@@ -541,8 +542,17 @@ construction_result place_road(world& w, const recipe_registry& reg,
     if (tile_it == w.tiles.end())
         return construction_result::no_tile;
 
-    // Validity: non-ocean land, and this tier strictly upgrades the tile (BL-172).
-    if (!placement_rules::can_place_road(tile_it->second, tier))
+    // BL-1340: the SIDE the road crosses. `k_road_side_auto` resolves here, once, so the
+    // refusals below read the side that would actually be laid.
+    const int chosen = (side == k_road_side_auto)
+                           ? placement_rules::auto_road_side(w, tile, tier)
+                           : static_cast<int>(side);
+    if (chosen < 0 || chosen > 5)
+        return construction_result::invalid_tile;
+
+    // Validity: land both ends, a neighbour that way, and a tier that strictly upgrades
+    // the crossing (BL-172 / BL-1340).
+    if (!placement_rules::can_place_road(w, tile, chosen, tier))
         return construction_result::invalid_tile;
 
     corporation_component& cc = corp_it->second;
@@ -573,11 +583,15 @@ construction_result place_road(world& w, const recipe_registry& reg,
     if (cc.balance < total_cost)
         return construction_result::insufficient_funds;
 
-    // Commit: debit, raise the tile to the chosen road tier, invalidate the
-    // logistics caches (road_level changed, so cached path and reach costs are
-    // stale — world.hpp invalidation contract).
+    // Commit: debit, raise the EDGE to the chosen road tier (both halves — BL-1340),
+    // invalidate the logistics caches (the road field moved, so cached path and reach
+    // costs are stale — world.hpp invalidation contract).
     cc.balance -= total_cost;
-    tile_it->second.road_level = tier; // BL-172: 1=Track, 2=Road, 3=Highway (upgrade-in-place).
+    if (!lay_road_edge(w, tile, chosen, tier)) // BL-172: 1=Track, 2=Road, 3=Highway
+    {
+        cc.balance += total_cost; // nothing was written: refund rather than charge for air
+        return construction_result::invalid_tile;
+    }
     invalidate_logistics_caches(w);
 
     return construction_result::placed;

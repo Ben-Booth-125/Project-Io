@@ -149,22 +149,24 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `gameplay.place_road` — Three road-tier rows (Track / Road / Highway) at the bottom of the tile construction ledger, below the building candidates.
 
-**Press.** Select a tile, click 'Construct Buildings' on the Selection band, scroll to the road rows, click 'Build' on a tier. Each row shows its own credit total and validity.
+**Press.** Select a tile, click 'Construct Buildings' on the Selection band, scroll to the road rows, click 'Build' on a tier. Each row shows its own credit total and validity. The rows do not yet name a SIDE, so the press sends `road_side` 255 and the verb lays the cheapest land crossing out of the tile; the seam can name a side directly.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tile` | `entity_id` | The tile whose road level rises. |
-| `road_tier` | `uint8 [1, 3]` | 1 = Track, 2 = Road, 3 = Highway. Higher tiers cost more and cut traversal cost further. |
+| `tile` | `entity_id` | One END of the crossing: a road is an EDGE between two tiles (BL-1340, LOGISTICS.md § 4), never a property of one. |
+| `road_side` | `uint8 [0, 5] or 255` | The hex side of `tile` the road crosses: 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE (odd-r offsets). 255 (the default) means NO SIDE NAMED, and the verb then lays the cheapest land crossing out of the tile — lowest traversal cost, ties to the lower side index. Any other value rejects the whole command at the wire boundary. |
+| `road_tier` | `uint8 [1, 3]` | 1 = Track, 2 = Road, 3 = Highway. Higher tiers cost more and cut the crossing's traversal cost further. |
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
 - The tile entity exists (rejected_invalid otherwise).
-- can_place_road accepts: a land tile whose current road_level is BELOW the pressed tier — upgrade-in-place is allowed, re-laying the same or a lower tier is refused, ocean is refused (rejected_placement).
+- `road_side` is 0-5 or 255; any other value rejects the command whole, mutating nothing (the untrusted-seam rule).
+- can_place_road accepts the resolved side: both ends land, the side HAS a neighbour on the grid (a road to nowhere cannot be expressed — the top and bottom rows do not wrap), and the tier is strictly above what that crossing already holds. Upgrade-in-place is allowed; re-laying the same or a lower tier is refused, water at either end is refused (rejected_placement).
 - The balance covers the tier's build cost plus materials priced at the tile's local market (rejected_funds; the row disables Build with 'Can't afford').
 
-**Expected output.** INSTANT, unlike building construction: on execution the tile's road_level rises to the tier, the full cost is debited up front, and the world's A* cost cache is invalidated so freight dispatch immediately sees the lower traversal cost through this tile. A road is a tile mutation, not a building — it occupies no build slot. Rejected attempts change nothing; invalid tiers show their reason string in place of the button.
+**Expected output.** INSTANT, unlike building construction: on execution the CROSSING rises to the tier — both halves, `road_side` of the tile and the facing side of the neighbour, so the two always agree — the full cost is debited up front, and the world's A* cost cache is invalidated so freight dispatch immediately sees the lower cost of that step. The discount belongs to the edge, not to either tile (BL-1340), and it is the same price in both directions, unlike a river's. A road is an edge mutation, not a building — it occupies no build slot. Rejected attempts change nothing; invalid tiers show their reason string in place of the button.
 
-**Reason to select.** Lowers intra-body haul cost along the tile, cheapening every supply run that routes through it — the press that tightens the chain between extraction sites, processors, and the market. Worth it on tiles carrying real freight; a road on an unused tile is pure spend.
+**Reason to select.** Lowers the intra-body haul cost of one step, cheapening every supply run that crosses it — the press that tightens the chain between extraction sites, processors and the market. Worth it on the boundaries real freight crosses; a crossing nothing uses is pure spend.
 
 ### `gameplay.place_sell_order` — RETIRED (BL-1265, 2026-10-10: the order book retired with corporation pools — no corporation holds goods; production lands on its market's shelf and is sold at the clearing price (MARKETS.md § The shelf economy), so there is nothing for a sell order to hold back or list). No surface issues it: the press was removed from the UI with the system it drove. The corp_verb slot `place_sell_order` survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
 

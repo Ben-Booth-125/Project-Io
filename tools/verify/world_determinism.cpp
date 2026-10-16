@@ -68,10 +68,16 @@ namespace {
 /// read as a moved FIELD. Reported, never asserted.
 void print_coverage(const char* what, const world& w, const era_minus_one_fixture& fx)
 {
+    // BL-1340: EDGES, each counted once (sides 0-2 are the canonical half of every
+    // crossing), beside the count of tiles the network touches.
     std::size_t road_tiles = 0;
     std::map<int, int> road_tier;
     for (const auto& [tid, tc] : w.tiles)
-        if (tc.road_level != 0) { ++road_tiles; ++road_tier[tc.road_level]; }
+    {
+        if (tc.road_edges != 0) ++road_tiles;
+        for (int s = 0; s < 3; ++s)
+            if (const int t = road_tier_on_side(tc, s)) ++road_tier[t];
+    }
     std::size_t lane_tiles = 0; // BL-1098: the sea lanes the deep digest folds
     for (const auto& [tid, tc] : w.tiles)
         if (tc.lane_level != 0) ++lane_tiles;

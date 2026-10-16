@@ -445,7 +445,21 @@ inline constexpr uint32_t world_save_magic =
 /// (`k_world_save_version_pre_tax`), as a world where every nation stands at
 /// tier III with no Discontent; v50 down to v47 still read. Every other version
 /// is refused.
-inline constexpr uint32_t world_save_version = 52;
+/// Bumped to 53 by BL-1340 (a road is an edge; LOGISTICS.md § 4, Ben 2026-10-16): the
+/// TILE RECORD changes shape — the one `road_level` byte becomes a u16 `road_edges`, a
+/// tier per hex side at two bits each. THE FIRST BUMP THAT IS NOT A TRAILING SECTION
+/// since v47, so v47-v52 are no longer strict prefixes of the current stream; they are
+/// still read, through the tile record's own version branch, and MIGRATE: between each
+/// pair of 4-cardinal neighbours that both carried a road, an edge at the LOWER of their
+/// two tiers (`migrate_legacy_roads`). On load the mirror invariant is checked over the
+/// whole field and the stream is refused whole if two halves of a crossing disagree.
+/// Every version outside v47-v53 is refused whole.
+inline constexpr uint32_t world_save_version = 53;
+
+/// BL-1340: v52 — the last stream with one road tier a TILE. Not a prefix of v53 (the
+/// tile record itself changed shape); read through the tile record's version branch and
+/// migrated to edges on load. v51 down to v47 read the same way.
+inline constexpr uint32_t k_world_save_version_pre_road_edges = 52;
 
 /// BL-1335: v51, a strict prefix of v52 (the tax section is v52's only addition).
 inline constexpr uint32_t k_world_save_version_pre_tax = 51;
@@ -475,6 +489,12 @@ inline constexpr uint32_t k_world_save_version_pre_state = 47;
 /// @param w   World to serialise.
 /// @param out Destination stream, opened binary.
 void write_world_snapshot(const world& w, std::ostream& out);
+
+/// BL-1340, VERIFICATION ONLY: @p w written as a PRE-v53 stream — the old tile record,
+/// one road tier a tile (the max over its sides), every other section exactly as
+/// `write_world_snapshot` writes it. The game never writes an old version; this exists so
+/// the migration path has a producer a harness can call (tools/verify/road_edges.cpp).
+void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out);
 
 /// BL-1335: the byte length of the v52 tax section `write_world_snapshot`
 /// writes for @p w (the nation rows and the returns' taxes) — what a harness

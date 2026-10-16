@@ -10,6 +10,7 @@
 #include "logistics.hpp"       // invalidate_logistics_caches, tile_traversal_cost, intra_body_path (BL-470)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
+#include "river_generation.hpp" // BL-1340: hex_side_for_offset — a march pays the edge's road tier
 #include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
@@ -4354,10 +4355,15 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
                 continue; // re-evaluate the loop condition against the fresh path
             }
 
-            // Same edge-cost convention intra_body_path/body_reach_field use:
-            // the mean of the two nodes' traversal-cost weights.
+            // Same edge-cost convention intra_body_path/body_reach_field use: the mean of
+            // the two nodes' traversal-cost weights, times the EDGE's own road discount
+            // (BL-1340 — a road is an edge, so a marching unit pays the crossing's tier,
+            // not either tile's). The river discount stays the flood's: a march is
+            // priced the same way round whichever way it walks.
+            const int march_side = road_side_between(w, u.position, next_id);
             const float step_cost = 0.5f * (tile_traversal_cost(cur_it->second)
-                                            + tile_traversal_cost(next_it->second));
+                                            + tile_traversal_cost(next_it->second))
+                                  * road_edge_discount(cur_it->second, march_side);
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;

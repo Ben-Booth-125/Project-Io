@@ -178,22 +178,31 @@ construction_result lay_track(world& w, const recipe_registry& reg, entity_id na
 /// the building does not exist or @p nation does not own it.
 bool demolish_state_building(world& w, entity_id nation, entity_id building);
 
-/// Attempt to place a road of tier `tier` on `tile` for corporation `corp` (BL-147 core, BL-172
-/// tier ladder). A road is a per-tile mutation, not a building: on success it raises
-/// `tile_component.road_level` to `tier` (1=Track, 2=Road, 3=Highway), which lowers that tile's
-/// intra-body A* traversal cost, and invalidates the world's A* cost cache so dispatch sees the
-/// roaded cost. Upgrade-in-place is allowed (raise a Track to a Highway); re-laying the same or a
-/// lower tier is refused (`invalid_tile`). The cost (registry `road_econ(tier)`) is a flat credit
-/// sum plus materials priced from the tile's local market, debited up front (roads are instant,
+/// Attempt to place a road of tier `tier` across one SIDE of `tile` for corporation `corp`
+/// (BL-147 core, BL-172 tier ladder, BL-1340 a road is an edge). A road is an EDGE between
+/// two tiles, never a property of one (LOGISTICS.md § 4): on success it raises that
+/// crossing — both halves, `side` of `tile` and the facing side of the neighbour — to
+/// `tier` (1=Track, 2=Road, 3=Highway), which lowers the traversal cost of the step across
+/// it, and invalidates the world's A* cost cache so dispatch sees the roaded cost.
+/// Upgrade-in-place is allowed (raise a Track to a Highway); re-laying the same or a lower
+/// tier is refused (`invalid_tile`), as is a side with no neighbour — a road to nowhere
+/// cannot be expressed. The cost (registry `road_econ(tier)`) is a flat credit sum plus
+/// materials priced from the tile's local market, debited up front (roads are instant,
 /// unlike durative building construction). The build front door (SELECTION.md) and app's
 /// pending-road handler route through this single function.
 ///
-/// @param w     World; mutated only on success (road_level raised, cache cleared, balance debited).
+/// @param w     World; mutated only on success (the edge raised, cache cleared, balance debited).
 /// @param reg   Loaded registry (per-tier road cost).
 /// @param corp  Corporation placing (and paying) — usually w.player_entity.
-/// @param tile  Target tile entity.
+/// @param tile  Target tile entity — one end of the crossing.
+/// @param side  Hex side of `tile` the road crosses: 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE
+///              (hex_neighbors.hpp). `k_road_side_auto` picks the cheapest land neighbour
+///              deterministically — lowest traversal cost, ties to the lower side index —
+///              which is what a caller with a tile but no direction (the AI's road
+///              candidate, a UI that has not yet grown a direction) gets.
 /// @param tier  Road tier to place: 1=Track (default, = BL-147 behaviour), 2=Road, 3=Highway.
-/// @return      `placed` on success; `invalid_tile` (ocean / already at or above `tier`),
-///              `insufficient_funds`, `no_corp`, or `no_tile` on refusal.
+/// @return      `placed` on success; `invalid_tile` (ocean / no neighbour that way /
+///              already at or above `tier`), `insufficient_funds`, `no_corp`, or `no_tile`.
 construction_result place_road(world& w, const recipe_registry& reg,
-                               entity_id corp, entity_id tile, std::uint8_t tier = 1);
+                               entity_id corp, entity_id tile,
+                               std::uint8_t side = k_road_side_auto, std::uint8_t tier = 1);

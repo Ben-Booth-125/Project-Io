@@ -266,7 +266,7 @@ int main(int argc, char** argv)
         for (const auto& [id, t] : w.tiles)
         {
             if (t.body != home) continue;
-            if (t.road_level > 0) ++road[std::min<int>(t.road_level, 3)];
+            if (tile_has_road(t)) ++road[std::min<int>(max_road_tier(t), 3)];
         }
         (void)land;
         kv("road_tiles", road[1] + road[2] + road[3]);

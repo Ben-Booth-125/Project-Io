@@ -2732,7 +2732,9 @@ void run_tail(generation_cursor& c)
                             /*seed=*/params.seed ^ 0xC17910E6u);
     stamp_urban_land_use(w, kepler, &kepler_settlement); // BL-1130: footprints stop at the cell
 
-    // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,
+    // Road network (BL-146): stamp each nation's road lattice onto tile.road_edges — a
+    // road is an EDGE between two tiles (BL-1340; LOGISTICS.md § 4), laid between
+    // consecutive tiles of each link's A* path,
     // after nations + population centres exist — anchor foundings included
     // (BL-623), so they take local streets and spurs like any village and the
     // off-lattice centre class ends here. Deterministic; no seed of its own —

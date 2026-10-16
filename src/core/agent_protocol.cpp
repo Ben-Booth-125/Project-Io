@@ -237,6 +237,12 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         const long long rcp_v  = kv_get_checked(kv, "recipe", no_recipe, 0, 0xFFFF, &ok);
         const long long wf_v   = kv_get_checked(kv, "workforce", 100, 0, 200, &ok); // 0-200 internal (BL-1322: 100% shown = 200)
         const long long road_v = kv_get_checked(kv, "road_tier", 1, 1, 3, &ok);
+        // BL-1340: the hex side, 0-5, or k_road_side_auto (255) for "no side named". A
+        // WIRE BOUNDARY, so the value is range-checked as the uint8_t that lands in the
+        // command and the whole command is rejected on violation — never clamped.
+        const long long side_v = kv_get_checked(kv, "road_side", k_road_side_auto, 0, 255, &ok);
+        if (ok && side_v > 5 && side_v != static_cast<long long>(k_road_side_auto))
+            ok = false;
         // unit_type only needs to FIT its uint16 destination:
         // apply_corp_command range-checks it against the live
         // unit_roster_table() itself, so the wire's only job is stopping a
@@ -309,6 +315,7 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         cmd.recipe       = static_cast<uint16_t>(rcp_v);
         cmd.workforce    = static_cast<int>(wf_v);
         cmd.road_tier    = static_cast<uint8_t>(road_v);
+        cmd.road_side    = static_cast<uint8_t>(side_v);
         cmd.unit_type    = static_cast<uint16_t>(unit_v);
         cmd.quantity     = qty_v;
         cmd.floor_price  = floor_v;

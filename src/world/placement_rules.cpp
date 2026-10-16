@@ -94,12 +94,62 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
     // No road on water — roads are land infrastructure.
     if (is_water_tile(tc.substrate))
         return placement_reason::ocean;
-    // Upgrade-in-place (BL-172): a tile already carrying an equal-or-better road is a no-op — you
-    // can raise a Track to a Road/Highway, but not re-lay the same or a lower tier. Reject rather
-    // than silently re-charge (BL-147 rejected any road; the tier check generalises that).
-    if (tc.road_level >= tier)
+    // Upgrade-in-place (BL-172, BL-1340): a tile every side of which already stands at or
+    // above @p tier has nothing this tier can add. Reject rather than silently re-charge
+    // (BL-147 rejected any road; the tier check generalises that).
+    if (max_road_tier(tc) >= tier && tier > 0)
+    {
+        bool room = false;
+        for (int s = 0; s < 6 && !room; ++s)
+            room = road_tier_on_side(tc, s) < tier;
+        if (!room)
+            return placement_reason::already_road;
+    }
+    return placement_reason::ok;
+}
+
+placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return placement_reason::ocean; // no tile: nothing to lay a road from
+    if (side < 0 || side > 5 || tier == 0 || tier > 3)
+        return placement_reason::ocean;
+    if (is_water_tile(tit->second.substrate))
+        return placement_reason::ocean;
+    // A ROAD TO NOWHERE CANNOT BE EXPRESSED (LOGISTICS.md § 4): a side with no neighbour,
+    // or a neighbour under water, is not a crossing.
+    const entity_id other = road_edge_neighbour(w, tile, side);
+    if (other == null_entity)
+        return placement_reason::ocean;
+    const auto oit = w.tiles.find(other);
+    if (oit == w.tiles.end() || is_water_tile(oit->second.substrate))
+        return placement_reason::ocean;
+    if (road_tier_on_side(tit->second, side) >= tier)
         return placement_reason::already_road;
     return placement_reason::ok;
+}
+
+int auto_road_side(const world& w, entity_id tile, std::uint8_t tier)
+{
+    int   best = -1;
+    float best_cost = 0.0f;
+    for (int s = 0; s < 6; ++s)
+    {
+        if (!can_place_road(w, tile, s, tier))
+            continue;
+        const entity_id other = road_edge_neighbour(w, tile, s);
+        const auto oit = w.tiles.find(other);
+        if (oit == w.tiles.end())
+            continue;
+        const float c = tile_traversal_cost(oit->second);
+        if (best < 0 || c < best_cost) // ties keep the lower side index
+        {
+            best = s;
+            best_cost = c;
+        }
+    }
+    return best;
 }
 
 placement_result can_place(const tile_component& tc, building_type type, resource_type target)

@@ -1895,7 +1895,7 @@ void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
 //   P29 The road / structure agreement: on every roaded works tile a through
 //       curve clears the cluster's keep-out disc by its half-width, an
 //       arriving road ends at the plan's forecourt, and the cluster moved; a
-//       town is not re-planned; a masked tile's road_level never reaches the
+//       town is not re-planned; a masked tile's road field never reaches the
 //       source.
 //   P30 A road change re-bakes only its window: region_hash moves while
 //       terrain_hash does not, and the windows the rule draws (a road built,
@@ -2257,10 +2257,10 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
             }
         if (mt)
         {
-            const std::uint8_t keep = mt->road_level;
-            mt->road_level = 3;
+            const std::uint16_t keep = mt->road_edges;
+            mt->road_edges = road_edges_on_every_side(3); // BL-1340: a road is an edge
             const bake_source ms = prepare_source(w, home, /*reveal_all=*/false);
-            mt->road_level = keep;
+            mt->road_edges = keep;
             check(ms.road[static_cast<std::size_t>(mt->grid_y) * ms.gw + mt->grid_x] == 0,
                   "P29", "a masked tile's road never reaches the source (the survey mask)");
         }

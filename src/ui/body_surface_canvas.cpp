@@ -18,6 +18,7 @@
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
+#include "world/river_generation.hpp"   // BL-1340: hex_side_for_offset — a road draws across its edge
 #include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
 #include "world/workforce.hpp"       // workforce_efficiency (Population lens, BL-069)
 
@@ -3876,7 +3877,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             && !state.dbg_hide_border_band;
     if (cache_nations)
         nation_cache.assign(static_cast<std::size_t>(gw) * gh, null_entity);
-    static std::vector<std::uint16_t> route_levels; // road | lane << 8, the band only
+    static std::vector<std::uint32_t> route_levels; // road_edges | lane << 16, the band only
     route_levels.resize(static_cast<std::size_t>(gw) * gh);
     for (int cr = row_cache_lo; cr <= row_cache_hi; ++cr)
     for (int cc = 0; cc < gw; ++cc)
@@ -3891,8 +3892,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         tile_cache[ci] = &ct;
         // The two route levels the static stroke cache hashes, read while the
         // record is in cache (BL-1260): a later read of a tile record is a miss.
-        route_levels[ci] = static_cast<std::uint16_t>(
-            ct.road_level | (static_cast<unsigned>(ct.lane_level) << 8));
+        // BL-1340: the whole six-side road mask, so a stroke cache keyed on this invalidates
+        // when ANY crossing of the tile moves — a max-over-sides reading would miss a new
+        // Track beside a Highway.
+        route_levels[ci] = static_cast<std::uint32_t>(
+            ct.road_edges | (static_cast<std::uint32_t>(ct.lane_level) << 16));
         if (cache_nations)
             nation_cache[ci] = nation_of(cid);
         tile_shade& sh = shade_cache[ci];
@@ -4027,7 +4031,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // end), so the half-edges still meet. A crossing is kept: the cross run's
         // tile does not run straight through along the other axis. Lanes only; a
         // road lattice's rungs are real roads.
-        const auto draw_network = [&](auto level_of, ImU32 col, float thick, bool skip_rungs)
+        // BL-1340: `link_of(self, dc, dr)` is the per-DIRECTION rung — non-zero only where
+        // the step actually crosses something laid. A road reads its edge mask there (a run
+        // draws across the boundary it crosses, RENDERING.md § Roads draw across the edge
+        // they cross); a sea lane, still a tile field, reads the neighbour's own level.
+        const auto draw_network = [&](auto level_of, auto link_of, ImU32 col, float thick,
+                                      bool skip_rungs)
         {
             static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
             const auto through = [&](int c, int r, bool horizontal) {
@@ -4054,6 +4063,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const tile_component* nb_tile = tile_rc(ncol, nrow);
                 if (!nb_tile || level_of(*nb_tile) == 0)
                     continue;
+                if (link_of(tile, card_off[n][0], card_off[n][1]) == 0)
+                    continue; // nothing is laid across THIS boundary (BL-1340)
                 if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
                     continue; // BL-408: god view draws into the masked region too
                 if (skip_rungs)
@@ -4216,16 +4227,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool route_lens  = state.overlay == overlay_mode::throughput;
         const bool route_drawn = !on_bake || route_lens;
         const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
-        if (route_drawn && tile.road_level > 0)
+        if (route_drawn && tile_has_road(tile))
         {
+            // The run's weight is the best tier meeting at this centre; which boundaries it
+            // crosses is the edge mask's (BL-1340).
             ImU32 col; float thick;
-            switch (tile.road_level)
+            switch (max_road_tier(tile))
             {
                 case 1:  col = IM_COL32(175, 158, 120, 205); thick = route_r * k_road_width_track;   break;
                 case 2:  col = IM_COL32(205, 188, 140, 225); thick = route_r * k_road_width_road;    break;
                 default: col = IM_COL32(225, 205, 150, 238); thick = route_r * k_road_width_highway; break;
             }
-            draw_network([](const tile_component& t) { return t.road_level; }, col, thick, false);
+            draw_network([](const tile_component& t) { return max_road_tier(t); },
+                         [&](const tile_component& self, int dc, int dr) {
+                             return road_tier_on_side(
+                                 self, hex_side_for_offset(dc, dr, (t_row & 1) != 0));
+                         },
+                         col, thick, false);
         }
 
         if (metered)
@@ -4236,6 +4254,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // roads: a lane is part of the network a convoy rides, not an overlay.
         if (route_drawn && tile.lane_level > 0)
             draw_network([](const tile_component& t) { return t.lane_level; },
+                         [](const tile_component&, int, int) { return 1; }, // a lane is a tile field
                          IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
 
         if (metered)
@@ -4535,8 +4554,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 else
                 {
                     const tile_component* t = tile_rc(cc, rr);
-                    v = t ? (std::uint64_t{ t->road_level } | (std::uint64_t{ t->lane_level } << 8))
-                          : 0xFFFFu;
+                    v = t ? (std::uint64_t{ t->road_edges } | (std::uint64_t{ t->lane_level } << 16))
+                          : 0xFFFFFFu;
                 }
                 v |= std::uint64_t{ survey_tile_visible(body.survey, gw, gh, cc, rr) } << 16;
                 v ^= fbits(vision_rc(cc, rr)) << 24;

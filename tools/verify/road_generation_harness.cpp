@@ -67,6 +67,7 @@
 // Exit non-zero on any failure.
 
 #include "world/components.hpp"
+#include "world/hex_neighbors.hpp" // BL-1340: a centre with no land neighbour has no edge to lay
 #include "world/hard_coded_world.hpp"
 #include "world/logistics.hpp" // invalidate_logistics_caches
 #include "world/market_clearing.hpp" // market_for_tile: a town's market (R6f)
@@ -103,8 +104,26 @@ static void check(bool ok, const char* what)
     if (!ok) ++g_fail;
 }
 
+// BL-1340 — A ROAD IS AN EDGE. This harness reads the road field as a TILE census
+// throughout (how many tiles at each tier, whether a route's tiles were stamped), which
+// is still a legitimate question of a tile: the best crossing meeting at it. These two
+// shims are the whole adaptation — every row's meaning is unchanged, and `road_edges`
+// (tools/verify/road_edges.cpp) owns the edge-grain rows this one does not ask.
+
+/// The best tier on any side of a six-side mask.
+static std::uint8_t mask_tier(std::uint16_t mask)
+{
+    std::uint8_t best = 0;
+    for (int s = 0; s < 6; ++s)
+        best = std::max(best, static_cast<std::uint8_t>((mask >> (2 * s)) & 0x3u));
+    return best;
+}
+
+/// The tile's own tier: the best crossing meeting at it.
+static std::uint8_t tile_tier(const tile_component& tc) { return max_road_tier(tc); }
+
 /// Re-run road generation on @p w's body with every nation's qualification forced to
-/// @p qual: reset the body's road_level field, drop the A*/reach caches (they embed the
+/// @p qual: reset the body's road field, drop the A*/reach caches (they embed the
 /// road discount), and call generate_roads again. Under BL-621's era-relative gates a
 /// UNIFORM value grades every nation at percentile 0.5 whatever the value is — the
 /// antiquity shape. The differential instrument is the SPREAD variant below. Formerly —
@@ -115,7 +134,7 @@ static void regen_roads_at_qualification(world& w, entity_id body, float qual)
         nc.qualification = qual;
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
-            tc.road_level = 0;
+            tc.road_edges = 0; // BL-1340: every crossing of the tile
     // EVERY traversal cache, through its one owner (BL-1119 round 2). This used to
     // clear only the pair cache and the reach field, so the regen read the built
     // world's road-weighted FLOOD FIELDS and laid its "road-free" network on roaded
@@ -183,7 +202,7 @@ static road_generation_stats regen_roads_with_spread(world& w, entity_id body,
             (i < n / 3) ? 0.05f : (i < 2 * n / 3) ? 0.30f : 0.60f;
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
-            tc.road_level = 0;
+            tc.road_edges = 0; // BL-1340
     invalidate_logistics_caches(w); // every cache, as above (BL-1119 round 2)
     road_generation_stats st{};
     generate_roads(w, body, nullptr, kVillageSpurFloorHeads, &st);
@@ -197,7 +216,7 @@ static road_generation_stats regen_roads_at_floor(world& w, entity_id body, long
 {
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
-            tc.road_level = 0;
+            tc.road_edges = 0; // BL-1340
     invalidate_logistics_caches(w);
     road_generation_stats st{};
     generate_roads(w, body, nullptr, floor_heads, &st, trace);
@@ -342,15 +361,17 @@ static highway_reading read_highway_inputs(const world& w, entity_id body, sprea
     return r;
 }
 
-/// Tier census of @p body's road_level field: counts[1..3], plus total in counts[0].
+/// Tier census of @p body's road field, PER TILE at its best crossing (BL-1340):
+/// counts[1..3], plus total in counts[0].
 static void tier_census(const world& w, entity_id body, int counts[4])
 {
     counts[0] = counts[1] = counts[2] = counts[3] = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.body != body || tc.road_level == 0 || tc.road_level > 3) continue;
+        const std::uint8_t lvl = tile_tier(tc);
+        if (tc.body != body || lvl == 0 || lvl > 3) continue;
         ++counts[0];
-        ++counts[tc.road_level];
+        ++counts[lvl];
     }
 }
 
@@ -437,9 +458,15 @@ h_grid h_build(world& w, entity_id body)
             continue;
         const std::size_t i = static_cast<std::size_t>(tc.grid_y) * g.gw + tc.grid_x;
         g.tile[i] = tid;
-        g.wgt[i]  = static_cast<std::int64_t>(std::llround(static_cast<double>(tile_traversal_cost(tc)) * 1.0e6));
+        // BL-1340: `market_cell_weight` (road_generation.cpp) is what the pass walks, and
+        // since a road is an EDGE it keeps a per-cell PROXY for it — the best tier on any
+        // of the cell's sides. This mirror must carry the same proxy or every recomputed
+        // route below reads a different field from the one the pass read.
+        g.wgt[i]  = static_cast<std::int64_t>(std::llround(
+            static_cast<double>(tile_traversal_cost(tc)
+                                * road_traversal_multiplier(max_road_tier(tc))) * 1.0e6));
         g.kind[i] = !is_water(tc.substrate) ? 0 : (is_open_ocean(tc.substrate) ? 2 : 1);
-        g.road[i] = (!is_water(tc.substrate) && tc.road_level > 0) ? 1 : 0;
+        g.road[i] = (!is_water(tc.substrate) && tile_has_road(tc)) ? 1 : 0;
         const auto nit = w.tile_to_nation.find(tid);
         g.nation[i] = nit != w.tile_to_nation.end() ? nit->second : null_entity;
     }
@@ -619,7 +646,7 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             const tile_component& tc = w.tiles.at(t);
             if (is_water(tc.substrate)) continue;
             ++land;
-            if (tc.road_level < 1) ok = false; // stamped; the tier per tile is R6e's
+            if (!tile_has_road(tc)) ok = false; // stamped; the tier per tile is R6e's
         }
         laid_ok[i] = (ok && land > 0) ? 1 : 0;
         if (laid_ok[i]) ++r.trunk_stamped;
@@ -647,15 +674,26 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             const std::uint8_t want = (sa >= 3 && sb >= 3 && q >= 0.80f) ? 3
                                     : ((sa >= 2 || sb >= 2) && q >= 0.40f) ? 2 : 1;
             bool ok = l.tier == want;
-            for (const entity_id t : l.path)
-            {
-                const tile_component& tc = w.tiles.at(t);
-                if (is_water(tc.substrate)) continue;
-                // Each tile at the gate of the nation whose land it crosses (Ben, 2026-10-03).
+            // BL-1340: the route lays EDGES, so a crossing takes the LOWER of its two
+            // ends' gates — the generalisation of "each tile at the gate of the nation
+            // whose land it crosses" (Ben, 2026-10-03) to a thing that lies between two
+            // tiles, and the same reading the trunk's own tier already takes of its two
+            // nations. A tile is therefore asked for the gate of the WEAKER of it and the
+            // route neighbours it is laid to.
+            const auto gate_of = [&](entity_id t) {
                 const float qt = pct_of(nation_at(t));
-                const std::uint8_t cap = (sa >= 3 && sb >= 3 && qt >= 0.80f) ? 3
-                                       : ((sa >= 2 || sb >= 2) && qt >= 0.40f) ? 2 : 1;
-                if (tc.road_level < std::min(want, cap)) ok = false;
+                return static_cast<std::uint8_t>((sa >= 3 && sb >= 3 && qt >= 0.80f) ? 3
+                                               : ((sa >= 2 || sb >= 2) && qt >= 0.40f) ? 2 : 1);
+            };
+            for (std::size_t k = 0; k + 1 < l.path.size(); ++k)
+            {
+                const tile_component& ta = w.tiles.at(l.path[k]);
+                const tile_component& tb = w.tiles.at(l.path[k + 1]);
+                if (is_water(ta.substrate) || is_water(tb.substrate)) continue;
+                const int side = road_side_between(w, l.path[k], l.path[k + 1]);
+                if (side < 0) continue;
+                const std::uint8_t cap = std::min(gate_of(l.path[k]), gate_of(l.path[k + 1]));
+                if (road_tier_on_side(ta, side) < std::min(want, cap)) ok = false;
             }
             if (!ok)
             {
@@ -673,10 +711,10 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
     // land of a nation under the Road gate (0.40), or on unowned land, leaves it at Track.
     {
         const std::map<entity_id, float> pct = road_qualification_percentiles(w);
-        std::map<entity_id, std::uint8_t> level_after; // the last raise per tile wins
+        std::map<entity_id, std::uint16_t> level_after; // the last raise per tile wins
         for (const auto& [t, before] : tr.raises) level_after[t] = 0;
-        for (const auto& [t, lvl] : level_after) level_after[t] = w.tiles.at(t).road_level;
-        std::map<entity_id, std::uint8_t> prior_level;
+        for (const auto& [t, lvl] : level_after) level_after[t] = w.tiles.at(t).road_edges;
+        std::map<entity_id, std::uint16_t> prior_level;
         for (const auto& [t, before] : tr.raises)
             if (prior_level.count(t) == 0) prior_level[t] = before;
         for (const auto& [t, after] : level_after)
@@ -687,7 +725,7 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             if (q >= 0.40f) continue;
             // The pass raised this tile; above Track is only legitimate when it was already
             // above Track before the pass (a national or ancient road it found there).
-            if (after > 1 && after > prior_level[t]) ++r.cliff_bad;
+            if (mask_tier(after) > 1 && mask_tier(after) > mask_tier(prior_level[t])) ++r.cliff_bad;
             ++r.cliff_tiles;
         }
     }
@@ -710,12 +748,12 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
     r.median_cost_after = median_of(pair_costs());
 
     // --- The field as the pass found it: "before", and R6c. -------------------------
-    std::map<entity_id, std::uint8_t> final_level;
-    for (const auto& [t, lvl] : tr.raises) final_level[t] = w.tiles.at(t).road_level;
-    // The level each raise left: the next raise's "before" on that tile, else the final.
-    std::vector<std::uint8_t> after_level(tr.raises.size(), 0);
+    std::map<entity_id, std::uint16_t> final_level;
+    for (const auto& [t, lvl] : tr.raises) final_level[t] = w.tiles.at(t).road_edges;
+    // The mask each raise left: the next raise's "before" on that tile, else the final.
+    std::vector<std::uint16_t> after_level(tr.raises.size(), 0);
     {
-        std::map<entity_id, std::uint8_t> next = final_level;
+        std::map<entity_id, std::uint16_t> next = final_level;
         for (std::size_t i = tr.raises.size(); i-- > 0;)
         {
             after_level[i] = next[tr.raises[i].first];
@@ -723,7 +761,7 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
         }
     }
     for (std::size_t i = tr.raises.size(); i-- > 0;)
-        w.tiles.at(tr.raises[i].first).road_level = tr.raises[i].second;
+        w.tiles.at(tr.raises[i].first).road_edges = tr.raises[i].second;
     tier_census(w, body, r.tiers_before);
     r.median_cost_before = median_of(pair_costs());
     g = h_build(w, body);
@@ -760,7 +798,7 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
         const auto& l = tr.links[i];
         while (applied < l.raises_before && applied < tr.raises.size())
         {
-            w.tiles.at(tr.raises[applied].first).road_level = after_level[applied];
+            w.tiles.at(tr.raises[applied].first).road_edges = after_level[applied];
             ++applied;
             dirty = true;
         }
@@ -838,7 +876,7 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
             r.notes.push_back(buf);
         }
     }
-    for (const auto& [t, lvl] : final_level) w.tiles.at(t).road_level = lvl; // the shipped field again
+    for (const auto& [t, lvl] : final_level) w.tiles.at(t).road_edges = lvl; // the shipped field again
     invalidate_logistics_caches(w);
 }
 
@@ -891,7 +929,7 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
     tier_census(w, body, r.shipped_tiers);
     std::map<entity_id, std::uint8_t> shipped_level;
     for (const auto& [tid, tc] : w.tiles)
-        if (tc.body == body) shipped_level[tid] = tc.road_level;
+        if (tc.body == body) shipped_level[tid] = tile_tier(tc); // BL-1340: the tile's best
 
     // Centre scale per tile (the highest standing there) and City+ per nation.
     std::map<entity_id, int> scale_at;
@@ -1010,8 +1048,8 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
     {
         if (tc.body != body) continue;
         const auto it = shipped_level.find(tid);
-        if (it != shipped_level.end() && tc.road_level > it->second) ++r.above_shipped;
-        if (it != shipped_level.end() && it->second == 3 && tc.road_level < 3)
+        if (it != shipped_level.end() && tile_tier(tc) > it->second) ++r.above_shipped;
+        if (it != shipped_level.end() && it->second == 3 && tile_tier(tc) < 3)
             ++r.highway_ancient_only;
     }
 
@@ -1419,20 +1457,21 @@ int main(int argc, char** argv)
         if (tc.body != kepler) continue;
         if (tc.grid_x >= 0 && tc.grid_x < gw && tc.grid_y >= 0 && tc.grid_y < gh)
             grid[static_cast<std::size_t>(tc.grid_y) * gw + tc.grid_x] = tid;
-        if (tc.road_level > 0)
+        if (tile_has_road(tc))
         {
             if (is_water(tc.substrate)) ++roaded_ocean;
             else                                              ++roaded_land;
-            if      (tc.road_level == 1) ++track_tiles;
-            else if (tc.road_level == 2) ++road_tiles;
-            else if (tc.road_level == 3) ++highway_tiles;
+            const std::uint8_t lvl = tile_tier(tc);
+            if      (lvl == 1) ++track_tiles;
+            else if (lvl == 2) ++road_tiles;
+            else if (lvl == 3) ++highway_tiles;
             else                         ++over_highway;
         }
     }
 
     // R1 presence.
-    check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile has road_level > 0)");
-    check(roaded_ocean == 0, "R1 no road_level stamped on ocean tiles");
+    check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile carries a road edge)");
+    check(roaded_ocean == 0, "R1 no road edge stamped on ocean tiles");
 
     // R2 three-tier ladder (BL-172), gated by qualification PERCENTILE (BL-618 as
     // amended by BL-621 — Ben's 2026-08-25 ruling on NR-641). The no_prehistory
@@ -1441,7 +1480,7 @@ int main(int argc, char** argv)
     // backbone and no Highways — the antiquity shape, and that IS the assertion.
     std::printf("      (tiers, all-tied world: track=%d road=%d highway=%d over=%d)\n",
                 track_tiles, road_tiles, highway_tiles, over_highway);
-    check(track_tiles > 0, "R2 track roads present (road_level 1)");
+    check(track_tiles > 0, "R2 track roads present (tier 1)");
     check(road_tiles > 0 && highway_tiles == 0,
           "R2 an all-tied world keeps Roads and promotes no Highway (BL-621)");
 
@@ -1499,7 +1538,7 @@ int main(int argc, char** argv)
         }
         std::printf("      (qualified regen: road tier on %d of 8 seeds; highway on %d of 8, first at seed index %d)\n",
                     seeds_with_road, seeds_with_highway, first);
-        check(seeds_with_road == 8, "R2 road tier (road_level 2) appears on every qualified seed");
+        check(seeds_with_road == 8, "R2 road tier (tier 2) appears on every qualified seed");
         // BL-1159: A PRINTED CONTROL, NO LONGER THE ROW. A no_prehistory world runs no
         // industrial urbanisation, so a nation holds at most one City+ and no link can be
         // City-City (0 of 8 since BL-1141). The Highway row reads the SHIPPED worlds below.
@@ -1507,7 +1546,7 @@ int main(int argc, char** argv)
                     "not asserted; R2s reads the shipped worlds, BL-1159)\n",
                     seeds_with_highway);
     }
-    check(over_highway == 0, "R2 no tile exceeds the highway tier (road_level <= 3)");
+    check(over_highway == 0, "R2 no tile exceeds the highway tier (tier <= 3)");
 
     // R3 connectivity — EVERY centre must touch a road tile (itself or a
     // 4-cardinal neighbour, column-wrapped).
@@ -1527,19 +1566,38 @@ int main(int argc, char** argv)
         const entity_id t = grid[static_cast<std::size_t>(r) * gw + c];
         if (t == null_entity) return false;
         const auto it = w.tiles.find(t);
-        return it != w.tiles.end() && it->second.road_level > 0;
+        return it != w.tiles.end() && tile_has_road(it->second);
     };
     auto is_anchor = [&](entity_id cid) -> bool {
         const auto it = w.population_centres.find(cid);
         return it != w.population_centres.end() && it->second.province_anchor;
     };
+    // BL-1340 — THE ONE EXEMPT CLASS A ROAD BEING AN EDGE CREATES. A road crosses the
+    // boundary between two tiles, so a centre with NO land neighbour on any of its six
+    // sides — a one-tile island — cannot carry one at all: "a road to nowhere is
+    // therefore impossible to express, which is the point" (LOGISTICS.md § 4). Before the
+    // move such a centre took a Track on its own tile that joined nothing. They are
+    // counted and named rather than quietly folded into the pass rate.
+    const auto land_at = [&](int rr, int cc) {
+        if (rr < 0 || rr >= gh) return false;
+        const entity_id t = grid[static_cast<std::size_t>(rr) * gw + ((cc % gw) + gw) % gw];
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() && !is_water(it->second.substrate);
+    };
     int total = 0, connected = 0, anchors = 0, anchors_connected = 0, street_only = 0,
-        off_lattice = 0;
+        off_lattice = 0, islanders = 0;
     for (const auto& [cid, tile] : w.population_centre_tile)
     {
         const auto tit = w.tiles.find(tile);
         if (tit == w.tiles.end() || tit->second.body != kepler) continue;
         const int  r = tit->second.grid_y, c = tit->second.grid_x;
+        bool has_land_neighbour = false;
+        for (int s = 0; s < 6; ++s)
+        {
+            const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, s);
+            has_land_neighbour = has_land_neighbour || land_at(nb.gy, nb.gx);
+        }
+        if (!has_land_neighbour) { ++islanders; continue; }
         const bool own       = road_at(r, c);
         const bool neighbour = road_at(r, (c + 1) % gw) || road_at(r, (c + gw - 1) % gw)
                                || road_at(r - 1, c) || road_at(r + 1, c);
@@ -1555,20 +1613,22 @@ int main(int argc, char** argv)
         }
     }
     std::printf("      (connectivity: %d/%d centres touch a road; %d/%d anchors;"
-                " %d street-only — below the spur floor (BL-1119), or spur-cap/open-sea survivors)\n",
-                connected, total, anchors_connected, anchors, street_only);
+                " %d street-only — below the spur floor (BL-1119), or spur-cap/open-sea"
+                " survivors; %d exempt with no land neighbour at all, BL-1340)\n",
+                connected, total, anchors_connected, anchors, street_only, islanders);
     check(total > 0 && connected == total,
-          "R3 every population centre touches the road lattice (anchors included, BL-623)");
+          "R3 every population centre with a land neighbour touches the road lattice"
+          " (anchors included, BL-623; an island centre cannot carry an edge, BL-1340)");
 
-    // R4 determinism — regenerate and compare the whole road_level field by tile.
+    // R4 determinism — regenerate and compare the whole road EDGE field by tile (BL-1340).
     world w2 = make_hard_coded_world(no_prehistory());
     int mismatches = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
         const auto it = w2.tiles.find(tid);
-        if (it == w2.tiles.end() || it->second.road_level != tc.road_level) ++mismatches;
+        if (it == w2.tiles.end() || it->second.road_edges != tc.road_edges) ++mismatches;
     }
-    check(mismatches == 0, "R4 road_level field identical across two generations");
+    check(mismatches == 0, "R4 road edge field identical across two generations");
 
     // R5 — the tree and the floor (BL-1119). A fresh world, so Q below keeps its own.
     {

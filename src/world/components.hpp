@@ -749,11 +749,22 @@ struct tile_component
     /// so the collision misleads nobody.
     float      substrate_density = 0.0f;
 
-    /// Road tier on this tile (BL-077 field; BL-172 ladder). 0 = no road; 1 = Track, 2 = Road,
-    /// 3 = Highway. Higher tiers lower the intra-body A* traversal cost of the tile
-    /// (road_traversal_multiplier: x0.67 / x0.50 / x0.40). Populated by BL-146/BL-172 road
-    /// generation and BL-147/BL-172 player placement; 0 everywhere in the economic core.
-    std::uint8_t road_level = 0;
+    /// Road tiers on this tile's six hex sides (BL-1340; LOGISTICS.md § 4. A road is an edge
+    /// between two tiles). TWO BITS A SIDE, side i at bits 2i..2i+1: 0 = none, 1 = Track,
+    /// 2 = Road, 3 = Highway -- twelve bits a tile. Side ordering is the river pass's:
+    /// 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE (odd-r offset, hex_neighbors.hpp).
+    ///
+    /// A ROAD IS AN EDGE, NEVER A TILE, exactly as a river already is: BOTH tiles of a
+    /// crossing carry it, side i of one tile mirroring side i+3 mod 6 of its neighbour, and
+    /// the two agreeing is an INVARIANT -- `road_edges_mirrored` (logistics.hpp) asserts it
+    /// after generation and `read_world_snapshot` rejects a stream that breaks it. So
+    /// "this tile has a Highway" is no longer something the world can say; a tier belongs to
+    /// a crossing, and every count of roads counts EDGES, each one once (`count_road_edges`).
+    ///
+    /// A tier discounts the EDGE's traversal cost (`road_edge_discount`, applied beside the
+    /// river discount), never either node's. Written by BL-146/BL-172 road generation and
+    /// BL-147/BL-172 player placement; 0 everywhere in the economic core.
+    std::uint16_t road_edges = 0;
 
     /// River edge bitmask (BL-170). Bit i (0-5) set means this tile's hex side i carries a
     /// river crossing. Side ordering: 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE (odd-r offset — see
@@ -806,6 +817,66 @@ struct tile_component
     /// the sea leg for every consumer of traversal cost. 0 everywhere a world ran no spans.
     std::uint8_t lane_level = 0;
 };
+
+// ---------------------------------------------------------------------------
+// Road edges (BL-1340) -- the accessors for tile_component::road_edges
+// ---------------------------------------------------------------------------
+// A road is an EDGE between two tiles (LOGISTICS.md § 4): two bits a side, six
+// sides. These are the only places the packing is known; nothing else shifts.
+
+/// The hex side facing @p side from the neighbour across it (i + 3 mod 6).
+inline constexpr int opposite_hex_side(int side) { return (side + 3) % 6; }
+
+/// Road tier on hex side @p side (0-5) of @p tc: 0 none / 1 Track / 2 Road / 3 Highway.
+/// Out-of-range sides read 0 rather than UB -- callers derive a side from an offset
+/// table that can legitimately answer "not a neighbour".
+inline std::uint8_t road_tier_on_side(const tile_component& tc, int side)
+{
+    if (side < 0 || side > 5)
+        return 0;
+    return static_cast<std::uint8_t>((tc.road_edges >> (2 * side)) & 0x3u);
+}
+
+/// Write @p tier (0-3) onto side @p side (0-5) of @p tc. ONE HALF OF AN EDGE: the
+/// caller must write the facing side of the neighbour too, or the mirror invariant
+/// breaks. `lay_road_edge` (logistics.hpp) does both and is what callers should use.
+inline void set_road_tier_on_side(tile_component& tc, int side, std::uint8_t tier)
+{
+    if (side < 0 || side > 5 || tier > 3)
+        return;
+    const auto mask = static_cast<std::uint16_t>(0x3u << (2 * side));
+    tc.road_edges = static_cast<std::uint16_t>((tc.road_edges & ~mask)
+                                               | (static_cast<std::uint16_t>(tier) << (2 * side)));
+}
+
+/// True if ANY side of @p tc carries a road -- "this tile is on the network", which is
+/// still a legitimate question even though "this tile's tier" is not.
+inline bool tile_has_road(const tile_component& tc) { return tc.road_edges != 0; }
+
+/// EVERY side at one tier — the mask a hand-built fixture wants when it means "this tile
+/// is in the middle of a road", and what the pre-v53 migration would have made of a tile
+/// whose neighbours were all roaded. tier x 0b010101010101: 1 -> 0x555, 2 -> 0xAAA,
+/// 3 -> 0xFFF. NOT for generation or placement, which lay one crossing at a time.
+inline constexpr std::uint16_t road_edges_on_every_side(std::uint8_t tier)
+{
+    return static_cast<std::uint16_t>((tier > 3 ? 3u : static_cast<unsigned>(tier)) * 0x555u);
+}
+
+/// "No side named" — the one value a `place_road` caller may pass instead of a side
+/// (BL-1340). The implementation then picks the cheapest land neighbour deterministically
+/// (`placement_rules::auto_road_side`): lowest traversal cost, ties to the lower side
+/// index. Outside 0-5 by construction, so no real side can collide with it.
+inline constexpr std::uint8_t k_road_side_auto = 0xFFu;
+
+/// The highest tier on any of @p tc's sides. A DISPLAY / PLANNER read, never a cost:
+/// the cost of a step is the tier of the one edge it crosses (`road_edge_discount`).
+inline std::uint8_t max_road_tier(const tile_component& tc)
+{
+    std::uint8_t best = 0;
+    for (int s = 0; s < 6; ++s)
+        best = std::max(best, road_tier_on_side(tc, s));
+    return best;
+}
 
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
 /// A body starts `hidden` — the player knows only its type, orbital position and

@@ -98,14 +98,14 @@ std::map<entity_id, std::uint8_t> road_field(const world& w, entity_id body)
 {
     std::map<entity_id, std::uint8_t> f;
     for (const auto& [tid, tc] : w.tiles)
-        if (tc.body == body && tc.road_level != 0) f[tid] = tc.road_level;
+        if (tc.body == body && tc.road_edges != 0) f[tid] = tc.road_edges;
     return f;
 }
 
 void clear_roads(world& w, entity_id body)
 {
     for (auto& [tid, tc] : w.tiles)
-        if (tc.body == body) tc.road_level = 0;
+        if (tc.body == body) tc.road_edges = 0;
     invalidate_logistics_caches(w);
 }
 
@@ -115,7 +115,7 @@ void set_field(world& w, entity_id body, const std::map<entity_id, std::uint8_t>
         if (tc.body == body)
         {
             const auto it = f.find(tid);
-            tc.road_level = it == f.end() ? 0 : it->second;
+            tc.road_edges = it == f.end() ? 0 : it->second;
         }
     invalidate_logistics_caches(w);
 }

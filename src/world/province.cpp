@@ -1322,8 +1322,11 @@ province_sustain measure_province_sustain(const world& w, const province& pr)
 
         ++s.land_tiles;                         // AREA
         s.habitability_area += tc.habitability;  // HABITABILITY
+        // BL-1340: a road is an edge, so the tile's INFRASTRUCTURE reading is the best
+        // tier on any of its sides — the development the ground carries, which is what
+        // this term always meant. A planner/summary read, never a traversal cost.
         s.infrastructure_gain +=                 // INFRASTRUCTURE
-            tc.habitability * (static_cast<float>(tc.road_level) / k_road_ladder_max);
+            tc.habitability * (static_cast<float>(max_road_tier(tc)) / k_road_ladder_max);
 
         const auto pit = pop_by_tile.find(tile_id);
         if (pit != pop_by_tile.end())

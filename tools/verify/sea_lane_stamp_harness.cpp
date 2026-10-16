@@ -882,7 +882,7 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
         const auto it = L.w.tiles.find(L.grid[static_cast<std::size_t>(i)]);
         if (it == L.w.tiles.end()) continue;
         if (it->second.lane_level > 0) { ++lane_tiles; if (!is_sea(it->second.substrate)) ++lane_on_land; }
-        if (is_water(it->second.substrate) && it->second.road_level > 0) ++road_on_water;
+        if (is_water(it->second.substrate) && tile_has_road(it->second)) ++road_on_water;
     }
     int earned = 0;
     for (const sea_leg& l : L.legs) if (l.uses >= lp.sea_lane_tier1_uses) ++earned;

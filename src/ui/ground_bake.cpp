@@ -711,6 +711,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
     std::vector<std::uint8_t> raw_in(n, 0), raw_out(n, 0);
     // BL-1253: road and lane tiers, read in this same pass over the tiles.
     s.road.assign(n, 0);
+    s.road_sides.assign(n, 0); // BL-1340: which boundaries the roads cross
     s.lane.assign(n, 0);
 
     for (const auto& [id, t] : w.tiles)
@@ -744,8 +745,13 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
         // BL-1253: a revealed tile's route (a masked one carries none). Roads
         // on land, lanes on water, as the world lays them; rail (k_route_rail)
         // from the world's track field (BL-1255), over any road on the tile.
-        if (!water && t.road_level > 0)
-            s.road[i] = static_cast<std::uint8_t>(std::min<int>(t.road_level, k_route_highway));
+        if (!water && tile_has_road(t))
+        {
+            // BL-1340: the tile's own tier is the best crossing meeting at it (the weight
+            // its run draws at); the mask says which boundaries that run crosses.
+            s.road[i] = static_cast<std::uint8_t>(std::min<int>(max_road_tier(t), k_route_highway));
+            s.road_sides[i] = t.road_edges;
+        }
         if (water && t.lane_level > 0)
             s.lane[i] = t.lane_level;
         if (!water && w.rail_track.count(id) != 0) // BL-1255: the track field draws as rail

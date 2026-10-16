@@ -47,7 +47,11 @@ static entity_id make_grid(world& w, int gw, int gh,
             const entity_id t = w.create_entity();
             tile_component tc{};
             tc.body = body; tc.grid_x = c; tc.grid_y = r;
-            tc.substrate = sub; tc.landform = lf; tc.road_level = road;
+            tc.substrate = sub; tc.landform = lf;
+            // BL-1340: a road is an EDGE. A fixture tile 'carrying a road' is one in the
+            // middle of a run: every side at that tier, so a step across any boundary of it
+            // pays the tier — which is what the per-node field meant before the move.
+            tc.road_edges = road_edges_on_every_side(road);
             w.tiles[t] = tc;
         }
     return body;
@@ -88,7 +92,7 @@ int main()
         check(cm > cp, "mountains cost more than plains over the same path");
     }
 
-    // T3 — road discount: road_level lowers the traversal cost of the crossed tiles.
+    // T3 — road discount: the tier of the EDGE lowers the cost of the step across it.
     {
         world w0; const entity_id b0 = make_grid(w0, 1, 5, terrain_landform::plains,
                                                  terrain_substrate::sedimentary, /*road=*/0);
@@ -97,7 +101,7 @@ int main()
         const float c0 = intra_body_path(w0, b0, tile_at(w0,b0,0,0), tile_at(w0,b0,0,4)).cost;
         const float c2 = intra_body_path(w2, b2, tile_at(w2,b2,0,0), tile_at(w2,b2,0,4)).cost;
         check(c2 < c0, "a roaded corridor costs less than an unroaded one");
-        check(approx(c2, 2.0f), "road_level 2 halves the plains column cost (4.0 -> 2.0)");
+        check(approx(c2, 2.0f), "a Road (tier 2) crossing halves the plains column cost (4.0 -> 2.0)");
     }
 
     // T4 — route-cache idempotence: the same query returns an identical cost, and
@@ -211,10 +215,10 @@ int main()
         check(approx(sea.cost, 3.5f), "ocean sea-leg raises the crossing cost (0.5*(1+2.5)*2 = 3.5)");
     }
 
-    // T6 — data model: road_level defaults to 0; land_use has the infrastructure value.
+    // T6 — data model: road_edges defaults to 0; land_use has the infrastructure value.
     {
         tile_component tc{};
-        check(tc.road_level == 0, "tile_component.road_level defaults to 0");
+        check(tc.road_edges == 0, "tile_component.road_edges defaults to 0 (no side roaded)");
         const land_use_component::type infra = land_use_component::type::infrastructure;
         check(infra == land_use_component::type::infrastructure, "land_use has an infrastructure value");
     }
@@ -329,7 +333,7 @@ int main()
         check(approx(spent, 0.4f), "a decommissioned hub confers no discount (full 0.4 cost)");
     }
     // T10 — BL-147/BL-172 road placement: place_road(tier) on a road-free land tile raises
-    // road_level to that tier, debits the tier's flat cost (no market -> no materials), and
+    // the crossing to that tier, debits the tier's flat cost (no market -> no materials), and
     // invalidates the A* cache. Upgrade-in-place: a higher tier on the same tile succeeds; the
     // same or a lower tier is rejected (already at or above).
     {
@@ -347,7 +351,7 @@ int main()
 
         const construction_result r = place_road(w, reg, corp, t, 1); // Track
         check(r == construction_result::placed, "place_road (Track) on a land tile succeeds");
-        check(w.tiles[t].road_level == 1, "placed Track raises the tile road_level to 1");
+        check(max_road_tier(w.tiles[t]) == 1, "placed Track raises one of the tile's crossings to 1");
         check(approx(bal - w.corporations[corp].balance, 25.0f),
               "Track debits its flat build_cost (25 cr, no market materials)");
         check(cache_warm && w.astar_cost_cache.empty(),
@@ -363,7 +367,7 @@ int main()
         bal = w.corporations[corp].balance;
         const construction_result r_up = place_road(w, reg, corp, t, 3); // Highway
         check(r_up == construction_result::placed, "upgrading Track -> Highway succeeds");
-        check(w.tiles[t].road_level == 3, "upgrade raises the tile road_level to 3 (Highway)");
+        check(max_road_tier(w.tiles[t]) == 3, "upgrade raises the crossing to 3 (Highway)");
         check(approx(bal - w.corporations[corp].balance, 90.0f),
               "Highway debits its flat build_cost (90 cr)");
         check(w.astar_cost_cache.empty(), "the upgrade invalidates the A* cost cache");

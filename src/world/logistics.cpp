@@ -80,11 +80,21 @@ float landform_logistics_cost(terrain_landform lf)
     return 1.0f;
 }
 
-float road_traversal_multiplier(std::uint8_t road_level)
+float road_traversal_multiplier(std::uint8_t tier)
 {
     // Each tier cuts the traversal cost; tier 0 = 1.0. 1/(1 + 0.5*tier): Track(1) ~0.67,
     // Road(2) 0.50, Highway(3) 0.40 — diminishing returns up the ladder (BL-172).
-    return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
+    return 1.0f / (1.0f + 0.5f * static_cast<float>(tier));
+}
+
+float road_edge_discount(const tile_component& from, int side)
+{
+    // BL-1340 — THE LADDER MOVED TO THE EDGE (LOGISTICS.md § 4). The same
+    // `road_traversal_multiplier` the node used to carry, read of the one crossing the hop
+    // makes. SYMMETRIC by the mirror invariant: the facing side of the tile being entered
+    // holds the same tier, so a road prices the hop the same way round — a river is what
+    // makes a path directed, never a road.
+    return road_traversal_multiplier(road_tier_on_side(from, side));
 }
 
 static float sea_lane_traversal_multiplier(std::uint8_t lane_level)
@@ -97,9 +107,11 @@ static float sea_lane_traversal_multiplier(std::uint8_t lane_level)
     return lane_level > 0 ? road_traversal_multiplier(2) : 1.0f;
 }
 
-/// A tile's traversal cost: ocean = sea leg, land = landform cost, both scaled by the
-/// road discount. The per-node weight; an edge cost is the average of its two nodes
-/// (A* and body_reach_field's Dijkstra both do this — see their own comments).
+/// A tile's traversal cost: ocean = sea leg, land = landform cost, the sea scaled by any
+/// lane on it. The per-node weight; an edge cost is the average of its two nodes, times
+/// that edge's river and road discounts (A* and body_reach_field's Dijkstra both do this
+/// — see their own comments). BL-1340: the ROAD discount is no longer here, because a
+/// road is an edge between two tiles and never a property of one.
 ///
 /// PROMOTED OUT OF the anonymous namespace above for BL-470 (unit march seam):
 /// run_unit_march (economy_system.cpp) spends a marching unit's march points
@@ -113,9 +125,183 @@ float tile_traversal_cost(const tile_component& tc)
                            : landform_logistics_cost(tc.landform);
     // BL-1098: a sea lane discounts the water it lies on (only ever stamped on sea tiles;
     // a land tile's lane_level is always 0, so this factor is 1 there).
-    return base * road_traversal_multiplier(tc.road_level) * sea_lane_traversal_multiplier(tc.lane_level);
+    return base * sea_lane_traversal_multiplier(tc.lane_level);
 }
 
+
+// ---------------------------------------------------------------------------
+// Road edges (BL-1340) — LOGISTICS.md § 4. A road is an edge between two tiles
+// ---------------------------------------------------------------------------
+// Both halves of a crossing are written together (`lay_road_edge`), every count
+// reads the canonical half only (`count_road_edges`), and the two halves agreeing
+// is asserted rather than assumed (`road_edges_mirrored`).
+
+namespace {
+
+/// (body, grid_y, grid_x) -> tile, over a CONST world: the neighbour lookup the two
+/// const readers below need, built in a std::map so the walk order is the raster's and
+/// no unordered-map layout can reach the answer.
+std::map<std::tuple<entity_id, int, int>, entity_id> road_tile_index(const world& w)
+{
+    std::map<std::tuple<entity_id, int, int>, entity_id> idx;
+    for (const auto& [tid, tc] : w.tiles)
+        idx.emplace(std::make_tuple(tc.body, tc.grid_y, tc.grid_x), tid);
+    return idx;
+}
+
+/// The grid width of @p body, or 0 if unknown — the east-west wrap's modulus.
+int road_grid_width(const world& w, entity_id body)
+{
+    const auto bit = w.bodies.find(body);
+    return bit != w.bodies.end() ? bit->second.grid_width : 0;
+}
+
+/// The neighbour of (@p gx, @p gy) across hex side @p side on a @p gw x @p gh grid, with
+/// the east-west wrap and no vertical wrap. Returns false where the row does not exist.
+bool road_neighbour_cell(int gx, int gy, int side, int gw, int gh, int& nx, int& ny)
+{
+    if (side < 0 || side > 5 || gw <= 0)
+        return false;
+    const hex_neighbors::coord c = hex_neighbors::neighbour(gx, gy, side);
+    if (c.gy < 0 || (gh > 0 && c.gy >= gh))
+        return false;
+    nx = ((c.gx % gw) + gw) % gw;
+    ny = c.gy;
+    return true;
+}
+
+} // namespace
+
+int road_side_between(const world& w, entity_id a, entity_id b)
+{
+    const auto ait = w.tiles.find(a);
+    const auto bit = w.tiles.find(b);
+    if (ait == w.tiles.end() || bit == w.tiles.end() || ait->second.body != bit->second.body)
+        return -1;
+    const int gw = road_grid_width(w, ait->second.body);
+    int dc = bit->second.grid_x - ait->second.grid_x;
+    if (gw > 1) // the east-west cylinder wrap
+    {
+        if (dc > 1)  dc -= gw;
+        if (dc < -1) dc += gw;
+    }
+    return hex_side_for_offset(dc, bit->second.grid_y - ait->second.grid_y,
+                               (ait->second.grid_y & 1) != 0);
+}
+
+entity_id road_edge_neighbour(const world& w, entity_id tile, int side)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return null_entity;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return null_entity;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    int nx = 0, ny = 0;
+    if (!road_neighbour_cell(tit->second.grid_x, tit->second.grid_y, side, gw, gh, nx, ny))
+        return null_entity;
+    const auto git = w.body_tile_index.find(tit->second.body);
+    if (git != w.body_tile_index.end())
+    {
+        const std::size_t idx = static_cast<std::size_t>(ny) * static_cast<std::size_t>(gw)
+                              + static_cast<std::size_t>(nx);
+        return idx < git->second.size() ? git->second[idx] : null_entity;
+    }
+    // No warm raster (a const caller cannot build one): one scan, and the answer is the
+    // same tile either way — a body holds one tile per cell.
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.body == tit->second.body && tc.grid_x == nx && tc.grid_y == ny)
+            return tid;
+    return null_entity;
+}
+
+entity_id road_edge_neighbour(world& w, entity_id tile, int side)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return null_entity;
+    body_tile_grid(w, tit->second.body); // warm the raster, then read it const
+    return road_edge_neighbour(static_cast<const world&>(w), tile, side);
+}
+
+bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier)
+{
+    if (side < 0 || side > 5 || tier == 0 || tier > 3)
+        return false;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end() || is_water(tit->second.substrate)) // BL-516: a road is land
+        return false;
+    const entity_id other = road_edge_neighbour(w, tile, side);
+    if (other == null_entity)
+        return false; // a road to nowhere cannot be expressed (LOGISTICS.md § 4)
+    const auto oit = w.tiles.find(other);
+    if (oit == w.tiles.end() || is_water(oit->second.substrate))
+        return false;
+    if (road_tier_on_side(tit->second, side) >= tier)
+        return false; // raises only — max on overlap
+    set_road_tier_on_side(tit->second, side, tier);
+    set_road_tier_on_side(oit->second, opposite_hex_side(side), tier);
+    return true;
+}
+
+int count_road_edges(const world& w, int* per_tier)
+{
+    if (per_tier != nullptr)
+        per_tier[0] = per_tier[1] = per_tier[2] = 0;
+    int total = 0;
+    // THE CANONICAL HALF: sides 0-2 (E, NE, NW). Every edge is side 0, 1 or 2 of exactly
+    // one of its two tiles, so this sees each crossing once — a walk over all six sides
+    // would count every one of them twice.
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        (void)tid;
+        for (int s = 0; s < 3; ++s)
+        {
+            const std::uint8_t t = road_tier_on_side(tc, s);
+            if (t == 0)
+                continue;
+            ++total;
+            if (per_tier != nullptr && t <= 3)
+                ++per_tier[t - 1];
+        }
+    }
+    return total;
+}
+
+bool road_edges_mirrored(const world& w, entity_id* bad_tile)
+{
+    const auto idx = road_tile_index(w);
+    std::map<entity_id, const tile_component*> ordered; // tile-id order: the first offender is stable
+    for (const auto& [tid, tc] : w.tiles)
+        ordered.emplace(tid, &tc);
+    for (const auto& [tid, tcp] : ordered)
+    {
+        const tile_component& tc = *tcp;
+        const int gw = road_grid_width(w, tc.body);
+        const auto bit = w.bodies.find(tc.body);
+        const int gh = bit != w.bodies.end() ? bit->second.grid_height : 0;
+        for (int s = 0; s < 6; ++s)
+        {
+            int nx = 0, ny = 0;
+            if (!road_neighbour_cell(tc.grid_x, tc.grid_y, s, gw, gh, nx, ny))
+                continue; // no neighbour that way: nothing to agree with
+            const auto nit = idx.find(std::make_tuple(tc.body, ny, nx));
+            if (nit == idx.end())
+                continue; // the cell is absent from the world (a hand-built fixture)
+            const auto ntc = w.tiles.find(nit->second);
+            if (ntc == w.tiles.end())
+                continue;
+            if (road_tier_on_side(tc, s) != road_tier_on_side(ntc->second, opposite_hex_side(s)))
+            {
+                if (bad_tile != nullptr)
+                    *bad_tile = tid;
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
 {
@@ -166,12 +352,15 @@ constexpr int k_flood_off_dr[4] = { -1,  1,  0, 0 };
 /// D) reads. Both floods share this one expression so they cannot disagree.
 inline float flood_edge_cost(float cur_cost, const tile_component& n_tc, int n_row, int i)
 {
-    // River discount (BL-170): a river-adjacent edge is cheaper, stacking
-    // multiplicatively with the road-tier discount inside tile_traversal_cost.
-    // The hop runs n -> settled: the reverse of offset i, from n's row parity.
+    // River discount (BL-170) and ROAD discount (BL-1340), both per-EDGE and stacking
+    // multiplicatively over the mean of the two node weights. The hop runs n -> settled:
+    // the reverse of offset i, from n's row parity. The river reads the tile being LEFT
+    // (it is directed); the road is the same tier read from either end (mirrored), so
+    // reading it off n_tc's side is the whole edge.
     const int hex_side = hex_side_for_offset(-k_flood_off_dc[i], -k_flood_off_dr[i], (n_row & 1) != 0);
     const float river_mult = (hex_side >= 0) ? river_edge_discount(n_tc, hex_side) : 1.0f;
-    return 0.5f * (cur_cost + tile_traversal_cost(n_tc)) * river_mult;
+    const float road_mult  = (hex_side >= 0) ? road_edge_discount(n_tc, hex_side) : 1.0f;
+    return 0.5f * (cur_cost + tile_traversal_cost(n_tc)) * river_mult * road_mult;
 }
 
 /// Fetch or build the COMPLETED flood field anchored at @p anchor_tile — the
@@ -922,7 +1111,7 @@ const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w)
             const auto tit = w.tiles.find(t);
             if (tit == w.tiles.end() || is_water(tit->second.substrate))
                 continue;
-            if (tit->second.road_level > 0)
+            if (tile_has_road(tit->second)) // BL-1340: any side of the tile carries a road
             {
                 wired[i] = 1;
                 bodies.insert(provs[i].body);
@@ -961,7 +1150,7 @@ const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w)
                 strait[c] = is_open_ocean(tc.substrate) ? 0 : 1;
                 continue;
             }
-            if (tc.road_level > 0)
+            if (tile_has_road(tc)) // BL-1340: on the network = any side carries a road
                 road_prov[c] = index_of(w.provinces.province_of(raster[c]));
         }
 
