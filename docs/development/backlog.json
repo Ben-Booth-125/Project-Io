@@ -932,6 +932,25 @@
    ],
    "title": "Nation selection offers Spectate: open the generated world with nobody seated",
    "design": "SPRINT 55 (Ben, 2026-10-15): spectate UI in the nation-selection step of generation. Today spectating is only the --spectate flag; the seat screen gains a Spectate choice beside Confirm that calls spectate_session(). Live click required."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, ruling NR-1048); filed by Claude",
+   "id": "BL-1335",
+   "short_name": "HIGH_TAX_PRODUCTIVITY_PENALTY",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [],
+   "files": [],
+   "title": "Sustained high taxes sour the public and cut productivity: a downside for high budgets",
+   "design": "SPRINT 55 (Ben, 2026-10-16): consider downsides for high budgets - a public mood penalty that takes effect after periods of high tax and affects productivity. DESIGN NOTES ONLY, not yet settled. (1) Term: GLOSSARY.md \"Sentiment\" is the actor-to-actor relation, so a population's mood needs its own glossary term before design. (2) Hook: the Budget ledger's tax tier (ACTIONS.json ledger.budget_tax_tier) is the cause; the penalty should be a systemic in-world force with a visible cause, never a term inside the scorer. (3) Shape: a lagged accumulator per nation (periods of high tax, decaying when taxes fall) feeding a productivity modifier on the nation's buildings, through the meta layer (META_LAYER.md modifier_set). (4) Owning doc to settle: NATIONS.md (tax) or POPULATION.md (productivity). (5) It brakes the AI budget scorer too, which now stands in for the player (NR-1048)."
   }
  ]
 }
