@@ -407,6 +407,11 @@ owes, and the pool flows down the queue (`docs/economy/RESEARCH.md` § Research 
 
 The cadence key is `world::current_econ_tick` — the quarter counter, never the day tick.
 
+**Until the budget verbs exist, the scorer stands in for the player (Ben, 2026-10-16, NR-1048).**
+The player's nation has no way yet to set its own weights, so move 1 scores it like a rival and
+writes its slot. The rule below holds the moment the budget verbs exist; the stand-in is the gap
+between the two, not a second rule.
+
 **The player's nation is never scored (Ben, 2026-10-10).** Its weights are the player's: move 1
 skips it, so no scorer ever writes its slot of `w.nation_budgets`, and the player sets the slot
 through the budget verbs. Moves 2 to 4 are mechanical — they gather the claims the firms on its ground

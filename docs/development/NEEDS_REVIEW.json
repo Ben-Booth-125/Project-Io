@@ -373,11 +373,13 @@
    "title": "The player's nation has its budget scored by nation_ai, against NATIONS.md and AI_OPPONENT.md § 11",
    "raised": "2026-10-15",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1275 (nation research AI) lane report, confirmed by reading src/world/nation_ai.cpp:543 and nation_step.cpp:54",
    "what": "score_national_budgets walks every landed nation and run_nation_step writes the result into w.nation_budgets, the player's nation included. The docs say the player's nation is never scored by nation_ai (AI_OPPONENT.md § 11, the 2026-10-10 narrowing). BL-1275's research pass does skip the player's nation; the budget scorer does not. This predates sprint 55.",
    "why_it_matters": "Either the AI is setting the player's national budget every cadence (an act on the player the grant forbids), or the player has no budget control yet and the scored weights stand in as a default. The two readings need different fixes.",
-   "call": "A) skip the player's nation in the scorer and give it a fixed default budget until a budget control exists; B) keep scoring it as a stand-in and record that as a dated exception in § 11; C) build the player's budget control now."
+   "call": "A) skip the player's nation in the scorer and give it a fixed default budget until a budget control exists; B) keep scoring it as a stand-in and record that as a dated exception in § 11; C) build the player's budget control now.",
+   "resolved": "2026-10-16",
+   "resolution": "Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11."
   }
  ]
 }

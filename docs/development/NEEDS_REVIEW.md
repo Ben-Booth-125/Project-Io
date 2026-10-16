@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 26 open, 0 resolved.*
+*26 entries — 25 open, 1 resolved.*
 
 ---
 
@@ -227,6 +227,13 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 
 **Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-1048 — The player's nation has its budget scored by nation_ai, against NATIONS.md and AI_OPPONENT.md § 11
 *question · raised 2026-10-15 · from BL-1275 (nation research AI) lane report, confirmed by reading src/world/nation_ai.cpp:543 and nation_step.cpp:54*
 
@@ -234,10 +241,5 @@ score_national_budgets walks every landed nation and run_nation_step writes the 
 
 **Why it matters.** Either the AI is setting the player's national budget every cadence (an act on the player the grant forbids), or the player has no budget control yet and the scored weights stand in as a default. The two readings need different fixes.
 
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
+> **RESOLVED.** Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11.
 

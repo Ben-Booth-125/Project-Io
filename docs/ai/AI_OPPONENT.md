@@ -2139,6 +2139,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   player's; no state building for a minor; no verb a corporation lacks. Pure, seeded,
   deterministic, replayable, legal verbs only, never a planner.
 
+  **The budget scorer stands in for the player's budget — a dated stand-in (Ben, 2026-10-16,
+  NR-1048).** The player's nation has no budget verbs yet, so `score_national_budgets` writes its
+  weights like a rival's. **Not admitted:** any other faculty scored for the player's nation, or the
+  stand-in surviving the budget verbs' arrival (`../politics/NATIONS.md` § What a nation does each tick).
+
   **AI nations run space programmes — granted (Ben, 2026-10-15; `../economy/SPACE_ASSETS.md` § Era 1
   near space).** A new subject: rival nations may launch satellites, rovers, crewed missions and
   station modules, and build the launch infrastructure they need, chosen by the scored-utility
