@@ -974,6 +974,49 @@
    ],
    "title": "AI nations set taxes by real need, so tiers move and Discontent can bite",
    "design": "SPRINT 55 (Ben, 2026-10-16: leave it for now, revisit after the live run). As built in BL-1335 (taxes and Discontent), the AI tier scorer counts a nation short whenever its research queue owes, so every nation sits at III with one year at IV; Discontent peaks at 0.25 and never bites in 80 years; treasuries end 7x main because the budget does not spend the new revenue. Option offered: raise taxes only when the treasury cannot cover the budget lines, cut them on surplus. Compare against Ben's play log first."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found verifying BL-1335, 2026-10-16)",
+   "requires": [],
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1337",
+   "short_name": "RETURN_NET_CROSSES_ZERO",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "tools/verify/quarterly_return.cpp",
+    "src/world/budget_system.cpp"
+   ],
+   "title": "quarterly_return R2 fails on main: a filed net misses the balance change when the balance crosses zero and interest is charged",
+   "design": "Confirmed on main 2026-10-16 (before BL-1335 merged): three settle rows, e.g. t=24 b0 17.797 net -19.502 balance -1.704. Find which side is wrong (the return or the interest path); never weaken the row."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found verifying BL-1335, 2026-10-16)",
+   "requires": [],
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1338",
+   "short_name": "DIGEST_PINS_STALE",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/player_seed_sweep.cpp"
+   ],
+   "title": "player_seed_sweep digest pins fail on every digest for every seed, both arcs",
+   "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben."
   }
  ]
 }
