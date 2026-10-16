@@ -647,9 +647,17 @@ into passive and active. What follows replaces the bifold model, the city genera
 - **Made only by buildings, each on its own network.** A **logistics hub** makes points carried
   along **roads** (further on higher road tiers); a **railway station** along **rail**; a **port**
   over **sea**. Cities make none. Anyone may build them — nations and corporations alike.
-- **Reach fades with distance.** A source's points reach at full strength out to a threshold
-  distance along its own network, then fade to zero, so a nation needs several sources to cover
-  its ground. Off the networks, points reach a few tiles to supply armies (military detail later).
+- **Reach fades with distance, and a better road reaches further (Ben, 2026-10-16).** A source's
+  points reach **full strength** out to a threshold along its own network and then **fade to zero at
+  double that distance**, so a nation needs several sources to cover its ground. The threshold is
+  the **road tier's**, which is what makes an upgrade worth paying for: **Track 6 tiles, Road 8,
+  Highway 10** at full strength, nothing left by 12, 16 and 20. Off the networks, points reach a few
+  tiles to supply armies (military detail later).
+- **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
+  points carry **20 tiles** along the line, and they are delivered at **the tile the line connects
+  to** — never to the country the line passes through. So rail is a link between places rather than
+  a blanket over ground, which is what makes it the **inter-market** carrier, and it is the same rule
+  goods already obey: they board and leave only at stations (§ 4c).
 - **Production consumes them.** A producing building needs Logistic Points to produce and uses them
   up each tick; short of its need it produces **in proportion** (half the points, half the output).
 - **The host nation's pool.** Every building on a nation's ground — its state's, its champion's,
@@ -687,11 +695,19 @@ constraint 3), the rule NR-620 measured at a 73% collapse in convoy traffic when
 was tried.
 
 **A march draws on the nation's pool too, and claims first (Ben, 2026-10-16).** Movement a
-player or rival directs draws the same points production does, so guns and butter compete in one
-currency. **The march claims before production does** — Ben's 2026-09-24 ruling kept literally now that
-its other half is gone: it arbitrated the army against *trade*, and trade draws nothing at all any
-more, so first-claim today means a campaign is supplied before the factories behind it. A
-campaign visibly starving its own industry is the intended, legible cost of marching.
+player or rival directs draws the same points production and trade do, so guns, butter and freight
+compete in one currency. **The march claims before the others** — Ben's 2026-09-24 ruling (NR-917),
+kept, and with trade drawing again it keeps its original subject: the front is supplied, and the
+trade and the factories behind it wait. A campaign visibly starving its own industry is the
+intended, legible cost of marching.
+
+**A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
+reinstated: a shipment draws at the anchor it leaves, **by cargo quantity** — the settled formula,
+*what moves, not how far*. It is what makes rail's twenty tiles matter, because an inter-market haul
+now has to be paid for in the capacity that carries it, and what makes a market's logistics a real
+constraint on its trading rather than a number beside it. A trade is a standing route with nobody to
+tell, so it is never refused whole: its shipment sends what the anchor admits, exactly as
+`SUPPLY.md` § A shipment already rules.
 - Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
   **new** stations; generated rail still passes as § 4c says.
 

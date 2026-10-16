@@ -1313,7 +1313,7 @@
     "src/ui/body_surface_canvas.cpp"
    ],
    "title": "Two unrelated Logistic Point systems are live at once, and the lens and marches read the retired one",
-   "design": "SPRINT 55 (found mapping Ben's 2026-10-16 logistics message). THE ROOT CAUSE of what Ben saw in play. Two LP systems stand in the tree: (1) THE REAL ONE, BL-1309, src/world/logistic_points.*: a pool per NATION made only by inland hubs (120/tick), railway stations (150) and ports (120), scaled by each source's upkeep supply, with a bounded-Dijkstra reach field per (nation, network, body) that is full strength to lp_full_reach {6,10,12} then fades to zero over lp_fade_length {6,8,8}; consumed ONLY by production (lp_need = 10 x workforce run), granted pro-rata or by the nation's share rule, and spent as a labour multiplier so half the points means half the output. (2) THE LEGACY ONE, BL-596, active_lp_anchor_pools in logistics.cpp:1075: a flat 20/tick pool at every ANCHOR, where collect_anchor_tile_set (:31) seeds an anchor at EVERY population centre plus every port and hub - no falloff, no nation, no rail. Marching units still draw the legacy pools (economy_system.cpp:4210-4300, first-come in unit-id order). THE THROUGHPUT LENS READS ONLY THE LEGACY ONE. So Ben's reading that cities supply logistics is true of the system he can SEE and false of the one that runs the economy - the doc already ruled 'Cities make none' (2026-10-14). THE WORK: one system. Retire the legacy anchor pools, move the march draw onto the nation pool (the march is the priced consumer - LOGISTICS.md's 'Active lands first' and 'Armies claim first' need re-reading against a model where trade draws nothing at all), and point the lens at the real model (BL-1353). Also retire the dead passive-LP remains: market_lp_left returns 0 (supply_system.cpp:1035), market_component::trade_lp_spare is permanently 0 yet still serialised at save v46 and still read by corp_ai's rival-Marketplace estimate, and corp_command's rejected_no_lp serves a gate that no longer draws."
+   "design": "SPRINT 55 (found mapping Ben's 2026-10-16 logistics message). THE ROOT CAUSE of what Ben saw in play. Two LP systems stand in the tree: (1) THE REAL ONE, BL-1309, src/world/logistic_points.*: a pool per NATION made only by inland hubs (120/tick), railway stations (150) and ports (120), scaled by each source's upkeep supply, with a bounded-Dijkstra reach field per (nation, network, body) that is full strength to lp_full_reach {6,10,12} then fades to zero over lp_fade_length {6,8,8}; consumed ONLY by production (lp_need = 10 x workforce run), granted pro-rata or by the nation's share rule, and spent as a labour multiplier so half the points means half the output. (2) THE LEGACY ONE, BL-596, active_lp_anchor_pools in logistics.cpp:1075: a flat 20/tick pool at every ANCHOR, where collect_anchor_tile_set (:31) seeds an anchor at EVERY population centre plus every port and hub - no falloff, no nation, no rail. Marching units still draw the legacy pools (economy_system.cpp:4210-4300, first-come in unit-id order). THE THROUGHPUT LENS READS ONLY THE LEGACY ONE. So Ben's reading that cities supply logistics is true of the system he can SEE and false of the one that runs the economy - the doc already ruled 'Cities make none' (2026-10-14). THE WORK: one system. Retire the legacy anchor pools, move the march draw onto the nation pool (the march is the priced consumer - LOGISTICS.md's 'Active lands first' and 'Armies claim first' need re-reading against a model where trade draws nothing at all), and point the lens at the real model (BL-1353). RECONCILED 2026-10-16: do NOT delete the passive-LP remains - Ben ruled the same day that a shipment draws points again (BL-1361), so market_lp_left (supply_system.cpp:1035, returns 0), market_component::trade_lp_spare (permanently 0, serialised at save v46, read by corp_ai) and corp_command rejected_no_lp are REVIVED by that item, not retired. Retire only the legacy ANCHOR pools and the march path that reads them."
   },
   {
    "status": "proposed",
@@ -1476,6 +1476,57 @@
    ],
    "title": "Generation starts a market centre with several levels of logistics building",
    "design": "SPRINT 55 (Ben, 2026-10-16): \"I imagine we might start generation with multiple levels in logistics buildings at the market centre.\" RULED (Ben, 2026-10-16): SEVERAL HUBS STACKED, not a tier ladder - generation puts more than one hub building on the centre tile. The stack rule already permits it (2-12 in aggregate, PRODUCTION.md section Building stacks) and a hub already makes a flat 120 points a tick scaled by its upkeep supply, so this is seeding, not new mechanism: seed_logistics_sources (logistic_points.cpp:382) already sites hubs at the serving market centre_tile where the ground allows and adds them one at a time until coverage and pool margin are met - it should start a centre with several. Gives Ben's picture: a centralised capital with a high number of points, diminishing with distance, extended by outlying hubs. Report points made at the centre against an outlying tile, per nation."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16); filed by Claude",
+   "id": "BL-1360",
+   "short_name": "ROAD_TIER_EXTENDS_REACH",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1340",
+    "BL-1352"
+   ],
+   "files": [
+    "src/world/logistic_points.hpp",
+    "src/world/logistic_points.cpp"
+   ],
+   "title": "A better road carries points further: Track 6, Road 8, Highway 10, fading to zero at double; rail carries 20 and delivers only where it connects",
+   "design": "SPRINT 55 (Ben, 2026-10-16): 'let's add an extension bonus to higher tiered roads. So tracks reach 6 tiles, roads reach 8, and highways reach 10 tiles. Railways can reach 20 tiles, but they only supply the exact tile they connect to.' RULED: those are FULL-STRENGTH distances and the fade runs to ZERO AT DOUBLE them (Ben, 2026-10-16) - track 6/12, road 8/16, highway 10/20. DESIGNED: LOGISTICS.md section One pool. THE ROAD HALF IS A RECALIBRATION, not new mechanism: lp_full_reach[road] is 6 with per-tier step costs lp_road_step {_, 1.0, 0.7, 0.5}, which already yields 6 / 8.6 / 12 tiles - set the steps to 1.0 / 0.75 / 0.6 for 6 / 8 / 10, and lp_fade_length[road] = lp_full_reach[road] for the double-distance fade. THE RAIL HALF IS NEW BEHAVIOUR: lp_full_reach[rail] 10 -> 20, and delivery becomes point-to-point - the station's points land on the tile the line connects to and on no tile the line merely passes, which is the rule goods already obey (board and leave only at stations, section 4c). Sea is untouched and keeps 12 full / 8 fade; say so rather than quietly generalising the double-fade to it. Measure coverage per nation before and after, then market_viability and haulage_measure --far-trade."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16); filed by Claude",
+   "id": "BL-1361",
+   "short_name": "TRADE_DRAWS_POINTS",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1352",
+    "BL-1356"
+   ],
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/trade.cpp",
+    "src/world/corp_command.hpp"
+   ],
+   "title": "A shipment draws Logistic Points again, by cargo quantity, at the anchor it leaves",
+   "design": "SPRINT 55 (Ben, 2026-10-16): 'we need to consider how trading consumes logistics points' - RULED the same day: yes, a shipment draws again. The cap was retired in BL-1309's cut and the code still stands, zeroed: market_lp_left (supply_system.cpp:1035) returns 0.0f, commit_trade_shipment (:1083) voids the pools and the refusal, market_component::trade_lp_spare is permanently 0 yet serialised at save v46 and still read by corp_ai's rival-Marketplace estimate, and corp_command::rejected_no_lp serves a gate that draws nothing. REVIVE rather than rewrite, and note BL-1352 was going to delete exactly this code - it has been reconciled. THE DRAW: cargo quantity at the anchor the shipment leaves - the settled formula, what moves and not how far, so it does not reintroduce the distance draw NR-620 measured at a 73% convoy-traffic collapse. NEVER REFUSED WHOLE: a trade is a standing route with nobody to tell, so the shipment sends what the anchor admits (SUPPLY.md section A shipment); whole refusal is for COMMANDED legs only (Ben, 2026-10-05, NR-969). Ordering: the march claims first (NR-917, which with trade drawing again recovers its original subject), then trade and production. A WORLD-MOVER on the traffic itself: haulage_measure --far-trade is the measurement that matters, against the 1055/802 and the 13,954/11,277 baselines, plus market_viability G1/G1b for input starvation."
   }
  ]
 }
