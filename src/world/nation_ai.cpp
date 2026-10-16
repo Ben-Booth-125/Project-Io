@@ -2,12 +2,20 @@
 
 #include "components.hpp"
 #include "hex_neighbors.hpp"
+#include "nation_tech.hpp"     // BL-1275: the research pick's verb and reads
+#include "placement_rules.hpp" // BL-1275: is_depositless_site (the named-site scope)
+#include "recipe_registry.hpp"
 #include "stance.hpp"
 #include "world.hpp"
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cmath>
+#include <cstdint>
+#include <string_view>
+#include <map>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -746,4 +754,492 @@ std::map<entity_id, nation_budget> score_national_budgets(const world& w,
     }
 
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// The research pick (BL-1275; AI_OPPONENT.md § 11, Ben 2026-10-10 and 2026-10-15)
+// ---------------------------------------------------------------------------
+//
+// THE SCORING RULE. score(node) = relief(node) - cost(node), both in milli-RP,
+// relief = research_relief_rp x (direct(node) + reach(node)), in RELIEF UNITS
+// (one home building-equivalent moved by 100%).
+//
+//   cost    node_cost_milli at TODAY's price index — what the queue will charge.
+//
+//   direct  what holding the node does for THIS nation:
+//     extraction_rate   each home extraction site the scope matches x (factor - 1) x E(ext)
+//     processing_yield  each home processing facility, its output goods' (factor - 1)
+//                       averaged over the outputs (one building counts once) x E(proc)
+//     logistics_cost    each home producer of a matched good, (1 - factor) averaged the
+//                       same way (one building counts once) x E(log)
+//     national_research the added share x max(1, home buildings) x E(res); the
+//                       University-scoped share x the staffed Universities on its ground
+//     unlocks           research_unlock_relief per thing the node unlocks — a recipe
+//                       (x E(proc)), a building or a placement (x E(works)), the space
+//                       gate (x E(space)) — read from the node's effects, read or
+//                       declared unread (an unlock is worth its promise to the scorer)
+//     the next cluster  (a major) research_cluster_relief x E(res) x the cost units of
+//                       the nodes it brings within reach (a node needing two groups
+//                       counts half per group it completes), plus
+//                       research_major_relief x E(res) x its own cost units: a major is
+//                       the cluster it closes, so its worth scales with its ring
+//
+//   reach   the share of each major the node buys on the way: for every major M not
+//           held or queued whose route (the enqueue planner's own preview — the
+//           cheapest route, the one the queue would take) contains the node,
+//           direct(M) x units(node) / units(route). The route shrinks as a nation
+//           progresses, so each next node of a route it has begun is worth more
+//           per unit: depth follows from the arithmetic, not from a goal. Nothing
+//           is queued beyond the one node; no route is remembered. The two sides
+//           of a pick-one pair carry the same share (either satisfies the route).
+//
+//   E(line) — THE BINDING TERMS — is the nation's own scored budget weight
+//   (`w.nation_budgets`, from its niche fit, gap and threat), as
+//   0.5 + 0.5 x weight x priority_count: an average line weighs 1, an unfunded
+//   line 0.5, so a line shades the choice and never zeroes a lever. Unscored: 1.
+//   ext = mean(charters, public_works); proc = mean(academic, public_works);
+//   log = logistics_maintenance; res = academic_research; works = public_works;
+//   space = space_programme.
+//
+// TIES. Score ties go to the lower node index — except between the two sides of
+// a pick-one pair, which break by the nation's own seed (an FNV hash of its
+// generated name and id), so nations diverge.
+//
+// An UNREAD modifier relieves nothing. A quest whose deed is unmet is never a
+// candidate and never a route. No look beyond one ring of the tree, no memory.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Relief is clamped to +/- this before it is rounded (the nation_tech cap).
+constexpr std::int64_t k_relief_cap_milli = 4'000'000'000'000'000'000LL;
+
+/// relief - cost, saturating: relief is clamped to +/- k_relief_cap_milli and a
+/// cost is non-negative and itself capped, so the result is clamped to the band.
+std::int64_t sat_sub(std::int64_t a, std::int64_t b)
+{
+    const std::int64_t lo = -k_relief_cap_milli;
+    if (b > 0 && a < lo + b)
+        return lo;
+    if (b < 0 && a > k_relief_cap_milli + b)
+        return k_relief_cap_milli;
+    return a - b;
+}
+
+std::int64_t relief_to_milli(double relief_units, double rp_per_unit)
+{
+    const double m = relief_units * rp_per_unit * static_cast<double>(k_milli_per_rp);
+    if (!std::isfinite(m))
+        return 0;
+    const double cap = static_cast<double>(k_relief_cap_milli);
+    return static_cast<std::int64_t>(std::llround(std::clamp(m, -cap, cap)));
+}
+
+const io::dg::node& dg(int n) { return io::dg::nodes[static_cast<std::size_t>(n)]; }
+
+struct home_profile
+{
+    std::map<std::pair<int, bool>, int> ext;   ///< (resource, depositless) -> sites
+    std::map<std::uint16_t, int>        proc;  ///< recipe id -> facilities
+    int universities = 0; ///< Staffed Universities on its ground (advance_research's count).
+    int total        = 0;
+};
+
+home_profile build_home_profile(const world& w, entity_id nation)
+{
+    home_profile hp;
+    // Integer counts only, under ordered keys: the walk order cannot reach the result.
+    for (const entity_id owner : economic_owner_ids(w))
+    {
+        const std::vector<entity_id>* assets = assets_of(w, owner);
+        if (assets == nullptr)
+            continue;
+        const bool home = owner_home_nation(w, owner) == nation;
+        for (const entity_id bid : *assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const building_component& b = bit->second;
+            if (b.decommissioned || b.ticks_remaining > 0)
+                continue;
+            if (b.type == building_type::university && b.workforce_assigned > 0.0f)
+                if (const auto tn = w.tile_to_nation.find(b.tile); tn != w.tile_to_nation.end() && tn->second == nation)
+                    ++hp.universities;
+            if (!home)
+                continue;
+            ++hp.total;
+            if (b.type == building_type::extraction_site)
+                ++hp.ext[{ static_cast<int>(b.target_resource),
+                           placement_rules::is_depositless_site(w, b.tile, b.target_resource) }];
+            else if (b.type == building_type::processing_facility && b.recipe != no_recipe)
+                ++hp.proc[b.recipe];
+        }
+    }
+    return hp;
+}
+
+struct line_emphasis
+{
+    double ext = 1.0, proc = 1.0, log = 1.0, res = 1.0, works = 1.0, space = 1.0;
+};
+
+line_emphasis emphasis_for(const world& w, entity_id nation)
+{
+    line_emphasis e;
+    const auto it = w.nation_budgets.find(nation);
+    if (it == w.nation_budgets.end())
+        return e;
+    double total = 0.0;
+    for (const float x : it->second.weights)
+        total += std::max(0.0f, x);
+    if (!(total > 0.0))
+        return e;
+    const auto W = [&](budget_priority l) {
+        const double share = static_cast<double>(std::max(0.0f, it->second.weights[static_cast<std::size_t>(l)]))
+                           / total * static_cast<double>(priority_count);
+        return 0.5 + 0.5 * share;
+    };
+    e.ext   = 0.5 * (W(budget_priority::charters) + W(budget_priority::public_works));
+    e.proc  = 0.5 * (W(budget_priority::academic_research) + W(budget_priority::public_works));
+    e.log   = W(budget_priority::logistics_maintenance);
+    e.res   = W(budget_priority::academic_research);
+    e.works = W(budget_priority::public_works);
+    e.space = W(budget_priority::space_programme);
+    return e;
+}
+
+/// What an effect row unlocks, for the scorer: 0 nothing, 1 a recipe, 2 a
+/// building or placement, 3 the space gate. Read from the store's own kinds;
+/// an unread row unlocks when it waits on a recipe and says "unlock", or waits
+/// on a building or a placement the campaign does not yet carry.
+int unlock_class(const io::dg::effect& ef)
+{
+    using io::dg::effect_kind;
+    const std::string_view waits = ef.waits_on;
+    const std::string_view what  = ef.what;
+    switch (ef.kind)
+    {
+        case effect_kind::unlock_recipe:    return 1;
+        case effect_kind::unlock_structure: return 2;
+        case effect_kind::mechanic:         return std::string_view(ef.target) == "space_dispatch" ? 3 : 0;
+        case effect_kind::unread:
+        {
+            static constexpr std::string_view k_recipes[]   = { "fertiliser recipe", "plastics recipe", "microchip recipe" };
+            static constexpr std::string_view k_buildings[] = { "Nuclear Plant", "Container Port", "offshore placement",
+                                                                "coastal water placement" };
+            for (const std::string_view r : k_recipes)
+                if (waits == r && what.find("unlock") != std::string_view::npos)
+                    return 1;
+            for (const std::string_view b : k_buildings)
+                if (waits == b)
+                    return 2;
+            return 0;
+        }
+        default: return 0;
+    }
+}
+
+struct scorer_ctx
+{
+    const world&                           w;
+    const recipe_registry&                 reg;
+    const nation_ai_params&                p;
+    entity_id                              nation;
+    const std::bitset<io::dg::node_count>& held;
+    home_profile                           hp;
+    line_emphasis                          e;
+};
+
+bool open_target(const scorer_ctx& c, int m)
+{
+    // A node that may still become a candidate: unheld, not refused by a held
+    // pair side, and not a quest whose deed is unmet.
+    if (c.held.test(static_cast<std::size_t>(m)) || !deed_met(c.w, c.nation, m))
+        return false;
+    const int ex = dg(m).excludes;
+    return ex < 0 || !c.held.test(static_cast<std::size_t>(ex));
+}
+
+/// direct(n), in relief units.
+double direct_relief(const scorer_ctx& c, int n)
+{
+    const line_emphasis& e = c.e;
+    double relief = 0.0;
+    for (const auto& [key, count] : c.hp.ext)
+    {
+        effect_target at;
+        at.resource = key.first;
+        at.site     = extraction_site_name(static_cast<resource_type>(key.first), key.second);
+        relief += count * (static_cast<double>(node_scalar_at(n, modifier_subject::extraction_rate, at)) - 1.0) * e.ext;
+        effect_target lt;
+        lt.resource = key.first;
+        relief += count * (1.0 - static_cast<double>(node_scalar_at(n, modifier_subject::logistics_cost, lt))) * e.log;
+    }
+    for (const auto& [rid, count] : c.hp.proc)
+    {
+        const recipe* rc = c.reg.get_recipe(rid);
+        if (rc == nullptr)
+            continue;
+        double yield = 0.0, haul = 0.0;
+        int    nout  = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(rc->outputs[r] > 0.0f))
+                continue;
+            effect_target at;
+            at.group    = rc->group;
+            at.recipe   = rc->name;
+            at.resource = static_cast<int>(r);
+            yield += static_cast<double>(node_scalar_at(n, modifier_subject::processing_yield, at)) - 1.0;
+            effect_target lt;
+            lt.resource = static_cast<int>(r);
+            haul += 1.0 - static_cast<double>(node_scalar_at(n, modifier_subject::logistics_cost, lt));
+            ++nout;
+        }
+        if (nout > 0)
+            relief += count * (yield * e.proc + haul * e.log) / nout;
+    }
+    relief += (static_cast<double>(node_scalar_at(n, modifier_subject::national_research, effect_target{})) - 1.0)
+            * std::max(1, c.hp.total) * e.res;
+    if (c.hp.universities > 0)
+    {
+        effect_target ut;
+        ut.building    = building_type::university;
+        ut.scoped_only = true;
+        relief += (static_cast<double>(node_scalar_at(n, modifier_subject::national_research, ut)) - 1.0)
+                * c.hp.universities * e.res;
+    }
+
+    const io::dg::node& nd = dg(n);
+    for (std::uint16_t i = nd.effect_begin; i < nd.effect_end; ++i)
+        switch (unlock_class(io::dg::effects[i]))
+        {
+            case 1: relief += c.p.research_unlock_relief * e.proc;  break;
+            case 2: relief += c.p.research_unlock_relief * e.works; break;
+            case 3: relief += c.p.research_unlock_relief * e.space; break;
+            default: break;
+        }
+
+    if (nd.t == io::dg::tier::major)
+    {
+        // The next cluster: the nodes this major brings within reach.
+        double opened = 0.0;
+        for (int m = 0; m < io::dg::node_count; ++m)
+        {
+            const io::dg::node& md = dg(m);
+            if (m == n || !open_target(c, m))
+                continue;
+            int unmet = 0;
+            bool completes = false;
+            for (int g = 0; g < md.group_count; ++g)
+            {
+                bool met = false, has_n = false;
+                for (const std::int16_t k : md.groups[static_cast<std::size_t>(g)])
+                {
+                    if (k < 0) continue;
+                    met   |= c.held.test(static_cast<std::size_t>(k));
+                    has_n |= k == n;
+                }
+                if (!met) { ++unmet; completes |= has_n; }
+            }
+            if (completes && unmet > 0)
+                opened += static_cast<double>(md.cost_units) / unmet;
+        }
+        relief += (c.p.research_cluster_relief * opened + c.p.research_major_relief * nd.cost_units) * e.res;
+    }
+    return std::isfinite(relief) ? relief : 0.0;
+}
+
+/// Deterministic per-nation bit for a pair tie: FNV-1a over the nation's
+/// generated name and id.
+bool pair_tie_prefers_higher(const world& w, entity_id nation)
+{
+    std::uint64_t h = 1469598103934665603ull;
+    const auto mix = [&](std::uint8_t b) { h = (h ^ b) * 1099511628211ull; };
+    if (const auto it = w.nations.find(nation); it != w.nations.end())
+        for (const char ch : it->second.name)
+            mix(static_cast<std::uint8_t>(ch));
+    for (int s = 0; s < 32; s += 8)
+        mix(static_cast<std::uint8_t>((static_cast<std::uint64_t>(nation) >> s) & 0xFFu));
+    return ((h >> 17) & 1u) != 0;
+}
+
+} // namespace
+
+bool research_queue_idle(const world& w, entity_id nation)
+{
+    const auto it = w.nation_tech.find(nation);
+    if (it == w.nation_tech.end())
+        return true;
+    for (const std::uint16_t q : it->second.queue)
+        if (deed_met(w, nation, q))
+            return false;
+    return true;
+}
+
+research_ai_pick choose_research_node(const world& w, const recipe_registry& reg,
+                                      entity_id nation, const nation_ai_params& p)
+{
+    research_ai_pick pick;
+    pick.nation = nation;
+    if (w.nations.find(nation) == w.nations.end())
+        return pick;
+
+    static const std::bitset<io::dg::node_count> k_none{};
+    const auto tit = w.nation_tech.find(nation);
+    const std::bitset<io::dg::node_count>& held = tit != w.nation_tech.end() ? tit->second.held : k_none;
+
+    scorer_ctx c{ w, reg, p, nation, held, build_home_profile(w, nation), emphasis_for(w, nation) };
+    const research_params& rp    = reg.research();
+    const std::int64_t     price = research_price_ppm(w, rp);
+
+    // direct() is memoised per pick: a node may be a candidate and a major both.
+    std::array<double, io::dg::node_count> direct{};
+    std::array<bool, io::dg::node_count>   have{};
+    const auto direct_of = [&](int n) {
+        if (!have[static_cast<std::size_t>(n)])
+        {
+            direct[static_cast<std::size_t>(n)] = direct_relief(c, n);
+            have[static_cast<std::size_t>(n)]   = true;
+        }
+        return direct[static_cast<std::size_t>(n)];
+    };
+
+    // Reach: each open major's worth, shared over its route by cost units.
+    std::array<double, io::dg::node_count> reach{};
+    std::vector<std::uint16_t> plan;
+    for (int m = 0; m < io::dg::node_count; ++m)
+    {
+        if (dg(m).t != io::dg::tier::major || !open_target(c, m))
+            continue;
+        plan.clear();
+        if (preview_enqueue(w, nation, m, &plan) != enqueue_result::queued || plan.empty())
+            continue;
+        double units = 0.0;
+        for (const std::uint16_t k : plan)
+            units += dg(k).cost_units;
+        const double v = direct_of(m);
+        if (!(units > 0.0) || !(v > 0.0))
+            continue;
+        for (const std::uint16_t k : plan)
+            if (k != m) // the major itself is worth its direct value, not a share of it
+                reach[k] += v * dg(k).cost_units / units;
+    }
+    // The planner's route takes the EARLIER side of a pick-one pair on a cost
+    // tie; either side satisfies the requirement equally, so both sides carry
+    // the larger share — the side is the nation's choice (its direct value,
+    // then its seed), never the planner's tie-break.
+    for (int a = 0; a < io::dg::node_count; ++a)
+    {
+        const int b = dg(a).excludes;
+        if (b > a)
+            reach[static_cast<std::size_t>(a)] = reach[static_cast<std::size_t>(b)] =
+                std::max(reach[static_cast<std::size_t>(a)], reach[static_cast<std::size_t>(b)]);
+    }
+
+    const bool higher = pair_tie_prefers_higher(w, nation);
+    for (int n = 0; n < io::dg::node_count; ++n)
+    {
+        if (held.test(static_cast<std::size_t>(n)) || !node_requirements_met(w, nation, n) || !deed_met(w, nation, n))
+            continue;
+        plan.clear();
+        if (preview_enqueue(w, nation, n, &plan) != enqueue_result::queued || plan.size() != 1)
+            continue; // queued already, or a pick-one pair refuses it
+        ++pick.candidates;
+        const std::int64_t relief_milli =
+            relief_to_milli(direct_of(n) + reach[static_cast<std::size_t>(n)], p.research_relief_rp);
+        const std::int64_t cost_milli = node_cost_milli(n, rp, price);
+        const std::int64_t score      = sat_sub(relief_milli, cost_milli);
+        bool take = pick.node < 0 || score > pick.score_milli;
+        // A tie with the pair sibling breaks by the nation's seed; any other tie
+        // keeps the lower index (the ascending walk).
+        if (!take && score == pick.score_milli && dg(n).excludes == pick.node)
+            take = higher;
+        if (take)
+        {
+            pick.node         = n;
+            pick.relief_milli = relief_milli;
+            pick.cost_milli   = cost_milli;
+            pick.score_milli  = score;
+        }
+    }
+    return pick;
+}
+
+namespace {
+
+std::vector<entity_id> research_ai_nations(const world& w, bool spectating)
+{
+    std::vector<entity_id> ids;
+    // The age opens at the handover: everything researched in the settle is
+    // erased (clear_research_at_handover), so a queue filled then would only
+    // have the research line spend the treasury on nothing.
+    if (!research_age_open(w))
+        return ids;
+    ids.reserve(w.nations.size());
+    // The player's nation is never queued for in a seated session; under
+    // spectate nobody is seated and the seat's nation is queued for too (Ben,
+    // 2026-10-15, AI_OPPONENT.md § 11).
+    const entity_id seated = spectating ? null_entity : player_nation(w);
+    for (const auto& kv : w.nations)
+        if (kv.first != seated)
+            ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+} // namespace
+
+int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating,
+                           std::vector<research_ai_pick>* out)
+{
+    int queued = 0;
+    for (const entity_id n : research_ai_nations(w, spectating))
+    {
+        if (!research_queue_idle(w, n))
+            continue;
+        research_ai_pick pick = choose_research_node(w, reg, n, reg.nation_ai());
+        if (pick.node >= 0)
+        {
+            pick.queued = enqueue_node(w, n, pick.node) == enqueue_result::queued;
+            if (pick.queued)
+                ++queued;
+        }
+        if (out)
+            out->push_back(pick);
+    }
+    return queued;
+}
+
+int run_nation_research_repick(world& w, const recipe_registry& reg, bool spectating,
+                               std::vector<research_ai_pick>* out)
+{
+    const nation_ai_params& p = reg.nation_ai();
+    int queued = 0;
+    for (const entity_id n : research_ai_nations(w, spectating))
+    {
+        // One node queued at a time: re-pick only while the queue is idle and
+        // the pool already holds the next pick's whole cost, so it completes
+        // now from RP in hand. No treasury is spent here (the line paid only
+        // what the queue owed in advance_research).
+        for (int k = 0; k < p.research_repicks_per_quarter && research_queue_idle(w, n); ++k)
+        {
+            const auto tit = w.nation_tech.find(n);
+            if (tit == w.nation_tech.end())
+                break;
+            research_ai_pick pick = choose_research_node(w, reg, n, p);
+            if (pick.node < 0 || tit->second.pool_milli < pick.cost_milli)
+                break;
+            pick.queued = enqueue_node(w, n, pick.node) == enqueue_result::queued;
+            if (out)
+                out->push_back(pick);
+            if (!pick.queued)
+                break;
+            ++queued;
+            if (flow_research_queue(w, n, reg.research()) == 0)
+                break; // not completed (cannot happen with the pool covering it); stays queued
+        }
+    }
+    return queued;
 }

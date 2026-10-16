@@ -177,9 +177,15 @@ int run_serve(int ticks, long long as_corp, bool as_any)
     // One econ tick, in one place. The warm-up loop and the TICK opcode used to
     // carry byte-identical copies of this sequence, which is how the survey step
     // came to be missing from BOTH rather than from one.
+    // BL-1275 review: live econ steps continue the SETTLED world's counter, as
+    // run_spectate_headless does (first live step = settled tick + 1), so the
+    // research age, its price index and the AI's settle guard read live
+    // quarters as live. Session tick t (the protocol's) maps to econ step
+    // econ0 + t.
+    const int econ0 = std::max(w.current_econ_tick, k_campaign_settle_ticks - 1);
     const auto step_one_tick = [&](int t) {
         w.current_day_tick  = t;
-        w.current_econ_tick = t;
+        w.current_econ_tick = econ0 + t;
         // BL-597: one shared passive/active Logistic Point pool for this
         // tick, handed to both the convoy dispatch (passive) and the march
         // pass inside run_economy_step (active) — so the two genuinely
@@ -195,7 +201,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
-        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
+        run_nation_step(w, reg, report, w.current_econ_tick); // Sprint N3: nations score, spend, dispatch
         // Age any dispatched survey by the days this tick spans (app.cpp does the
         // same on the day boundary). Without it the geographic fog never lifted
         // here: `survey` was an applicable verb whose effect never arrived, so no
@@ -302,10 +308,13 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                                             : "");
     }
 
+    // BL-1275 review: this world is not settled, but its ticks are live play —
+    // number econ steps from the first live step, as run_serve does.
+    const int econ0 = std::max(w.current_econ_tick, k_campaign_settle_ticks - 1);
     for (int t = 1; t <= ticks; ++t)
     {
         w.current_day_tick  = t;
-        w.current_econ_tick = t;
+        w.current_econ_tick = econ0 + t;
         // BL-597: see step_one_tick's own comment above — one shared LP pool
         // per tick for both the passive (convoy) and active (march) draws.
         lp_pool_map tick_lp_pools;
@@ -318,7 +327,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
-        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
+        run_nation_step(w, reg, report, w.current_econ_tick); // Sprint N3: nations score, spend, dispatch
     }
 
     std::filesystem::create_directories(out_dir);

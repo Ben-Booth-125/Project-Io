@@ -256,6 +256,11 @@ int research_next_age_quarter(const world& w)
     return std::max(0, w.current_econ_tick + 1 - k_campaign_settle_ticks);
 }
 
+bool research_age_open(const world& w)
+{
+    return w.current_econ_tick >= k_campaign_settle_ticks;
+}
+
 std::int64_t research_price_ppm(const world& w, const research_params& p)
 {
     return research_price_ppm_at(research_age_quarter(w), p);
@@ -686,6 +691,29 @@ float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
         if (st->held.test(r.node) && scope_matches(r, target))
             base = apply_scalar_modifier(base, r.mod);
     return base;
+}
+
+float node_scalar_at(int node, modifier_subject subject, const effect_target& target, float base)
+{
+    if (!valid_node(node))
+        return base;
+    const std::size_t si = static_cast<std::size_t>(subject);
+    const effect_tables& t = tables();
+    if (si >= std::size(t.by_subject))
+        return base;
+    // The fold nation_scalar runs, over this one node's read rows (its effect order).
+    for (const resolved_modifier& r : t.by_subject[si])
+        if (r.node == static_cast<std::size_t>(node) && scope_matches(r, target))
+            base = apply_scalar_modifier(base, r.mod);
+    return base;
+}
+
+bool node_has_mechanic(int node, std::string_view key)
+{
+    for (const resolved_mechanic& m : tables().mechanics)
+        if (m.node == static_cast<std::size_t>(node) && m.key == key)
+            return true;
+    return false;
 }
 
 float research_multiplier(const world& w, entity_id nation)

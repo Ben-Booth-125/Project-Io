@@ -83,7 +83,7 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // (BL-1273) run the quarter's research: RP into each nation's pool and down
     // its queue. After apply_budget so the treasury holds this quarter's levy
     // and tariff.
-    run_nation_step(w, reg, out.report, w.current_econ_tick);
+    run_nation_step(w, reg, out.report, w.current_econ_tick, spectating);
     lap_done(3); // budget + nation step
 
     // Lap 4 was BL-344's per-corp tech gates, retired with BL-1273 (NR-1022);
@@ -177,9 +177,9 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
     // THE HANDOVER (BL-1273; RESEARCH.md: no nation opens ahead in technology).
     // The settle ran the nation step like any tick, so the base and any
     // University or institute accrued RP into pools; none of it carries into
-    // play. Nothing queues during the settle (no caller of enqueue_node yet,
-    // BL-1275's scorer included, and an empty queue spends no treasury), so the
-    // clear drops only RP that cost the treasury nothing.
+    // play. Nothing queues during the settle — the nation research AI (BL-1275)
+    // waits for `research_age_open`, and an empty queue spends no treasury — so
+    // the clear drops only RP that cost the treasury nothing.
     clear_research_at_handover(w);
     if (progress != nullptr) progress->report_sub(0, 0);
 }

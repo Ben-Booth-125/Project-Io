@@ -488,6 +488,10 @@ struct economy_report
     /// nodes completed. The treasury ledger's explanation of the research debit.
     std::vector<research_accrual> research;
 
+    /// BL-1275: what the nation research AI weighed this tick — one row per
+    /// nation whose queue was idle and that it may act for, ascending.
+    std::vector<research_ai_pick> research_picks;
+
     /// What the space-asset step did this quarter (BL-1327; space_assets.hpp):
     /// launches and their cost (the launch debit), arrivals, and the upkeep
     /// paid or unpaid. Both debits are direct treasury expenditures, credited

@@ -91,8 +91,10 @@ struct earmark_result
 /// `report.earmarks`, `report.space_purchases`, `report.budget_claims` (the
 /// state's own space-programme claims) and `report.budgets[corp].subsidies`.
 ///
+/// @p spectating (BL-1275): nobody is seated, so the research AI queues for
+/// every nation; false in play, where the player's nation is never queued for.
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
-                     int econ_tick);
+                     int econ_tick, bool spectating = false);
 
 /// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): record each off-book WANT the
 /// state purchase derivations returned as an unposted bid

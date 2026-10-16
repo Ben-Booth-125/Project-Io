@@ -119,6 +119,11 @@ std::int64_t research_price_ppm_at(int age_quarter, const research_params& p = {
 /// opened (`current_econ_tick` less the settle's ticks), never negative.
 int research_age_quarter(const world& w);
 
+/// BL-1275: whether the age has opened — the world is past the campaign settle
+/// (`current_econ_tick >= k_campaign_settle_ticks`). Research in the settle is
+/// erased at the handover, so the nation research AI queues nothing before it.
+bool research_age_open(const world& w);
+
 /// The age quarter the NEXT quarterly pass will charge: econ step
 /// `current_econ_tick + 1` less the settle's ticks, never negative. Between
 /// passes `current_econ_tick` is the step the last pass ran at — straight
@@ -303,6 +308,17 @@ float research_multiplier(const world& w, entity_id nation);
 /// item's to move.
 float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
                     const effect_target& target, float base);
+
+/// BL-1275: what node @p node's OWN read modifiers on @p subject do to @p base
+/// at @p target — the `nation_scalar` fold over that one node's rows, as if it
+/// were the only node held. @p base back untouched for a node with no matching
+/// read row (an unread effect moves nothing, so it relieves nothing). The
+/// nation research AI prices a candidate's relief with it.
+float node_scalar_at(int node, modifier_subject subject, const effect_target& target,
+                     float base = 1.0f);
+
+/// BL-1275: whether node @p node carries a read `mechanic` effect keyed @p key.
+bool node_has_mechanic(int node, std::string_view key);
 
 /// Whether @p nation may use the mechanic @p key: true when no node carries a
 /// read `mechanic` effect with that key, else true only once the nation holds

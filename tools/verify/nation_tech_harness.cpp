@@ -3,12 +3,18 @@
 // group "nation-tech-state" rows R0-R3 (R3's canonical-world half is
 // save_roundtrip P5).
 //
-// NOTHING IN src/ CALLS enqueue_node YET. That is correct: the nation research
-// AI (BL-1275) is the scorer that queues, and the panel (BL-1276) is the
-// player's verb. Until they land, no nation in a real campaign ever queues, so
-// the line never spends and no node completes in play. R0 therefore SCRIPTS a
-// queue for every nation after the seat; its pacing rows measure what the
-// research arithmetic would do, not what a campaign does today.
+// The nation research AI (BL-1275, nation_ai.cpp run_nation_research_ai) queues
+// for every AI nation whose queue is idle, one frontier node at a time; the
+// panel (BL-1276) is the player's verb. R0 still SCRIPTS a queue for every
+// nation after the seat, so its pacing rows measure the research arithmetic on
+// a fixed path (the AI only acts once that scripted queue has drained).
+//
+//   R6  (BL-1275) the research AI on a fixture: an AI nation with an empty
+//       queue enqueues exactly one frontier node; the player's nation never
+//       (and under spectate, nobody is seated, so it is); a live entry stops
+//       it; deterministic twice; relief to home industry moves the choice; a
+//       whole walk of picks is legal (frontier, unheld, pair rule, no
+//       deed-unmet quest).
 //
 //   R1  accrual: the academic-research line pays min(its share, what the queue
 //       still owes) out of the treasury; an empty queue spends nothing.
@@ -75,6 +81,7 @@
 #include "world/finish_campaign_world.hpp"
 #include "world/logistics.hpp" // invalidate_logistics_caches (T2 live: planted Ports)
 #include "world/placement_rules.hpp" // is_coastal (T2 live)
+#include "world/nation_ai.hpp"   // BL-1275: run_nation_research_ai, choose_research_node
 #include "world/nation_budget.hpp"
 #include "world/nation_tech.hpp"
 #include "world/recipe_registry.hpp"
@@ -204,6 +211,203 @@ const research_accrual* row_for(const std::vector<research_accrual>& rows, entit
     for (const research_accrual& r : rows)
         if (r.nation == n) return &r;
     return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// R6 — the nation research AI (BL-1275; AI_OPPONENT.md § 11)
+// ---------------------------------------------------------------------------
+
+std::string pick_id(int n) { return n >= 0 ? io::dg::nodes[static_cast<std::size_t>(n)].id : "(none)"; }
+
+void rows_r6(const recipe_registry& reg)
+{
+    std::printf("\nR6 the nation research AI (BL-1275)\n");
+
+    // The fixture: `nation` is AI-run; the seat (corp2) is homed in `other`,
+    // so `other` is the player's nation.
+    const auto make = [] {
+        fixture f = make_fixture();
+        f.w.player_entity     = f.corp2;
+        f.w.current_econ_tick = k_campaign_settle_ticks; // the first live quarter
+        return f;
+    };
+
+    {
+        fixture f = make();
+        f.w.current_econ_tick = k_campaign_settle_ticks - 1;
+        check(run_nation_research_ai(f.w, reg, true, nullptr) == 0 && f.w.nation_tech.empty(),
+              "R6s in the settle nothing is queued (the handover would erase it; the treasury keeps the share)");
+    }
+
+    {
+        fixture f = make();
+        std::vector<research_ai_pick> picks;
+        const int queued = run_nation_research_ai(f.w, reg, /*spectating=*/false, &picks);
+        const auto& st = f.w.nation_tech[f.nation];
+        std::printf("     AI nation queued %s (relief %lld, cost %lld milli-RP, %d candidates)\n",
+                    st.queue.empty() ? "nothing" : pick_id(st.queue[0]).c_str(),
+                    picks.empty() ? 0LL : static_cast<long long>(picks[0].relief_milli),
+                    picks.empty() ? 0LL : static_cast<long long>(picks[0].cost_milli),
+                    picks.empty() ? 0 : picks[0].candidates);
+        check(queued == 1 && st.queue.size() == 1,
+              "R6a an AI nation with an empty queue enqueues exactly one node");
+        const bool other_empty = f.w.nation_tech.find(f.other) == f.w.nation_tech.end()
+                              || f.w.nation_tech.at(f.other).queue.empty();
+        bool other_picked = false;
+        for (const research_ai_pick& p : picks) other_picked |= p.nation == f.other;
+        check(other_empty && !other_picked, "R6b the player's nation is never queued for (nor scored)");
+        const int n = st.queue.empty() ? -1 : st.queue[0];
+        check(n >= 0 && io::dg::nodes[static_cast<std::size_t>(n)].is_root,
+              "R6c ...the node is frontier: with nothing held, a root");
+        check(run_nation_research_ai(f.w, reg, false, nullptr) == 0 && st.queue.size() == 1,
+              "R6d a queue with a live entry is left alone: one node at a time");
+
+        fixture g = make();
+        run_nation_research_ai(g.w, reg, false, nullptr);
+        check(g.w.nation_tech[g.nation].queue == st.queue && g.w.state_hash(0) == f.w.state_hash(0),
+              "R6e the choice is deterministic across two runs (same node, same state_hash)");
+
+        // Under spectate the seat's nation researches too — granted (Ben,
+        // 2026-10-15, AI_OPPONENT.md § 11): nobody is seated (§ 10i).
+        fixture s = make();
+        run_nation_research_ai(s.w, reg, /*spectating=*/true, nullptr);
+        check(s.w.nation_tech.count(s.other) && s.w.nation_tech.at(s.other).queue.size() == 1,
+              "R6f under spectate nobody is seated: the seat's nation is queued for like any other");
+    }
+
+    {
+        // Relief moves the choice: home petroleum sites make Drill-Bit
+        // Metallurgy (Oil Platforms +5%) beat Seismic Survey (unread) at equal cost.
+        const int t1 = node("DG-PR-EX-T1"), t2 = node("DG-PR-EX-T2");
+        const int a1 = node("DG-PR-EX-A1"), a2 = node("DG-PR-EX-A2");
+        fixture f = make();
+        nation_budget nb;
+        nb.weights[static_cast<std::size_t>(budget_priority::charters)]     = 0.5f;
+        nb.weights[static_cast<std::size_t>(budget_priority::public_works)] = 0.5f;
+        f.w.nation_budgets[f.nation] = nb;
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(t1));
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(t2));
+        fixture bare = f;
+        for (int i = 0; i < 4; ++i)
+        {
+            const entity_id t = add_tile(f.w, f.body, f.nation);
+            const entity_id b = add_building(f.w, f.corp, t, building_type::extraction_site, 0, false);
+            f.w.buildings.at(b).target_resource = resource_type::petroleum;
+        }
+        const research_ai_pick with = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+        const research_ai_pick none = choose_research_node(bare.w, reg, bare.nation, reg.nation_ai());
+        std::printf("     with 4 home oil sites: %s (relief %lld); with none: %s (relief %lld)\n",
+                    pick_id(with.node).c_str(), static_cast<long long>(with.relief_milli),
+                    pick_id(none.node).c_str(), static_cast<long long>(none.relief_milli));
+        check(with.node == a2 && with.relief_milli > 0 && with.score_milli == with.relief_milli - with.cost_milli,
+              "R6g relief to the home industry picks the node that moves it (A2 over the unread A1)");
+        check(none.node == a1 && none.relief_milli < with.relief_milli,
+              "R6h ...and with no home industry the two minors tie on their share of the major (lower index)");
+    }
+
+    {
+        // Legality over a whole walk: hold one side of a pair, then let the AI
+        // pick and "complete" node after node until nothing is legal. Every
+        // pick is frontier, unheld, unqueued, not a deed-unmet quest, and the
+        // held pair side's sibling is never chosen.
+        const int ba = node("DG-ST-OR-Ba"), bb = node("DG-ST-OR-Bb");
+        fixture f = make();
+        nation_tech_state& st = f.w.nation_tech[f.nation];
+        st.held.set(static_cast<std::size_t>(bb));
+        int  picks = 0, zero_majors = 0, majors = 0;
+        bool legal = true, took_ba = false, took_quest = false;
+        std::string order;
+        for (int i = 0; i < io::dg::node_count + 5; ++i)
+        {
+            const research_ai_pick p = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+            if (p.node < 0) break;
+            const auto& nd = io::dg::nodes[static_cast<std::size_t>(p.node)];
+            std::vector<std::uint16_t> plan;
+            legal &= !st.held.test(static_cast<std::size_t>(p.node))
+                  && node_requirements_met(f.w, f.nation, p.node)
+                  && preview_enqueue(f.w, f.nation, p.node, &plan) == enqueue_result::queued
+                  && plan.size() == 1
+                  && (nd.excludes < 0 || !st.held.test(static_cast<std::size_t>(nd.excludes)));
+            took_ba    |= p.node == ba;
+            took_quest |= nd.is_quest;
+            if (nd.t == io::dg::tier::major)
+            {
+                ++majors;
+                if (p.relief_milli <= 0) ++zero_majors;
+                order += " " + std::to_string(picks + 1) + ":" + nd.id;
+            }
+            if (enqueue_node(f.w, f.nation, p.node) != enqueue_result::queued) { legal = false; break; }
+            st.held.set(static_cast<std::size_t>(p.node)); // complete it
+            st.queue.clear();
+            ++picks;
+        }
+        std::printf("     walk: %d picks, %zu held at the end of %d\n", picks, st.held.count(), io::dg::node_count);
+        check(picks > 20 && legal, "R6i every pick over a whole walk is legal: frontier, unheld, pair rule kept");
+        check(!took_ba, "R6j ...the held pair side's sibling is never chosen");
+        check(!took_quest, "R6k ...no deed-unmet quest is chosen (a deed is read, never pursued)");
+        std::printf("     majors in walk order (pick#:id):%s\n", order.c_str());
+        check(majors > 0 && zero_majors == 0,
+              "R6l every major picked scores above zero (what it unlocks: recipes, buildings, the space gate, the next cluster)");
+    }
+
+    {
+        // Pair ties break by the nation's seed: hold everything but the
+        // DG-ST-OR-Ba/Bb pair and what needs it, so the two sides are the only
+        // candidates and tie; sixteen differently named nations must not all
+        // take the same side, and each nation's choice repeats.
+        const int ba = node("DG-ST-OR-Ba"), bb = node("DG-ST-OR-Bb");
+        int took_a = 0, took_b = 0;
+        bool repeat = true;
+        for (int k = 0; k < 16; ++k)
+        {
+            fixture f = make();
+            f.w.nations.at(f.nation).name = "Nation " + std::to_string(k * 7 + 3);
+            nation_tech_state& st = f.w.nation_tech[f.nation];
+            for (int n = 0; n < io::dg::node_count; ++n)
+            {
+                if (n == ba || n == bb) continue;
+                const auto& nd = io::dg::nodes[static_cast<std::size_t>(n)];
+                bool needs = nd.is_quest;
+                for (int g = 0; g < nd.group_count; ++g)
+                    for (const std::int16_t m : nd.groups[static_cast<std::size_t>(g)])
+                        needs |= m == ba || m == bb;
+                if (!needs) st.held.set(static_cast<std::size_t>(n));
+            }
+            const research_ai_pick a = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+            const research_ai_pick b = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+            repeat &= a.node == b.node && a.candidates == 2;
+            took_a += a.node == ba;
+            took_b += a.node == bb;
+        }
+        std::printf("     pair tie over 16 nations: %d took Ba, %d took Bb\n", took_a, took_b);
+        check(repeat && took_a + took_b == 16, "R6m the pair's two sides are the only candidates, and each nation's pick repeats");
+        check(took_a > 0 && took_b > 0, "R6n ...a pair tie breaks by the nation's seed: nations diverge");
+    }
+
+    {
+        // The re-pick within the quarter (Ben, 2026-10-15): a pool covering
+        // several nodes takes them one at a time, at most the bound, spending
+        // no treasury; an empty pool takes nothing.
+        fixture f = make();
+        const float treasury = f.w.nations.at(f.nation).treasury;
+        f.w.nation_tech[f.nation].pool_milli = milli(1.0e6);
+        std::vector<research_ai_pick> picks;
+        const int n = run_nation_research_repick(f.w, reg, false, &picks);
+        const auto& st = f.w.nation_tech[f.nation];
+        std::int64_t spent = 0;
+        for (const research_ai_pick& p : picks) spent += p.cost_milli;
+        check(n == reg.nation_ai().research_repicks_per_quarter
+                  && static_cast<int>(st.held.count()) == n && st.queue.empty()
+                  && st.pool_milli == milli(1.0e6) - spent
+                  && f.w.nations.at(f.nation).treasury == treasury,
+              "R6o a covered pool re-picks up to the bound in one quarter: each completes, the pool pays, the treasury does not");
+        fixture g = make();
+        g.w.nation_tech[g.nation].pool_milli = 0;
+        check(run_nation_research_repick(g.w, reg, false, nullptr) == 0 && g.w.nation_tech[g.nation].queue.empty(),
+              "R6p ...and a pool that cannot cover the next pick re-picks nothing");
+        check(!f.w.nation_tech.count(f.other) || f.w.nation_tech.at(f.other).held.none(),
+              "R6q ...never for the player's nation");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1111,8 +1315,11 @@ void rows_r5_live(std::uint32_t seed)
     run_app_validation_settle(w, reg);
     if (seat_player_corporation(w, seed, start->land.search.winner_score).seated == null_entity)
     { std::printf("  FAIL  no corporation seated\n"); ++g_failures; return; }
-    entity_id nid = null_entity; // the lowest nation id
-    for (const auto& kv : w.nations) if (nid == null_entity || kv.first < nid) nid = kv.first;
+    // The seat's nation: in a seated session the research AI (BL-1275) never
+    // queues for it, so the queue this row projects is exactly the one it set.
+    entity_id nid = player_nation(w);
+    check(nid != null_entity, "R5j0 the seated corp has a home nation (the projection's subject)");
+    if (nid == null_entity) return;
     const int major = node("DG-PR-EX-A");
     int day = 0;
     int live = 0;
@@ -1757,6 +1964,201 @@ void rows_r4(const std::vector<std::uint32_t>& seeds, int years, const dial_over
     check(flat(med), "R4c PACING (scripted queue): the median nation's completed-major interval moves within +/-25% decade to decade");
 }
 
+// ---------------------------------------------------------------------------
+// R7 — the AI age run (BL-1275 review, Ben 2026-10-15): no script — every
+// nation's queue is filled by the research AI (spectated, so the seat's nation
+// too) for Y years. Measures what RESEARCH.md § Cost asks of the scorer: the
+// median nation's first ring-2 major in about five years, majors at roughly
+// steady intervals; and how the pick-one pairs split across nations.
+// Run: nation_tech_harness --ai Y --age-only [--seed-list ...]
+//      [--relief K] [--unlock U] [--cluster C] [--majorw M]   (scorer dials)
+// ---------------------------------------------------------------------------
+
+struct ai_dials
+{
+    bool  set_relief = false, set_unlock = false, set_cluster = false, set_major = false;
+    float relief = 0.0f, unlock = 0.0f, cluster = 0.0f, major = 0.0f;
+};
+
+struct ai_nation
+{
+    std::vector<int>  major_q; ///< Live quarter each major completed in.
+    std::vector<int>  held_d;  ///< Nodes held at each decade's close.
+    std::vector<bool> side;    ///< Per pair: true = the higher-index side held.
+    std::vector<bool> any;     ///< Per pair: either side held.
+};
+
+struct ai_run
+{
+    std::string                    fail;
+    std::map<entity_id, ai_nation> nations;
+    std::uint64_t                  digest = 0;
+    double                         secs   = 0.0;
+};
+
+ai_run run_ai_age(std::uint32_t seed, int years, const dial_override& ov, const ai_dials& ad,
+                  const std::vector<std::pair<int, int>>& pairs)
+{
+    ai_run out;
+    const auto t0 = std::chrono::steady_clock::now();
+    lua_state lua;
+    world_params wp;
+    wp.seed = seed;
+    auto start = std::make_unique<app_start_world>();
+    try { build_app_start_world(lua, wp, *start); }
+    catch (const std::exception& e) { out.fail = std::string("world build threw: ") + e.what(); return out; }
+    world& w = start->w;
+    recipe_registry& reg = start->reg;
+    {
+        research_params rp = reg.research();
+        if (ov.set_base) rp.base_rp_per_nation = ov.base;
+        if (ov.set_sqrt) rp.rp_per_research_credit_sqrt = ov.sqrt_k;
+        if (ov.set_unit) rp.rp_per_cost_unit = ov.unit;
+        if (ov.set_growth) rp.price_growth_per_year = ov.growth;
+        if (ov.set_econ)   rp.rp_per_economy_unit = ov.econ;
+        reg.set_research(rp);
+        nation_ai_params np = reg.nation_ai();
+        if (ad.set_relief)  np.research_relief_rp      = ad.relief;
+        if (ad.set_unlock)  np.research_unlock_relief  = ad.unlock;
+        if (ad.set_cluster) np.research_cluster_relief = ad.cluster;
+        if (ad.set_major)   np.research_major_relief   = ad.major;
+        reg.set_nation_ai(np);
+    }
+    run_app_validation_settle(w, reg);
+    const spawn_seat_result seat = seat_player_corporation(w, seed, start->land.search.winner_score);
+    if (seat.seated == null_entity) { out.fail = "no corporation seated"; return out; }
+
+    std::vector<entity_id> nids;
+    for (const auto& kv : w.nations) nids.push_back(kv.first);
+    std::sort(nids.begin(), nids.end());
+    std::vector<int> majors;
+    for (int n = 0; n < io::dg::node_count; ++n)
+        if (io::dg::nodes[static_cast<std::size_t>(n)].t == io::dg::tier::major) majors.push_back(n);
+    std::map<entity_id, int> held_majors;
+
+    const int first = k_app_validation_ticks;
+    constexpr int k_econ_tick_days = 90;
+    for (int qtr = 1; qtr <= years * 4; ++qtr)
+    {
+        const int day = qtr * k_econ_tick_days;
+        advance_orbits(w, static_cast<double>(k_econ_tick_days));
+        advance_surveys(w, k_econ_tick_days);
+        w.current_day_tick = day;
+        run_settle_tick(w, reg, first + (qtr - 1), day, /*spectating=*/true);
+        for (const entity_id nid : nids)
+        {
+            ai_nation& a = out.nations[nid];
+            const auto it = w.nation_tech.find(nid);
+            int held = 0;
+            if (it != w.nation_tech.end())
+                for (const int m : majors) held += it->second.held.test(static_cast<std::size_t>(m)) ? 1 : 0;
+            for (int k = held_majors[nid]; k < held; ++k) a.major_q.push_back(qtr);
+            held_majors[nid] = held;
+            if (qtr % 40 == 0 || qtr == years * 4)
+                a.held_d.push_back(it != w.nation_tech.end() ? static_cast<int>(it->second.held.count()) : 0);
+        }
+    }
+    for (const entity_id nid : nids)
+    {
+        ai_nation& a = out.nations[nid];
+        const auto it = w.nation_tech.find(nid);
+        for (const auto& [lo, hi] : pairs)
+        {
+            const bool l = it != w.nation_tech.end() && it->second.held.test(static_cast<std::size_t>(lo));
+            const bool h = it != w.nation_tech.end() && it->second.held.test(static_cast<std::size_t>(hi));
+            a.any.push_back(l || h);
+            a.side.push_back(h);
+        }
+    }
+    out.digest = w.state_hash(w.current_day_tick);
+    for (const auto& [nid, st] : w.nation_tech)
+        out.digest = (out.digest * 1099511628211ull) ^ static_cast<std::uint64_t>(st.pool_milli)
+                   ^ (static_cast<std::uint64_t>(st.held.count()) << 48);
+    out.secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    return out;
+}
+
+void rows_r7(const std::vector<std::uint32_t>& seeds, int years, const dial_override& ov, const ai_dials& ad)
+{
+    const nation_ai_params np{};
+    std::printf("\nR7 the AI age run: %zu seeds, %d years, every nation's queue filled by the research AI (spectated)\n"
+                "  scorer dials: relief %.0f RP/unit  unlock %.3g  cluster %.3g  major %.3g  (defaults %.0f %.3g %.3g %.3g)\n",
+                seeds.size(), years,
+                ad.set_relief ? ad.relief : np.research_relief_rp, ad.set_unlock ? ad.unlock : np.research_unlock_relief,
+                ad.set_cluster ? ad.cluster : np.research_cluster_relief, ad.set_major ? ad.major : np.research_major_relief,
+                np.research_relief_rp, np.research_unlock_relief, np.research_cluster_relief, np.research_major_relief);
+    std::vector<std::pair<int, int>> pairs;
+    for (int n = 0; n < io::dg::node_count; ++n)
+    {
+        const int ex = io::dg::nodes[static_cast<std::size_t>(n)].excludes;
+        if (ex > n) pairs.push_back({n, ex});
+    }
+    const double k_never = 1.0e9;
+    std::vector<double> first_y, gap_y;
+    const std::size_t decades = static_cast<std::size_t>((years + 9) / 10);
+    std::vector<std::vector<double>> majors_in(decades), held_at(decades);
+    std::vector<int> side_hi(pairs.size(), 0), side_any(pairs.size(), 0);
+    int fails = 0;
+    bool det = true;
+    for (const std::uint32_t s : seeds)
+    {
+        const ai_run a = run_ai_age(s, years, ov, ad, pairs);
+        if (!a.fail.empty()) { std::printf("  seed %u FAIL %s\n", s, a.fail.c_str()); ++fails; continue; }
+        std::vector<double> sf;
+        for (const auto& [nid, n] : a.nations)
+        {
+            const double f = n.major_q.empty() ? k_never : n.major_q.front() / 4.0;
+            first_y.push_back(f);
+            sf.push_back(f);
+            for (std::size_t i = 1; i < n.major_q.size(); ++i) gap_y.push_back((n.major_q[i] - n.major_q[i - 1]) / 4.0);
+            for (std::size_t d = 0; d < decades; ++d)
+            {
+                int c = 0;
+                for (const int q : n.major_q) c += static_cast<std::size_t>((q - 1) / 40) == d ? 1 : 0;
+                majors_in[d].push_back(c);
+                if (d < n.held_d.size()) held_at[d].push_back(n.held_d[d]);
+            }
+            for (std::size_t p = 0; p < pairs.size(); ++p)
+            {
+                side_any[p] += n.any[p] ? 1 : 0;
+                side_hi[p]  += n.side[p] ? 1 : 0;
+            }
+        }
+        std::printf("  seed %-10u nations %2zu  median first major %5.2f y  digest %016llx (%.0f s)\n",
+                    s, a.nations.size(), median_of(sf), static_cast<unsigned long long>(a.digest), a.secs);
+        if (s == seeds.front())
+        {
+            const ai_run b = run_ai_age(s, years, ov, ad, pairs);
+            det = b.fail.empty() && b.digest == a.digest;
+        }
+    }
+    const double med_first = median_of(first_y);
+    std::printf("  first ring-2... major (years after the open): p10 %.2f  p25 %.2f  MEDIAN %.2f  p75 %.2f  p90 %.2f\n",
+                pct(first_y, 0.1), pct(first_y, 0.25), med_first, pct(first_y, 0.75), pct(first_y, 0.9));
+    std::printf("  years between consecutive majors: p25 %.2f  median %.2f  p75 %.2f\n",
+                pct(gap_y, 0.25), median_of(gap_y), pct(gap_y, 0.75));
+    std::printf("  per decade (median nation): majors completed | nodes held at the close\n");
+    for (std::size_t d = 0; d < decades; ++d)
+        std::printf("    %4zu-%4zu  %4.1f (p90 %4.1f) | %5.1f\n", 1960 + 10 * d, 1970 + 10 * d,
+                    median_of(majors_in[d]), pct(majors_in[d], 0.9), median_of(held_at[d]));
+    int split = 0, taken_pairs = 0;
+    for (std::size_t p = 0; p < pairs.size(); ++p)
+    {
+        const auto& lo = io::dg::nodes[static_cast<std::size_t>(pairs[p].first)];
+        const auto& hi = io::dg::nodes[static_cast<std::size_t>(pairs[p].second)];
+        const int n_hi = side_hi[p], n_lo = side_any[p] - side_hi[p];
+        std::printf("  pair %-12s / %-12s  %3d took %s, %3d took %s\n", lo.id, hi.id, n_lo, lo.id, n_hi, hi.id);
+        if (side_any[p] > 0) ++taken_pairs;
+        if (n_hi > 0 && n_lo > 0) ++split;
+    }
+    check(fails == 0, "R7a every seed builds, settles, seats and runs the age with the AI");
+    check(det, "R7b the AI age run is byte-identical twice (first seed)");
+    check(taken_pairs == 0 || split > 0, "R7c nations diverge on the pick-one pairs (some pair taken both ways)");
+    // RESEARCH.md § Cost: the median nation's first ring-2 major in about five
+    // years. Reported against a 4-6 year band; never weakened.
+    check(med_first >= 4.0 && med_first <= 6.0, "R7d PACING: the median nation's first major lands in about five years (4-6)");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -1767,6 +2169,8 @@ int main(int argc, char** argv)
     int  quarters   = 32; // 16 x the RP-unit scale (200 / 100)
     bool twice      = true;
     dial_override ov;
+    ai_dials ad;
+    int ai_years = 0; // BL-1275: --ai Y runs R7 over Y years
     std::vector<std::uint32_t> seeds;
     for (int i = 1; i < argc; ++i)
     {
@@ -1783,11 +2187,16 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--econ") && more)   { ov.set_econ = true; ov.econ = static_cast<float>(std::atof(argv[++i])); }
         else if (!std::strcmp(argv[i], "--age") && more)    age_years = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--age-only"))       age_only = true;
+        else if (!std::strcmp(argv[i], "--ai") && more)     ai_years = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--relief") && more)  { ad.set_relief = true;  ad.relief  = static_cast<float>(std::atof(argv[++i])); }
+        else if (!std::strcmp(argv[i], "--unlock") && more)  { ad.set_unlock = true;  ad.unlock  = static_cast<float>(std::atof(argv[++i])); }
+        else if (!std::strcmp(argv[i], "--cluster") && more) { ad.set_cluster = true; ad.cluster = static_cast<float>(std::atof(argv[++i])); }
+        else if (!std::strcmp(argv[i], "--majorw") && more)  { ad.set_major = true;   ad.major   = static_cast<float>(std::atof(argv[++i])); }
         else
         {
             std::fprintf(stderr, "usage: nation_tech_harness [--seeds N | --seed-list a,b] [--quarters Q] [--once]"
                                  " [--base X] [--lin Y] [--sqrt Z] [--unit U] [--growth G] [--econ E]"
-                                 " [--age Y] [--age-only]\n");
+                                 " [--age Y] [--age-only] [--ai Y] [--relief K] [--unlock U] [--cluster C] [--majorw M]\n");
             return 2;
         }
     }
@@ -1810,6 +2219,7 @@ int main(int argc, char** argv)
         reg.load_from_lua(lua);
         rows_t1(reg);
         rows_t2(reg);
+        rows_r6(reg);
     }
     {
         // Curated seeds for the rows a hand fixture cannot route: the overland
@@ -1840,6 +2250,8 @@ int main(int argc, char** argv)
         rows_r0(seeds, quarters, twice, ov);
     if (!seeds.empty() && age_years > 0)
         rows_r4(seeds, age_years, ov);
+    if (!seeds.empty() && ai_years > 0)
+        rows_r7(seeds, ai_years, ov, ad);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures,
                 g_failures == 1 ? "" : "s");
