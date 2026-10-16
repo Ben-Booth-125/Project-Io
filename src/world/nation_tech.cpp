@@ -256,6 +256,11 @@ int research_next_age_quarter(const world& w)
     return std::max(0, w.current_econ_tick + 1 - k_campaign_settle_ticks);
 }
 
+bool research_age_open(const world& w)
+{
+    return w.current_econ_tick >= k_campaign_settle_ticks;
+}
+
 std::int64_t research_price_ppm(const world& w, const research_params& p)
 {
     return research_price_ppm_at(research_age_quarter(w), p);

@@ -201,10 +201,21 @@ struct nation_ai_params
     /// RP one unit of relief is worth when it is weighed against a node's
     /// priced cost. A unit of relief is one home building-equivalent moved by
     /// 100% (see `choose_research_node`), so at 20000 a +1% lever on ONE home
-    /// building is worth 200 RP — a ring-1 travel node's opening price. A nation
-    /// with more matching buildings than that finds the node worth its price;
-    /// one with none sees only the cost, and takes the cheapest frontier node.
+    /// building is worth 200 RP — a ring-1 travel node's opening price.
     float research_relief_rp = 20000.0f;
+    /// Relief units per thing a node unlocks — a recipe, a building or
+    /// placement, the space gate (Ben, 2026-10-15: a major scores for what it
+    /// unlocks), before the line emphasis. Calibrated (nation_tech_harness R7).
+    float research_unlock_relief = 0.5f;
+    /// Relief units per cost unit of the next cluster a major brings within reach.
+    float research_cluster_relief = 0.02f;
+    /// Relief units per cost unit of a major itself: a major is the cluster it
+    /// closes, so a ring-4 major is worth about twice a ring-2.
+    float research_major_relief = 0.04f;
+    /// The most nodes one nation may pick in one quarter AFTER the research
+    /// pass (Ben, 2026-10-15: re-pick within the quarter while the pool covers
+    /// the next node; a bounded loop, one node queued at a time).
+    int research_repicks_per_quarter = 8;
 };
 
 /// The three terms, per nation, exactly as they were computed. Reported, never
@@ -340,7 +351,8 @@ struct research_ai_pick
 /// deed already met (a deed is read, never acted toward: a quest whose deed is
 /// unmet would sit in the queue forever, so it is never chosen). A pair's two
 /// sides are both candidates until one is held or queued; the score picks the
-/// side. The scoring rule is the comment over the definition (nation_ai.cpp).
+/// side, and a tie between them breaks by the nation's own seed. The scoring
+/// rule is the comment over the definition (nation_ai.cpp).
 research_ai_pick choose_research_node(const world& w, const recipe_registry& reg,
                                       entity_id nation, const nation_ai_params& p);
 
@@ -352,8 +364,17 @@ bool research_queue_idle(const world& w, entity_id nation);
 /// queue `choose_research_node`'s pick through `enqueue_node`. NEVER the
 /// player's nation (NATIONS.md: the player's nation is never scored) — unless
 /// @p spectating, where nobody is seated and the session has no player's
-/// nation to protect (AI_OPPONENT.md § 10i). Does nothing in the settle
-/// (`current_econ_tick < k_campaign_settle_ticks`): the handover erases what it
-/// researches, so queuing then only spends treasury. Returns how many nodes it queued.
+/// nation to protect (AI_OPPONENT.md § 10i; Ben 2026-10-15: under spectate the
+/// seat's nation researches too). Does nothing in the settle
+/// (`research_age_open`): the handover erases what it researches, so queuing
+/// then only spends treasury. Returns how many nodes it queued.
 int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating,
                            std::vector<research_ai_pick>* out = nullptr);
+
+/// The re-pick (Ben, 2026-10-15), run AFTER the quarter's research pass: for
+/// the same nations, while a nation's queue is idle and its pool already covers
+/// the next pick's whole cost, queue that pick and flow the pool into it, up
+/// to `research_repicks_per_quarter` times. Spends no treasury — the line paid
+/// only what the queue owed. Returns how many nodes it queued.
+int run_nation_research_repick(world& w, const recipe_registry& reg, bool spectating,
+                               std::vector<research_ai_pick>* out = nullptr);

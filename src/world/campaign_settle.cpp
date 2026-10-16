@@ -177,9 +177,9 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
     // THE HANDOVER (BL-1273; RESEARCH.md: no nation opens ahead in technology).
     // The settle ran the nation step like any tick, so the base and any
     // University or institute accrued RP into pools; none of it carries into
-    // play. Nothing queues during the settle (no caller of enqueue_node yet,
-    // BL-1275's scorer included, and an empty queue spends no treasury), so the
-    // clear drops only RP that cost the treasury nothing.
+    // play. Nothing queues during the settle — the nation research AI (BL-1275)
+    // waits for `research_age_open`, and an empty queue spends no treasury — so
+    // the clear drops only RP that cost the treasury nothing.
     clear_research_at_handover(w);
     if (progress != nullptr) progress->report_sub(0, 0);
 }

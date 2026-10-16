@@ -119,6 +119,11 @@ std::int64_t research_price_ppm_at(int age_quarter, const research_params& p = {
 /// opened (`current_econ_tick` less the settle's ticks), never negative.
 int research_age_quarter(const world& w);
 
+/// BL-1275: whether the age has opened — the world is past the campaign settle
+/// (`current_econ_tick >= k_campaign_settle_ticks`). Research in the settle is
+/// erased at the handover, so the nation research AI queues nothing before it.
+bool research_age_open(const world& w);
+
 /// The age quarter the NEXT quarterly pass will charge: econ step
 /// `current_econ_tick + 1` less the settle's ticks, never negative. Between
 /// passes `current_econ_tick` is the step the last pass ran at — straight

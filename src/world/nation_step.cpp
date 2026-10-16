@@ -181,9 +181,12 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     //
     // BL-1275 first: an AI nation whose queue is idle queues ONE frontier node
     // (nation_ai.cpp, choose_research_node) through the legal enqueue verb, so
-    // this quarter's RP flow into it. Never the player's nation in play.
+    // this quarter's RP flow into it. Never the player's nation in play. Then,
+    // after the pass, the bounded re-pick: a nation whose node completed and
+    // whose pool already covers the next pick takes it in the same quarter.
     run_nation_research_ai(w, reg, spectating, &report.research_picks);
     advance_research(w, reg.research(), &report.research);
+    run_nation_research_repick(w, reg, spectating, &report.research_picks);
 
     // ---- 7. Space assets (BL-1327, SPACE_ASSETS.md) — arrivals, then each
     // placed asset's quarterly upkeep paid whole from its owner's treasury or
