@@ -68,7 +68,7 @@ grid carries a fourth button that opens this view **aimed** at the selected buil
 group expanded, the building selected — which is how a map selection reaches its levers in one
 press.
 
-**Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can supply; below `1 / max_stretch` the build is **paused**. `construction_rate`, `construction_status` ("Building… ~N qtrs", "(materials scarce)", "Paused - market can't supply materials") and `construction_status_colour` (green on schedule / amber scarce / red paused) mirror `run_construction`'s formula so the panel and the Selection front door show the same number. The building carries `ticks_remaining` (an integer gate) and `construction_progress` (the fractional accumulator that lets a starved build stretch over many ticks). The display word is **qtr**, never tick (NR-002, Ben 2026-08-01) — a Tick is literally a calendar quarter.
+**Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can actually give it; below `1 / max_stretch` the build is **paused**. **What "can give it" means is the whole defect this surface once had (Ben, 2026-10-16 playtest):** the sim draws the market's **persistent `inventory`**, adds the `capacity_per_build_tick` row, and counts a good priced above `reservation_mult × base` as absent (`shelf_admits`). The panel's own mirror read `supply` — the per-tick flow, reset every tick — carried no capacity row and ignored the price ceiling, so it reported "ETA ~2 qtrs" while the sim held the same build at the `1 / max_stretch` floor for twenty. **One shared read now serves both**, and the mirror matching `run_construction`'s `site_rate` is the contract its declaration cites. A stall also **names the good** that holds it, in the status line, the stack reading, the queue row and the build door. The building carries `ticks_remaining` (an integer gate) and `construction_progress` (the fractional accumulator that lets a starved build stretch over many ticks). The display word is **qtr**, never tick (NR-002, Ben 2026-08-01) — a Tick is literally a calendar quarter.
 
 **Default view on open:** Buildings.
 **Cross-cutting selectors that are NOT views (toggle-exempt):** none. The Buildings view's method
@@ -83,7 +83,7 @@ headers are an accordion, and a `CollapsingHeader` is already a toggle.
 The ledger arms no lens on open; the mapping above is the proposal.
 
 ## 4. Data sources
-- **Queue** — `world::buildings` filtered to `is_player_owned` and `ticks_remaining > 0`; rate from `construction_rate` (market supply against `recipe_registry::economics(type).resource_build_cost` and `build_duration_ticks`, `reg.construction().max_stretch`).
+- **Queue** — `world::buildings` filtered to `is_player_owned` and `ticks_remaining > 0`, nearest done first; rate from the shared `read_construction` (the market's **inventory**, the capacity row and the fair-price ceiling, against `recipe_registry::economics(type).resource_build_cost` and `build_duration_ticks`, `reg.construction().max_stretch`).
 - **Estimated cost** — `compute_building_opex` (`budget_system.hpp`) over the same set, with `body_mean_habitability` feeding the workforce term.
 - **Build cost, arming, placement** — `recipe_registry::economics()` (`build_cost`, `resource_build_cost[]`) and `placement_rules::k_extractable`, read by the tile Selection card rather than here.
 - **Roster** — `player_building_groups` (`construction_panel.cpp`): every `is_player_owned` building, keyed by `building_group_name` (the Build door's own vocabulary — `extraction_building_name` for an extraction site, the active recipe's `group` for a processing facility, `building_type_name` otherwise). The per-building net is `estimate_building_profit(...).net()`, the SAME figure `rank_player_buildings_by_profit` ranks the Balance ledger on, so the two surfaces cannot report different profits for one building. A building the report cannot yet price contributes **zero** to its group's total, never a guess. Groups are walked in name order and members by net descending then entity id, so an unordered `world::buildings` cannot vary what a player or a check sees.
@@ -114,8 +114,11 @@ band is independent of the column and stays where it is.
   navigation the view exists for. Built as: always the whole estate, with the selection driving
   which group is expanded and which row is highlighted. Confirm, or say what a multi-building
   selection would be.
-- **Queue table shape.** Per row: building type, tile, progress %, ETA in quarters, status (on
-  schedule / scarce / paused), and cost remaining — or a leaner three-column read? The progress
-  colour bands (25 / 75 %) are a strawman.
+- ~~**Queue table shape.**~~ **Answered in build (2026-10-16):** four columns — building (selects
+  it), done %, quarters left, cost left — with body and tile on the row hover, because at the
+  panel's width a fifth column never fitted. The 25 / 75 % colour bands were kept. Progress is
+  `construction_paid / construction_capex`, which re-prices live, so the bar can wobble as prices
+  and the site multiplier move; the drift-free alternative is storing the original total on the
+  building, which is a save-format change and is not taken.
 - **Lens: follow-the-view or fixed?** Confirm the mapping (Construction→opportunity /
   Buildings→production), or pin one lens for the whole ledger.

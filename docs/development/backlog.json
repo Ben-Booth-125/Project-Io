@@ -1527,6 +1527,71 @@
    ],
    "title": "A shipment draws Logistic Points again, by cargo quantity, at the anchor it leaves",
    "design": "SPRINT 55 (Ben, 2026-10-16): 'we need to consider how trading consumes logistics points' - RULED the same day: yes, a shipment draws again. The cap was retired in BL-1309's cut and the code still stands, zeroed: market_lp_left (supply_system.cpp:1035) returns 0.0f, commit_trade_shipment (:1083) voids the pools and the refusal, market_component::trade_lp_spare is permanently 0 yet serialised at save v46 and still read by corp_ai's rival-Marketplace estimate, and corp_command::rejected_no_lp serves a gate that draws nothing. REVIVE rather than rewrite, and note BL-1352 was going to delete exactly this code - it has been reconciled. THE DRAW: cargo quantity at the anchor the shipment leaves - the settled formula, what moves and not how far, so it does not reintroduce the distance draw NR-620 measured at a 73% convoy-traffic collapse. NEVER REFUSED WHOLE: a trade is a standing route with nobody to tell, so the shipment sends what the anchor admits (SUPPLY.md section A shipment); whole refusal is for COMMANDED legs only (Ben, 2026-10-05, NR-969). Ordering: the march claims first (NR-917, which with trade drawing again recovers its original subject), then trade and production. A WORLD-MOVER on the traffic itself: haulage_measure --far-trade is the measurement that matters, against the 1055/802 and the 13,954/11,277 baselines, plus market_viability G1/G1b for input starvation."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1342..BL-1344, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1362",
+   "short_name": "SIM_PUBLISHES_BUILD_RATE",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/ui/construction_panel.cpp"
+   ],
+   "title": "The construction panel still cannot see the sim's pro-rata rationing, because the sim never publishes its realised build rate",
+   "design": "SPRINT 56 (found delivering BL-1342, 2026-10-16). BL-1342 made the UI read what run_construction reads - inventory, the capacity row, the fair-price ceiling, state_idle - and closed the lying ETA. ONE DIVERGENCE REMAINS BY DESIGN: BL-1209's plan_short_shelves pre-solves a pro-rata allocation across every site contending for one shelf, in visit order, and the UI does not duplicate that solver. So where several sites compete for the same shelf the panel reads OPTIMISTIC, never pessimistic. The right close is not a second copy of the solver: run_construction should publish each site's REALISED rate in economy_report, and the panel should read it, keeping one source of truth. That is economy_system.* and was outside the UI lane's owned files. Then the mirror can be deleted outright rather than kept in step."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1342..BL-1344, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1363",
+   "short_name": "STORE_THE_BUILD_TOTAL",
+   "category": "Economy",
+   "priority": "C",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "A construction progress bar wobbles because its denominator is re-priced live",
+   "design": "SPRINT 56 (found delivering BL-1343, 2026-10-16). Progress is construction_paid / construction_capex(...), and capex is re-priced from live market prices and the live site multiplier, so the bar can move backwards when prices rise or the reach/stack field changes. The ticks ratio has the same flaw through construction_site_multiplier. The drift-free fix is to store the original total on the building when construct_for sets ticks_remaining, which is a persistent field and therefore a save-format bump - deliberately NOT taken inside BL-1343. Cheap, and it also gives the queue an honest 'cost left'."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1342..BL-1344, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1364",
+   "short_name": "BUILD_REFUSAL_COLLAPSES",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 1,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/construction.cpp"
+   ],
+   "title": "Every placement refusal but the launchpad collapses into \"invalid tile\", so the toast misnames a full stack",
+   "design": "SPRINT 56 (found investigating BL-1341, 2026-10-16). construct_building maps every can_place_in_world refusal except launchpad_exists into construction_result::invalid_tile (construction.cpp:213), so a full extraction stack, a full non-extraction stack and a full province ceiling all report 'invalid tile' in the post-hoc toast - a tile that is perfectly valid. The build-door row is honest (BL-1341 gave it the real wording and the numbers); it is the seam's own result enum that is lossy, and the seam is also the AI-facing one, where a wrong reason is a wrong signal. Carry the placement_reason through instead of flattening it."
   }
  ]
 }
