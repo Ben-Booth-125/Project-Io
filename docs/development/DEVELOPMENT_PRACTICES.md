@@ -571,6 +571,11 @@ budget line, a lens tint, a `world_audit` section. These surfaces are debugging 
 functional specification for the production UI. Write ImGui code clearly, not cleverly — it is
 reference material as much as working code.
 
+**The play log.** A seated session writes `play_logs/<date-time>_seed<N>.jsonl` (`src/core/play_log.hpp`:
+a header, every human command, every nation's quarter; `IO_PLAY_LOG=0` turns it off, `=1` turns it on
+for the headless `--autostart`); `node tools/session/play_vs_ai.js <log> [--json]` compares the
+player's nation with the AI majors. It is an observation, never an input: it must not move `state_hash`.
+
 ---
 
 ## Development constraints
