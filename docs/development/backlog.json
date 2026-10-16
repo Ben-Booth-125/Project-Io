@@ -1042,7 +1042,7 @@
    "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"reroll in life doesn't reroll the seed. I'm still getting similar landmasses either way.\" CONFIRMED: the press increments preferences.roll[1] (startup_screens.cpp:2866), which perturbs only resolve_preferences' rb stream - home_ocean, oxygenation, coal_climate (planetology.cpp:385). run_continents is seeded from params.seed ^ prototype_body_seed(1) (hard_coded_world.cpp:596) and reads only mobile_lid and theta, both from roll[0]. So plates, drift and the height-bias field are bit-identical across any number of Life rerolls; only sea level moves. Fold the round's roll into the body seed handed to run_continents (or move params.seed) so a Reroll re-draws the landmasses."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 55,
    "written": "2026-10-16",
@@ -1054,11 +1054,20 @@
    "short_name": "ROADS_CROSS_TILE_EDGES",
    "category": "UI",
    "priority": "B",
-   "difficulty": 3,
+   "difficulty": 4,
    "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [],
-   "title": "Roads should be directional and always cross the edge between two tiles",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"Roads should be directional, so they always cross the edge of two tiles.\" Settle in LOGISTICS.md (what a road segment IS: a link between two adjacent tiles, with a direction) and RENDERING.md (how it draws: crossing the shared edge, not painted per tile). Exact reading to confirm with Ben before building."
+   "files": [
+    "src/world/components.hpp",
+    "src/world/logistics.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/logistic_points.cpp",
+    "src/world/network_upkeep.cpp",
+    "src/world/construction.cpp",
+    "src/world/world_save.cpp",
+    "src/ui/ground_bake.cpp"
+   ],
+   "title": "A road is an edge between two tiles, not a property of one",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): 'Roads should be directional, so they always cross the edge of two tiles.' RULED (Ben, 2026-10-16): roads move to EDGES, as rivers already are - not a rendering-only change. DESIGNED: LOGISTICS.md section 4 (Roads - an edge between two tiles) and RENDERING.md (Roads draw across the edge they cross). Grain: a tier per hex side, six sides, two bits each (0 none / 1 Track / 2 Road / 3 Highway), both tiles of an edge carrying it as both tiles of a river crossing do, side i mirroring side i+3. The road multiplier moves from the node to the EDGE in logistics.cpp edge_cost, beside the river discount that already lives there (A* keeps its 4-cardinal walk and its hex_side_for_offset derivation). Every count of roaded TILES becomes a count of roaded EDGES, each edge once: Logistic Points, network upkeep, reach, interdiction. Placement names a tile AND a side. Pre-v53 saves migrate by laying, between each pair of 4-cardinal neighbours that both carried a road, an edge at the LOWER of their two tiers. World save v53 claimed. A WORLD-MOVER: measure haulage_measure --far-trade and market_viability before and after; a re-bless is Ben's."
   },
   {
    "status": "proposed",

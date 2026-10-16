@@ -54,6 +54,15 @@ the stepped tilt.
 
 ---
 
+
+## Roads draw across the edge they cross (Ben, 2026-10-16)
+
+A road is an edge, not a tile (`../economy/LOGISTICS.md` § 4. A road is an edge), and it draws as
+one: a run crossing the boundary between two tiles, meeting the boundary where the two tile centres
+would. It is never a fill, a blob or a stamp inside one tile's footprint. Tier reads as the run's
+own weight, and a junction is what several runs meeting at one centre already look like — nothing
+draws a junction as a separate object.
+
 ## The mechanism — baked terrain chunks
 
 The ground is rendered **once** into per-body chunk textures (render targets on the

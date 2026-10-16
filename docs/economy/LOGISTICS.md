@@ -76,7 +76,9 @@ Landform multipliers, from TILES.md: plains 1.0, valley 1.1, highland 1.25, crat
 rift 1.6, mountain 2.0. Water is crossable at a higher **sea-leg** cost, so a path exists on any
 connected body — and **whether the cheapest path touches water is what selects sea vs land mode**.
 
-Roads discount it: `road_traversal_multiplier` = `1 / (1 + 0.5 × tier)`.
+Roads discount it: `road_traversal_multiplier` = `1 / (1 + 0.5 × tier)` — applied to the **edge**
+the step crosses, not to either node (§ 4. A road is an edge), exactly where the river discount is
+applied.
 
 An **edge** cost is the mean of its two nodes, but a river discounts an edge in one direction only
 (downstream is cheaper than upstream), so **a path is directed**. Its cost is always the origin →
@@ -173,7 +175,43 @@ shortfall floor.
 `docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
 shortfall rule; this section owns only the transmission.
 
-### 4. Roads — generated, then extended by hand
+### 4. Roads — an edge between two tiles, generated then extended by hand
+
+**A road crosses the boundary between two tiles; it is never a property of one.** The player's
+words: *"Roads should be directional, so they always cross the edge of two tiles."* A river was
+already an edge and never a tile (`TILES.md`, `river_generation.hpp`); a road now reads the same
+way, which is why the cost above moves to the edge beside the river discount rather than needing a
+second model.
+
+**The grain.** A tile carries a **tier per hex side** — six sides, ordered as the river pass orders
+them (0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE, odd-r offset), each holding 0 = none, 1 = Track, 2 = Road,
+3 = Highway. Two bits a side, so twelve bits a tile. Both tiles of an edge carry it, as both tiles
+of a river crossing do: the road on side *i* of a tile is the road on side *i+3 mod 6* of its
+neighbour, and the two agreeing is an invariant, asserted rather than assumed.
+
+**What the ladder means now.** A tier is a property of a crossing, so *"this tile has a Highway"* is
+no longer a thing the world can say. Every reading that used to count roaded **tiles** — the
+Logistic Point pool, network upkeep, the reach field, the interdiction surfaces — counts roaded
+**edges**, each edge once: a traversal from either side finds the same tier, so a count that walked
+both tiles of every edge would double it.
+
+**Placement is directional.** Laying a road names a tile **and a side**. A road to nowhere is
+therefore impossible to express, which is the point: the refusal *"there is no neighbour that way"*
+is cheaper to understand than a tile that is roaded while nothing adjoins it.
+
+**Pathfinding is unchanged in shape.** A* still walks 4-cardinal neighbours over the body grid and
+still derives the hex side of each step (`hex_side_for_offset`), the two diagonal sides the
+cardinal walk skips carrying no road a step can use — the same geometry the river discount has
+always lived with. A path is already directed because a river discounts one way only; a road
+discounts both ways, so it adds no new asymmetry.
+
+**Older saves.** A save written before the field existed carried one tier a tile. It migrates by
+laying, between each pair of 4-cardinal neighbours that both carried a road, an edge at the
+**lower** of their two tiers — a road crosses only where both ends were roaded. Deterministic, and
+it reconstructs the network the generated lattice meant rather than inventing crossings at its
+frontier.
+
+**Generated, then extended by hand.**
 
 Generated per nation after population, deterministically from the campaign seed (BL-146 /
 BL-172, road generation). Local streets first: every centre's own tile gets at least a Track.
