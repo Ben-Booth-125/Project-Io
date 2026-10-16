@@ -745,6 +745,7 @@ void ground_layer::prebake(const world& w, entity_id body, bool assume_surveyed)
     m_home = body; // the pre-bake target is the homeworld: pinned (BL-1259)
     b->last_visit = m_frame;
     make_room(master_bytes(*b), body, m_active);
+    m_prebake_started = clock::now();
     if (fill_log_on())
     {
         m_prebake_pending = true;
@@ -1433,7 +1434,7 @@ void ground_layer::feed(bool verify)
     // IO_GROUND_NO_BACKGROUND=1 (a measurement switch): no speculative
     // bakes, so a bench can time a true first visit.
     static const bool no_background = env_flag("IO_GROUND_NO_BACKGROUND");
-    if (!m_in_play || queued >= cap || !m_world || no_background)
+    if (!m_in_play || queued >= cap || !m_world || no_background || !background_enabled)
         return;
     if ((act && act->n_ready < act->n_chunks) || (pre && pre->n_ready < pre->n_chunks))
         return;

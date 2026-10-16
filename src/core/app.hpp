@@ -73,9 +73,25 @@ public:
     /// which is precisely what happened on 2026-08-16.
     /// `play` walks the same wizard and then just keeps running, for when someone
     /// needs to LOOK at the running game without clicking through the wizard first.
-    enum class autostart_mode : std::uint8_t { none = 0, smoke, play };
+    /// `bench_ground` is BL-1247's ground benchmark (`--bench-ground`): the
+    /// play walk with a reader's dwell on every round, then a scripted drive
+    /// of the Planetary canvas that reports the five target-hardware budgets
+    /// (TECH_FOUNDATIONS.md § Target hardware) and exits. See ground_bench.cpp.
+    enum class autostart_mode : std::uint8_t { none = 0, smoke, play, bench_ground };
 
     int run(autostart_mode autostart = autostart_mode::none);
+
+    /// BL-1247: `--bench-ground [--dwell <ms>] [--bench-background <s>]`.
+    /// @p dwell_ms is how long the walk reads each lapse round and the close
+    /// before Begin (0 = clicks straight through, the tracked-only case);
+    /// @p background_s lets the background bodies bake that long after the
+    /// measures, for the memory reading (0 = not at all). Call before run().
+    void set_bench_ground(long long dwell_ms, double background_s)
+    {
+        m_bench.on           = true;
+        m_bench.dwell_ms     = dwell_ms;
+        m_bench.background_s = background_s;
+    }
 
     /// BL-412: ask run() to host the live agent control seam on
     /// 127.0.0.1:@p port (0 = don't host, the default). The listener opens
@@ -1239,6 +1255,56 @@ private:
     generation_progress m_paint_wait;
     /// When the "Painting the ground" wait began (its length is said as play opens).
     std::chrono::steady_clock::time_point m_paint_t0{};
+
+    /// BL-1247 — the ground benchmark's state (`--bench-ground`; the driver is
+    /// bench_ground_frame in ground_bench.cpp, called once per frame-loop pass).
+    struct bench_state
+    {
+        using tp = std::chrono::steady_clock::time_point;
+        bool        on = false;
+        long long   dwell_ms = 10000;
+        double      background_s = 0.0;
+        // Before play.
+        tp          prebake_t0{};          ///< The latest pre-bake start.
+        int         prebake_starts = 0;
+        bool        was_current = false;
+        tp          current_since{};       ///< When the home master last became current.
+        tp          paint_wait_t0{};       ///< The "Painting the ground" screen first shown.
+        double      seat_wait_s = 0.0;     ///< The pre-bake's cost added to generation.
+        double      paint_total_s = -1.0;  ///< Pre-bake start -> home master current.
+        // In play.
+        bool        in_play = false;
+        int         phase = 0;
+        int         step = 0;              ///< Rung index / sub-step inside a phase.
+        int         frames = 0;            ///< Frames inside the current step.
+        tp          t0{};
+        entity_id   home = null_entity;
+        entity_id   other = null_entity;
+        float       zoom0 = 1.0f;          ///< kMinZoom, read off the ladder.
+        // Stand-ins.
+        int         standin_frames = 0, standin_zoom = 0, standin_pan = 0, watched_frames = 0;
+        int         standin_run = 0, standin_worst_run = 0;
+        // Frame work per rung (ms), and the level each drew.
+        std::vector<float> rung_ms[5];
+        double      rung_level_ppr[5] = {};
+        // The re-bake.
+        std::uint64_t rebakes0 = 0;
+        double      rebake_s = -1.0;
+        std::string rebake_note;
+        // The first visit.
+        double      visit_s = -1.0;
+        double      visit_master_s = -1.0;
+        std::string other_name;
+        // Memory readings: { label, working set, peak WS, private, peak private, ground RAM }.
+        struct mem_row { std::string label; double ws, peak_ws, priv, peak_priv, ground; };
+        std::vector<mem_row> mem;
+        bool        done = false;
+    };
+    bench_state m_bench;
+    /// BL-1247: one pass of the bench driver (no-op unless m_bench.on).
+    void bench_ground_frame();
+    void bench_mem(const char* label);
+    void bench_report();
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.

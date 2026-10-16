@@ -1033,6 +1033,35 @@ int main(int argc, char* argv[])
                 return a.run(app::autostart_mode::smoke);
             }
 
+        // --bench-ground [--dwell <ms>] [--bench-background <s>]  (BL-1247):
+        // the ground benchmark. NOT a --verify mode: --verify bakes what each
+        // frame draws synchronously, which is the wrong thing to time. This is
+        // the live app — the play walk with a reader's dwell on every round
+        // (default 10 s; --dwell 0 clicks straight through), then a scripted
+        // drive of the Planetary canvas on the reference 1720x1080 window. It
+        // prints PASS/FAIL per budget of TECH_FOUNDATIONS.md § Target hardware,
+        // the ground's total paint time and the process's peak memory, and exits.
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--bench-ground")
+            {
+                long long dwell_ms     = 10000;
+                double    background_s = 0.0;
+                for (int j = 1; j + 1 < argc; ++j)
+                {
+                    const std::string a = argv[j];
+                    if (a == "--dwell")
+                        dwell_ms = std::max(0LL, std::atoll(argv[j + 1]));
+                    if (a == "--bench-background")
+                        background_s = std::max(0.0, std::atof(argv[j + 1]));
+                }
+                auto a_owner = std::make_unique<app>();
+                app& a = *a_owner;
+                if (epoch_set) a.set_epoch_year(epoch_year);
+                if (seat_set) a.set_seat_pick(seat_corp);
+                a.set_bench_ground(dwell_ms, background_s);
+                return a.run(app::autostart_mode::bench_ground);
+            }
+
         // --autostart-play: walk the wizard like the smoke test, then STAY OPEN.
         // Added 2026-08-16 after --autostart-windowed was used to open the game
         // for Ben to look at: it renders 120 frames and exits, so from the far

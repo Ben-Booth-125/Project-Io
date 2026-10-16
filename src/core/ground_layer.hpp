@@ -158,6 +158,24 @@ public:
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
 
+    /// BL-1247 (the ground benchmark, `--bench-ground`): false holds back the
+    /// speculative background bakes of other bodies, so the bench can time a
+    /// true first visit. True in play.
+    bool background_enabled = true;
+    /// BL-1247: the body the pre-bake is filling (null = none), and when the
+    /// latest pre-bake of it began (a restart — a new gate world — moves it).
+    entity_id prebake_target() const { return m_prebake; }
+    /// The last tick's view was final (stats_snapshot().view_final, without the
+    /// snapshot's per-chunk walk — the bench reads it every frame).
+    bool view_final() const { return m_view_final; }
+    std::chrono::steady_clock::time_point prebake_started() const { return m_prebake_started; }
+    /// BL-1247: the bytes one whole master of @p body holds (every level), 0 unknown.
+    long long master_size(entity_id body) const
+    {
+        const body_state* b = find(body);
+        return b ? master_bytes(*b) : 0;
+    }
+
     /// Bake-cost and residency instrumentation, read by verify.ground_stats().
     /// Slot 0 = the far page; slot 1 + l = level l (0 = the master). bake_ms /
     /// bakes: cumulative since reset_stats() — master chunk bakes in slot 1,
@@ -615,6 +633,7 @@ private:
     bool              m_master_pending = false; ///< The visited body's whole master, timed from the visit.
     bool              m_prebake_pending = false;
     clock::time_point m_prebake_t0{};
+    clock::time_point m_prebake_started{}; ///< Always recorded (BL-1247's bench reads it).
     bool              m_boundary_log = false; ///< resnapshot() moved the source: log its sweep.
     bool              m_rebake_pending = false;
     clock::time_point m_rebake_t0{};

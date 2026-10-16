@@ -767,6 +767,9 @@ guarantees about it:
   master reaches complete and current from a first visit, after every rung, after a
   body switch and after a burst of dirty chunks; on the pool path
   (`IO_GROUND_BENCH=1`) the background fill alone does so within a time bound.
+- **Benchmark:** `ProjectIo --bench-ground` — the five target-hardware budgets
+  (TECH_FOUNDATIONS.md § Target hardware) measured on the live pool path, with
+  the total paint time, the per-chunk bake cost and the peak process memory.
 - **Headless:** chunk invalidation (a build dirties exactly the intersecting
   chunks; nothing else re-bakes) and brush-manifest integrity are display-free
   checks.
