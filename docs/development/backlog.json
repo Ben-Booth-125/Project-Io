@@ -1080,16 +1080,16 @@
    "requires": [],
    "id": "BL-1341",
    "short_name": "STACK_A_SECOND_OF_ONE_TYPE",
-   "category": "Economy",
+   "category": "UI",
    "priority": "B",
    "difficulty": 2,
-   "authority_doc": "docs/economy/PRODUCTION.md",
+   "authority_doc": "docs/ui/ledgers/construction.md",
    "files": [
     "src/world/placement_rules.cpp",
     "src/ui/selection_panel.cpp"
    ],
-   "title": "Building a second of the same type on one tile: find what actually refused it",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"We should be able to build multiple of the same building on one tile.\" NOTE: the code already permits it - non_extraction_stack_cap is 2-12 in AGGREGATE across every non-extraction type (placement_rules.cpp:557, TILES.md Urban transform) and extraction is max(1, richness/50) per deposit (PRODUCTION.md Building stacks). So either the tile's aggregate cap was already full, the province ceiling bit, or the Build door does not re-offer a type already standing. Find which, then either fix the door or report the number to Ben."
+   "title": "The build card never says a second of the same type may stand on the tile, or how to add it",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): 'We should be able to build multiple of the same building on one tile' then, clarifying: 'it's not clear how to build the second level.' So nothing refused him - the rule already permits stacking (non_extraction_stack_cap 2-12 in AGGREGATE across every non-extraction type, placement_rules.cpp:557; extraction max(1, richness/50) per deposit). It is an AFFORDANCE defect in the construction ledger's build list: the row shows a type once and never says Build adds to the stack, nor how much room the tile has left. The card should carry how many stand and how much room remains, in wording that does not imply the non-extraction room is per type, and must not read like the road/rail ladder rows beside it, which are upgrades-in-place. A full tile's refusal should name what filled it (aggregate cap, per-deposit cap, or the province ceiling at placement_rules.cpp:479). No cap or rule changes."
   },
   {
    "status": "proposed",
