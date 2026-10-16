@@ -609,6 +609,17 @@ in `tools/verify/README.md`.
   population centre*, was written, measured and **fails at 64%**; it is deliberately non-gating and
   is the acceptance test for BL-463 (settlement count is seed-invariant).
 
+- **`life_reroll`** — BL-1339: does the wizard's **Life** Reroll actually give another world?
+  Ben pressed it and kept getting the same landmasses, because `roll[1]` reached only three
+  `resolve_preferences` draws (ocean, oxygen, coal) and never the continents pass. R1–R6 pin the
+  division of labour that fixes it: eight successive rolls give eight distinct land rasters,
+  `height_bias` fields and plate assignments **on the shipped path**
+  (`generate_home_surface_preview`), each moving 10%+ of the land/sea mask (measured 37–58%);
+  the System round's values — star, mass, metallicity, age, radiogenic, orbit, `theta`,
+  `mobile_lid` — plus the plate COUNT and the drift SPEED derived from them stay bit-identical;
+  the same roll reproduces its world; and roll 0 folds to exactly 0, so every fixture and
+  curated seed keeps its world. Build via `build_harness.js`.
+
 - **`continent_drift`** — The plate time axis (BL-763). Asserts that plate motion integrates over
   the drift history rather than being read off the present landform, so a tile can be asked where
   it was as well as where it is.

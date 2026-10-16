@@ -691,6 +691,50 @@ struct world_preferences
     uint32_t roll[3] = { 0, 0, 0 };
 };
 
+/// THE LIFE ROUND'S REROLL, FOLDED INTO THE HOME BODY'S LAND (BL-1339).
+///
+/// `roll[1]` used to reach exactly three draws — `home_ocean`, `oxygenation`,
+/// `coal_climate` in resolve_preferences — so a Life Reroll moved the sea level
+/// and the oxygen story and left the CONTINENTS where they were: plates, drift
+/// and the whole `height_bias` field are seeded off the body seed and the System
+/// round's `theta`, neither of which a Life roll touched. The player pressed
+/// Reroll and got the same landmasses, which is what Ben saw (2026-10-16).
+///
+/// The division of labour this restores, and it is the one the docs already
+/// assert. The SYSTEM round owns the body's PHYSICS — mass, metallicity, the
+/// radiogenic budget, `theta`, `mobile_lid`, and therefore the plate COUNT and
+/// the drift SPEED, which CONTINENTS.md § Consequence, not dice derives from
+/// that budget and not from any roll. The LIFE round owns WHERE THAT LAND ENDED
+/// UP: the plate seed positions, their drift directions, the oceanic/continental
+/// coin, the boundary layout and the rift basin that follow — plus the
+/// heightmap noise the bias is added to. STARTUP.md § Rounds is explicit that
+/// "the Life round rolls [the seed], and Reroll is how a player gets another
+/// world", and § Each pass round is rerollable gives the Culture round no Reroll
+/// precisely because "the Life round's reroll is how a player rejects" the
+/// migration — which it cannot be while the ground never moves.
+///
+/// It is a FOLD, not a new seed: `world_params::seed` stays latched for the
+/// whole wizard (so the verify path's suppression of the seed roll still holds
+/// every fixture's world), and the same params plus the same roll vector always
+/// give the same world. A roll is part of the world's identity, not a clock.
+///
+/// ZERO IS THE UNREROLLED WORLD, BIT FOR BIT — the fold is an XOR of 0 at
+/// `roll[1] == 0`, on the same zero-neutral footing as `world_params::span_seed`.
+/// Integer mixing only (no transcendental, no distribution), so it is
+/// bit-identical across compilers per PLANETOLOGY.md § Determinism & cost.
+inline uint32_t home_land_roll_fold(const world_preferences& pref)
+{
+    const uint32_t roll = pref.roll[1];
+    if (roll == 0) return 0u;
+    uint32_t x = roll * 0x9E3779B9u + 0x85EBCA6Bu;
+    x ^= x >> 15;
+    x *= 0x2545F491u;
+    x ^= x >> 13;
+    x *= 0x27220A95u;
+    x ^= x >> 16;
+    return x;
+}
+
 /// Whether a generated homeworld clears the strict Earth-like floor.
 ///
 /// Ben's call (2026-07-22): the floor stays STRICT — every homeworld should be
