@@ -133,13 +133,16 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds)
     // `expense_count` mean "segments drawn". Interest is the live case: charged
     // only while the balance is negative, so a solvent corp's stack is one
     // segment shorter than an indebted corp's.
-    const charts::stack_segment all[6] = {
+    const charts::stack_segment all[7] = {
         {b.expenditure, IM_COL32(205, 120, 95, 255),  "Inputs",      nullptr},
         {b.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance", nullptr},
         {b.wages,       IM_COL32(160, 115, 200, 255), "Wages",       nullptr},
         {b.interest,    IM_COL32(200, 110, 160, 255), "Interest",    nullptr},
         {b.levies,      IM_COL32(210, 175, 90, 255),  "Levies",      nullptr},
         {b.upkeep,      IM_COL32(200, 130, 110, 255), "Force",       nullptr},
+        // BL-1335: the home nation's tax on the quarter's operating profit.
+        {b.taxes,       IM_COL32(185, 150, 120, 255), "Taxes",
+         "Your home nation's tax tier: its share of this quarter's operating profit"},
     };
     for (const charts::stack_segment& s : all)
         if (s.value > 0.0f)

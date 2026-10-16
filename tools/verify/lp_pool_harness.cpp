@@ -490,7 +490,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         // and less BL-1327's v51 space-asset section after it (one empty count).
         // BL-1335 (v52): and less the tax section after that (count + 9 bytes a
         // nation whose tier or Discontent moved).
-        const std::size_t tax_tail = 4 + 9 * static_cast<std::size_t>(std::count_if(c.nations.begin(), c.nations.end(), [](const auto& kv) { return kv.second.tax_tier != k_default_tax_tier || kv.second.discontent != 0.0f; }));
+        const std::size_t tax_tail = world_save_tax_section_bytes(c);
         std::string b49 = b51.substr(0, b51.size() - (4 + 4 + 12) - 4 - tax_tail);
         const std::uint32_t v49 = k_world_save_version_pre_lp;
         std::memcpy(&b49[4], &v49, 4);

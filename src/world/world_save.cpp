@@ -1191,6 +1191,41 @@ void write_world_snapshot(const world& w, std::ostream& out)
             w_f32(out, nc.discontent);
         }
     }
+
+    // BL-1335 review (v52, same layout — unreleased): the TAX each filed
+    // quarterly return booked, so a reloaded firm's returns still telescope.
+    // Kept out of the return record so v51 stays a strict prefix: every
+    // corporation with any taxed return, ascending id, as (id, u32 n = its
+    // return count, n x f32 in filed order). Nobody taxed: one empty count.
+    {
+        std::vector<entity_id> taxed;
+        for (const auto& [cid, cc] : w.corporations)
+            for (const quarterly_return& q : cc.returns)
+                if (q.taxes != 0.0f) { taxed.push_back(cid); break; }
+        std::sort(taxed.begin(), taxed.end());
+        w_u32(out, static_cast<uint32_t>(taxed.size()));
+        for (const entity_id cid : taxed)
+        {
+            const std::vector<quarterly_return>& rs = w.corporations.at(cid).returns;
+            w_id(out, cid);
+            w_u32(out, static_cast<uint32_t>(rs.size()));
+            for (const quarterly_return& q : rs)
+                w_f32(out, q.taxes);
+        }
+    }
+}
+
+std::size_t world_save_tax_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f)
+            n += 4 + 1 + 4;
+    n += 4;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const quarterly_return& q : cc.returns)
+            if (q.taxes != 0.0f) { n += 4 + 4 + 4 * cc.returns.size(); break; }
+    return n;
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1632,6 +1667,33 @@ bool read_world_snapshot(world& w, std::istream& in)
             prev = nid;
             s.nations.at(nid).tax_tier   = static_cast<int>(tier);
             s.nations.at(nid).discontent = d;
+        }
+
+        // The returns' taxes. Untrusted: each names a corporation in the stream,
+        // strictly ascending, with exactly its return count of finite,
+        // non-negative figures. Refused whole otherwise.
+        uint32_t ccount = 0;
+        if (!r_u32(in, ccount) || ccount > s.corporations.size())
+            return false;
+        entity_id cprev = null_entity;
+        for (uint32_t k = 0; k < ccount; ++k)
+        {
+            entity_id cid = null_entity;
+            uint32_t  n   = 0;
+            if (!r_id(in, cid) || !r_u32(in, n))
+                return false;
+            const auto cit = s.corporations.find(cid);
+            if (cid == null_entity || (k > 0 && cid <= cprev) || cit == s.corporations.end()
+                || n != cit->second.returns.size())
+                return false;
+            cprev = cid;
+            for (quarterly_return& q : cit->second.returns)
+            {
+                float t = 0.0f;
+                if (!r_f32(in, t) || !std::isfinite(t) || t < 0.0f)
+                    return false;
+                q.taxes = t;
+            }
         }
     }
 

@@ -898,7 +898,7 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         tail += sizeof(uint32_t) + c.space_assets.size() * 35u;
         // BL-1335 (v52): the tax section after them (count + 9 bytes a nation
         // whose tier or Discontent moved off the default).
-        tail += 4 + 9 * static_cast<std::size_t>(std::count_if(c.nations.begin(), c.nations.end(), [](const auto& kv) { return kv.second.tax_tier != k_default_tax_tier || kv.second.discontent != 0.0f; }));
+        tail += world_save_tax_section_bytes(c);
         std::string v48 = b.substr(0, b.size() - tail);
         const uint32_t ver = k_world_save_version_pre_rail;
         std::memcpy(&v48[4], &ver, sizeof ver);

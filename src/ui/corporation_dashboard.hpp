@@ -82,7 +82,7 @@ struct balance_columns
     std::size_t           earning_count = 0;
 
     /// Every outflow `corp_budget::net()` subtracts, each its own segment.
-    charts::stack_segment expenses[6]{};
+    charts::stack_segment expenses[7]{}; // BL-1335: + Taxes
     std::size_t           expense_count = 0;
 
     /// Sum of the drawn expense segments — the quarter's real expenditure.

@@ -1789,6 +1789,13 @@ struct quarterly_return
     /// − levies − upkeep + refunds. Zero on every other row. world_save_version 37.
     float refunds     = 0.0f;
 
+    /// BL-1335 (NATIONS.md § Taxes and Discontent): the tax this firm paid its
+    /// home nation this quarter, taken inside apply_budget before the return is
+    /// filed, so `net` = income − expenditure − maintenance − wages − interest
+    /// − levies − upkeep − taxes + refunds and the returns still telescope.
+    /// SERIALISED in the v52 trailing tax section (only firms that ever paid).
+    float taxes       = 0.0f;
+
     /// The exact balance delta this tick — closing balance less opening balance.
     float net = 0.0f;
 

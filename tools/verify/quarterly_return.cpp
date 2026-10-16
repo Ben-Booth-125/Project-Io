@@ -77,6 +77,7 @@
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
+#include "world/nation_step.hpp" // BL-1335: run_nation_step (R7)
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
@@ -405,6 +406,87 @@ void run_fixture_rows(const recipe_registry& reg)
 }
 
 // ---------------------------------------------------------------------------
+// R7 — BL-1335: the tax is in the SAME quarter's filed return
+// ---------------------------------------------------------------------------
+// The fixture's two corporations are given a home nation at tier V and run 20
+// live quarters (past the settle, so the tax is on) through apply_budget AND
+// run_nation_step. The tax is taken inside apply_budget before the return is
+// filed, so the sum of the filed nets equals the real balance change across the
+// whole run EXACTLY — the nation step moves no balance here (no budget, no
+// claims) — every return's flows, taxes included, rebuild its net, and the
+// treasury rose by exactly the taxes the returns booked.
+void run_tax_rows(const recipe_registry& reg)
+{
+    std::printf("\nR7 — BL-1335: the tax lands in the filed return, run_nation_step included\n");
+    fixture f = build_fixture(reg);
+    const entity_id nation = f.w.create_entity();
+    f.w.nations[nation] = nation_component{};
+    f.w.nations[nation].name     = "Fixture Nation";
+    f.w.nations[nation].tax_tier = 5;
+    for (auto& [cid, cc] : f.w.corporations)
+        cc.home_nation = nation;
+
+    std::map<entity_id, double> initial;
+    for (const entity_id id : sorted_corp_ids(f.w))
+        initial[id] = static_cast<double>(f.w.corporations.at(id).balance);
+    const double treasury0 = static_cast<double>(f.w.nations.at(nation).treasury);
+
+    for (int t = 0; t < 20; ++t)
+    {
+        const int econ = k_campaign_settle_ticks + t;
+        f.w.current_econ_tick = econ;
+        advance_convoys(f.w);
+        credit_arrived_convoys(f.w, econ);
+        economy_report report = run_economy_step(f.w, reg);
+        run_trades(f.w, reg, report);
+        auto flows = clear_markets(f.w, reg, report);
+        // The fixture has no shelf its firms sell onto, so the market income is
+        // supplied: 100 a quarter to each firm, the term the tax is levied on.
+        for (const entity_id id : sorted_corp_ids(f.w))
+            flows[id].income += 100.0f;
+        apply_budget(f.w, reg, flows, report.workforce_contention, &report.budgets,
+                     &report.buildings, &report.building_labour);
+        run_nation_step(f.w, reg, report, econ);
+    }
+
+    bool exact = true, rebuild = true;
+    double taxes = 0.0;
+    for (const entity_id id : sorted_corp_ids(f.w))
+    {
+        const corporation_component& cc = f.w.corporations.at(id);
+        double sum = 0.0;
+        for (const quarterly_return& q : cc.returns)
+        {
+            sum   += static_cast<double>(q.net);
+            taxes += static_cast<double>(q.taxes);
+            const double flows_net = static_cast<double>(q.income) - q.expenditure - q.maintenance
+                                   - q.wages - q.interest - q.levies - q.upkeep - q.taxes + q.refunds;
+            rebuild = rebuild && std::fabs(flows_net - q.net) <= 1e-3 * std::max(1.0, std::fabs(static_cast<double>(q.net)));
+        }
+        exact = exact && cc.returns.size() == 20
+             && sum == static_cast<double>(cc.balance) - initial.at(id);
+    }
+    for (const entity_id id : sorted_corp_ids(f.w))
+    {
+        double inc = 0.0, out = 0.0;
+        for (const quarterly_return& q : f.w.corporations.at(id).returns)
+        {
+            inc += q.income;
+            out += static_cast<double>(q.expenditure) + q.maintenance + q.wages + q.interest + q.levies + q.upkeep;
+        }
+        std::printf("       corp %u: income %.2f, outflows %.2f over the run\n", static_cast<unsigned>(id), inc, out);
+    }
+    const double raised = static_cast<double>(f.w.nations.at(nation).treasury) - treasury0;
+    char buf[200];
+    std::snprintf(buf, sizeof buf, "the run taxed something (%.4f credits over 20 quarters at tier V)", taxes);
+    check(taxes > 0.0, "R7", buf);
+    check(exact, "R7", "sum of 20 filed nets == the real balance change with the tax and run_nation_step on, EXACTLY");
+    check(rebuild, "R7", "every filed return's flows, taxes included, rebuild its net");
+    std::snprintf(buf, sizeof buf, "the treasury rose by the returns' taxes (%.4f vs %.4f)", raised, taxes);
+    check(std::fabs(raised - taxes) <= 1e-3 * std::max(1.0, taxes), "R7", buf);
+}
+
+// ---------------------------------------------------------------------------
 // R5 — the serialisation seam
 // ---------------------------------------------------------------------------
 void run_save_rows(const recipe_registry& reg)
@@ -704,6 +786,7 @@ int main()
     run_fixture_rows(reg);
     run_save_rows(reg);
     run_settle_rows(reg);
+    run_tax_rows(reg);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");

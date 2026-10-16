@@ -49,9 +49,9 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
                      int econ_tick, bool spectating)
 {
     // ---- 0. Tax and Discontent (BL-1335, NATIONS.md § Taxes and Discontent):
-    // each nation takes its tier's share of its home firms' operating profit
-    // this quarter — first, so the tax is in the treasury this quarter's budget
-    // spends — and Discontent takes the tier's pressure.
+    // the tax was taken in apply_budget (before the returns were filed), so it
+    // is already in the treasury this quarter's budget spends; here it is
+    // reported, and Discontent takes the tier's pressure. Not in the settle.
     run_nation_taxes(w, reg.tax(), report);
 
     // ---- 1. Score: the nations due this tick overwrite their slot -----------
@@ -204,7 +204,8 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // whole budget (rationed lines, the research line) and the Discontent the
     // quarter left. The tier it picks taxes from the next quarter. Never the
     // player's nation in a seated session.
-    run_nation_tax_ai(w, reg, report, econ_tick, spectating, &report.tax_picks);
+    if (research_age_open(w)) // never in the settle: play opens at tier III
+        run_nation_tax_ai(w, reg, report, econ_tick, spectating, &report.tax_picks);
 }
 
 bool set_nation_tax_tier(world& w, entity_id nation, int tier)
@@ -218,33 +219,24 @@ bool set_nation_tax_tier(world& w, entity_id nation, int tier)
 
 void run_nation_taxes(world& w, const tax_params& p, economy_report& report)
 {
-    if (w.nations.empty())
+    // Never in the campaign settle: every nation opens play at tier III with
+    // Discontent 0 (the research age's own boundary).
+    if (w.nations.empty() || !research_age_open(w))
         return;
 
-    // The tax: ascending corp id (report.budgets is a std::map), so each
-    // treasury's credits land in a fixed float order.
+    // The tax itself was taken inside apply_budget, before the returns were
+    // filed (BL-1335 review: the returns must telescope). Here it is only
+    // reported: each nation's firms' booked taxes, in ascending corp order.
     std::map<entity_id, nation_tax_row> rows;
-    for (auto& [cid, b] : report.budgets)
+    for (const auto& [cid, b] : report.budgets)
     {
+        if (!(b.taxes > 0.0f))
+            continue;
         const auto cit = w.corporations.find(cid);
         if (cit == w.corporations.end())
             continue;
-        corporation_component& cc = cit->second;
-        const auto nit = w.nations.find(cc.home_nation);
-        if (nit == w.nations.end())
-            continue;
-        const float profit =
-            b.income - b.expenditure - b.maintenance - b.wages - b.interest - b.levies - b.upkeep;
-        if (!std::isfinite(profit) || !(profit > 0.0f))
-            continue;
-        const float tax = profit * p.rate[tax_tier_index(nit->second.tax_tier)];
-        if (!std::isfinite(tax) || !(tax > 0.0f))
-            continue;
-        cc.balance            -= tax; // a TRANSFER: the same float,
-        nit->second.treasury  += tax; // the same tick
-        b.taxes               += tax;
-        nation_tax_row& r = rows[cc.home_nation];
-        r.collected += tax;
+        nation_tax_row& r = rows[cit->second.home_nation];
+        r.collected += b.taxes;
         ++r.firms_taxed;
     }
 

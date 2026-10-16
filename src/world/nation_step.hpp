@@ -106,16 +106,12 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
 /// tier outside 1..5.
 bool set_nation_tax_tier(world& w, entity_id nation, int tier);
 
-/// The quarter's tax and Discontent, the nation step's first move (so the tax
-/// joins what this quarter's budget spends). For every corporation in
-/// `report.budgets` (ascending id) headquartered in a nation: the operating
-/// profit its money loop earned this tick — `income - expenditure -
-/// maintenance - wages - interest - levies - upkeep`, the flows apply_budget
-/// just computed, never the filed return — times its home nation's tier rate,
-/// when positive, is debited from the firm and credited to the treasury, the
-/// same float in the same tick, and booked on `report.budgets[corp].taxes`.
-/// Then every nation (ascending id) takes its tier's Discontent pressure,
-/// clamped to [0, 1]. One `report.taxes` row per nation.
+/// The quarter's tax report and Discontent, the nation step's first move. The
+/// tax itself is taken in apply_budget (`nation_tax_due`, economy_system.hpp)
+/// before the returns are filed; this rolls `report.budgets[corp].taxes` up
+/// into one `report.taxes` row per nation (ascending id) and moves every
+/// nation's Discontent by its tier's pressure, clamped to [0, 1]. Does nothing
+/// in the campaign settle (`research_age_open`).
 void run_nation_taxes(world& w, const tax_params& p, economy_report& report);
 
 /// The output multiplier Discontent puts on a building standing on @p tile:

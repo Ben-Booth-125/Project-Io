@@ -164,8 +164,13 @@ std::vector<entity_id> sorted_nations(const world& w)
 /// nation's quarter row, after the budget; empty while no such field exists on
 /// the nation, so a log from before them simply lacks the keys and
 /// play_vs_ai.js reads them only where present.
-void nation_policy_fields(std::string& /*o*/, const world& /*w*/, entity_id /*nation*/)
+void nation_policy_fields(std::string& o, const world& w, entity_id nation)
 {
+    const auto n = w.nations.find(nation);
+    if (n == w.nations.end())
+        return;
+    kv_int(o, "tax_tier", n->second.tax_tier);
+    kv_num(o, "discontent", n->second.discontent);
 }
 
 } // namespace
@@ -212,6 +217,7 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::clear_research:       return "clear_research";
         case corp_verb::lay_track:            return "lay_track";
         case corp_verb::set_logistics_shares: return "set_logistics_shares";
+        case corp_verb::set_tax_tier:         return "set_tax_tier";
     }
     return "verb?";
 }

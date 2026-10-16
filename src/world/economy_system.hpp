@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono> // economy_step_phase_clock (BL-1117)
+#include <cmath>  // BL-1335: nation_tax_due
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -128,6 +129,21 @@ struct corp_budget
                - taxes;
     }
 };
+
+/// BL-1335: the tax a firm owes its home nation on this quarter's money loop at
+/// tier @p tier — the tier's rate of the operating profit (income less
+/// expenditure, maintenance, wages, interest, levies and upkeep; subsidies and
+/// taxes excluded), 0 when that profit is not positive. The one definition
+/// apply_budget charges and a harness re-derives.
+inline float nation_tax_due(const corp_budget& b, int tier, const tax_params& p)
+{
+    const float profit =
+        b.income - b.expenditure - b.maintenance - b.wages - b.interest - b.levies - b.upkeep;
+    if (!std::isfinite(profit) || !(profit > 0.0f))
+        return 0.0f;
+    const float tax = profit * p.rate[tax_tier_index(tier)];
+    return (std::isfinite(tax) && tax > 0.0f) ? tax : 0.0f;
+}
 
 /// One background-corp agency action taken this tick (the BL-079 reflexes). Pure
 /// derived data recorded alongside the action — recording changes nothing about

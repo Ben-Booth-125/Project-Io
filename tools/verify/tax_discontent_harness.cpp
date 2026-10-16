@@ -4,7 +4,10 @@
 // docs/politics/NATIONS.md § Taxes and Discontent (Ben, 2026-10-16). On the
 // SHIPPED start (harness_params.hpp's app mirror), seed 0 by default:
 //
-//   T1  THE TAX CONSERVES: one real tick's money-loop budgets, taxed by
+//   T0  THE SETTLE TAXES NOBODY: after finish_campaign_world every nation is
+//       at tier III with Discontent 0 and no filed return carries a tax.
+//   T1  THE TAX CONSERVES (rewritten in review: the tax is taken in
+//       apply_budget, before the return is filed): one real tick's money-loop budgets, taxed by
 //       run_nation_taxes on a copy — every taxed firm's debit is exactly its
 //       profit x its home nation's tier rate, landed on its balance and on
 //       `budgets[corp].taxes`; every treasury moved by exactly its firms'
@@ -41,6 +44,7 @@
 
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
+#include "world/budget_system.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
@@ -145,81 +149,121 @@ int bite_quarter(int tier, const tax_params& p, float* at_threshold_quarter_d, i
 
 // ---------------------------------------------------------------------------
 
+void t0_settle_untaxed(const app_start_world& out)
+{
+    std::printf("--- T0 the settle taxes nobody ---\n");
+    const world& w = out.w;
+    bool opening = true;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f) opening = false;
+    bool untaxed = true;
+    std::size_t filed = 0;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const quarterly_return& q : cc.returns)
+        {
+            ++filed;
+            if (q.taxes != 0.0f) untaxed = false;
+        }
+    check(opening, "T0", fmt("after finish_campaign_world (econ tick %d) every one of %zu nations stands at tier III with Discontent 0",
+                             w.current_econ_tick, w.nations.size()));
+    check(untaxed && filed > 0, "T0", fmt("no firm was taxed in the settle (%zu filed returns, every `taxes` 0)", filed));
+}
+
 void t1_conserves(const app_start_world& out)
 {
-    std::printf("--- T1 the tax conserves ---\n");
-    const tax_params& p = out.reg.tax();
-    // One real tick for real money-loop budgets.
+    std::printf("--- T1 the tax conserves, inside apply_budget ---\n");
+    // Two copies of the opened world, one quarter into play, run through the
+    // SAME apply_budget with the same flows: A with the shipped tax, B with
+    // every rate 0. Every firm earns 1000 at the market, so profits are real.
+    world a = out.w, b = out.w;
+    a.current_econ_tick = b.current_econ_tick = out.w.current_econ_tick + 1;
+    recipe_registry reg0 = out.reg;
+    tax_params zero = out.reg.tax();
+    zero.rate.fill(0.0f);
+    reg0.set_tax(zero);
+    std::unordered_map<entity_id, corp_cash_flow> flows;
+    for (const auto& [cid, c] : a.corporations)
+        if (cid % 3 != 0) flows[cid].income = 1000.0f; // a third earn nothing: a loss, no tax
+    const std::map<std::pair<entity_id, entity_id>, float> contention;
+    std::map<entity_id, corp_budget> ba, bb;
+    apply_budget(a, out.reg, flows, contention, &ba);
+    apply_budget(b, reg0, flows, contention, &bb);
+
+    bool per_firm = true, loss_free = true, filed = true;
+    int taxed = 0, untaxed = 0;
+    double debits = 0.0;
+    std::map<entity_id, double> by_nation;
+    for (const auto& [cid, x] : ba)
+    {
+        corp_budget pre = x;
+        pre.taxes = 0.0f;
+        const corporation_component& ca = a.corporations.at(cid);
+        const float want = a.nations.count(ca.home_nation) != 0
+            ? nation_tax_due(pre, a.nations.at(ca.home_nation).tax_tier, out.reg.tax()) : 0.0f;
+        if (x.taxes != want) per_firm = false;
+        float bal = b.corporations.at(cid).balance;
+        bal -= x.taxes;
+        if (x.taxes > 0.0f)
+        {
+            ++taxed;
+            if (ca.balance != bal) per_firm = false;
+        }
+        else
+        {
+            ++untaxed;
+            if (ca.balance != b.corporations.at(cid).balance) loss_free = false;
+        }
+        if (ca.returns.empty() || ca.returns.back().taxes != x.taxes) filed = false;
+        debits += x.taxes;
+        by_nation[ca.home_nation] += x.taxes;
+    }
+    double credits = 0.0;
+    bool treasuries = true;
+    for (const auto& [nid, n] : a.nations)
+    {
+        const double moved = static_cast<double>(n.treasury) - static_cast<double>(b.nations.at(nid).treasury);
+        credits += moved;
+        const double want = by_nation.count(nid) ? by_nation.at(nid) : 0.0;
+        if (std::fabs(moved - want) > 1e-3 * std::max(1.0, std::fabs(static_cast<double>(n.treasury))))
+            treasuries = false;
+    }
+    check(taxed > 0 && untaxed > 0, "T1", fmt("%d firms taxed, %d not (no positive operating profit)", taxed, untaxed));
+    check(per_firm, "T1", "each firm's tax is nation_tax_due of its money loop at its home nation's tier, and its balance is exactly the untaxed one less it");
+    check(loss_free, "T1", "a firm with no positive operating profit pays nothing");
+    check(filed, "T1", "the tax lands on the SAME quarter's filed return (`returns.back().taxes`)");
+    check(treasuries && std::fabs(debits - credits) <= 1e-3 * std::max(1.0, debits), "T1",
+          fmt("each treasury rose by its firms' taxes: debits %.4f = credits %.4f (a transfer, never a mint)", debits, credits));
+    {
+        bool telescopes = true;
+        for (const auto& [cid, c] : a.corporations)
+        {
+            if (c.returns.empty()) continue;
+            const quarterly_return& q = c.returns.back();
+            const double flows_net = static_cast<double>(q.income) - q.expenditure - q.maintenance - q.wages
+                                   - q.interest - q.levies - q.upkeep - q.taxes + q.refunds;
+            if (std::fabs(flows_net - q.net) > 1e-3 * std::max(1.0, std::fabs(static_cast<double>(q.net))))
+                telescopes = false;
+        }
+        check(telescopes, "T1", "every filed return's flows, taxes included, rebuild its net");
+    }
+
+    // A whole tick: report rows agree with the firms' booked taxes.
     world probe = out.w;
     settle_tick_result tick = run_settle_tick(probe, out.reg, probe.current_econ_tick + 1, 0, true);
-
-    // Re-run the tax alone, on the PRE-tick world, with that tick's budgets less their taxes.
-    world w = out.w;
-    economy_report rep;
-    rep.budgets = tick.report.budgets;
-    for (auto& [cid, b] : rep.budgets) { b.taxes = 0.0f; b.subsidies = 0.0f; }
-    std::map<entity_id, float> bal0, tre0;
-    for (const auto& [cid, c] : w.corporations) bal0[cid] = c.balance;
-    for (const auto& [nid, n] : w.nations) tre0[nid] = n.treasury;
-    const economy_report before = rep;
-    run_nation_taxes(w, p, rep);
-
-    bool per_firm = true, nonpos_zero = true;
-    int taxed = 0, untaxed = 0;
-    std::map<entity_id, float> credit_rewalk = tre0;
-    std::vector<float> debits;
-    for (const auto& [cid, b] : before.budgets) // ascending corp id: the pass's order
-    {
-        const auto cit = w.corporations.find(cid);
-        if (cit == w.corporations.end()) continue;
-        const entity_id hn = cit->second.home_nation;
-        const float profit = b.income - b.expenditure - b.maintenance - b.wages - b.interest - b.levies - b.upkeep;
-        const float paid = rep.budgets.at(cid).taxes;
-        if (w.nations.count(hn) == 0 || !(profit > 0.0f))
-        {
-            if (paid != 0.0f || cit->second.balance != bal0.at(cid)) nonpos_zero = false;
-            ++untaxed;
-            continue;
-        }
-        const float expect = profit * p.rate[tax_tier_index(w.nations.at(hn).tax_tier)];
-        if (!(expect > 0.0f)) { ++untaxed; continue; }
-        ++taxed;
-        float bal = bal0.at(cid);
-        bal -= expect;
-        if (paid != expect || cit->second.balance != bal) per_firm = false;
-        credit_rewalk[hn] += expect;
-        debits.push_back(expect);
-    }
-    bool treasuries = true;
-    for (const auto& [nid, n] : w.nations)
-        if (n.treasury != credit_rewalk.at(nid)) treasuries = false;
-    double sum_debit = 0.0, sum_credit = 0.0;
-    for (const float d : debits) sum_debit += d;
-    for (const nation_tax_row& r : rep.taxes) sum_credit += r.collected; // rows sum the same floats per nation
-    double sum_row_firms = 0.0;
-    for (const nation_tax_row& r : rep.taxes) sum_row_firms += r.firms_taxed;
-    check(taxed > 0, "T1", fmt("the shipped world's first tick taxes %d firms (%d untaxed: no positive profit or no home nation)", taxed, untaxed));
-    check(per_firm, "T1", "every taxed firm paid exactly profit x its home nation's tier rate, off its balance, booked on budgets.taxes");
-    check(nonpos_zero, "T1", "a firm with no positive operating profit pays nothing");
-    check(treasuries, "T1", "every treasury moved by exactly its firms' credits, re-walked in ascending corp order");
-    check(std::fabs(sum_debit - sum_credit) <= 1e-6 * std::max(1.0, sum_debit) && sum_row_firms == taxed,
-          "T1", fmt("debits %.4f = credits %.4f (a transfer, never a mint)", sum_debit, sum_credit));
-
-    // The whole settle tick: rows agree with the firms' booked taxes.
-    std::map<entity_id, double> by_nation;
-    for (const auto& [cid, b] : tick.report.budgets)
+    std::map<entity_id, double> per;
+    for (const auto& [cid, x] : tick.report.budgets)
         if (const auto cit = probe.corporations.find(cid); cit != probe.corporations.end())
-            by_nation[cit->second.home_nation] += b.taxes;
+            per[cit->second.home_nation] += x.taxes;
     bool rows_ok = !tick.report.taxes.empty();
     double total = 0.0;
     for (const nation_tax_row& r : tick.report.taxes)
     {
         total += r.collected;
-        if (std::fabs(static_cast<double>(r.collected) - by_nation[r.nation]) > 1e-3 * std::max(1.0, by_nation[r.nation]))
+        if (std::fabs(static_cast<double>(r.collected) - per[r.nation]) > 1e-3 * std::max(1.0, per[r.nation]))
             rows_ok = false;
     }
-    check(rows_ok, "T1", fmt("a whole settle tick: %zu nation rows, each `collected` = its firms' booked taxes (%.1f credits in all)",
-                             tick.report.taxes.size(), total));
+    check(rows_ok && total > 0.0, "T1", fmt("the first live tick: %zu nation rows, each `collected` = its firms' booked taxes (%.1f credits in all)",
+                                            tick.report.taxes.size(), total));
 }
 
 void t2_t4_discontent(const app_start_world& out)
@@ -244,6 +288,7 @@ void t2_t4_discontent(const app_start_world& out)
     // Through the pass, on a real nation.
     {
         world w = out.w;
+        w.current_econ_tick = k_campaign_settle_ticks; // the pass is inert in the settle
         const std::vector<entity_id> ids = nation_ids(w);
         const entity_id a = ids.front(), b = ids.back();
         w.nations.at(a).tax_tier = 5;
@@ -433,17 +478,23 @@ void t6_save(const app_start_world& out)
     c.nations.at(ids.front()).discontent = 0.6875f;
     c.nations.at(ids.back()).tax_tier    = 1;
     c.nations.at(ids[ids.size() / 2]).discontent = 0.125f; // tier III, Discontent moved
+    entity_id taxed_corp = null_entity;
+    for (auto& [cid, cc] : c.corporations)
+        if (!cc.returns.empty() && (taxed_corp == null_entity || cid < taxed_corp)) taxed_corp = cid;
+    if (taxed_corp != null_entity)
+        c.corporations.at(taxed_corp).returns.back().taxes = 12.5f;
     const std::string b52 = to_bytes(c);
     world r;
     const bool rt = from_bytes(b52, r);
     check(rt && to_bytes(r) == b52 && r.state_hash(0) == c.state_hash(0)
               && r.nations.at(ids.front()).tax_tier == 5 && r.nations.at(ids.front()).discontent == 0.6875f
-              && r.nations.at(ids.back()).tax_tier == 1 && r.nations.at(ids[ids.size() / 2]).discontent == 0.125f,
-          "T6", fmt("v%u round-trips tiers and Discontent byte-identically (%zu bytes) with an equal state_hash",
+              && r.nations.at(ids.back()).tax_tier == 1 && r.nations.at(ids[ids.size() / 2]).discontent == 0.125f
+              && taxed_corp != null_entity && r.corporations.at(taxed_corp).returns.back().taxes == 12.5f,
+          "T6", fmt("v%u round-trips tiers, Discontent and a return's tax byte-identically (%zu bytes) with an equal state_hash",
                     static_cast<unsigned>(world_save_version), b52.size()));
 
-    // v51: the stream less the tax section (u32 count + 9 bytes a moved nation).
-    const std::size_t tail = 4 + 9 * moved_nations(c);
+    // v51: the stream less the tax section (nation rows, then the returns' taxes).
+    const std::size_t tail = world_save_tax_section_bytes(c);
     std::string b51 = b52.substr(0, b52.size() - tail);
     const std::uint32_t v51 = k_world_save_version_pre_tax;
     std::memcpy(&b51[4], &v51, 4);
@@ -475,6 +526,11 @@ void t6_save(const app_start_world& out)
     refuse("a Discontent of 1.5", [&](std::string& s) { const float f = 1.5f; std::memcpy(&s[row0 + 5], &f, 4); });
     refuse("a negative Discontent", [&](std::string& s) { const float f = -0.25f; std::memcpy(&s[row0 + 5], &f, 4); });
     refuse("an unknown nation id", [&](std::string& s) { const std::uint32_t id = 0x7FFFFFF0u; std::memcpy(&s[row0], &id, 4); });
+    // The returns' taxes: count (4), then the corp's id (4), n (4), floats.
+    const std::size_t ret0 = b52.size() - tail + 4 + 9 * moved_nations(c) + 4;
+    refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - 4], &f, 4); });
+    refuse("a return-tax count that is not the firm's return count", [&](std::string& s) {
+        std::uint32_t n = 0; std::memcpy(&n, &s[ret0 + 4], 4); n += 1; std::memcpy(&s[ret0 + 4], &n, 4); });
 }
 
 void t7_scorer(const app_start_world& out)
@@ -586,6 +642,9 @@ int main(int argc, char** argv)
     params.seed = seed;
     app_start_world out;
     build_app_start_world(lua, params, out);
+    // The campaign settle, as finish_campaign_world runs it (twelve spectating
+    // ticks), then the seat drawn from what it produced.
+    run_settle(out.w, out.reg, k_campaign_settle_ticks);
     (void)seat_player_corporation(out.w, seed, out.land.search.winner_score);
     const tax_params& p = out.reg.tax();
     std::printf("dials: rates %.2f %.2f %.2f %.2f %.2f | pressure %.4f %.4f %.4f %.4f %.4f | threshold %.3f | max penalty %.3f | ai headroom %.4f\n",
@@ -594,6 +653,7 @@ int main(int argc, char** argv)
     std::printf("world: %zu nations, %zu corporations, seat %u (nation %u)\n", out.w.nations.size(),
                 out.w.corporations.size(), out.w.player_entity, player_nation(out.w));
 
+    t0_settle_untaxed(out);
     t1_conserves(out);
     t2_t4_discontent(out);
     t3_penalty(out);

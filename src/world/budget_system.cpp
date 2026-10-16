@@ -1,6 +1,8 @@
 #include "budget_system.hpp"
 
 #include "law.hpp"         // BL-343: evaluate_laws at the enforcement seam
+#include "economy_system.hpp" // BL-1335: corp_budget, nation_tax_due
+#include "nation_tech.hpp"    // BL-1335: research_age_open (no tax in the settle)
 #include "unit_roster.hpp" // BL-454: resolve_unit_upkeep (the credit half)
 
 #include <algorithm>
@@ -192,6 +194,18 @@ void apply_budget(world& w,
     // anything reads it. Collect (corp, nation, levy) here and apply after the
     // loop in sorted order. Debits stay per-corp and are untouched.
     std::vector<std::tuple<entity_id, entity_id, float>> levy_credits;
+
+    // BL-1335 (NATIONS.md § Taxes and Discontent): the quarter's tax, taken HERE
+    // — after interest, before the return is filed — so the filed `net` carries
+    // it and the returns telescope. The home nation's tier rate of the money
+    // loop's operating profit (income less every outflow, floored at 0). The
+    // debit is per corp in the loop; the credit is deferred and applied in
+    // ascending (corp, nation) order like the levy's, the same float. Never in
+    // the campaign settle (`research_age_open`): every nation opens play at
+    // tier III with Discontent 0 and no firm taxed.
+    const bool      tax_pass = research_age_open(w);
+    const tax_params& taxp   = reg.tax();
+    std::vector<std::tuple<entity_id, entity_id, float>> tax_credits;
 
     // BL-626: this tick's quarterly returns, keyed by corp. Collected here and
     // FILED after the loop, in the map's own ascending entity_id order, because
@@ -426,6 +440,22 @@ void apply_budget(world& w,
             cc.balance  -= bud.interest;
         }
 
+        // BL-1335: the tax (see tax_pass above).
+        if (tax_pass)
+        {
+            const auto nit = w.nations.find(cc.home_nation);
+            if (nit != w.nations.end())
+            {
+                const float tax = nation_tax_due(bud, nit->second.tax_tier, taxp);
+                if (tax > 0.0f)
+                {
+                    bud.taxes   = tax;
+                    cc.balance -= tax; // the debit half
+                    tax_credits.emplace_back(corp, cc.home_nation, tax);
+                }
+            }
+        }
+
         if (breakdown)
             (*breakdown)[corp] = bud;
 
@@ -443,6 +473,7 @@ void apply_budget(world& w,
         qr.levies      = bud.levies;
         qr.upkeep      = bud.upkeep;
         qr.refunds     = refunds;
+        qr.taxes       = bud.taxes; // BL-1335
         qr.net        = cc.balance - opening_balance; // the exact delta applied
         qr.balance     = cc.balance;
         qr.holdings    = static_cast<uint32_t>(cc.assets.size());
@@ -463,6 +494,16 @@ void apply_budget(world& w,
             if (nat != w.nations.end())
                 nat->second.treasury += amount;
         }
+    }
+
+    // BL-1335: the tax credits, ascending (corp, nation) — the same floats the
+    // loop debited, so the transfer conserves by construction.
+    if (!tax_credits.empty())
+    {
+        std::sort(tax_credits.begin(), tax_credits.end());
+        for (const auto& [payer, nation, amount] : tax_credits)
+            if (const auto nat = w.nations.find(nation); nat != w.nations.end())
+                nat->second.treasury += amount;
     }
 
     // BL-1296 — THE STATE PASS (NATIONS.md § State industry; § 2, the second

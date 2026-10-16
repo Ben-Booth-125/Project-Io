@@ -2,6 +2,7 @@
 
 #include "world.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 
@@ -437,7 +438,9 @@ inline constexpr uint32_t world_save_magic =
 /// Bumped to 52 by BL-1335 (taxes and Discontent; NATIONS.md § Taxes and
 /// Discontent, Ben 2026-10-16): a TRAILING SECTION after the space assets --
 /// each nation whose tax state differs from the opening default (tier III,
-/// Discontent 0), ascending id, as (id, u8 tier, f32 discontent). Nothing else
+/// Discontent 0), ascending id, as (id, u8 tier, f32 discontent); then each
+/// corporation with any taxed quarterly return, ascending id, as (id, u32 n,
+/// n x f32 — every return's `taxes`, filed order). Nothing else
 /// moves, so v51 is a STRICT PREFIX of v52 and is read too
 /// (`k_world_save_version_pre_tax`), as a world where every nation stands at
 /// tier III with no Discontent; v50 down to v47 still read. Every other version
@@ -472,6 +475,11 @@ inline constexpr uint32_t k_world_save_version_pre_state = 47;
 /// @param w   World to serialise.
 /// @param out Destination stream, opened binary.
 void write_world_snapshot(const world& w, std::ostream& out);
+
+/// BL-1335: the byte length of the v52 tax section `write_world_snapshot`
+/// writes for @p w (the nation rows and the returns' taxes) — what a harness
+/// cuts off a v52 stream to make the v51 prefix.
+std::size_t world_save_tax_section_bytes(const world& w);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

@@ -475,6 +475,7 @@ void merge_returns(std::vector<quarterly_return>& dst,
             row.levies      += b->levies;
             row.upkeep      += b->upkeep;
             row.refunds     += b->refunds; // BL-1206: the merged flows still rebuild net
+            row.taxes       += b->taxes;   // BL-1335: and the tax
             row.net         += b->net;
             row.balance     += b->balance;
             row.holdings    += b->holdings;
