@@ -143,6 +143,12 @@ it. A tile with no road of its own costs the network cost of the nearest roaded 
 **off-road leg** (LOGISTICS.md § 3b), which is why **every tile belongs to a market** — including
 the land logistics will never spread to, which renders as part of its market like any other.
 
+**Its own nation pulls harder — a fifth more (Ben, 2026-10-16).** A tile owned by the same nation
+as the market centre is **1.2x** as attracted to it as its cost alone would make it. The bonus is a
+property of the *pair*, not of the centre: the same centre pulls harder on its own ground and no
+harder on anyone else's. So a border is sticky — a tile a foreign centre is slightly nearer
+still clears at home — and **a large nation therefore builds large markets**, which is the point.
+
 **The pull** is a multiplier on a centre, 1 unless something raises it, and it raises *that centre's*
 attraction everywhere at once: a pull of 2 reaches twice as far in cost terms. Two things raise it,
 both of them visible in the world — a **technology** the centre's nation holds, and a **building
