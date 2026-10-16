@@ -1,6 +1,7 @@
 #include "construction_panel.hpp"
 
 #include <algorithm>
+#include <array>   // the per-tick need row the sim's mirror builds (BL-1342)
 #include <cmath>   // std::ceil (construction ETA, BL-095)
 #include <string>  // status strings (BL-095)
 
@@ -13,6 +14,7 @@
 #include "world/budget_system.hpp"     // building_opex / compute_building_opex, body_mean_habitability (BL-143)
 #include "world/building_profit.hpp"   // estimate_building_profit — the per-building figure the roster sums
 #include "world/economy_system.hpp"    // economy_report (BL-143 status column)
+#include "world/construction.hpp"      // construction_capex / construction_build_ticks (the progress denominator, BL-1343)
 #include "world/market_clearing.hpp"   // market_for_tile (build-rate read, BL-095)
 #include "world/placement_rules.hpp"   // is_well_site - the Well's roster name (BL-1198)
 #include "world/recipe_registry.hpp"
@@ -23,25 +25,60 @@
 
 namespace ui {
 
-namespace {
-
-// --- Analog construction status (BL-095 task E) ------------------------------
-// Construction is durative *and* material-gated: each economy tick a building under
-// construction advances by a RATE in [0,1] set by how much of its per-tick material
-// need the local market can supply (economy_system.cpp § run_construction). These
-// mirror that formula (const-read only) so the management view can show the same
-// analog rate / ETA / paused status the Selection front door does. (Kept a local copy
-// rather than shared — the UI has no common header seam to hang it on.)
-float construction_rate(const world& w, const recipe_registry& reg,
-                        building_type type, resource_type target, uint16_t recipe,
-                        entity_id tile)
+// --- THE construction mirror (BL-095 task E; corrected + unified by BL-1342) --
+//
+// `construction.md` § "Construction is durative and material-gated" is the
+// contract: these "mirror run_construction's formula so the panel and the
+// Selection front door show the same number". Read it against
+// `run_construction` / `site_rate` in src/world/economy_system.cpp — the two
+// formulas are meant to be read side by side, which is why this one is here
+// ONCE and selection_panel.cpp now calls it rather than keeping its own copy.
+//
+// The four ways the old mirrors lied (Ben, playtest 2026-10-16: "ETA 2 qtr, but
+// no progress for multiple quarters"):
+//   1. they read `m->supply[r]`, the per-tick FLOW the clear resets, where the
+//      sim draws `m->inventory[r]`, the persistent STOCK;
+//   2. they left `construction().capacity_per_build_tick` out of the need row,
+//      so a capacity-starved build read as on schedule;
+//   3. they ignored `shelf_admits` — BL-1172's fair-price ceiling — so a good
+//      priced over `reservation_mult x base` read as available when the sim
+//      sees nothing there at all;
+//   4. they knew nothing of `state_idle`, so an unfunded state site read as
+//      building.
+// What is still NOT mirrored: BL-1209's pro-rata rationing of a contended shelf
+// (see the header's note).
+construction_read read_construction(const world& w, const recipe_registry& reg,
+                                    building_type type, resource_type target,
+                                    std::uint16_t recipe, entity_id tile,
+                                    bool state_idle)
 {
+    construction_read out;
+
     const building_economics& econ = reg.economics(type);
     const float duration = econ.build_duration_ticks;
     if (duration <= 0.0f)
-        return 1.0f; // instant build — never material-gated
-    // BL-590: the material cost specific to THIS named building.
+        return out; // instant build — never material-gated (rate 1)
+
+    if (state_idle) // BL-1296: it draws nothing and advances not at all this tick
+    {
+        out.rate   = 0.0f;
+        out.paused = true;
+        out.waiting_on_funding = true;
+        return out;
+    }
+
+    // THE NEED ROW, exactly `need_row_for`: the material cost of THIS named
+    // building (BL-590) spread over its duration, plus a FLAT per-tick draw of
+    // construction capacity (BL-709 — not divided by the duration, because a
+    // longer build occupies the sector for longer).
     const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
+    const std::size_t cap_index = static_cast<std::size_t>(resource_type::construction_capacity);
+    const float capacity_rate   = reg.construction().capacity_per_build_tick;
+    std::array<float, resource_count> need{};
+    for (std::size_t r = 0; r < resource_count; ++r)
+        need[r] = material_cost_row[r] / duration;
+    if (capacity_rate > 0.0f)
+        need[cap_index] += capacity_rate;
 
     const market_component* m = nullptr;
     const entity_id mid = market_for_tile(w, tile);
@@ -51,23 +88,73 @@ float construction_rate(const world& w, const recipe_registry& reg,
         if (mit != w.markets.end())
             m = &mit->second;
     }
+    out.no_market = (m == nullptr);
 
-    float rate = 1.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        const float need = material_cost_row[r] / duration;
-        if (need <= 0.0f)
-            continue;
-        const float avail = m ? m->supply[r] : 0.0f;
-        rate = std::min(rate, avail / need);
-    }
-    rate = std::clamp(rate, 0.0f, 1.0f);
+    // `admitted` + the inventory read, exactly as the sim's own lambdas: a good
+    // over the fair-price ceiling reads 0, and a site with no market can draw
+    // nothing at all (the sim's `admitted` is false when `m` is null).
+    const float res_mult = reg.price_band().reservation_mult;
+    const auto admitted  = [&](std::size_t r) {
+        return m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true);
+    };
+    const auto avail_of = [&](std::size_t r) {
+        return admitted(r) ? std::max(0.0f, m->inventory[r]) : 0.0f;
+    };
 
     const float max_stretch = reg.construction().max_stretch;
-    const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+    const float pause_below = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+
+    // `site_rate`: the scarcest MATERIAL sets the rate and can pause the build;
+    // CAPACITY only stretches it, its coverage floored at `pause_below`.
+    float rate     = 1.0f;
+    float worst    = 1.0f; // the lowest coverage seen, for the binding good
+    bool  have_bad = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (r == cap_index || !(need[r] > 0.0f))
+            continue;
+        const float cov = avail_of(r) / need[r];
+        rate = std::min(rate, cov);
+        if (cov < worst || !have_bad)
+        {
+            if (cov < 1.0f)
+            {
+                worst                 = cov;
+                have_bad              = true;
+                out.has_binding       = true;
+                out.binding           = static_cast<resource_type>(r);
+                // Priced out rather than short: the shelf HAS it, the ceiling refuses it.
+                out.binding_priced_out = (m != nullptr && !admitted(r) && m->inventory[r] > 0.0f);
+            }
+        }
+    }
+    if (capacity_rate > 0.0f)
+    {
+        const float cov = (need[cap_index] > 0.0f) ? (avail_of(cap_index) / need[cap_index]) : 1.0f;
+        const float eff = std::max(cov, pause_below);
+        if (eff < rate)
+        {
+            rate                   = eff;
+            out.has_binding        = true;
+            out.binding            = resource_type::construction_capacity;
+            out.binding_priced_out = (m != nullptr && !admitted(cap_index)
+                                      && m->inventory[cap_index] > 0.0f);
+        }
+    }
+    rate = std::clamp(rate, 0.0f, 1.0f);
     if (rate < pause_below)
         rate = 0.0f; // paused: even the max-stretched rate can't be supplied
-    return rate;
+
+    out.rate   = rate;
+    out.paused = (rate <= 0.0f);
+    return out;
+}
+
+float construction_rate(const world& w, const recipe_registry& reg,
+                        building_type type, resource_type target, std::uint16_t recipe,
+                        entity_id tile)
+{
+    return read_construction(w, reg, type, target, recipe, tile).rate;
 }
 
 // Compact quarter-count label; a Tick is ~3 months, so 4 make a year (BL-095).
@@ -84,24 +171,79 @@ std::string ticks_label(int ticks)
     return s;
 }
 
-// Human status for a build rate + the whole ticks of work left.
-std::string construction_status(float rate, int ticks_left)
+int construction_eta_qtrs(const construction_read& rd, int ticks_left)
 {
-    if (rate <= 0.0f)
-        return "Paused - market can't supply materials";
-    if (rate >= 1.0f)
-        return "Building... ~" + ticks_label(ticks_left);
-    const int eta = static_cast<int>(std::ceil(static_cast<float>(ticks_left) / rate));
+    if (rd.rate <= 0.0f)
+        return -1; // a paused build has no honest ETA
+    if (rd.rate >= 1.0f)
+        return ticks_left;
+    return static_cast<int>(std::ceil(static_cast<float>(ticks_left) / rd.rate));
+}
+
+std::string construction_blocker_phrase(const construction_read& rd)
+{
+    if (rd.waiting_on_funding)
+        return "unfunded";
+    if (!rd.has_binding)
+        return rd.no_market ? "no market" : std::string();
+    const std::string good = resource_name(rd.binding);
+    return rd.binding_priced_out ? good + " priced out" : "no " + good;
+}
+
+// The status line — a stall NAMES the good holding it (BL-1342), because "Paused"
+// alone tells a player nothing they can act on.
+std::string construction_status(const construction_read& rd, int ticks_left)
+{
+    const std::string good = rd.has_binding ? resource_name(rd.binding) : std::string();
+    if (rd.waiting_on_funding)
+        return "Paused - its treasury could not fund it this quarter";
+    if (rd.paused)
+    {
+        if (rd.has_binding && rd.binding_priced_out)
+            return "Paused - " + good + " is priced above the build ceiling";
+        if (rd.has_binding)
+            return "Paused - no " + good + " at the market";
+        return rd.no_market ? "Paused - no market supplies this tile"
+                            : "Paused - market can't supply materials";
+    }
+    const int eta = construction_eta_qtrs(rd, ticks_left);
+    if (rd.rate >= 1.0f)
+        return "Building... ~" + ticks_label(eta);
+    if (rd.has_binding)
+        return "Building... ~" + ticks_label(eta)
+             + (rd.binding_priced_out ? " (" + good + " priced out)" : " (short of " + good + ")");
     return "Building... ~" + ticks_label(eta) + " (materials scarce)";
 }
 
 // Colour for an analog build status: red paused, amber scarce, green on-schedule.
-ImVec4 construction_status_colour(float rate)
+ImVec4 construction_rate_colour(float rate)
 {
     return (rate <= 0.0f) ? ImVec4{0.90f, 0.55f, 0.55f, 1.0f}   // paused
          : (rate < 1.0f)  ? ImVec4{0.85f, 0.75f, 0.45f, 1.0f}   // materials scarce
                           : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
 }
+
+ImVec4 construction_status_colour(const construction_read& rd)
+{
+    return construction_rate_colour(rd.rate);
+}
+
+float construction_progress_fraction(const world& w, const recipe_registry& reg,
+                                     const building_component& b)
+{
+    const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
+    if (capex > 0.0f)
+        return std::clamp(b.construction_paid / capex, 0.0f, 1.0f);
+    // No priceable capex (no market yet): fall back to the ticks ratio, live
+    // denominator and all — an approximate bar beats no bar.
+    const int total = construction_build_ticks(w, reg, b.tile, b.type, b.target_resource);
+    if (total <= 0)
+        return 0.0f;
+    const float done = static_cast<float>(total - b.ticks_remaining) + b.construction_progress;
+    return std::clamp(done / static_cast<float>(total), 0.0f, 1.0f);
+}
+
+namespace {
 
 // --- Estimated quarterly cost of in-progress construction (BL-143) ----------
 // Sums compute_building_opex's maintenance + wages (budget_system.hpp — the
@@ -129,13 +271,23 @@ float estimated_quarterly_construction_cost(const world& w, const recipe_registr
 }
 
 // --- Queue overview table ----------------------------------------------------
-// All active construction items across all bodies. Progress cell is
-// colour-coded: dim (<25%) grey, mid (25–75%) yellow, high (>75%) green.
-// The construction queue data model is not yet authored (BL-029 precedes the
-// queue backend); until that lands, this always shows the empty-state message.
-// Own tab ("Construction", BL-143 rename): "what's happening with my
-// construction?" — now paired with an estimated per-quarter cost of every
-// in-progress build.
+// WHAT IS IN FLIGHT, read from the buildings themselves (BL-1343). Ben, playtest
+// 2026-10-16: "the construction queue is showing 'No active construction', when
+// there are multiple buildings being constructed". It did, because the table was
+// dead behind a hard-coded `any_items = false` while it waited on a
+// `w.construction_queue` that does not exist and is not needed: a building with
+// `ticks_remaining > 0` IS the queue item, and `estimated_quarterly_construction_cost`
+// above was already walking exactly that set to price the header.
+//
+// One row per player building under construction, NEAREST DONE FIRST (progress
+// descending, entity id breaking ties so an unordered `world::buildings` cannot
+// vary what a player or a check sees) — "what lands next" is what a player asks a
+// queue. The Progress cell keeps the authored colour bands: dim (<25 %) /
+// mid (25-75 %) / high (>75 %).
+//
+// FOUR columns, not the five the dead header declared: the fold-out column is
+// ~380 px and Body never fitted beside the name, the progress, the ETA and the
+// cost. The body and the tile ride the row's hover instead, with the stall reason.
 void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui)
 {
     // COLLAPSIBLE, and collapsed by default: the queue is empty most of the time,
@@ -157,11 +309,46 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
     if (!open)
         return;
 
-    // When the queue backend lands, iterate the queue here.
-    // For now the queue is always empty — show the placeholder.
-    const bool any_items = false;
+    struct queue_row
+    {
+        entity_id         id = null_entity;
+        std::string       name;
+        std::string       where;           ///< "Body [x, y]" — the hover.
+        float             progress  = 0.0f; ///< construction_paid / capex.
+        float             cost_left = 0.0f;
+        construction_read rd;
+        int               ticks_left = 0;
+    };
+    std::vector<queue_row> rows;
+    for (const auto& [id, b] : w.buildings)
+    {
+        if (b.ticks_remaining <= 0 || !is_player_owned(w, id))
+            continue;
+        queue_row row;
+        row.id         = id;
+        row.name       = building_group_name(w, reg, b);
+        row.progress   = construction_progress_fraction(w, reg, b);
+        row.ticks_left = b.ticks_remaining;
+        row.rd         = read_construction(w, reg, b.type, b.target_resource, b.recipe, b.tile,
+                                           b.state_idle);
+        const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
+        row.cost_left     = std::max(0.0f, capex - b.construction_paid);
+        if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+        {
+            const auto bod = w.bodies.find(tit->second.body);
+            row.where = (bod != w.bodies.end() ? bod->second.name : std::string("off map"))
+                      + " [" + std::to_string(tit->second.grid_x) + ", "
+                      + std::to_string(tit->second.grid_y) + "]";
+        }
+        rows.push_back(std::move(row));
+    }
+    std::sort(rows.begin(), rows.end(), [](const queue_row& a, const queue_row& b) {
+        if (a.progress != b.progress)
+            return a.progress > b.progress; // nearest done first
+        return a.id < b.id;                 // total order, so the walk is reproducible
+    });
 
-    if (!any_items)
+    if (rows.empty())
     {
         ImGui::TextDisabled("No active construction.");
         return;
@@ -173,39 +360,79 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         ImGuiTableFlags_RowBg |
         ImGuiTableFlags_SizingStretchProp;
 
-    if (!ImGui::BeginTable("##construction_queue", 5, table_flags))
+    if (!ImGui::BeginTable("##construction_queue", 4, table_flags))
         return;
 
-    ImGui::TableSetupColumn("Body",             ImGuiTableColumnFlags_WidthStretch, 1.5f);
-    ImGui::TableSetupColumn("Building",         ImGuiTableColumnFlags_WidthStretch, 2.0f);
-    ImGui::TableSetupColumn("Progress",         ImGuiTableColumnFlags_WidthStretch, 1.5f);
-    ImGui::TableSetupColumn("Est. qtrs left",  ImGuiTableColumnFlags_WidthStretch, 1.5f);
-    ImGui::TableSetupColumn("Cost remaining",   ImGuiTableColumnFlags_WidthStretch, 1.5f);
+    ImGui::TableSetupColumn("Building",  ImGuiTableColumnFlags_WidthStretch, 2.2f);
+    // "Done", not "Progress": measured at 1720x1080 the column is ~55 px and
+    // elided the longer header to "Progre...", which is a header that has stopped
+    // naming its column.
+    ImGui::TableSetupColumn("Done",      ImGuiTableColumnFlags_WidthStretch, 1.2f);
+    ImGui::TableSetupColumn("Qtrs left", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+    ImGui::TableSetupColumn("Cost left", ImGuiTableColumnFlags_WidthStretch, 1.3f);
     ImGui::TableHeadersRow();
 
-    // Placeholder loop — replace with real queue iteration when the backend lands.
-    // Example shape:
-    //   for (const auto& item : w.construction_queue) {
-    //       const float pct = item.progress_0_to_1;
-    //       ImGui::TableNextRow();
-    //       ImGui::TableSetColumnIndex(0);
-    //       ImGui::TextUnformatted(w.bodies.at(item.body).name.c_str());
-    //       ImGui::TableSetColumnIndex(1);
-    //       ImGui::TextUnformatted(building_type_name(item.type));
-    //       ImGui::TableSetColumnIndex(2);
-    //       ImU32 cell_colour;
-    //       if      (pct < 0.25f) cell_colour = IM_COL32(80, 80, 80, 160);
-    //       else if (pct < 0.75f) cell_colour = IM_COL32(200, 180, 0, 160);
-    //       else                  cell_colour = IM_COL32(0, 160, 80, 160);
-    //       ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cell_colour);
-    //       ImGui::Text("%.0f%%", pct * 100.0f);
-    //       ImGui::TableSetColumnIndex(3);
-    //       ImGui::Text("%d", item.ticks_remaining);
-    //       ImGui::TableSetColumnIndex(4);
-    //       ImGui::Text("%.1f", item.cost_remaining);
-    //   }
+    for (const queue_row& row : rows)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::PushID(static_cast<int>(row.id));
+        // Pressing a row SELECTS the building — the same navigation the group
+        // member rows below offer, and it decides nothing for the player.
+        if (ImGui::Selectable(row.name.c_str(), ui.selected_entity == row.id,
+                              ImGuiSelectableFlags_SpanAllColumns))
+            ui.selected_entity = row.id;
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(row.name.c_str());
+            if (!row.where.empty())
+                ImGui::TextDisabled("%s", row.where.c_str());
+            ImGui::TextColored(construction_status_colour(row.rd), "%s",
+                               construction_status(row.rd, row.ticks_left).c_str());
+            ImGui::EndTooltip();
+        }
+        ImGui::PopID();
+
+        ImGui::TableSetColumnIndex(1);
+        const ImU32 cell_colour = (row.progress < 0.25f) ? IM_COL32(80, 80, 80, 160)
+                                : (row.progress < 0.75f) ? IM_COL32(200, 180, 0, 160)
+                                                         : IM_COL32(0, 160, 80, 160);
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cell_colour);
+        ImGui::Text("%.0f%%", static_cast<double>(row.progress * 100.0f));
+
+        ImGui::TableSetColumnIndex(2);
+        // The ETA the status line gives, not the raw tick count: a stretched build
+        // takes longer than its ticks say, and a paused one has no honest ETA.
+        const int eta = construction_eta_qtrs(row.rd, row.ticks_left);
+        if (eta < 0)
+            ImGui::TextColored(construction_status_colour(row.rd), "paused");
+        else
+            ImGui::TextColored(construction_status_colour(row.rd), "%d", eta);
+
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%.0f cr", static_cast<double>(row.cost_left));
+    }
 
     ImGui::EndTable();
+
+    // A STALL NAMES ITS GOOD, under the table rather than inside it (BL-1342):
+    // no cell in a ~380 px column can carry "Steel is priced above the build
+    // ceiling", and the good is the only part of it the player can act on.
+    for (const queue_row& row : rows)
+    {
+        if (row.rd.rate >= 1.0f)
+            continue;
+        const std::string blocker = construction_blocker_phrase(row.rd);
+        if (blocker.empty())
+            continue;
+        // Short, because the table above already carries the ETA: the NAME, whether
+        // it is paused or merely stretched, and the good.
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(construction_status_colour(row.rd), "%s: %s - %s", row.name.c_str(),
+                           row.rd.paused ? "paused" : "stretched", blocker.c_str());
+        ImGui::PopTextWrapPos();
+    }
 }
 
 

@@ -5,12 +5,99 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <imgui.h> // ImVec4 — the status colour this header hands out
+
 #include <string>
 #include <vector>
 
 struct ui_state; // forward-declared; the full definition lives in ui_state.hpp.
 
 namespace ui {
+
+// --- The construction mirror (BL-095; corrected and unified by BL-1342) ------
+//
+// THE CONTRACT (docs/ui/ledgers/construction.md § "Construction is durative and
+// material-gated": `construction_rate` / `construction_status` "mirror
+// run_construction's formula so the panel and the Selection front door show the
+// same number"). This is the ONE declaration of that mirror: before BL-1342 there
+// were two private copies — one in construction_panel.cpp, one in
+// selection_panel.cpp — and BOTH had drifted off `run_construction`
+// (src/world/economy_system.cpp, `site_rate`), reading the per-tick FLOW
+// (`market_component::supply`, reset every tick) where the sim draws the
+// persistent STOCK (`inventory`), omitting construction capacity from the need
+// row, and ignoring the fair-price ceiling. The result was an honest-looking "ETA
+// 2 qtr" over a build making no progress at all (Ben, playtest 2026-10-16).
+//
+// Keep the mirror and the sim's formula in step by hand: `read_construction` in
+// construction_panel.cpp carries a line-by-line note against `run_construction`.
+// ONE DIVERGENCE REMAINS, deliberately: the sim's pro-rata rationing of a
+// CONTENDED shelf (`plan_short_shelves`, BL-1209) is a solver over every site in
+// visit order and is not duplicated here, so where several sites draw one short
+// shelf the mirror reads the rate the site would get alone — optimistic, never
+// pessimistic. Closing that gap wants the sim to publish its realised rate in
+// `economy_report`, not a second solver in the UI.
+
+/// What `run_construction` will do with this site (or would do with this
+/// candidate) on the next economy tick, and WHY — so a stall can name the good
+/// that is holding it instead of saying only "Paused".
+struct construction_read
+{
+    float         rate    = 1.0f;  ///< The sim's `site_rate`, in [0,1]; 0 is paused.
+    bool          paused  = false; ///< rate == 0 — no progress at all this tick.
+    bool          waiting_on_funding = false; ///< `state_idle`: a state site its treasury could not fund.
+    bool          has_binding = false;        ///< A good is holding the rate below 1.
+    resource_type binding = resource_type::iron_ore; ///< That good (valid only with `has_binding`).
+    bool          binding_priced_out = false; ///< It is ON the shelf but over the fair-price ceiling
+                                              ///< (`shelf_admits`), rather than simply short.
+    bool          no_market = false;          ///< The tile routes to no market: nothing can be drawn.
+};
+
+/// The mirror itself. @p state_idle is the building's own `state_idle` (false for
+/// a prospective candidate, which has no building yet).
+construction_read read_construction(const world& w, const recipe_registry& reg,
+                                    building_type type, resource_type target,
+                                    std::uint16_t recipe, entity_id tile,
+                                    bool state_idle = false);
+
+/// The rate alone, for the callers that only rank/warn on it.
+float construction_rate(const world& w, const recipe_registry& reg,
+                        building_type type, resource_type target, std::uint16_t recipe,
+                        entity_id tile);
+
+/// Quarters of work left at this rate (`ticks_left` stretched by the rate); -1 when
+/// paused, because a paused build has no honest ETA.
+int construction_eta_qtrs(const construction_read& rd, int ticks_left);
+
+/// A compact quarter count — "3 qtrs", "8 qtrs (~2 yr)". The display word is **qtr**,
+/// never tick (NR-002, Ben 2026-08-01).
+std::string ticks_label(int ticks);
+
+/// The blocking good in a few words — "no Steel", "Steel priced out", "" when
+/// nothing is holding the build. For a narrow reading (a stack button).
+std::string construction_blocker_phrase(const construction_read& rd);
+
+/// The full status line: "Building... ~3 qtrs", "Building... ~9 qtrs (short of
+/// Steel)", "Paused - no Steel at the market", "Paused - Steel is priced above
+/// the build ceiling".
+std::string construction_status(const construction_read& rd, int ticks_left);
+
+/// Red paused / amber stretched / green on schedule.
+ImVec4 construction_status_colour(const construction_read& rd);
+
+/// The colour for a bare rate (the Build door's pre-commit warning, which has a
+/// candidate rather than a site).
+ImVec4 construction_rate_colour(float rate);
+
+/// How far through its build @p b is, in [0,1] — `construction_paid` over
+/// `construction_capex`, the CREDIT fraction. Preferred over the ticks ratio
+/// because `ticks_remaining` is measured against a total nothing stores: recomputing
+/// it calls `construction_site_multiplier`, which reads the live reach/stack field,
+/// so the denominator moves when a road or the stack does. Capex is re-priced live
+/// too, so the bar can wobble with local prices; the drift-free alternative is to
+/// store the original total on the building, which is a save-format change.
+/// Falls back to the ticks ratio where capex cannot be priced.
+float construction_progress_fraction(const world& w, const recipe_registry& reg,
+                                     const building_component& b);
 
 /// The NAME the Buildings view files @p b under — the same words the Build door
 /// offers, so a player recognises the row as the thing they built:
