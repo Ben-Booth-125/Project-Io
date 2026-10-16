@@ -380,6 +380,17 @@
    "call": "A) skip the player's nation in the scorer and give it a fixed default budget until a budget control exists; B) keep scoring it as a stand-in and record that as a dated exception in § 11; C) build the player's budget control now.",
    "resolved": "2026-10-16",
    "resolution": "Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11."
+  },
+  {
+   "id": "NR-1049",
+   "title": "Sprint 56 calibrations taken inside the 2026-10-16 calls: strait width 3 tiles; paint target read per build",
+   "raised": "2026-10-16",
+   "kind": "decision",
+   "status": "open",
+   "source": "Sprint 56 cut (branch claude/sprint-56-456d2b); NATION_GENERATION.md § Pass 2e",
+   "what": "(1) BL-1310 (nations contiguous): \"short strait only (a few sea tiles)\" is set at strait_tiles = 3, about 380 km at 128 km per tile. (2) The remote island beyond any strait is exempt and goes to the nearest nation; the floor island case now goes to the nearest nation, not the globally largest. (3) BL-1311 (ground paint perf): the 1 minute / 6 GB target is measured on the Debug build that produced 3-5 min / 12 GB, with Release reported beside it.",
+   "why_it_matters": "Strait width sets how many exclaves are ceded and how far an island realm may reach; the build the target is read on decides whether BL-1311 needs code at all.",
+   "call": "Confirm, or name a different strait width or target build."
   }
  ]
 }

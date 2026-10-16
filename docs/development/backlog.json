@@ -144,7 +144,7 @@
    "author": "Claude (the BL-1206 lane, 2026-10-07)",
    "id": "BL-1214",
    "short_name": "EIGHTH_FIELD_DOC_DRIFT",
-   "sprint": 50,
+   "sprint": 56,
    "category": "Economy",
    "priority": "B",
    "difficulty": 2,
@@ -400,7 +400,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 51,
+   "sprint": 56,
    "written": "2026-10-09",
    "requires": [
     "BL-1246"
@@ -664,7 +664,7 @@
    "requires": [],
    "files": [],
    "title": "Every nation holds one contiguous group of tiles, or one contiguous group across water - no borders jumping across other nations",
-   "design": "SPRINT 56 (Ben, 2026-10-15; moved from 55 the same day): some nations' territory jumps across other nations; it should be one land-contiguous group, or contiguous via a water crossing. Design the rule in NATION_GENERATION.md (fold/floor/closing rounds interplay) before building; world-mover."
+   "design": "SPRINT 56 (Ben, 2026-10-15; moved from 55 the same day): some nations' territory jumps across other nations; it should be one land-contiguous group, or contiguous via a water crossing. Design the rule in NATION_GENERATION.md (fold/floor/closing rounds interplay) before building; world-mover. RULED (Ben, 2026-10-16): contiguous means by land or across a short strait only; an exclave that fails it is ceded to the nation that surrounds it, recorded as a closing-round event. Rule written into NATION_GENERATION.md § Pass 2e."
   },
   {
    "status": "proposed",
@@ -683,12 +683,12 @@
    "requires": [],
    "files": [],
    "title": "Ground painting takes 3-5 minutes and 12 GB of RAM - cut both drastically",
-   "design": "SPRINT 56 (Ben, 2026-10-15; moved from 55 the same day), with rendering improvements again. Measure the bake (time, peak memory, per-chunk) first; target an order of magnitude on both."
+   "design": "SPRINT 56 (Ben, 2026-10-15; moved from 55 the same day), with rendering improvements again. Measure the bake (time, peak memory, per-chunk) first; target an order of magnitude on both. TARGET (Ben, 2026-10-16): under 1 minute and 6 GB peak; Ben suspects the Debug build caused most of it, so measure Debug and Release both before changing code."
   },
   {
    "status": "proposed",
    "glyph": "",
-   "sprint": 54,
+   "sprint": 56,
    "written": "2026-10-13",
    "parked": false,
    "blocked_on": null,
@@ -1016,7 +1016,7 @@
     "tools/verify/player_seed_sweep.cpp"
    ],
    "title": "player_seed_sweep digest pins fail on every digest for every seed, both arcs",
-   "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben."
+   "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben. RULED (Ben, 2026-10-16): attribute the movers on the sprint 56 branch; re-pin at integration after sprint 55 lands, not on the branch."
   },
   {
    "status": "proposed",

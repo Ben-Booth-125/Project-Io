@@ -87,9 +87,26 @@
    "risk": "Wave 3 overturns the DLC parking of all space work (ROADMAP.md, now narrowed to near space). BL-1327 touches the save format. The pacing slider (2.5x) was superseded by Ben's note: no speed-up for the average nation.",
    "done_when": "Set at the cut. Proposed: an unattended spectator run reaches ~2040 on the curated seeds with every major nation past the Digitisation midpoint, at least one crewed lunar landing and one orbital station.",
    "notes": "Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11."
+  },
+  {
+   "id": "56",
+   "theme": "trustworthy ground",
+   "state": "open",
+   "status_line": "OPENED 2026-10-16 in worktree claude/sprint-56-456d2b, beside sprint 55 on main (Ben playtesting). Calls answered same day (Ben). Items BL-1310, BL-1311, BL-1337, BL-1338, BL-1247, BL-1214, BL-1319.",
+   "opened_date": "2026-10-16",
+   "author": "Ben (2026-10-16)",
+   "goal": "Every nation holds one territory (contiguous by land or a short strait), the ground paints inside 1 minute and 6 GB, and the failing quarterly-return and digest-pin gates tell the truth again.",
+   "planned": [
+    "WAVE 1 - GATES TELL THE TRUTH. BL-1337 (return net crosses zero), BL-1214 (eighth field doc drift), BL-1338 (digest pins stale: attribute only), BL-1319 (fixture base stall).",
+    "WAVE 2 - GROUND PAINT. BL-1247 (ground benchmark) measures first, then BL-1311 (ground paint perf).",
+    "WAVE 3 - ONE TERRITORY. BL-1310 (nations contiguous), the world mover, last so the gates measure it alone."
+   ],
+   "risk": "Runs in parallel with sprint 55 on main; BL-1310 moves the world while sprint 55 also moves it, so every gate here is measured on a world without sprint 55. Re-pins wait for integration. BL-1340 (roads cross tile edges, sprint 55) may touch the ground bake BL-1311 changes.",
+   "done_when": "BL-1310: world_audit reports zero illegal exclaves on the curated seeds with nation totals still hit. BL-1311: ground paint under 1 minute and 6 GB peak on the slow case. quarterly_return R2 passes without weakening the row. Digest movers attributed. stage_ui_fixture completes.",
+   "notes": "Calls 2026-10-16 (Ben): add-ons BL-1247, BL-1214, BL-1319; water rule = short strait only; an illegal exclave is ceded to the nation that surrounds it, recorded as a closing-round event; BL-1338 attributes movers here and re-pins at integration after sprint 55 lands; paint target 1 minute and 6 GB (\"this seems like it was caused by the debug\")."
   }
  ],
- "next_up": "SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.",
+ "next_up": "SPRINT 55 in progress on main (spectator to the end of Era 1). SPRINT 56 open in parallel on claude/sprint-56-456d2b (trustworthy ground). Handoff: docs/development/NEXT_SESSION.md.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]

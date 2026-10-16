@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 25 open, 1 resolved.*
+*27 entries — 26 open, 1 resolved.*
 
 ---
 
@@ -226,6 +226,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 Destinations are named slots (body + orbit|surface), tiered from the owner home body: home orbit, moon orbit, moon surface, far orbit, far surface. Launch cost: satellite 10000, rover 20000, crewed 60000, station module 40000; reach 0/8000/15000/30000/45000 + 20000 per AU (far tiers). Travel quarters 0/1/1/2/3 + floor(AU), clamped at 400 extra. Upkeep/quarter: 500/1000/3000/2000. Lost after 4 unpaid quarters (hard ceiling 64). Launch cost and upkeep are pure treasury sinks until BL-1328 (launch infrastructure) buys goods from corporations.
 
 **Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
+
+### NR-1049 — Sprint 56 calibrations taken inside the 2026-10-16 calls: strait width 3 tiles; paint target read per build
+*decision · raised 2026-10-16 · from Sprint 56 cut (branch claude/sprint-56-456d2b); NATION_GENERATION.md § Pass 2e*
+
+(1) BL-1310 (nations contiguous): "short strait only (a few sea tiles)" is set at strait_tiles = 3, about 380 km at 128 km per tile. (2) The remote island beyond any strait is exempt and goes to the nearest nation; the floor island case now goes to the nearest nation, not the globally largest. (3) BL-1311 (ground paint perf): the 1 minute / 6 GB target is measured on the Debug build that produced 3-5 min / 12 GB, with Release reported beside it.
+
+**Why it matters.** Strait width sets how many exclaves are ceded and how far an island realm may reach; the build the target is read on decides whether BL-1311 needs code at all.
 
 ---
 

@@ -245,7 +245,7 @@ geography leaves standing. The result amplifies the size spread (rich-get-richer
 **irregular, non-convex borders** — a nation may be the union of a core and an absorbed
 neighbour. Tie-breaks are fully deterministic (smallest by tile count then lowest index;
 absorbing neighbour by tile count then lowest index; an island with no land neighbour is absorbed
-into the globally largest nation). This pass is *not* itself a source of fragmentation — it only
+into the nearest nation across the water, § Pass 2e). This pass is *not* itself a source of fragmentation — it only
 ever merges a nation into a neighbour it already touches, so it cannot cut one in two.
 
 **The floor runs after the fold, so it judges realms, not seeds** (§ Pass 2d — The polity fold).
@@ -275,9 +275,8 @@ representative: its **name**, coined once at the realm's founding and never re-c
 its **colour slot**, the one the wizard's rounds painted it in (§ Pass 5); its **treasury** at
 the close (§ Pass 7); and its capital tile. Nothing about a realm is recalculated at the handoff:
 the nation the player meets at Begin is the realm they watched rise, under the same name and the
-same colour. A realm's territory can be **non-contiguous**, and that is a fact of the history
-rather than a defect — a polity that conquered across a neighbour holds ground on both sides of
-it.
+same colour. A realm's territory is **one territory** (§ Pass 2e): a polity that conquered across
+a neighbour does not keep the far side, which the closing rounds cede to the nation around it.
 
 **A city state crosses as itself.** A polity that reached the close holding one region with a
 population centre on it is a nation on its own account — exempt from the size floor, and never an
@@ -289,8 +288,9 @@ rule A, Ben, 2026-09-24). When Pass 2c folds a small realm into a neighbour, the
 results is the **absorber**: it keeps its own name and its own colour slot, its chest grows by the
 absorbed realm's (§ Pass 7), and the seat card (`../ui/STARTUP.md` § The seat) lists under the
 nation's name the realms it absorbed. The absorbed realm contributes ground, people and a chest —
-never a name, whatever index its seed carried. No other pass merges nations, and nothing splits
-one.
+never a name, whatever index its seed carried. No other pass merges nations. The one transfer of
+ground between surviving nations is the cession of an exclave (§ Pass 2e), which moves ground and
+never a nation.
 
 **Ownerless ground crosses as a nation with no realm.** A Voronoi cell around an anchor no polity
 held at the close folds to itself, so it becomes a nation of its own, subject to the size floor
@@ -299,6 +299,38 @@ name for — in the tongue of the culture that settled the region its seed grew 
 case the colour table assigns a fresh slot to; the seat card says the ground had no realm at the
 close. A body with no settlement pass is all ownerless ground, and there the fold is the identity:
 every seed is its own nation, exactly as the random-placement path carves.
+
+### Pass 2e — One territory: the strait rule
+
+**Every nation holds one territory (Ben, 2026-10-16).** A nation's ground is one land-contiguous
+group, or several groups joined by **short straits**, never ground that jumps across another
+nation. Borders that leap a neighbour read as a defect at the first look at the map, whatever
+history produced them.
+
+**What joins two groups.** Two of a nation's land groups (cardinal adjacency, column-wrapped) are
+**joined** when a path between them crosses **at most `strait_tiles` ocean tiles and no land
+another nation holds**. Joins chain: a nation's groups form one territory when every group reaches
+the **core** — the group holding its capital — through joins. `strait_tiles` is **3** (≈ 380 km at
+`body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
+
+**An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
+**ceded to the nation that surrounds it**: the nation sharing the most cardinal land edges with it,
+or, for an island with no land neighbour, the nation whose ground is fewest ocean tiles away (ties
+to the lower nation index, then the lower tile index). The cession moves ground only. The nation
+keeps its core, its name and its chest, so a cession never changes the nation count, and the
+receiver's own contiguity is re-checked after each one until no exclave is left.
+
+**A cession is a history event.** On a settled world it is a **closing-round step of
+Industrialisation** (§ The nation count is a target), recorded with its cause — the exclave was
+cut off from its realm — and it runs **first**, before the size floor and before reconciliation.
+The floor then judges territories as the player will see them. Reconciliation keeps the rule: an
+absorption joins a nation to a neighbour it already touches, and a secession is chosen so both
+sides remain one territory. Where no history ran, the same rule runs as a post-pass after Pass 2d.
+
+**The remote island.** A landmass farther than `strait_tiles` from every nation's ground cannot
+be held contiguously by anyone. Pass 2b still gives it to the nearest nation, and it is the one
+group exempt from the rule. The floor's island case follows the same reading: an island with no
+land neighbour is absorbed by the nearest nation across the water, never the globally largest.
 
 ### Territorial fragmentation, measured
 
@@ -325,8 +357,11 @@ Pass 2b — 31 % of exclaves by count, but **49 % of exclave tiles** (940 of 193
 produced emergent exclaves (6–17 each), and roughly half of all nations hold at least one. The
 promise pays: fragmentation is real and sim-produced, but Pass 2b's long tail of tiny orphan
 islands dominates the raw *count*, so the honest headline is the tile share, not the component
-share. The audit asserts only a wide bar — at least 6 emergent exclaves across the sweep — to be
-tightened once the distribution has been watched.
+share. Those figures describe the carve **before** § Pass 2e. The cession turns emergent
+fragmentation into history — a cut-off province changing hands — rather than into a map defect.
+So the audit asserts two things on the finished world: **no exclave outside the strait rule**, save
+the remote island; and the cessions counted as recorded events, so the sim still visibly
+produces the fragmentation the rule resolves.
 
 ### Pass 3 — Resource profile derivation
 
