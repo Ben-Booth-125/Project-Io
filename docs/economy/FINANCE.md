@@ -329,7 +329,10 @@ row a balance sheet rather than an income statement alone.
 - **`net` is a balance difference, not `corp_budget::net()`.** The two are a ULP apart: the money
   loop accumulates its delta interleaved and forbids re-grouping, so only the difference of two
   consecutive balances telescopes *exactly*. The retain property below is the whole point of the
-  record, and it is worth more than naming a tidier source.
+  record, and it is worth more than naming a tidier source. The difference is held at **double**
+  precision: when a balance crosses zero the difference of two single-precision balances can need
+  more significand than a single has (17.797 → −1.704 is a −19.50 move at −1.70's precision), and a
+  rounded `net` would neither state the quarter nor replay onto the balance the loop wrote.
 - **`book_value` is historical cost, and deliberately NOT what the build press charges.** The press
   charges `build_cost` **plus** a materials term valued at the *current market price*. Folding that
   in would make a firm's balance sheet mark-to-market — the same building's book value moving every

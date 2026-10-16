@@ -445,7 +445,21 @@ inline constexpr uint32_t world_save_magic =
 /// (`k_world_save_version_pre_tax`), as a world where every nation stands at
 /// tier III with no Discontent; v50 down to v47 still read. Every other version
 /// is refused.
-inline constexpr uint32_t world_save_version = 52;
+/// Bumped to 54 by BL-1337 (return net crosses zero; FINANCE.md § The quarterly
+/// return): `quarterly_return::net` is a double, the exact balance delta. The
+/// record keeps its f32 slot (the double rounded to float), and a TRAILING
+/// SECTION after the returns' taxes carries the exact figure for every
+/// corporation whose history holds any net the f32 slot does not carry exactly,
+/// ascending id, as (id, u32 n = its return count, n x f64 in filed order).
+/// Nothing else moves, so v52 is a STRICT PREFIX of v54 and is read too
+/// (`k_world_save_version_pre_net`), its nets as their f32 slots; v51 down to
+/// v47 still read. (v53 is claimed by BL-1340 on another branch: the integrator
+/// stacks this section after that one and moves `k_world_save_version_pre_net`
+/// to 53.) Every other version is refused.
+inline constexpr uint32_t world_save_version = 54;
+
+/// BL-1337: v52, a strict prefix of v54 (the exact-net section is v54's only addition).
+inline constexpr uint32_t k_world_save_version_pre_net = 52;
 
 /// BL-1335: v51, a strict prefix of v52 (the tax section is v52's only addition).
 inline constexpr uint32_t k_world_save_version_pre_tax = 51;
@@ -480,6 +494,11 @@ void write_world_snapshot(const world& w, std::ostream& out);
 /// writes for @p w (the nation rows and the returns' taxes) — what a harness
 /// cuts off a v52 stream to make the v51 prefix.
 std::size_t world_save_tax_section_bytes(const world& w);
+
+/// BL-1337: the byte length of the v54 exact-net section `write_world_snapshot`
+/// writes for @p w — what a harness cuts off a v54 stream to make the v52
+/// prefix. Every older prefix is cut through it too, since it is the last.
+std::size_t world_save_net_section_bytes(const world& w);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

@@ -30,7 +30,9 @@
 //       is never doing the work on its own.
 //
 //       Exactness is possible because `quarterly_return::net` is the DIFFERENCE
-//       of two consecutive balances rather than a re-grouped sum of the flows.
+//       of two consecutive balances rather than a re-grouped sum of the flows,
+//       taken in DOUBLE (BL-1337: a float difference rounds when a balance
+//       crosses zero, so a float `net` could not hold the delta at all).
 //       Each term is therefore exact, and a double-precision sum of exact
 //       differences telescopes: every partial sum b_k - b_0 is itself
 //       representable, so IEEE addition returns it unrounded.
@@ -302,7 +304,9 @@ void run_fixture_rows(const recipe_registry& reg)
                 && q.maintenance == b.maintenance && q.wages == b.wages
                 && q.interest == b.interest && q.levies == b.levies
                 && q.upkeep == b.upkeep;
-            net_exact      = net_exact && q.net == cc.balance - opening.at(id);
+            net_exact      = net_exact
+                          && q.net == static_cast<double>(cc.balance)
+                                    - static_cast<double>(opening.at(id));
             bal_match      = bal_match && q.balance == cc.balance;
             holdings_match = holdings_match
                           && q.holdings == static_cast<uint32_t>(cc.assets.size());
@@ -514,6 +518,58 @@ void run_save_rows(const recipe_registry& reg)
               "write -> read -> write is byte-equal (read and write sides agree)");
     }
 
+    // P1b — BL-1337: an exact net NO FLOAT CAN HOLD survives the round trip
+    // through the exact-net section; a stream cut to the predecessor's prefix
+    // reads it back as its f32 slot; and an exact net that disagrees with its
+    // own slot is refused whole. Planted on purpose: the fixture's nets may all
+    // be float-exact, which would leave the section empty and these rows vacuous.
+    {
+        world x = f.w;
+        const entity_id cid = sorted_corp_ids(x).front();
+        quarterly_return& q = x.corporations.at(cid).returns.back();
+        const float b0 = 17.7972374f, b1 = -1.70437169f; // the t=24 crossing row
+        q.net = static_cast<double>(b1) - static_cast<double>(b0);
+        const double exact = q.net;
+        const double slot  = static_cast<double>(static_cast<float>(exact));
+        check(slot != exact, "R5", "the planted net is one a float cannot hold (not vacuous)");
+
+        const std::string xb = to_bytes(x);
+        {
+            world back;
+            std::istringstream in(xb, std::ios::binary);
+            const bool ok = read_world_snapshot(back, in);
+            check(ok && back.corporations.at(cid).returns.back().net == exact
+                     && to_bytes(back) == xb,
+                  "R5", "an exact net round-trips bit for bit (the exact-net section)");
+        }
+
+        const std::size_t sec = world_save_net_section_bytes(x);
+        const std::size_t n   = x.corporations.at(cid).returns.size();
+        check(sec == 4 + 4 + 4 + 8 * n, "R5",
+              "the exact-net section carries exactly the one inexact history");
+        constexpr std::size_t k_version_offset = sizeof(uint32_t);
+        {
+            std::string pre = xb.substr(0, xb.size() - sec);
+            const uint32_t v = k_world_save_version_pre_net;
+            std::memcpy(pre.data() + k_version_offset, &v, sizeof v);
+            world back;
+            std::istringstream in(pre, std::ios::binary);
+            const bool ok = read_world_snapshot(back, in);
+            check(ok && back.corporations.at(cid).returns.back().net == slot, "R5",
+                  "the predecessor's prefix still reads, each net as its f32 slot");
+        }
+        {
+            std::string bad = xb; // the stream's last 8 bytes are this net
+            const double wrong = exact + 1.0;
+            std::memcpy(bad.data() + bad.size() - sizeof wrong, &wrong, sizeof wrong);
+            world sentinel = build_fixture(reg).w;
+            const std::string before = returns_image(sentinel);
+            std::istringstream in(bad, std::ios::binary);
+            check(!read_world_snapshot(sentinel, in) && returns_image(sentinel) == before,
+                  "R5", "an exact net its own f32 slot contradicts is REFUSED, destination untouched");
+        }
+    }
+
     // P2 — a stream at the PRIOR version is refused whole, destination untouched.
     {
         std::string older = bytes;
@@ -673,9 +729,18 @@ void run_settle_rows(const recipe_registry& reg)
             // an epsilon, not looser, and it passed on all 640 rows the moment it was
             // tried. The explicit cast pins the result to float against a
             // wider-evaluation FLT_EVAL_METHOD.
-            const float net_f = cit->second.returns.back().net;
-            per_tick_exact = per_tick_exact
-                          && static_cast<float>(b0 + net_f) == cit->second.balance;
+            //
+            // BL-1337 (2026-10-16): the replay then FAILED too — 3 of 416 rows,
+            // each a balance CROSSING ZERO with interest charged (t=24: b0 17.797,
+            // close -1.70437169, float net -19.5016098 replays to -1.70437241). A
+            // float `net` cannot hold a delta that needs more significand than a
+            // float has, so neither form could pass while the record was float.
+            // `net` is now the DOUBLE difference, and BOTH forms are asserted: the
+            // replay, and the original `net == d` bit equality NR-720 had to drop.
+            const double net_d = cit->second.returns.back().net;
+            per_tick_exact = per_tick_exact && net_d == d
+                          && static_cast<float>(static_cast<double>(b0) + net_d)
+                                 == cit->second.balance;
             ++per_tick_rows;
         }
 

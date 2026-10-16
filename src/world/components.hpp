@@ -1796,9 +1796,6 @@ struct quarterly_return
     /// SERIALISED in the v52 trailing tax section (only firms that ever paid).
     float taxes       = 0.0f;
 
-    /// The exact balance delta this tick — closing balance less opening balance.
-    float net = 0.0f;
-
     /// Closing `corporation_component::balance`, after interest.
     float balance = 0.0f;
 
@@ -1807,7 +1804,21 @@ struct quarterly_return
 
     /// Sum of `recipe_registry::economics(type).build_cost` over the holdings.
     float book_value = 0.0f;
+
+    /// The exact balance delta this tick — closing balance less opening balance,
+    /// taken in DOUBLE (BL-1337). A float could not carry it: when a balance
+    /// crosses zero the difference of two floats can need more significand than
+    /// a float has (17.797 → −1.704 is a −19.50 delta at −1.70's precision), and
+    /// a rounded `net` both misstates the quarter and fails to replay onto the
+    /// balance the loop wrote. The difference of two floats is exact in double
+    /// whenever their exponents are within 29 of each other, so this IS the
+    /// movement. Declared LAST so the record has no padding (sizeof 56, asserted
+    /// below — the record's bytes are hashed raw by a harness). SERIALISED as the
+    /// record's f32 slot plus the v53 trailing exact-net section.
+    double net = 0.0;
 };
+static_assert(sizeof(quarterly_return) == 56,
+              "quarterly_return must stay padding-free: its bytes are compared raw");
 
 /// Rolling retention of `corporation_component::returns`: ten years at four
 /// economy ticks to the year (Ben, 2026-08-26). Bounded by construction, and
