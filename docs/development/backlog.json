@@ -1382,6 +1382,100 @@
    "files": [],
    "title": "LOGISTICS.md prints the superseded bifold LP model as the model, and LENSES.md justifies the lens from a quantity BL-1309 replaced",
    "design": "SPRINT 55 (found mapping Ben's 2026-10-16 message). The doc stacks two models and only soft-marks the older one, so a top-down reader passes the 2026-10-14 ruling and then reads the overturned text as current. (1) The 'What it is' section still declares LP 'is BIFOLD' with a passive/active table and 'Cities generate it.' (2) 'Passive LP caps trade' is false in code: the convoy gate is retired, market_lp_left returns 0, so the 'Armies claim first' arbitration has no contention left to arbitrate - trade draws nothing. (3) Constraint 2's 'Cities are the locus' is false: the locus is a nation-wide scalar pool plus a per-source reach field, and that pool is arguably the pooled haul allowance the constraint was written to forbid, now pooled per nation - which deserves a sentence saying why that is acceptable rather than leaving the contradiction silent. (4) 'Where the parts live' has no row for src/world/logistic_points.* - the file that now IS the model. (5) LENSES.md:1016-1030 names the legacy pools as 'the magnitude' and argues per-tile LP is constant. Reconcile against the code after BL-1352 lands, so the doc describes one system; keep the history clearly fenced as history."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1356",
+   "short_name": "LP_ROUTED_REQUESTS",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 5,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1352",
+    "BL-1353",
+    "BL-1354"
+   ],
+   "files": [
+    "src/world/logistic_points.cpp",
+    "src/world/economy_system.cpp"
+   ],
+   "title": "A tile requests the points it needs and they are routed to it over one path, split across sources in distance order",
+   "design": "SPRINT 55 (Ben, 2026-10-16, on the LP form: \"Both: surfaces now, routing straight after\"). DESIGNED: LOGISTICS.md section How a tile's points get to it. SEQUENCE IS BEN'S: BL-1352 (one system), BL-1353 (lens) and BL-1354 (tile surface) land FIRST, so routing is measured against honest numbers rather than guessed - the real model's reach already fades with distance and extends with outlying hubs, and nobody has yet seen it drawn. THE MODEL: today there is no routing at all - a nation-wide scalar pool scaled by a per-tile reach field (max over the nation's three networks), granted pro-rata or by the share rule. New: a tile's request is the sum of its buildings' needs; it is filled over ONE best path, never two at once; a source fills part of a request only if it both reaches the tile AND is itself connected back toward the market centre (Ben: \"further sources have to both reach the tile, and produce enough to extend backward towards the market centre\"), so points arrive along a chain the centre anchors and an isolated hub supplies nothing; where the nearest source falls short the remainder comes from the next nearest that satisfies both tests, in distance order. This supersedes the older constraint-2 rule that a draw lands on exactly one anchor. SCARCITY (Ben's ruling): distance ORDERS the queue and never raises the bill - requests inside the falloff range are served first, then those beyond, and a far building draws the same points as a near one. The settled rule 'the draw is what moves, not how far' therefore stands; NR-620 measured a 73% convoy-traffic collapse the one time a distance draw was tried, so any implementation that makes a far building cost more points is wrong by ruling, not by taste. MARCHES (Ben's ruling): a march draws the nation pool and competes with production. OPEN READING flagged to Ben: his own 2026-09-24 ruling (NR-917) was 'Armies claim first', which arbitrated armies against TRADE - and trade now draws nothing at all, so first-claim would mean armies taking from production outright. Settle before building. Determinism: allocation must stay order-independent - a deterministic priority over a sorted set, never first-come by iteration order (the march draw is first-come in unit-id order today, economy_system.cpp:4210). A WORLD-MOVER: measure market_viability, haulage_measure --far-trade and per-nation output before and after."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1357",
+   "short_name": "ROAD_CROSSES_A_BORDER",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1340",
+    "BL-1348"
+   ],
+   "files": [
+    "src/world/placement_rules.cpp"
+   ],
+   "title": "A road may always be built across a national border, and never further",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"if another nation holds the market centre, we may not be able to even build roads to supply LP. So due to this case, it should always be possible to build a road over a national border, but not further.\" DESIGNED: LOGISTICS.md section 4 (A road may always cross a national border). From a tile you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a tile you may build FROM, so the road stops where it lands - a connection, never a corridor. It is the exception that keeps BL-1348 (a road is laid from a road) from making a foreign-held market centre unreachable, which under BL-1356 would make every tile behind it unsuppliable. Sequenced after BL-1340 and BL-1348, whose placement rule it amends."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1358",
+   "short_name": "BUILD_A_MARKET_CENTRE",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "requires": [
+    "BL-1346"
+   ],
+   "files": [],
+   "title": "The player can construct a market centre, at a high cost in materials",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We also want to give the player a way to construct market centres, this can just be a high cost for the materials needed. This should help to reduce the number of tiles pulled towards neighbouring markets.\" DESIGNED (shape): MARKETS.md section A market centre can be built. Expensive in materials and gated by nothing else - the cost IS the constraint. A rival nation may build one too, by the same verb, so it is not an asymmetric player power. Still to settle: the material bill, whether a new centre must stand a minimum distance from an existing one, and what it does to the spontaneous-emergence pass (MARKETS.md section Spontaneous market emergence) which already creates centres on its own. Needs the verb on the corp_command seam with an ACTIONS.json entry, and the surface to press it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1359",
+   "short_name": "HUB_LEVELS_AT_CENTRES",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1351"
+   ],
+   "files": [
+    "src/world/logistic_points.cpp"
+   ],
+   "title": "Generation starts a market centre with several levels of logistics building",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"I imagine we might start generation with multiple levels in logistics buildings at the market centre.\" OPEN READING flagged to Ben before building: 'multiple levels' could mean (a) several hub BUILDINGS stacked on the centre tile, which the stack rule already permits (2-12 in aggregate, PRODUCTION.md section Building stacks) and which seed_logistics_sources could simply do more of; or (b) a TIER LADDER on the hub itself, as roads have Track/Road/Highway, each level making more points - a new building ladder and a bigger change. Today a hub is one building making a flat 120 points a tick scaled by its upkeep supply, and generation's seeding pass (logistic_points.cpp:382) adds hubs one at a time until coverage and pool margin are met, siting them at the serving market's centre_tile where it can. Either reading gives Ben's picture - a centralised capital with a high number of points, diminishing with distance - so the choice is about the building model, not the outcome."
   }
  ]
 }

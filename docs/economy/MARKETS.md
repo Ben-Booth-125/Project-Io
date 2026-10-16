@@ -165,6 +165,17 @@ output lands on that market's shelf and its inputs and upkeep are bought there
 (`PRODUCTION.md` § Output and the shelf), and goods a trade delivers land and sell at the market
 they were delivered to (`TRADE.md` § A trade).
 
+## A market centre can be built (Ben, 2026-10-16)
+
+**The player may construct a market centre**, and so may a rival nation. It is deliberately
+**expensive in materials** rather than gated behind anything cleverer: the cost is the whole
+constraint, so the decision is *can I afford to pull this ground toward me* and nothing else.
+
+Its purpose is the one Ben named: **fewer of a nation's tiles pulled toward a neighbour's market.**
+A new centre inside its own ground wins the tiles around it on cost, and wins them more easily for
+the nation that holds them (§ Its own nation pulls harder). It is the constructive answer to a
+border that leaks catchment, where the pull modifiers are the incremental one.
+
 ## Spontaneous market emergence
 
 Off-world (any body other than `world::home_body`), a market is **runtime state, not a

@@ -219,6 +219,14 @@ in open country, and a frontier is reached by laying one crossing at a time out 
 generation's own rule below — every centre's tile gets at least a Track — so no world can begin with
 nowhere to build from, and a nation's first road of a campaign extends the lattice it inherited.
 
+**A road may always cross a national border, and never go further (Ben, 2026-10-16).** From a tile
+you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a
+tile you may build *from*, so the road stops where it lands. The reason is a real case: a market
+centre held by another nation could otherwise be impossible to connect at all, and a tile that
+cannot reach its centre cannot be supplied (§ How a tile's points get to it). One crossing is
+enough to touch the border and no more than that — it buys a connection, never a corridor through
+somebody's country.
+
 **Generation roads every building site (Ben, 2026-10-16).** A building needs a road on its tile
 (`PRODUCTION.md` § A building needs a road), and that rule binds the generated world as it binds
 play: the road pass lays a crossing to every site it stamps, so the 1960 world contains no building
@@ -653,6 +661,34 @@ into passive and active. What follows replaces the bifold model, the city genera
   zeroed by a shortfall.
 - **Trade points stay separate** (`TRADE.md`): how much an owner can ship, beside the capacity to
   move and produce.
+
+#### How a tile's points get to it (Ben, 2026-10-16)
+
+**Every tile asks for what it needs, and the answer is routed.** A tile's request is the sum of its
+buildings' needs. It is filled over **one path** — the best path from a source, never two paths at
+once — and a path is a connection along a network, land or sea.
+
+**A tile must be connected to the market centre, not merely near a source.** A source that reaches
+the tile fills part of its request only if that source is itself connected **back toward the centre**
+— so points arrive along a chain the centre anchors, and a hub dropped in isolation supplies
+nothing. This is what makes an outlying hub an *extension* of a network rather than an island.
+
+**A request may be split across sources, in distance order.** Where the nearest source cannot fill
+it, the remainder comes from the next nearest that both reaches the tile and extends the chain, and
+so on. It supersedes the older "a draw lands on an anchor" rule in the superseded half below, which
+allowed exactly one.
+
+**Distance orders the queue; it never raises the bill.** When a nation's points fall short of what
+its ground asks for, requests **inside the falloff range are served first**, then the ones beyond
+it. What a building draws does not grow with its distance: a far building costs the same points as a
+near one and simply waits behind it. This keeps the settled rule intact — *the draw is what moves,
+not how far*, distance priced in credits and only in credits (§ Three rules that are settled,
+constraint 3), the rule NR-620 measured at a 73% collapse in convoy traffic when a distance draw
+was tried.
+
+**A march draws on the nation's pool too (Ben, 2026-10-16).** Movement a player or rival directs
+competes with production for the same points, so guns and butter compete in one currency, as the
+single-pool reasoning always argued they should.
 - Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
   **new** stations; generated rail still passes as § 4c says.
 
