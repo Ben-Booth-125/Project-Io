@@ -352,8 +352,9 @@ corporation from it, the spawn shortlist reads it before a player exists, and a 
 must come back with its history intact. The player's own profit chart keeps reading the UI cache;
 that surface is unchanged.
 
-**Determinism.** Returns append in a sorted walk by `entity_id`, one row per corp per tick, fixed
-width on the save seam. No branch reads a return during the tick that writes it, so the record is
+**Determinism.** Returns append in a sorted walk by `entity_id`, one row per corp per tick, each row
+fixed width on the save seam; the exact nets a row's f32 slot cannot hold follow in one trailing
+section, listed only for the corps that have one. No branch reads a return during the tick that writes it, so the record is
 a pure downstream observation of the loop and cannot feed back into it.
 
 ### What a return does not carry — the movers outside the money loop

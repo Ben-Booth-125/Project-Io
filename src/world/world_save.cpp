@@ -349,7 +349,7 @@ void w_return(std::ostream& o, const quarterly_return& q)
     w_f32(o, q.levies);
     w_f32(o, q.upkeep);
     // BL-1337: `net` is a double; its f32 slot keeps v52 a strict prefix, and
-    // the exact figure follows in the v53 trailing exact-net section.
+    // the exact figure follows in the v54 trailing exact-net section.
     w_f32(o, static_cast<float>(q.net));
     w_f32(o, q.balance);
     w_u32(o, q.holdings);
@@ -359,7 +359,7 @@ void w_return(std::ostream& o, const quarterly_return& q)
 
 bool r_return(std::istream& i, quarterly_return& q)
 {
-    float net32 = 0.0f; // BL-1337: the f32 slot; a v53 stream refines it below
+    float net32 = 0.0f; // BL-1337: the f32 slot; a v54 stream refines it below
     if (!(r_f32(i, q.income) && r_f32(i, q.expenditure) && r_f32(i, q.maintenance)
           && r_f32(i, q.wages) && r_f32(i, q.interest) && r_f32(i, q.levies)
           && r_f32(i, q.upkeep) && r_f32(i, net32) && r_f32(i, q.balance)

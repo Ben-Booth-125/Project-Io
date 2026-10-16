@@ -531,7 +531,7 @@ void t6_save(const app_start_world& out)
     refuse("an unknown nation id", [&](std::string& s) { const std::uint32_t id = 0x7FFFFFF0u; std::memcpy(&s[row0], &id, 4); });
     // The returns' taxes: count (4), then the corp's id (4), n (4), floats.
     const std::size_t ret0 = b52.size() - tail - net_tail + 4 + 9 * moved_nations(c) + 4;
-    refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - 4], &f, 4); });
+    refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - net_tail - 4], &f, 4); }); // BL-1337 review: the v54 net section follows the tax floats
     refuse("a return-tax count that is not the firm's return count", [&](std::string& s) {
         std::uint32_t n = 0; std::memcpy(&n, &s[ret0 + 4], 4); n += 1; std::memcpy(&s[ret0 + 4], &n, 4); });
 }

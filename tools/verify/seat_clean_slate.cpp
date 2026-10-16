@@ -213,7 +213,7 @@ int main()
     // Bit-exact across the seat: the booking return opens from the previous
     // return's close itself (the stored pre-refund balance), not from
     // fl(fl(C0 + R) - R), so net is exactly the difference of the two closes.
-    check(q != nullptr && q->net == q->balance - prev_close,
+    check(q != nullptr && q->net == static_cast<double>(q->balance) - static_cast<double>(prev_close),
           "R4 bit-exact telescoping across the seat: net == balance - previous return's balance");
     check(x.w.corporations.at(x.s).refund_unbooked == 0.0f, "R4 nothing is left unbooked");
 

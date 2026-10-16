@@ -1814,7 +1814,7 @@ struct quarterly_return
     /// whenever their exponents are within 29 of each other, so this IS the
     /// movement. Declared LAST so the record has no padding (sizeof 56, asserted
     /// below — the record's bytes are hashed raw by a harness). SERIALISED as the
-    /// record's f32 slot plus the v53 trailing exact-net section.
+    /// record's f32 slot plus the v54 trailing exact-net section.
     double net = 0.0;
 };
 static_assert(sizeof(quarterly_return) == 56,
