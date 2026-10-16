@@ -1017,6 +1017,135 @@
    ],
    "title": "player_seed_sweep digest pins fail on every digest for every seed, both arcs",
    "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16 playtest); filed by Claude",
+   "requires": [],
+   "id": "BL-1339",
+   "short_name": "LIFE_REROLL_MOVES_THE_WORLD",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/ui/startup_screens.cpp",
+    "src/world/planetology.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "title": "The Life round's Reroll gives the same landmasses: it moves ocean/oxygen only, never the plates",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"reroll in life doesn't reroll the seed. I'm still getting similar landmasses either way.\" CONFIRMED: the press increments preferences.roll[1] (startup_screens.cpp:2866), which perturbs only resolve_preferences' rb stream - home_ocean, oxygenation, coal_climate (planetology.cpp:385). run_continents is seeded from params.seed ^ prototype_body_seed(1) (hard_coded_world.cpp:596) and reads only mobile_lid and theta, both from roll[0]. So plates, drift and the height-bias field are bit-identical across any number of Life rerolls; only sea level moves. Fold the round's roll into the body seed handed to run_continents (or move params.seed) so a Reroll re-draws the landmasses."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16 playtest); filed by Claude",
+   "requires": [],
+   "id": "BL-1340",
+   "short_name": "ROADS_CROSS_TILE_EDGES",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [],
+   "title": "Roads should be directional and always cross the edge between two tiles",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"Roads should be directional, so they always cross the edge of two tiles.\" Settle in LOGISTICS.md (what a road segment IS: a link between two adjacent tiles, with a direction) and RENDERING.md (how it draws: crossing the shared edge, not painted per tile). Exact reading to confirm with Ben before building."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16 playtest); filed by Claude",
+   "requires": [],
+   "id": "BL-1341",
+   "short_name": "STACK_A_SECOND_OF_ONE_TYPE",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/placement_rules.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "Building a second of the same type on one tile: find what actually refused it",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"We should be able to build multiple of the same building on one tile.\" NOTE: the code already permits it - non_extraction_stack_cap is 2-12 in AGGREGATE across every non-extraction type (placement_rules.cpp:557, TILES.md Urban transform) and extraction is max(1, richness/50) per deposit (PRODUCTION.md Building stacks). So either the tile's aggregate cap was already full, the province ceiling bit, or the Build door does not re-offer a type already standing. Find which, then either fix the door or report the number to Ben."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16 playtest); filed by Claude",
+   "requires": [],
+   "id": "BL-1342",
+   "short_name": "CONSTRUCTION_ETA_IS_HONEST",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/construction_panel.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "Construction shows ETA 2 qtr and never moves: the UI's rate mirror reads different numbers from the sim",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"construction stall when there appears to be enough goods. ETA 2 qtr, but no progress for multiple quarters.\" CONFIRMED divergence: ui::construction_rate (construction_panel.cpp:35) reads m->supply[r] (the per-tick FLOW, reset every tick) where run_construction draws m->inventory[r] (persistent stock); it omits capacity_per_build_tick from the need row (so a capacity-starved site reads on-schedule while the sim stretches it up to 10x); it ignores the shelf_admits fair-price ceiling (a good above reservation_mult x base is zero to the sim); and it ignores plan_short_shelves rationing and state_idle. construction.md:71 asserts the mirror matches run_construction - that claim is false. Make the UI read what the sim reads, and name the blocking good on the status line so a stall says why."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16 playtest); filed by Claude",
+   "requires": [],
+   "id": "BL-1343",
+   "short_name": "CONSTRUCTION_QUEUE_AND_PROGRESS",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/construction_panel.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "The construction queue says \"No active construction\" while buildings are building, and no construction shows a progress bar",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"the construction queue is showing 'No active construction', when there are multiple buildings being constructed\" and \"We should show a progress bar on constructions.\" The placeholder is hard-coded: const bool any_items = false (construction_panel.cpp:160) with the 5-column table dead behind it, while the same file's estimated_quarterly_construction_cost already walks w.buildings for ticks_remaining > 0. There is no construction_queue container and none is needed. Progress is computable at every draw site from ticks_remaining, construction_progress and construction_build_ticks (or construction_paid / construction_capex, which cannot drift when roads or the stack change)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16 playtest); filed by Claude",
+   "requires": [],
+   "id": "BL-1344",
+   "short_name": "BUILD_CARD_COST_AND_OUTPUT",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "The build card should show the cost in resources and credits and what the building produces, and drop payback",
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"change building tiles in construction to show the cost of building it in both resources and credits, and then the output resource or effect, rather than just the credits expected. And we should remove the 'payback' portion.\" Card: draw_construction_ledger_body (selection_panel.cpp:3758-3875); payback is inline at :3807 as capex / profit.net() and is pessimistic ~2x because the estimate assumes 50% staffing. Everything needed is already in scope: reg.resource_build_cost_for(type, target, recipe) for materials, reg.get_recipe(c.recipe)->inputs/outputs for the output, c.target for extraction. Drop the payback clause and the caption that points at it."
   }
  ]
 }
