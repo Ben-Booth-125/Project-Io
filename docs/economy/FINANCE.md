@@ -302,8 +302,9 @@ interest).
 ## The quarterly return
 
 One economy tick is one quarter, so the ledger's cadence is the money loop's own. At the end of
-`apply_budget` every corporation writes a **quarterly return** — the seven flows it just paid, its
-closing balance, and two stock figures. It is a *retain*, not a second computation: every flow
+`apply_budget` every corporation writes a **quarterly return** — the seven flows it just paid, the
+tax it paid its home nation, any refund booked since its last return, its net and closing balance,
+and two stock figures. It is a *retain*, not a second computation: every flow
 already exists in `corp_budget`, and `net()` is by construction the delta applied to the balance,
 so a return can never disagree with the loop that produced it.
 
@@ -315,7 +316,8 @@ profitability, updated each quarter with company balance sheets."*
 | `income` / `expenditure` | `corp_budget` — the market cash flows from `clear_markets` |
 | `maintenance` / `wages` | `corp_budget` — summed `compute_building_opex` |
 | `interest` / `levies` / `upkeep` | `corp_budget` — the debt charge, enacted law, standing force |
-| `refunds` | Credits refunded to the firm since its last return, booked on the next one — the seat's cancelled construction (`CORPORATION_GENERATION.md` § The spawn shortlist, and the seat, step 5) is the one source. A credit: `net` = the seven flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
+| `refunds` | Credits refunded to the firm since its last return, booked on the next one — the seat's cancelled construction (`CORPORATION_GENERATION.md` § The spawn shortlist, and the seat, step 5) is the one source. A credit: `net` = the seven flows − taxes **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
+| `taxes` | `corp_budget` — the home nation's tier rate of the quarter's operating profit, taken inside `apply_budget` after interest and before the return is filed (`NATIONS.md` § Taxes and Discontent) |
 | `net` | The difference of two consecutive balances across the money loop — see below |
 | `balance` | closing `corporation_component.balance` |
 | `holdings` | `assets.size()` — the building count |
@@ -354,32 +356,36 @@ that surface is unchanged.
 width on the save seam. No branch reads a return during the tick that writes it, so the record is
 a pure downstream observation of the loop and cannot feed back into it.
 
-### The eighth field — what the money loop does not move
+### What a return does not carry — the movers outside the money loop
 
-The money loop is not the only thing that moves a balance in a quarter. National transfers and
-mercenary-contract payouts land *after* it (`apply_budget` runs at `app.cpp:1271`, `run_nation_step`
-at `:1281`), and construction, hire, survey and convoy spend land elsewhere in the tick. Left there,
-a return would explain the money loop's movement exactly and the *quarter's* only partly — which is
-fine for reading profitability and **not** fine for pricing a firm: a corporation earning through
-contracts reads as unprofitable on its own books, and the acquisition price below undervalues it by
-a **measured 640 credits**.
+The money loop is not the only thing that moves a balance in a quarter. A return records
+`apply_budget` and nothing else: its `net` is the balance's movement **across that call**, plus the
+one refund it books (above). Every other debit or credit lands elsewhere in the tick and appears in
+**no** return:
 
-So a return carries an eighth field. **`other` = the whole-tick balance delta minus the money-loop
-net**, and the record is filed **after the tick's last mover** rather than at the end of
-`apply_budget` (Ben, 2026-08-26, ruling on NR-655/NR-668). Design: BL-653 (the eighth field).
+- **Construction** — the build press's charge, and the flat per-tick build charge while a site
+  rises. (The site's materials are bought at the clear, so they *are* in `expenditure`.)
+- **Retooling** — the charge for switching a building's recipe.
+- **Hiring** — a unit's hire cost and the kit it buys off the firm's own shelves — and a unit's
+  **movement credits**, priced per Logistic Point drawn.
+- **Survey dispatch** — debited upfront.
+- **Procurement** — the deposit at acceptance and the paced instalments, out of the buyer and into
+  the supplier (`CONTRACTS.md`).
+- **Trade** — the haul a trade pays at dispatch (its purchase at the source shelf is billed at the
+  clear and *is* in `expenditure`), and the **tariff** a convoy pays the nation whose border it
+  crosses.
+- **National transfers** — what a nation's budget pays a firm, and any clawback of it. These land
+  in `run_nation_step`, after `apply_budget`.
+- **Acquisition** — the price a buyer pays, and the cash a target's balance brings with it.
 
-Three properties, and the shape is chosen for them:
+So a return explains the money loop's movement exactly and the **quarter's** only partly. That is
+right for reading profitability. It is **not** a full account for pricing a firm: the acquisition
+price below reads `net` alone, so a firm earning through contracts or transfers reads as no more
+profitable than one that earns nothing there.
 
-- **The seven flows still explain `net`.** Nothing about the money loop's own accounting changes;
-  `other` is the residue, not a re-cut of it.
-- **`net + other` telescopes exactly.** Summed over any run it equals the whole balance delta, which
-  is the retain property extended to the whole tick rather than one function within it.
-- **A firm is priced off the sum.** `trailing_net` becomes the mean of `net + other`, so contract
-  income is visible to the buyout and the 640-credit gap closes.
-
-`other` is deliberately **not** itemised. The moment it is split into named lines it becomes a second
-budget breakdown competing with `corp_budget`, and the reason there is one accounting authority is
-that two of them disagree.
+The return carries **no residue field**. An `other` line — the whole-tick delta less the money-loop
+`net`, filed after the tick's last mover — was weighed (Ben, 2026-08-26, on NR-655/NR-668) and is
+not part of the design.
 
 ## Disclosure — who may read a return
 
@@ -426,8 +432,9 @@ acquisition).
 price = max(0, book_value + k_acquisition_multiple x trailing_net + balance)
 ```
 
-- `trailing_net` is the mean `net` over the target's last **8** filed quarters — two years of the
-  forty retained, or fewer if the firm is younger than that.
+- `trailing_net` is the mean of `net − refunds` over the target's last **8** filed quarters — two
+  years of the forty retained, or fewer if the firm is younger than that. A refund is cash the
+  balance already holds, not earnings, so pricing it in would charge a buyer for it twice.
 - `k_acquisition_multiple` is authored in `scripts/economy.lua`, so tuning the acquisition market
   is a data change rather than a code one.
 - `balance` is signed. Buying a firm buys its cash **and its debts**, so a leveraged target is
