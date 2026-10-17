@@ -194,6 +194,11 @@ whole while placement stays honest about the road.
 the thing: *"edge means from one tile centre to another, but not only one tile centre. This should
 allow spanning water with bridges."* So a road edge is permitted where either end is **water** — and
 a run of such edges across a strait **is a bridge**, needing no second mechanism and no new field.
+**A crossing the player lays must touch land at one end (Ben, 2026-10-17):** a bridge spans a
+strait, and spanning is all it does — without the rule the only brake on walking a road out across
+open ocean, cell by paid cell, is the price of each crossing. Generation never threads open sea
+anyway, so the rules differ only in the middle of a two-cell strait, where the player must build
+from a shore rather than from the water; that difference is accepted as the cost of the brake.
 A bridge edge prices as its tier like any other road edge, and a crossing made on one is paid at
 that road price rather than the water's sea-leg price: a bridge that did not beat the water it
 crosses would be a decoration. What remains forbidden is the thing the ruling was aimed at — a road
