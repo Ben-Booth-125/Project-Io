@@ -45,7 +45,7 @@ This note is for the session that brings the branch onto main after sprint 55 la
 ## Open for Ben
 
 - BL-1377 (ground under six GB): decided later (Ben, 2026-10-17); options C (stream the master) or D (96 px).
-- The wizard footer's live click, if not yet taken.
+- Live click 2026-10-17 (Ben): wizard footer good; borders contiguous; memory down. Observation: many minors are very small and the world reads as dominated by large powers — see the open question below.
 
 Resolved 2026-10-17: NR-1049 (strait 3 tiles kept; exact net in the acquisition price kept), NR-1051
 (Debug-optimised bake kept, on by default), the BL-1338 re-pin authorised in principle.
