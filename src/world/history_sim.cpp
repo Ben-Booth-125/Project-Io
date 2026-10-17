@@ -12322,7 +12322,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const std::vector<int> cells = closing_carve_cells(cr, ss.regions);
         const closing_plan plan = plan_closing_rounds(ss.regions, out.polities, cells, cr.ground.gw, cr.ground.gh,
                                                       cr.min_nation_tiles, cr.keep_city_states,
-                                                      cr.total_target);
+                                                      cr.total_target, &cr.ground.sub);
         const int64_t y_floor = params.stop_year > params.start_year ? params.stop_year - 1 : params.start_year;
         const int64_t y_total = params.stop_year;
         const auto realm_label = [&](int pid) -> std::string {
@@ -12335,8 +12335,89 @@ history_sim_state run_history_sim(settlement_state&         ss,
         };
         for (const closing_step& st : plan.steps)
         {
-            const int64_t y = st.kind == closing_step_kind::floor_absorb ? y_floor : y_total;
+            const int64_t y = (st.kind == closing_step_kind::floor_absorb
+                               || (st.kind == closing_step_kind::exclave_cede && !st.late))
+                                  ? y_floor : y_total;
             event_year = y;
+            // BL-1310 (NATION_GENERATION.md sec Pass 2e): A CESSION. Ground cut
+            // off from its realm's core passes to the nation around it, FIRST,
+            // before the floor -- dated with the floor (a late repair after a
+            // split secession, with the total). Ground only: no realm dies and
+            // none is founded, so the count the rounds planned is untouched.
+            // The chest stays with the realm (sec Pass 2e: "the nation keeps
+            // its core, its name and its chest"): treasury standing on a ceded
+            // province -- a captured capital's -- goes home to the cedent's seat.
+            // Everything else on the ground (people, works, stocks) is the
+            // ground's and moves with it, as conquest moves it.
+            if (st.kind == closing_step_kind::exclave_cede)
+            {
+                const int from = st.from_polity;
+                const int into = st.into_polity;
+                int from_seat = -1;
+                if (from >= 0 && from < static_cast<int>(out.polities.size()))
+                {
+                    from_seat = out.polities[static_cast<std::size_t>(from)].capital;
+                    if (from_seat < 0 || static_cast<std::size_t>(from_seat) >= owner.size()
+                        || owner[static_cast<std::size_t>(from_seat)] != from)
+                    {
+                        from_seat = -1;
+                        for (std::size_t h = 0; h < owner.size(); ++h)
+                            if (owner[h] == from && !std::binary_search(st.moved.begin(), st.moved.end(), static_cast<int>(h)))
+                            { from_seat = static_cast<int>(h); break; }
+                    }
+                }
+                int into_seat = -1;
+                if (into >= 0 && into < static_cast<int>(out.polities.size()))
+                {
+                    into_seat = out.polities[static_cast<std::size_t>(into)].capital;
+                    if (into_seat < 0 || static_cast<std::size_t>(into_seat) >= owner.size()
+                        || owner[static_cast<std::size_t>(into_seat)] != into)
+                    {
+                        into_seat = -1;
+                        for (std::size_t h = 0; h < owner.size(); ++h)
+                            if (owner[h] == into) { into_seat = static_cast<int>(h); break; }
+                    }
+                }
+                for (const int r : st.moved)
+                {
+                    const std::size_t ri = static_cast<std::size_t>(r);
+                    region& rg = ss.regions[ri];
+                    if (rg.treasury > 0 && from_seat >= 0)
+                    {
+                        ss.regions[static_cast<std::size_t>(from_seat)].treasury += rg.treasury;
+                        rg.treasury = 0;
+                    }
+                    owner[ri] = into;
+                    rg.nation = into;
+                    void_stale_standing_army(rg);
+                    if (!rg.is_seat) rg.seat_region = into_seat;
+                    out.owner_changes.push_back(owner_change{
+                        static_cast<int32_t>(y), static_cast<uint16_t>(r),
+                        into >= 0 ? static_cast<uint16_t>(into) : owner_none});
+                }
+                // The cedent's ground that pointed at a departing seat re-points at its own.
+                if (from >= 0)
+                    for (std::size_t h = 0; h < owner.size(); ++h)
+                        if (owner[h] == from && ss.regions[h].seat_region >= 0
+                            && std::binary_search(st.moved.begin(), st.moved.end(), ss.regions[h].seat_region))
+                            ss.regions[h].seat_region = from_seat;
+                touch_owner(from);
+                touch_owner(into);
+                note_event(lapse_event_kind::exclave_ceded, st.region, from, into);
+                ++out.closing_cessions;
+                const std::string ground_name =
+                    st.region >= 0 ? ss.regions[static_cast<std::size_t>(st.region)].name : std::string("an islet");
+                // The cause, in the line: the ground was cut off from its realm.
+                const std::string whose = st.moved.empty() ? "Ground off " + ground_name : ground_name;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    whose + (from >= 0 ? ", cut off from " + realm_label(from) : std::string(", cut off from the ground around it"))
+                        + ", is ceded to "
+                        + (into >= 0 ? realm_label(into) : std::string("the unheld ground around it"))
+                        + (st.late ? " as the realms settle to their number" : " as the old order closes"),
+                    std::string{}});
+                continue;
+            }
             if (st.kind == closing_step_kind::target_secede)
             {
                 const int qid  = st.from_polity;
@@ -12503,6 +12584,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.closing_predicted           = plan.nations_after;
         out.closing_short_of_target     = plan.short_of_target;
         out.closing_subfloor_secessions = plan.subfloor_secessions;
+        out.closing_cessions_islet      = plan.cessions_islet;
+        out.closing_cessions_to_unheld  = plan.cessions_to_unheld;
+        out.closing_cessions_late       = plan.cessions_late;
+        out.closing_secessions_split    = plan.secessions_split;
+        out.closing_reps_off_core       = plan.reps_off_core;
+        out.closing_cell_overrides.assign(plan.cell_overrides.begin(), plan.cell_overrides.end());
+        out.closing_polity_core_tiles.assign(plan.polity_core_tiles.begin(), plan.polity_core_tiles.end());
     }
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's

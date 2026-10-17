@@ -4,6 +4,7 @@
 #include "world.hpp"
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -162,7 +163,102 @@ struct nation_params
     /// closing rounds planned. False (the default, and every world with no
     /// history) keeps the post-pass exactly as it was.
     bool floor_in_history = false;
+
+    /// BL-1310 — THE CESSIONS' CARVE (NATION_GENERATION.md § Pass 2e). The
+    /// closing rounds cede exclaves at the history's grain: a province moves
+    /// realm by moving its region, which `seed_polities` already carries. Ground
+    /// a region move cannot express — an islet of one carve cell ceded to
+    /// another nation, or a province ceded to ground no realm held — is a
+    /// RELABEL of the carve: per pair, a land tile (raster index) and the
+    /// anchor tile of the region whose cell now holds it. Applied to the carve
+    /// before the polity fold, after which the water re-derives from the
+    /// shore. Empty (the default, and every world with no history) changes
+    /// nothing.
+    std::vector<std::pair<int, int>> cell_overrides;
+
+    /// BL-1310 — each realm's CORE as the closing rounds read it, indexed by
+    /// polity id: the anchor tile of its capital (its seat at the close) where
+    /// that region still has a carve cell, else of the lowest region it holds;
+    /// -1 for a polity with none. § Pass 2e's "group holding its capital" is
+    /// the realm's capital, so the tail's pass anchors a nation's territory
+    /// here, and Pass 5 seats the nation on the lowest seed INSIDE that
+    /// territory (the representative's own tile wherever it lies there, which
+    /// is nearly always). Empty (no history, or no closing rounds): the core
+    /// is the representative seed's tile, as Pass 5 has always read it.
+    std::vector<int> polity_core_tiles;
 };
+
+/// BL-1310 — THE STRAIT (NATION_GENERATION.md § Pass 2e; Ben, 2026-10-16): two
+/// of a nation's land groups are joined when a path between them crosses at
+/// most this many water tiles and no land another nation holds. ≈ 380 km at
+/// `body_km_per_tile`.
+inline constexpr int strait_tiles = 3;
+
+/// BL-1310 — ONE CESSION under the strait rule (§ Pass 2e), as the tile-level
+/// rule finds it. Owner KEYS are the caller's (nation indices in the tail,
+/// fold groups in the closing rounds).
+struct exclave_cession
+{
+    int from = -1;          ///< the key that held the exclave
+    int to   = -1;          ///< the key it is ceded to
+    std::vector<int> tiles; ///< the exclave's land tiles, ascending
+    /// The receiver's land tile that decided it: the lowest-index tile of the
+    /// receiver touching the exclave (a land-bordered exclave), or the nearest
+    /// across the water (an island).
+    int contact = -1;
+    /// 0 = land-bordered (most shared edges), 1 = an island ceded to the
+    /// nearest nation's ground in strait reach, 2 = an islet of a remote
+    /// archipelago consolidated to the owner of its largest island.
+    int kind = 0;
+};
+
+/// BL-1310 — find the NEXT cession the strait rule asks for, or return false
+/// when every land group of every key is one territory with its core or the
+/// remote island. PURE: ascending walks, fixed tie-breaks, no draw.
+///
+/// @param owner     per raster tile the owner key on LAND (>= 0), -1 elsewhere
+///                  (water must be -1: the rule reads land groups).
+/// @param water     per raster tile 1 where the ground is water (a strait leg
+///                  may cross it), 0 for land and for no tile at all.
+/// @param core_tile per key: the tile whose group is the key's core (its
+///                  capital); -1 or a tile it does not hold -> its largest group.
+/// @param order     per key: the tie-break rank (lower wins) — the nation index.
+///
+/// Order of business: land-bordered exclaves first (lowest tile first; to the
+/// key sharing the most cardinal land edges, ties the lower rank then the lower
+/// tile), then islands within strait reach of another key's TERRITORY (to the
+/// nearest by water tiles, same ties), then islets of a remote archipelago
+/// whose islands several keys hold (to the owner of its largest island). An
+/// island farther than `strait_tiles` from every other key's ground is the
+/// remote island and is never ceded.
+bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                          const std::vector<int>& core_tile, const std::vector<int>& order,
+                          exclave_cession& out);
+
+/// BL-1310 — the floor's island case (§ Pass 2c, § Pass 2e): the key whose land
+/// is fewest water tiles from @p from's land, among keys @p eligible admits
+/// (ties: lower @p order, then lower tile). -1 when the water reaches none.
+/// @p owner and @p water as for `next_exclave_cession`.
+int nearest_key_across_water(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                             int from, const std::vector<char>& eligible, const std::vector<int>& order);
+
+/// BL-1310 — is every land group of @p key joined to its core (the group
+/// holding @p core_tile) by land or straits, save the remote island? The
+/// secession's test that both sides stay one territory.
+bool key_is_one_territory(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                          int key, int core_tile);
+
+/// BL-1310 — per raster tile, 1 where the tile is land of a key AND lies in
+/// that key's territory (its core group, or joined to it by land or chained
+/// straits). @p core_tile per key as for `next_exclave_cession`.
+std::vector<char> territory_tiles(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                                  const std::vector<int>& core_tile);
+
+/// BL-1310 — re-derive the water of a carve from its land (NR-792's shore
+/// rule, `generate_nations`' own derivation): every water tile is cleared and
+/// re-owned from the shore. A carve whose land did not change is returned
+/// unchanged, so it is safe to call after any relabel.
+void rederive_carve_water(std::vector<int>& owner_map, const std::vector<terrain_substrate>& sub, int gw, int gh);
 
 /// BL-1089 — WHAT THE FOLD DID, per nation, in the order `generate_nations`
 /// returns the nation ids. Written for the caller to put on the generation
@@ -180,6 +276,10 @@ struct nation_fold_record
     std::vector<int32_t> absorbed_first;
     std::vector<int32_t> absorbed_count;
     std::vector<int32_t> absorbed;
+    /// BL-1310: exclaves the tail's tile-level pass ceded (§ Pass 2e). On a
+    /// world whose closing rounds ran, the history ceded them all, so a
+    /// non-zero count here is drift between the plan and the carve.
+    int32_t cessions = 0;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

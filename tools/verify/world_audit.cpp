@@ -19,11 +19,18 @@
 #include "world/population_generation.hpp"
 #include "world/terrain_combat.hpp"
 #include "world/world.hpp"
+#include "world/era_minus_one.hpp"
+#include "world/era_timelapse.hpp"
+#include "world/history_sim.hpp"
+#include "world/works_roster.hpp"
+#include "world/world_gen_config.hpp"
+#include "scripting/lua_state.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <set>
 #include <string>
@@ -213,8 +220,337 @@ static frag_stats measure_fragmentation(const world& w, const generation_report&
     return fs;
 }
 
-int main()
+// ---------------------------------------------------------------------------
+// BL-1310 — ONE TERRITORY: THE STRAIT RULE, AUDITED (NATION_GENERATION.md
+// § Pass 2e). Independent of the generator's own cession code on purpose: it
+// re-derives every nation's land groups, its core (the group holding its
+// capital tile), the groups joined to the core by straits of at most
+// `strait_tiles` water tiles (chained, water-only legs, column-wrapped), and
+// classifies every other group as the REMOTE ISLAND (no land neighbour of
+// another nation and no other nation's ground within strait reach — the one
+// exemption) or an ILLEGAL exclave. The rule's promise is zero illegal.
+// ---------------------------------------------------------------------------
+struct strait_stats
 {
+    int nations          = 0;
+    int groups           = 0; ///< land groups over all nations
+    int strait_joined    = 0; ///< non-core groups joined to their core by straits
+    int remote           = 0; ///< exempt remote-island groups
+    int remote_tiles     = 0;
+    int illegal          = 0; ///< exclaves outside the rule
+    int illegal_tiles    = 0;
+    int illegal_anchored = 0; ///< of those, holding a region anchor (a seeded province)
+    int illegal_bordered = 0; ///< of those, with a land neighbour of another nation
+    int capital_off      = 0; ///< nations whose capital tile is not on their own land
+};
+
+static strait_stats audit_strait_rule(const world& w, const generation_report& rep, int strait_tiles = 3)
+{
+    strait_stats ss;
+    const entity_id body = w.home_body;
+    const auto      bit  = w.bodies.find(body);
+    if (bit == w.bodies.end()) return ss;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height, total = gw * gh;
+    if (total <= 0) return ss;
+
+    std::vector<char>      land(static_cast<std::size_t>(total), 0), water(static_cast<std::size_t>(total), 0);
+    std::vector<entity_id> owner(static_cast<std::size_t>(total), null_entity);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body) continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx < 0 || idx >= total) continue;
+        if (is_water(tc.substrate)) { water[static_cast<std::size_t>(idx)] = 1; continue; }
+        land[static_cast<std::size_t>(idx)] = 1;
+        const auto nit = w.tile_to_nation.find(tid);
+        if (nit != w.tile_to_nation.end()) owner[static_cast<std::size_t>(idx)] = nit->second;
+    }
+    auto nb4 = [gw, gh](int idx, int out[4]) {
+        const int col = idx % gw, row = idx / gw;
+        int n = 0;
+        out[n++] = row * gw + ((col + 1) % gw);
+        out[n++] = row * gw + ((col - 1 + gw) % gw);
+        if (row > 0) out[n++] = (row - 1) * gw + col;
+        if (row < gh - 1) out[n++] = (row + 1) * gw + col;
+        return n;
+    };
+
+    // Land groups per nation.
+    std::vector<int> comp(static_cast<std::size_t>(total), -1);
+    std::vector<entity_id> comp_owner;
+    std::vector<std::vector<int>> comp_tiles;
+    for (int s = 0; s < total; ++s)
+    {
+        const entity_id o = owner[static_cast<std::size_t>(s)];
+        if (o == null_entity || comp[static_cast<std::size_t>(s)] >= 0) continue;
+        const int id = static_cast<int>(comp_tiles.size());
+        comp_owner.push_back(o);
+        comp_tiles.emplace_back();
+        std::vector<int> st{ s };
+        comp[static_cast<std::size_t>(s)] = id;
+        while (!st.empty())
+        {
+            const int t = st.back();
+            st.pop_back();
+            comp_tiles[static_cast<std::size_t>(id)].push_back(t);
+            int nb[4];
+            const int n = nb4(t, nb);
+            for (int i = 0; i < n; ++i)
+                if (owner[static_cast<std::size_t>(nb[i])] == o && comp[static_cast<std::size_t>(nb[i])] < 0)
+                {
+                    comp[static_cast<std::size_t>(nb[i])] = id;
+                    st.push_back(nb[i]);
+                }
+        }
+    }
+    ss.groups = static_cast<int>(comp_tiles.size());
+
+    std::vector<char> anchored(comp_tiles.size(), 0);
+    for (const auto& be : rep.bodies)
+        if (be.id == body)
+            for (const region& p : be.settlement.regions)
+                if (p.anchor >= 0 && p.anchor < total && comp[static_cast<std::size_t>(p.anchor)] >= 0)
+                    anchored[static_cast<std::size_t>(comp[static_cast<std::size_t>(p.anchor)])] = 1;
+
+    std::map<entity_id, std::vector<int>> by_nation;
+    for (int c = 0; c < static_cast<int>(comp_tiles.size()); ++c) by_nation[comp_owner[static_cast<std::size_t>(c)]].push_back(c);
+    ss.nations = static_cast<int>(by_nation.size());
+
+    std::vector<char> in_terr(comp_tiles.size(), 0);
+    std::vector<int>  wdist(static_cast<std::size_t>(total), 1 << 20);
+    for (const auto& [nid, cs] : by_nation)
+    {
+        // The core: the group holding the capital tile, else the largest.
+        int core = -1;
+        const auto nit = w.nations.find(nid);
+        if (nit != w.nations.end() && nit->second.capital_tile != null_entity)
+        {
+            const auto tit = w.tiles.find(nit->second.capital_tile);
+            if (tit != w.tiles.end() && tit->second.body == body)
+            {
+                const int ci = tit->second.grid_y * gw + tit->second.grid_x;
+                if (ci >= 0 && ci < total && owner[static_cast<std::size_t>(ci)] == nid)
+                    core = comp[static_cast<std::size_t>(ci)];
+            }
+        }
+        if (core < 0)
+        {
+            ++ss.capital_off;
+            for (const int c : cs)
+                if (core < 0 || comp_tiles[static_cast<std::size_t>(c)].size() > comp_tiles[static_cast<std::size_t>(core)].size())
+                    core = c;
+        }
+        // Chained straits: water legs of at most `strait_tiles` from any
+        // joined group's land; a leg re-starts at every group it reaches.
+        std::vector<int> touched, q;
+        auto join = [&](int c) {
+            in_terr[static_cast<std::size_t>(c)] = 1;
+            for (const int t : comp_tiles[static_cast<std::size_t>(c)]) q.push_back(t);
+        };
+        join(core);
+        std::size_t head = 0;
+        while (head < q.size())
+        {
+            const int t = q[head++];
+            const int d = land[static_cast<std::size_t>(t)] ? 0 : wdist[static_cast<std::size_t>(t)];
+            int nb[4];
+            const int n = nb4(t, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (d + 1 > strait_tiles || wdist[static_cast<std::size_t>(u)] <= d + 1) continue;
+                    if (wdist[static_cast<std::size_t>(u)] == (1 << 20)) touched.push_back(u);
+                    wdist[static_cast<std::size_t>(u)] = d + 1;
+                    q.push_back(u);
+                }
+                else if (owner[static_cast<std::size_t>(u)] == nid && !in_terr[static_cast<std::size_t>(comp[static_cast<std::size_t>(u)])])
+                    join(comp[static_cast<std::size_t>(u)]);
+            }
+        }
+        for (const int t : touched) wdist[static_cast<std::size_t>(t)] = 1 << 20;
+        for (const int c : cs)
+            if (c != core && in_terr[static_cast<std::size_t>(c)]) ++ss.strait_joined;
+    }
+
+    // Everything outside a territory: the remote island, or illegal.
+    for (int c = 0; c < static_cast<int>(comp_tiles.size()); ++c)
+    {
+        if (in_terr[static_cast<std::size_t>(c)]) continue;
+        const entity_id o = comp_owner[static_cast<std::size_t>(c)];
+        bool bordered = false, reach_other = false;
+        std::vector<int> touched, q;
+        for (const int t : comp_tiles[static_cast<std::size_t>(c)]) q.push_back(t);
+        std::size_t head = 0;
+        while (head < q.size() && !reach_other)
+        {
+            const int t = q[head++];
+            const int d = land[static_cast<std::size_t>(t)] ? 0 : wdist[static_cast<std::size_t>(t)];
+            int nb[4];
+            const int n = nb4(t, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (d + 1 > strait_tiles || wdist[static_cast<std::size_t>(u)] <= d + 1) continue;
+                    if (wdist[static_cast<std::size_t>(u)] == (1 << 20)) touched.push_back(u);
+                    wdist[static_cast<std::size_t>(u)] = d + 1;
+                    q.push_back(u);
+                }
+                else if (owner[static_cast<std::size_t>(u)] != null_entity && owner[static_cast<std::size_t>(u)] != o)
+                {
+                    reach_other = true;
+                    if (d == 0) bordered = true;
+                }
+            }
+        }
+        for (const int t : touched) wdist[static_cast<std::size_t>(t)] = 1 << 20;
+        const int sz = static_cast<int>(comp_tiles[static_cast<std::size_t>(c)].size());
+        if (!reach_other) { ++ss.remote; ss.remote_tiles += sz; continue; }
+        ++ss.illegal;
+        ss.illegal_tiles += sz;
+        ss.illegal_anchored += anchored[static_cast<std::size_t>(c)] ? 1 : 0;
+        if (!bordered)
+        {
+            // The early exit above may stop before a land edge is seen: look directly.
+            for (const int t : comp_tiles[static_cast<std::size_t>(c)])
+            {
+                int nb[4];
+                const int n = nb4(t, nb);
+                for (int i = 0; i < n; ++i)
+                    if (owner[static_cast<std::size_t>(nb[i])] != null_entity && owner[static_cast<std::size_t>(nb[i])] != o)
+                        bordered = true;
+            }
+        }
+        ss.illegal_bordered += bordered ? 1 : 0;
+    }
+    return ss;
+}
+
+static void print_strait(const char* tag, uint32_t seed, const strait_stats& s, int cessions)
+{
+    std::printf("  %s seed %u: %d nations, %d groups | strait-joined %d | remote %d (%d tiles) | "
+                "ILLEGAL %d (%d tiles; %d anchored, %d land-bordered) | capital off-ground %d | cessions %d\n",
+                tag, seed, s.nations, s.groups, s.strait_joined, s.remote, s.remote_tiles, s.illegal,
+                s.illegal_tiles, s.illegal_anchored, s.illegal_bordered, s.capital_off, cessions);
+}
+
+static int count_cessions(const generation_report& rep)
+{
+    int n = 0;
+    for (const auto& be : rep.bodies)
+        if (be.is_homeworld)
+            for (const lapse_event& e : be.industrialisation_timelapse.events)
+                if (e.kind == static_cast<uint8_t>(lapse_event_kind::exclave_ceded)) ++n;
+    return n;
+}
+
+static std::vector<uint32_t> parse_seed_list(const char* s)
+{
+    std::vector<uint32_t> out;
+    const char* p = s;
+    while (*p)
+    {
+        char* end = nullptr;
+        const unsigned long v = std::strtoul(p, &end, 10);
+        if (end == p) break;
+        out.push_back(static_cast<uint32_t>(v));
+        p = (*end == ',') ? end + 1 : end;
+    }
+    return out;
+}
+
+// LIBRARY MODE (BL-1310): `world_audit --seeds a,b,c [--pairs t:m,...]` builds
+// each SHIPPED world (history on, the app's data layer) and audits the strait
+// rule on it — natural counts, then each target pair. par_seeds.sh shards it.
+static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vector<std::pair<int, int>>& pairs)
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+    lua.load("scripts/world_gen.lua");
+    cfg.load_from_lua(lua);
+    lua.load("scripts/works.lua");
+    works.load_from_lua(lua);
+
+    int checks = 0, fails = 0, cessions_total = 0;
+    std::printf("world_audit strait rule (BL-1310), %zu seed(s), %zu target pair(s) beside natural\n",
+                seeds.size(), pairs.size());
+    for (const uint32_t seed : seeds)
+    {
+        std::vector<std::pair<int, int>> runs{ { 0, 0 } };
+        runs.insert(runs.end(), pairs.begin(), pairs.end());
+        for (const auto& [tt, mt] : runs)
+        {
+            world_params p = arc_params(world_arc::shipped);
+            p.seed                = seed;
+            p.nation_total_target = tt;
+            p.major_target        = mt;
+            generation_report     rep{};
+            era_minus_one_fixture fx{};
+            const world       sw = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
+            const strait_stats s  = audit_strait_rule(sw, rep);
+            const int          ce = count_cessions(rep);
+            const history_sim_state& hs = fx.industrialisation_state;
+            cessions_total += ce;
+            char tag[32];
+            std::snprintf(tag, sizeof(tag), tt > 0 ? "t%d/%d" : "natural", tt, mt);
+            // The rule holds, AND the cessions are the history's own events
+            // (one per closing-round step), AND the tail found nothing left.
+            // § Territorial fragmentation, measured: "the cessions counted as
+            // recorded events, so the sim still visibly produces the
+            // fragmentation the rule resolves" -- at least one on every world.
+            const bool events_ok = ce == hs.closing_cessions && ce > 0;
+            const bool ok = s.illegal == 0 && events_ok && rep.handoff_violation.empty();
+            ++checks;
+            fails += ok ? 0 : 1;
+            std::printf("%s", ok ? "PASS" : "FAIL");
+            print_strait(tag, seed, s, ce);
+            std::printf("        plan: cessions %d (islet %d, to unheld %d, late %d), split secessions %d, "
+                        "reps off core %d, overrides %zu, nations %d%s%s\n",
+                        hs.closing_cessions, hs.closing_cessions_islet, hs.closing_cessions_to_unheld,
+                        hs.closing_cessions_late, hs.closing_secessions_split, hs.closing_reps_off_core,
+                        hs.closing_cell_overrides.size(), hs.closing_predicted,
+                        rep.handoff_violation.empty() ? "" : " | VIOLATION: ", rep.handoff_violation.c_str());
+            std::fflush(stdout);
+        }
+    }
+    std::printf("\nSUMMARY strait rule: %d check(s), %d failure(s), %d cession event(s) -- %s\n", checks, fails,
+                cessions_total, fails == 0 ? "PASS" : "FAIL");
+    return fails == 0 ? 0 : 1;
+}
+
+int main(int argc, char** argv)
+{
+    {
+        std::vector<uint32_t>            seeds;
+        std::vector<std::pair<int, int>> pairs;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc) seeds = parse_seed_list(argv[++i]);
+            else if (std::strcmp(argv[i], "--pairs") == 0 && i + 1 < argc)
+            {
+                const std::vector<uint32_t> v = parse_seed_list(argv[++i]); // "t:m" read below
+                (void)v;
+                const char* s = argv[i];
+                while (*s)
+                {
+                    char* e1 = nullptr;
+                    const long t = std::strtol(s, &e1, 10);
+                    if (e1 == s || *e1 != ':') break;
+                    char* e2 = nullptr;
+                    const long m = std::strtol(e1 + 1, &e2, 10);
+                    pairs.emplace_back(static_cast<int>(t), static_cast<int>(m));
+                    s = (*e2 == ',') ? e2 + 1 : e2;
+                    if (e2 == e1 + 1) break;
+                }
+            }
+        }
+        if (!seeds.empty()) return run_library_mode(seeds, pairs);
+    }
+
     generation_report report;
     world w = make_hard_coded_world(no_prehistory(), &report);
 
@@ -1096,15 +1432,20 @@ int main()
     // orphan-island cleanup (authored). The emergent share is the headline — it is
     // the number BL-218's argument for the expensive path predicted. ---
     frag_stats frag_total;
+    int        strait_illegal = 0;
     {
         std::printf("Territorial fragmentation (BL-284) — exclaves by producer:\n");
         constexpr uint32_t sweep_seeds[] = { 0u, 1u, 2u, 3u, 4u, 5u };
         for (uint32_t s : sweep_seeds)
         {
-            frag_stats fs;
+            frag_stats   fs;
+            strait_stats st;
+            int          ce = 0;
             if (s == 0)
             {
                 fs = measure_fragmentation(w, report);
+                st = audit_strait_rule(w, report);
+                ce = count_cessions(report);
             }
             else
             {
@@ -1112,7 +1453,11 @@ int main()
                 generation_report rp;
                 const world       sw = make_hard_coded_world(no_prehistory(wp), &rp);
                 fs = measure_fragmentation(sw, rp);
+                st = audit_strait_rule(sw, rp);
+                ce = count_cessions(rp);
             }
+            strait_illegal += st.illegal;
+            print_strait("no-prehistory", s, st, ce);
             std::printf("  seed %u: %d nations, %d with an exclave | emergent %d (%d tiles), "
                         "Pass 2b %d (%d tiles) | %d landmasses, %d seedless\n",
                         s, fs.nations, fs.nations_with_exclave,
@@ -1137,13 +1482,19 @@ int main()
                     emergent_share, frag_total.tiles_emergent,
                     frag_total.tiles_emergent + frag_total.tiles_pass2b);
     }
-    // Wide bars, deliberately (BL-284): the assertion is that the settlement sim
-    // produces fragmentation AT ALL, on at least half the swept seeds. Tighten once
-    // the real distribution has been watched for a while.
-    const bool frag_ok = frag_total.exclaves_emergent >= 6;
-    std::printf("  BL-284 R1 the settlement sim produces emergent exclaves "
-                "(>= 6 across the 6-seed sweep, saw %d): %s\n",
-                frag_total.exclaves_emergent, frag_ok ? "PASS" : "FAIL");
+    // BL-1310 REPLACES BL-284's R1 (NATION_GENERATION.md § Territorial
+    // fragmentation, measured; § Pass 2e). The old bar asserted the sim
+    // produces exclaves at all; the strait rule now cedes every one, so the
+    // finished world is asserted to hold NO exclave outside the rule save the
+    // remote island. `no_prehistory` drops only the pre-epoch year-tick sim:
+    // the spans and their closing rounds still run, so these cessions are the
+    // history's. That every shipped world records them as events (at least
+    // one, one per closing step) is asserted by `world_audit --seeds`
+    // (library mode, the app's data layer, natural and targeted).
+    const bool frag_ok = strait_illegal == 0;
+    std::printf("  BL-1310 R1 no exclave outside the strait rule across the 6-seed sweep "
+                "(saw %d): %s\n",
+                strait_illegal, frag_ok ? "PASS" : "FAIL");
 
     // --- BL-612 (urban ground stamped): every centre carries an urban
     // footprint; urban ground exists only where centres are. The stamp is the

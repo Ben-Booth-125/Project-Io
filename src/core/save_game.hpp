@@ -322,6 +322,12 @@ inline constexpr uint32_t save_game_magic =
 /// `polity` the realm, `other` the region the line now reaches). No field
 /// moves, so no version bump; a build that predates it refuses such a stream
 /// on the kind range check. (The track itself is world state: world_save v49.)
+/// v23 ALSO admits 42 `exclave_ceded` in the Industrialisation record (BL-1310,
+/// NATION_GENERATION.md sec Pass 2e: a closing-round cession of ground cut off
+/// from its realm's core -- `region` the lowest region whose ground moved,
+/// `polity` the cedent, `other` the receiver, either none for unheld ground).
+/// No field moves, so no version bump; a build that predates it refuses such
+/// a stream on the kind range check.
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

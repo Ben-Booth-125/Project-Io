@@ -5158,6 +5158,24 @@ struct history_sim_state
     int32_t closing_subfloor_secessions = 0; ///< Secessions taken below the floor (the target outranks it).
     bool    closing_short_of_target    = false;
 
+    /// BL-1310 — THE CESSIONS (NATION_GENERATION.md sec Pass 2e): the closing
+    /// rounds' `exclave_cede` steps, each noted as `exclave_ceded`. Ground
+    /// only: none of them moves the count above. The plan's split counters
+    /// (closing_rounds.hpp `closing_plan`) are read by harnesses.
+    int32_t closing_cessions           = 0;
+    int32_t closing_cessions_islet     = 0;
+    int32_t closing_cessions_to_unheld = 0;
+    int32_t closing_cessions_late      = 0;
+    int32_t closing_secessions_split   = 0;
+    int32_t closing_reps_off_core      = 0;
+    /// The carve as the cessions left it (`closing_plan::cell_overrides`):
+    /// per pair a land tile and the REGION whose cell now holds it. The tail
+    /// hands these to `generate_nations` by the region's anchor tile.
+    std::vector<std::pair<int32_t, int32_t>> closing_cell_overrides;
+    /// Per polity id, the anchor tile of the realm's core after the rounds
+    /// (`closing_plan::polity_core_tiles`), for the tail's territory reads.
+    std::vector<int32_t> closing_polity_core_tiles;
+
     /// BL-1287 — THE RISE AND FALL'S OWN READING (all -1/0/false on a run
     /// whose params did not carry `rise_fall_target`). Taken at the recorded
     /// steps' cadence off the same counts the record samples, so it reads
