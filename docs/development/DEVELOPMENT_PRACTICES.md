@@ -578,6 +578,22 @@ player's nation with the AI majors. It is an observation, never an input: it mus
 
 ---
 
+## The two builds, and the one a worktree agent can run
+
+`build_app.bat` builds **`build/`** — Debug, NMake, the tree `--verify` reads. `build_rel/` is the
+separate **play** build (Release, Ninja) and goes stale on its own, so rebuild it before asking
+anyone to look at the game.
+
+**A worktree-isolated agent cannot invoke `cmd.exe` at all**, so neither `build_app.bat` nor
+`vcvars64.bat` can be run there. Three lanes in a row each rebuilt that environment by hand before
+they could compile anything. **`bash tools/build_rel.sh [target]`** (BL-1373) is that hour saved: it
+derives its own root, so it works in the main checkout and in any worktree, and it pins **MSVC
+14.44.35207** by hand — the pin being the whole point, because putting a newer Visual Studio's
+headers in front of the 14.44 compiler fails inside `<variant>` with bogus `std::std::` errors that
+read as a corrupt STL, and on 14.51 as `STL1001: Unexpected compiler version`. Neither names its
+cause. Read its last line, `BUILD_REL_EXIT <code>`, and not the tail of the log: a pipeline's exit
+code is the last command's, not the build's.
+
 ## Development constraints
 
 Standing prohibitions for the prototype, migrated from the retired build-sequence doc. The
