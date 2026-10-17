@@ -1189,28 +1189,6 @@
    "written": "2026-10-16",
    "parked": false,
    "blocked_on": null,
-   "author": "Ben (2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"); filed by Claude",
-   "id": "BL-1351",
-   "short_name": "GENERATION_SEEDS_LOGISTICS",
-   "category": "Verification",
-   "priority": "B",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "requires": [],
-   "files": [
-    "src/world/corporation_generation.cpp",
-    "src/world/hard_coded_world.cpp"
-   ],
-   "title": "Verify that generation's seeded logistics sources really cover every nation",
-   "design": "SPRINT 55 (Ben, 2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"). CORRECTION, 2026-10-16: an earlier revision of this item claimed a landlocked nation has NO Logistic Points because corporation_generation's building mixes seed ports but no inland hub. The mixes do lack the hub (corporation_generation.cpp:305, the hub appears only as a placement score at :449) - but a DEDICATED pass seeds them: seed_logistics_sources (logistic_points.cpp:382) places inland_logistics_hubs at world fold until every consumer on a nation's ground has coverage 1 and every pool meets claim x k_pool_margin (2.0), bounded by k_max_hubs 4000 over 64 sufficiency rounds, siting a hub on the serving market's centre_tile where that is on the nation's dry ground and on the consumer's own tile otherwise. So coverage is engineered by construction, and this item is MEASUREMENT, not new work. THE WORK: measure per nation on the curated seeds - sources seeded by network, tiles covered, pool made against claim, and how many nations fall back to on-consumer-tile hubs rather than market centres. That also tests Ben's picture (a centralised capital with high points, diminishing with distance, extended by outlying hubs): if hubs land mostly on consumer tiles rather than at centres, the picture will not appear however the lens is drawn."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
    "author": "Ben (2026-10-16, the logistics visibility message); filed by Claude",
    "id": "BL-1352",
    "short_name": "LP_ONE_SYSTEM",
@@ -1526,6 +1504,29 @@
    ],
    "title": "The rail rows are the one non-grid row left in the build list, a four-line box among one-line rows",
    "design": "SPRINT 55 (found delivering BL-1365, 2026-10-17). Every construction row is now one line in a fixed-column grid (construction.md: One line a row / The line is a grid). draw_rail_rows lives in src/ui/rail_tool.cpp, which was outside that lane's owned files, so the Track and Railway Station rows still draw a four-line bordered box - and they now sit visibly taller between the one-line Infrastructure rows above and below them (see the lane's construction_build_door_extraction.png capture). The lane passed them their OLD metric so they are not clipped, which is the right holding action and not the end state. THE WORK: bring both rail rows into ui::construction_grid's columns and the shared hover card, reusing construction_row_height / construction_row_hovered / construction_row_card / construction_grid_bar rather than a second idiom. Note BL-1255's live click asked for the track row to be restyled like the road rows, which this subsumes."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": "Ben: is the centralised picture the intent, and which doc owns it",
+   "author": "Claude (from the BL-1351 census, 2026-10-17)",
+   "requires": [
+    "BL-1351"
+   ],
+   "id": "BL-1367",
+   "short_name": "LP_SOURCE_LAYOUT",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/logistic_points.cpp"
+   ],
+   "title": "No doc owns where generation puts logistics sources, and what it puts there is not the picture Ben described",
+   "design": "SPRINT 55 (from the BL-1351 census, 2026-10-17). Ben, 2026-10-16: 'What we want to see is a centralised market capital city, with a high number of logistics points, and logistics diminishing as we get further away, but extended by logistics buildings further away.' The census measured the opposite shape: 10.3% of hubs at market centres, points fading 83/73/65/39 across distance rings with the capital the peak in only 19% of cases and empty in 28%, and 78% of national ground at coverage 0 while every consumer is fully covered. The pass is honest - it walks CONSUMERS and covers each with one hub - so this is not a defect in it; it is that nothing ever asked it for a hierarchy. THE GAP THAT BLOCKS THE WORK: LOGISTICS.md section Logistic Points defines what a source IS and how reach fades, and says NOTHING about where the fold should put one, so Ben's picture has no owning doc and findings above have nothing to be pass/fail against. SO: Ben rules whether the centralised picture is the intent; it is written into LOGISTICS.md (or a generation doc) as the layout the fold owes; then the seeding pass is changed to seed hierarchically - centres and the capital first, outward after - and the census is re-run against it as pass/fail rather than as description. Sequenced after the road-tier reach extension (BL-1360) and rail point-to-point, both of which move these numbers."
   }
  ]
 }

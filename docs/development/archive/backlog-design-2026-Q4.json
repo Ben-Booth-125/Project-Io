@@ -6244,6 +6244,47 @@
         "title",
         "design"
       ]
+    },
+    "BL-1351": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 55,
+      "written": "2026-10-16",
+      "parked": false,
+      "blocked_on": null,
+      "author": "Ben (2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"); filed by Claude",
+      "id": "BL-1351",
+      "short_name": "GENERATION_SEEDS_LOGISTICS",
+      "category": "Verification",
+      "priority": "B",
+      "difficulty": 2,
+      "authority_doc": "docs/economy/LOGISTICS.md",
+      "requires": [],
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/hard_coded_world.cpp"
+      ],
+      "title": "Verify that generation's seeded logistics sources really cover every nation",
+      "design": "SPRINT 55 (Ben, 2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"). CORRECTION, 2026-10-16: an earlier revision of this item claimed a landlocked nation has NO Logistic Points because corporation_generation's building mixes seed ports but no inland hub. The mixes do lack the hub (corporation_generation.cpp:305, the hub appears only as a placement score at :449) - but a DEDICATED pass seeds them: seed_logistics_sources (logistic_points.cpp:382) places inland_logistics_hubs at world fold until every consumer on a nation's ground has coverage 1 and every pool meets claim x k_pool_margin (2.0), bounded by k_max_hubs 4000 over 64 sufficiency rounds, siting a hub on the serving market's centre_tile where that is on the nation's dry ground and on the consumer's own tile otherwise. So coverage is engineered by construction, and this item is MEASUREMENT, not new work. THE WORK: measure per nation on the curated seeds - sources seeded by network, tiles covered, pool made against claim, and how many nations fall back to on-consumer-tile hubs rather than market centres. That also tests Ben's picture (a centralised capital with high points, diminishing with distance, extended by outlying hubs): if hubs land mostly on consumer tiles rather than at centres, the picture will not appear however the lens is drawn. DELIVERED 2026-10-17: tools/verify/lp_coverage_census.cpp merged, 16 curated seeds in 168-196 s, deterministic twice over, cross-checked against lp_pool_harness seed 0 line for line. THE BASELINE: 707 hubs over 16 worlds (44.2 a world, 1.1% of k_max_hubs 4000); seeding costs 59 ms mean at the fold; 0 pre-existing hubs, so every road source is this pass; 5,544 consumers ALL at coverage 1, none partial, none uncovered; no nation anywhere short of its claim; pooled margin 8.47 against k_pool_margin 2.0, so pass 2 is nearly idle. AND THE THREE FINDINGS: only 10.3% of hubs land on a market centre_tile (73 of 707), structurally capped because the dedupe allows one hub a centre and the reach test from a bare centre rejects most; points barely fade from the capital (83/73/65/39 per tile by distance ring, the capital the peak of its own field in 19% of cases and holding ZERO points in 28%); and coverage is building-local, not territorial - 98.7% of building tiles and 100% of consumers covered against 78.1% of national ground at coverage 0, so a lens reading the field as a map will look like confetti. 48% of nation-rows (347 of 730, every one a minor) hold ground and get no pool - harmless today because those are exactly the nations with no consumer on their ground, latent the moment anything is built there. Landlocked nations are weakest on every axis. Re-run form is key=value records by prefix so two runs diff as numbers; re-run unchanged after roads-as-edges, the road-tier reach extension and rail point-to-point. Successor: BL-1367.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "requires",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }
