@@ -6203,6 +6203,47 @@
         "title",
         "design"
       ]
+    },
+    "BL-1365": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 55,
+      "written": "2026-10-17",
+      "parked": false,
+      "blocked_on": null,
+      "author": "Ben (2026-10-17, revising the delivered build card); filed by Claude",
+      "id": "BL-1365",
+      "short_name": "CONSTRUCTION_ONE_LINE_ROWS",
+      "category": "UI",
+      "priority": "A",
+      "difficulty": 3,
+      "authority_doc": "docs/ui/ledgers/construction.md",
+      "requires": [],
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "title": "Compact every construction row to one line, with icons over words and the words in the hover card",
+      "design": "SPRINT 55 (Ben, 2026-10-17, revising BL-1344 the day it landed): 'We should move a lot of the text on each construction panel to tooltips, and favour using icons where possible. We really need to compact this.' RULED from a mockup: option B, ONE LINE a row, and the pass covers ALL construction surfaces - the build list, the queue table, the tile-card stack buttons and the expanded site card. DESIGNED: construction.md section One line a row. BL-1344 grew the build row from 5 to 7 reserved lines, which fits about 4 rows in the panel; one line fits about 20. The line reads in glyphs: building glyph, cost, materials, a RESOURCE PIP for the output (not the word), the stack as 2/4, a state mark (green dot fine / amber triangle stalling), the progress bar, the press. The hover card takes everything the line drops - the sentence each chip replaced, the stall's named good, the output in words, and what filled a full tile. Keep every FACT that BL-1341..1344 added; this changes where it is read, never whether it is there. A live click is owed. GRID (Ben, 2026-10-17): the one line is a COLUMN GRID, not a sentence - each figure in its own column, the same column in every row, so a column reads down the list; a missing figure leaves its column empty rather than closing up. A fixed-width table, not inline chips, on all four surfaces; the queue is already a table, so it is the shape the others match. If the columns will not fit the panel width, the lowest-value column drops into the hover card - the panel is never widened and a column never wraps. Written into construction.md (The line is a grid, not a sentence). DELIVERED 2026-10-17 (live click: Ben, \"the grid rows and hover cards read right\"). Eight fixed columns on the build list (glyph 15 / name stretch / cost 34 / output pip 14 / stack 28 / state mark 12 / profit bar 38 / Build 44), and the same grid on the queue (6), the tile-card stacks (6) and the expanded site card, which borrows the queue column set so a site reads in the same places on both. Row height 20 px against a 16 px line, measured and asserted. 4 build rows visible before, 18 plus 4 fold headings and 2 queue rows after. NO NEW GLYPH: the state mark is the vocabulary own value_mark with colour as the ordered channel, the output is the resource pip. The shared hover primitive carries everything the line drops, through new shared helpers (construction_row_height / construction_row_hovered / construction_row_card / construction_grid_bar), and construction_stall_reason now authors the stall clause once so the status line and the build door cannot drift. TWO COLUMNS DROPPED TO THE CARD on width, each reasoned: materials from the build list (the credit column beside it IS those materials priced at this market), and the progress bar from the tile card only (that surface asks which stack is losing money; the queue and the site card keep the bar). Verified on main, Release: construction_progress 95/95 PASS (baseline 11/11, the rest new grid-metric and hover-text assertions), tile_card 55/55, 0 golden failures, nothing re-blessed. Tail: BL-1366 (the rail rows are still a four-line box among one-line rows).",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "requires",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }
