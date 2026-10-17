@@ -435,7 +435,7 @@
   ],
   [
    "ledger.selection_tile_building",
-   "Selection band, tile element, the TILE CARD (third column): a grid of building buttons, three across, one per stack on the tile (grouped by type, what it makes and owner; a rival's by type and owner only). Each button carries the type glyph with the stack's count, the building's name, and its net profit per quarter coloured by sign - 'private' on a rival's, an ETA while the stack is still under construction."
+   "Selection band, tile element, the TILE CARD (third column): a grid of building buttons, three across, one per stack on the tile (grouped by type, what it makes and owner; a rival's by type and owner only). Each button carries the type glyph with the stack's count, the building's name, and its net profit per quarter coloured by sign - 'private' on a rival's, and while the stack is still under construction an ETA or a named stall ('ETA 3 qtrs', 'Paused - no Steel', 'ETA 9 qtrs - Steel priced out') over a thin progress strip along the button's bottom edge."
   ],
   [
    "ledger.selection_building_back",

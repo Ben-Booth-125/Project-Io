@@ -1302,13 +1302,14 @@
    ],
    "summary": "Arm-buttons for Extraction Site / Processing Facility / Port, a target-resource picker for extraction, live cost readout, plus a Queue subsection.",
    "interesting_question": "The Queue subsection is described as placeholder-only with no backing construction_queue, progress percentage, or ticks-left data at all — what does a player actually see when they check on a build in progress?",
-   "resolution": "Named plainly as unbuilt: construction.md states 'draw_queue_section always shows No active construction... Any queue table in the mock is owed data, not live. This is the single biggest gap' — there is no in-progress readout today.",
+   "resolution": "Answered by BL-1343: the queue reads the buildings themselves — every player building with ticks_remaining > 0, nearest done first, with the per-cent of its capex paid, the ETA at its current rate and the credits still to pay, plus a line naming the good holding any build that is not running at full rate. The hard-coded empty flag it sat behind (and the 'No active construction.' it produced while builds were under way) is gone, and no `world::construction_queue` was needed: a building under construction IS the queue item. A build in progress also carries a progress bar on its Selection card and a progress strip on its tile-card stack button.",
    "checks": [
     "tile_build_ledger",
     "roads",
     "build_door_wide_roster",
     "fresh_start_build",
-    "air_gate"
+    "air_gate",
+    "construction_progress"
    ]
   },
   {

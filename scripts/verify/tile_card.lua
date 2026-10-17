@@ -320,8 +320,10 @@ do
         if not b.open then
             closed = closed + 1
             verify.expect(b.good == "", "rival button names no good (got '" .. b.good .. "')")
+            -- BL-1342: a stall now NAMES its good, so the reading is "Paused - no
+            -- Steel" / "ETA 9 qtrs - Steel priced out" rather than a bare word.
             verify.expect(b.detail == "private" or b.detail:find("ETA", 1, true) == 1
-                          or b.detail == "Paused",
+                          or b.detail:find("Paused", 1, true) == 1,
                           "rival button reads private (or its ETA): '" .. b.detail .. "'")
             for _, bb in ipairs(verify.buildings()) do
                 if bb.x == rival_site.x and bb.y == rival_site.y and not bb.player

@@ -24,6 +24,12 @@ owner each tick, at its staffed rate, as a processor makes goods. Trade points a
 not a stock: made and spent within the tick, never banked — the Logistic Points rule
 (`LOGISTICS.md` § Logistic Points), applied to an owner's capacity.
 
+**A building on a market centre makes trade points and pull (Ben, 2026-10-16).** A building family
+unlocked from the tech tree stands **on a market centre** and does two things at once: it makes
+trade points for its owner, as a Marketplace does, and it raises that centre's **pull**, widening
+the market's catchment (`MARKETS.md` § Catchment is an attraction). One building, two effects, both
+of them legible in the world — the trade it carries and the ground it draws.
+
 **Ports make trade points too (Ben, 2026-10-10).** A Port, besides its sea-lane role, makes trade
 points for its owner each tick, as a Marketplace does at a lower rate the data sets. A Marketplace
 makes its points at its staffed rate; a Port, which staffs at zero, makes its flat rate.

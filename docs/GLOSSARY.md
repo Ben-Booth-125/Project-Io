@@ -88,6 +88,9 @@ The split is by audience, not by meaning: a CSV export column stays `tick` becau
 **Faction**
 Legacy umbrella term — prefer the specific actor: **Nation** (political/territorial) or **Corporation** (economic). The map lens formerly named Faction is the **Country** lens (renamed by BL-052, faction → country — it always showed nations). "Faction" as a colour concept — player-vs-rival identity — is the **Corporation** identity colour (`corp_colour` / `corp_identity_colour`, `src/ui/presentation.hpp`). Per-faction sentiment is **Sentiment**.
 
+**Market attraction**
+What decides which market a tile clears against (Ben, 2026-10-16): the **logistics cost** from the tile to a market's centre divided by that centre's **pull**, lowest winning. **Pull** is a multiplier on a centre, 1 by default, raised by a technology its nation holds or a building standing on it. Every tile has an attraction to every market on its body, so every tile belongs to one — land with no road is priced through the **off-road leg** rather than excluded. Distinct from **reach**, which is a placement permission and does not spread off the road. See `docs/economy/MARKETS.md` and `docs/economy/LOGISTICS.md` § 3b.
+
 **Market**
 A pooled exchange with a physical boundary through which any faction can buy or sell goods with the delivery cost depending on logistical cost. Price is set by rarity on a body, then modulated by local supply and demand. All tiles belong to a market.
 

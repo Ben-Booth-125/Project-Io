@@ -555,32 +555,6 @@
    "design": "RULED (Ben, 2026-10-10, the doc-check form): widen the code to match the doc. PRODUCTION.md (~545-549): 'for a building that makes or uses power, the solver reads power's supply and demand pooled over the building's grid'. The code applies the pooled read to OUTPUTS only, and only for processing facilities (economy_system.cpp ~976-992, ~1013-1015); a power input is priced at the plant's own market's posted price (~1082). WORK: price power as an input on the grid too, by the same pooled read; measure the 16-seed gate before/after; a cold review (the dial and the player's auto-solver both call solve_workforce_target)."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 55,
-   "written": "2026-10-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
-   "id": "BL-1275",
-   "short_name": "NATION_RESEARCH_AI",
-   "category": "Economy",
-   "priority": "B",
-   "difficulty": 3,
-   "authority_doc": "docs/ai/AI_OPPONENT.md",
-   "requires": [
-    "BL-1273"
-   ],
-   "files": [
-    "src/world/nation_ai.cpp",
-    "src/world/nation_ai.hpp",
-    "src/world/nation_tech.cpp",
-    "tools/verify/nation_tech_harness.cpp"
-   ],
-   "title": "An AI nation fills its research queue one frontier node at a time, by its scorer",
-   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274. SPRINT 55 (2026-10-15): restored. The BL-1325 headless 2040 run showed no nation ever queues research (zero tech in 80 years); the grant (AI_OPPONENT.md § 11, Ben 2026-10-10) already covers it."
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 51,
@@ -1067,94 +1041,7 @@
     "src/ui/ground_bake.cpp"
    ],
    "title": "A road is an edge between two tiles, not a property of one",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): 'Roads should be directional, so they always cross the edge of two tiles.' RULED (Ben, 2026-10-16): roads move to EDGES, as rivers already are - not a rendering-only change. DESIGNED: LOGISTICS.md section 4 (Roads - an edge between two tiles) and RENDERING.md (Roads draw across the edge they cross). Grain: a tier per hex side, six sides, two bits each (0 none / 1 Track / 2 Road / 3 Highway), both tiles of an edge carrying it as both tiles of a river crossing do, side i mirroring side i+3. The road multiplier moves from the node to the EDGE in logistics.cpp edge_cost, beside the river discount that already lives there (A* keeps its 4-cardinal walk and its hex_side_for_offset derivation). Every count of roaded TILES becomes a count of roaded EDGES, each edge once: Logistic Points, network upkeep, reach, interdiction. Placement names a tile AND a side. Pre-v53 saves migrate by laying, between each pair of 4-cardinal neighbours that both carried a road, an edge at the LOWER of their two tiers. World save v53 claimed. A WORLD-MOVER: measure haulage_measure --far-trade and market_viability before and after; a re-bless is Ben's."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16 playtest); filed by Claude",
-   "requires": [],
-   "id": "BL-1341",
-   "short_name": "STACK_A_SECOND_OF_ONE_TYPE",
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/world/placement_rules.cpp",
-    "src/ui/selection_panel.cpp"
-   ],
-   "title": "The build card never says a second of the same type may stand on the tile, or how to add it",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): 'We should be able to build multiple of the same building on one tile' then, clarifying: 'it's not clear how to build the second level.' So nothing refused him - the rule already permits stacking (non_extraction_stack_cap 2-12 in AGGREGATE across every non-extraction type, placement_rules.cpp:557; extraction max(1, richness/50) per deposit). It is an AFFORDANCE defect in the construction ledger's build list: the row shows a type once and never says Build adds to the stack, nor how much room the tile has left. The card should carry how many stand and how much room remains, in wording that does not imply the non-extraction room is per type, and must not read like the road/rail ladder rows beside it, which are upgrades-in-place. A full tile's refusal should name what filled it (aggregate cap, per-deposit cap, or the province ceiling at placement_rules.cpp:479). No cap or rule changes."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16 playtest); filed by Claude",
-   "requires": [],
-   "id": "BL-1342",
-   "short_name": "CONSTRUCTION_ETA_IS_HONEST",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 3,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/construction_panel.cpp",
-    "src/ui/selection_panel.cpp"
-   ],
-   "title": "Construction shows ETA 2 qtr and never moves: the UI's rate mirror reads different numbers from the sim",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"construction stall when there appears to be enough goods. ETA 2 qtr, but no progress for multiple quarters.\" CONFIRMED divergence: ui::construction_rate (construction_panel.cpp:35) reads m->supply[r] (the per-tick FLOW, reset every tick) where run_construction draws m->inventory[r] (persistent stock); it omits capacity_per_build_tick from the need row (so a capacity-starved site reads on-schedule while the sim stretches it up to 10x); it ignores the shelf_admits fair-price ceiling (a good above reservation_mult x base is zero to the sim); and it ignores plan_short_shelves rationing and state_idle. construction.md:71 asserts the mirror matches run_construction - that claim is false. Make the UI read what the sim reads, and name the blocking good on the status line so a stall says why."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16 playtest); filed by Claude",
-   "requires": [],
-   "id": "BL-1343",
-   "short_name": "CONSTRUCTION_QUEUE_AND_PROGRESS",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/construction_panel.cpp",
-    "src/ui/selection_panel.cpp"
-   ],
-   "title": "The construction queue says \"No active construction\" while buildings are building, and no construction shows a progress bar",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"the construction queue is showing 'No active construction', when there are multiple buildings being constructed\" and \"We should show a progress bar on constructions.\" The placeholder is hard-coded: const bool any_items = false (construction_panel.cpp:160) with the 5-column table dead behind it, while the same file's estimated_quarterly_construction_cost already walks w.buildings for ticks_remaining > 0. There is no construction_queue container and none is needed. Progress is computable at every draw site from ticks_remaining, construction_progress and construction_build_ticks (or construction_paid / construction_capex, which cannot drift when roads or the stack change)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16 playtest); filed by Claude",
-   "requires": [],
-   "id": "BL-1344",
-   "short_name": "BUILD_CARD_COST_AND_OUTPUT",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/selection_panel.cpp"
-   ],
-   "title": "The build card should show the cost in resources and credits and what the building produces, and drop payback",
-   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): \"change building tiles in construction to show the cost of building it in both resources and credits, and then the output resource or effect, rather than just the credits expected. And we should remove the 'payback' portion.\" Card: draw_construction_ledger_body (selection_panel.cpp:3758-3875); payback is inline at :3807 as capex / profit.net() and is pessimistic ~2x because the estimate assumes 50% staffing. Everything needed is already in scope: reg.resource_build_cost_for(type, target, recipe) for materials, reg.get_recipe(c.recipe)->inputs/outputs for the output, c.target for extraction. Drop the payback clause and the caption that points at it."
+   "design": "SPRINT 55 (Ben, 2026-10-16 playtest): 'Roads should be directional, so they always cross the edge of two tiles.' RULED (Ben, 2026-10-16): roads move to EDGES, as rivers already are - not a rendering-only change. DESIGNED: LOGISTICS.md section 4 (Roads - an edge between two tiles) and RENDERING.md (Roads draw across the edge they cross). Grain: a tier per hex side, six sides, two bits each (0 none / 1 Track / 2 Road / 3 Highway), both tiles of an edge carrying it as both tiles of a river crossing do, side i mirroring side i+3. The road multiplier moves from the node to the EDGE in logistics.cpp edge_cost, beside the river discount that already lives there (A* keeps its 4-cardinal walk and its hex_side_for_offset derivation). Every count of roaded TILES becomes a count of roaded EDGES, each edge once: Logistic Points, network upkeep, reach, interdiction. Placement names a tile AND a side. Pre-v53 saves migrate by laying, between each pair of 4-cardinal neighbours that both carried a road, an edge at the LOWER of their two tiers. World save v53 claimed. A WORLD-MOVER: measure haulage_measure --far-trade and market_viability before and after; a re-bless is Ben's. BRIDGES GRANTED (Ben, 2026-10-17): \"edge means from one tile centre to another, but not only one tile centre. This should allow spanning water with bridges\" / \"Roads can go over water with bridges no problem.\" So a road edge is permitted where EITHER END is water, and a run of such edges across a strait IS a bridge - no second mechanism, no new field. A bridge edge prices as its tier, and a crossing made on one is paid at that road price rather than the water sea-leg price. What stays forbidden is only the original target: a road that is a property of ONE tile. This unblocks the four road_generation_harness rows the build left red (R6a markets off the backbone, R6b/R6d trunk links stamping nothing, R2s-a) and the 15 markets stranded off their nation backbone. HAULAGE ACCEPTED (Ben, 2026-10-17): the far-trade drop (pooled window Y units -28%, share past the nearest market +2-5 points) is the intended meaning - a road discounts only the crossing it covers - so no re-tune; re-measure after bridges land, since they change it again."
   },
   {
    "status": "proposed",
@@ -1176,6 +1063,470 @@
    ],
    "title": "A later round's reroll can move an earlier round's committed draws, through the viability attempt index",
    "design": "SPRINT 55 (found verifying BL-1339, 2026-10-16). planetology.cpp's comment on the three preference streams claims 'bumping a later round's reroll counter cannot disturb an earlier round's already-committed draw'. That is FALSE: resolve_preferences folds the rejection attempt index k into all three streams (ra/rb/rc), so a Life roll that changes how many attempts the world needs moves the SYSTEM draws too. Observed by tools/verify/life_reroll.cpp: campaign seed 0 roll 7 resolves at attempt 2 and theta moves 1.519 -> 1.462, plate count 9 -> 8; seed 7 roll 3 resolves at attempt 3. Pre-dates BL-1339 (it was already true of the three Life draws) and is only now measured. THE CALL IS BEN'S: either the System draws become attempt-independent (so an accepted round really is committed), or the doc and the comment stop claiming independence. A doc and the code disagree, so one of them is wrong and the fix is work."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+   "id": "BL-1346",
+   "short_name": "MARKET_ATTRACTION",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "requires": [
+    "BL-1340"
+   ],
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/logistics.cpp"
+   ],
+   "title": "A tile clears at the market it is most attracted to: logistics cost over the centre's pull, not grid distance",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"Markets should be mildly dynamic, where each tile has a market attraction for each market, based on logistics distance to that market centre and also a modifier for that market centre which can come from either tech nodes or buildings.\" DESIGNED: MARKETS.md section Catchment is an attraction, not a distance; LOGISTICS.md section 3b (the off-road leg); GLOSSARY Market attraction. Today market_for_tile is nearest centre_tile by SQUARED GRID DISTANCE, column wrapped (market_clearing.cpp:165-284), cached in an unsaved raster rebuilt on market-set change - it cannot see a road, a tech or a building. New: attraction = traversal cost (LOGISTICS.md section 1) / centre pull, lowest wins, ties to the lowest market id; pull is a modifier_set multiplier, 1 by default. OFF-ROAD (Ben's call): a tile with no roaded edge costs the nearest roaded tile's network cost PLUS off-road-per-tile x the 4-cardinal step count to it (column wrapped), so every tile belongs to a market and far land drifts between markets as roads approach. Reach (section 3) is NOT changed - catchment and permission stay separate. CADENCE (Ben's call): recompute on change - a road laid or cut, a pull gained or lost, a market carved or folded - never on a clock, so it stays a pure function of standing state and is still never saved. A WORLD-MOVER: measure market_viability and haulage_measure --far-trade before and after; a re-bless is Ben's. Sequenced after BL-1340 (roads are edges), which changes what a roaded tile is. SAME-NATION BONUS (Ben, 2026-10-16): a tile owned by the same nation as the centre is 1.2x as attracted to it - a property of the (tile, centre) PAIR, not of the centre, so a centre pulls harder only on its own ground. Written into MARKETS.md. Measure how many tiles actually change hands at 1.2: the bonus is small against the cost spread, so report the count of tiles whose market flips because of it, per seed, and say so if it flips almost none."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+   "id": "BL-1347",
+   "short_name": "BUILDINGS_NEED_A_ROAD",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "requires": [
+    "BL-1340"
+   ],
+   "files": [
+    "src/world/placement_rules.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "title": "No building may be constructed on a tile with no road, and generation roads every site it stamps",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"buildings should be impossible to construct unless there is a road on that tile.\" DESIGNED: PRODUCTION.md section A building needs a road; LOGISTICS.md section 4 (Generation roads every building site). A tile carries a road when any of its hex sides carries a roaded edge - a crossing INTO the tile is a road ON it, from either side. EXTRACTION IS NOT EXEMPT (Ben's call): a remote deposit is worked only once a road reaches it, which with BL-1348 means a chain of crossings built out to it one tile at a time - the intended cost of far ore. GENERATION IS BOUND TOO (Ben's call): the road pass lays a crossing to every site it stamps, so the 1960 world holds no building the rule would refuse; exempting generated buildings would make the opening world the one place the rule fails. Add the refusal to placement_rules.cpp beside the stack and ceiling checks, with a message that names the road. A WORLD-MOVER and a playability shift (roads gate all expansion): measure market_viability, haulage_measure --far-trade and the generated building count before and after. Sequenced after BL-1340."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+   "id": "BL-1348",
+   "short_name": "ROAD_FROM_A_ROAD",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1340"
+   ],
+   "files": [
+    "src/world/placement_rules.cpp",
+    "src/world/construction.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "A road is laid from a tile that already has one, across to the next tile",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"roads should only be constructible from an existing tile with a road, and across to the next tile. So whenever we build a road, it's unambiguous where it comes and goes.\" DESIGNED: LOGISTICS.md section 4 (A road is laid from a road). The named tile must already carry a roaded edge and the new road crosses one of its sides to the neighbour; a road cannot be dropped in open country. The root is generation's Track on every centre's own tile, so no world begins with nowhere to build from. Also bind the AI's road candidate (corp_ai.cpp:1943) and the refusal wording. Sequenced after BL-1340 (the same placement code and the same edge grain)."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+   "id": "BL-1349",
+   "short_name": "MARKET_CENTRE_BUILDINGS",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/TRADE.md",
+   "requires": [
+    "BL-1346"
+   ],
+   "files": [],
+   "title": "A tech-unlocked building family stands on a market centre, making trade points and raising the market pull",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We can also add buildings to unlock from the tech tree which can be placed on a market centre, giving trade points and market attraction.\" DESIGNED (shape only): TRADE.md section A building on a market centre makes trade points and pull. One building, two effects - trade points for its owner at a staffed rate as a Marketplace makes them, and a multiplier on that centre's pull (BL-1346). Still to settle: how many rungs the family has, the trade points and pull each rung gives, its placement rule (one per centre?), its cost and upkeep, and which tech nodes unlock it (BL-1350 holds the provisional nodes). Needs PRODUCTION.md section Infrastructure buildings for the building itself."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+   "id": "BL-1350",
+   "short_name": "PROVISIONAL_PULL_TECHS",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "requires": [
+    "BL-1346"
+   ],
+   "files": [
+    "docs/economy/tech/digitisation_tree.json"
+   ],
+   "title": "Provisional Digitisation nodes that raise market pull, for Ben to approve later",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We can add provisional techs for market pull and approve them later.\" The nodes grant the market-pull modifier BL-1346 reads, and unlock the building family in BL-1349. PROVISIONAL by Ben's own word: file them as the tree's placeholder kind (RESEARCH.md section The grammar of an age's tree) so the tree stays honest about what is authored and what is pending approval. The store is canonical - add them with node tools/session/tech_tree_store.js and re-render DIGITISATION_TREE.md's tables from it; never hand-edit the mirror, and run tech_tree_store.js --check after. Report the node count (160 before) and which branch each node joins."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"); filed by Claude",
+   "id": "BL-1351",
+   "short_name": "GENERATION_SEEDS_LOGISTICS",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [],
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "title": "Verify that generation's seeded logistics sources really cover every nation",
+   "design": "SPRINT 55 (Ben, 2026-10-16: \"we can take a look at generation to make sure logistics producing assets give points across each nation\"). CORRECTION, 2026-10-16: an earlier revision of this item claimed a landlocked nation has NO Logistic Points because corporation_generation's building mixes seed ports but no inland hub. The mixes do lack the hub (corporation_generation.cpp:305, the hub appears only as a placement score at :449) - but a DEDICATED pass seeds them: seed_logistics_sources (logistic_points.cpp:382) places inland_logistics_hubs at world fold until every consumer on a nation's ground has coverage 1 and every pool meets claim x k_pool_margin (2.0), bounded by k_max_hubs 4000 over 64 sufficiency rounds, siting a hub on the serving market's centre_tile where that is on the nation's dry ground and on the consumer's own tile otherwise. So coverage is engineered by construction, and this item is MEASUREMENT, not new work. THE WORK: measure per nation on the curated seeds - sources seeded by network, tiles covered, pool made against claim, and how many nations fall back to on-consumer-tile hubs rather than market centres. That also tests Ben's picture (a centralised capital with high points, diminishing with distance, extended by outlying hubs): if hubs land mostly on consumer tiles rather than at centres, the picture will not appear however the lens is drawn."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the logistics visibility message); filed by Claude",
+   "id": "BL-1352",
+   "short_name": "LP_ONE_SYSTEM",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [],
+   "files": [
+    "src/world/logistics.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/supply_system.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "title": "Two unrelated Logistic Point systems are live at once, and the lens and marches read the retired one",
+   "design": "SPRINT 55 (found mapping Ben's 2026-10-16 logistics message). THE ROOT CAUSE of what Ben saw in play. Two LP systems stand in the tree: (1) THE REAL ONE, BL-1309, src/world/logistic_points.*: a pool per NATION made only by inland hubs (120/tick), railway stations (150) and ports (120), scaled by each source's upkeep supply, with a bounded-Dijkstra reach field per (nation, network, body) that is full strength to lp_full_reach {6,10,12} then fades to zero over lp_fade_length {6,8,8}; consumed ONLY by production (lp_need = 10 x workforce run), granted pro-rata or by the nation's share rule, and spent as a labour multiplier so half the points means half the output. (2) THE LEGACY ONE, BL-596, active_lp_anchor_pools in logistics.cpp:1075: a flat 20/tick pool at every ANCHOR, where collect_anchor_tile_set (:31) seeds an anchor at EVERY population centre plus every port and hub - no falloff, no nation, no rail. Marching units still draw the legacy pools (economy_system.cpp:4210-4300, first-come in unit-id order). THE THROUGHPUT LENS READS ONLY THE LEGACY ONE. So Ben's reading that cities supply logistics is true of the system he can SEE and false of the one that runs the economy - the doc already ruled 'Cities make none' (2026-10-14). THE WORK: one system. Retire the legacy anchor pools, move the march draw onto the nation pool (the march is the priced consumer - LOGISTICS.md's 'Active lands first' and 'Armies claim first' need re-reading against a model where trade draws nothing at all), and point the lens at the real model (BL-1353). RECONCILED 2026-10-16: do NOT delete the passive-LP remains - Ben ruled the same day that a shipment draws points again (BL-1361), so market_lp_left (supply_system.cpp:1035, returns 0), market_component::trade_lp_spare (permanently 0, serialised at save v46, read by corp_ai) and corp_command rejected_no_lp are REVIVED by that item, not retired. Retire only the legacy ANCHOR pools and the march path that reads them."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the logistics visibility message); filed by Claude",
+   "id": "BL-1353",
+   "short_name": "LP_LENS_REWORK",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/LENSES.md",
+   "requires": [
+    "BL-1352"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/overlay.cpp"
+   ],
+   "title": "The throughput lens: per-tile point numbers, the player's own nation only, no taglines, and roads recoloured in the pass that already redraws them",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"let's change the throughput lens, we can drop the '(active logistics points)' taglines, and give a number to each tile, so we can see exactly how many points we have. The lens should also be player facing, so we can see only the player's home nation's road network and points... instead let's recolour the roads to be a brighter white.\" TAGLINES: overlay.cpp:59 ('Throughput (active Logistic Points)') and the on-canvas legend title at body_surface_canvas.cpp:1490, which also prints 'anchor: N LP/tick' and 'N anchors - N LP/tick total'. PER-TILE NUMBERS: none today - the wash is the REACH-COST field (1 - sqrt(rc/p90)), not LP at all, and the only LP-valued mark is an anchor ring whose share is always exactly 1.0 because the legacy rate is uniform. LENSES.md:1020-1030 argues per-tile LP cannot vary for that reason; BL-1309 overtook that argument and nobody revisited it, since lp_coverage_at (logistic_points.cpp:342) is already a per-tile function and resolve_logistic_points already yields per-building coverage and grant fractions. Note the lens currently suppresses the hover card body-wide (:6058) as 'a value field with no structure grain' - that premise also goes once the field carries real per-tile numbers. PLAYER-FACING: no owner or nation filter exists anywhere in the path - collect_anchor_tile_set and body_reach_field are both body-wide. Filter to the player's home nation, and reconsider the suppressed border band (:3978) once it is one nation's network. ROADS, AND THE RENDERING ANSWER: the second road pass Ben noticed is real and deliberate - route_drawn goes true under this lens alone (:4216-4217), redrawing the network as vector curves over the baked road paint. Recolouring is CHEAP there: change the three IM_COL32 literals at :4224-4226 (track/road/highway) to the brighter white and leave the bake alone. The static-stroke cache key already includes overlay (:4484), so a lens toggle rebuilds strokes, never pixels. Do NOT try to brighten the BAKED asphalt per lens: bake_params carries no lens field and region_hash keys only tile fields, so adding one would re-bake every visible chunk on every lens toggle. Re-run tools/verify/throughput_field_census.cpp (LENSES.md:1043 requires it whenever the anchor set moves) and scripts/verify/throughput_lens.lua."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the logistics visibility message); filed by Claude",
+   "id": "BL-1354",
+   "short_name": "TILE_LOGISTICS_SECTION",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/SELECTION.md",
+   "requires": [
+    "BL-1352"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "Tile selection gains a Logistics section: the points provided here and the points consumed here",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"we should improve visibility by giving tile selection a surface for logistics. We should show the number of logistics points provided, and the number consumed by that tile.\" Attach in COLUMN 3, the Tile card, right after the 'Tile [x, y] - <road tier>' title row and before the building grid (selection_panel.cpp:2999-3001) - already the tile-grain, road-aware spot, and a BeginChild that scrolls on its own. A fifth column would break SELECTION.md's four-column ruling (Ben, 2026-10-13); the disabled Supply action button is the cheaper alternative if the card proves too tight. EVERY FIGURE IS ALREADY IN SCOPE at that draw site: the economy_report gives report.logistic_points - per building need / coverage / granted / class, and per nation pool / made[3] / sources[3] / claim[3] / granted[3] / rule_set - and w is non-const there, so lp_coverage_at(w, memo, tile_id) gives the coverage a building on this tile WOULD get even with nothing built, which is the one genuinely per-tile figure. PROVIDED = what a source on this tile makes (its network rate x its upkeep supply scalar, 0 where no source stands); CONSUMED = the sum of its buildings' granted points, with their need beside it so a shortfall reads as a shortfall. Say which nation's pool it draws on, since every building on a nation's ground draws that nation's pool whoever owns it. A live click is owed."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the logistics visibility message); filed by Claude",
+   "id": "BL-1355",
+   "short_name": "LP_DOC_RECONCILE",
+   "category": "Documentation",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1352"
+   ],
+   "files": [],
+   "title": "LOGISTICS.md prints the superseded bifold LP model as the model, and LENSES.md justifies the lens from a quantity BL-1309 replaced",
+   "design": "SPRINT 55 (found mapping Ben's 2026-10-16 message). The doc stacks two models and only soft-marks the older one, so a top-down reader passes the 2026-10-14 ruling and then reads the overturned text as current. (1) The 'What it is' section still declares LP 'is BIFOLD' with a passive/active table and 'Cities generate it.' (2) 'Passive LP caps trade' is false in code: the convoy gate is retired, market_lp_left returns 0, so the 'Armies claim first' arbitration has no contention left to arbitrate - trade draws nothing. (3) Constraint 2's 'Cities are the locus' is false: the locus is a nation-wide scalar pool plus a per-source reach field, and that pool is arguably the pooled haul allowance the constraint was written to forbid, now pooled per nation - which deserves a sentence saying why that is acceptable rather than leaving the contradiction silent. (4) 'Where the parts live' has no row for src/world/logistic_points.* - the file that now IS the model. (5) LENSES.md:1016-1030 names the legacy pools as 'the magnitude' and argues per-tile LP is constant. Reconcile against the code after BL-1352 lands, so the doc describes one system; keep the history clearly fenced as history."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1356",
+   "short_name": "LP_ROUTED_REQUESTS",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 5,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1352",
+    "BL-1353",
+    "BL-1354"
+   ],
+   "files": [
+    "src/world/logistic_points.cpp",
+    "src/world/economy_system.cpp"
+   ],
+   "title": "A tile requests the points it needs and they are routed to it over one path, split across sources in distance order",
+   "design": "SPRINT 55 (Ben, 2026-10-16, on the LP form: \"Both: surfaces now, routing straight after\"). DESIGNED: LOGISTICS.md section How a tile's points get to it. SEQUENCE IS BEN'S: BL-1352 (one system), BL-1353 (lens) and BL-1354 (tile surface) land FIRST, so routing is measured against honest numbers rather than guessed - the real model's reach already fades with distance and extends with outlying hubs, and nobody has yet seen it drawn. THE MODEL: today there is no routing at all - a nation-wide scalar pool scaled by a per-tile reach field (max over the nation's three networks), granted pro-rata or by the share rule. New: a tile's request is the sum of its buildings' needs; it is filled over ONE best path, never two at once; a source fills part of a request only if it both reaches the tile AND is itself connected back toward the market centre (Ben: \"further sources have to both reach the tile, and produce enough to extend backward towards the market centre\"), so points arrive along a chain the centre anchors and an isolated hub supplies nothing; where the nearest source falls short the remainder comes from the next nearest that satisfies both tests, in distance order. This supersedes the older constraint-2 rule that a draw lands on exactly one anchor. SCARCITY (Ben's ruling): distance ORDERS the queue and never raises the bill - requests inside the falloff range are served first, then those beyond, and a far building draws the same points as a near one. The settled rule 'the draw is what moves, not how far' therefore stands; NR-620 measured a 73% convoy-traffic collapse the one time a distance draw was tried, so any implementation that makes a far building cost more points is wrong by ruling, not by taste. MARCHES (Ben's ruling): a march draws the nation pool and competes with production. RULED (Ben, 2026-10-16): the march CLAIMS FIRST, keeping his 2026-09-24 ruling (NR-917) literally now that its other half is gone - it arbitrated armies against trade, and trade draws nothing, so a march is supplied before the production behind it. Written into LOGISTICS.md. Determinism: allocation must stay order-independent - a deterministic priority over a sorted set, never first-come by iteration order (the march draw is first-come in unit-id order today, economy_system.cpp:4210). A WORLD-MOVER: measure market_viability, haulage_measure --far-trade and per-nation output before and after."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1357",
+   "short_name": "ROAD_CROSSES_A_BORDER",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1340",
+    "BL-1348"
+   ],
+   "files": [
+    "src/world/placement_rules.cpp"
+   ],
+   "title": "A road may always be built across a national border, and never further",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"if another nation holds the market centre, we may not be able to even build roads to supply LP. So due to this case, it should always be possible to build a road over a national border, but not further.\" DESIGNED: LOGISTICS.md section 4 (A road may always cross a national border). From a tile you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a tile you may build FROM, so the road stops where it lands - a connection, never a corridor. It is the exception that keeps BL-1348 (a road is laid from a road) from making a foreign-held market centre unreachable, which under BL-1356 would make every tile behind it unsuppliable. Sequenced after BL-1340 and BL-1348, whose placement rule it amends."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1358",
+   "short_name": "BUILD_A_MARKET_CENTRE",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "requires": [
+    "BL-1346"
+   ],
+   "files": [],
+   "title": "The player can construct a market centre, at a high cost in materials",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We also want to give the player a way to construct market centres, this can just be a high cost for the materials needed. This should help to reduce the number of tiles pulled towards neighbouring markets.\" DESIGNED (shape): MARKETS.md section A market centre can be built. Expensive in materials and gated by nothing else - the cost IS the constraint. A rival nation may build one too, by the same verb, so it is not an asymmetric player power. Still to settle: the material bill, whether a new centre must stand a minimum distance from an existing one, and what it does to the spontaneous-emergence pass (MARKETS.md section Spontaneous market emergence) which already creates centres on its own. Needs the verb on the corp_command seam with an ACTIONS.json entry, and the surface to press it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+   "id": "BL-1359",
+   "short_name": "HUB_LEVELS_AT_CENTRES",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1351"
+   ],
+   "files": [
+    "src/world/logistic_points.cpp"
+   ],
+   "title": "Generation starts a market centre with several levels of logistics building",
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"I imagine we might start generation with multiple levels in logistics buildings at the market centre.\" RULED (Ben, 2026-10-16): SEVERAL HUBS STACKED, not a tier ladder - generation puts more than one hub building on the centre tile. The stack rule already permits it (2-12 in aggregate, PRODUCTION.md section Building stacks) and a hub already makes a flat 120 points a tick scaled by its upkeep supply, so this is seeding, not new mechanism: seed_logistics_sources (logistic_points.cpp:382) already sites hubs at the serving market centre_tile where the ground allows and adds them one at a time until coverage and pool margin are met - it should start a centre with several. Gives Ben's picture: a centralised capital with a high number of points, diminishing with distance, extended by outlying hubs. Report points made at the centre against an outlying tile, per nation."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16); filed by Claude",
+   "id": "BL-1360",
+   "short_name": "ROAD_TIER_EXTENDS_REACH",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1340",
+    "BL-1352"
+   ],
+   "files": [
+    "src/world/logistic_points.hpp",
+    "src/world/logistic_points.cpp"
+   ],
+   "title": "A better road carries points further: Track 6, Road 8, Highway 10, fading to zero at double; rail carries 20 and delivers only where it connects",
+   "design": "SPRINT 55 (Ben, 2026-10-16): 'let's add an extension bonus to higher tiered roads. So tracks reach 6 tiles, roads reach 8, and highways reach 10 tiles. Railways can reach 20 tiles, but they only supply the exact tile they connect to.' RULED: those are FULL-STRENGTH distances and the fade runs to ZERO AT DOUBLE them (Ben, 2026-10-16) - track 6/12, road 8/16, highway 10/20. DESIGNED: LOGISTICS.md section One pool. THE ROAD HALF IS A RECALIBRATION, not new mechanism: lp_full_reach[road] is 6 with per-tier step costs lp_road_step {_, 1.0, 0.7, 0.5}, which already yields 6 / 8.6 / 12 tiles - set the steps to 1.0 / 0.75 / 0.6 for 6 / 8 / 10, and lp_fade_length[road] = lp_full_reach[road] for the double-distance fade. THE RAIL HALF IS NEW BEHAVIOUR: lp_full_reach[rail] 10 -> 20, and delivery becomes point-to-point - the station's points land on the tile the line connects to and on no tile the line merely passes, which is the rule goods already obey (board and leave only at stations, section 4c). Sea is untouched and keeps 12 full / 8 fade; say so rather than quietly generalising the double-fade to it. Measure coverage per nation before and after, then market_viability and haulage_measure --far-trade."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-16); filed by Claude",
+   "id": "BL-1361",
+   "short_name": "TRADE_DRAWS_POINTS",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1352",
+    "BL-1356"
+   ],
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/trade.cpp",
+    "src/world/corp_command.hpp"
+   ],
+   "title": "A shipment draws Logistic Points again, by cargo quantity, at the anchor it leaves",
+   "design": "SPRINT 55 (Ben, 2026-10-16): 'we need to consider how trading consumes logistics points' - RULED the same day: yes, a shipment draws again. The cap was retired in BL-1309's cut and the code still stands, zeroed: market_lp_left (supply_system.cpp:1035) returns 0.0f, commit_trade_shipment (:1083) voids the pools and the refusal, market_component::trade_lp_spare is permanently 0 yet serialised at save v46 and still read by corp_ai's rival-Marketplace estimate, and corp_command::rejected_no_lp serves a gate that draws nothing. REVIVE rather than rewrite, and note BL-1352 was going to delete exactly this code - it has been reconciled. THE DRAW: cargo quantity at the anchor the shipment leaves - the settled formula, what moves and not how far, so it does not reintroduce the distance draw NR-620 measured at a 73% convoy-traffic collapse. NEVER REFUSED WHOLE: a trade is a standing route with nobody to tell, so the shipment sends what the anchor admits (SUPPLY.md section A shipment); whole refusal is for COMMANDED legs only (Ben, 2026-10-05, NR-969). Ordering: the march claims first (NR-917, which with trade drawing again recovers its original subject), then trade and production. A WORLD-MOVER on the traffic itself: haulage_measure --far-trade is the measurement that matters, against the 1055/802 and the 13,954/11,277 baselines, plus market_viability G1/G1b for input starvation."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1342..BL-1344, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1362",
+   "short_name": "SIM_PUBLISHES_BUILD_RATE",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/ui/construction_panel.cpp"
+   ],
+   "title": "The construction panel still cannot see the sim's pro-rata rationing, because the sim never publishes its realised build rate",
+   "design": "SPRINT 56 (found delivering BL-1342, 2026-10-16). BL-1342 made the UI read what run_construction reads - inventory, the capacity row, the fair-price ceiling, state_idle - and closed the lying ETA. ONE DIVERGENCE REMAINS BY DESIGN: BL-1209's plan_short_shelves pre-solves a pro-rata allocation across every site contending for one shelf, in visit order, and the UI does not duplicate that solver. So where several sites compete for the same shelf the panel reads OPTIMISTIC, never pessimistic. The right close is not a second copy of the solver: run_construction should publish each site's REALISED rate in economy_report, and the panel should read it, keeping one source of truth. That is economy_system.* and was outside the UI lane's owned files. Then the mirror can be deleted outright rather than kept in step."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1342..BL-1344, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1363",
+   "short_name": "STORE_THE_BUILD_TOTAL",
+   "category": "Economy",
+   "priority": "C",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "A construction progress bar wobbles because its denominator is re-priced live",
+   "design": "SPRINT 56 (found delivering BL-1343, 2026-10-16). Progress is construction_paid / construction_capex(...), and capex is re-priced from live market prices and the live site multiplier, so the bar can move backwards when prices rise or the reach/stack field changes. The ticks ratio has the same flaw through construction_site_multiplier. The drift-free fix is to store the original total on the building when construct_for sets ticks_remaining, which is a persistent field and therefore a save-format bump - deliberately NOT taken inside BL-1343. Cheap, and it also gives the queue an honest 'cost left'."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-16",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1342..BL-1344, 2026-10-16)",
+   "requires": [],
+   "id": "BL-1364",
+   "short_name": "BUILD_REFUSAL_COLLAPSES",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 1,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/construction.cpp"
+   ],
+   "title": "Every placement refusal but the launchpad collapses into \"invalid tile\", so the toast misnames a full stack",
+   "design": "SPRINT 56 (found investigating BL-1341, 2026-10-16). construct_building maps every can_place_in_world refusal except launchpad_exists into construction_result::invalid_tile (construction.cpp:213), so a full extraction stack, a full non-extraction stack and a full province ceiling all report 'invalid tile' in the post-hoc toast - a tile that is perfectly valid. The build-door row is honest (BL-1341 gave it the real wording and the numbers); it is the seam's own result enum that is lossy, and the seam is also the AI-facing one, where a wrong reason is a wrong signal. Carry the placement_reason through instead of flattening it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17, revising the delivered build card); filed by Claude",
+   "id": "BL-1365",
+   "short_name": "CONSTRUCTION_ONE_LINE_ROWS",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "requires": [],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/construction_panel.cpp"
+   ],
+   "title": "Compact every construction row to one line, with icons over words and the words in the hover card",
+   "design": "SPRINT 55 (Ben, 2026-10-17, revising BL-1344 the day it landed): 'We should move a lot of the text on each construction panel to tooltips, and favour using icons where possible. We really need to compact this.' RULED from a mockup: option B, ONE LINE a row, and the pass covers ALL construction surfaces - the build list, the queue table, the tile-card stack buttons and the expanded site card. DESIGNED: construction.md section One line a row. BL-1344 grew the build row from 5 to 7 reserved lines, which fits about 4 rows in the panel; one line fits about 20. The line reads in glyphs: building glyph, cost, materials, a RESOURCE PIP for the output (not the word), the stack as 2/4, a state mark (green dot fine / amber triangle stalling), the progress bar, the press. The hover card takes everything the line drops - the sentence each chip replaced, the stall's named good, the output in words, and what filled a full tile. Keep every FACT that BL-1341..1344 added; this changes where it is read, never whether it is there. A live click is owed. GRID (Ben, 2026-10-17): the one line is a COLUMN GRID, not a sentence - each figure in its own column, the same column in every row, so a column reads down the list; a missing figure leaves its column empty rather than closing up. A fixed-width table, not inline chips, on all four surfaces; the queue is already a table, so it is the shape the others match. If the columns will not fit the panel width, the lowest-value column drops into the hover card - the panel is never widened and a column never wraps. Written into construction.md (The line is a grid, not a sentence)."
   }
  ]
 }

@@ -47,6 +47,18 @@ A tile can carry **several** extraction sites on one deposit. What that costs, a
 buys, is § Building stacks below — a fourth factor (stack rank) on the output above, and a
 depletion taper shared across the whole stack rather than computed per site.
 
+### A building needs a road (Ben, 2026-10-16)
+
+**No building may be constructed on a tile with no road.** A tile carries a road when one of its
+hex sides carries a roaded edge (`../economy/LOGISTICS.md` § 4) — a road crossing *into* the tile is
+a road *on* it, from either side. **Extraction is not exempt:** a remote deposit is worked only once
+a road reaches it, which with the lay-from-a-road rule means a chain of crossings built out to the
+deposit, one tile at a time. That is the intended cost of reaching far ore, and it is the reason the
+richest tile on the body is a decision rather than a lookup.
+
+The generated world obeys the same rule: the road pass lays a crossing to every site it stamps
+(`../economy/LOGISTICS.md` § 4, Generation roads every building site).
+
 ### Building stacks
 
 A tile is not a single build slot: several extraction sites may work the same deposit. Two rules

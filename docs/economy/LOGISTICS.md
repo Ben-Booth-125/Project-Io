@@ -175,7 +175,29 @@ shortfall floor.
 `docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
 shortfall rule; this section owns only the transmission.
 
+### 3b. The off-road leg — membership without spread (Ben, 2026-10-16)
+
+**The network does not spread off the road; market membership does.** A tile with no roaded edge is
+reached by pricing the walk to the nearest tile that has one: **the off-road cost per tile times the
+number of 4-cardinal steps** to it (column wrapped, as every walk here is), added to that tile's own
+network cost. Far-out land is therefore dear rather than unreachable, and it drifts between markets
+as roads move toward it — which is the whole reason the term is per step and not a flat fee.
+
+**Reach (§ 3) is untouched by this.** An off-road tile is in a market's catchment without being in
+anybody's reach: the two answer different questions — *what does this tile sell into* and *where may
+a firm build* — and only the second is a permission. Keeping them apart is what lets a market render
+whole while placement stays honest about the road.
+
 ### 4. Roads — an edge between two tiles, generated then extended by hand
+
+**A road runs from one tile centre to another, and may span water (Ben, 2026-10-17).** The link is
+the thing: *"edge means from one tile centre to another, but not only one tile centre. This should
+allow spanning water with bridges."* So a road edge is permitted where either end is **water** — and
+a run of such edges across a strait **is a bridge**, needing no second mechanism and no new field.
+A bridge edge prices as its tier like any other road edge, and a crossing made on one is paid at
+that road price rather than the water's sea-leg price: a bridge that did not beat the water it
+crosses would be a decoration. What remains forbidden is the thing the ruling was aimed at — a road
+that is a property of **one** tile, belonging to no crossing.
 
 **A road crosses the boundary between two tiles; it is never a property of one.** The player's
 words: *"Roads should be directional, so they always cross the edge of two tiles."* A river was
@@ -198,6 +220,27 @@ both tiles of every edge would double it.
 **Placement is directional.** Laying a road names a tile **and a side**. A road to nowhere is
 therefore impossible to express, which is the point: the refusal *"there is no neighbour that way"*
 is cheaper to understand than a tile that is roaded while nothing adjoins it.
+
+**A road is laid from a road, across to the next tile (Ben, 2026-10-16).** The named tile must
+already carry a roaded edge, and the new road crosses one of its sides to the neighbour — so every
+road's provenance is unambiguous: *where it comes from and where it goes.* A road cannot be dropped
+in open country, and a frontier is reached by laying one crossing at a time out to it. The root is
+generation's own rule below — every centre's tile gets at least a Track — so no world can begin with
+nowhere to build from, and a nation's first road of a campaign extends the lattice it inherited.
+
+**A road may always cross a national border, and never go further (Ben, 2026-10-16).** From a tile
+you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a
+tile you may build *from*, so the road stops where it lands. The reason is a real case: a market
+centre held by another nation could otherwise be impossible to connect at all, and a tile that
+cannot reach its centre cannot be supplied (§ How a tile's points get to it). One crossing is
+enough to touch the border and no more than that — it buys a connection, never a corridor through
+somebody's country.
+
+**Generation roads every building site (Ben, 2026-10-16).** A building needs a road on its tile
+(`PRODUCTION.md` § A building needs a road), and that rule binds the generated world as it binds
+play: the road pass lays a crossing to every site it stamps, so the 1960 world contains no building
+the rule would have refused. The alternative — exempting what generation laid — would have made the
+opening world the one place the rule does not hold.
 
 **Pathfinding is unchanged in shape.** A* still walks 4-cardinal neighbours over the body grid and
 still derives the hex side of each step (`hex_side_for_offset`), the two diagonal sides the
@@ -613,9 +656,17 @@ into passive and active. What follows replaces the bifold model, the city genera
 - **Made only by buildings, each on its own network.** A **logistics hub** makes points carried
   along **roads** (further on higher road tiers); a **railway station** along **rail**; a **port**
   over **sea**. Cities make none. Anyone may build them — nations and corporations alike.
-- **Reach fades with distance.** A source's points reach at full strength out to a threshold
-  distance along its own network, then fade to zero, so a nation needs several sources to cover
-  its ground. Off the networks, points reach a few tiles to supply armies (military detail later).
+- **Reach fades with distance, and a better road reaches further (Ben, 2026-10-16).** A source's
+  points reach **full strength** out to a threshold along its own network and then **fade to zero at
+  double that distance**, so a nation needs several sources to cover its ground. The threshold is
+  the **road tier's**, which is what makes an upgrade worth paying for: **Track 6 tiles, Road 8,
+  Highway 10** at full strength, nothing left by 12, 16 and 20. Off the networks, points reach a few
+  tiles to supply armies (military detail later).
+- **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
+  points carry **20 tiles** along the line, and they are delivered at **the tile the line connects
+  to** — never to the country the line passes through. So rail is a link between places rather than
+  a blanket over ground, which is what makes it the **inter-market** carrier, and it is the same rule
+  goods already obey: they board and leave only at stations (§ 4c).
 - **Production consumes them.** A producing building needs Logistic Points to produce and uses them
   up each tick; short of its need it produces **in proportion** (half the points, half the output).
 - **The host nation's pool.** Every building on a nation's ground — its state's, its champion's,
@@ -627,6 +678,45 @@ into passive and active. What follows replaces the bifold model, the city genera
   zeroed by a shortfall.
 - **Trade points stay separate** (`TRADE.md`): how much an owner can ship, beside the capacity to
   move and produce.
+
+#### How a tile's points get to it (Ben, 2026-10-16)
+
+**Every tile asks for what it needs, and the answer is routed.** A tile's request is the sum of its
+buildings' needs. It is filled over **one path** — the best path from a source, never two paths at
+once — and a path is a connection along a network, land or sea.
+
+**A tile must be connected to the market centre, not merely near a source.** A source that reaches
+the tile fills part of its request only if that source is itself connected **back toward the centre**
+— so points arrive along a chain the centre anchors, and a hub dropped in isolation supplies
+nothing. This is what makes an outlying hub an *extension* of a network rather than an island.
+
+**A request may be split across sources, in distance order.** Where the nearest source cannot fill
+it, the remainder comes from the next nearest that both reaches the tile and extends the chain, and
+so on. It supersedes the older "a draw lands on an anchor" rule in the superseded half below, which
+allowed exactly one.
+
+**Distance orders the queue; it never raises the bill.** When a nation's points fall short of what
+its ground asks for, requests **inside the falloff range are served first**, then the ones beyond
+it. What a building draws does not grow with its distance: a far building costs the same points as a
+near one and simply waits behind it. This keeps the settled rule intact — *the draw is what moves,
+not how far*, distance priced in credits and only in credits (§ Three rules that are settled,
+constraint 3), the rule NR-620 measured at a 73% collapse in convoy traffic when a distance draw
+was tried.
+
+**A march draws on the nation's pool too, and claims first (Ben, 2026-10-16).** Movement a
+player or rival directs draws the same points production and trade do, so guns, butter and freight
+compete in one currency. **The march claims before the others** — Ben's 2026-09-24 ruling (NR-917),
+kept, and with trade drawing again it keeps its original subject: the front is supplied, and the
+trade and the factories behind it wait. A campaign visibly starving its own industry is the
+intended, legible cost of marching.
+
+**A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
+reinstated: a shipment draws at the anchor it leaves, **by cargo quantity** — the settled formula,
+*what moves, not how far*. It is what makes rail's twenty tiles matter, because an inter-market haul
+now has to be paid for in the capacity that carries it, and what makes a market's logistics a real
+constraint on its trading rather than a number beside it. A trade is a standing route with nobody to
+tell, so it is never refused whole: its shipment sends what the anchor admits, exactly as
+`SUPPLY.md` § A shipment already rules.
 - Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
   **new** stations; generated rail still passes as § 4c says.
 

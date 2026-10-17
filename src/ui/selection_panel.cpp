@@ -77,87 +77,16 @@ std::string input_basket_names(const recipe* ri)
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
-// Construction is now durative *and* material-gated: each economy tick a building
-// under construction advances by a RATE in [0,1] set by how much of its per-tick
-// material need the local market can supply (economy_system.cpp § run_construction).
-// The front door used to read this as a binary yes/no; these helpers surface it as
-// an analog rate / ETA / paused status instead.
-
-// Recompute a build's current material rate exactly as run_construction does — the
-// fraction of this tick's per-material need the local market can supply, set by the
-// scarcest required material and forced to 0 (paused) below 1/max_stretch. Shared by
-// the prospective front door (a candidate tile + type) and the in-progress building
-// card. A local mirror of the world-side formula, not a call into it, because the UI
-// is const and only needs the read.
-float construction_rate(const world& w, const recipe_registry& reg,
-                        building_type type, resource_type target, uint16_t recipe,
-                        entity_id tile)
-{
-    const building_economics& econ = reg.economics(type);
-    const float duration = econ.build_duration_ticks;
-    if (duration <= 0.0f)
-        return 1.0f; // instant build — never material-gated
-    // BL-590: the material cost specific to THIS named building.
-    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
-
-    const market_component* m = nullptr;
-    const entity_id mid = market_for_tile(w, tile);
-    if (mid != null_entity)
-    {
-        const auto mit = w.markets.find(mid);
-        if (mit != w.markets.end())
-            m = &mit->second;
-    }
-
-    float rate = 1.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        const float need = material_cost_row[r] / duration;
-        if (need <= 0.0f)
-            continue;
-        const float avail = m ? m->supply[r] : 0.0f;
-        rate = std::min(rate, avail / need);
-    }
-    rate = std::clamp(rate, 0.0f, 1.0f);
-
-    const float max_stretch = reg.construction().max_stretch;
-    const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
-    if (rate < pause_below)
-        rate = 0.0f; // paused: even the max-stretched rate can't be supplied
-    return rate;
-}
-
-// A compact quarter-count label. A Tick is ~3 months, so 4 make a year (BL-095);
-// years surface once the span reads better than a raw count. The display word is
-// "qtr" — Tick is the internal term and stays out of player-facing text (NR-002).
-std::string ticks_label(int ticks)
-{
-    std::string s = std::to_string(ticks) + (ticks == 1 ? " qtr" : " qtrs");
-    if (ticks >= 4)
-        s += " (~" + std::to_string(ticks / 4) + " yr)";
-    return s;
-}
-
-// The human status for a build rate + the whole ticks of work left: paused when the
-// market can't feed even the max-stretched rate; otherwise "Building..." with an ETA
-// a sub-1 rate stretches (and flags as scarce).
-std::string construction_status(float rate, int ticks_left)
-{
-    if (rate <= 0.0f)
-        return "Paused - market can't supply materials";
-    if (rate >= 1.0f)
-        return "Building... ~" + ticks_label(ticks_left);
-    const int eta = static_cast<int>(std::ceil(static_cast<float>(ticks_left) / rate));
-    return "Building... ~" + ticks_label(eta) + " (materials scarce)";
-}
-
-// Colour for an analog build status: red paused, amber scarce, green on-schedule.
-ImVec4 construction_status_colour(float rate)
-{
-    return (rate <= 0.0f) ? ImVec4{0.90f, 0.55f, 0.55f, 1.0f}   // paused
-         : (rate < 1.0f)  ? ImVec4{0.85f, 0.75f, 0.45f, 1.0f}   // materials scarce
-                          : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
-}
+// The mirror of `run_construction`'s rate — `ui::read_construction` and its status
+// helpers — lives in construction_panel.hpp and is called from here.
+//
+// It USED to live here as well, a second private copy beside the Construction
+// ledger's, and BL-1342 is what two copies cost: both had drifted off the sim
+// (reading the per-tick FLOW where the sim draws the persistent STOCK, with no
+// capacity row and no fair-price ceiling), so the card promised "ETA 2 qtr" over
+// a build that had not moved in quarters. `construction.md` § "Construction is
+// durative and material-gated" names mirroring `run_construction`'s formula as
+// the contract, and a contract with two implementations has none.
 
 // Headline label for a selected entity. Bodies carry a name; the other kinds
 // have none, so their kind doubles as the title and the stat block supplies the
@@ -1294,9 +1223,10 @@ static std::string draw_building_status_line(const world& w, const recipe_regist
     ImGui::PushTextWrapPos(0.0f);
     if (b.ticks_remaining > 0)
     {
-        const float rate = construction_rate(w, reg, b.type, b.target_resource, b.recipe, b.tile);
-        line = construction_status(rate, b.ticks_remaining);
-        ImGui::TextColored(construction_status_colour(rate), "%s", line.c_str());
+        const construction_read rd = read_construction(w, reg, b.type, b.target_resource,
+                                                       b.recipe, b.tile, b.state_idle);
+        line = construction_status(rd, b.ticks_remaining);
+        ImGui::TextColored(construction_status_colour(rd), "%s", line.c_str());
     }
     else if (open)
     {
@@ -2221,6 +2151,11 @@ struct stack_reading
 {
     std::string text;
     ImU32       colour = palette::text_secondary;
+    /// BL-1343: how far through its build the stack's first unfinished member is,
+    /// in [0,1] — drawn as a thin bar along the button's bottom edge. Valid only
+    /// with `building`.
+    float       progress = 0.0f;
+    bool        building = false;
 };
 
 stack_reading read_stack(const world& w, const recipe_registry& reg,
@@ -2240,15 +2175,24 @@ stack_reading read_stack(const world& w, const recipe_registry& reg,
     // the map, so this is public for a rival's stack too.
     if (complete == 0 && building != null_entity)
     {
-        const building_component& b = w.buildings.at(building);
-        const float rate = construction_rate(w, reg, b.type, b.target_resource, b.recipe, b.tile);
-        out.colour = ImGui::ColorConvertFloat4ToU32(construction_status_colour(rate));
-        if (rate <= 0.0f)
-            out.text = "Paused";
+        const building_component& b  = w.buildings.at(building);
+        const construction_read   rd = read_construction(w, reg, b.type, b.target_resource,
+                                                         b.recipe, b.tile, b.state_idle);
+        out.colour   = ImGui::ColorConvertFloat4ToU32(construction_status_colour(rd));
+        out.progress = construction_progress_fraction(w, reg, b);
+        out.building = true;
+        // BL-1342: a stall NAMES the good holding it, in the few words the stack
+        // button's third line can carry ("Paused - no Steel"). "Paused" alone was
+        // the reading Ben met on a build that had not moved in quarters.
+        const std::string blocker = construction_blocker_phrase(rd);
+        if (rd.paused)
+            out.text = blocker.empty() ? "Paused" : "Paused - " + blocker;
         else
         {
-            const int eta = static_cast<int>(std::ceil(static_cast<float>(b.ticks_remaining) / rate));
+            const int eta = construction_eta_qtrs(rd, b.ticks_remaining);
             out.text = "ETA " + std::to_string(eta) + (eta == 1 ? " qtr" : " qtrs");
+            if (!blocker.empty())
+                out.text += " - " + blocker;
         }
         return out;
     }
@@ -2363,6 +2307,23 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
                      {p.x + pad, p.y + pad + (line_h + gap) * 2.0f}, bw - pad * 2.0f,
                      rd.colour, rd.text.c_str());
 
+        // BL-1343 — the PROGRESS BAR of a stack still building: a 3 px strip along
+        // the button's bottom edge, so it costs no line of the three the button
+        // already spends and an unfinished stack is distinguishable from a running
+        // one at a glance. Fraction is the credit fraction
+        // (`construction_progress_fraction`), the same figure the queue's Progress
+        // column shows, so the two cannot disagree.
+        if (rd.building)
+        {
+            constexpr float strip = 3.0f;
+            const float     y0    = p.y + bh - strip - 1.0f;
+            dl->AddRectFilled({p.x + pad, y0}, {p.x + bw - pad, y0 + strip},
+                              IM_COL32(70, 74, 86, 255), 1.0f);
+            const float fill = (bw - pad * 2.0f) * std::clamp(rd.progress, 0.0f, 1.0f);
+            if (fill > 0.0f)
+                dl->AddRectFilled({p.x + pad, y0}, {p.x + pad + fill, y0 + strip}, rd.colour, 1.0f);
+        }
+
         if (hovered)
         {
             ImGui::BeginTooltip();
@@ -2377,6 +2338,8 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
                                     cit != w.corporations.end() ? cit->second.name.c_str() : "unknown");
             }
             ImGui::TextDisabled("%s", rd.text.c_str());
+            if (rd.building)
+                ImGui::TextDisabled("%.0f%% built", static_cast<double>(rd.progress * 100.0f));
             ImGui::TextDisabled("Press to expand.");
             ImGui::EndTooltip();
         }
@@ -2557,7 +2520,26 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
     }
 
     if (b.ticks_remaining > 0)
-        return; // still building: header, method and status are the card
+    {
+        // BL-1343 (Ben, playtest 2026-10-16: "We should show a progress bar on
+        // constructions") — the card for a SITE is header + method + status, and
+        // the status line's ETA was the only read of how far along it was. One
+        // bar, the shared narrow-list idiom (`charts::draw_value_bar`, ceiling 1),
+        // on the credit fraction the queue's Progress column shows.
+        const float frac = construction_progress_fraction(w, reg, b);
+        ImGui::Spacing();
+        ImGui::TextDisabled("Built");
+        ImGui::SameLine();
+        {
+            constexpr float bar_h = 12.0f;
+            const ImVec2    bp    = ImGui::GetCursorScreenPos();
+            const float     bw    = std::max(40.0f, ImGui::GetContentRegionAvail().x);
+            charts::draw_value_bar(ImGui::GetWindowDrawList(), bp, {bp.x + bw, bp.y + bar_h},
+                                   frac * 100.0f, 100.0f, palette::selection, "%.0f%%");
+            ImGui::Dummy({bw, bar_h});
+        }
+        return; // still building: header, method, status and the progress bar are the card
+    }
     // ── The profit row ── (with data: a fresh campaign has the settle's)
     if (const building_profit p = estimate_building_reading(w, reg, report, bid); p.has_data)
     {
@@ -3417,11 +3399,212 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     ImGui::EndChild();
 }
 
+namespace {
+
+// --- What a build COSTS and what it GIVES (BL-1344) -------------------------
+// Ben, playtest 2026-10-16: "change building tiles in construction to show the
+// cost of building it in both resources and credits, and then the output resource
+// or effect, rather than just the credits expected. And we should remove the
+// 'payback' portion."
+
+/// The MATERIALS a build draws, in the registry's own row — "12 Stone, 4 Timber",
+/// "" where the type needs none. The credit figure beside it (`construction_capex`)
+/// already prices these at the local market, so the two lines are one cost read
+/// from two sides: what leaves the shelf, and what leaves the balance.
+std::string build_material_line(const recipe_registry& reg, building_type type,
+                                resource_type target, std::uint16_t recipe)
+{
+    const auto& row = reg.resource_build_cost_for(type, target, recipe);
+    std::string out;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(row[r] > 0.0f))
+            continue;
+        if (!out.empty())
+            out += ", ";
+        char qty[24];
+        std::snprintf(qty, sizeof qty, "%.0f ", static_cast<double>(row[r]));
+        out += qty;
+        out += resource_name(static_cast<resource_type>(r));
+    }
+    return out;
+}
+
+/// What the building will DO, in one phrase — the output good for a producer, the
+/// effect for infrastructure that has none. The SAME vocabulary the built card's
+/// `building_method_line` uses, in the future tense a candidate needs; a second set
+/// of words for the same types is how a door and a card come to describe different
+/// buildings.
+std::string candidate_effect_line(const recipe_registry& reg, building_type type,
+                                  resource_type target, std::uint16_t recipe_id)
+{
+    char buf[160];
+    switch (type)
+    {
+        case building_type::extraction_site:
+            return std::string("Makes ") + resource_name(target);
+        case building_type::processing_facility:
+        {
+            const recipe* rc = reg.get_recipe(recipe_id);
+            if (rc == nullptr)
+                return "No method set";
+            std::string outs;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (!(rc->outputs[r] > 0.0f))
+                    continue;
+                if (!outs.empty())
+                    outs += ", ";
+                outs += resource_name(static_cast<resource_type>(r));
+            }
+            return outs.empty() ? std::string("Makes nothing yet") : "Makes " + outs;
+        }
+        case building_type::port:
+        case building_type::planetary_marketplace:
+            return "Makes trade points for this market";
+        case building_type::inland_logistics_hub:
+            std::snprintf(buf, sizeof buf, "Cuts haul cost %.0f%% on routes through it",
+                          static_cast<double>(reg.logistics_nodes().hub_discount * 100.0f));
+            return buf;
+        case building_type::launchpad:
+            return "Launches convoys into space";
+        case building_type::military_base:
+            return "Musters units";
+        case building_type::research_institute:
+        case building_type::university:
+            return "Makes research points for its nation";
+        default:
+            return building_type_name(type);
+    }
+}
+
+/// --- How many of this already stand here, and how many more fit (BL-1341) ---
+/// Ben, 2026-10-16: *"For multiple of the same building on one tile, it's not
+/// clear how to build the second level."* Nothing refused him — the stack caps
+/// permit 2-12 non-extraction buildings per tile and `richness / 50` extraction
+/// sites per deposit — so this is an AFFORDANCE defect, not a rule one: the row
+/// never said a second was allowed, nor that Build ADDS one rather than upgrading
+/// the building already there. The road and rail rows beside it ARE upgrades in
+/// place, so the two idioms sit together and must not read alike.
+///
+/// The numbers are the rules' own (`placement_rules`), never a guess, and the
+/// wording keeps the two caps' different shapes: an extraction cap is PER DEPOSIT,
+/// a non-extraction cap is AGGREGATE across every non-extraction type, so the room
+/// left is shared with every other such row on the tile.
+struct stack_room
+{
+    int  of_type = 0; ///< How many of THIS named thing already stand on the tile.
+    int  here    = 0; ///< The occupancy the cap is measured against (aggregate when shared).
+    int  cap     = 0; ///< That ceiling.
+    bool shared = false; ///< The cap (and so the room left) is aggregate, not per type.
+};
+
+stack_room candidate_stack_room(const world& w, const recipe_registry& reg, entity_id tile_id,
+                                const tile_component& tile, building_type type,
+                                resource_type target, const std::string& row_name)
+{
+    stack_room out;
+    out.shared  = (type != building_type::extraction_site);
+    out.of_type = placement_rules::buildings_on_tile(w, tile_id, type, target);
+    // A processing row is a RECIPE GROUP, not a type (BL-434), so counting the
+    // type would tell an Alloy row that the Bloomery beside it is one of its own.
+    // Count what the row actually offers: buildings the player would call by the
+    // row's own name, which is what `building_group_name` answers.
+    if (type == building_type::processing_facility)
+    {
+        out.of_type = 0;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)bid;
+            if (b.tile == tile_id && b.type == type && building_group_name(w, reg, b) == row_name)
+                ++out.of_type;
+        }
+    }
+    out.here    = out.shared ? placement_rules::non_extraction_buildings_on_tile(w, tile_id)
+                             : out.of_type;
+    out.cap     = placement_rules::stack_capacity(tile, type, target);
+    return out;
+}
+
+/// The row's stack line. Present on EVERY valid row, because "you may add another"
+/// is exactly as much news as "this tile is full".
+///
+/// The two caps are worded differently ON PURPOSE. An extraction cap is the
+/// DEPOSIT's, and it is this type's alone. A non-extraction cap is the GROUND's,
+/// and it is shared across every non-extraction building on the tile — so the
+/// aggregate is said as slots used of slots available, never as a count of this
+/// type, which would promise room that the row beside it can take.
+std::string stack_room_line(const stack_room& sr)
+{
+    const int left = std::max(0, sr.cap - sr.here);
+    char buf[200];
+    // "Adds another", never "upgrades": a stacked build is one MORE building with
+    // its own (decayed) output, not a tier. The road and rail rows below ARE
+    // upgrades in place, and the two must not read alike.
+    const char* add = (left > 0) ? " - Build adds another" : "";
+    if (sr.shared)
+    {
+        if (sr.of_type > 0)
+            std::snprintf(buf, sizeof buf, "%d here%s; %d of %d slots on this tile used",
+                          sr.of_type, add, sr.here, sr.cap);
+        else
+            std::snprintf(buf, sizeof buf, "None here; %d of %d slots on this tile used",
+                          sr.here, sr.cap);
+        return buf;
+    }
+    if (sr.of_type > 0)
+        std::snprintf(buf, sizeof buf, "%d here%s; this deposit supports %d", sr.of_type, add,
+                      sr.cap);
+    else
+        std::snprintf(buf, sizeof buf, "None here; this deposit supports %d", sr.cap);
+    return buf;
+}
+
+/// A refusal that NAMES WHAT FILLED THE TILE (BL-1341), where the shared
+/// `placement_reason_text` can only say "No build slot free here" — it has no tile
+/// and no counts. Everything else keeps the shared message verbatim.
+std::string candidate_refusal(const world& w, entity_id tile_id,
+                              const placement_rules::placement_result& pr, const stack_room& sr)
+{
+    char buf[200];
+    if (pr.reason == placement_rules::placement_reason::slot_full)
+    {
+        if (sr.shared)
+            std::snprintf(buf, sizeof buf,
+                          "Full: this ground takes %d buildings of any kind, and %d stand here",
+                          sr.cap, sr.here);
+        else
+            std::snprintf(buf, sizeof buf,
+                          "Full: this deposit supports %d site%s, and %d work%s it",
+                          sr.cap, sr.cap == 1 ? "" : "s", sr.here, sr.here == 1 ? "s" : "");
+        return buf;
+    }
+    if (pr.reason == placement_rules::placement_reason::province_full)
+    {
+        const uint32_t pid = w.provinces.province_of(tile_id);
+        const int ceiling  = (pid != 0) ? province_building_ceiling(w, pid) : -1;
+        const int standing = (pid != 0) ? province_buildings_standing(w, pid) : -1;
+        if (ceiling >= 0)
+        {
+            std::snprintf(buf, sizeof buf,
+                          "The province is full: %d buildings standing of the %d this land "
+                          "sustains - improve it, or build elsewhere",
+                          standing, ceiling);
+            return buf;
+        }
+    }
+    return pr.message();
+}
+
+} // namespace
+
 // The tile construction ledger (BL-162): the tile-contextual surface that actually
 // lets the player build. Lists every building type placeable on the selected tile —
-// each in a bordered container (name + full credit cost + payback + an expected-profit
-// magnitude bar + a reason-coded validity read + a Build action) — and enqueues the
-// chosen build on the tile via the construction.pending_tile seam app executes.
+// each in a bordered container (name + the build cost in materials AND credits +
+// what the building gives + an expected-profit magnitude bar + how many of it
+// already stand on the tile + a reason-coded validity read + a Build action) — and
+// enqueues the chosen build on the tile via the construction.pending_tile seam app
+// executes.
 // Candidates sort by expected net descending on a ceiling shared across the list, so
 // the best options are the ones on screen without scrolling.
 void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui)
@@ -3531,7 +3714,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         bool            produces = false; ///< Extraction/processing earn directly; infrastructure does not.
         int             group    = 0;    ///< Render band: 0 = ranked/priced, 1 = valid unranked, 2 = invalid.
         std::string     category;        ///< Fold group (BL-326): Extraction / Processing / Infrastructure / Military.
-        float           material_rate = 1.0f; ///< construction_rate at this tile (BL-328 pre-commit warning).
+        construction_read crd;           ///< The sim's build rate at this tile (BL-328 pre-commit warning, BL-1342's mirror).
+        stack_room      room;            ///< BL-1341: how many stand here, how many more fit.
+        std::string     materials;       ///< BL-1344: the build cost in goods.
+        std::string     effect;          ///< BL-1344: what the building gives.
     };
     std::vector<candidate> cands;
     for (const resource_type er : placement_rules::k_extractable)
@@ -3629,7 +3815,18 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                                                   ui.max_logistics_reach,
                                                   w.player_entity,
                                                   reg.placement_gate_for(c.type, c.recipe));
-        c.material_rate = construction_rate(w, reg, c.type, c.target, c.recipe, tile_id); // BL-328 pre-commit warning
+        // BL-328 pre-commit warning, on BL-1342's corrected mirror: the market's
+        // persistent stock, the capacity row and the fair-price ceiling, exactly
+        // as run_construction reads them.
+        c.crd       = read_construction(w, reg, c.type, c.target, c.recipe, tile_id);
+        // The row's own identity: a processing row is its recipe's GROUP (the name
+        // the BL-434 collapse gives it below), everything else its own name.
+        c.room      = candidate_stack_room(w, reg, tile_id, tile, c.type, c.target,
+                                           c.type == building_type::processing_facility
+                                               ? recipe_group_of(reg, c.recipe)
+                                               : c.name);
+        c.materials = build_material_line(reg, c.type, c.target, c.recipe);
+        c.effect    = candidate_effect_line(reg, c.type, c.target, c.recipe);
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the
         // materials priced at the local market. This ledger used to gate on build_cost
@@ -3726,18 +3923,27 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // floor, not a ceiling, and a player reads a profit bar as a prediction. Three words
     // stop it reading as the most the building will ever earn (Ben's call, 2026-08-01).
     ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
+    // BL-1344: the payback clause is gone from the rows, so the caption's pointer at
+    // it goes with it. What replaced it is the cost said in full — goods and credits
+    // — which is the honest version of the same sentence: the bar is earnings, the
+    // cost lines above it are cost.
     ImGui::TextWrapped("Est. net / qtr at today's local prices - at least this, before "
-                       "auto-staffing; 50%% staffing, no labour shortage. Capex is not in "
-                       "the bar; see payback.");
+                       "auto-staffing; 50%% staffing, no labour shortage.");
     ImGui::PopStyleColor();
 
-    // Five lines per candidate: name / cost + payback / supply warning (BL-328,
-    // reserved unconditionally so a warning row never clips against a fixed-height
-    // sibling that lacks one) / profit bar / action.
+    // SEVEN lines per candidate (BL-1344 / BL-1341 added two to the five): name /
+    // credits / materials / what it gives / how many stand here / supply warning
+    // (BL-328, reserved unconditionally so a warning row never clips against a
+    // fixed-height sibling that lacks one) / profit bar / action. Every line is
+    // reserved whether or not it has something to say, so the rows stay a uniform
+    // height — the rail rows below share this metric.
     constexpr float bar_h = 14.0f;
     const float     row_h = style.WindowPadding.y * 2.0f
                           + ImGui::GetTextLineHeightWithSpacing()       // name
-                          + ImGui::GetTextLineHeightWithSpacing()       // cost + payback
+                          + ImGui::GetTextLineHeightWithSpacing()       // cost in credits
+                          + ImGui::GetTextLineHeightWithSpacing()       // cost in materials
+                          + ImGui::GetTextLineHeightWithSpacing()       // what it gives
+                          + ImGui::GetTextLineHeightWithSpacing()       // how many stand here
                           + ImGui::GetTextLineHeightWithSpacing()       // supply warning (blank if none)
                           + std::max(bar_h, ImGui::GetTextLineHeight()) // profit bar or its text
                           + style.ItemSpacing.y
@@ -3802,31 +4008,59 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                                c.name.c_str());
         }
 
-        // Cost: one credit total with the materials priced in, then payback (capex over
-        // net) when the candidate earns — net alone ranks earnings and ignores capex.
-        std::string cost = std::to_string(static_cast<int>(c.capex)) + " cr";
-        if (c.group == 0 && c.profit.net() > 0.0f)
-        {
-            const float pb = c.capex / c.profit.net();
-            cost += (pb > 999.0f)
-                    ? std::string(" - payback > 999 qtrs")
-                    : " - payback ~" + std::to_string(static_cast<int>(pb)) + " qtrs";
-        }
-        ImGui::TextDisabled("%s", cost.c_str());
+        // THE COST, BOTH WAYS (BL-1344): the credits the gate charges — the figure
+        // `construction_capex` prices, flat cost plus the materials at this market —
+        // and then the materials themselves, which is what the build actually draws
+        // off the shelf and the half a player can be short of. Payback is GONE
+        // (Ben, 2026-10-16): it divided a capex by a per-quarter net that the first
+        // auto-staffing tick already invalidates, and read as a recommendation.
+        ImGui::TextDisabled("Cost %d cr", static_cast<int>(c.capex));
+        if (!c.materials.empty())
+            fit_text(text_box::table_cell, "build.row.materials",
+                     ("Materials " + c.materials).c_str(),
+                     std::max(24.0f, ImGui::GetContentRegionAvail().x), /*disabled=*/true);
+        else
+            ImGui::TextDisabled("No materials");
 
-        // Pre-commit material-supply warning (BL-328): the same construction_rate the
+        // WHAT IT GIVES: the output good for a producer, the effect in one phrase for
+        // infrastructure that makes nothing (BL-1344).
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, palette::neutral);
+            fit_text(text_box::table_cell, "build.row.effect", c.effect.c_str(),
+                     std::max(24.0f, ImGui::GetContentRegionAvail().x));
+            ImGui::PopStyleColor();
+        }
+
+        // HOW MANY STAND HERE, and that Build adds another (BL-1341). On a refused
+        // row the reason below carries the same fact with its numbers, so the line
+        // is reserved and left blank rather than said twice.
+        if (c.pr.ok())
+            fit_text(text_box::table_cell, "build.row.stack", stack_room_line(c.room).c_str(),
+                     std::max(24.0f, ImGui::GetContentRegionAvail().x), /*disabled=*/true);
+        else
+            ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
+
+        // Pre-commit material-supply warning (BL-328): the same mirror the
         // in-progress building card reads, checked before the player commits capex —
         // "will this stall" answered up front instead of via a post-hoc paused status.
+        // BL-1342 names the good: "will stall" with no subject is the reading that
+        // sent Ben looking at a build with enough goods on the shelf.
         // Gated on c.pr.ok(): an already-invalid tile (ocean, wrong deposit, ...) shows
         // ITS reason below and needs no second, redundant warning stacked on top. The
         // line always occupies its row_h slot (blank when there is nothing to say) so
         // rows stay a uniform height rather than the sibling below clipping into it.
-        if (c.pr.ok() && c.material_rate <= 0.0f)
-            ImGui::TextColored(construction_status_colour(0.0f), "%s",
-                               "No local supply - build will stall");
-        else if (c.pr.ok() && c.material_rate < 1.0f)
-            ImGui::TextColored(construction_status_colour(c.material_rate), "%s",
-                               "Supply-limited - will stretch");
+        if (c.pr.ok() && c.crd.rate < 1.0f)
+        {
+            const std::string blocker = construction_blocker_phrase(c.crd);
+            const std::string warn    = (c.crd.paused ? std::string("Will stall")
+                                                      : std::string("Will stretch"))
+                                      + (blocker.empty() ? std::string() : " - " + blocker);
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImGui::ColorConvertFloat4ToU32(construction_status_colour(c.crd)));
+            fit_text(text_box::table_cell, "build.row.supply", warn.c_str(),
+                     std::max(24.0f, ImGui::GetContentRegionAvail().x));
+            ImGui::PopStyleColor();
+        }
         else
             ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
 
@@ -3872,7 +4106,13 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         }
         else
         {
-            ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", c.pr.message());
+            // BL-1341: a refusal names WHAT filled the tile with the rules' own
+            // counts — the shared placement message has neither a tile nor a cap.
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(230, 140, 140, 255));
+            fit_text(text_box::table_cell, "build.row.refusal",
+                     candidate_refusal(w, tile_id, c.pr, c.room).c_str(),
+                     std::max(24.0f, ImGui::GetContentRegionAvail().x));
+            ImGui::PopStyleColor();
         }
 
         ImGui::EndChild();
