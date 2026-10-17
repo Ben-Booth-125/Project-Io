@@ -1325,6 +1325,27 @@
    ],
    "title": "The UI checks BL-1319 unblocked pass their own claims",
    "design": "BL-1319 (fixture base stall) let stage_ui_fixture complete again on 2026-10-17: all 10 consumer scripts run with 0 script errors. Their own claims, unexercised for months, then failed on the sprint 56 tip: border_band.lua finds no clickable border corridor at zoom 5 even with an 11-line sweep (the frame does show frontiers); lens_structure_pivot.lua 7 fails (under the Market and Corporation lenses a press on ground selects nothing and opens no ledger); shell_pass.lua 15 golden diffs (goldens predate many world movers; re-bless is Ben's, per the golden policy). Decide per script whether the UI or the check is wrong; never weaken a check to pass."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "Rendering",
+   "priority": "A",
+   "difficulty": 4,
+   "id": "BL-1377",
+   "short_name": "GROUND_UNDER_SIX_GB",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.cpp"
+   ],
+   "title": "The game process peaks under 6 GB: the first visit to another body no longer crosses the ceiling",
+   "design": "RENDERING.md § Resident set (Ben, 2026-10-17): the process peaks under 6 GB on every machine. BL-1311 options A+B measured 2026-10-17 (seed 0, Debug, quiet machine, --bench-ground --bench-background 150): 5.85 GB at play open, 6.13 after zoom/pan, 6.64 after the first visit to another body (its drawn body adds ~0.64 GB), 6.66 peak. The pinned home master as RGB is 5.15 GB and the rest of the process ~0.55-0.9 GB, so A+B alone cannot meet the ceiling. Options from the BL-1311 lane: C) keep the master level out of RAM, streaming it around the view from the disk cache (ground ~1.7 GB, overturns home pinned, stand-in risk at the top rung); D) 96 px master (changes the look; Ben chose 128 over 96). Ben's call between them."
   }
  ]
 }
