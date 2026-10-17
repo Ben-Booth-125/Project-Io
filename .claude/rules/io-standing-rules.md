@@ -35,6 +35,11 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   set would let a wrong highlight agree with a wrong assertion — so the script needs the rules'
   answer built independently, which is the only way that check means anything. It reveals nothing
   the screen does not already draw. Verify-only by construction, bound behind `--verify`.
+  **Third (Ben, 2026-10-17), the same family:** `verify.road_admits`'s sibling
+  `verify.find_water_crossing()` may return the position of ONE existing crossing with a water end,
+  so a capture can be aimed at an actual bridge rather than hoping one is on screen or hard-coding
+  coordinates that rot when generation moves. One crossing, its position, and whether both ends are
+  water; nothing else. Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
