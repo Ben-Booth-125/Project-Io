@@ -417,6 +417,15 @@ and both read as annotation laid on a painting. They move into the bake.
 
 ### Roads and sea lanes — smooth curves on their own tiles
 
+**A bridge is the run carried over the water, and nothing more (Ben, 2026-10-17).** A crossing with
+a water end draws as a **deck**: the same tier width, the same colour and the same crossing points
+as the road on either shore, continuous with it. What a deck does *not* carry is any treatment that
+belongs to ground — no verge, ditch, embankment, cut or spoil, and none of the water's own colour,
+because the ground-tint term is dust off the land a road is cut into and a bridge is not made of the
+strait. Its one mark on the water is the narrow shadow the shared light throws. No parapet and no
+ornament: at play zooms a deck is a sub-pixel thread like any other road, and anything added for
+decoration is something a restyle must later undo.
+
 **Roads are part of the ground's tile sets, not threads laid on it** (Ben, 2026-10-10, walking
 the C-F build: *"various tile sets with roads, highways, and railroads on them, so the roads don't
 appear just painted on top … roads curving around hills / buildings, and connecting at various

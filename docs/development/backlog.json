@@ -1701,6 +1701,27 @@
    ],
    "title": "A crossing with a water end never draws: the bake still skips road data on water tiles",
    "design": "SPRINT 55 (Ben, 2026-10-17, at the live click: 'The logic seems to work, but not every road is rendering'). DIAGNOSED BY READING: ground_bake.cpp:748 gates the road copy on 'if (!water && tile_has_road(t))', so a WATER tile never gets s.road[i] or s.road_sides[i] filled at all - that guard predates bridges and Ben's 2026-10-17 bridge ruling invalidated it. Two consequences, both matching what he sees: a bridge deck over water draws nothing, AND the LAND side of a shore crossing draws nothing either, because route_paint.cpp road_links_of (:130) gates every neighbour on on_net(s.road, nc, nr) (:139) and the water neighbour reads as not-on-net, so no link bit is set and no stroke is drawn. Inland roads are unaffected, which is why it reads as 'not EVERY road'. Row parity is NOT the cause - road_links_of already derives the side per parity via hex_side_for_offset. THE WORK: fill s.road / s.road_sides for a water tile that carries a road edge (the deck), let on_net and road_links_of see it, and paint the deck in route_paint, which today has only a sea-lane wake on water. Check the bake_source tile_class water branch does not skip route painting as well. RENDERING.md already rules a road draws as a run crossing the boundary it crosses, so the doc is right and the code is behind it. Verify with a capture of a bridge at a strait and of a shore crossing, and extend scripts/verify/roads.lua to assert a bridged crossing publishes a link bit."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": "Ben: are jetties intended, or should generation stop laying them",
+   "author": "Claude (found delivering BL-1375, 2026-10-17)",
+   "requires": [],
+   "id": "BL-1376",
+   "short_name": "CROSSINGS_TO_NOWHERE",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/road_generation.cpp"
+   ],
+   "title": "Generation lays 105 crossings from land onto a water tile with no continuation, and they now draw as jetties",
+   "design": "SPRINT 55 (found delivering BL-1375, 2026-10-17). Now that a crossing with a water end DRAWS, the data shows what it always held: of 170 water tiles carrying road data on the measured seed, 105 carry only ONE link - a crossing laid from land onto a water tile that continues nowhere. They render as a half-hex jetty into the sea. The renderer is faithful: hiding them would recreate the original defect in a new form, a crossing bought, billed and drawn by nothing, and roads.lua prints the count every run. THE QUESTION IS UPSTREAM: why does road generation lay a crossing onto a water tile with no continuation? Either it is a bridge whose far half the pass failed to lay (then the pass is wrong and should lay both or neither - note it already counts a link as laid only if a crossing was written, so this is a different hole), or a deliberate quay/landing (then it wants a name and a look, not an accident of the road field). BEN'S CALL on which, before anyone 'fixes' it in the renderer. Measure after: the jetty count should go to zero or become an intended, named thing."
   }
  ]
 }

@@ -400,7 +400,9 @@ Highways and demotes its laggards to Track. Only a nation *behind its own world*
 all-Track lattice — engineering above the track is a product of relative, not absolute,
 qualified labour.
 
-**Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
+**Roads are a land feature except where they bridge (§ 4, the 2026-10-17 ruling).** A crossing may
+have water at an end, and a run of such crossings over a strait is a bridge; what a road still
+never does is strike out across *open* ocean — an edge whose route crosses it
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant
 shores. A short crossing made of shore (a strait, TILES.md § Water kinds) does get a road.
 **A bridge spans at most two water tiles** (Ben, 2026-10-03, playing the build: *"bridges can
