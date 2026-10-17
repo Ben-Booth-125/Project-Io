@@ -27,6 +27,14 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   the selected good, and a script had no way to find such ground — so that half of every lens check
   swept blindly or asserted nothing, and a check that cannot aim is not a check. Verify-only by
   construction (`src/core/verify_api.cpp`, bound behind `--verify`).
+  **Second scoped exception (Ben, 2026-10-17):** the verify API may answer *which neighbours a road
+  may legally reach* from one tile — `verify.road_admits(x, y, tier)` returns the admitted sides and
+  their neighbour positions and nothing else. Not terrain, not ownership, not what the tile holds.
+  Reason for the grant: the armed road flow highlights exactly the crossings
+  `placement_rules::can_place_road` admits, and a check that read the highlight's *own* published
+  set would let a wrong highlight agree with a wrong assertion — so the script needs the rules'
+  answer built independently, which is the only way that check means anything. It reveals nothing
+  the screen does not already draw. Verify-only by construction, bound behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of

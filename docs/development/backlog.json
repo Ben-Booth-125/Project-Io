@@ -1616,6 +1616,48 @@
    ],
    "title": "A construction row is two lines tall so text wraps instead of truncating",
    "design": "SPRINT 55 (Ben, 2026-10-17, at the live click on BL-1365/1368): 'looking at the building grids, we are going to have to use two row spaces for each building, this is so that text can wrap to the second row. Many rows truncate the text, and it will look better with text wrap taking up more space.' DESIGNED: construction.md (A row is two lines tall, and text wraps rather than truncating). The columns, their order and their widths all stand - only the row height changes, from one line to TWO, and a column whose text does not fit wraps into the second line instead of eliding through fit_text. The name column was the worst case at about 70 px of stretch. A row needing one line still occupies two, so the grid stays a grid. Apply to all five surfaces that use ui::construction_begin_build_grid - build list, rail rows, queue, tile-card stacks, expanded site card - and update the harness rows that assert the one-line metric (construction_progress asserts row h 20.0 against a 16.0 line; both move). Keep the per-column explainers; wrapping reduces what they must carry but does not replace them."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17) / Claude; filed by Claude",
+   "requires": [],
+   "id": "BL-1372",
+   "short_name": "RAIL_IS_A_CROSSING",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/world_save.cpp",
+    "src/ui/rail_tool.cpp"
+   ],
+   "title": "Rail is stored per tile while a road is a crossing, so the rail row cannot name where it goes",
+   "design": "SPRINT 56 (Ben, 2026-10-17: 'File rail as a crossing'). FOUND delivering BL-1370: the rail track row cannot take the two-press targeting flow because w.rail_track is per TILE and lay_track(tile) names no side - rail has no crossing to aim at. The delivering lane was right to refuse the brief that called it 'the same kind of crossing' and corrected its ACTIONS entry to say it does not arm and why. THE WORK: rail becomes an edge as roads did in BL-1340 - a tier (or presence) per hex side, both tiles carrying it, the discount on the crossing, counts over edges each once, placement naming a tile and a side with the same armed two-press flow and the same crossable-side and land-end rules. A WORLD-MOVER with its own save bump and a migration (between 4-cardinal neighbours that both carried track, lay the edge), and it touches rail reach, which LOGISTICS.md already rules carries 20 tiles point-to-point delivering only at the tile it connects. Measure haulage before and after; sequence after the Logistic Point work, since rail reach feeds it."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17) / Claude; filed by Claude",
+   "requires": [],
+   "id": "BL-1373",
+   "short_name": "WORKTREE_BUILD_SCRIPT",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 1,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [],
+   "title": "A worktree agent cannot invoke build_app.bat, and rebuilds the MSVC environment by hand every time",
+   "design": "SPRINT 56 (found delivering BL-1370/1371, 2026-10-17). An isolated worktree agent cannot invoke cmd.exe at all - the guard refuses it - so build_app.bat and reconfigure.bat are unusable there, and the lane spent about an hour hand-building an MSVC 14.44 / SDK 10.0.26100.0 environment pinned to exactly what build_app.bat pins, then configured its own Ninja/Release build_rel. It worked first try and it deleted the throwaway rather than commit a script outside its brief. SAVE THE TOOL (CLAUDE.md: tool creation is skill creation): commit a build_rel.sh (and a Debug sibling) that does this from Git Bash with the same pinning, so every future worktree agent and the main session share one invocation. Name it in DEVELOPMENT_PRACTICES.md beside build_app.bat and in the verifier skills, and note the toolchain trap it closes (the 14.51-headers-against-14.44-compiler failure that reads as a corrupt STL)."
   }
  ]
 }
