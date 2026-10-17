@@ -1176,6 +1176,132 @@
    ],
    "title": "A later round's reroll can move an earlier round's committed draws, through the viability attempt index",
    "design": "SPRINT 55 (found verifying BL-1339, 2026-10-16). planetology.cpp's comment on the three preference streams claims 'bumping a later round's reroll counter cannot disturb an earlier round's already-committed draw'. That is FALSE: resolve_preferences folds the rejection attempt index k into all three streams (ra/rb/rc), so a Life roll that changes how many attempts the world needs moves the SYSTEM draws too. Observed by tools/verify/life_reroll.cpp: campaign seed 0 roll 7 resolves at attempt 2 and theta moves 1.519 -> 1.462, plate count 9 -> 8; seed 7 roll 3 resolves at attempt 3. Pre-dates BL-1339 (it was already true of the three Life draws) and is only now measured. THE CALL IS BEN'S: either the System draws become attempt-independent (so an accepted round really is committed), or the doc and the comment stop claiming independence. A doc and the code disagree, so one of them is wrong and the fix is work."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17); filed by Claude",
+   "requires": [],
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1370",
+   "short_name": "OPENING_MATERIAL_SHORTAGE",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/economy_system.cpp"
+   ],
+   "title": "The opening economy can finish what it starts: construction sites are not short of materials at handoff",
+   "design": "FILED (Ben, 2026-10-17, BL-1319 call: option C filed beside option A). construction_stall on seed 0 (sprint 56 tip): 107 of 149 sites under construction are short of materials at handoff; over 40 play ticks 114 sites stalled 10+ ticks and 131 of 257 completed. The player cannot finish a military base (300 cr + 35 steel) inside 40 ticks without the verify fixture stocking its shelf. BL-1066 (cancelled) traced the same symptom to steel production collapsing within ~9 ticks and opening stock sold to shelves. Measure per material (construction_stall names the first blocking material per site) across the library seeds before designing."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1371",
+   "short_name": "MONEY_CONSERVATION_ROWS",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "tools/verify/money_conservation.cpp"
+   ],
+   "title": "money_conservation passes: P1.7, P1.8 and P3.0 fail on the sprint 56 base",
+   "design": "Found by the BL-1337 lane 2026-10-17: rows P1.7, P1.8 (buyer paid 182.8125, supplier received 62.8125) and P3.0 fail identically on the unchanged base 169bbabd. Find which side leaks or which row is stale; never weaken a row."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1372",
+   "short_name": "OFFCENTRE_PRESS_SELECTS_TILE",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "scripts/verify/ground_bake.lua"
+   ],
+   "title": "An off-centre press on a single-building tile selects the building, as ground_bake.lua expects",
+   "design": "ground_bake.lua reports 9 expect failures at zoom 5 and 10: a press offset 0.6 r from the centre of a single-building tile selects the tile, not the building. Seen before and after BL-1311 (2026-10-17); the expect dates from sprint 51 (5fd068ed). Decide whether the hit area or the expect is wrong (SELECTION.md)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "Rendering",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1373",
+   "short_name": "SNAPSHOT_FRAME_HITCH",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.cpp"
+   ],
+   "title": "The drawn body source snapshot leaves the main thread: no 32-36 ms hitch every 30 frames",
+   "design": "BL-1247 benchmark (2026-10-17): frame-time budget [4] (16.7 ms) fails; the drawn body source snapshot runs on the main thread every 30 frames at 32-36 ms, which alone explains the Release 1%-low of ~35 ms."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "Rendering",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1374",
+   "short_name": "ZOOM_STAND_INS",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.cpp"
+   ],
+   "title": "No stand-in frame on a zoom step into rungs 3 and 4",
+   "design": "BL-1247 benchmark (2026-10-17): budget [2] fails with 11 stand-in frames, all on zoom steps into rungs 3 and 4; the newly drawn level chunks are not yet on the GPU (8 uploads a frame; prefetch covers only the central half of the finer level)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "Rendering",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1375",
+   "short_name": "RELEASE_SEAT_WAIT",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.cpp"
+   ],
+   "title": "The Release seat wait meets the 15 s pre-bake budget",
+   "design": "BL-1247 benchmark (2026-10-17): the Release reader-paced seat wait reads 24 s (34.8 s click-through) against the 15 s budget, while Debug read 12.7 s on seed 0 under lighter load. Re-measure on an idle machine first; the per-pixel base pass is 57-70% of bake CPU."
   }
  ]
 }
