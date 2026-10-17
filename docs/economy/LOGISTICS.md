@@ -190,6 +190,15 @@ whole while placement stays honest about the road.
 
 ### 4. Roads — an edge between two tiles, generated then extended by hand
 
+**A road runs from one tile centre to another, and may span water (Ben, 2026-10-17).** The link is
+the thing: *"edge means from one tile centre to another, but not only one tile centre. This should
+allow spanning water with bridges."* So a road edge is permitted where either end is **water** — and
+a run of such edges across a strait **is a bridge**, needing no second mechanism and no new field.
+A bridge edge prices as its tier like any other road edge, and a crossing made on one is paid at
+that road price rather than the water's sea-leg price: a bridge that did not beat the water it
+crosses would be a decoration. What remains forbidden is the thing the ruling was aimed at — a road
+that is a property of **one** tile, belonging to no crossing.
+
 **A road crosses the boundary between two tiles; it is never a property of one.** The player's
 words: *"Roads should be directional, so they always cross the edge of two tiles."* A river was
 already an edge and never a tile (`TILES.md`, `river_generation.hpp`); a road now reads the same
