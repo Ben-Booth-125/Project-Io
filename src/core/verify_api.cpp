@@ -4397,10 +4397,54 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["hover"] = r.hover;
             row["x"]     = r.x;
             row["y"]     = r.y;
+            row["h"]     = r.h;
+            sol::table cols = st.create_table();
+            int        cn   = 0;
+            for (const ui_grid_col& gc : r.cols)
+            {
+                sol::table col = st.create_table();
+                col["key"]  = gc.key;
+                col["text"] = gc.text;
+                col["x"]    = gc.x;
+                col["y"]    = gc.y;
+                cols[++cn]  = col;
+            }
+            row["cols"]   = cols;
+            row["n_cols"] = cn;
             rows[++rn]   = row;
         }
         out["rows"]  = rows;
         out["n_rows"] = rn;
+        // BL-1366: the two RAIL rows, in the SAME grid, at the same metric, with
+        // the same per-column cards. Published separately only because
+        // rail_tool.cpp draws them outside the candidate loop.
+        sol::table rail = st.create_table();
+        int        raln = 0;
+        for (const construction_controls::grid_row& r : c.rail_rows)
+        {
+            sol::table row = st.create_table();
+            row["name"]  = r.name;
+            row["hover"] = r.hover;
+            row["x"]     = r.x;
+            row["y"]     = r.y;
+            row["h"]     = r.h;
+            sol::table cols = st.create_table();
+            int        cn   = 0;
+            for (const ui_grid_col& gc : r.cols)
+            {
+                sol::table col = st.create_table();
+                col["key"]  = gc.key;
+                col["text"] = gc.text;
+                col["x"]    = gc.x;
+                col["y"]    = gc.y;
+                cols[++cn]  = col;
+            }
+            row["cols"]   = cols;
+            row["n_cols"] = cn;
+            rail[++raln] = row;
+        }
+        out["rail_rows"]   = rail;
+        out["n_rail_rows"] = raln;
         return out;
     });
 
@@ -4421,6 +4465,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["hover"] = r.hover;
             row["x"]     = r.x;
             row["y"]     = r.y;
+            row["h"]     = r.h;
+            sol::table cols = st.create_table();
+            int        cn   = 0;
+            for (const ui_grid_col& gc : r.cols)
+            {
+                sol::table col = st.create_table();
+                col["key"]  = gc.key;
+                col["text"] = gc.text;
+                col["x"]    = gc.x;
+                col["y"]    = gc.y;
+                cols[++cn]  = col;
+            }
+            row["cols"]   = cols;
+            row["n_cols"] = cn;
             rows[++n]    = row;
         }
         out["rows"]   = rows;
@@ -5013,9 +5071,37 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["first"]  = static_cast<unsigned>(b.first);
             row["x"]      = b.x;
             row["y"]      = b.y;
+            // BL-1368: the stack row's per-column explainers.
+            sol::table cols = st.create_table();
+            int        cn   = 0;
+            for (const ui_grid_col& gc : b.cols)
+            {
+                sol::table col = st.create_table();
+                col["key"]  = gc.key;
+                col["text"] = gc.text;
+                col["x"]    = gc.x;
+                col["y"]    = gc.y;
+                cols[++cn]  = col;
+            }
+            row["cols"]   = cols;
+            row["n_cols"] = cn;
             buttons[++n] = row;
         }
         out["buttons"] = buttons;
+        // BL-1368: the EXPANDED site row's own columns (the under-construction row).
+        sol::table scols = st.create_table();
+        n = 0;
+        for (const ui_grid_col& gc : c.site_cols)
+        {
+            sol::table col = st.create_table();
+            col["key"]  = gc.key;
+            col["text"] = gc.text;
+            col["x"]    = gc.x;
+            col["y"]    = gc.y;
+            scols[++n]  = col;
+        }
+        out["site_cols"]   = scols;
+        out["n_site_cols"] = n;
         return out;
     });
 

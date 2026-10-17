@@ -192,9 +192,36 @@ do
     verify.expect(c.row_h > 0 and c.row_h <= c.line_h + 8.0,
                   string.format("a stack row is one line plus padding (%.1f px / %.1f px line)",
                                 c.row_h, c.line_h))
+    -- BL-1368: the hover is PER COLUMN here too - the owner and the press on the
+    -- name, the good on the pip, the net on the net column, and the stall's named
+    -- good with the progress on the state mark.
+    for _, b in ipairs(c.buttons) do
+        verify.expect(b.n_cols > 0, "stack row '" .. b.label .. "' publishes its columns")
+        local seen = {}
+        for _, col in ipairs(b.cols) do
+            seen[col.key] = col.text
+            verify.expect(col.text ~= "",
+                          "stack row '" .. b.label .. "' column '" .. col.key
+                          .. "' explains itself")
+            verify.expect(#col.text <= 240,
+                          string.format("stack column '%s' explainer is short (%d): '%s'",
+                                        col.key, #col.text, col.text))
+        end
+        for _, key in ipairs({ "name", "makes", "net", "state" }) do
+            verify.expect(seen[key] ~= nil,
+                          "stack row '" .. b.label .. "' carries a '" .. key .. "' explainer")
+        end
+        verify.expect(seen["name"]:find("Press", 1, true) ~= nil,
+                      "the name column says the row is a press: '" .. seen["name"] .. "'")
+    end
     verify.hover(c.buttons[1].x, c.buttons[1].y, 2)
     verify.frames(2)
     verify.capture("tile_card_stack_hover")
+    for _, col in ipairs(c.buttons[1].cols) do
+        verify.hover(col.x, col.y, 2)
+        verify.frames(2)
+        verify.capture("tile_card_stack_col_" .. col.key)
+    end
     verify.hover(860, 300, 2) -- park the pointer on the canvas, off the band (no press)
     verify.frames(2)
     verify.capture("tile_card_built")
@@ -255,6 +282,19 @@ do
             print("tile_card: the pressed building has no profit data yet - profit asserts skipped")
         end
         verify.expect(#e.buttons == 0, "the grid gives way to the expanded card")
+        -- BL-1368: an under-construction site card is ONE grid row, and each of
+        -- its columns explains itself. A finished building has no such row, so
+        -- the columns are asserted only where they are published.
+        for _, col in ipairs(e.site_cols) do
+            verify.expect(col.text ~= "",
+                          "site row column '" .. col.key .. "' explains itself")
+            verify.expect(#col.text <= 240,
+                          string.format("site column '%s' explainer is short (%d): '%s'",
+                                        col.key, #col.text, col.text))
+            verify.hover(col.x, col.y, 2)
+            verify.frames(2)
+            verify.capture("tile_card_site_col_" .. col.key)
+        end
         local cc = verify.construction_controls()
         verify.expect(cc.open_ledger_ok, "the action grid retargets: Open in ledger is on it")
         verify.hover(860, 300, 2)

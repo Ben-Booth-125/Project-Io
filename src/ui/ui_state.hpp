@@ -270,6 +270,21 @@ struct construction_state
     bool          queue_open = false;
 };
 
+/// One construction-grid COLUMN as it was drawn this frame (BL-1368): which
+/// column it is, the explainer its own hover card carries, and the centre of its
+/// cell so a check can hover that column and nothing else.
+///
+/// A construction row is one line of glyphs and abbreviations and each column
+/// explains itself in the hover, so neither half is provable from a capture: the
+/// surface reports its own columns instead. VIEW state, not serialised.
+struct ui_grid_col
+{
+    std::string key;         ///< "name", "cost", "makes", "stack", "state", "bar", "act", "eta", "count".
+    std::string text;        ///< That column's explainer — one or two short sentences.
+    float       x = -1.0f;   ///< The cell's centre, screen px.
+    float       y = -1.0f;
+};
+
 /// Where the Construction ledger's own controls landed on screen this frame, so a
 /// verify script can press the REAL control rather than a computed guess.
 ///
@@ -334,12 +349,26 @@ struct construction_controls
     struct grid_row
     {
         std::string name;        ///< The row's name, unelided.
-        std::string hover;       ///< The hover card's body, newline-joined.
+        std::string hover;       ///< Every column's explainer, newline-joined.
         float       x = -1.0f;   ///< A point inside the row, in screen pixels.
         float       y = -1.0f;
+        /// The height this row was DRAWN at (BL-1366): the rail rows are a
+        /// different draw site from the build list's, so "they are the same grid"
+        /// is only an assertion if each row reports its own metric.
+        float       h = 0.0f;
+        /// BL-1368: one entry per COLUMN, in drawn order — the hover is per column
+        /// now, so a check hovers each cell's own centre and asserts that column's
+        /// own explainer. `hover` above stays the union of these, which is the one
+        /// assertion that nothing was lost when the row-wide card was split.
+        std::vector<ui_grid_col> cols;
     };
     std::vector<grid_row> queue_rows; ///< The in-flight queue's rows.
     std::vector<grid_row> door_rows;  ///< The build list's rows, in drawn order.
+    /// BL-1366: the two RAIL rows (Track, Railway Station) as grid rows. Separate
+    /// from `door_rows` only because they are drawn by rail_tool.cpp outside the
+    /// candidate loop; they are the same grid, the same metric and the same
+    /// per-column cards, which is the property the check asserts.
+    std::vector<grid_row> rail_rows;
     float row_h  = 0.0f; ///< The grid's row height as drawn (one line plus padding).
     float line_h = 0.0f; ///< One text line, so a check can assert row_h is one of them.
 };
@@ -1119,6 +1148,8 @@ struct ui_state
         int         count = 1;
         entity_id   first = null_entity;   ///< The member a press selects.
         float       x = -1.0f, y = -1.0f;  ///< Button centre, screen px.
+        /// BL-1368: the stack row's per-COLUMN explainers, in drawn order.
+        std::vector<ui_grid_col> cols;
     };
     struct tile_card_readout
     {
@@ -1141,6 +1172,10 @@ struct ui_state
         int         population = 0;         ///< The province card's header figure, thousands.
         float       province_scroll_max = 0.0f; ///< The province card's OWN window scroll range (must be 0).
         std::string status;                 ///< The expanded card's status line, "" when none.
+        /// BL-1368: the EXPANDED site row's per-column explainers (the under-
+        /// construction card is one grid row), in drawn order. Empty on a card
+        /// whose building is finished, which has no grid row at all.
+        std::vector<ui_grid_col> site_cols;
         float       back_x = -1.0f, back_y = -1.0f;         ///< The back control's centre.
         int         province_standing = 0;
         int         province_ceiling  = -1;

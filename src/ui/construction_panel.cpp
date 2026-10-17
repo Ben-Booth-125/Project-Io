@@ -279,6 +279,88 @@ void construction_row_card(const char* title, const std::function<void()>& conte
     });
 }
 
+// --- Per-column explainers (BL-1368) ----------------------------------------
+// construction.md § "Each element explains itself, and only itself". One cell,
+// one subject, one or two sentences. The hit-test is a rect per cell so the Build
+// press keeps its click (the same reason the row hit-test was a rect).
+
+grid_explainer construction_cell(const char* key, ImVec2 cursor, float w, std::string text,
+                                 ImU32 ink)
+{
+    const float py = ImGui::GetStyle().CellPadding.y;
+    grid_explainer e;
+    e.key  = key;
+    e.mn   = {cursor.x - construction_grid::pad, cursor.y - py};
+    e.mx   = {cursor.x + w + construction_grid::pad,
+              cursor.y + ImGui::GetTextLineHeight() + py};
+    e.text = std::move(text);
+    e.ink  = ink;
+    return e;
+}
+
+int construction_column_card(const char* title, const std::vector<grid_explainer>& cells)
+{
+    for (std::size_t i = 0; i < cells.size(); ++i)
+    {
+        const grid_explainer& c = cells[i];
+        if (c.text.empty() || !construction_row_hovered(c.mn, c.mx))
+            continue;
+        construction_row_card(title, [&]() {
+            ImGui::PushTextWrapPos(0.0f);
+            if (c.ink != 0)
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(c.ink), "%s", c.text.c_str());
+            else
+                ImGui::TextDisabled("%s", c.text.c_str());
+            ImGui::PopTextWrapPos();
+        });
+        return static_cast<int>(i);
+    }
+    return -1;
+}
+
+std::string construction_cells_text(const std::vector<grid_explainer>& cells)
+{
+    std::string out;
+    for (const grid_explainer& c : cells)
+    {
+        if (c.text.empty())
+            continue;
+        if (!out.empty())
+            out += '\n';
+        out += c.text;
+    }
+    return out;
+}
+
+bool construction_begin_build_grid(const char* id)
+{
+    constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg
+                                    | ImGuiTableFlags_NoPadInnerX
+                                    | ImGuiTableFlags_SizingFixedFit;
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,
+                        {construction_grid::pad, ImGui::GetStyle().CellPadding.y});
+    if (!ImGui::BeginTable(id, 8, flags))
+    {
+        ImGui::PopStyleVar();
+        return false;
+    }
+    ImGui::TableSetupColumn("##glyph", ImGuiTableColumnFlags_WidthFixed, construction_grid::glyph);
+    ImGui::TableSetupColumn("##name",  ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn("##cost",  ImGuiTableColumnFlags_WidthFixed, construction_grid::cost);
+    ImGui::TableSetupColumn("##makes", ImGuiTableColumnFlags_WidthFixed, construction_grid::makes);
+    ImGui::TableSetupColumn("##stack", ImGuiTableColumnFlags_WidthFixed, construction_grid::stack);
+    ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
+    ImGui::TableSetupColumn("##bar",   ImGuiTableColumnFlags_WidthFixed, construction_grid::bar);
+    ImGui::TableSetupColumn("##act",   ImGuiTableColumnFlags_WidthFixed, construction_grid::act);
+    return true;
+}
+
+void construction_end_grid()
+{
+    ImGui::EndTable();
+    ImGui::PopStyleVar();
+}
+
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b)
 {
@@ -475,7 +557,12 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
                         IM_COL32(150, 235, 160, 255));
         ImGui::Dummy({construction_grid::glyph, line_h});
 
+        // BL-1368: one explainer per COLUMN, collected as the row draws and
+        // hit-tested after it — the row-wide card said all six at once.
+        std::vector<grid_explainer> cells;
+
         ImGui::TableSetColumnIndex(1);
+        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
         ImGui::PushID(static_cast<int>(row.id));
         // Pressing a row SELECTS the building — the same navigation the group
         // member rows below offer, and it decides nothing for the player.
@@ -487,10 +574,18 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         // ELIDED to its column instead of pushing the columns right.
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
-        fit_text(text_box::table_cell, "construction.queue.name", row.name.c_str(),
-                 std::max(16.0f, ImGui::GetContentRegionAvail().x));
+        fit_text(text_box::table_cell, "construction.queue.name", row.name.c_str(), name_w);
         ImGui::PopStyleColor();
         ImGui::PopID();
+        // The glyph and the name are one subject: WHICH site this is, where it
+        // stands, and that the row is a press. The glyph's identity keys on what
+        // the site will make (ICONS.md § 1c), so that belongs here too.
+        cells.push_back(construction_cell(
+            "name", gp, construction_grid::glyph + construction_grid::pad * 2.0f + name_w,
+            (row.where.empty() ? std::string("Off the map") : "Stands at " + row.where) + ". "
+                + (row.makes ? std::string("Will make ") + resource_name(row.good) + ". "
+                             : std::string())
+                + "Press the row to select it."));
 
         ImGui::TableSetColumnIndex(2);
         // The authored bands, now the bar's FILL colour: dim (<25 %) / mid
@@ -504,20 +599,50 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
                                   {bp.x + construction_grid::bar, bp.y + line_h - 3.0f},
                                   row.progress, band);
             ImGui::Dummy({construction_grid::bar, line_h});
+            char buf[200];
+            std::snprintf(buf, sizeof buf,
+                          "%.0f%% built - the credits paid in against what the build will cost "
+                          "at today's prices.", static_cast<double>(row.progress * 100.0f));
+            cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf, band));
         }
 
         ImGui::TableSetColumnIndex(3);
         // The ETA the status line gives, not the raw tick count: a stretched build
         // takes longer than its ticks say, and a paused one has no honest ETA — so
         // a paused row prints an em dash and leaves the saying-why to the card.
-        const int eta = construction_eta_qtrs(row.rd, row.ticks_left);
+        const ImVec2 ep  = ImGui::GetCursorScreenPos();
+        const int    eta = construction_eta_qtrs(row.rd, row.ticks_left);
         if (eta < 0)
             ImGui::TextColored(construction_status_colour(row.rd), "\xe2\x80\x94");
         else
             ImGui::TextColored(construction_status_colour(row.rd), "%d", eta);
+        {
+            // The quarters column explains the COUNT, and an em dash is a reading
+            // too: a paused build has no honest ETA, which is why the cell is blank
+            // rather than optimistic. WHY it is paused is the state mark's.
+            char buf[220];
+            if (eta < 0)
+                std::snprintf(buf, sizeof buf,
+                              "No honest estimate while it is paused, so the column shows a dash.");
+            else
+                std::snprintf(buf, sizeof buf,
+                              "About %s left at the rate it is building now.",
+                              ticks_label(eta).c_str());
+            cells.push_back(construction_cell("eta", ep, construction_grid::eta, buf,
+                                              ImGui::ColorConvertFloat4ToU32(
+                                                  construction_status_colour(row.rd))));
+        }
 
         ImGui::TableSetColumnIndex(4);
+        const ImVec2 cp = ImGui::GetCursorScreenPos();
         ImGui::TextDisabled("%s", fmt::abbreviate(static_cast<double>(row.cost_left)).c_str());
+        {
+            char buf[200];
+            std::snprintf(buf, sizeof buf,
+                          "%.0f cr still to pay, at today's prices for the materials it has "
+                          "left to buy.", static_cast<double>(row.cost_left));
+            cells.push_back(construction_cell("cost", cp, construction_grid::cost, buf));
+        }
 
         ImGui::TableSetColumnIndex(5);
         // THE STATE MARK — `icons::value_mark`, the vocabulary's single filled dot
@@ -532,35 +657,31 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             icons::value_mark(dl, {sp.x + construction_grid::state * 0.5f, sp.y + line_h * 0.5f},
                               3.0f, c);
             ImGui::Dummy({construction_grid::state, line_h});
+            // THE MARK NAMES THE GOOD. `construction_status` is the single author
+            // of that clause (through `construction_stall_reason`), so this
+            // explainer and the status line on the site card cannot drift.
+            cells.push_back(construction_cell(
+                "state", sp, construction_grid::state, construction_status(row.rd, row.ticks_left),
+                ImGui::ColorConvertFloat4ToU32(construction_status_colour(row.rd))));
         }
 
-        // EVERYTHING THE LINE DROPPED, in the shared hover card (BL-1365): where
-        // it stands, what it makes in words, the figures the columns abbreviate,
-        // and the stall's named good in the authored sentence — which no ~38 px
-        // cell could ever carry ("Steel is priced above the build ceiling").
-        const std::string status = construction_status(row.rd, row.ticks_left);
-        if (hovered)
-            construction_row_card(row.name.c_str(), [&]() {
-                if (!row.where.empty())
-                    ImGui::TextDisabled("%s", row.where.c_str());
-                if (row.makes)
-                    ImGui::TextDisabled("Makes %s", resource_name(row.good));
-                ImGui::TextDisabled("%.0f%% built", static_cast<double>(row.progress * 100.0f));
-                ImGui::TextDisabled("%.0f cr still to pay", static_cast<double>(row.cost_left));
-                ImGui::PushTextWrapPos(0.0f);
-                ImGui::TextColored(construction_status_colour(row.rd), "%s", status.c_str());
-                ImGui::PopTextWrapPos();
-            });
+        // ONE CARD, FOR THE COLUMN UNDER THE POINTER (BL-1368). The six cells say
+        // between them what the row-wide card said at once — where it stands, what
+        // it makes, the figures the columns abbreviate, and the stall's named good
+        // in the authored sentence — but one column at a time.
+        (void)hovered; // the press is the Selectable's; the cards hit-test their cells
+        construction_column_card(row.name.c_str(), cells);
 
-        // The surface reporting its own rows, so a check can hover the REAL row
-        // and assert the card's words rather than infer them from a picture.
+        // The surface reporting its own rows: a check hovers each CELL's centre and
+        // asserts that column's own explainer, and `hover` stays the union of them.
         construction_controls::grid_row pub;
         pub.name  = row.name;
-        pub.hover = row.where + "\n" + (row.makes ? std::string("Makes ") + resource_name(row.good)
-                                                  : std::string())
-                  + "\n" + status;
+        pub.hover = construction_cells_text(cells);
         pub.x     = gp.x + 24.0f;
         pub.y     = gp.y + line_h * 0.5f;
+        pub.h     = row_h;
+        for (const grid_explainer& e : cells)
+            pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f, (e.mn.y + e.mx.y) * 0.5f});
         ui.construction_ui.queue_rows.push_back(std::move(pub));
     }
 

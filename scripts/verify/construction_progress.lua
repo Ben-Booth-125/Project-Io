@@ -28,6 +28,19 @@
 -- metric and card text, and the check asserts on those AND hovers a real row to
 -- capture the card.
 --
+-- BL-1368 moves the hover PER COLUMN (construction.md § "Each element explains
+-- itself, and only itself"): the cost column explains the cost, the pip what it
+-- makes, the stack figure WHICH cap it counts against, the state mark the good
+-- that stalls it, the bar the estimate, the press a refusal. Every row therefore
+-- publishes one entry per column - key, explainer, and the cell's own centre -
+-- and this check asserts that each expected column HAS an explainer, that it is
+-- short, that the authored stall clause is on the state mark, and then hovers
+-- each column in turn and captures the card it draws.
+--
+-- BL-1366 brings the two RAIL rows into the same grid: they drew a four-line
+-- bordered box between one-line rows, so the check asserts their published row
+-- height is the build list's own and that they carry the same columns.
+--
 -- Run with: ProjectIo --verify scripts/verify/construction_progress.lua
 
 -- 1720x1080, the resolution the shell's widths are tuned against (the same one
@@ -99,6 +112,32 @@ local function names_a_cause(text)
     end
     return nil
 end
+-- BL-1368: the per-column assertions, shared by the queue and the build list.
+-- A column must HAVE an explainer and it must be SHORT - one or two short
+-- sentences was the ruling, and the row-wide card it replaced was eight lines.
+local k_max_explainer = 240
+local function assert_columns(what, row, expected)
+    verify.expect(row.n_cols > 0, what .. " '" .. row.name .. "' publishes its columns")
+    local seen = {}
+    for _, col in ipairs(row.cols) do
+        seen[col.key] = col.text
+        verify.expect(col.text ~= "",
+                      what .. " '" .. row.name .. "' column '" .. col.key
+                      .. "' has an explainer of its own")
+        verify.expect(#col.text <= k_max_explainer,
+                      string.format("%s '%s' column '%s' explainer is short (%d chars): '%s'",
+                                    what, row.name, col.key, #col.text, col.text))
+        verify.expect(col.x > 0 and col.y > 0,
+                      what .. " '" .. row.name .. "' column '" .. col.key
+                      .. "' publishes the cell a check must hover")
+    end
+    for _, key in ipairs(expected) do
+        verify.expect(seen[key] ~= nil,
+                      what .. " '" .. row.name .. "' carries a '" .. key .. "' explainer")
+    end
+    return seen
+end
+
 local stalled_in_queue = 0
 for _, r in ipairs(q.rows) do
     verify.expect(r.hover ~= "", "queue row '" .. r.name .. "' publishes a hover card")
@@ -116,14 +155,32 @@ for _, r in ipairs(q.rows) do
     end
     verify.expect(r.hover:find("Building%.%.%.") ~= nil or paused,
                   "queue row '" .. r.name .. "' card carries its status line")
+    -- BL-1368: six columns, six explainers, and the STATE mark is the one that
+    -- names the good (the authored clause, `construction_stall_reason`'s).
+    local cols = assert_columns("queue row", r, { "name", "bar", "eta", "cost", "state" })
+    if paused then
+        verify.expect(names_a_cause(cols["state"]) ~= nil,
+                      "a paused queue row's STATE MARK names the cause: '" .. cols["state"] .. "'")
+    end
+    verify.expect(cols["bar"]:find("built", 1, true) ~= nil,
+                  "the queue's done bar explains the percentage: '" .. cols["bar"] .. "'")
+    verify.expect(cols["cost"]:find("still to pay", 1, true) ~= nil,
+                  "the queue's cost column explains what is left to pay: '" .. cols["cost"] .. "'")
 end
 print(string.format("construction_progress: %d of %d queue rows are stalled or stretched",
                     stalled_in_queue, q.n_rows))
--- Hover the first queue row and capture the card itself.
+-- Hover the first queue row and capture the card itself, then EACH COLUMN of it
+-- in turn: one card per column is the whole of BL-1368, and it is the half no
+-- single capture can show.
 if q.n_rows > 0 then
     verify.hover(q.rows[1].x, q.rows[1].y, 2)
     verify.frames(2)
     verify.capture("construction_queue_row_hover")
+    for _, col in ipairs(q.rows[1].cols) do
+        verify.hover(col.x, col.y, 2)
+        verify.frames(2)
+        verify.capture("construction_queue_col_" .. col.key)
+    end
 end
 
 -- ── 3. The build door on a tile that already carries one of a type ──────────
@@ -161,20 +218,44 @@ verify.expect(door.row_h > 0 and door.row_h <= door.line_h + 8.0,
 verify.expect(door.n_rows > 0, "the build door published " .. tostring(door.n_rows) .. " grid rows")
 local stalling, refused = 0, 0
 for _, r in ipairs(door.rows) do
-    verify.expect(r.hover:find("Cost ", 1, true) == 1,
-                  "row '" .. r.name .. "' card opens with the cost in full")
-    verify.expect(r.hover:find("Materials ", 1, true) ~= nil
-                  or r.hover:find("No materials", 1, true) ~= nil,
-                  "row '" .. r.name .. "' card carries the MATERIALS the line dropped")
+    -- BL-1368 re-words these two: the cost and the materials are now the COST
+    -- COLUMN's own explainer rather than the first two lines of a row-wide card,
+    -- so the union carries them somewhere rather than at the front.
+    verify.expect(r.hover:find("Costs ", 1, true) ~= nil,
+                  "row '" .. r.name .. "' carries the cost in full")
+    verify.expect(r.hover:find("Materials: ", 1, true) ~= nil
+                  or r.hover:find("no materials", 1, true) ~= nil,
+                  "row '" .. r.name .. "' carries the MATERIALS the line dropped")
     verify.expect(r.hover:find("here", 1, true) ~= nil or r.hover:find("Full", 1, true) ~= nil,
                   "row '" .. r.name .. "' card carries the stack's own sentence")
+    -- BL-1368: EIGHT columns, eight explainers, each about its own column.
+    local cols = assert_columns("build row", r,
+                                { "name", "cost", "makes", "stack", "state", "bar", "act" })
+    verify.expect(cols["cost"]:find("Costs ", 1, true) == 1,
+                  "the cost column's explainer is about the COST: '" .. cols["cost"] .. "'")
+    verify.expect(cols["makes"]:find("Makes", 1, true) ~= nil,
+                  "the pip's explainer says what it MAKES: '" .. cols["makes"] .. "'")
+    verify.expect(cols["stack"]:find("deposit", 1, true) ~= nil
+                  or cols["stack"]:find("ground", 1, true) ~= nil,
+                  "the stack figure's explainer says WHICH CAP it counts against: '"
+                  .. cols["stack"] .. "'")
+    verify.expect(cols["bar"]:find("Est. net", 1, true) ~= nil
+                  or cols["bar"]:find("upkeep", 1, true) ~= nil
+                  or cols["bar"]:find("No estimate", 1, true) ~= nil,
+                  "the bar's explainer is about the ESTIMATE: '" .. cols["bar"] .. "'")
     if r.hover:find("Will stall", 1, true) or r.hover:find("Will stretch", 1, true) then
         stalling = stalling + 1
         verify.expect(names_a_cause(r.hover) ~= nil,
                       "a stalling row's card names the GOOD in the authored words: '"
                       .. r.hover:gsub("%s+", " ") .. "'")
+        verify.expect(names_a_cause(cols["state"]) ~= nil,
+                      "...and it is the STATE MARK that names it: '" .. cols["state"] .. "'")
     end
-    if r.hover:find("Full:", 1, true) then refused = refused + 1 end
+    if r.hover:find("Full:", 1, true) then
+        refused = refused + 1
+        verify.expect(cols["act"]:find("Full:", 1, true) ~= nil,
+                      "a refused row's PRESS explains the refusal: '" .. cols["act"] .. "'")
+    end
 end
 print(string.format("construction_progress: %d build rows, %d will stall or stretch, %d refused full",
                     door.n_rows, stalling, refused))
@@ -182,6 +263,55 @@ print(string.format("construction_progress: %d build rows, %d will stall or stre
 verify.hover(door.rows[1].x, door.rows[1].y, 2)
 verify.frames(2)
 verify.capture("construction_build_row_hover")
+-- ONE CAPTURE PER COLUMN of a real row (BL-1368).
+for _, col in ipairs(door.rows[1].cols) do
+    verify.hover(col.x, col.y, 2)
+    verify.frames(2)
+    verify.capture("construction_build_col_" .. col.key)
+end
+
+-- ── 3b. BL-1366: the rail rows are rows of THIS grid ───────────────────────
+-- They drew a four-line bordered box, so Track and Railway Station sat visibly
+-- taller than the one-line Infrastructure rows above and below them. The rows
+-- only exist where a major nation is seated and the era carries the railway, so
+-- their ABSENCE is not a failure - but where they draw, they are this grid.
+print(string.format("construction_progress: %d rail rows published", door.n_rail_rows))
+for _, r in ipairs(door.rail_rows) do
+    verify.expect(r.h > 0 and math.abs(r.h - door.row_h) < 0.5,
+                  string.format("rail row '%s' is drawn at the SHARED row height (%.1f vs %.1f)",
+                                r.name, r.h, door.row_h))
+    verify.expect(r.h <= door.line_h + 8.0,
+                  string.format("rail row '%s' is one line plus padding (%.1f px / %.1f px line)",
+                                r.name, r.h, door.line_h))
+    local cols = assert_columns("rail row", r,
+                                { "name", "cost", "makes", "stack", "state", "bar", "act" })
+    verify.expect(cols["cost"]:find("treasury", 1, true) ~= nil,
+                  "a rail row's cost column says whose money it is: '" .. cols["cost"] .. "'")
+    verify.expect(cols["bar"]:find("Upkeep", 1, true) ~= nil,
+                  "a rail row's empty bar column carries the upkeep: '" .. cols["bar"] .. "'")
+end
+-- The columns must LAND IN THE SAME PLACE as the build list's, or "the same
+-- grid" is a claim rather than a fact: a column that reads down the list as a
+-- column is the whole of the grid ruling.
+if door.n_rail_rows > 0 and door.n_rows > 0 then
+    local ref = {}
+    for _, col in ipairs(door.rows[1].cols) do ref[col.key] = col.x end
+    for _, r in ipairs(door.rail_rows) do
+        for _, col in ipairs(r.cols) do
+            if ref[col.key] and col.key ~= "name" then
+                verify.expect(math.abs(col.x - ref[col.key]) <= 1.0,
+                              string.format("rail row '%s' column '%s' is in the build list's own "
+                                            .. "column (%.1f vs %.1f)",
+                                            r.name, col.key, col.x, ref[col.key]))
+            end
+        end
+    end
+end
+if door.n_rail_rows > 0 then
+    verify.hover(door.rail_rows[1].x, door.rail_rows[1].y, 2)
+    verify.frames(2)
+    verify.capture("construction_rail_row_hover")
+end
 
 -- ── 4. The tile card: stack reading + the site card's progress bar ──────────
 verify.show_panel("construction", false)
@@ -217,3 +347,26 @@ verify.capture("construction_site_card_progress")
 local sited = verify.tile_card()
 verify.expect(sited.is_expanded, "a building is expanded on the card")
 verify.expect(sited.status ~= "", "the site card drew a status line: " .. sited.status)
+
+-- BL-1368: the expanded SITE row is one grid row, and each of its columns
+-- explains itself - the method on the name, the percentage on the bar, the ETA
+-- on the quarters, what is left to pay on the cost, and the authored stall
+-- clause on the state mark. One capture per column.
+verify.expect(sited.n_site_cols > 0, "the site row published its columns")
+local site_seen = {}
+for _, col in ipairs(sited.site_cols) do
+    site_seen[col.key] = col.text
+    verify.expect(col.text ~= "", "site column '" .. col.key .. "' explains itself")
+    verify.expect(#col.text <= k_max_explainer,
+                  string.format("site column '%s' explainer is short (%d): '%s'",
+                                col.key, #col.text, col.text))
+    verify.hover(col.x, col.y, 2)
+    verify.frames(2)
+    verify.capture("construction_site_col_" .. col.key)
+end
+for _, key in ipairs({ "name", "bar", "eta", "cost", "state" }) do
+    verify.expect(site_seen[key] ~= nil, "the site row carries a '" .. key .. "' explainer")
+end
+verify.expect(site_seen["state"] == sited.status,
+              "the site row's STATE MARK carries the status line verbatim, one author for both: '"
+              .. site_seen["state"] .. "'")

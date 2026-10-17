@@ -190,6 +190,66 @@ bool construction_row_hovered(ImVec2 mn, ImVec2 mx);
 /// selection ink (the row's name, which the grid itself may have elided).
 void construction_row_card(const char* title, const std::function<void()>& content);
 
+// --- EACH ELEMENT EXPLAINS ITSELF, AND ONLY ITSELF (BL-1368) -----------------
+//
+// construction.md § "Each element explains itself, and only itself" (Ben,
+// 2026-10-17): *"I would expect the tooltip to be shorter, and give each element
+// in the row a different explainer."* BL-1365's card answered every column at
+// once, which was right against its own brief and too long in the hand — eight
+// lines to read one figure. The hover is therefore PER COLUMN: the cost column
+// explains the cost, the pip says what the building makes, the stack figure says
+// WHICH cap it counts against, the state mark names the good that stalls it, the
+// bar explains the estimate, the press explains a refusal.
+//
+// A column's explainer is ONE OR TWO SHORT SENTENCES. If it wants more, the
+// column is carrying two facts and should be two columns or one fact.
+//
+// The hit-test is a RECT per cell, not an ImGui item, for the same reason the row
+// hit-test was: an item over the cell would claim the click the Build press needs.
+// The act column is hit-tested exactly like the others, so a disabled Build still
+// explains its refusal while an enabled one still takes the press.
+
+/// One column's own explainer: the cell it occupies, and the sentences that
+/// explain THAT column and nothing else. An empty @ref text means the column has
+/// nothing to say on this row and shows no card at all.
+struct grid_explainer
+{
+    const char* key = "";          ///< Stable column name, published for the checks.
+    ImVec2      mn{0.0f, 0.0f};    ///< The cell's rect, in screen px.
+    ImVec2      mx{0.0f, 0.0f};
+    std::string text;              ///< One or two short sentences.
+    ImU32       ink = 0;           ///< 0 = the disabled ink; otherwise the body's colour.
+};
+
+/// The cell occupied by a column @p w px wide drawn at @p cursor (the
+/// `GetCursorScreenPos` inside the cell), grown by the grid's own cell padding so
+/// neighbouring columns abut with no dead strip between them.
+grid_explainer construction_cell(const char* key, ImVec2 cursor, float w, std::string text,
+                                 ImU32 ink = 0);
+
+/// Hit-test @p cells in order and draw the shared hover card for the FIRST one
+/// the pointer is inside, titled @p title (the row's name, which the grid may
+/// have elided). Returns the index drawn, or -1 for none.
+int construction_column_card(const char* title, const std::vector<grid_explainer>& cells);
+
+/// Every column's explainer, newline-joined — the union a check asserts
+/// "nothing was lost from the row-wide card" against, in one string.
+std::string construction_cells_text(const std::vector<grid_explainer>& cells);
+
+/// The BUILD LIST's eight columns, declared ONCE: glyph | name | cost | makes |
+/// stack | state | bar | act.
+///
+/// Shared so the rail rows (`rail_tool.cpp`) are the SAME grid as the
+/// Infrastructure rows they sit between rather than a second idiom beside them
+/// (BL-1366: they were a four-line bordered box, visibly taller than the one-line
+/// rows above and below). Push/pop the cell padding itself; `construction_end_grid`
+/// undoes both.
+bool construction_begin_build_grid(const char* id);
+
+/// Close a table opened by `construction_begin_build_grid` (or any grid that
+/// pushed the shared cell padding).
+void construction_end_grid();
+
 /// One row of the Buildings view: a building TYPE the player owns at least one of.
 struct building_group
 {

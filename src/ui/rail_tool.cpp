@@ -1,5 +1,7 @@
 #include "rail_tool.hpp"
 
+#include "construction_panel.hpp" // the SHARED grid: columns, row metric, per-column cards
+#include "format.hpp"             // fmt::abbreviate - the cost column's own figure
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "ui_state.hpp"
@@ -13,6 +15,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
+#include <vector>
 
 namespace ui
 {
@@ -42,8 +47,6 @@ bool touches_track(const world& w, entity_id tile, entity_id owner, bool self)
             return true;
     return false;
 }
-
-const ImVec4 k_refusal{0.90f, 0.55f, 0.55f, 1.0f};
 
 } // namespace
 
@@ -138,50 +141,173 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         return;
 
     const float treasury = state_uncommitted_treasury(w, nation);
-    const auto  row = [&](const char* name, float credits, float steel, float upkeep,
-                          const char* refusal, bool& pressed, float& px, float& py) {
-        ImGui::BeginChild(name, {0.0f, row_h}, true,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-        {
-            constexpr float gr = 9.0f;
-            const ImVec2    gp = ImGui::GetCursorScreenPos();
-            icons::building(ImGui::GetWindowDrawList(),
-                            {gp.x + gr, gp.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
+
+    // ONE LINE, IN THE SHARED GRID (BL-1366; construction.md § "The line is a
+    // grid, not a sentence"). These two rows drew a four-line bordered box, so
+    // Track and Railway Station sat visibly taller than the one-line rows above
+    // and below them - the holding action was to hand them the OLD seven-line
+    // metric so they would not clip. They are now the same code as the rows they
+    // sit among: `construction_begin_build_grid`'s eight columns, the shared row
+    // height, and `construction_column_card`'s per-column explainers. The refusal
+    // that used to wrap to two red lines (BL-1255's live click) is the Build
+    // press's own explainer, exactly as a refused building row's is.
+    //
+    // The row's own table rather than the caller's: a nested table would resolve
+    // the stretch name column against one cell's width instead of the panel's, so
+    // the columns would stop lining up - which is the whole point of the grid.
+    const auto grid_row = [&](const char* id, const char* name, bool rail_glyph, float credits,
+                              float steel, float upkeep, int here, int cap, const char* refusal,
+                              bool& pressed, float& px, float& py) {
+        if (!construction_begin_build_grid(id))
+            return;
+        const float line_h = ImGui::GetTextLineHeight();
+        ImDrawList* dl     = ImGui::GetWindowDrawList();
+        std::vector<grid_explainer> cells;
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, row_h);
+        ImGui::PushID(id);
+
+        // Column 0: the glyph, in the same 15 px box as a building row's.
+        ImGui::TableSetColumnIndex(0);
+        const ImVec2 gp = ImGui::GetCursorScreenPos();
+        const float  gr = construction_grid::glyph * 0.5f;
+        if (rail_glyph)
+            icons::rail_line(dl, {gp.x + gr, gp.y + line_h * 0.5f}, gr * 0.76f,
+                             IM_COL32(150, 235, 160, 255));
+        else
+            icons::building(dl, {gp.x + gr, gp.y + line_h * 0.5f}, gr,
                             building_type::railway_station, resource_type::steel,
                             IM_COL32(150, 235, 160, 255));
-            ImGui::Dummy({gr * 2.0f, ImGui::GetTextLineHeight()});
-            ImGui::SameLine();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", name);
-        }
-        if (steel > 0.0f)
-            ImGui::TextDisabled("%.0f cr + %.1f steel", static_cast<double>(credits),
-                                static_cast<double>(steel));
-        else
-            ImGui::TextDisabled("%.0f cr", static_cast<double>(credits));
-        ImGui::TextDisabled("From the treasury (%.0f cr)", static_cast<double>(treasury));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral),
-                           "State industry - upkeep %.2f cr/tick", static_cast<double>(upkeep));
-        if (refusal == nullptr)
+        ImGui::Dummy({construction_grid::glyph, line_h});
+
+        // Column 1: the name.
+        ImGui::TableSetColumnIndex(1);
+        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", name);
+        cells.push_back(construction_cell(
+            "name", gp, construction_grid::glyph + construction_grid::pad * 2.0f + name_w,
+            std::string("State industry: the seat nation builds it, not your corporation.")));
+
+        // Column 2: the cost, abbreviated as every other cost column is.
+        ImGui::TableSetColumnIndex(2);
+        const ImVec2 cp = ImGui::GetCursorScreenPos();
+        ImGui::TextDisabled("%s", fmt::abbreviate(static_cast<double>(credits)).c_str());
         {
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            if (ImGui::Button("Build"))
-                pressed = true;
-            // Published only while the press is on screen: the rows sit in a
-            // scrolled list, and a position a click cannot reach is no press.
-            if (ImGui::IsItemVisible())
-            {
-                px = p.x + ImGui::GetItemRectSize().x * 0.5f;
-                py = p.y + ImGui::GetItemRectSize().y * 0.5f;
-            }
+            char buf[280];
+            if (steel > 0.0f)
+                std::snprintf(buf, sizeof buf,
+                              "Costs %d cr and %.1f Steel off this market's shelf. Both come "
+                              "from the national treasury, which holds %d cr.",
+                              static_cast<int>(credits), static_cast<double>(steel),
+                              static_cast<int>(treasury));
+            else
+                std::snprintf(buf, sizeof buf,
+                              "Costs %d cr from the national treasury, which holds %d cr.",
+                              static_cast<int>(credits), static_cast<int>(treasury));
+            cells.push_back(construction_cell("cost", cp, construction_grid::cost, buf));
         }
-        else
+
+        // Column 3: the pip column stays EMPTY - rail makes no good - and says so.
+        ImGui::TableSetColumnIndex(3);
         {
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextColored(k_refusal, "%s", refusal);
-            ImGui::PopTextWrapPos();
+            const ImVec2 pp = ImGui::GetCursorScreenPos();
+            ImGui::Dummy({construction_grid::makes, line_h});
+            cells.push_back(construction_cell(
+                "makes", pp, construction_grid::makes,
+                rail_glyph ? std::string("Makes no good, so the pip is empty. Track is the line "
+                                         "a railway runs on.")
+                           : std::string("Makes no good, so the pip is empty. A station is where "
+                                         "the railway loads and unloads.")));
         }
-        ImGui::EndChild();
-        ImGui::Spacing();
+
+        // Column 4: the stack, as every other row's "here / cap".
+        ImGui::TableSetColumnIndex(4);
+        const ImVec2 sk = ImGui::GetCursorScreenPos();
+        ImGui::TextDisabled("%d/%d", here, cap);
+        cells.push_back(construction_cell(
+            "stack", sk, construction_grid::stack,
+            rail_glyph
+                ? std::string("A tile carries one length of track, and this one ")
+                      + (here > 0 ? "already does." : "does not yet.")
+                : std::string("A city takes one station, and this one ")
+                      + (here > 0 ? "already has it." : "has none.")));
+
+        // Column 5: the state mark - grey when it will go up, red when refused.
+        ImGui::TableSetColumnIndex(5);
+        {
+            const ImVec2 sp = ImGui::GetCursorScreenPos();
+            icons::value_mark(dl, {sp.x + construction_grid::state * 0.5f, sp.y + line_h * 0.5f},
+                              3.0f,
+                              refusal == nullptr ? IM_COL32(110, 116, 128, 255)
+                                                 : IM_COL32(230, 140, 140, 255));
+            ImGui::Dummy({construction_grid::state, line_h});
+            cells.push_back(construction_cell(
+                "state", sp, construction_grid::state,
+                refusal == nullptr
+                    ? std::string("Nothing is holding it back: the treasury and the ground both "
+                                  "allow it.")
+                    : std::string("Red: this tile refuses it. The Build press says what refused "
+                                  "it."),
+                refusal == nullptr ? 0u : IM_COL32(230, 140, 140, 255)));
+        }
+
+        // Column 6: the profit bar stays EMPTY - state industry earns no corporate
+        // revenue - and the upkeep sentence the old four lines carried lives here.
+        ImGui::TableSetColumnIndex(6);
+        {
+            const ImVec2 bp = ImGui::GetCursorScreenPos();
+            ImGui::Dummy({construction_grid::bar, line_h});
+            char buf[240];
+            std::snprintf(buf, sizeof buf,
+                          "No corporate revenue: the nation owns it. Upkeep %.2f cr / qtr, paid "
+                          "from the treasury.",
+                          static_cast<double>(upkeep));
+            cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf));
+        }
+
+        // Column 7: the press, in the same place as every other row's, DISABLED on
+        // a refusal rather than replaced by a wrapped sentence.
+        ImGui::TableSetColumnIndex(7);
+        const ImVec2 ap = ImGui::GetCursorScreenPos();
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.0f, 0.0f});
+        ImGui::BeginDisabled(refusal != nullptr);
+        if (ImGui::Button("Build"))
+            pressed = true;
+        // Published only while the press is on screen: the rows sit in a scrolled
+        // list, and a position a click cannot reach is no press. A REFUSED row
+        // publishes nothing, which is the absence a check asserts.
+        if (refusal == nullptr && ImGui::IsItemVisible())
+        {
+            px = ap.x + ImGui::GetItemRectSize().x * 0.5f;
+            py = ap.y + ImGui::GetItemRectSize().y * 0.5f;
+        }
+        ImGui::EndDisabled();
+        ImGui::PopStyleVar();
+        ImGui::PopID();
+        {
+            char buf[300];
+            if (refusal != nullptr)
+                std::snprintf(buf, sizeof buf, "%s.", refusal);
+            else
+                std::snprintf(buf, sizeof buf,
+                              "Starts it here and charges the treasury %d cr now.",
+                              static_cast<int>(credits));
+            cells.push_back(construction_cell("act", ap, construction_grid::act, buf,
+                                              refusal == nullptr ? 0u : IM_COL32(230, 140, 140, 255)));
+        }
+
+        construction_column_card(name, cells);
+        construction_controls::grid_row pub;
+        pub.name  = name;
+        pub.hover = construction_cells_text(cells);
+        pub.x     = gp.x + 24.0f;
+        pub.y     = gp.y + line_h * 0.5f;
+        pub.h     = row_h;
+        for (const grid_explainer& e : cells)
+            pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f, (e.mn.y + e.mx.y) * 0.5f});
+        cc.rail_rows.push_back(std::move(pub));
+        cc.row_h  = row_h;
+        cc.line_h = line_h;
+        construction_end_grid();
     };
 
     // Track: the lay_track rule (own ground; a city of the nation, or touching
@@ -202,56 +328,11 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             else if (!std::isfinite(cost) || cost > treasury)
                 why = "Treasury cannot cover it";
         }
-        // Laid out exactly as the road ladder's rows above it (row_h is the
-        // ladder's glyph-box side here): a boxed glyph left, then name, cost,
-        // and Build or a wrapped refusal. The treasury and upkeep lines the
-        // station row carries go to the hover instead.
-        bool        pressed = false;
-        const float img     = row_h;
-        const float credits = std::isfinite(cost) ? cost : 0.0f;
-        ImGui::BeginChild("rail_track##build", {0.0f, 0.0f},
-                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-        ImDrawList*  cdl = ImGui::GetWindowDrawList();
-        const ImVec2 ip  = ImGui::GetCursorScreenPos();
-        const ImVec2 imx = {ip.x + img, ip.y + img};
-        cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
-        cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
-        icons::rail_line(cdl, {ip.x + img * 0.5f, ip.y + img * 0.5f}, img * 0.38f,
-                         IM_COL32(150, 235, 160, 255));
-        ImGui::Dummy({img, img});
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Track");
-        if (steel > 0.0f)
-            ImGui::TextDisabled("%.0f cr + %.1f steel", static_cast<double>(credits),
-                                static_cast<double>(steel));
-        else
-            ImGui::TextDisabled("%.0f cr", static_cast<double>(credits));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("From the treasury (%.0f cr)\nState industry - upkeep %.2f cr/tick",
-                              static_cast<double>(treasury),
-                              static_cast<double>(reg.rail().track_upkeep_per_tile));
-        if (why == nullptr)
-        {
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            if (ImGui::Button("Build"))
-                pressed = true;
-            if (ImGui::IsItemVisible())
-            {
-                cc.rail_track_x = p.x + ImGui::GetItemRectSize().x * 0.5f;
-                cc.rail_track_y = p.y + ImGui::GetItemRectSize().y * 0.5f;
-            }
-        }
-        else
-        {
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextColored(k_refusal, "%s", why);
-            ImGui::PopTextWrapPos();
-        }
-        ImGui::EndGroup();
-        ImGui::EndChild();
-        ImGui::Spacing();
+        bool pressed = false;
+        grid_row("rail_track##build", "Track", /*rail_glyph=*/true,
+                 std::isfinite(cost) ? cost : 0.0f, steel, reg.rail().track_upkeep_per_tile,
+                 w.rail_track.count(tile) != 0 ? 1 : 0, 1, why, pressed,
+                 cc.rail_track_x, cc.rail_track_y);
         if (pressed)
             ui.construction.pending_track_tile = tile;
     }
@@ -263,10 +344,18 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
                                               resource_type::iron_ore);
         if (rail_station_tile_ok(w, nation, tile, &why) && (!std::isfinite(cost) || cost > treasury))
             why = "Treasury cannot cover it";
+        int standing = 0;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)bid;
+            if (b.type == building_type::railway_station && b.tile == tile)
+                ++standing;
+        }
         bool pressed = false;
-        row("Railway Station", std::isfinite(cost) ? cost : 0.0f, 0.0f,
-            reg.economics(building_type::railway_station).maintenance, why, pressed,
-            cc.rail_station_x, cc.rail_station_y);
+        grid_row("rail_station##build", "Railway Station", /*rail_glyph=*/false,
+                 std::isfinite(cost) ? cost : 0.0f, 0.0f,
+                 reg.economics(building_type::railway_station).maintenance, standing, 1, why,
+                 pressed, cc.rail_station_x, cc.rail_station_y);
         if (pressed)
             ui.construction.pending_station_tile = tile;
     }
