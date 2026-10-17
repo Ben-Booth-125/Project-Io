@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*28 entries — 27 open, 1 resolved.*
+*29 entries — 28 open, 1 resolved.*
 
 ---
 
@@ -240,6 +240,13 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 The strait rule anchors a territory at its core, the group holding the capital. The closing rounds read the realm's seat at the close (polity::capital), but Pass 5 placed the capital on the lowest-indexed seed, which can sit in a different territory; on seed 12 at 6:1 that ceded a 2,475-tile heartland. The lane made Pass 5 seat a nation on its lowest seed INSIDE its territory, moving at most one capital per world. Neither NATION_GENERATION.md nor the brief names this.
 
 **Why it matters.** Pass 5 capital placement feeds the seat, the treasury's home and every capital-keyed reading; a quiet rule change there is scope growth.
+
+### NR-1051 — BL-1311 (ground paint perf) builds the ground bake at /O2 in Debug: a new object library and CMake policy CMP0184
+*novel-work · raised 2026-10-17 · from BL-1311 lane report (commit 3af45cdb); CMakeLists.txt*
+
+The four bake files (ground_bake, structure_stamps, route_paint, terrain_palette) now build as their own library at /O2 even in Debug, with runtime checks off; CMake policy CMP0184 is switched on so Debug runtime checks become a per-target property, and /RTC1 is stripped from the cached Debug flags for top-level targets (they keep the checks through the property). IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=OFF restores single-stepping. Existing build trees rebuild once. This cut the Debug seat wait from 750 s to 12.7 s with byte-identical captures.
+
+**Why it matters.** It changes what the Debug build means for one subsystem (no runtime checks, not steppable by default) and touches every build tree; a build-system change is project-wide scope.
 
 ---
 
