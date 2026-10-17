@@ -172,6 +172,13 @@ struct generation_cursor
     /// rule as the chests above, so Pass 5 inherits the name the wizard's last
     /// board printed. Empty when no span ran.
     std::vector<std::string> kepler_polity_names;
+    /// BL-1310 (NATION_GENERATION.md sec Pass 2d, Ben 2026-10-17): per polity
+    /// id, its seat (`polity::capital`, a region index) at the same close as
+    /// the names, -1 for a dead realm -- the nation's capital. And which span
+    /// closed last (1 Empires, 2 Exploration, 3 Industrialisation; 0 none), so
+    /// a cession the tail takes is recorded as an event of that span.
+    std::vector<int> kepler_polity_seats;
+    int              kepler_last_span = 0;
 
     /// BL-1159: indexed by POLITY id, each polity's own industrial crossing year
     /// (`polity::industrial_year`, `k_never_industrialised` for one that never
