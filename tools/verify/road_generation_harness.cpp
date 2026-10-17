@@ -940,6 +940,15 @@ struct shipped_highway_row
     std::vector<std::string> offenders;  // writer, ends, run
     int    refused_candidates = 0, refused_spurs = 0, refused_border = 0, refused_ancient = 0;
     int    ancient_laid = 0, ancient_corridors = 0;
+    // R7b -- A BRIDGE IS LAID WHOLE OR NOT AT ALL (BL-1376, Ben 2026-10-17). Read off the
+    // SHIPPED field, before the re-lay below resets it: a water tile carrying exactly one
+    // crossing is half a bridge -- a deck from a shore onto water that continues nowhere,
+    // which the C-F ground draws as a jetty. The count must be zero.
+    int    water_road_tiles = 0, water_one_link = 0, water_no_link_side = 0;
+    // The crossings the three writers refused for that reason: the national lattice (read
+    // off the re-lay, the only national stats this harness holds), then the shipped
+    // ancient-corridor and market passes.
+    int    half_national = 0, half_ancient = 0, half_market = 0;
     int    nations_with_towns = 0, nations_split = 0;
 };
 
@@ -964,6 +973,27 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
     std::map<entity_id, std::uint8_t> shipped_level;
     for (const auto& [tid, tc] : w.tiles)
         if (tc.body == body) shipped_level[tid] = tile_tier(tc); // BL-1340: the tile's best
+
+    // R7b (BL-1376): the shipped field's water tiles, by how many crossings each carries.
+    // Only a side a four-cardinal walk can cross counts as a link, which is what the
+    // renderer draws and what scripts/verify/roads.lua reports as a deck's link count; a
+    // road on one of the other two sides is counted apart (it should never happen).
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body || !is_water(tc.substrate) || tc.road_edges == 0)
+            continue;
+        ++r.water_road_tiles;
+        int links = 0, off = 0;
+        for (int sd = 0; sd < 6; ++sd)
+        {
+            if (road_tier_on_side(tc, sd) == 0) continue;
+            if (road_side_is_crossable(sd, tc.grid_y)) ++links; else ++off;
+        }
+        if (links == 1) ++r.water_one_link;
+        r.water_no_link_side += off;
+    }
+    r.half_ancient = out.report.history_roads.half_crossings_refused;
+    r.half_market  = out.report.market_roads.half_crossings_refused;
 
     // Centre scale per tile (the highest standing there) and City+ per nation.
     std::map<entity_id, int> scale_at;
@@ -1077,6 +1107,7 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
     for (const auto& [tid, lvl] : lanes) w.tiles[tid].lane_level = lvl;
     r.links_two_major = st.links_two_major;
     r.links_highway   = st.links_highway;
+    r.half_national   = st.half_crossings_refused;
     tier_census(w, body, r.national_tiers);
     for (const auto& [tid, tc] : w.tiles)
     {
@@ -1356,6 +1387,33 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
           "R7 no laid road route, by any writer (national tree/loop/spur/border, ancient corridor,"
           " market join/pull/trunk), crosses a water run longer than two tiles (Ben, 2026-10-03),"
           " each offender named by its writer");
+
+    // R7b — A BRIDGE IS LAID WHOLE OR NOT AT ALL (BL-1376, Ben 2026-10-17). The cap above
+    // bounds how FAR a bridge reaches; this bounds whether it ARRIVES. A water tile carrying
+    // one crossing is a deck laid from a shore onto water that continues nowhere — drawn as a
+    // jetty since the deck landed, and on the measured seed 105 of 170 roaded water tiles were
+    // one. Read off the shipped field, so it holds whatever writer laid it.
+    std::printf("      seed | roaded water tiles | of them ONE crossing (a jetty) | roads on an"
+                " uncrossable side | half crossings refused: national/ancient/market\n");
+    long long wt_tiles = 0, wt_one = 0, wt_off = 0, hn = 0, ha = 0, hm = 0;
+    for (const shipped_highway_row& r : hrows)
+    {
+        std::printf("      %4u | %5d | %5d | %d | %d/%d/%d\n", r.seed, r.water_road_tiles,
+                    r.water_one_link, r.water_no_link_side, r.half_national, r.half_ancient,
+                    r.half_market);
+        wt_tiles += r.water_road_tiles;
+        wt_one   += r.water_one_link;
+        wt_off   += r.water_no_link_side;
+        hn += r.half_national; ha += r.half_ancient; hm += r.half_market;
+    }
+    std::printf("      (R7b pooled: %lld roaded water tile(s), %lld with ONE crossing, %lld road(s)"
+                " on an uncrossable side; half crossings refused national %lld, ancient %lld,"
+                " market %lld)\n", wt_tiles, wt_one, wt_off, hn, ha, hm);
+    check(wt_one == 0,
+          "R7b no water tile of the shipped field carries exactly ONE crossing: a bridge is laid"
+          " whole or not at all (Ben, 2026-10-17), so generation lays no jetty");
+    check(wt_off == 0,
+          "R7b' no water tile carries a road on a side no four-cardinal walk can cross");
 
     // R6 — roads pull toward markets (BL-1138), per seed then pooled.
     std::printf("      (R6 roads pull toward markets, BL-1138; K = %d neighbours, detour ratio %.2f)\n",

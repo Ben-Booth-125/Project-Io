@@ -199,6 +199,14 @@ strait, and spanning is all it does — without the rule the only brake on walki
 open ocean, cell by paid cell, is the price of each crossing. Generation never threads open sea
 anyway, so the rules differ only in the middle of a two-cell strait, where the player must build
 from a shore rather than from the water; that difference is accepted as the cost of the brake.
+**A bridge is laid whole or not at all (Ben, 2026-10-17).** Generation lays both halves of a
+crossing or neither: a route whose first or last cells are water cannot finish that crossing, so
+its whole terminal water run is dropped and the route is laid up to the last shore. A single
+crossing from a shore onto water that continues nowhere is a jetty, not a bridge — nothing is
+designed to stand on it, upkeep bills it, and the ground draws it — so the rule is that the pass
+never lays one, rather than that the renderer declines to draw it. A corridor to a region anchored
+on coastal water therefore reaches that shore and stops, and a crossing refused this way is
+counted and named like any other refusal.
 A bridge edge prices as its tier like any other road edge, and a crossing made on one is paid at
 that road price rather than the water's sea-leg price: a bridge that did not beat the water it
 crosses would be a decoration. What remains forbidden is the thing the ruling was aimed at — a road

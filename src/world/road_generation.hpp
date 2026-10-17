@@ -162,6 +162,10 @@ struct road_generation_stats
     int spurs_laid           = 0; ///< villages that laid a spur
     int spurs_failed         = 0; ///< at/above the floor, but no target within the cap / by land
     int border_pairs         = 0; ///< territorially-adjacent nation pairs walked
+    /// BL-1376 -- crossings refused because they would be HALF a bridge: a route whose
+    /// first or last cells are water cannot complete that crossing, so its whole terminal
+    /// water run is dropped (Ben, 2026-10-17: lay both halves of a bridge or neither).
+    int half_crossings_refused = 0;
     /// Adjacent pairs where one side holds no centre on its network (no town, no
     /// spurring village), so no link is tried (Ben, 2026-09-25: a border link ends only
     /// on a town or a spurring village).
@@ -226,6 +230,10 @@ struct history_road_stats
     /// BL-1252: corridor stretches the snap re-walked onto the road they ran beside.
     long long snaps                 = 0;
     long long snaps_refused_cost    = 0; ///< re-walks the snap's cost bound refused
+    /// BL-1376 -- crossings refused because they would be HALF a bridge: a route whose
+    /// first or last cells are water cannot complete that crossing, so its whole terminal
+    /// water run is dropped (Ben, 2026-10-17: lay both halves of a bridge or neither).
+    int half_crossings_refused = 0;
 };
 
 /// Every corridor one `stamp_history_roads` call LAID, whole (the bridge-cap row reads
@@ -355,6 +363,10 @@ struct market_road_stats
     int trunk_empty           = 0; ///< admitted, but the route held no land tile: nothing laid
     int tiles_raised          = 0; ///< distinct land tiles the pass laid a road edge on
     long long walks           = 0; ///< Dijkstra walks the pass ran (its cost)
+    /// BL-1376 -- crossings refused because they would be HALF a bridge: a route whose
+    /// first or last cells are water cannot complete that crossing, so its whole terminal
+    /// water run is dropped (Ben, 2026-10-17: lay both halves of a bridge or neither).
+    int half_crossings_refused = 0;
 };
 
 /// Every link one call considered, whole, for a harness. WRITE-ONLY.

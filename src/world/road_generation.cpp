@@ -440,6 +440,58 @@ struct road_snapper
     }
 };
 
+/// The crossings of a route a writer may lay, as a half-open index range, and how many
+/// it must drop.
+///
+/// BL-1376 — A BRIDGE IS LAID WHOLE OR NOT AT ALL (Ben, 2026-10-17). Since the ruling let a
+/// crossing have a water end, every consecutive pair of a route was laid, water included — and
+/// a route whose FIRST or LAST cells are water then laid a deck from the shore onto water that
+/// continues nowhere. On the measured seed 105 of the 170 water tiles carrying road data held
+/// exactly ONE crossing: half-hex jetties into the sea, laid, counted, billed by upkeep and
+/// now drawn. They are not a landing or a quay — nothing is designed to stand on them — so the
+/// pass stops laying them rather than the renderer stopping drawing them.
+///
+/// The atomic unit is therefore the route's **terminal water run**. An INTERIOR water run is
+/// bounded by land on both sides by construction, so its whole bridge — both shore crossings
+/// and the span between them — is laid as before; a run that reaches either end of the route
+/// cannot be completed by anybody, so every crossing of it is dropped and counted. Nothing
+/// else about the route changes: the land part of a corridor to a water-anchored region is
+/// still laid, up to the last shore.
+///
+/// Neither the two-water-tile cap nor the no-open-ocean rule is touched: both still refuse the
+/// whole route upstream (`crossing_kind`), and this only narrows what a route already admitted
+/// may write.
+struct crossing_window
+{
+    int lo      = 0; ///< first crossing index that may be laid
+    int hi      = 0; ///< one past the last
+    int dropped = 0; ///< crossings refused: a terminal water run's half crossings
+};
+
+/// @p n cells, @p wet telling water from land by cell index.
+template <class Wet>
+crossing_window layable_crossings(std::size_t n, Wet&& wet)
+{
+    crossing_window cw{};
+    if (n < 2)
+        return cw; // a one-cell route lays nothing: a road is an edge
+    const int ncross = static_cast<int>(n) - 1;
+    int       lead = 0, trail = 0;
+    while (lead < static_cast<int>(n) && wet(static_cast<std::size_t>(lead)))
+        ++lead;
+    if (lead == static_cast<int>(n))
+    {
+        cw.dropped = ncross; // every cell water: no crossing here has a land end to finish on
+        return cw;
+    }
+    while (trail < static_cast<int>(n) && wet(n - 1 - static_cast<std::size_t>(trail)))
+        ++trail;
+    cw.lo      = std::min(lead, ncross);
+    cw.hi      = std::max(cw.lo, ncross - trail);
+    cw.dropped = ncross - (cw.hi - cw.lo);
+    return cw;
+}
+
 /// Stamp a road of @p level along the A* path between two tiles, taking the max on
 /// overlap and skipping WATER OF EVERY KIND (roads are a land feature). No-op if unreachable, or
 /// if the route crosses open sea rather than a strait (see kMaxCrossingTiles). Returns whether
@@ -447,10 +499,12 @@ struct road_snapper
 /// the village-spur pass feeds these back as future spur targets). @p too_long, when given,
 /// counts a refusal the bridge cap alone made (a shore crossing longer than kMaxCrossingTiles).
 /// @p snapper, when given, re-walks the route's parallel stretches onto the road beside them
-/// before the stamp (BL-1252, above). The route laid is left in `g_last_laid` for the traces.
+/// before the stamp (BL-1252, above). @p half_dropped, when given, counts the crossings a
+/// terminal water run cost this route (BL-1376, `layable_crossings`). The route laid is left in
+/// `g_last_laid` for the traces.
 bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level,
                 std::vector<entity_id>* stamped = nullptr, int* too_long = nullptr,
-                road_snapper* snapper = nullptr)
+                road_snapper* snapper = nullptr, int* half_dropped = nullptr)
 {
     const logistics_path& p = intra_body_path(w, body, ta, tb);
     if (!p.reachable)
@@ -474,12 +528,21 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     // together (`lay_road_edge`). A single-tile route lays nothing — a road to nowhere
     // cannot be expressed. WATER NO LONGER ENDS THE RUN (Ben, 2026-10-17): the crossings
     // over a strait are the BRIDGE, and the route was already refused unless its water
-    // runs are straits (`crossing_kind`), so no bridge is laid over open sea. `stamped`
+    // runs are straits (`crossing_kind`), so no bridge is laid over open sea. BL-1376
+    // narrows that to the run a bridge can finish: a water run reaching either END of the
+    // route is dropped whole (`layable_crossings`), so no half crossing is written. `stamped`
     // still reports the TILES the route touched, which is what its readers (the traces,
     // the spur's "is this tile joined") ask of it.
     bool raised = false; // probe-only reading
     int  joined = 0;      // crossings of the route that carry a road once the stamp is done
-    for (std::size_t k = 0; k + 1 < g_last_laid.size(); ++k)
+    // BL-1376: a terminal water run's crossings are HALF a bridge, so they are not laid.
+    const crossing_window cw = layable_crossings(g_last_laid.size(), [&](std::size_t i) {
+        const auto it = w.tiles.find(g_last_laid[i]);
+        return it != w.tiles.end() && is_water(it->second.substrate);
+    });
+    if (half_dropped != nullptr)
+        *half_dropped += cw.dropped;
+    for (std::size_t k = static_cast<std::size_t>(cw.lo); k < static_cast<std::size_t>(cw.hi); ++k)
     {
         const entity_id a = g_last_laid[k], b = g_last_laid[k + 1];
         const int side = road_side_between(w, a, b);
@@ -1003,7 +1066,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                 stamped.clear();
                 const bool laid =
                     stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped,
-                               nullptr, &snapper);
+                               nullptr, &snapper, &st.half_crossings_refused);
                 if (!laid)
                     ++(is_tree ? st.tree_links_refused : st.loops_refused);
                 else
@@ -1072,7 +1135,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                         break;
                     stamped.clear();
                     if (!stamp_edge(w, body, nodes[m].tile, best[s].tile, kTrack, &stamped,
-                                    &st.spurs_long_crossing, &snapper))
+                                    &st.spurs_long_crossing, &snapper,
+                                    &st.half_crossings_refused))
                         continue; // unreachable or open-sea route: try the next-nearest
                     for (const entity_id t : stamped)
                         if (nation_of(w, t) == nation)
@@ -1234,7 +1298,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         const entity_id best_a = toward_a ? best_to : best_from; // nation A's endpoint
         const entity_id best_b = toward_a ? best_from : best_to; // nation B's endpoint
         if (best_from != null_entity
-            && stamp_edge(w, body, best_from, best_to, kTrack, nullptr, &st.border_long_crossing, &snapper))
+            && stamp_edge(w, body, best_from, best_to, kTrack, nullptr, &st.border_long_crossing,
+                          &snapper, &st.half_crossings_refused))
         {
             record(road_generation_trace::kind::border, best_from, best_to, na);
             ++st.border_links;
@@ -1352,10 +1417,12 @@ void stamp_history_roads(world& w, entity_id body,
         const entity_id to   = toward_a ? ta : tb;
 
         // A region anchored on coastal water is legitimate (BL-777, the water
-        // ownership ruling), and it simply carries no road: stamp_edge skips
-        // every water tile, and the strait rule refuses a route that crosses
-        // open ocean. Neither is special-cased here — the ancient network obeys
-        // the same land rule the national lattice does.
+        // ownership ruling), and it simply carries no road: the corridor is laid
+        // up to the last shore and the crossing ONTO the anchor is dropped, because
+        // nothing continues past it (BL-1376, `layable_crossings` — this pass was the
+        // largest source of the half crossings that ruling removed). The strait rule
+        // still refuses a route that crosses open ocean. Neither is special-cased
+        // here — the ancient network obeys the same rules the national lattice does.
         // BL-949: a corridor the sim carried at its THIRD rung (a Post Road,
         // `history_corridor::tier` 3 -- bought with capital, not walked) stamps
         // at the campaign ladder's top grade whatever its traffic reads. Read
@@ -1364,7 +1431,8 @@ void stamp_history_roads(world& w, entity_id body,
         if (c.tier >= 3) tier = kHighway;
         ++hs.corridors;
         destinations.insert(to);
-        if (stamp_edge(w, body, from, to, tier, nullptr, &hs.refused_long_crossing, &snapper))
+        if (stamp_edge(w, body, from, to, tier, nullptr, &hs.refused_long_crossing, &snapper,
+                       &hs.half_crossings_refused))
         {
             ++hs.laid;
             if (trace != nullptr) // write-only: the route stamp_edge just laid (BL-1252: snapped)
@@ -1677,7 +1745,13 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
             if (path != nullptr) path->push_back(g.tile[static_cast<std::size_t>(c)]);
             if (is_land(c)) ++land;
         }
-        for (std::size_t k = 0; k + 1 < cells.size(); ++k)
+        // BL-1376: a bridge is laid whole or not at all, so a water run reaching either END
+        // of the route — a join or pull that walks onto a water-centred market, say — is
+        // dropped whole rather than laying a deck into open water (`layable_crossings`).
+        const crossing_window cw =
+            layable_crossings(cells.size(), [&](std::size_t i) { return !is_land(cells[i]); });
+        st.half_crossings_refused += cw.dropped;
+        for (std::size_t k = static_cast<std::size_t>(cw.lo); k < static_cast<std::size_t>(cw.hi); ++k)
         {
             const std::size_t ca = static_cast<std::size_t>(cells[k]);
             const std::size_t cb = static_cast<std::size_t>(cells[k + 1]);
