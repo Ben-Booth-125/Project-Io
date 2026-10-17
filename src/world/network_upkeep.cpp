@@ -1,5 +1,6 @@
 #include "network_upkeep.hpp"
 
+#include "logistics.hpp" // BL-1340: count_road_edges_by_nation — the one edge counter
 #include "world.hpp"
 
 #include <algorithm>
@@ -60,7 +61,7 @@ bool pool_price_admitted(const world& w, entity_id pool_key, std::size_t ri, flo
 /// walks that fill it commute and the result is hash-layout-independent.
 struct network_size
 {
-    int roads[3] = {0, 0, 0}; ///< Tiles at road_level 1 / 2 / 3.
+    int roads[3] = {0, 0, 0}; ///< EDGES at tier 1 / 2 / 3 (BL-1340), each counted once.
     int hubs     = 0;         ///< Active ports + inland logistics hubs.
 };
 
@@ -104,16 +105,16 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
     // serialisation seam. Both source maps are unordered, but only integer
     // increments land here, which commute; the keyed std::map makes every walk
     // AFTER this point ascending-order.
+    // BL-1340 — A ROAD IS AN EDGE, SO THE BILL COUNTS EDGES, through the ONE counter
+    // (`count_road_edges_by_nation`, logistics.cpp) rather than a loop of its own: each
+    // crossing once, attributed to the nation at either end so a road whose canonical half
+    // sits on unowned frontier ground is still billed to the nation that holds the other
+    // end (review of 0831de6d — the hand-rolled loop here dropped about half of every
+    // frontier road, selected by grid orientation alone).
     std::map<entity_id, network_size> sizes;
-    for (const auto& [tile, nid] : w.tile_to_nation)
-    {
-        const auto tit = w.tiles.find(tile);
-        if (tit == w.tiles.end())
-            continue;
-        const std::uint8_t lvl = tit->second.road_level;
-        if (lvl >= 1 && lvl <= 3)
-            ++sizes[nid].roads[lvl - 1];
-    }
+    for (const auto& [nid, tiers] : count_road_edges_by_nation(w))
+        for (std::size_t i = 0; i < 3; ++i)
+            sizes[nid].roads[i] = tiers[i];
     for (const auto& [bid, bc] : w.buildings)
     {
         if (bc.type != building_type::port && bc.type != building_type::inland_logistics_hub)

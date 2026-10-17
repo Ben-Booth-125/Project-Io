@@ -67,7 +67,7 @@ reading read_world(world& w)
     {
         const auto it = w.tiles.find(grid[static_cast<std::size_t>(i)]);
         if (it == w.tiles.end() || is_water(it->second.substrate)) continue;
-        const int lv = std::min<int>(3, it->second.road_level);
+        const int lv = std::min<int>(3, max_road_tier(it->second));
         ++r.tier[lv];
         road[static_cast<std::size_t>(i)] = lv > 0;
     }
@@ -124,7 +124,7 @@ reading read_world(world& w)
         {
             const auto& tc = w.tiles.at(t);
             if (is_water(tc.substrate)) continue;
-            ++l.land; l.roaded += tc.road_level > 0;
+            ++l.land; l.roaded += tile_has_road(tc) ? 1 : 0;
         }
         return l;
     };

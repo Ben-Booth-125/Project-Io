@@ -1894,6 +1894,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 entity_id    best_body = null_entity;
                 float        best_net  = 0.0f;
                 std::uint8_t best_tier = 1;
+                std::uint8_t best_side = k_road_side_auto; // BL-1340: the crossing to raise
                 for (const extraction_site& s : ranked_sites)
                 {
                     // Tile-level placement must still hold (terrain, tech,
@@ -1940,15 +1941,38 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // unreached tile upgrades it rather than re-requesting a
                     // tier it already holds (which `place_road` refuses as
                     // `invalid_tile`, benign per APPLY THEN COUNT below).
-                    best_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(tc.road_level + 1));
+                    // ONE TILE, ONE CROSSING TO IMPROVE (review of 0831de6d). Raising
+                    // `max_road_tier + 1` and leaving the side to the auto-pick bought a
+                    // NEW edge on a fresh side every time, so the same tile could be paid
+                    // for eighteen times (six sides x three tiers) instead of three, with
+                    // nothing joined. The candidate names the crossing the tile ALREADY
+                    // has — its best, ties to the lower side index — and asks for one
+                    // tier more; a tile with no crossing yet leaves the side unnamed and
+                    // takes the cheapest one `place_road` resolves.
+                    best_side = k_road_side_auto;
+                    std::uint8_t have = 0;
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        const std::uint8_t t = road_tier_on_side(tc, s);
+                        if (t > have && road_side_is_crossable(s, tc.grid_y))
+                        {
+                            have = t;
+                            best_side = static_cast<std::uint8_t>(s);
+                        }
+                    }
+                    best_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(have + 1));
                 }
 
                 if (best_tile != null_entity)
                 {
-                    // ROAD candidate: raising this tile's own road_level
-                    // discounts its traversal cost (road_traversal_multiplier),
-                    // which feeds directly into body_reach_field's Dijkstra
-                    // edge costs — the same mechanism the Reach lens reads.
+                    // ROAD candidate: a road is an EDGE (BL-1340), so the command names
+                    // the tile and leaves the SIDE unnamed (`k_road_side_auto`) —
+                    // place_road then lays the cheapest land crossing out of it, lowest
+                    // traversal cost and ties to the lower side index. That discounts the
+                    // edge (road_edge_discount), which feeds directly into
+                    // body_reach_field's Dijkstra — the same mechanism the Reach lens
+                    // reads. The scorer picks a tile and a tier; the geometry is the
+                    // verb's, not a plan.
                     {
                         const road_economics& rex = reg.road_econ(best_tier);
                         candidate c;
@@ -1956,6 +1980,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.verb      = corp_verb::place_road;
                         c.cmd.tile      = best_tile;
                         c.cmd.road_tier = best_tier;
+                        c.cmd.road_side = best_side;
                         // Modest relative to the site it targets: a road does
                         // not itself earn revenue, it unlocks a FUTURE build's,
                         // so it is priced UNDER the build curve rather than

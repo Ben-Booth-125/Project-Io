@@ -3,6 +3,7 @@
 #include "ground_bake.hpp"
 #include "terrain_palette.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/river_generation.hpp" // BL-1340: hex_side_for_offset — a road crosses an edge
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -121,6 +122,35 @@ inline bool on_net(const std::vector<std::uint8_t>& lv, const bake_source& s, in
 /// Link bits (E, W, S, N = bits 0-3) of tile (c, r) on network @p lv. Lanes
 /// skip RUNGS: a link between two tiles that both run straight through along
 /// the other axis (the canvas rule, symmetric so the halves still meet).
+/// BL-1340: the ROAD's link bits. A link exists where the tile's own edge mask carries a
+/// tier across that boundary and the neighbour is on the network and revealed — so a run
+/// is drawn across the edge the world laid, never between two tiles that merely both
+/// carry roads elsewhere. RAIL stays a tile field (BL-1255) and keeps the neighbour rule:
+/// a rail tile at either end of the step links as it always did.
+std::uint8_t road_links_of(const bake_source& s, int c, int r)
+{
+    const std::size_t i = static_cast<std::size_t>(r) * s.gw + c;
+    const std::uint16_t mask = i < s.road_sides.size() ? s.road_sides[i] : 0;
+    const bool self_rail = i < s.road.size() && s.road[i] == k_route_rail;
+    std::uint8_t bits = 0;
+    for (int n = 0; n < 4; ++n)
+    {
+        const int nc = c + k_card[n][0], nr = r + k_card[n][1];
+        if (!on_net(s.road, s, nc, nr))
+            continue;
+        const int cw = ((nc % s.gw) + s.gw) % s.gw;
+        const std::size_t ni = static_cast<std::size_t>(nr) * s.gw + cw;
+        const bool rail = self_rail || (ni < s.road.size() && s.road[ni] == k_route_rail);
+        const int side = hex_side_for_offset(k_card[n][0], k_card[n][1], (r & 1) != 0);
+        const std::uint8_t tier = (side >= 0)
+            ? static_cast<std::uint8_t>((mask >> (2 * side)) & 0x3u) : 0;
+        if (!rail && tier == 0)
+            continue;
+        bits |= static_cast<std::uint8_t>(1u << n);
+    }
+    return bits;
+}
+
 std::uint8_t links_of(const std::vector<std::uint8_t>& lv, const bake_source& s, int c, int r,
                       bool skip_rungs)
 {
@@ -927,6 +957,7 @@ void rederive_routes(bake_source& s)
 {
     const std::size_t n = static_cast<std::size_t>(s.gw) * s.gh;
     s.road.resize(n, 0);
+    s.road_sides.resize(n, 0); // BL-1340
     s.lane.resize(n, 0);
     s.route_links.assign(n, 0);
     s.near_route.assign(n, 0);
@@ -940,7 +971,7 @@ void rederive_routes(bake_source& s)
         const int r = static_cast<int>(i) / s.gw, c = static_cast<int>(i) % s.gw;
         std::uint8_t bits = 0;
         if (s.road[i])
-            bits |= links_of(s.road, s, c, r, false);
+            bits |= road_links_of(s, c, r); // BL-1340: the edges, not the neighbours
         if (s.lane[i])
             bits |= static_cast<std::uint8_t>(links_of(s.lane, s, c, r, true) << 4);
         s.route_links[i] = bits;

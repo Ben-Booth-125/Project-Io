@@ -160,7 +160,8 @@ int main()
         const float before = reach_at(f, 10, 0);
 
         for (int c = 0; c <= 10; ++c)
-            f.w.tiles.at(at(f, c, 0)).road_level = 3; // highway the whole corridor
+            f.w.tiles.at(at(f, c, 0)).road_edges =
+                road_edges_on_every_side(3); // BL-1340: highway every crossing of the corridor
         f.w.body_reach_cost.clear();
         const float after = reach_at(f, 10, 0);
 

@@ -353,7 +353,7 @@ struct market_road_stats
     int trunk_refused         = 0; ///< pairs the detour test refused (a serviceable route exists)
     int trunk_laid            = 0; ///< laid, with a land tile on the route
     int trunk_empty           = 0; ///< admitted, but the route held no land tile: nothing laid
-    int tiles_raised          = 0; ///< distinct land tiles whose road_level the pass raised
+    int tiles_raised          = 0; ///< distinct land tiles the pass laid a road edge on
     long long walks           = 0; ///< Dijkstra walks the pass ran (its cost)
 };
 
@@ -381,9 +381,10 @@ struct market_road_trace
         std::vector<entity_id> path;         ///< the direct route, from -> to (laid links only)
     };
     std::vector<link> links;
-    /// Every raise the pass made, in order: (tile, road_level before the raise). Undoing
-    /// them all, last first, gives the field exactly as the pass found it.
-    std::vector<std::pair<entity_id, std::uint8_t>> raises;
+    /// Every raise the pass made, in order: (tile, its whole `road_edges` mask before the
+    /// raise — BL-1340, a road is an edge, so both ends of a crossing get a record).
+    /// Undoing them all, last first, gives the field exactly as the pass found it.
+    std::vector<std::pair<entity_id, std::uint16_t>> raises;
 };
 
 /// BL-621: each nation's qualification PERCENTILE among the world's nations, mid-rank on

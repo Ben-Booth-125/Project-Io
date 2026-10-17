@@ -258,20 +258,23 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         fold_f32(h, v.trust);
     }
 
-    // Road tier per tile, SPARSE: (tile, tier) for every tile carrying a road,
-    // in ascending tile id. Complete as a detector — two worlds that differ on
-    // any tile's tier differ in this list — and it keeps the walk proportional
-    // to the network rather than to the grid.
+    // Road EDGES per tile, SPARSE (BL-1340: a road is an edge between two tiles):
+    // (tile, six-side mask) for every tile any side of which carries a road, in ascending
+    // tile id. Complete as a detector — two worlds that differ on any crossing differ in
+    // this list, and the mask carries which SIDE as well as which tier, which the old
+    // one-tier-a-tile term could not — and it keeps the walk proportional to the network
+    // rather than to the grid. THE DIGEST MOVES WITH THIS ITEM: every world that has a
+    // road folds a different term here than it did at v52.
     {
         std::vector<entity_id> roads;
         for (const auto& [tid, tc] : w.tiles)
-            if (tc.road_level != 0) roads.push_back(tid);
+            if (tc.road_edges != 0) roads.push_back(tid);
         std::sort(roads.begin(), roads.end());
         fold_u32(h, static_cast<uint32_t>(roads.size()));
         for (const entity_id tid : roads)
         {
             fold_u32(h, tid);
-            fold_u32(h, w.tiles.at(tid).road_level);
+            fold_u32(h, w.tiles.at(tid).road_edges);
         }
     }
 

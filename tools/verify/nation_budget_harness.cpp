@@ -1498,7 +1498,7 @@ int main()
             tc.body       = body;
             tc.grid_x     = x;
             tc.grid_y     = y;
-            tc.road_level = road;
+            tc.road_edges = road_edges_on_every_side(road); // BL-1340: a road is an edge
             w.tiles[t] = tc;
             if (nation != null_entity)
                 w.tile_to_nation[t] = nation;

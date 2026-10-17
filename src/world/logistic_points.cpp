@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"       // body_tile_grid, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
+#include "river_generation.hpp" // BL-1340: hex_side_for_offset — a step prices the edge it crosses
 
 #include <algorithm>
 #include <cmath>
@@ -60,8 +61,12 @@ float lp_reach(lp_network n, float d)
 
 namespace {
 
-/// Cost of stepping INTO @p tc on network @p n; negative = impassable.
-float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_network n)
+/// Cost of stepping INTO @p tc on network @p n, having left @p from across its hex side
+/// @p side; negative = impassable. BL-1340: the road rung is the EDGE's tier — the
+/// crossing the step actually makes — not a property of either tile, so a step off the
+/// network pays `lp_offnet_step` even between two tiles that each carry roads elsewhere.
+float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_network n,
+                const tile_component& from, int side)
 {
     const bool water = is_water(tc.substrate);
     switch (n)
@@ -70,7 +75,7 @@ float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_net
         {
             if (water)
                 return -1.0f;
-            const std::uint8_t lvl = tc.road_level;
+            const std::uint8_t lvl = road_tier_on_side(from, side);
             return (lvl >= 1 && lvl <= 3) ? lp_road_step[lvl] : lp_offnet_step;
         }
         case lp_network::rail:
@@ -120,15 +125,23 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
         const int x = tc.grid_x, y = tc.grid_y;
         const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
                              y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
-        for (const int c : cand)
+        // BL-1340: the hex side of each cardinal step, in the same order as `cand`
+        // (N, E, S, W), read off the tile being LEFT — so the step prices the edge it
+        // crosses. The two diagonal hex sides a 4-cardinal walk skips carry no road a
+        // step can use, which is the geometry the river discount already lives with.
+        const int step_dc[4] = {  0,  1,  0, -1 };
+        const int step_dr[4] = { -1,  0,  1,  0 };
+        for (int ci = 0; ci < 4; ++ci)
         {
+            const int c = cand[ci];
             if (c < 0 || static_cast<std::size_t>(c) >= grid.size())
                 continue;
             const entity_id nt = grid[static_cast<std::size_t>(c)];
             if (nt == null_entity)
                 continue;
             const tile_component& ntc = w.tiles.at(nt);
-            const float sc = step_cost(w, nt, ntc, n);
+            const int side = hex_side_for_offset(step_dc[ci], step_dr[ci], (y & 1) != 0);
+            const float sc = step_cost(w, nt, ntc, n, tc, side);
             if (sc < 0.0f)
                 continue;
             const float nd = d + sc;

@@ -14,7 +14,8 @@
 // ---------------------------------------------------------------------------
 // Terrain-weighted A* over a body's tile grid: the shortest weighted path
 // between two tiles, each tile weighted by its landform build-cost (TILES.md)
-// and discounted by road_level, respecting the east-west cylinder wrap. Ocean
+// and each EDGE discounted by the road and river crossing it (BL-1340: a road
+// is an edge, not a tile), respecting the east-west cylinder wrap. Ocean
 // tiles are crossable at a higher "sea-leg" cost, so a path exists on any
 // connected body; whether the cheapest path touches ocean selects sea vs land
 // mode. Results cache on `world` (body_tile_index + astar_cost_cache), so the
@@ -31,18 +32,113 @@
 /// determinism).
 float landform_logistics_cost(terrain_landform lf);
 
-/// Traversal-cost multiplier for a tile's road tier (BL-077). Tier 0 = 1.0 (no road);
-/// higher tiers reduce the cost so A* prefers roaded corridors. 0 everywhere in the
-/// core (roads arrive with BL-146); wired here so the follow-on needs no A* change.
-float road_traversal_multiplier(std::uint8_t road_level);
+/// Traversal-cost multiplier for a road tier (BL-077 ladder). Tier 0 = 1.0 (no road);
+/// higher tiers reduce the cost so A* prefers roaded corridors. BL-1340: the ladder is
+/// unchanged, but it is read of an EDGE's tier, never a tile's — `road_edge_discount` is
+/// the cost model's one caller.
+float road_traversal_multiplier(std::uint8_t tier);
 
-/// A tile's traversal-cost WEIGHT — ocean or landform cost, discounted by
-/// road_level. The per-node weight A*, body_reach_field's Dijkstra, and (BL-470)
-/// a marching unit all share; an edge/hop cost is the mean of its two nodes.
+/// Per-EDGE road discount (BL-1340; LOGISTICS.md § 1 and § 4): the multiplier for the
+/// step that leaves @p from across its hex side @p side. 1.0 where that side carries no
+/// road. SYMMETRIC, unlike the river discount: the mirror invariant means the facing side
+/// of the neighbour holds the same tier, so a road costs the same both ways and adds no
+/// direction to a path. Stacks MULTIPLICATIVELY with `river_edge_discount`, exactly where
+/// that one is applied.
+///
+/// @param from  The tile being left (the "from" node of the hop).
+/// @param side  Hex side index (0-5, hex_side_for_offset's ordering) the hop crosses.
+float road_edge_discount(const tile_component& from, int side);
+
+/// A BRIDGE DECK'S OWN WEIGHT (BL-1340; LOGISTICS.md § 4, "A road runs from one tile
+/// centre to another, and may span water", Ben 2026-10-17). A road edge may span water,
+/// and a run of such edges IS a bridge; what a crossing on one costs is its ROAD tier's
+/// price, not the water's sea leg — "a bridge that did not beat the water it crosses
+/// would be a decoration". So the water node of a roaded edge is priced as the road's own
+/// surface, plains 1.0, before the tier discount. Neither the sea leg nor a sea lane is
+/// read on a bridged node: a bridge is road, not water.
+inline constexpr float k_bridge_deck_cost = 1.0f;
+
+/// One NODE's weight inside an edge whose road tier is @p tier: the bridge deck where the
+/// node is water and the edge carries a road, `tile_traversal_cost` otherwise (BL-1340).
+float road_edge_node_cost(const tile_component& tc, std::uint8_t tier);
+
+/// THE ONE HOP PRICE (BL-1340), shared by every consumer so none can drift: the step that
+/// leaves @p from across its hex side @p side and lands on @p to costs the MEAN of the two
+/// nodes' weights, times the river discount of that side of @p from (directed — downstream
+/// is cheaper), times the ROAD discount of the crossing (symmetric). Water nodes of a
+/// roaded edge are priced as the bridge deck. @p side < 0 (not neighbours) prices the mean
+/// alone. Called by both intra-body floods (`flood_edge_cost`), the reach field, the sea
+/// leg, `lane_clock`, and `run_unit_march`.
+///
+/// @param read_river  false suppresses the river term alone (the road, the bridge deck and
+///        the node mean are unchanged). `body_reach_field` passes false: reach is a SCALAR
+///        per tile, read as "can this be supplied", and a river's discount runs one way
+///        only — a directed term in an undirected field would make reach depend on which
+///        way it was asked. Everything that prices a DIRECTED hop leaves it true.
+float edge_traversal_cost(const tile_component& from, const tile_component& to, int side,
+                          bool read_river = true);
+
+/// A tile's traversal-cost WEIGHT — ocean or landform cost, discounted by a sea lane
+/// where one lies on it. The per-node weight A*, body_reach_field's Dijkstra, and
+/// (BL-470) a marching unit all share; a hop's cost is the mean of its two nodes times
+/// the edge's own river and ROAD discounts (BL-1340: a road is an edge, so it is no
+/// longer a term here).
 /// Exposed (promoted out of logistics.cpp's anonymous namespace) so run_unit_march
 /// (economy_system.cpp) spends march points against the SAME cost function
 /// rather than a second invented model.
 float tile_traversal_cost(const tile_component& tc);
+
+/// The hex side of @p a that a step @p a -> @p b crosses, honouring the east-west
+/// cylinder wrap; -1 if the two are not neighbours, not on one body, or unknown. The
+/// one place a raster step becomes a SIDE, so every consumer of the edge road reads the
+/// same geometry (BL-1340).
+int road_side_between(const world& w, entity_id a, entity_id b);
+
+/// The tile across hex side @p side of @p tile, honouring the east-west cylinder wrap;
+/// null_entity where the grid has no such neighbour — the top and bottom rows do not
+/// wrap (BL-1340). The CONST overload is the placement-rule / UI read: it uses the
+/// body raster cache when one is warm and falls back to a single scan of the tile map
+/// when it is not, so a const caller never has to warm a cache to ask who adjoins whom.
+entity_id road_edge_neighbour(world& w, entity_id tile, int side);
+entity_id road_edge_neighbour(const world& w, entity_id tile, int side);
+
+/// Lay a road of @p tier on hex side @p side of tile @p tile, writing BOTH halves of the
+/// edge — @p side of @p tile and the facing side of the neighbour across it — so the
+/// mirror invariant holds by construction (BL-1340). Raises only: an edge already at or
+/// above @p tier is left alone. Does NOT invalidate the logistics caches; the caller does
+/// that once per batch.
+///
+/// EITHER END MAY BE WATER (Ben, 2026-10-17): a run of such edges is a bridge, and no
+/// second mechanism or field expresses one. What is still impossible is a road belonging
+/// to no crossing — the thing the ruling was aimed at.
+///
+/// @return false (nothing written) if the tile is unknown, @p side has no neighbour on the
+///         grid (the top and bottom rows do not wrap), or the edge already stands at
+///         @p tier or better.
+bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier);
+
+/// Every road edge in the world, counted ONCE (BL-1340): a tile's sides 0-2 (E, NE, NW)
+/// are the canonical half of every crossing — the facing sides 3-5 are those same edges
+/// seen from the other end — so walking every tile and reading only those three sides
+/// counts each edge exactly once. @p per_tier (optional, 3 ints) takes the Track / Road /
+/// Highway split.
+int count_road_edges(const world& w, int* per_tier = nullptr);
+
+/// The same count, SPLIT BY THE NATION THAT HOLDS IT (BL-1340; review of 0831de6d): per
+/// nation, how many road edges at tier 1 / 2 / 3. Attribution is by EITHER END — the
+/// nation of the tile that sees the edge from its canonical half, or, where that ground is
+/// unowned, the nation at the other end. Billing the canonical half alone left about half
+/// of every frontier road unbilled, selected by nothing but grid orientation. An edge
+/// between two nations is one nation's; an edge nobody holds is nobody's and appears under
+/// no key. THE ONE COUNTER every production reader shares, so the rule verified in
+/// tools/verify/road_edges.cpp is the rule that runs.
+std::map<entity_id, std::array<int, 3>> count_road_edges_by_nation(const world& w);
+
+/// THE MIRROR INVARIANT (BL-1340; LOGISTICS.md § 4): for every tile and every side whose
+/// neighbour is present on the grid, the neighbour's facing side carries the same tier.
+/// Asserted after generation and on load — a world that fails it is not a world.
+/// @p bad_tile (optional) takes the first offending tile in tile-id order.
+bool road_edges_mirrored(const world& w, entity_id* bad_tile = nullptr);
 
 /// Per-body raster index (grid_y*grid_width + grid_x -> tile entity, null_entity for an
 /// absent cell), built and cached in world.body_tile_index on first use. Deterministic —

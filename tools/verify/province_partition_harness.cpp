@@ -718,7 +718,7 @@ int main()
     // partition exactly. The replay guard — and, since BL-623 (provinces
     // before roads), the guard of the two-call generation shape: the world
     // recomputed from here carries stamped roads and post-partition anchor
-    // foundings, and the fill must reproduce anyway, because road_level is not
+    // foundings, and the fill must reproduce anyway, because the road field is not
     // an input and `province_anchor` centres are seed-skipped. The homeworld's
     // early partition and the end-of-generation rebuild agree by exactly this
     // property.

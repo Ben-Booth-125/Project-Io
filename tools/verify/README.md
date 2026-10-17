@@ -1035,6 +1035,30 @@ differ while presence does not — the series moves by about a percent over the 
 the check is sized to that honestly rather than to a swing the physics does not give. D7/D8 hold
 the world to still feeding and fuelling itself after the split.
 
+## road_edges — BL-1340, a road is an edge between two tiles
+
+Ben, from a playtest 2026-10-16: *"Roads should be directional, so they always cross the edge of two
+tiles."* A road moved off the tile and onto the EDGE, where a river already was:
+`tile_component::road_edges` holds a tier per hex side, two bits each, and both tiles of a crossing
+carry it (side *i* mirroring side *i+3 mod 6*). LOGISTICS.md § 4 is the design; this is its guard.
+
+**M1/M2** the mirror invariant over a generated world, with no crossing touching water — the
+invariant everything else rests on, since a half-written edge would price a hop differently
+depending on which way it was asked · **C1** `count_road_edges` reads sides 0-2 only, and an
+independent walk of all six sides comes to exactly twice it, which is what every count of the
+network (Logistic Points, network upkeep) now rests on · **E1** the ladder falls with tier and a
+real `intra_body_path` hop costs strictly less across a laid crossing than with it taken away — the
+row that proves the discount reaches the pathfinder · **E2** the same crossing prices the step
+identically both ways, unlike a river · **S1** the v53 save round-trips byte-identically, mask for
+mask · **S2** a pre-v53 stream (`write_world_snapshot_pre_road_edges`, verification-only) migrates
+to the LOWER of each adjacent pair's two tiers, checked against an independent recomputation ·
+**S3** one half of one crossing tampered with in the stream and the load is refused whole, the
+target world untouched · **D1** two generations of one seed lay the same edges.
+
+```
+node tools/verify/build_harness.js road_edges --run
+```
+
 ## life_reroll — BL-1339, does the wizard's Life Reroll give another world?
 
 The Life round's Reroll bumps `world_preferences::roll[1]`, whose only consumer was

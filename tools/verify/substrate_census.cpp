@@ -266,10 +266,10 @@ census_row measure(const world& w, uint32_t seed)
         if (idx < 0 || idx >= total) continue;
         if (!ocean) is_land[static_cast<std::size_t>(idx)] = 1;
 
-        if (tc.road_level > 0)
+        if (tile_has_road(tc))
         {
             ++r.road_tiles;
-            const int t = std::min<int>(tc.road_level, 3);
+            const int t = std::min<int>(max_road_tier(tc), 3);
             ++r.road_by_tier[static_cast<std::size_t>(t)];
             if (!ocean) is_civil[static_cast<std::size_t>(idx)] = 1;
         }
@@ -299,7 +299,7 @@ census_row measure(const world& w, uint32_t seed)
         for (const entity_id tid : w.nations.at(nid).tiles)
         {
             const auto tit = w.tiles.find(tid);
-            if (tit != w.tiles.end() && tit->second.road_level > 0)
+            if (tit != w.tiles.end() && tile_has_road(tit->second))
             {
                 nations_with_road.insert(nid);
                 break;

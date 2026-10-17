@@ -35,7 +35,7 @@ enum class corp_verb : uint8_t
     set_workforce, ///< building_component.workforce_target := value (0–200 internal); clears workforce_auto. RIVALS ONLY: refused for the player corp (BL-1322).
     idle,          ///< building_component.decommissioned := true.
     resume,        ///< building_component.decommissioned := false.
-    place_road,    ///< place_road(tile, tier).
+    place_road,    ///< place_road(tile, side, tier) — a road is an edge (BL-1340).
     survey,        ///< dispatch_survey(body) on behalf of the corp.
     hire_unit,     ///< Raise a unit at a tile from the campaign roster (BL-324).
     // --- BL-293: the order book joins the seam (2026-08-07) ---
@@ -248,6 +248,12 @@ struct corp_command
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
     int           workforce = 100;                      ///< set_workforce value [0, 100] (BL-1322).
     uint8_t       road_tier = 1;                        ///< place_road tier (1–3).
+    /// place_road: the hex SIDE of `tile` the road crosses (BL-1340 — a road is an edge
+    /// between two tiles). 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE; `k_road_side_auto` (0xFF,
+    /// the default) means "no side named", and `place_road` then picks the cheapest land
+    /// neighbour deterministically. 0-5 or 0xFF; any other value is rejected at the
+    /// untrusted seam (agent_protocol.cpp), whole, mutating nothing.
+    uint8_t       road_side = k_road_side_auto;
     uint16_t      unit_type = 0;                        ///< hire_unit: index into unit_roster_table().
 
     // --- BL-293 order-book args ---

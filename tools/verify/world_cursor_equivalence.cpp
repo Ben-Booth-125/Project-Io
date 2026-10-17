@@ -486,7 +486,7 @@ uint64_t cursor_state_digest(const generation_cursor& c)
         fold_u32(h, t.cover_density);
         fold_u32(h, t.river_edges);
         fold_u32(h, t.river_downstream);
-        fold_u32(h, t.road_level);
+        fold_u32(h, t.road_edges); // BL-1340: the six-side mask
         fold_f32(h, t.height);
         fold_f32(h, t.hazard_level);
         fold_f32(h, t.habitability);

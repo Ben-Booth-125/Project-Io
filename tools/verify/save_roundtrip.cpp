@@ -72,6 +72,16 @@ std::string to_bytes(const world& w)
     return out.str();
 }
 
+/// BL-1340: @p w as a PRE-v53 stream — the tile record before a road was an edge. The
+/// base every old-stream row below truncates, since v47-v52 share that record and v53
+/// does not.
+std::string to_bytes_pre_road_edges(const world& w)
+{
+    std::ostringstream out(std::ios::binary);
+    write_world_snapshot_pre_road_edges(w, out);
+    return out.str();
+}
+
 /// Read a snapshot from @p bytes into @p w.
 bool from_bytes(const std::string& bytes, world& w)
 {
@@ -692,6 +702,15 @@ int main()
             check(!from_bytes(bad, victim),
                   "P20 a stream at the newest unread prior version is refused");
         }
+        // BL-1340 (v53) -- THE BASE OF EVERY OLD-STREAM ROW BELOW. Until v53 every
+        // bump was a trailing section, so an older stream was the current one truncated
+        // and relabelled. v53 widened the TILE RECORD (one road tier a tile became a
+        // six-side mask), so a relabelled v53 stream is not a v47 stream at all: its tile
+        // records are two bytes wider than a v47 reader expects. The pre-edge writer
+        // (`write_world_snapshot_pre_road_edges`, verification-only) produces the v52
+        // shape, which IS the shape v47-v52 share, and the trailing-section truncation
+        // then works exactly as it always did off that base.
+        const std::string pre_edge_once = to_bytes_pre_road_edges(w);
         {
             // P20b (BL-1296) -- the v47 stream: this v48 stream less its
             // state-industry section (a world with none writes two empty
@@ -703,8 +722,8 @@ int main()
             // it (share rules, space assets): 28 bytes in all. The reader ignores
             // trailing bytes, so a stale count here still "passed" -- it is exact now.
             // BL-1335 (v52): plus the tax section (count + 9 bytes a moved nation).
-            std::string v47 = bytes_once.substr(0, bytes_once.size() - 7 * sizeof(uint32_t)
-                                                       - (world_save_tax_section_bytes(w)));
+            std::string v47 = pre_edge_once.substr(0, pre_edge_once.size() - 7 * sizeof(uint32_t)
+                                                          - (world_save_tax_section_bytes(w)));
             const uint32_t pre = k_world_save_version_pre_state;
             std::memcpy(&v47[4], &pre, sizeof pre);
             world old;
@@ -721,8 +740,8 @@ int main()
             // section (a world with no rail writes three empty counts, 12 bytes),
             // stamped 48. It reads, as a world with no rail. (+2 empty counts:
             // the v50 share rules and the v51 space assets.)
-            std::string v48 = bytes_once.substr(0, bytes_once.size() - 5 * sizeof(uint32_t)
-                                                       - (world_save_tax_section_bytes(w))); // + BL-1335's v52 tax section
+            std::string v48 = pre_edge_once.substr(0, pre_edge_once.size() - 5 * sizeof(uint32_t)
+                                                          - (world_save_tax_section_bytes(w))); // + BL-1335's v52 tax section
             const uint32_t pre = k_world_save_version_pre_rail;
             std::memcpy(&v48[4], &pre, sizeof pre);
             world old;

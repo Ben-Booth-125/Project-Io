@@ -609,6 +609,19 @@ in `tools/verify/README.md`.
   population centre*, was written, measured and **fails at 64%**; it is deliberately non-gating and
   is the acceptance test for BL-463 (settlement count is seed-invariant).
 
+- **`road_edges`** — BL-1340: a road is an EDGE between two tiles, not a property of one
+  (Ben, from a playtest 2026-10-16: *"Roads should be directional, so they always cross the
+  edge of two tiles"*; LOGISTICS.md § 4). `tile_component::road_edges` holds a tier per hex
+  side, two bits each. M1/M2 the mirror invariant holds across a generated world and no
+  crossing touches water; C1 `count_road_edges` counts each edge once (all six sides come to
+  exactly twice it) — the property the Logistic Point pool and network upkeep rest on; E1 the
+  discount falls with tier AND a real `intra_body_path` hop costs less across a laid crossing
+  than with it removed; E2 the same crossing prices the step identically both ways, unlike a
+  river; S1 the v53 save round-trips byte-identically; S2 a pre-v53 stream migrates to the
+  LOWER of each adjacent pair's tiers, checked against an independent recomputation; S3 a
+  tampered mirror is refused whole with nothing mutated; D1 two generations of one seed are
+  identical. Build via `build_harness.js`.
+
 - **`life_reroll`** — BL-1339: does the wizard's **Life** Reroll actually give another world?
   Ben pressed it and kept getting the same landmasses, because `roll[1]` reached only three
   `resolve_preferences` draws (ocean, oxygen, coal) and never the continents pass. R1–R6 pin the

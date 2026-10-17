@@ -87,8 +87,8 @@ std::map<entity_id, std::uint8_t> road_field(const world& w, entity_id body)
 {
     std::map<entity_id, std::uint8_t> f;
     for (const auto& [tid, tc] : w.tiles)
-        if (tc.body == body && tc.road_level != 0)
-            f[tid] = tc.road_level;
+        if (tc.body == body && tc.road_edges != 0)
+            f[tid] = tc.road_edges;
     return f;
 }
 
@@ -111,11 +111,11 @@ void write_road_map(const world& w, entity_id body, const std::set<entity_id>& c
             continue;
         unsigned char r = 200, g = 188, b = 150;                    // bare land
         if (is_water(tc.substrate)) { r = 28; g = 48; b = 88; }     // water
-        if (tc.road_level > 0)
+        if (tile_has_road(tc))
         {
             if (centre_tiles.count(tid) != 0) { r = 235; g = 140; b = 30; } // street
-            else if (tc.road_level == 1)      { r = 95;  g = 60;  b = 25; } // Track
-            else if (tc.road_level == 2)      { r = 200; g = 25;  b = 25; } // Road
+            else if (max_road_tier(tc) == 1)  { r = 95;  g = 60;  b = 25; } // Track
+            else if (max_road_tier(tc) == 2)  { r = 200; g = 25;  b = 25; } // Road
             else                              { r = 0;   g = 0;   b = 0;  } // Highway
         }
         const std::size_t i = (static_cast<std::size_t>(tc.grid_y) * gw + tc.grid_x) * 3;
@@ -206,12 +206,12 @@ joined_reading read_joined(const world& w, entity_id body, const road_generation
 }
 
 /// A road-free body and cold traversal caches: the state `generate_roads` meets in
-/// generation (only the two road passes write road_level before the finish).
+/// generation (only the two road passes write the road field before the finish).
 void clear_roads(world& w, entity_id body)
 {
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
-            tc.road_level = 0;
+            tc.road_edges = 0;
     invalidate_logistics_caches(w); // every traversal cache, through its one owner
 }
 
@@ -360,10 +360,10 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
         int tiers[4] = { 0, 0, 0, 0 };
         int streets = 0; // road tiles hosting a centre: the local streets
         for (const auto& [tid, tc] : w.tiles)
-            if (tc.body == body && tc.road_level >= 1 && tc.road_level <= 3)
+            if (tc.body == body && max_road_tier(tc) >= 1)
             {
                 ++tiers[0];
-                ++tiers[tc.road_level];
+                ++tiers[max_road_tier(tc)];
                 if (centre_tiles.count(tid) != 0) ++streets;
             }
         std::printf("  ROADS seed %u TREE floor %lld: %.2f s floods %lld (%lld before the border walk) | road tiles %d (T1 %d T2 %d T3 %d; "

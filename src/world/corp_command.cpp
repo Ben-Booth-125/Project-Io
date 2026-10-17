@@ -1305,7 +1305,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         }
 
         case corp_verb::place_road:
-            return map_construction(place_road(w, reg, cmd.corp, cmd.tile, cmd.road_tier));
+            return map_construction(place_road(w, reg, cmd.corp, cmd.tile, cmd.road_tier,
+                                              cmd.road_side));
 
         case corp_verb::survey:
         {

@@ -2,7 +2,7 @@
 //
 // Measures the metric those cuts exist to move: how many nations end generation
 // with NO roaded tile anywhere in their territory. A road-less nation is not a
-// stylistic gap — road_level feeds road_traversal_multiplier, so such a nation is
+// stylistic gap — a road edge feeds road_traversal_multiplier, so such a nation is
 // simply more expensive to reach than the map's shape says it should be.
 //
 // Reports, over the 8-seed census set (the same sweep road_generation_harness
@@ -10,8 +10,10 @@
 //   C1 road-less nations   — count and share, per seed and in total.
 //   C2 single-centre share — how much of C1 is nations with one centre
 //                            (road_generation.cpp's <2-centre early return).
-//   C3 no-ocean invariant  — no tile with road_level > 0 is ocean.
-//   C4 determinism         — regenerating seed 0 yields an identical road_level
+//   C3 no-ocean invariant  — no tile carrying a road edge is OPEN OCEAN. A crossing may
+//                            span water since Ben's 2026-10-17 ruling (a run of them is a
+//                            bridge), but generation only ever bridges a strait.
+//   C4 determinism         — regenerating seed 0 yields an identical road edge
 //                            field AND an identical state_hash.
 //   C5 stranded tracks     — (added 2026-08-21) how many nations hold a roaded tile
 //                            that has NO roaded neighbour anywhere, and are therefore
@@ -72,13 +74,14 @@ seed_result census(const world& w)
         if (it != w.tile_to_nation.end() && it->second != null_entity)
             centres[it->second]++;
     }
-    // Any roaded tile per nation; ocean-road violations.
+    // Any roaded tile per nation; OPEN-OCEAN crossings (BL-1340: a bridge over a strait is
+    // legal, one over open ocean is not, and generation never routes through open sea).
     std::set<entity_id> has_road;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.road_level == 0)
+        if (!tile_has_road(tc))
             continue;
-        if (is_water(tc.substrate))
+        if (is_open_ocean(tc.substrate))
             ++r.roaded_ocean;
         const auto it = w.tile_to_nation.find(tid);
         if (it != w.tile_to_nation.end() && it->second != null_entity)
@@ -93,13 +96,13 @@ seed_result census(const world& w)
     for (const auto& [tid, tc] : w.tiles)
     {
         (void)tid;
-        if (tc.road_level > 0 && !is_water(tc.substrate))
+        if (tile_has_road(tc) && !is_water(tc.substrate))
             roaded.insert({ tc.body, tc.grid_x, tc.grid_y });
     }
     std::map<entity_id, std::vector<std::tuple<entity_id, int, int>>> nation_roads;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.road_level == 0 || is_water(tc.substrate))
+        if (!tile_has_road(tc) || is_water(tc.substrate))
             continue;
         const auto it = w.tile_to_nation.find(tid);
         if (it != w.tile_to_nation.end() && it->second != null_entity)
@@ -183,7 +186,8 @@ int main()
                 tot_nations ? 100.0 * tot_one_centre / tot_nations : 0.0, tot_stranded,
                 tot_nations ? 100.0 * tot_stranded / tot_nations : 0.0);
     check(tot_nations > 0, "C1 census measured a non-empty nation set");
-    check(tot_ocean == 0, "C3 no road_level stamped on an ocean tile");
+    check(tot_ocean == 0, "C3 no road edge stamped on an OPEN-OCEAN tile (a bridge spans a"
+                         " strait only, BL-1340)");
 
     // C4 determinism — same seed twice, identical road field and state hash.
     world_params wp0;
@@ -194,14 +198,14 @@ int main()
     for (const auto& [tid, tc] : a.tiles)
     {
         const auto it = b.tiles.find(tid);
-        if (it == b.tiles.end() || it->second.road_level != tc.road_level)
+        if (it == b.tiles.end() || it->second.road_edges != tc.road_edges)
             ++mismatches;
     }
     const std::uint64_t ha = a.state_hash(a.current_day_tick);
     const std::uint64_t hb = b.state_hash(b.current_day_tick);
     std::printf("      (state_hash %016llX vs %016llX)\n",
                 static_cast<unsigned long long>(ha), static_cast<unsigned long long>(hb));
-    check(mismatches == 0, "C4 road_level field identical across two generations");
+    check(mismatches == 0, "C4 road edge field identical across two generations");
     check(ha == hb, "C4 state_hash identical across two generations");
 
     // -----------------------------------------------------------------------
@@ -239,9 +243,9 @@ int main()
             ocean = 0;
             for (const auto& [tid, tc] : ww.tiles)
             {
-                if (tc.body != ww.home_body || tc.road_level == 0) continue;
+                if (tc.body != ww.home_body || !tile_has_road(tc)) continue;
                 if (is_water(tc.substrate)) ++ocean;
-                const int t = tc.road_level < 4 ? tc.road_level : 3;
+                const int t = max_road_tier(tc);
                 ++out4[0];
                 if (t >= 1 && t <= 3) ++out4[t];
             }
@@ -266,7 +270,7 @@ int main()
         for (const auto& [tid, tc] : w_on.tiles)
         {
             const auto it = w_on2.tiles.find(tid);
-            if (it == w_on2.tiles.end() || it->second.road_level != tc.road_level)
+            if (it == w_on2.tiles.end() || it->second.road_edges != tc.road_edges)
                 ++road_mismatch;
         }
         check(road_mismatch == 0,
@@ -311,13 +315,13 @@ int main()
             auto highways = [](const world& ww) {
                 int n = 0;
                 for (const auto& [tid, tc] : ww.tiles)
-                    if (tc.body == ww.home_body && tc.road_level >= 3) ++n;
+                    if (tc.body == ww.home_body && max_road_tier(tc) >= 3) ++n;
                 return n;
             };
             auto roads_or_better = [](const world& ww) {
                 int n = 0;
                 for (const auto& [tid, tc] : ww.tiles)
-                    if (tc.body == ww.home_body && tc.road_level >= 2) ++n;
+                    if (tc.body == ww.home_body && max_road_tier(tc) >= 2) ++n;
                 return n;
             };
 

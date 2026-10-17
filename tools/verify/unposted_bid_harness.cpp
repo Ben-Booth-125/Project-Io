@@ -149,7 +149,7 @@ int main()
     {
         fixture f = make_fixture();
         f.w.tile_to_nation[f.tile] = f.nation;
-        f.w.tiles.at(f.tile).road_level = 1;
+        f.w.tiles.at(f.tile).road_edges = road_edges_on_every_side(1); // BL-1340: a road is an edge
         check(vetoed(f, resource_type::stone), "U2 not vacuous: before the want, stone is a dead market at M");
         std::map<entity_id, nation_budget> budgets{{f.nation, budget_for(budget_priority::logistics_maintenance)}};
         network_upkeep_params np;

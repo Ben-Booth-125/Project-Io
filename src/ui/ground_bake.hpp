@@ -319,7 +319,13 @@ struct bake_source
     // arrays are a pure function of road, lane, class and installations
     // (rederive_routes).
     std::vector<std::uint8_t> road;          ///< Route tier per tile (k_route_*): revealed land only.
+    /// BL-1340: the six-side road mask of each revealed land tile, two bits a side
+    /// (tile_component::road_edges). THE AUTHORITY ON WHICH BOUNDARY A ROAD CROSSES —
+    /// `rederive_routes` derives the link bits from this, so a run is drawn across the
+    /// edge the world laid and nowhere else (RENDERING.md § Roads draw across the edge
+    /// they cross). `road` above stays the tile's own tier: the weight the run draws at.
     std::vector<std::uint8_t> lane;          ///< Sea-lane tier per tile: revealed water only.
+    std::vector<std::uint16_t> road_sides;   ///< see above (declared after `road`'s doc)
     std::vector<std::uint8_t> route_links;   ///< Bits 0-3: road links E, W, S, N; bits 4-7: lane links (rungs skipped).
     std::vector<std::uint8_t> near_route;    ///< Bit 0: a road on this tile or a neighbour; bit 1: a lane (the pass's cull).
     std::vector<std::int32_t> route_first;   ///< Per tile: its first piece in route_pieces.

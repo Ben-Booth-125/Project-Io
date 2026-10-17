@@ -1151,8 +1151,8 @@ int main(int argc, char** argv)
     {
         int base_hist[4] = { 0, 0, 0, 0 };
         for (const auto& kv : base.tiles)
-            if (kv.second.road_level > 0 && kv.second.road_level < 4)
-                ++base_hist[kv.second.road_level];
+            if (max_road_tier(kv.second) > 0) // BL-1340: the tile's best crossing
+                ++base_hist[max_road_tier(kv.second)];
         std::printf("    base road field: tier1=%d tier2=%d tier3=%d\n",
                     base_hist[1], base_hist[2], base_hist[3]);
 
@@ -1163,7 +1163,7 @@ int main(int argc, char** argv)
             world w = base;
             apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
             for (const auto& kv : w.tiles)
-                if (kv.second.road_level >= 3)
+                if (max_road_tier(kv.second) >= 3)
                     ++at_top[t];
             at[t] = score_landscape(w, reg);
             std::printf("    road_tier=%u  highway tiles=%-5d  potential=%.5f  "

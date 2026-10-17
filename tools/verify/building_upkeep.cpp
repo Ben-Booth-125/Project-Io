@@ -990,7 +990,8 @@ struct grid_fixture
             tc.grid_y     = 0;
             tc.substrate  = (water[static_cast<std::size_t>(x)] == 'w') ? terrain_substrate::coast
                                                                         : terrain_substrate::sedimentary;
-            tc.road_level = (road[static_cast<std::size_t>(x)] == 'r') ? 1 : 0;
+            tc.road_edges = road_edges_on_every_side(
+                (road[static_cast<std::size_t>(x)] == 'r') ? 1 : 0); // BL-1340: a road is an edge
             w.tiles[t] = tc;
             tiles.push_back(t);
         }
