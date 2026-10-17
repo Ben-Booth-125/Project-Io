@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 28 open, 1 resolved.*
+*29 entries — 27 open, 2 resolved.*
 
 ---
 
@@ -234,13 +234,6 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 
 **Why it matters.** Strait width sets how many exclaves are ceded and how far an island realm may reach; the build the target is read on decides whether BL-1311 needs code at all.
 
-### NR-1050 — BL-1310 (nations contiguous) changed how Pass 5 picks a nation's capital tile
-*novel-work · raised 2026-10-17 · from BL-1310 lane report (commit 7b17ea08); NATION_GENERATION.md § Pass 2e, § Pass 5*
-
-The strait rule anchors a territory at its core, the group holding the capital. The closing rounds read the realm's seat at the close (polity::capital), but Pass 5 placed the capital on the lowest-indexed seed, which can sit in a different territory; on seed 12 at 6:1 that ceded a 2,475-tile heartland. The lane made Pass 5 seat a nation on its lowest seed INSIDE its territory, moving at most one capital per world. Neither NATION_GENERATION.md nor the brief names this.
-
-**Why it matters.** Pass 5 capital placement feeds the seat, the treasury's home and every capital-keyed reading; a quiet rule change there is scope growth.
-
 ### NR-1051 — BL-1311 (ground paint perf) builds the ground bake at /O2 in Debug: a new object library and CMake policy CMP0184
 *novel-work · raised 2026-10-17 · from BL-1311 lane report (commit 3af45cdb); CMakeLists.txt*
 
@@ -263,4 +256,13 @@ score_national_budgets walks every landed nation and run_nation_step writes the 
 **Why it matters.** Either the AI is setting the player's national budget every cadence (an act on the player the grant forbids), or the player has no budget control yet and the scored weights stand in as a default. The two readings need different fixes.
 
 > **RESOLVED.** Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11.
+
+### NR-1050 — BL-1310 (nations contiguous) changed how Pass 5 picks a nation's capital tile
+*novel-work · raised 2026-10-17 · from BL-1310 lane report (commit 7b17ea08); NATION_GENERATION.md § Pass 2e, § Pass 5*
+
+The strait rule anchors a territory at its core, the group holding the capital. The closing rounds read the realm's seat at the close (polity::capital), but Pass 5 placed the capital on the lowest-indexed seed, which can sit in a different territory; on seed 12 at 6:1 that ceded a 2,475-tile heartland. The lane made Pass 5 seat a nation on its lowest seed INSIDE its territory, moving at most one capital per world. Neither NATION_GENERATION.md nor the brief names this.
+
+**Why it matters.** Pass 5 capital placement feeds the seat, the treasury's home and every capital-keyed reading; a quiet rule change there is scope growth.
+
+> **RESOLVED.** Ben: A, the realm's seat at the close is always the capital tile. Same form: every launch obeys the strait rule (Empires-round launches included); the remote island is exempt at any size; the late repair after absorption stays. Written into NATION_GENERATION.md § Pass 2d and § Pass 2e.
 

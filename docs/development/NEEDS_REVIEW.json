@@ -397,11 +397,13 @@
    "title": "BL-1310 (nations contiguous) changed how Pass 5 picks a nation's capital tile",
    "raised": "2026-10-17",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1310 lane report (commit 7b17ea08); NATION_GENERATION.md § Pass 2e, § Pass 5",
    "what": "The strait rule anchors a territory at its core, the group holding the capital. The closing rounds read the realm's seat at the close (polity::capital), but Pass 5 placed the capital on the lowest-indexed seed, which can sit in a different territory; on seed 12 at 6:1 that ceded a 2,475-tile heartland. The lane made Pass 5 seat a nation on its lowest seed INSIDE its territory, moving at most one capital per world. Neither NATION_GENERATION.md nor the brief names this.",
    "why_it_matters": "Pass 5 capital placement feeds the seat, the treasury's home and every capital-keyed reading; a quiet rule change there is scope growth.",
-   "call": "A) the realm's seat at the close always becomes the capital tile (cleanest, moves many capitals); B) as built (lowest seed inside the territory); C) the literal reading, core = lowest seed (cedes heartlands). Write the choice into § Pass 2e and § Pass 5."
+   "call": "A) the realm's seat at the close always becomes the capital tile (cleanest, moves many capitals); B) as built (lowest seed inside the territory); C) the literal reading, core = lowest seed (cedes heartlands). Write the choice into § Pass 2e and § Pass 5.",
+   "resolved": "2026-10-17",
+   "resolution": "Ben: A, the realm's seat at the close is always the capital tile. Same form: every launch obeys the strait rule (Empires-round launches included); the remote island is exempt at any size; the late repair after absorption stays. Written into NATION_GENERATION.md § Pass 2d and § Pass 2e."
   },
   {
    "id": "NR-1051",

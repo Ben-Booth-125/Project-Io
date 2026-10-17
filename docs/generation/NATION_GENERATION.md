@@ -273,7 +273,8 @@ polity is its founding core — the lowest-indexed region it held, because regio
 founding order — and the nation the fold makes carries the realm's identity through that
 representative: its **name**, coined once at the realm's founding and never re-coined (§ Pass 5);
 its **colour slot**, the one the wizard's rounds painted it in (§ Pass 5); its **treasury** at
-the close (§ Pass 7); and its capital tile. Nothing about a realm is recalculated at the handoff:
+the close (§ Pass 7); and its capital. **The realm's seat at the close is always the nation's
+capital tile (Ben, 2026-10-17).** Nothing about a realm is recalculated at the handoff:
 the nation the player meets at Begin is the realm they watched rise, under the same name and the
 same colour. A realm's territory is **one territory** (§ Pass 2e): a polity that conquered across
 a neighbour does not keep the far side, which the closing rounds cede to the nation around it.
@@ -310,7 +311,9 @@ history produced them.
 **What joins two groups.** Two of a nation's land groups (cardinal adjacency, column-wrapped) are
 **joined** when a path between them crosses **at most `strait_tiles` ocean tiles and no land
 another nation holds**. Joins chain: a nation's groups form one territory when every group reaches
-the **core** — the group holding its capital — through joins. `strait_tiles` is **3** (≈ 380 km at
+the **core** — the group holding its capital, which is the realm's seat at the close (§ Pass 2d); a
+nation with no realm is seated on its lowest seed inside its territory — through joins. The core
+is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
 `body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
 
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
@@ -325,11 +328,19 @@ Industrialisation** (§ The nation count is a target), recorded with its cause �
 cut off from its realm — and it runs **first**, before the size floor and before reconciliation.
 The floor then judges territories as the player will see them. Reconciliation keeps the rule: an
 absorption joins a nation to a neighbour it already touches, and a secession is chosen so both
-sides remain one territory. Where no history ran, the same rule runs as a post-pass after Pass 2d.
+sides remain one territory. Where an absorption reaches its neighbour only through owned water —
+a lake or a coast that joins beyond a strait — the closing rounds run the rule again after it and
+cede what is left over (Ben, 2026-10-17).
+
+**Every launch obeys the rule (Ben, 2026-10-17).** A launch that closes before Industrialisation —
+an Empires-round launch, where no closing round runs — holds one territory too: the same rule runs
+as a post-pass after Pass 2d, and each cession is recorded as an event of the last span that ran.
+Where no history ran at all, it runs as the same post-pass, and again after the size floor.
 
 **The remote island.** A landmass farther than `strait_tiles` from every nation's ground cannot
 be held contiguously by anyone. Pass 2b still gives it to the nearest nation, and it is the one
-group exempt from the rule. The floor's island case follows the same reading: an island with no
+group exempt from the rule, **at any size** (Ben, 2026-10-17): a whole continent beyond every
+strait is held by one nation as a remote island would be. The floor's island case follows the same reading: an island with no
 land neighbour is absorbed by the nearest nation across the water, never the globally largest.
 
 ### Territorial fragmentation, measured
