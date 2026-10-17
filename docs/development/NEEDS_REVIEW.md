@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*27 entries — 26 open, 1 resolved.*
+*28 entries — 27 open, 1 resolved.*
 
 ---
 
@@ -233,6 +233,13 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 (1) BL-1310 (nations contiguous): "short strait only (a few sea tiles)" is set at strait_tiles = 3, about 380 km at 128 km per tile. (2) The remote island beyond any strait is exempt and goes to the nearest nation; the floor island case now goes to the nearest nation, not the globally largest. (3) BL-1311 (ground paint perf): the 1 minute / 6 GB target is measured on the Debug build that produced 3-5 min / 12 GB, with Release reported beside it. (4) BL-1337 (return net crosses zero): net is now the exact double, so corp_trailing_net (the acquisition price and the AI that prices buyouts) and spawn_seat trailing_net read the exact figure, which differs from the old float-rounded delta by about 1 ULP on quarters where a balance crossed zero. Deterministic; it can move a buyout debit by ~1e-6 credits and could in principle flip a threshold. Taken as a correction (cold review 2026-10-17, finding 2), not reverted.
 
 **Why it matters.** Strait width sets how many exclaves are ceded and how far an island realm may reach; the build the target is read on decides whether BL-1311 needs code at all.
+
+### NR-1050 — BL-1310 (nations contiguous) changed how Pass 5 picks a nation's capital tile
+*novel-work · raised 2026-10-17 · from BL-1310 lane report (commit 7b17ea08); NATION_GENERATION.md § Pass 2e, § Pass 5*
+
+The strait rule anchors a territory at its core, the group holding the capital. The closing rounds read the realm's seat at the close (polity::capital), but Pass 5 placed the capital on the lowest-indexed seed, which can sit in a different territory; on seed 12 at 6:1 that ceded a 2,475-tile heartland. The lane made Pass 5 seat a nation on its lowest seed INSIDE its territory, moving at most one capital per world. Neither NATION_GENERATION.md nor the brief names this.
+
+**Why it matters.** Pass 5 capital placement feeds the seat, the treasury's home and every capital-keyed reading; a quiet rule change there is scope growth.
 
 ---
 
