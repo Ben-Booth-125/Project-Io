@@ -74,10 +74,10 @@ press.
 text on each construction panel to tooltips, and favour using icons where possible. We really need
 to compact this."* Every row on this ledger — the build list, the queue, the tile card's stack
 buttons, the expanded site card — is **one line**, and it reads in glyphs: the building glyph
-(), the cost, the materials, a **resource pip** for what it makes, the stack as , a
-state mark, the progress bar, the press. A word appears only where no glyph can carry the meaning.
+(`../ICONS.md`), the cost, the materials, a **resource pip** for what it makes, the stack as `2/4`,
+a state mark, the progress bar, the press. A word appears only where no glyph carries the meaning.
 
-**Everything the line drops belongs to the hover card** (), not to a second line and
+**Everything the line drops belongs to the hover card** (`../TOOLTIP.md`), not to a second line and
 not to nothing: the sentence a chip replaced, the stall's named good, what the building makes in
 words, and what filled a tile when it is full. The rule this enforces is that **a scan and a read
 are different acts** — the row serves the scan, the card serves the read — and the surface failed it
