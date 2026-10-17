@@ -1570,6 +1570,52 @@
    ],
    "title": "The road ladder is the last tall row on the build list, and its first rung is called Track like the rail row above it",
    "design": "SPRINT 55 (found delivering BL-1366/1368, 2026-10-17). TWO THINGS, one surface. (1) Every construction row is now one line in the shared eight-column grid - build list, queue, tile-card stacks, expanded site card, and as of BL-1366 the rail rows too. The ROAD LADDER's three tier rows are the last exception: tall bordered boxes with a 56 px glyph, and now the only tall rows on the panel. Bring them into ui::construction_begin_build_grid and the per-column explainers, as the rail rows were. (2) A NAME COLLISION, pre-existing but newly visible now both are compact: the road ladder's first rung is 'Track' (LOGISTICS.md's road tier 1) and the rail row directly above it is also 'Track' (the railway line). Two adjacent one-line rows, same word, different networks. BEN'S CALL whether to rename one - the road tier names Track/Road/Highway are LOGISTICS.md's ladder and the rail 'Track' is GLOSSARY-adjacent, so a rename moves a term, not a label. Raise it rather than pick."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17, at the live click); filed by Claude",
+   "id": "BL-1370",
+   "short_name": "ROAD_TARGETS_A_NEIGHBOUR",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "requires": [],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/app.cpp"
+   ],
+   "title": "Building a road must name which neighbour it crosses to, in two presses with the candidates highlighted",
+   "design": "SPRINT 55 (Ben, 2026-10-17, at the live click): 'roads should be buildable from an existing road to another tile. Right now I am seeing This tile already has an equal or better road. So it should be click on a tile with a road with construction open, then click build, then available tiles are highlighted (no equal or better road), then click on an available tile to complete the road.' DESIGNED: construction.md (A road is built from a road to a tile, in two presses). THE CAUSE: BL-1340 made a road a crossing between two tiles and place_road took a side, but no UI ever supplied one - app.cpp:2976 passes k_road_side_auto, so the press guesses the cheapest land crossing and a roaded tile answers already_road (placement_rules.cpp:27) because the question it asked was about the TILE. The roads lane flagged exactly this gap: it asked for a pending_road_side on ui.construction and nothing provided it. THE WORK: select a roaded tile, press Build on the road row, highlight every tile the crossing may legally reach - the crossable sides for that row parity (LOGISTICS.md section 4), never a water-to-water span (the land-end rule), never a side already at an equal or better tier - then a press on a highlighted tile lays it and charges it. The refusal moves from a sentence after the fact to the absence of a highlight. Needs: pending_road_side on ui.construction, the highlight on the planetary canvas, and the ACTIONS.json entries for gameplay.place_road and gameplay.lay_track rewritten to the two-press shape. A live click is owed."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17, at the live click); filed by Claude",
+   "id": "BL-1371",
+   "short_name": "TWO_LINE_GRID_ROWS",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "requires": [],
+   "files": [
+    "src/ui/construction_panel.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/rail_tool.cpp"
+   ],
+   "title": "A construction row is two lines tall so text wraps instead of truncating",
+   "design": "SPRINT 55 (Ben, 2026-10-17, at the live click on BL-1365/1368): 'looking at the building grids, we are going to have to use two row spaces for each building, this is so that text can wrap to the second row. Many rows truncate the text, and it will look better with text wrap taking up more space.' DESIGNED: construction.md (A row is two lines tall, and text wraps rather than truncating). The columns, their order and their widths all stand - only the row height changes, from one line to TWO, and a column whose text does not fit wraps into the second line instead of eliding through fit_text. The name column was the worst case at about 70 px of stretch. A row needing one line still occupies two, so the grid stays a grid. Apply to all five surfaces that use ui::construction_begin_build_grid - build list, rail rows, queue, tile-card stacks, expanded site card - and update the harness rows that assert the one-line metric (construction_progress asserts row h 20.0 against a 16.0 line; both move). Keep the per-column explainers; wrapping reduces what they must carry but does not replace them."
   }
  ]
 }

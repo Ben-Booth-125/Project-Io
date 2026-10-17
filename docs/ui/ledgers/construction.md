@@ -70,7 +70,27 @@ press.
 
 **Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can actually give it; below `1 / max_stretch` the build is **paused**. **What "can give it" means is the whole defect this surface once had (Ben, 2026-10-16 playtest):** the sim draws the market's **persistent `inventory`**, adds the `capacity_per_build_tick` row, and counts a good priced above `reservation_mult × base` as absent (`shelf_admits`). The panel's own mirror read `supply` — the per-tick flow, reset every tick — carried no capacity row and ignored the price ceiling, so it reported "ETA ~2 qtrs" while the sim held the same build at the `1 / max_stretch` floor for twenty. **One shared read now serves both**, and the mirror matching `run_construction`'s `site_rate` is the contract its declaration cites. A stall also **names the good** that holds it, in the status line, the stack reading, the queue row and the build door. The building carries `ticks_remaining` (an integer gate) and `construction_progress` (the fractional accumulator that lets a starved build stretch over many ticks). The display word is **qtr**, never tick (NR-002, Ben 2026-08-01) — a Tick is literally a calendar quarter.
 
-**One line a row, and the words live in the hover (Ben, 2026-10-17).** *"We should move a lot of the
+**A row is two lines tall, and text wraps rather than truncating (Ben, 2026-10-17).** The grid's
+columns are right and its one-line row was too tight: *"we are going to have to use two row spaces
+for each building, this is so that text can wrap to the second row. Many rows truncate the text,
+and it will look better with text wrap taking up more space."* So each row reserves **two line
+heights**, and a column whose text does not fit **wraps into the second** instead of eliding. The
+columns, their order and their widths are unchanged — this buys back the words a 70 px name column
+was cutting, and a row that needs only one line still occupies two so the grid stays a grid.
+
+**A road is built from a road to a tile, in two presses (Ben, 2026-10-17).** Selecting a tile and
+pressing Build asked the wrong question — it tried to road the tile you had already selected, which
+is why a roaded tile answered *"this tile already has an equal or better road."* A road is a
+crossing between two tiles (`../../economy/LOGISTICS.md` § 4), so the press must name **which
+neighbour**: select a tile that carries a road, press Build on the road row, and the tiles it could
+legally cross to **highlight** — exactly the sides a crossing may legally carry, so never a side no
+walk can cross, never a water-to-water span, and never one already holding an equal or better
+road. Pressing a highlighted tile lays that crossing and charges it. The refusal therefore moves
+from the press to the **absence of a highlight**: a tile with nowhere left to go offers nothing to
+click, which is a quieter and more honest way to say it than a sentence after the fact.
+
+**One line a row, and the words live in the hover (Ben, 2026-10-17; the row is two lines tall since
+the same day — see above).** *"We should move a lot of the
 text on each construction panel to tooltips, and favour using icons where possible. We really need
 to compact this."* Every row on this ledger — the build list, the queue, the tile card's stack
 buttons, the expanded site card — is **one line**, and it reads in glyphs: the building glyph
