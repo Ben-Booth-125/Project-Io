@@ -2047,6 +2047,164 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
 
 
 // ---------------------------------------------------------------------------
+// BL-1347 -- GENERATION ROADS EVERY BUILDING SITE IT STAMPS
+// ---------------------------------------------------------------------------
+// A building needs a road on its tile (PRODUCTION.md § A building needs a road), and the
+// rule binds the generated world as it binds play (Ben, 2026-10-16): exempting what
+// generation laid would make the opening world the one place the rule does not hold. The
+// road passes above run BEFORE any building exists -- the roster, the charters, the state
+// handover and the hub/station seeding all stamp later -- so the crossing to a site cannot
+// be laid by the pass that laid the lattice. This is that pass, run after the stampers.
+//
+// ONE TRACK PER UNROADED SITE, laid the way a village lays a spur (BL-620): the three
+// nearest tiles that already carry a road, tried in order, `stamp_edge` doing the A*, the
+// strait rules, the bridge cap and the BL-1252 snap exactly as every other link does. So
+// what a site gets is a chain of crossings from the network out to it -- the same chain
+// BL-1348 makes the player build -- and not a lone edge stranded in open country.
+//
+// DETERMINISTIC: sites are walked in (row, column, tile id) order off `world::buildings`'
+// unordered map, candidates are ranked by (wrapped grid distance^2, tile id), and every
+// tile a stamp roads joins the candidate set, so a later site branches off an earlier
+// site's track exactly as a later village branches off an earlier spur.
+//
+// IDEMPOTENT: a site whose tile already carries a crossing is skipped, so calling it
+// twice -- once at the tail of world generation, once after the charter web is laid --
+// does no second work and lays no second road.
+site_road_stats lay_site_roads(world& w, entity_id body)
+{
+    site_road_stats st{};
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return st;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return st;
+
+    const auto cell = [&](entity_id t) -> std::pair<int, int> {
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() ? std::make_pair(it->second.grid_x, it->second.grid_y)
+                                   : std::make_pair(-1, -1);
+    };
+    const auto wrapped_d2 = [&](int ax, int ay, int bx, int by) -> long long {
+        long long dx = ax - bx;
+        if (dx < 0) dx = -dx;
+        if (gw - dx < dx) dx = gw - dx; // the shorter way round the cylinder
+        const long long dy = ay - by;
+        return dx * dx + dy * dy;
+    };
+
+    // The sites: every building's tile on this body, deduplicated, in raster order. A
+    // tile is read once however many buildings stand on it -- the rule is about the
+    // ground, so a stack of five costs one crossing.
+    struct site { int gy; int gx; entity_id tile; };
+    std::vector<site> sites;
+    {
+        std::vector<entity_id> tiles;
+        tiles.reserve(w.buildings.size());
+        for (const auto& [bid, bc] : w.buildings)
+        {
+            (void)bid;
+            const auto tit = w.tiles.find(bc.tile);
+            if (tit == w.tiles.end() || tit->second.body != body)
+                continue;
+            tiles.push_back(bc.tile);
+        }
+        std::sort(tiles.begin(), tiles.end());
+        tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
+        sites.reserve(tiles.size());
+        for (const entity_id t : tiles)
+        {
+            const auto [gx, gy] = cell(t);
+            sites.push_back({ gy, gx, t });
+        }
+        std::sort(sites.begin(), sites.end(), [](const site& a, const site& b) {
+            if (a.gy != b.gy) return a.gy < b.gy;
+            if (a.gx != b.gx) return a.gx < b.gx;
+            return a.tile < b.tile;
+        });
+    }
+    st.sites = static_cast<int>(sites.size());
+    count_road_edges(w, st.edges_before);
+    for (int k = 0; k < 3; ++k)
+        st.edges_after[k] = st.edges_before[k];
+    if (sites.empty())
+        return st;
+
+    // The targets: every tile on the body that carries a crossing. Collected once and
+    // grown as the pass lays, exactly as the spur pass grows its own set.
+    struct target { entity_id tile; int gx; int gy; };
+    std::vector<target> targets;
+    std::set<entity_id> have_target;
+    const auto add_target = [&](entity_id t) {
+        if (t == null_entity || !have_target.insert(t).second)
+            return;
+        const auto [gx, gy] = cell(t);
+        if (gx >= 0) targets.push_back({ t, gx, gy });
+    };
+    {
+        std::vector<entity_id> roaded;
+        for (const auto& [tid, tc] : w.tiles)
+            if (tc.body == body && tile_has_road(tc))
+                roaded.push_back(tid);
+        std::sort(roaded.begin(), roaded.end()); // order-independent of the tile map
+        for (const entity_id t : roaded)
+            add_target(t);
+    }
+
+    road_snapper           snapper(w, body); // BL-1252: no parallel roads, here too
+    std::vector<entity_id> stamped;
+    for (const site& s : sites)
+    {
+        const auto tit = w.tiles.find(s.tile);
+        if (tit == w.tiles.end())
+            continue;
+        if (tile_has_road(tit->second))
+            continue; // already served -- by the lattice, or by an earlier site's track
+        ++st.sites_roadless;
+        // The kSiteRoadCandidates nearest roaded tiles by (distance^2, tile id). No
+        // distance cap: there are orders of magnitude fewer sites than villages, and a
+        // site generation chose to stamp must end up roaded wherever it stands.
+        struct cand { long long d2; entity_id tile; };
+        std::array<cand, kSiteRoadCandidates> best;
+        best.fill({ std::numeric_limits<long long>::max(), null_entity });
+        for (const target& t : targets)
+        {
+            if (t.tile == s.tile)
+                continue;
+            cand c{ wrapped_d2(s.gx, s.gy, t.gx, t.gy), t.tile };
+            for (int k = 0; k < kSiteRoadCandidates; ++k)
+                if (best[k].tile == null_entity || c.d2 < best[k].d2
+                    || (c.d2 == best[k].d2 && c.tile < best[k].tile))
+                    std::swap(c, best[k]);
+        }
+        bool laid = false;
+        for (int k = 0; k < kSiteRoadCandidates && !laid; ++k)
+        {
+            if (best[k].tile == null_entity)
+                break;
+            stamped.clear();
+            if (!stamp_edge(w, body, s.tile, best[k].tile, kTrack, &stamped,
+                            &st.long_crossing, &snapper, &st.half_crossings_refused))
+                continue; // unreachable, or an open-sea route: try the next-nearest
+            for (const entity_id t : stamped)
+                add_target(t);
+            st.crossings_laid += static_cast<int>(stamped.size() > 0 ? stamped.size() - 1 : 0);
+            laid = true;
+        }
+        ++(laid ? st.sites_joined : st.sites_failed);
+        if (laid)
+            add_target(s.tile);
+    }
+    st.walks = static_cast<long long>(w.logistics_flood_fields.size());
+    count_road_edges(w, st.edges_after);
+    if (st.sites_joined > 0)
+        invalidate_logistics_caches(w); // road_level moved: generate_roads' own contract
+    return st;
+}
+
+
+// ---------------------------------------------------------------------------
 // Sea lanes, stamped from the lane record (BL-1098)
 // ---------------------------------------------------------------------------
 

@@ -47,8 +47,14 @@ int main()
     const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
 
     // A land tile with an iron deposit, and an ocean tile.
+    // BL-1347: NO BUILDING STANDS ON A TILE NO ROAD REACHES (PRODUCTION.md § A building
+    // needs a road), and the generated world now holds a crossing to every site it
+    // stamps. So every LAND tile of this fixture carries a Track: the subject here is the
+    // terrain/deposit/funds gates, and a roadless fixture would refuse every placement on
+    // the road rule before reaching them. The ocean tile is deliberately left bare.
     const entity_id land = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
+      tc.road_edges = road_edges_on_every_side(1);
       tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land] = tc; }
     const entity_id sea = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::ocean;
@@ -63,9 +69,11 @@ int main()
     // deposit -> invalid (Farm-viable terrain, no hydroponics needed).
     const entity_id no_deposit_tile = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
+      tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.grid_x = 2; tc.grid_y = 2; w.tiles[no_deposit_tile] = tc; }
     const entity_id deposit_tile = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
+      tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.grid_x = 2; tc.grid_y = 1;
       tc.resource_deposit[ri(resource_type::agricultural_produce)] = 5.0f; w.tiles[deposit_tile] = tc; }
 
@@ -74,9 +82,11 @@ int main()
     // no ocean neighbour -> invalid.
     const entity_id coastal_tile = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
+      tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.grid_x = 1; tc.grid_y = 1; w.tiles[coastal_tile] = tc; }
     const entity_id inland_tile = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
+      tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.grid_x = 0; tc.grid_y = 2; w.tiles[inland_tile] = tc; }
 
     // Player corp with a modest balance.
@@ -130,6 +140,7 @@ int main()
     w.corporations[corp].balance = 100.0f; // < 150 processing build_cost
     const entity_id land2 = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
+      tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land2] = tc; }
     const std::size_t n_before = w.corporations[corp].assets.size();
     entity_id none_built = null_entity;

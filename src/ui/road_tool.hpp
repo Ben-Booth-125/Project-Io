@@ -39,7 +39,12 @@ struct road_target
 /// @p tier, in side order (so the walk is deterministic and world-order
 /// independent). Empty for a tile with nowhere left to go — which is how the
 /// refusal is said now: the absence of a highlight rather than a sentence.
+/// @p actor is the CORPORATION the highlight is drawn FOR -- the player's. BL-1357 reads
+/// it: a tile another nation holds is one a road may cross INTO and not build OUT of, so
+/// the set it admits depends on who is asking. Passing `null_entity` asks the
+/// nation-blind form, which is the generation/affordance read and not a player surface.
 std::vector<road_target> road_crossing_targets(const world& w, entity_id tile,
-                                               std::uint8_t tier);
+                                               std::uint8_t tier,
+                                               entity_id actor = null_entity);
 
 } // namespace ui

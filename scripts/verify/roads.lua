@@ -332,6 +332,11 @@ end
 -- Found by scanning a window with the rules themselves rather than asserted of a
 -- hand-picked coordinate: which tiles are landlocked in water (or fully roaded)
 -- is a property of the seed, not of this script.
+-- BL-1348 widened what this finds: a tile carrying no road at all now admits no crossing
+-- either (a road is laid FROM a road), so the scan lands on one of those long before it
+-- reaches a landlocked or fully-roaded one. Both are the same assertion here -- the press
+-- arms, highlights nothing, and says why -- so the case is exercised on more seeds than
+-- before rather than fewer.
 local dead = nil
 if from ~= nil then
     for dy = -12, 12 do
@@ -363,7 +368,14 @@ else
     verify.expect(trow ~= nil, "the ladder drew for a tile with nowhere to cross to")
     if trow ~= nil then
         verify.expect(trow.targets == 0, "the row counts zero crossings")
-        verify.expect(trow.explainer:find("Nowhere left", 1, true) ~= nil,
+        -- TWO WORDINGS, ONE ASSERTION (BL-1348). A tile with zero legal crossings is now
+        -- either of two things, and the press says which: a tile carrying a road with
+        -- nowhere left to go ("Nowhere left"), or -- far commoner since a road is laid
+        -- FROM a road -- a tile carrying none at all, which has nothing to go FROM. The
+        -- check is that the press NAMES its refusal, not which of the two it found; the
+        -- print above records which one this seed's scan landed on.
+        verify.expect(trow.explainer:find("Nowhere left", 1, true) ~= nil
+                      or trow.explainer:find("laid from a road", 1, true) ~= nil,
                       "and SAYS so on the press: '" .. trow.explainer .. "'")
         if trow.x > 0 then
             local edges_before = rd.edges

@@ -50,6 +50,7 @@
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/placement_rules.hpp"
+#include "world/road_generation.hpp" // BL-1347: lay_site_roads, after this path's own stamper
 #include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
 #include "ui/ground_bake.hpp"        // BL-1375: prepare_source, the bake the audit reads
 #include "world/stance.hpp"
@@ -866,6 +867,19 @@ void app::verify_lay_roster()
                     : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
                                            : "");
     }
+
+    // BL-1347 -- THE VERIFY PATH IS NOT ROADED HERE, AND THAT IS OWED. This path is a
+    // THIRD stamper of generated buildings (the roster, or the charter web above), laid
+    // after world generation's own `lay_site_roads` at its tail, so the verified world can
+    // hold a site no road reaches -- which the shipped paths (generation's tail and
+    // `finish_campaign_world`) do not. The obvious fix is to run the pass here too, and it
+    // was tried: measured 2026-10-17 on the run_verify world it joins 130 of 131 unroaded
+    // site tiles with 135 crossings, cheaply. It is left out because the run it was tried
+    // in did not finish: `roads.lua`'s FIRST wide capture stopped returning, the process
+    // climbing past 5 GB with no further output. The pass is NOT established as the cause --
+    // the same stall then reproduced with the call removed, on a machine that had just run
+    // two 16-shard sweeps -- so this is an unattributed stall, and wiring the verify world
+    // to the rule waits on someone naming it. Flagged rather than guessed at.
 }
 
 int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
@@ -4322,8 +4336,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             for (int s = 0; s < 6; ++s)
             {
+                // THE SAME ACTOR THE UI ASKS AS (BL-1357): the admitted set depends on
+                // who holds the ground, so an oracle asking nation-blind would disagree
+                // with the highlight at every border.
                 if (!placement_rules::can_place_road(m_world, tile, s,
-                                                     static_cast<std::uint8_t>(tier)))
+                                                     static_cast<std::uint8_t>(tier),
+                                                     m_world.player_entity))
                     continue;
                 const entity_id other = road_edge_neighbour(m_world, tile, s);
                 const auto      oit   = m_world.tiles.find(other);

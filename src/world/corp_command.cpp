@@ -706,6 +706,11 @@ corp_command_result map_construction(construction_result r)
         case construction_result::tech_locked:            return corp_command_result::rejected_tech_locked;
         case construction_result::era_locked:             return corp_command_result::rejected_era_locked;
         case construction_result::wrong_air:              return corp_command_result::rejected_wrong_air;
+        // BL-1347 / BL-1348 / BL-1357: a road refusal IS a placement refusal at this
+        // seam -- the agent-facing enum keeps its existing vocabulary, and the specific
+        // reason reaches the player's surface through `construction_result` itself.
+        case construction_result::needs_road:
+        case construction_result::foreign_ground:
         case construction_result::invalid_tile:
         case construction_result::out_of_range:
         case construction_result::slot_occupied:

@@ -3466,6 +3466,27 @@ void run_tail(generation_cursor& c)
         }
     }
 
+    // -----------------------------------------------------------------------
+    // BL-1347 — A CROSSING TO EVERY SITE THIS STAGE STAMPED (PRODUCTION.md § A
+    // building needs a road; LOGISTICS.md § 4, "Generation roads every building site").
+    // HERE, at the tail, because every road pass above it runs before a building
+    // exists: the roster's holdings (generate_corporations), the two authored
+    // installations and the state/hub stampers all land after `generate_roads` and after
+    // the market pulls. Idempotent, so `finish_campaign_world` calls it again once the
+    // winner's charters are laid and nothing is laid twice.
+    // -----------------------------------------------------------------------
+    {
+        const site_road_stats srs = lay_site_roads(w, kepler);
+        if (report != nullptr) report->site_roads = srs;
+        std::printf("[site roads] %d site tile(s): %d unroaded, %d joined by a new Track, "
+                    "%d unreachable (%d crossing(s) on the routes); edges %d/%d/%d -> %d/%d/%d\n",
+                    srs.sites, srs.sites_roadless, srs.sites_joined, srs.sites_failed,
+                    srs.crossings_laid,
+                    srs.edges_before[0], srs.edges_before[1], srs.edges_before[2],
+                    srs.edges_after[0], srs.edges_after[1], srs.edges_after[2]);
+        std::fflush(stdout);
+    }
+
     // THE PLAYER UNIT STUB IS GONE (BL-635, 2026-08-26), and its removal is the
     // deletion of a duplicate rather than a change of design.
     //

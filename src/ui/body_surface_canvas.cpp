@@ -2592,7 +2592,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     std::vector<road_target> road_arm_targets;
     if (state.construction.road_arm_tile != null_entity)
         road_arm_targets = road_crossing_targets(w, state.construction.road_arm_tile,
-                                                 state.construction.road_arm_tier);
+                                                 state.construction.road_arm_tier,
+                                                 w.player_entity); // BL-1357: whose border is it
     state.construction_ui.road_arm_tile = state.construction.road_arm_tile;
     state.construction_ui.road_arm_tier = state.construction.road_arm_tier;
     state.construction_ui.road_drawn    = 0;

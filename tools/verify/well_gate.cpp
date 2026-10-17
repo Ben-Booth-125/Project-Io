@@ -91,6 +91,9 @@ int main()
             tc.body = body; tc.grid_x = x; tc.grid_y = y;
             tc.substrate = (y == 4) ? terrain_substrate::ocean : terrain_substrate::rocky;
             tc.habitability = 0.8f;
+            // BL-1347: every LAND tile of the fixture carries a Track, as a generated site
+            // now does. The ocean row is left bare -- nothing stands on water anyway.
+            if (y != 4) tc.road_edges = road_edges_on_every_side(1);
             w.tiles[t] = tc;
             g_tile[y][x] = t;
         }

@@ -107,6 +107,8 @@ static const char* construction_result_name(construction_result r)
         case construction_result::tech_locked:            return "tech_locked";
         case construction_result::era_locked:             return "era_locked";
         case construction_result::wrong_air:              return "wrong_air";
+        case construction_result::needs_road:             return "needs_road";
+        case construction_result::foreign_ground:         return "foreign_ground";
     }
     return "result?";
 }
@@ -2936,6 +2938,16 @@ void app::render()
                 // Propellant routes follow the body's air (Ben, 2026-10-09).
                 m_ui.construction.last_message =
                     "This method cannot run on this body's air."; break;
+            case construction_result::needs_road:
+                // BL-1347 (PRODUCTION.md § A building needs a road): the one refusal
+                // here the player can act on directly, so it NAMES the road rather
+                // than arriving as "can't build there".
+                m_ui.construction.last_message =
+                    "No road reaches this tile - lay one to it first."; break;
+            case construction_result::foreign_ground:
+                // BL-1357: reachable only by the road door below, never by a build.
+                m_ui.construction.last_message =
+                    "That ground is another nation's."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }
@@ -2991,6 +3003,15 @@ void app::render()
             }
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build a road there."; break;
+            case construction_result::needs_road:
+                // BL-1348: a road is laid FROM a road, so the refusal names the thing
+                // that is missing rather than the tile.
+                m_ui.construction.last_message =
+                    "A road is laid from a road - this tile carries none."; break;
+            case construction_result::foreign_ground:
+                // BL-1357: one crossing over a border, and no further.
+                m_ui.construction.last_message =
+                    "A road crosses a border but runs no further - that ground is another nation's."; break;
             case construction_result::insufficient_funds:
                 m_ui.construction.last_message = "Can't afford the road."; break;
             default:

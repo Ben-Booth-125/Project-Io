@@ -7,7 +7,7 @@ namespace ui
 {
 
 std::vector<road_target> road_crossing_targets(const world& w, entity_id tile,
-                                               std::uint8_t tier)
+                                               std::uint8_t tier, entity_id actor)
 {
     std::vector<road_target> out;
     if (w.tiles.find(tile) == w.tiles.end())
@@ -17,9 +17,10 @@ std::vector<road_target> road_crossing_targets(const world& w, entity_id tile,
     {
         // ONE QUESTION, ASKED OF THE RULES. `can_place_road` refuses a side no
         // cost walk can cross, a side with no neighbour, a span with water at both
-        // ends, and a crossing already at or above this tier — four conditions
-        // this file deliberately does not restate.
-        if (!placement_rules::can_place_road(w, tile, s, tier))
+        // ends, a crossing already at or above this tier, a tile carrying no road to
+        // build out of (BL-1348) and ground another nation holds (BL-1357) — six
+        // conditions this file deliberately does not restate.
+        if (!placement_rules::can_place_road(w, tile, s, tier, actor))
             continue;
         const entity_id other = road_edge_neighbour(w, tile, s);
         if (other == null_entity)

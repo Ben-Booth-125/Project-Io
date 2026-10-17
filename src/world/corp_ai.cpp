@@ -1933,46 +1933,85 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (net <= best_net)
                         continue; // never extend toward a loss, and keep only the single best
 
-                    best_net  = net;
-                    best_tile = s.tile;
-                    best_body = body;
-                    // Raise one tier past whatever is there, capped at
-                    // Highway — a repeat eval against the same still-
-                    // unreached tile upgrades it rather than re-requesting a
-                    // tier it already holds (which `place_road` refuses as
-                    // `invalid_tile`, benign per APPLY THEN COUNT below).
-                    // ONE TILE, ONE CROSSING TO IMPROVE (review of 0831de6d). Raising
-                    // `max_road_tier + 1` and leaving the side to the auto-pick bought a
-                    // NEW edge on a fresh side every time, so the same tile could be paid
-                    // for eighteen times (six sides x three tiers) instead of three, with
-                    // nothing joined. The candidate names the crossing the tile ALREADY
-                    // has — its best, ties to the lower side index — and asks for one
-                    // tier more; a tile with no crossing yet leaves the side unnamed and
-                    // takes the cheapest one `place_road` resolves.
-                    best_side = k_road_side_auto;
-                    std::uint8_t have = 0;
-                    for (int s = 0; s < 6; ++s)
+                    // A ROAD IS LAID FROM A ROAD (BL-1348), SO THE CANDIDATE NAMES A
+                    // TILE THAT CARRIES ONE. Before BL-1348 this named the unreached site
+                    // tile itself; under the rule that tile is nowhere to build out of
+                    // while it carries no crossing, and the command would be refused at
+                    // the door every evaluation. So:
+                    //   * the site tile already roaded -> name it and RAISE its best
+                    //     crossing (the pre-BL-1348 behaviour, unchanged: ONE TILE, ONE
+                    //     CROSSING TO IMPROVE, review of 0831de6d — asking
+                    //     `max_road_tier + 1` with the side unnamed bought a fresh edge
+                    //     every time, paying for one tile up to eighteen times);
+                    //   * otherwise -> name a NEIGHBOUR that is roaded and cross INTO the
+                    //     site, which is the one legal step toward it. Lowest side index
+                    //     of the site, so the pick is deterministic and world-order
+                    //     independent. No plan is stored: each evaluation re-reads the
+                    //     network and proposes one crossing, so a chain out to a far
+                    //     deposit is the emergent product of repeated scoring, never a
+                    //     route this scorer holds.
+                    // A site with no roaded neighbour at all proposes NOTHING — a road
+                    // the rules refuse is not a candidate (BL-1357 included: the gate is
+                    // asked with this corp, so another nation's ground is never named).
+                    entity_id    cand_from = null_entity;
+                    std::uint8_t cand_side = k_road_side_auto;
+                    std::uint8_t cand_tier = 1;
+                    if (tile_has_road(tc))
                     {
-                        const std::uint8_t t = road_tier_on_side(tc, s);
-                        if (t > have && road_side_is_crossable(s, tc.grid_y))
+                        std::uint8_t have = 0;
+                        for (int sd = 0; sd < 6; ++sd)
                         {
-                            have = t;
-                            best_side = static_cast<std::uint8_t>(s);
+                            const std::uint8_t t = road_tier_on_side(tc, sd);
+                            if (t > have && road_side_is_crossable(sd, tc.grid_y))
+                            {
+                                have      = t;
+                                cand_side = static_cast<std::uint8_t>(sd);
+                            }
+                        }
+                        cand_from = s.tile;
+                        cand_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(have + 1));
+                    }
+                    else
+                    {
+                        for (int sd = 0; sd < 6 && cand_from == null_entity; ++sd)
+                        {
+                            if (!road_side_is_crossable(sd, tc.grid_y))
+                                continue;
+                            const entity_id nb = road_edge_neighbour(w, s.tile, sd);
+                            const auto      nit = w.tiles.find(nb);
+                            if (nit == w.tiles.end() || !tile_has_road(nit->second))
+                                continue;
+                            const int back = road_side_between(w, nb, s.tile);
+                            if (back < 0)
+                                continue;
+                            cand_from = nb;
+                            cand_side = static_cast<std::uint8_t>(back);
+                            cand_tier = std::min<std::uint8_t>(
+                                3, static_cast<std::uint8_t>(road_tier_on_side(nit->second, back) + 1));
                         }
                     }
-                    best_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(have + 1));
+                    if (cand_from == null_entity)
+                        continue; // nothing legal to lay toward this site
+                    if (!placement_rules::can_place_road(w, cand_from, static_cast<int>(cand_side),
+                                                         cand_tier, corp))
+                        continue; // the door would refuse it: not a candidate
+
+                    best_net  = net;
+                    best_tile = cand_from;
+                    best_body = body;
+                    best_side = cand_side;
+                    best_tier = cand_tier;
                 }
 
                 if (best_tile != null_entity)
                 {
                     // ROAD candidate: a road is an EDGE (BL-1340), so the command names
-                    // the tile and leaves the SIDE unnamed (`k_road_side_auto`) —
-                    // place_road then lays the cheapest land crossing out of it, lowest
-                    // traversal cost and ties to the lower side index. That discounts the
-                    // edge (road_edge_discount), which feeds directly into
-                    // body_reach_field's Dijkstra — the same mechanism the Reach lens
-                    // reads. The scorer picks a tile and a tier; the geometry is the
-                    // verb's, not a plan.
+                    // the tile AND the side it crosses — resolved above as the one legal
+                    // crossing toward the site (BL-1348/BL-1357), never a guess left to
+                    // the auto-pick. That discounts the edge (road_edge_discount), which
+                    // feeds directly into body_reach_field's Dijkstra — the same mechanism
+                    // the Reach lens reads. The scorer picks a crossing and a tier; the
+                    // laying is the verb's, not a plan.
                     {
                         const road_economics& rex = reg.road_econ(best_tier);
                         candidate c;
@@ -2007,6 +2046,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // LOGISTICS.md § Reach), so it is the only way out of
                     // that state. This is LP constraint 5 answered directly —
                     // "a rival must be able to build the generator".
+                    // `best_tile` is the ROADED end of the crossing above (BL-1348), which
+                    // is also the only end an anchor may stand on: BL-1347 refuses a
+                    // building on a tile no road reaches, so siting the bootstrap anchor on
+                    // the unreached site tile would be a candidate the door throws out.
                     if (!body_has_supply_anchor(w, best_body))
                     {
                         const building_type atype = placement_rules::is_coastal(w, best_tile)

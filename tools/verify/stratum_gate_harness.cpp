@@ -84,6 +84,7 @@ fixture make_body()
             tc.cover_density = 150;
             tc.landform  = terrain_landform::plains;
             tc.habitability = 0.8f;
+            tc.road_edges   = road_edges_on_every_side(1); // BL-1347: the ground is roaded
             tc.resource_deposit[static_cast<std::size_t>(resource_type::iron_ore)]   = 100.0f;
             tc.resource_remaining[static_cast<std::size_t>(resource_type::iron_ore)] = 40000.0f;
             f.w.tiles.emplace(t, tc);

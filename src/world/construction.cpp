@@ -208,6 +208,13 @@ construction_result construct_for(world& w, const recipe_registry& reg,
             return construction_result::out_of_range;
         if (pr.reason == placement_rules::placement_reason::tech_locked)
             return construction_result::tech_locked;
+        // BL-1347: A BUILDING NEEDS A ROAD, and the refusal says so rather than becoming
+        // one more `invalid_tile`. The flattening this joins the exceptions to is BL-1364's
+        // subject (every placement reason but the launchpad's collapses here); this rule
+        // is the one a player can act on -- bring a road to the tile -- so it is the one
+        // that must not arrive as "invalid tile".
+        if (pr.reason == placement_rules::placement_reason::needs_road)
+            return construction_result::needs_road;
         if (type == building_type::launchpad)
             return construction_result::slot_occupied;
         return construction_result::invalid_tile; // Port not coastal
@@ -545,15 +552,25 @@ construction_result place_road(world& w, const recipe_registry& reg,
     // BL-1340: the SIDE the road crosses. `k_road_side_auto` resolves here, once, so the
     // refusals below read the side that would actually be laid.
     const int chosen = (side == k_road_side_auto)
-                           ? placement_rules::auto_road_side(w, tile, tier)
+                           ? placement_rules::auto_road_side(w, tile, tier, corp)
                            : static_cast<int>(side);
     if (chosen < 0 || chosen > 5)
         return construction_result::invalid_tile;
 
-    // Validity: land both ends, a neighbour that way, and a tier that strictly upgrades
-    // the crossing (BL-172 / BL-1340).
-    if (!placement_rules::can_place_road(w, tile, chosen, tier))
+    // Validity: land at one end, a neighbour that way, a tier that strictly upgrades the
+    // crossing (BL-172 / BL-1340), a ROAD ON THE NAMED TILE to build out of (BL-1348), and
+    // ground this corp's nation may build from (BL-1357 -- one crossing over a border, and
+    // no further). The ACTOR is handed in: it is what makes "a tile you hold" askable.
+    const placement_rules::placement_result rr =
+        placement_rules::can_place_road(w, tile, chosen, tier, corp);
+    if (!rr)
+    {
+        if (rr.reason == placement_rules::placement_reason::no_road_to_extend)
+            return construction_result::needs_road;
+        if (rr.reason == placement_rules::placement_reason::foreign_ground)
+            return construction_result::foreign_ground;
         return construction_result::invalid_tile;
+    }
 
     corporation_component& cc = corp_it->second;
     const road_economics&  re = reg.road_econ(tier);

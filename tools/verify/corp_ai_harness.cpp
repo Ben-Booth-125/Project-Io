@@ -109,6 +109,12 @@ entity_id make_tile(world& w, entity_id body, int gx, int gy,
     tc.grid_y      = gy;
     tc.substrate = sub;
     tc.landform    = terrain_landform::plains;
+    // BL-1347: a building needs a road on its tile (PRODUCTION.md § A building needs a
+    // road), and the generated world now carries a crossing to every site it stamps. The
+    // scene's LAND is roaded for the same reason -- the subject here is the scorer and the
+    // command seam, and a roadless scene refuses every build before either is reached.
+    if (!is_water(sub))
+        tc.road_edges = road_edges_on_every_side(1);
     if (iron_richness > 0.0f)
     {
         tc.resource_deposit[ri(resource_type::iron_ore)]   = iron_richness;

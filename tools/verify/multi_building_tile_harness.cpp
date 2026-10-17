@@ -80,7 +80,9 @@ int main()
 
     // --- R7: a tile that never reaches its cap never transforms ---------------
     const entity_id under_cap_tile = w.create_entity();
+    // BL-1347: the fixture's ground is roaded, as a generated site's is.
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
+      tc.road_edges = road_edges_on_every_side(1);
       tc.grid_x = 0; tc.grid_y = 0; w.tiles[under_cap_tile] = tc; }
     entity_id built = null_entity;
     construct_building(w, reg, corp, under_cap_tile, building_type::processing_facility,
@@ -98,6 +100,7 @@ int main()
         t.body = body;
         t.substrate = terrain_substrate::sedimentary; t.cover = terrain_cover::grass; t.cover_density = 150;
         t.grid_x = 1; t.grid_y = 0;
+        t.road_edges = road_edges_on_every_side(1); // BL-1347: the ground is roaded
         t.resource_deposit[ri(resource_type::iron_ore)] = 100.0f; // for R4/R5 below
         w.tiles[tile] = t;
     }
@@ -158,6 +161,7 @@ int main()
         t.body = body;
         t.substrate = terrain_substrate::sedimentary; t.cover = terrain_cover::grass; t.cover_density = 150;
         t.grid_x = 2; t.grid_y = 0;
+        t.road_edges = road_edges_on_every_side(1); // BL-1347: the ground is roaded
         t.habitability = 0.95f;
         w.tiles[high_hab_tile] = t;
     }

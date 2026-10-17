@@ -64,6 +64,8 @@ int main()
 
     const entity_id outpost_tile = w.create_entity();
     { tile_component tc{}; tc.body = outpost_body; tc.substrate = terrain_substrate::rocky;
+      // BL-1347: a building needs a road on its tile, and this harness builds one here.
+      tc.road_edges = road_edges_on_every_side(1);
       tc.resource_deposit[ri(resource_type::iron_ore)] = 100.0f; w.tiles[outpost_tile] = tc; }
 
     const entity_id corp = w.create_entity();

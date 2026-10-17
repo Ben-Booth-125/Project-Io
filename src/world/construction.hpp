@@ -19,6 +19,8 @@ enum class construction_result : uint8_t
     tech_locked,         ///< BL-344: the corporation has not earned the tech that unlocks this type.
     era_locked,          ///< BL-433: this building type is not part of the campaign's era band (e.g. a Launchpad at 0 CE).
     wrong_air,           ///< The recipe cannot run on this body's air (propellant routes, Ben 2026-10-09).
+    needs_road,          ///< BL-1347: no road reaches the tile (a building), or the named tile carries none to lay from (BL-1348, a road).
+    foreign_ground,      ///< BL-1357: a road may cross a border and no further -- the named tile is another nation's.
     // BL-692 removed `depth_locked` (BL-428): chain depth no longer gates a
     // build, so the value became unreachable. Tech is the only method lock now.
 };

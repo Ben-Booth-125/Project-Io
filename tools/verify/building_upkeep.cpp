@@ -1271,8 +1271,16 @@ void r11_the_province_is_the_grid_cell()
         f.build(6, 3, "rrr...", "......", {});
         check(f.grid_at(4) == 0, "R11f before: the second province is dark");
         recipe_registry reg;
-        const construction_result res = place_road(f.w, reg, f.corp, f.tiles[3], 1);
-        check(res == construction_result::placed, "R11f place_road placed a Track on the second province's edge");
+        // BL-1348 (a road is laid FROM a road): the crossing is named out of the ROADED
+        // tile (2,0) across its east side into (3,0) -- the first tile of the dark
+        // province -- rather than named on (3,0), which carries no road to build out of.
+        // A crossing INTO a tile is a road ON it (BL-1347), so the province still joins.
+        // AT ROAD, NOT TRACK: the fixture writes its mask with a Track on every side of a
+        // roaded tile, so (2,0)'s east side already stands at 1 and a Track there is
+        // `already_road`. Road (2) is the strict upgrade that writes BOTH halves of the
+        // crossing, which is what puts a road on (3,0).
+        const construction_result res = place_road(f.w, reg, f.corp, f.tiles[2], 2, 0);
+        check(res == construction_result::placed, "R11f place_road placed a Road onto the second province's edge");
         check(f.grid_at(4) != 0 && f.grid_at(4) == f.grid_at(0),
               "R11f after: the cached grid was invalidated and the province joined the first's grid");
     }

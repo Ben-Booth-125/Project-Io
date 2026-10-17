@@ -1065,6 +1065,9 @@ struct generation_report
     // What `lay_market_roads` did on the home body, after the folds. Write-only.
     market_road_stats market_roads;
     market_road_trace market_road_links;
+    // BL-1347: what `lay_site_roads` did on the home body at the tail -- a crossing to
+    // every site the generation stampers left unroaded. Write-only.
+    site_road_stats   site_roads;
     // What `stamp_history_roads` did on the home body (the bridge cap's row reads
     // every corridor laid, whole). Write-only.
     history_road_stats history_roads;

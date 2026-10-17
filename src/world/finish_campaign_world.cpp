@@ -7,6 +7,7 @@
 #include "world/hard_coded_world.hpp"       // generation_progress, generation_step_cost_ms
 #include "world/history_log.hpp"            // seed_genesis_history
 #include "world/recipe_registry.hpp"
+#include "world/road_generation.hpp"        // BL-1347: lay_site_roads, after the stampers
 #include "world/survey_system.hpp"          // init_survey_states
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -400,6 +401,41 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // every pool meets its need. After the rail handover (stations are sources).
     out.lp = seed_logistics_sources(w);
     print_lp_seed_report(out.lp);
+    // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS
+    // (PRODUCTION.md § A building needs a road; LOGISTICS.md § 4, "Generation roads every
+    // building site"). Generation roaded the sites it had laid by its tail; everything
+    // between that point and here stamps more -- the winner's charters, the state
+    // handover's transfers (same tiles, so free), the rail stations and the LP hubs. The
+    // rule binds the generated world as it binds play, so the last stamper is followed by
+    // the pass. BEFORE THE SETTLE: the twelve econ ticks are played on a world the rule
+    // already holds for, and a hub laid here is on the network for the first of them.
+    // Idempotent and cheap on an already-roaded world (one map walk, no A*).
+    {
+        std::vector<entity_id> bodies;
+        for (const auto& [bid, bc] : w.bodies)
+        {
+            (void)bc;
+            bodies.push_back(bid);
+        }
+        std::sort(bodies.begin(), bodies.end()); // deterministic: bodies is unordered
+        for (const entity_id b : bodies)
+        {
+            const site_road_stats s = lay_site_roads(w, b);
+            out.site_roads.sites          += s.sites;
+            out.site_roads.sites_roadless += s.sites_roadless;
+            out.site_roads.sites_joined   += s.sites_joined;
+            out.site_roads.sites_failed   += s.sites_failed;
+            out.site_roads.crossings_laid += s.crossings_laid;
+            out.site_roads.long_crossing  += s.long_crossing;
+            out.site_roads.half_crossings_refused += s.half_crossings_refused;
+        }
+        std::printf("[site roads] finish: %d site tile(s), %d unroaded -> %d joined, "
+                    "%d unreachable (%d crossing(s))\n",
+                    out.site_roads.sites, out.site_roads.sites_roadless,
+                    out.site_roads.sites_joined, out.site_roads.sites_failed,
+                    out.site_roads.crossings_laid);
+        std::fflush(stdout);
+    }
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

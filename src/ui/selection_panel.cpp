@@ -4617,6 +4617,12 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             { "Road",    2, 3.0f, IM_COL32(205, 188, 140, 255) },
             { "Highway", 3, 4.0f, IM_COL32(225, 205, 150, 255) },
         };
+        // BL-1348: whether this tile carries a crossing at all decides WHICH empty-set
+        // refusal the press explains — "nowhere left to go" or "nothing here to go from".
+        const bool tile_carries_road = [&]() {
+            const auto tit = w.tiles.find(tile_id);
+            return tit != w.tiles.end() && tile_has_road(tit->second);
+        }();
 
         for (const road_tier_affordance& rt : road_tiers)
         {
@@ -4633,7 +4639,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             // crossing. The refusal is therefore the ABSENCE of a target, which is
             // why there is no refusal sentence in this row any more.
             const std::vector<road_target> targets =
-                road_crossing_targets(w, tile_id, rt.level);
+                road_crossing_targets(w, tile_id, rt.level, w.player_entity);
 
             // Same affordability defect as the building path: place_road gates on
             // build_cost PLUS materials priced at the local market, so gating on
@@ -4707,6 +4713,13 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             if (!affordable)
                 why = "Can't afford it: the crossing charges "
                     + std::to_string(static_cast<int>(road_capex)) + " cr.";
+            else if (targets.empty() && !tile_carries_road)
+                // BL-1348 (LOGISTICS.md § 4): a road is laid FROM a road. This tile carries
+                // none, so there is nothing here to build out of -- a different refusal
+                // from "nowhere left to go", and one the player can act on by bringing a
+                // road to a neighbour first.
+                why = "A road is laid from a road: this tile carries none, so there is "
+                      "nowhere to cross from. Bring one to a neighbour first.";
             else if (targets.empty())
                 why = "Nowhere left to cross to from this tile at this tier, so pressing "
                       "highlights nothing.";

@@ -94,6 +94,20 @@ fixture make_body()
 
 entity_id at(const fixture& f, int c, int r) { return f.grid[static_cast<std::size_t>(r) * GW + c]; }
 
+/// BL-1347: a building needs a road on its tile (PRODUCTION.md § A building needs a road),
+/// so a PLACEMENT check on this fixture's bare ground would now be refused for want of a
+/// road rather than answering the reach question it is asked. Lay a Track everywhere,
+/// called ONLY by the sections that assert a placement -- never by the ones that measure
+/// the cost model (R2's "five plains steps cost 5.0" is a statement about bare plains, and
+/// a road discounts the walk), so the two subjects stay apart.
+void road_all(fixture& f)
+{
+    for (const entity_id t : f.grid)
+        if (const auto it = f.w.tiles.find(t); it != f.w.tiles.end())
+            it->second.road_edges = road_edges_on_every_side(1);
+    f.w.body_reach_cost.clear();
+}
+
 /// Make (c,r) a supply anchor by putting an inland logistics hub on it.
 void anchor(fixture& f, int c, int r)
 {
@@ -171,6 +185,7 @@ int main()
     // --- R5: the gate refuses, permits, and disables ----------------------
     {
         fixture f = make_body();
+        road_all(f); // BL-1347: this section asserts PLACEMENTS
         anchor(f, 0, 0);
         body_reach_field(f.w, f.body);
 
@@ -199,6 +214,7 @@ int main()
     // --- R6: an anchor is always placeable --------------------------------
     {
         fixture f = make_body();
+        road_all(f); // BL-1347: this section asserts a PLACEMENT
         anchor(f, 0, 0);
         anchor(f, 10, 7); // a second hub at the far corner, well beyond any sane budget
         body_reach_field(f.w, f.body);
@@ -235,6 +251,7 @@ int main()
 
         // And the gate SKIPS rather than refuses when the field is unknown.
         fixture g = make_body();
+        road_all(g); // BL-1347: this is a PLACEMENT check
         const auto unknown = placement_rules::can_place_in_world(
             g.w, at(g, 5, 0), building_type::extraction_site, resource_type::iron_ore, 1.0f);
         check(unknown.ok(),
@@ -272,6 +289,7 @@ int main()
     // --- R10: the first-anchor bootstrap (Ben's ruling, 2026-08-08) --------
     {
         fixture f = make_body();
+        road_all(f); // BL-1347: every check in this section is a PLACEMENT
         body_reach_field(f.w, f.body); // built and all-infinite: no anchor anywhere
 
         // Before the fix this refused EVERYTHING on a virgin body, the first hub
@@ -314,6 +332,7 @@ int main()
     // --- R11: construct/demolish invalidate the caches themselves ----------
     {
         fixture f = make_body();
+        road_all(f); // BL-1347: this section builds through the real door
         recipe_registry reg;
         { building_economics hub; hub.build_cost = 10.0f; hub.build_duration_ticks = 0.0f;
           reg.set_economics(building_type::inland_logistics_hub, hub); }

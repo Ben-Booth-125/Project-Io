@@ -332,10 +332,17 @@ int main()
         const float spent = bal_before - f.w.corporations[f.corp].balance;
         check(approx(spent, 0.4f), "a decommissioned hub confers no discount (full 0.4 cost)");
     }
-    // T10 — BL-147/BL-172 road placement: place_road(tier) on a road-free land tile raises
-    // the crossing to that tier, debits the tier's flat cost (no market -> no materials), and
-    // invalidates the A* cache. Upgrade-in-place: a higher tier on the same tile succeeds; the
-    // same or a lower tier is rejected (already at or above).
+    // T10 — BL-147/BL-172 road placement: place_road(tier, side) raises THAT crossing to
+    // the tier, debits the tier's flat cost (no market -> no materials), and invalidates the
+    // A* cache. Upgrade-in-place: a higher tier on the same crossing succeeds; the same or a
+    // lower tier is rejected (already at or above).
+    //
+    // BL-1348 (Ben, 2026-10-16): A ROAD IS LAID FROM A ROAD. The named tile must already
+    // carry a crossing, so this section no longer starts from road-free ground -- it seeds
+    // the inherited lattice first (one Track between (0,0) and (1,0), as generation's local
+    // streets would) and then builds OUT of (1,0) across its east side. Naming the side is
+    // what the player's two presses do since BL-1370; the auto form would read the press as
+    // "improve the road here" and refuse a tier the crossing already holds.
     {
         world w;
         const entity_id corp = w.create_entity();
@@ -345,35 +352,38 @@ int main()
         const entity_id t = tile_at(w, body, 1, 0);
 
         recipe_registry reg; // default road_econ (no Lua): Track 25 / Road 45 / Highway 90 cr
+        // The inherited lattice: a Track from (0,0) across to (1,0) (side 0 = E), so the
+        // tile the player builds out of carries a road (BL-1348).
+        lay_road_edge(w, tile_at(w, body, 0, 0), 0, 1);
         (void)intra_body_path(w, body, tile_at(w,body,0,0), tile_at(w,body,2,0)); // warm the cache
         const bool cache_warm = !w.astar_cost_cache.empty();
         float bal = w.corporations[corp].balance;
 
-        const construction_result r = place_road(w, reg, corp, t, 1); // Track
-        check(r == construction_result::placed, "place_road (Track) on a land tile succeeds");
-        check(max_road_tier(w.tiles[t]) == 1, "placed Track raises one of the tile's crossings to 1");
+        const construction_result r = place_road(w, reg, corp, t, 1, 0); // Track, east side
+        check(r == construction_result::placed, "place_road (Track) from a roaded tile succeeds");
+        check(road_tier_on_side(w.tiles[t], 0) == 1, "placed Track raises THAT crossing to 1");
         check(approx(bal - w.corporations[corp].balance, 25.0f),
               "Track debits its flat build_cost (25 cr, no market materials)");
         check(cache_warm && w.astar_cost_cache.empty(),
               "road placement invalidates the A* cost cache");
 
         // Same tier again -> rejected (already at or above this tier).
-        const construction_result r_same = place_road(w, reg, corp, t, 1);
+        const construction_result r_same = place_road(w, reg, corp, t, 1, 0);
         check(r_same == construction_result::invalid_tile,
               "re-laying the same tier on a road tile is rejected (already at or above)");
 
         // Upgrade Track -> Highway succeeds, raises the tier, and debits the Highway cost.
         (void)intra_body_path(w, body, tile_at(w,body,0,0), tile_at(w,body,2,0)); // re-warm
         bal = w.corporations[corp].balance;
-        const construction_result r_up = place_road(w, reg, corp, t, 3); // Highway
+        const construction_result r_up = place_road(w, reg, corp, t, 3, 0); // Highway, same crossing
         check(r_up == construction_result::placed, "upgrading Track -> Highway succeeds");
-        check(max_road_tier(w.tiles[t]) == 3, "upgrade raises the crossing to 3 (Highway)");
+        check(road_tier_on_side(w.tiles[t], 0) == 3, "upgrade raises the crossing to 3 (Highway)");
         check(approx(bal - w.corporations[corp].balance, 90.0f),
               "Highway debits its flat build_cost (90 cr)");
         check(w.astar_cost_cache.empty(), "the upgrade invalidates the A* cost cache");
 
         // A lower tier on the Highway tile -> rejected.
-        const construction_result r_down = place_road(w, reg, corp, t, 2); // Road < Highway
+        const construction_result r_down = place_road(w, reg, corp, t, 2, 0); // Road < Highway
         check(r_down == construction_result::invalid_tile,
               "a lower tier on an existing higher road is rejected");
     }

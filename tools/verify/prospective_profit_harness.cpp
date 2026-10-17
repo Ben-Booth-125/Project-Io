@@ -102,6 +102,7 @@ int main()
         tc.resource_deposit[ri(resource_type::iron_ore)]   = 2.0f;
         tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;
         tc.hazard_level = 0.0f;
+        tc.road_edges   = road_edges_on_every_side(1); // BL-1347: the ground is roaded
         w.tiles[tile_iron] = tc;
     }
     const entity_id tile_bare = w.create_entity();
@@ -109,6 +110,7 @@ int main()
         tile_component tc{};
         tc.body = body;
         tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
+        tc.road_edges = road_edges_on_every_side(1); // BL-1347: the ground is roaded
         w.tiles[tile_bare] = tc;
     }
 

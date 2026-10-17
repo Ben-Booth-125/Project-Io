@@ -422,7 +422,6 @@ int main(int argc, char** argv)
                     continue;
                 const bool nb_wet = is_water(w.tiles.at(nb).substrate);
                 if (nb_wet && wet_a == null_entity) { wet_a = tid; wet_b = nb; wet_side = s; }
-                if (!nb_wet && shore == null_entity) { shore = tid; shore_side = s; }
             }
             if (wet_a != null_entity && shore != null_entity)
                 break;
@@ -430,6 +429,30 @@ int main(int argc, char** argv)
         std::printf("       probe sides: water-to-water %s, shore-to-water %s\n",
                     wet_a != null_entity ? "found" : "none on this seed",
                     shore != null_entity ? "found" : "none on this seed");
+        // BL-1348: THE SHORE CASE IS NAMED FROM THE LAND END NOW. A road is laid FROM a
+        // road, so the tile a crossing is named out of must already carry one -- and the
+        // bridge the player builds is laid from the shore he stands on, not from the water.
+        // The old probe named the WATER tile of a shore pair, which carries no road until a
+        // deck is laid on it, so the rule refuses it for want of a road rather than for the
+        // water. Scanned the other way round: a LAND tile that carries a road and adjoins
+        // water on a crossable side.
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            if (is_water(tc.substrate) || !tile_has_road(tc))
+                continue;
+            for (int s = 0; s < 6; ++s)
+            {
+                if (!road_side_is_crossable(s, tc.grid_y))
+                    continue;
+                const entity_id nb = road_edge_neighbour(w, tid, s);
+                if (nb == null_entity || !is_water(w.tiles.at(nb).substrate))
+                    continue;
+                // The LOWEST tile id that qualifies, not the first the unordered map
+                // happens to hand over: the probe should pick the same ground on every run.
+                if (shore == null_entity || tid < shore) { shore = tid; shore_side = s; }
+                break;
+            }
+        }
         check(shore != null_entity, "P1a found a shore-to-water crossing to ask of");
         if (shore != null_entity)
         {

@@ -44,6 +44,11 @@ entity_id make_tile(world& w, entity_id body, int c, int r,
     tc.grid_y      = r;
     tc.substrate = terrain_substrate::rocky;
     tc.landform    = lf;
+    // BL-1347: a building needs a road on its tile (PRODUCTION.md § A building needs a
+    // road), and generation now lays a crossing to every site it stamps. The fixture's
+    // ground is roaded for the same reason: the subject here is the deposit/terrain gate,
+    // and a roadless fixture refuses every placement before reaching it.
+    tc.road_edges  = road_edges_on_every_side(1);
     w.tiles.emplace(t, tc);
     return t;
 }
@@ -188,7 +193,14 @@ int main()
         recipe_registry reg;
         building_economics base; base.build_cost = 300.0f; base.build_duration_ticks = 4.0f;
         reg.set_economics(building_type::military_base, base);
-        construction_params cp; cp.max_logistics_reach = 5.0f;
+        // THE BUDGET IS 3, AND THE NUMBER MOVED WITH BL-1347. The fixture's ground now
+        // carries a Track (a building needs a road on its tile, so a roadless fixture
+        // refuses every placement here), and a road discounts the walk: measured on this
+        // grid, column 2 prices 1.333 and column 6 prices 4.000, where the bare ground
+        // priced 2 and 6. A budget of 5 therefore admitted BOTH and the beyond-reach case
+        // stopped being one. 3 restores it -- in at column 2, out at column 6 -- so the
+        // subject (a military base earns no anchor exemption) is asserted as before.
+        construction_params cp; cp.max_logistics_reach = 3.0f;
         reg.set_construction(cp);
 
         world w;
@@ -213,14 +225,14 @@ int main()
         // Placement: land within reach OK (no deposit needed), ocean refused,
         // beyond-reach refused — the base earns NO anchor exemption.
         check(placement_rules::can_place_in_world(w, grid[0][2],
-                  building_type::military_base, resource_type::iron_ore, 5.0f).ok(),
+                  building_type::military_base, resource_type::iron_ore, 3.0f).ok(),
               "R6 a military base is placeable on bare land within reach (no deposit needed)");
         check(!placement_rules::can_place_in_world(w, grid[1][0],
-                  building_type::military_base, resource_type::iron_ore, 5.0f).ok(),
+                  building_type::military_base, resource_type::iron_ore, 3.0f).ok(),
               "R6 a military base is refused on ocean");
         // Column 6 is 6 steps away (columns wrap at 12, so the short way is 6).
         check(!placement_rules::can_place_in_world(w, grid[0][6],
-                  building_type::military_base, resource_type::iron_ore, 5.0f).ok(),
+                  building_type::military_base, resource_type::iron_ore, 3.0f).ok(),
               "R6 a military base beyond the reach budget is refused (no anchor-type exemption)");
 
         // Built through the real path: staffs at zero, and — ruling 3 — the

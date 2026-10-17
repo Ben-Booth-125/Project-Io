@@ -49,6 +49,7 @@
 #include "world/corporation_generation.hpp" // marketplace_retrofit_report (BL-1268)
 #include "world/state_industry.hpp"         // state_handover_report (BL-1296)
 #include "world/logistic_points.hpp"        // lp_seed_report (BL-1309)
+#include "world/road_generation.hpp"        // site_road_stats (BL-1347)
 
 #include <cstdint>
 #include <vector>
@@ -109,6 +110,11 @@ struct finish_campaign_result
     state_handover_report   state;
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
     lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
+    /// BL-1347: the crossings laid to the sites the WINNER's charters, the state handover
+    /// and the hub/station seeding stamped -- summed over every body that holds a
+    /// building. Generation ran its own pass at its tail; this is the second, for what
+    /// was stamped after it (`lay_site_roads` is idempotent).
+    site_road_stats         site_roads{};
     /// Wall clock of the search and of the settle, milliseconds -- REPORTED
     /// ONLY, on the BL-754 footing; the loading bar's weights are re-measured
     /// from these, never read from them at run time.

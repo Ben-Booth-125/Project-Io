@@ -409,6 +409,41 @@ std::map<entity_id, float> road_qualification_percentiles(const world& w);
 void lay_market_roads(world& w, entity_id body, market_road_stats* stats = nullptr,
                       market_road_trace* trace = nullptr);
 
+// ---------------------------------------------------------------------------
+// BL-1347 -- a crossing to every site generation stamps
+// ---------------------------------------------------------------------------
+// `PRODUCTION.md` § A building needs a road binds the generated world too (Ben,
+// 2026-10-16; LOGISTICS.md § 4, "Generation roads every building site"), and every road
+// pass above runs BEFORE a single building exists. So the crossing to a site is laid here,
+// after the stampers: one Track per unroaded building tile, by the village spur's own
+// method (the three nearest roaded tiles, `stamp_edge` doing the A*, the strait rules and
+// the bridge cap). Idempotent and deterministic -- see the definition's header for the
+// walk order and why it may be called more than once.
+constexpr int kSiteRoadCandidates = 3;
+
+/// What one `lay_site_roads` call did. WRITE-ONLY.
+struct site_road_stats
+{
+    int sites          = 0; ///< distinct tiles carrying a building on the body
+    int sites_roadless = 0; ///< of them, carrying no road edge when their turn came
+    int sites_joined   = 0; ///< of those, a crossing was laid to
+    int sites_failed   = 0; ///< of those, nothing reachable to lay from (counted, never hidden)
+    int crossings_laid = 0; ///< crossings written, summed over the routes laid
+    int long_crossing  = 0; ///< routes refused by the bridge cap alone
+    int half_crossings_refused = 0; ///< BL-1376: crossings a terminal water run cost a route
+    long long walks    = 0; ///< world flood-field count when the pass ended (its cost)
+    /// Road edges in the world by tier (Track / Road / Highway), counted once each
+    /// (`count_road_edges`), as the pass FOUND them and as it LEFT them. The measurement
+    /// of what this rule costs a world in road, read where it is laid rather than
+    /// inferred from a count taken elsewhere.
+    int edges_before[3] = { 0, 0, 0 };
+    int edges_after[3]  = { 0, 0, 0 };
+};
+
+/// Lay a Track from the network to every building tile on @p body that carries no road
+/// edge. Call AFTER everything that stamps a generated building. Idempotent.
+site_road_stats lay_site_roads(world& w, entity_id body);
+
 /// Undo every raise @p trace recorded, last first: the road field as `lay_market_roads`
 /// found it. Drops the logistics caches. For instruments reading the pre-pass network
 /// (market_gravity_ladder folds on it; road_generation_harness reads "before").

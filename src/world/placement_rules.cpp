@@ -33,6 +33,9 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::centre_too_small: return "This settlement is too small to host it - a larger centre is needed";
         case placement_reason::not_fresh_water: return "A well must stand on a river or beside a lake";
         case placement_reason::far_from_centre: return "Too far from a population centre to draw a workforce";
+        case placement_reason::needs_road: return "No road reaches this tile - lay one to it before building here";
+        case placement_reason::no_road_to_extend: return "A road is laid from a road - this tile carries none to build out of";
+        case placement_reason::foreign_ground: return "A road may cross a border, but not run on past it - this ground is another nation's";
     }
     return "Cannot build here";
 }
@@ -105,8 +108,12 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
     // wants another direction names the side.
     if (tier == 0 || tier > 3)
         return placement_reason::already_road;
+    // BL-1348 (Ben, 2026-10-16): a tile carrying NO crossing used to be the easy `ok`
+    // case -- "nothing here yet: the first crossing". It is now the refusal: a road is
+    // laid FROM a road, so a tile with none is nowhere to build out of, whatever side the
+    // caller might name next.
     if (max_road_tier(tc) == 0)
-        return placement_reason::ok; // nothing here yet: the first crossing
+        return placement_reason::no_road_to_extend;
     bool upgradable = false;
     for (int s = 0; s < 6 && !upgradable; ++s)
     {
@@ -117,7 +124,8 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
                       : placement_result{placement_reason::already_road};
 }
 
-placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier)
+placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier,
+                                entity_id actor)
 {
     const auto tit = w.tiles.find(tile);
     if (tit == w.tiles.end())
@@ -150,10 +158,42 @@ placement_result can_place_road(const world& w, entity_id tile, int side, std::u
         return placement_reason::ocean;
     if (road_tier_on_side(tit->second, side) >= tier)
         return placement_reason::already_road;
+    // A ROAD IS LAID FROM A ROAD, ACROSS TO THE NEXT TILE (BL-1348; Ben, 2026-10-16;
+    // LOGISTICS.md § 4). The NAMED tile must already carry a roaded edge: a road cannot be
+    // dropped in open country, and a frontier is reached one crossing at a time. The rule
+    // is bootstrappable because generation's own rule gives every market centre's tile at
+    // least a Track, so no world begins with nowhere to build from. Read on the named tile
+    // only -- the far end is what the crossing REACHES, and requiring a road there too
+    // would make every extension impossible.
+    if (max_road_tier(tit->second) == 0)
+        return placement_reason::no_road_to_extend;
+    // ...AND NEVER FURTHER THAN ONE CROSSING OVER A BORDER (BL-1357; Ben, 2026-10-16).
+    // Crossing INTO a neighbour's tile is always permitted (nothing here refuses it -- it
+    // is what stops a foreign-held market centre being unconnectable), but the foreign
+    // tile the road landed on is NOT a tile this actor may build FROM. So the road stops
+    // where it lands: a connection, never a corridor through somebody's country. Asked of
+    // the ACTOR's own nation, because "a tile you hold" is the rule's own wording; with no
+    // actor named (a generation stamp, a bare affordance) there is no holder to compare
+    // against and this half does not fire.
+    if (actor != null_entity)
+    {
+        const auto cit = w.corporations.find(actor);
+        const entity_id home = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+        if (home != null_entity)
+        {
+            const auto hn = w.tile_to_nation.find(tile);
+            const entity_id holder = hn != w.tile_to_nation.end() ? hn->second : null_entity;
+            // Unowned ground is nobody's border: a chain may be walked out across it, which
+            // is how a remote deposit is reached at all (PRODUCTION.md § A building needs a
+            // road). Only ground ANOTHER nation holds stops the chain.
+            if (holder != null_entity && holder != home)
+                return placement_reason::foreign_ground;
+        }
+    }
     return placement_reason::ok;
 }
 
-int auto_road_side(const world& w, entity_id tile, std::uint8_t tier)
+int auto_road_side(const world& w, entity_id tile, std::uint8_t tier, entity_id actor)
 {
     // UPGRADE BEFORE EXTEND (review of 0831de6d). "No side named" means "improve the road
     // here", so the crossing the tile ALREADY has comes first: the highest existing tier
@@ -173,7 +213,7 @@ int auto_road_side(const world& w, entity_id tile, std::uint8_t tier)
             const std::uint8_t t = road_tier_on_side(tit->second, s);
             if (t == 0 || t >= tier || t <= have)
                 continue;
-            if (!can_place_road(w, tile, s, tier))
+            if (!can_place_road(w, tile, s, tier, actor))
                 continue;
             have    = t;
             best_up = s;
@@ -187,7 +227,7 @@ int auto_road_side(const world& w, entity_id tile, std::uint8_t tier)
     float best_cost = 0.0f;
     for (int s = 0; s < 6; ++s)
     {
-        if (!can_place_road(w, tile, s, tier))
+        if (!can_place_road(w, tile, s, tier, actor))
             continue;
         const entity_id other = road_edge_neighbour(w, tile, s);
         const auto oit = w.tiles.find(other);
@@ -562,6 +602,25 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
                 return placement_reason::out_of_logistics_range;
         }
     }
+
+    // A BUILDING NEEDS A ROAD (BL-1347; Ben, 2026-10-16; PRODUCTION.md § A building
+    // needs a road). A tile carries a road when ANY of its hex sides carries a roaded
+    // edge — a crossing INTO the tile is a road ON it, from either side, which is why
+    // this reads `tile_has_road` (the whole six-side mask) and not one named side.
+    //
+    // EXTRACTION IS NOT EXEMPT (Ben's call): a remote deposit is worked only once a road
+    // reaches it, which with BL-1348 means a chain of crossings built out to it. That is
+    // the intended cost of reaching far ore, and the reason the richest tile on the body
+    // is a decision rather than a lookup.
+    //
+    // Checked beside the stack and province ceilings and ahead of them, because this one
+    // names a thing the player can FIX on this tile — bring a road to it — where a full
+    // stack and a full province only say "not here". Generated buildings are bound by the
+    // same rule at their own end rather than exempted here: the road passes lay a crossing
+    // to every site generation stamps (`lay_site_roads`, road_generation.hpp), so the 1960
+    // world holds no building this would have refused.
+    if (!tile_has_road(tc_it->second))
+        return placement_reason::needs_road;
 
     // Stack ceiling: a tile carries several sites working one deposit, but not
     // without limit. Checked last — a full stack is the least interesting reason

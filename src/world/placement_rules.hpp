@@ -50,6 +50,9 @@ enum class placement_reason : uint8_t
     centre_too_small,  ///< BL-615: the hosting centre is below the building's required stratum.
     far_from_centre,   ///< BL-615: no population centre within the building's proximity radius.
     not_fresh_water,   ///< BL-1198: a Well (water, no deposit) must stand on a river or beside a lake.
+    needs_road,        ///< BL-1347: no building stands on a tile no road reaches (PRODUCTION.md § A building needs a road).
+    no_road_to_extend, ///< BL-1348: a road is laid FROM a road -- the named tile carries none.
+    foreign_ground,    ///< BL-1357: a road may cross a border and no further -- the named tile is another nation's.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -168,13 +171,33 @@ resource_type richest_extractable(const tile_component& tc, bool& any);
 ///              refuse open sea, so the two differ only in mid-strait.
 /// @param tier  The road tier to place (BL-172): 1=Track, 2=Road, 3=Highway. Upgrade-in-place —
 ///              valid only if strictly higher than the tier the crossing already holds.
+/// @param actor The CORPORATION laying it, or `null_entity` where no actor is named (a
+///              generation stamp, a bare affordance). Only BL-1357's half reads it: the
+///              nation that holds @p tile is compared with the actor's home nation.
 /// @return    `ok`, or `ocean` (no neighbour that way, a side no walk can cross, or water
-///            at BOTH ends) / `already_road` (already at or above @p tier).
-placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier = 1);
+///            at BOTH ends) / `already_road` (already at or above @p tier) /
+///            `no_road_to_extend` (BL-1348: @p tile carries no crossing to build from) /
+///            `foreign_ground` (BL-1357: @p tile is another nation's, so the road that
+///            landed there goes no further).
+///
+/// A ROAD IS LAID FROM A ROAD (Ben, 2026-10-16; LOGISTICS.md § 4). @p tile must already
+/// carry a roaded edge: a road cannot be dropped in open country, and a frontier is
+/// reached one crossing at a time. Generation's own rule (every centre's tile gets a
+/// Track) is what makes this bootstrappable, so no world begins with nowhere to build
+/// from.
+///
+/// A ROAD MAY ALWAYS CROSS A NATIONAL BORDER, AND NEVER GO FURTHER (Ben, 2026-10-16;
+/// LOGISTICS.md § 4). The crossing INTO a neighbour's tile is always permitted -- it is
+/// what stops a foreign-held market centre being unconnectable -- but that foreign tile is
+/// not then a tile the actor may build FROM, so the road stops where it lands. A
+/// connection, never a corridor.
+placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier = 1,
+                                entity_id actor = null_entity);
 
 /// The WEAK form, for a surface that has a tile but no direction yet — the affordance
-/// behind `k_road_side_auto`. UPGRADE BEFORE EXTEND: `ok` when the tile carries no
-/// crossing at all, or when some crossable side carries a LOWER tier; `already_road` when
+/// behind `k_road_side_auto`. UPGRADE BEFORE EXTEND: `no_road_to_extend` when the tile
+/// carries no crossing at all (BL-1348: a road is laid FROM a road, so there is nothing
+/// here to build out of); `ok` when some crossable side carries a LOWER tier; `already_road` when
 /// every crossing it has already stands at or above @p tier. It cannot see neighbours, so
 /// it is an affordance only — `can_place_road(w, tile, side, tier)` is the real gate and
 /// `place_road` runs it on the side `auto_road_side` resolves.
@@ -188,7 +211,8 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier = 1)
 /// already stands at or above @p tier. It runs `can_place_road` on every candidate, so it
 /// never offers a side no cost walk can cross, nor a water-to-water crossing (Ben,
 /// 2026-10-17). Deterministic and world-order independent.
-int auto_road_side(const world& w, entity_id tile, std::uint8_t tier);
+int auto_road_side(const world& w, entity_id tile, std::uint8_t tier,
+                   entity_id actor = null_entity);
 
 /// Returns true if a population centre may be placed on this tile.
 ///
