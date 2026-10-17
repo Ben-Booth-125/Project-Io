@@ -186,6 +186,12 @@ struct nation_params
     /// is nearly always). Empty (no history, or no closing rounds): the core
     /// is the representative seed's tile, as Pass 5 has always read it.
     std::vector<int> polity_core_tiles;
+
+    /// BL-1310 review — the anchor tiles of the regions a closing-round
+    /// cession moved to another realm. Their seeds stand on ceded ground:
+    /// Pass 5 neither seats nor names a nation by them, exactly as for a seed
+    /// a relabel or the tail's pass ceded. Empty where no history ran.
+    std::vector<int> ceded_seed_tiles;
 };
 
 /// BL-1310 — THE STRAIT (NATION_GENERATION.md § Pass 2e; Ben, 2026-10-16): two

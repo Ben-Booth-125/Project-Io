@@ -1089,6 +1089,11 @@ std::vector<entity_id> generate_nations(
     for (int idx = 0; idx < total; ++idx)
         water[static_cast<std::size_t>(idx)] = unclaimable[static_cast<std::size_t>(idx)] ? 1 : 0;
     std::vector<char> ceded(static_cast<std::size_t>(total), 0);
+    // The provinces the closing rounds ceded AS REGIONS (the main kind: their
+    // polity changed, so the fold already puts them with the receiver) are
+    // ceded ground too (BL-1310 review): their seeds seat and name nobody.
+    for (const int t : params.ceded_seed_tiles)
+        if (t >= 0 && t < total) ceded[static_cast<std::size_t>(t)] = 1;
     if (!params.cell_overrides.empty())
     {
         std::vector<int> seed_at(static_cast<std::size_t>(total), -1);
@@ -1272,6 +1277,43 @@ std::vector<entity_id> generate_nations(
                                                 gw, gh, city_states, &absorbed_into, &seed_to_nation,
                                                 strait_rule_here ? &water : nullptr);
 
+    // BL-1310 review — THE REPAIR AFTER THE FLOOR, where no history ran (the
+    // closing rounds' late repair, the same rule on the same footing). The
+    // merge reads a neighbour through owned water, and a lake is owned whole
+    // by one shore, so an absorption can join a realm farther than a strait:
+    // whatever that leaves outside the rule is ceded here. Ground only; the
+    // count the floor left stands. Cores are the absorbers' (merge rule A).
+    if (floor_here && strait_rule_here)
+    {
+        std::vector<int> land_owner(owner_map);
+        for (int idx = 0; idx < total; ++idx)
+            if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
+        std::vector<int> core_tile(static_cast<std::size_t>(nation_count), -1), rank(static_cast<std::size_t>(nation_count));
+        for (int ni = 0; ni < nation_count; ++ni) rank[static_cast<std::size_t>(ni)] = ni;
+        for (int si = 0; si < seed_count; ++si)
+        {
+            const int ni = seed_to_nation[static_cast<std::size_t>(si)];
+            if (ni >= 0 && ni < nation_count && core_tile[static_cast<std::size_t>(ni)] < 0)
+                core_tile[static_cast<std::size_t>(ni)] = seeds[static_cast<std::size_t>(si)];
+        }
+        exclave_cession ex;
+        int repaired = 0;
+        for (int guard = 0; guard < total; ++guard)
+        {
+            if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex)) break;
+            for (const int t : ex.tiles)
+            {
+                land_owner[static_cast<std::size_t>(t)] = ex.to;
+                owner_map[static_cast<std::size_t>(t)]  = ex.to;
+                ceded[static_cast<std::size_t>(t)]      = 1;
+            }
+            ++repaired;
+        }
+        if (repaired > 0) rederive_carve_water(owner_map, sub, gw, gh);
+        tail_cessions += repaired;
+        if (fold_out) fold_out->cessions = tail_cessions;
+    }
+
     // BL-305: 2b and 2c both rewrite owner indices wholesale (the merge also
     // COMPACTS them), so this is the one place the published map has to be
     // restated rather than extended. One whole-map pass, and the recolour it
@@ -1424,6 +1466,23 @@ std::vector<entity_id> generate_nations(
         if (!nation_speech[static_cast<std::size_t>(ni)].usable())
             nation_speech[static_cast<std::size_t>(ni)] = seed_speech[si];
     }
+    // EVERY NATION IS SEATED (BL-1310 review). A nation all of whose seeds
+    // stand on ground a cession once moved -- a successor that seceded with
+    // provinces its parent had received -- has no seed the walk above
+    // admits; ceded ground is then its own founding ground, so it is seated
+    // on its lowest seed inside its territory (else its lowest seed), and
+    // named in that seed's speech where it has none.
+    for (int pass = 0; pass < 2; ++pass)
+        for (std::size_t si = 0; si < seeds.size(); ++si)
+        {
+            const int ni = owner_map[static_cast<std::size_t>(seeds[si])];
+            if (ni < 0 || ni >= nation_count) continue;
+            if (nation_data[static_cast<std::size_t>(ni)].capital_tile != null_entity) continue;
+            if (pass == 0 && !in_territory.empty() && !in_territory[static_cast<std::size_t>(seeds[si])]) continue;
+            nation_data[static_cast<std::size_t>(ni)].capital_tile = tile_ids[static_cast<std::size_t>(seeds[si])];
+            if (si < seed_speech.size() && seed_speech[si].usable() && !nation_speech[static_cast<std::size_t>(ni)].usable())
+                nation_speech[static_cast<std::size_t>(ni)] = seed_speech[si];
+        }
 
     // A body with no culture layer (no settlement pass, or a caller that
     // supplied bare seed tiles) still gets ONE coherent tongue rather than a

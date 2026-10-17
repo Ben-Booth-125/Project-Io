@@ -126,10 +126,13 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
     int K  = KP + static_cast<int>(R);
     const auto key_of = [&](int r) { return cur_polity[static_cast<std::size_t>(r)] >= 0 ? cur_polity[static_cast<std::size_t>(r)] : KP + r; };
     std::vector<int> own(static_cast<std::size_t>(total), -1), core_tile, order;
+    std::vector<int> frozen_polity_core, frozen_lone_core(R, -1); // tiles, -1 = not yet read
     const auto build_keys = [&]() {
         KP = static_cast<int>(cap.size());
         for (std::size_t r = 0; r < R; ++r) KP = std::max(KP, cur_polity[r] + 1);
         K = KP + static_cast<int>(R);
+        if (frozen_polity_core.size() < static_cast<std::size_t>(KP))
+            frozen_polity_core.resize(static_cast<std::size_t>(KP), -1);
         for (int t = 0; t < total; ++t)
         {
             const int r = cells[static_cast<std::size_t>(t)];
@@ -147,6 +150,21 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         for (int k = 0; k < K; ++k)
         {
             if (order[static_cast<std::size_t>(k)] == INT_MAX) continue;
+            // A CORE IS FROZEN the first time it is read and carried through
+            // every receive (BL-1310 review): re-deriving it per cession let a
+            // realm whose capital has no live cell (a region founded on a
+            // coastal anchor never gets a seed) take its core from
+            // `order[k]` -- and a low-numbered exclave it RECEIVED then became
+            // the core, and its real mainland was ceded away province by
+            // province. Re-read only where the frozen tile is no longer the
+            // key's own (a realm that died, or a key re-used by a successor).
+            int& frozen = k < KP ? frozen_polity_core[static_cast<std::size_t>(k)]
+                                 : frozen_lone_core[static_cast<std::size_t>(k - KP)];
+            if (frozen >= 0 && frozen < total && own[static_cast<std::size_t>(frozen)] == k)
+            {
+                core_tile[static_cast<std::size_t>(k)] = frozen;
+                continue;
+            }
             int cr = order[static_cast<std::size_t>(k)];
             if (k < KP)
             {
@@ -154,6 +172,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 if (s >= 0 && live_cell(s)) cr = s;
             }
             core_tile[static_cast<std::size_t>(k)] = anchor_of(cr);
+            frozen = core_tile[static_cast<std::size_t>(k)];
         }
     };
 
@@ -237,13 +256,52 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             st.region      = moved.empty() ? lowest_ground : moved.front();
             st.moved       = moved;
             st.late        = late;
+            plan.ceded_regions.insert(plan.ceded_regions.end(), moved.begin(), moved.end());
             plan.steps.push_back(std::move(st));
             ++plan.cessions;
             if (moved.empty()) ++plan.cessions_islet;
             if (late) ++plan.cessions_late;
         }
     };
+    // THE CORE STAYS PUT (the review's check): every key's frozen core group
+    // as the cessions open, flooded on its own land; after them, no tile of it
+    // may have changed hands. A cession only ever moves ground outside a
+    // territory, so a lost core tile means a core moved under a realm.
+    std::vector<std::pair<int, int>> core_snapshot; // (tile, key)
+    if (strait_rule)
+    {
+        build_keys();
+        std::vector<char> seen(static_cast<std::size_t>(total), 0);
+        for (int k = 0; k < K; ++k)
+        {
+            const int c0 = core_tile[static_cast<std::size_t>(k)];
+            if (c0 < 0 || c0 >= total || own[static_cast<std::size_t>(c0)] != k || seen[static_cast<std::size_t>(c0)]) continue;
+            std::vector<int> st{ c0 };
+            seen[static_cast<std::size_t>(c0)] = 1;
+            while (!st.empty())
+            {
+                const int t = st.back();
+                st.pop_back();
+                core_snapshot.emplace_back(t, k);
+                const int col = t % gw, row = t / gw;
+                const int nb[4] = { row * gw + (col + 1) % gw, row * gw + (col - 1 + gw) % gw,
+                                    row > 0 ? t - gw : -1, row + 1 < gh ? t + gw : -1 };
+                for (const int u : nb)
+                    if (u >= 0 && !seen[static_cast<std::size_t>(u)] && own[static_cast<std::size_t>(u)] == k)
+                    {
+                        seen[static_cast<std::size_t>(u)] = 1;
+                        st.push_back(u);
+                    }
+            }
+        }
+    }
     run_cessions(false);
+    if (strait_rule)
+    {
+        build_keys();
+        for (const auto& [t, k] : core_snapshot)
+            if (own[static_cast<std::size_t>(t)] != k) ++plan.core_tiles_lost;
+    }
 
     const std::vector<int64_t> tiles = closing_cell_tiles(cells, R);
 
@@ -557,10 +615,23 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                     const int64_t shortfall =
                         min_tiles > 0 ? std::max<int64_t>(0, min_tiles - bt) + std::max<int64_t>(0, min_tiles - keep)
                                       : 0;
+                    // The order without the one-territory key: does this
+                    // prefix beat the incumbent on everything after it?
+                    const bool rest_better =
+                        best < 0
+                        || shortfall < best_short
+                        || (shortfall == best_short
+                            && (block.size() < best_block.size()
+                                || (block.size() == best_block.size()
+                                    && (supply < best_supply || (supply == best_supply && bt > best_tiles)))));
                     // Both sides one territory? Read on the group map with the
-                    // block relabelled to a scratch key, then restored.
+                    // block relabelled to a scratch key, then restored. Read
+                    // ONLY when it can decide the order (BL-1310 review, the
+                    // cost): against a one-territory incumbent a prefix that
+                    // loses on the rest cannot win, whatever it reads.
+                    const bool can_win = best < 0 || !best_whole || rest_better;
                     bool whole = true;
-                    if (strait_rule)
+                    if (strait_rule && can_win)
                     {
                         for (const int m : block)
                             for (const int t : region_land[static_cast<std::size_t>(m)]) gown[static_cast<std::size_t>(t)] = scratch_key;
@@ -572,14 +643,10 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                             for (const int t : region_land[static_cast<std::size_t>(m)]) gown[static_cast<std::size_t>(t)] = g;
                     }
                     const bool better =
-                        best < 0
-                        || (whole && !best_whole)
-                        || (whole == best_whole
-                            && (shortfall < best_short
-                                || (shortfall == best_short
-                                    && (block.size() < best_block.size()
-                                        || (block.size() == best_block.size()
-                                            && (supply < best_supply || (supply == best_supply && bt > best_tiles)))))));
+                        can_win
+                        && (best < 0
+                            || (whole && !best_whole)
+                            || (whole == best_whole && rest_better));
                     if (better)
                     {
                         best = static_cast<int>(r);
@@ -699,6 +766,9 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
     // representative against the capital.
     if (strait_rule)
     {
+        std::sort(plan.ceded_regions.begin(), plan.ceded_regions.end());
+        plan.ceded_regions.erase(std::unique(plan.ceded_regions.begin(), plan.ceded_regions.end()),
+                                 plan.ceded_regions.end());
         build_keys();
         plan.polity_core_tiles.assign(static_cast<std::size_t>(KP), -1);
         for (int k = 0; k < KP; ++k) plan.polity_core_tiles[static_cast<std::size_t>(k)] = core_tile[static_cast<std::size_t>(k)];

@@ -131,6 +131,15 @@ struct closing_plan
     /// its lowest region's); -1 for a polity holding no cell. The tail anchors
     /// the nation's territory on it (`nation_params::polity_core_tiles`).
     std::vector<int> polity_core_tiles;
+    /// BL-1310 review: tiles of the realms' frozen core groups (as the
+    /// cessions open) that changed hands in the opening cessions. A cession
+    /// moves only ground outside a territory, so anything above 0 is a core
+    /// moving under a realm -- a defect the audit asserts against.
+    int core_tiles_lost = 0;
+    /// BL-1310 review: every region a cession moved to another realm (or out
+    /// of every realm), ascending. Its seed stands on ceded ground, so Pass 5
+    /// neither seats nor names a nation by it.
+    std::vector<int> ceded_regions;
 };
 
 /// Per region, the number of carve tiles its anchor's cell holds (0 for a
