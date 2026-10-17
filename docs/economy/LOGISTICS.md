@@ -310,7 +310,11 @@ The two pulls are one pass after the folds, over the laid network. **A market ce
 joins its own nation's backbone**: the network it must reach is its nation's own roads from its
 nation's towns, never another nation's (a border link is a Track between two networks, not part of
 either backbone), and the join runs over the nation's own land. A market whose nation holds no
-town has no backbone and stays off it, counted.
+town has no backbone and stays off it, counted. **And a market whose reachable ground holds no
+road of its own nation cannot be joined either (Ben's rule, read out of it 2026-10-17):** a town is
+not a network, so a market that can walk to a town standing on no road has nothing to join to, and
+no stamp can invent one. It is a third case, distinct from holding no town and from having no
+route, and it is counted and named like the others rather than passing silently.
 **One cost model** (§ 1): every route is priced with `tile_traversal_cost`. The **direct route**
 walks any land and any strait of up to two shore-water cells, never open ocean; every link is
 priced along it, so it reuses the roads that already shorten it, and laid along it as the snap
