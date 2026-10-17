@@ -58,7 +58,9 @@
 //
 // RAM (BL-1259, Ben 2026-10-10): the HOME body's master is pinned — never
 // dropped, and not counted against the budget. The other bodies share a
-// budget (others_budget(): 45% of installed RAM less the pinned home): when one must leave RAM, the least-recently-
+// FIXED budget (others_budget(): k_ground_budget less the pinned home, Ben
+// 2026-10-17 — the process peaks under 6 GB on every machine; an opaque chunk
+// is held as RGB, BL-1311): when one must leave RAM, the least-recently-
 // visited one SPILLS to the disk cache — its finished chunks (master piece +
 // mip pieces + the content hash each was baked against) are written by one
 // writer thread, atomically (temp file + rename), and its RAM freed — keeping
@@ -223,6 +225,11 @@ public:
         /// Thread CPU time of the master jobs (all, and the partial ones), ms:
         /// the work itself, which a busy machine cannot inflate as it does wall.
         double    cpu_ms = 0.0, patch_cpu_ms = 0.0;
+        /// BL-1311: chunks held (every level, every body) as RGB / as RGBA,
+        /// and their bytes; the fixed ground budget and the others' share.
+        int       rgb_chunks = 0, rgba_chunks = 0;
+        long long rgb_bytes = 0, rgba_bytes = 0;
+        long long ground_budget = 0, others_budget = 0;
     };
     stats stats_snapshot() const;
     void  reset_stats();
@@ -281,9 +288,8 @@ public:
 
     // --- BL-1259: the disk cache ---------------------------------------
     /// RAM budget across the bodies OTHER than home (home is pinned outside
-    /// it). -1 = automatic (Ben, 2026-10-10: scale with installed RAM): the
-    /// ground as a whole may hold k_ram_share of the machine's RAM, and the
-    /// other bodies get what the pinned home leaves of that (others_budget()).
+    /// it). -1 = automatic: what the pinned home leaves of k_ground_budget,
+    /// the same on every machine (Ben, 2026-10-17).
     /// Verify sets an explicit value to force a spill (verify.ground_set_ram_budget).
     long long ram_budget = -1;
     long long others_budget() const;
@@ -340,10 +346,15 @@ public:
     static constexpr int         k_prefetch_budget = 2;
     /// GPU texture LRU cap (textures of the active body; each <= 1 MB).
     static constexpr std::size_t k_gpu_cap = 320;
-    /// RAM budget across the bodies other than home (TECH_FOUNDATIONS.md §
-    /// Target hardware: 16 GB minimum; RENDERING.md § Chunks, cache and
-    /// invalidation): the home master is pinned outside it.
-    static constexpr double      k_ram_share  = 0.45; ///< Share of installed RAM the whole ground may hold.
+    /// THE FIXED GROUND BUDGET (Ben, 2026-10-17; RENDERING.md § Resident set,
+    /// replacing 2026-10-10's 45% of installed RAM): the game process peaks
+    /// under 6 GB on every machine, so the ground as a whole — the pinned home
+    /// master included — holds at most this, the same on every machine; the
+    /// other bodies share what the home leaves of it and stream from the disk
+    /// cache. Set as the ceiling less what the rest of the process was measured
+    /// to hold at its peak (see ground_layer.cpp, others_budget()).
+    static constexpr long long   k_process_ceiling = 6LL << 30;
+    static constexpr long long   k_ground_budget   = 4800LL << 20;
     /// Disk cache cap across bodies (BL-1259): LRU by body past it.
     /// IO_GROUND_CACHE_CAP_GB overrides.
     static constexpr long long   k_disk_cap = 32LL * 1024 * 1024 * 1024;
@@ -358,7 +369,7 @@ private:
     {
         ui::ground::geometry geom;
         int cw = 0, ch = 0;
-        std::vector<std::vector<std::uint32_t>> px; ///< Per chunk; empty = nothing written yet.
+        std::vector<ui::ground::packed_px> px; ///< Per chunk, RGB when opaque (BL-1311); empty = nothing written yet.
         std::vector<std::uint32_t>              ver; ///< Bumps on every write.
     };
 
@@ -448,6 +459,9 @@ private:
         std::uint64_t hash = 0;
         std::uint32_t epoch = 0;
         std::vector<std::uint32_t> px;
+        /// Master jobs (a whole chunk, baked or loaded): the master piece as
+        /// held, packed by the worker (BL-1311); px is then empty.
+        ui::ground::packed_px      packed;
         std::vector<std::uint32_t> mip[L];     ///< Levels 1..L-1 pieces (master jobs).
         std::vector<std::uint64_t> hashes;     ///< Sweep result.
         std::shared_ptr<const ui::ground::bake_source> src; ///< Master jobs: what it was baked against.
@@ -520,6 +534,9 @@ private:
     void drain();
     void land(result& d, bool sync);
     void bake_sync(job j);                     ///< Run on the main thread and land.
+    /// BL-1311: master chunk @p idx just landed — it, and every level chunk
+    /// over it whose whole footprint has now landed, become RGB if opaque.
+    void narrow_landed(body_state& b, int idx);
 
     // GPU.
     void flush_gpu();
@@ -543,7 +560,7 @@ private:
         std::uint64_t stamp = 0;
         int           cw[L] = {};          ///< Level chunk columns.
         int           lw[L] = {}, lh[L] = {}; ///< Level widths / heights, px.
-        std::vector<std::vector<std::uint32_t>> lv[L]; ///< The level chunks, moved out of the body.
+        std::vector<ui::ground::packed_px> lv[L]; ///< The level chunks, moved out of the body.
         std::vector<spill_chunk> chunks;   ///< The chunks to write.
         /// Who may be evicted if the cap is passed: other bodies' directories,
         /// least recently visited first (a main-thread snapshot).
@@ -605,6 +622,7 @@ private:
 
     // GPU textures of the active body: key = level << 24 | chunk index.
     std::unordered_map<std::uint32_t, gpu_chunk> m_gpu;
+    std::vector<std::uint32_t> m_upload_px; ///< BL-1311: a packed chunk unpacked for its upload.
     SDL_Texture*  m_far_tex = nullptr;
     std::uint32_t m_far_tex_ver = ~0u;
     std::vector<std::uint32_t> m_publish_keys; ///< Visible keys of the drawn level, on GPU.

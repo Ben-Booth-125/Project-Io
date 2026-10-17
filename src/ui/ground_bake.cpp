@@ -18,6 +18,113 @@ pass_clock& thread_pass_clock()
     return c;
 }
 
+// --- Packed chunks (BL-1311). Words are ABGR (little-endian bytes R, G, B,
+// A); RGB holds the first three bytes and implies A = 255. Raw pointers: these
+// run on every upload and landing, in a Debug build too. -------------------
+namespace {
+bool all_opaque(const std::uint32_t* px, std::size_t n)
+{
+    for (std::size_t i = 0; i < n; ++i)
+        if ((px[i] >> 24) != 0xFFu)
+            return false;
+    return true;
+}
+void put_rgb(std::uint8_t* d, const std::uint32_t* s, std::size_t n)
+{
+    for (std::size_t i = 0; i < n; ++i, d += 3)
+    {
+        const std::uint32_t v = s[i];
+        d[0] = static_cast<std::uint8_t>(v);
+        d[1] = static_cast<std::uint8_t>(v >> 8);
+        d[2] = static_cast<std::uint8_t>(v >> 16);
+    }
+}
+void get_rgb(std::uint32_t* d, const std::uint8_t* s, std::size_t n)
+{
+    for (std::size_t i = 0; i < n; ++i, s += 3)
+        d[i] = static_cast<std::uint32_t>(s[0]) | (static_cast<std::uint32_t>(s[1]) << 8)
+             | (static_cast<std::uint32_t>(s[2]) << 16) | 0xFF000000u;
+}
+} // namespace
+
+void pack_px(const std::uint32_t* px, int n, packed_px& out)
+{
+    const std::size_t m = static_cast<std::size_t>(std::max(0, n));
+    out.n   = static_cast<std::int32_t>(m);
+    out.rgb = all_opaque(px, m);
+    std::vector<std::uint8_t> b(m * (out.rgb ? 3u : 4u));
+    if (out.rgb)
+        put_rgb(b.data(), px, m);
+    else if (m)
+        std::memcpy(b.data(), px, m * 4u);
+    out.b.swap(b);
+}
+
+void alloc_transparent(packed_px& p, int n)
+{
+    p.n   = std::max(0, n);
+    p.rgb = false;
+    std::vector<std::uint8_t>(static_cast<std::size_t>(p.n) * 4u, 0u).swap(p.b);
+}
+
+void unpack_px(const packed_px& p, std::uint32_t* out)
+{
+    const std::size_t m = static_cast<std::size_t>(p.n);
+    if (p.rgb)
+        get_rgb(out, p.b.data(), m);
+    else if (m)
+        std::memcpy(out, p.b.data(), m * 4u);
+}
+
+void read_rect(const packed_px& p, int w, int x0, int y0, int rw, int rh, std::uint32_t* out)
+{
+    for (int y = 0; y < rh; ++y)
+    {
+        const std::size_t at = static_cast<std::size_t>(y0 + y) * w + x0;
+        std::uint32_t* d = out + static_cast<std::size_t>(y) * rw;
+        if (p.rgb)
+            get_rgb(d, p.b.data() + at * 3u, static_cast<std::size_t>(rw));
+        else
+            std::memcpy(d, p.b.data() + at * 4u, static_cast<std::size_t>(rw) * 4u);
+    }
+}
+
+void write_rect(packed_px& p, int w, int x0, int y0, int rw, int rh, const std::uint32_t* src)
+{
+    if (p.rgb && !all_opaque(src, static_cast<std::size_t>(rw) * rh))
+    {
+        // Widen to RGBA (alpha 255 everywhere it was implied), then write.
+        std::vector<std::uint8_t> wide(static_cast<std::size_t>(p.n) * 4u);
+        get_rgb(reinterpret_cast<std::uint32_t*>(wide.data()), p.b.data(), static_cast<std::size_t>(p.n));
+        p.b.swap(wide);
+        p.rgb = false;
+    }
+    for (int y = 0; y < rh; ++y)
+    {
+        const std::size_t at = static_cast<std::size_t>(y0 + y) * w + x0;
+        const std::uint32_t* s = src + static_cast<std::size_t>(y) * rw;
+        if (p.rgb)
+            put_rgb(p.b.data() + at * 3u, s, static_cast<std::size_t>(rw));
+        else
+            std::memcpy(p.b.data() + at * 4u, s, static_cast<std::size_t>(rw) * 4u);
+    }
+}
+
+bool narrow_if_opaque(packed_px& p)
+{
+    if (p.rgb || p.b.empty())
+        return false;
+    const std::uint32_t* px = reinterpret_cast<const std::uint32_t*>(p.b.data());
+    const std::size_t m = static_cast<std::size_t>(p.n);
+    if (!all_opaque(px, m))
+        return false;
+    std::vector<std::uint8_t> b(m * 3u);
+    put_rgb(b.data(), px, m);
+    p.b.swap(b);
+    p.rgb = true;
+    return true;
+}
+
 namespace {
 
 /// Times one pass into the calling thread's pass_clock (BL-1311, a reading).
