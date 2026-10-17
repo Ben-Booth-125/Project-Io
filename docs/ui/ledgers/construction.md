@@ -145,7 +145,10 @@ band is independent of the column and stays where it is.
 - ~~**Queue table shape.**~~ **Answered in build (2026-10-17, superseding the previous day's
   four):** six columns — glyph, building (selects it), done (a bar), quarters left, cost left, and
   the state mark — the shape the grid ruling gives every construction row, so the queue, the build
-  list, the tile card's stacks and the expanded site card all read in the same places. Body, tile
+  list, the tile card's stacks and the expanded site card all read in the same places. The build
+  list and the rail rows take **eight** (glyph, name, cost, output pip, stack, state, bar, press);
+  the queue, the tile card's stacks and the expanded site card take **six**, the site card
+  borrowing the queue's own set so one site reads identically on both. Body, tile
   and every stall sentence moved onto the hover card, and the stall lines that printed under the
   table are gone. The 25 / 75 % colour bands were kept. Progress is
   `construction_paid / construction_capex`, which re-prices live, so the bar can wobble as prices
