@@ -442,8 +442,10 @@ static int count_cessions(const generation_report& rep)
     int n = 0;
     for (const auto& be : rep.bodies)
         if (be.is_homeworld)
-            for (const lapse_event& e : be.industrialisation_timelapse.events)
-                if (e.kind == static_cast<uint8_t>(lapse_event_kind::exclave_ceded)) ++n;
+            for (const era_timelapse* t : { &be.prehistory_timelapse, &be.exploration_timelapse,
+                                            &be.industrialisation_timelapse })
+                for (const lapse_event& e : t->events)
+                    if (e.kind == static_cast<uint8_t>(lapse_event_kind::exclave_ceded)) ++n;
     return n;
 }
 
@@ -476,6 +478,8 @@ static strait_stats audit_no_history(world sw, uint32_t seed, int& nations_out)
     const generation_report none{};
     return audit_strait_rule(sw, none);
 }
+
+static bool g_dump_capitals = false; ///< `--dump-capitals`: print CAP lines (library mode)
 
 static std::vector<uint32_t> parse_seed_list(const char* s)
 {
@@ -510,14 +514,24 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                 seeds.size(), pairs.size());
     for (const uint32_t seed : seeds)
     {
-        std::vector<std::pair<int, int>> runs{ { 0, 0 } };
-        runs.insert(runs.end(), pairs.begin(), pairs.end());
-        for (const auto& [tt, mt] : runs)
+        // (target total, target majors, launch): 0 the shipped close at 1960;
+        // 1 an EMPIRES-ROUND launch (Exploration and Industrialisation off);
+        // 2 an EXPLORATION-ROUND launch (Industrialisation off). Every launch
+        // obeys the strait rule (Ben, 2026-10-17); the early ones by the
+        // tail's post-pass, its cessions recorded in the last span's record.
+        struct run_spec { int tt, mt, launch; };
+        std::vector<run_spec> runs{ { 0, 0, 0 } };
+        for (const auto& [t, m] : pairs) runs.push_back({ t, m, 0 });
+        runs.push_back({ 0, 0, 1 });
+        runs.push_back({ 0, 0, 2 });
+        for (const auto& [tt, mt, launch] : runs)
         {
             world_params p = arc_params(world_arc::shipped);
             p.seed                = seed;
             p.nation_total_target = tt;
             p.major_target        = mt;
+            if (launch == 1) p.exploration_sim_enabled = false;
+            if (launch >= 1) p.industrialisation_span_enabled = false;
             generation_report     rep{};
             era_minus_one_fixture fx{};
             const world       sw = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
@@ -525,14 +539,33 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
             const int          ce = count_cessions(rep);
             const history_sim_state& hs = fx.industrialisation_state;
             cessions_total += ce;
+            // CAPITALS, by realm, for comparing two builds (`CAP` lines):
+            // the polity each nation folds from and its capital's raster tile.
+            if (g_dump_capitals)
+                for (const auto& be : rep.bodies)
+                    if (be.is_homeworld)
+                        for (std::size_t i = 0; i < be.nation_ids.size() && i < be.nation_polity.size(); ++i)
+                        {
+                            if (be.nation_polity[i] < 0) continue;
+                            const auto nit = sw.nations.find(be.nation_ids[i]);
+                            if (nit == sw.nations.end()) continue;
+                            const auto tit = sw.tiles.find(nit->second.capital_tile);
+                            const int  ct  = tit == sw.tiles.end() ? -1
+                                           : tit->second.grid_y * sw.bodies.at(be.id).grid_width + tit->second.grid_x;
+                            std::printf("CAP %d %d %u %d %d\n", launch, tt, seed, be.nation_polity[i], ct);
+                        }
             char tag[32];
-            std::snprintf(tag, sizeof(tag), tt > 0 ? "t%d/%d" : "natural", tt, mt);
+            if (launch == 1)      std::snprintf(tag, sizeof(tag), "empires");
+            else if (launch == 2) std::snprintf(tag, sizeof(tag), "explorat");
+            else std::snprintf(tag, sizeof(tag), tt > 0 ? "t%d/%d" : "natural", tt, mt);
             // The rule holds, AND the cessions are the history's own events
             // (one per closing-round step), AND the tail found nothing left.
             // § Territorial fragmentation, measured: "the cessions counted as
             // recorded events, so the sim still visibly produces the
             // fragmentation the rule resolves" -- at least one on every world.
-            const bool events_ok = ce == hs.closing_cessions && ce > 0;
+            // An early launch ran no closing round: its cessions are the
+            // tail's, recorded as events of the last span (at least one).
+            const bool events_ok = launch == 0 ? (ce == hs.closing_cessions && ce > 0) : ce > 0;
             // No capital off its own land (Pass 5 seats inside the
             // territory), and the frozen cores intact: no opening cession moved
             // a tile of a realm's core group (the review's row -- a core that
@@ -566,6 +599,7 @@ int main(int argc, char** argv)
         for (int i = 1; i < argc; ++i)
         {
             if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc) seeds = parse_seed_list(argv[++i]);
+            else if (std::strcmp(argv[i], "--dump-capitals") == 0) g_dump_capitals = true;
             else if (std::strcmp(argv[i], "--pairs") == 0 && i + 1 < argc)
             {
                 const std::vector<uint32_t> v = parse_seed_list(argv[++i]); // "t:m" read below

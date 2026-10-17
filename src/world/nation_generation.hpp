@@ -192,6 +192,17 @@ struct nation_params
     /// Pass 5 neither seats nor names a nation by them, exactly as for a seed
     /// a relabel or the tail's pass ceded. Empty where no history ran.
     std::vector<int> ceded_seed_tiles;
+
+    /// BL-1310 — THE REALM'S SEAT IS THE CAPITAL (NATION_GENERATION.md
+    /// § Pass 2d, Ben 2026-10-17). Indexed by polity id: the raster tile of
+    /// the realm's seat (`polity::capital`'s anchor) at the last span's close,
+    /// -1 for a dead realm. Read where the closing rounds did not run (an
+    /// Empires- or Exploration-round launch); after them
+    /// `polity_core_tiles` (the rounds' own frozen core, the same seat) wins.
+    /// A seat tile on water, or ground the realm does not hold after the
+    /// fold, seats the nation on its NEAREST land of its own
+    /// (`nearest_key_tile`). Empty: no realm, the lowest seed in territory.
+    std::vector<int> polity_seat_tiles;
 };
 
 /// BL-1310 — THE STRAIT (NATION_GENERATION.md § Pass 2e; Ben, 2026-10-16): two
@@ -241,6 +252,15 @@ bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>
                           const std::vector<int>& core_tile, const std::vector<int>& order,
                           exclave_cession& out);
 
+/// BL-1310 — the honest seat where a realm's seat region has no carve cell of
+/// its own (its anchor stands on coastal water, so it never seeded): the
+/// realm's NEAREST PROVINCE, i.e. of @p tiles (the anchors of the realm's own
+/// seeded regions) the one nearest @p target by grid distance (Chebyshev,
+/// column-wrapped), ties to the lower tile index. A province's anchor always
+/// stands in that province's own ground, so the seat it gives is never an
+/// islet hung on another cell. -1 when @p tiles is empty.
+int nearest_tile_among(const std::vector<int>& tiles, int target, int gw);
+
 /// BL-1310 — the floor's island case (§ Pass 2c, § Pass 2e): the key whose land
 /// is fewest water tiles from @p from's land, among keys @p eligible admits
 /// (ties: lower @p order, then lower tile). -1 when the water reaches none.
@@ -286,6 +306,14 @@ struct nation_fold_record
     /// world whose closing rounds ran, the history ceded them all, so a
     /// non-zero count here is drift between the plan and the carve.
     int32_t cessions = 0;
+    /// BL-1310 (§ Pass 2e, Ben 2026-10-17: "every launch obeys the rule") —
+    /// each cession the tail took, in order, for the caller to record as an
+    /// event of the last span that ran: the cedent's and the receiver's
+    /// polity ids (-1: ground no realm held), and the anchor tile of the seed
+    /// whose ground moved (the lowest seed standing in the exclave, else the
+    /// one whose carve cell held its lowest tile).
+    struct cession_record { int32_t from_polity = -1; int32_t to_polity = -1; int32_t seed_tile = -1; };
+    std::vector<cession_record> cession_log;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

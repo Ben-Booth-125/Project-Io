@@ -165,14 +165,32 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 core_tile[static_cast<std::size_t>(k)] = frozen;
                 continue;
             }
-            int cr = order[static_cast<std::size_t>(k)];
+            // THE REALM'S SEAT IS ITS CORE AND ITS CAPITAL (§ Pass 2d, Ben
+            // 2026-10-17): the seat's anchor where its cell is live; where the
+            // seat stands on no carve cell of its own (an anchor on coastal
+            // water never seeds), the realm's NEAREST PROVINCE to that anchor
+            // -- the anchor of its nearest live region (`nearest_tile_among`:
+            // grid distance, ties to the lower tile). Ground no realm holds:
+            // its own anchor.
+            int ct = anchor_of(order[static_cast<std::size_t>(k)]);
             if (k < KP)
             {
                 const int s = seat_of(k);
-                if (s >= 0 && live_cell(s)) cr = s;
+                if (s >= 0 && live_cell(s)) ct = anchor_of(s);
+                else if (s >= 0)
+                {
+                    const region& sr = regions[static_cast<std::size_t>(s)];
+                    const int target = sr.anchor >= 0 ? sr.anchor : sr.row * gw + sr.col;
+                    std::vector<int> provinces;
+                    for (std::size_t r = 0; r < R; ++r)
+                        if (live_cell(static_cast<int>(r)) && key_of(static_cast<int>(r)) == k)
+                            provinces.push_back(anchor_of(static_cast<int>(r)));
+                    const int near = nearest_tile_among(provinces, target, gw);
+                    if (near >= 0) ct = near;
+                }
             }
-            core_tile[static_cast<std::size_t>(k)] = anchor_of(cr);
-            frozen = core_tile[static_cast<std::size_t>(k)];
+            core_tile[static_cast<std::size_t>(k)] = ct;
+            frozen = ct;
         }
     };
 

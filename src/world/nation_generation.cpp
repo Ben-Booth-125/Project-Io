@@ -1111,6 +1111,9 @@ std::vector<entity_id> generate_nations(
         }
         if (any) rederive_carve_water(owner_map, ground.sub, gw, gh);
     }
+    // The carve's cells (seed per tile) as they stand before the fold folds
+    // them into nations: a tail cession names the seed its ground grew from.
+    const std::vector<int> cell_seed = owner_map;
 
     // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
     //
@@ -1196,48 +1199,89 @@ std::vector<entity_id> generate_nations(
     // the player will see them. Where the history's closing rounds ran, they
     // ceded at the history's grain and this pass finds nothing (a cession here
     // is drift, which the caller guards); where no history ran, this IS the
-    // rule. The core is the REALM'S capital where the history supplies it
-    // (`nation_params::polity_core_tiles`, the closing rounds' own core), else
-    // the representative seed's tile; Pass 5 then seats the nation inside
-    // the territory that core anchors.
+    // rule. EVERY LAUNCH OBEYS IT (Ben, 2026-10-17): a launch that closed
+    // before Industrialisation (no closing round ran) runs it here too, and
+    // the caller records each cession as an event of the last span that ran
+    // (`nation_fold_record::cession_log`).
     //
-    // SCOPE: the two cases § Pass 2e names -- after closing rounds (the
-    // guarantee) and where no history ran (the rule). A world whose history
-    // ran WITHOUT the Industrialisation span (the legacy arc, an Empires-round
-    // launch) carves exactly as before: the doc does not name it, and the
-    // legacy arc's pins are never overwritten.
-    bool history_ran = false;
-    for (const int p : seed_polity) history_ran = history_ran || p >= 0;
-    const bool strait_rule_here = params.floor_in_history || !history_ran;
-    int tail_cessions = 0;
-    if (strait_rule_here)
+    // THE CORE IS THE REALM'S SEAT (§ Pass 2d, Ben 2026-10-17), fixed here,
+    // before the first cession, so ground a nation receives never becomes
+    // its core: the closing rounds' own frozen core where they ran
+    // (`polity_core_tiles`), else the seat tile the last close left
+    // (`polity_seat_tiles`) -- or, where that is water or not the realm's
+    // own after the fold, the realm's nearest land to it. A nation with no
+    // realm: its representative seed. Pass 5 seats a realm's nation on this
+    // very tile.
+    const bool strait_rule_here = true;
+    std::vector<int> seed_core(static_cast<std::size_t>(seed_count), -1); // per representative seed
     {
         std::vector<int> land_owner(owner_map);
         for (int idx = 0; idx < total; ++idx)
             if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
-        std::vector<int> core_tile(static_cast<std::size_t>(seed_count), -1), rank(static_cast<std::size_t>(seed_count));
         for (int si = 0; si < seed_count; ++si)
         {
-            core_tile[static_cast<std::size_t>(si)] = seeds[static_cast<std::size_t>(si)];
-            rank[static_cast<std::size_t>(si)]      = si;
+            seed_core[static_cast<std::size_t>(si)] = seeds[static_cast<std::size_t>(si)];
             const int p = si < static_cast<int>(seed_polity.size()) ? seed_polity[static_cast<std::size_t>(si)] : -1;
-            if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size())
+            if (p < 0) continue;
+            if (static_cast<std::size_t>(p) < params.polity_core_tiles.size())
             {
                 const int ct = params.polity_core_tiles[static_cast<std::size_t>(p)];
                 if (ct >= 0 && ct < total && land_owner[static_cast<std::size_t>(ct)] == si)
-                    core_tile[static_cast<std::size_t>(si)] = ct;
+                {
+                    seed_core[static_cast<std::size_t>(si)] = ct;
+                    continue;
+                }
+            }
+            if (static_cast<std::size_t>(p) < params.polity_seat_tiles.size())
+            {
+                // The seat's own seed where it seeded and the nation holds it;
+                // else the nation's nearest province -- the nearest of its own
+                // seed tiles (`nearest_tile_among`, ties to the lower tile).
+                const int st = params.polity_seat_tiles[static_cast<std::size_t>(p)];
+                if (st < 0 || st >= total) continue;
+                std::vector<int> provinces;
+                for (int sj = 0; sj < seed_count; ++sj)
+                {
+                    const int t = seeds[static_cast<std::size_t>(sj)];
+                    if (land_owner[static_cast<std::size_t>(t)] == si && !ceded[static_cast<std::size_t>(t)])
+                        provinces.push_back(t);
+                }
+                const int near = nearest_tile_among(provinces, st, gw);
+                if (near >= 0) seed_core[static_cast<std::size_t>(si)] = near;
             }
         }
+    }
+    const auto polity_of_seed = [&](int si) {
+        return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;
+    };
+    // The seed a ceded group grew from: the lowest seed standing in it, else
+    // the carve cell under its lowest tile.
+    const auto ceded_seed_tile = [&](const std::vector<int>& tiles) -> int32_t {
+        for (int si = 0; si < seed_count; ++si)
+            if (std::binary_search(tiles.begin(), tiles.end(), seeds[static_cast<std::size_t>(si)]))
+                return seeds[static_cast<std::size_t>(si)];
+        const int c0 = tiles.empty() ? -1 : cell_seed[static_cast<std::size_t>(tiles.front())];
+        return (c0 >= 0 && c0 < seed_count) ? seeds[static_cast<std::size_t>(c0)] : -1;
+    };
+    int tail_cessions = 0;
+    {
+        std::vector<int> land_owner(owner_map);
+        for (int idx = 0; idx < total; ++idx)
+            if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
+        std::vector<int> rank(static_cast<std::size_t>(seed_count));
+        for (int si = 0; si < seed_count; ++si) rank[static_cast<std::size_t>(si)] = si;
         exclave_cession ex;
         for (int guard = 0; guard < total; ++guard)
         {
-            if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex)) break;
+            if (!next_exclave_cession(land_owner, water, gw, gh, seed_core, rank, ex)) break;
             for (const int t : ex.tiles)
             {
                 land_owner[static_cast<std::size_t>(t)] = ex.to;
                 owner_map[static_cast<std::size_t>(t)]  = ex.to;
                 ceded[static_cast<std::size_t>(t)]      = 1;
             }
+            if (fold_out)
+                fold_out->cession_log.push_back({ polity_of_seed(ex.from), polity_of_seed(ex.to), ceded_seed_tile(ex.tiles) });
             ++tail_cessions;
         }
         if (tail_cessions > 0) rederive_carve_water(owner_map, sub, gw, gh);
@@ -1290,11 +1334,17 @@ std::vector<entity_id> generate_nations(
             if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
         std::vector<int> core_tile(static_cast<std::size_t>(nation_count), -1), rank(static_cast<std::size_t>(nation_count));
         for (int ni = 0; ni < nation_count; ++ni) rank[static_cast<std::size_t>(ni)] = ni;
+        // The survivor seed of each nation (merge rule A: the absorber), and
+        // its seat core fixed before the first cession above.
+        std::vector<int> survivor(static_cast<std::size_t>(nation_count), -1);
         for (int si = 0; si < seed_count; ++si)
         {
             const int ni = seed_to_nation[static_cast<std::size_t>(si)];
-            if (ni >= 0 && ni < nation_count && core_tile[static_cast<std::size_t>(ni)] < 0)
-                core_tile[static_cast<std::size_t>(ni)] = seeds[static_cast<std::size_t>(si)];
+            if (ni >= 0 && ni < nation_count && survivor[static_cast<std::size_t>(ni)] < 0)
+            {
+                survivor[static_cast<std::size_t>(ni)]  = si;
+                core_tile[static_cast<std::size_t>(ni)] = seed_core[static_cast<std::size_t>(si)];
+            }
         }
         exclave_cession ex;
         int repaired = 0;
@@ -1307,6 +1357,10 @@ std::vector<entity_id> generate_nations(
                 owner_map[static_cast<std::size_t>(t)]  = ex.to;
                 ceded[static_cast<std::size_t>(t)]      = 1;
             }
+            if (fold_out)
+                fold_out->cession_log.push_back({ polity_of_seed(survivor[static_cast<std::size_t>(ex.from)]),
+                                                  polity_of_seed(survivor[static_cast<std::size_t>(ex.to)]),
+                                                  ceded_seed_tile(ex.tiles) });
             ++repaired;
         }
         if (repaired > 0) rederive_carve_water(owner_map, sub, gw, gh);
@@ -1418,14 +1472,13 @@ std::vector<entity_id> generate_nations(
     // than a tongue. Unlike the speech pick this one is unconditional (no
     // "usable()" gate — every surviving seed has a real tile), so it is set on
     // the FIRST si whose owner is this nation, full stop.
-    // BL-1310: THE CAPITAL STANDS IN THE TERRITORY. A nation's territory is
-    // anchored on its core (§ Pass 2e) -- the realm's capital where the
-    // history supplies it, else its representative's seed (the absorber's,
-    // after the floor: merge rule A) -- and Pass 5 seats it on the lowest
-    // seed INSIDE that territory, which is the representative's own wherever
-    // it stands there (nearly always). A lower seed on a remote island, or
-    // on ground an island absorption left beyond the strait, seats nobody,
-    // so "the group holding its capital" means one thing everywhere.
+    // BL-1310: THE REALM'S SEAT IS THE CAPITAL (§ Pass 2d, Ben 2026-10-17).
+    // A nation of a realm is seated on its core -- the realm's seat, fixed
+    // before the first cession (`seed_core`; the absorber's after the floor,
+    // merge rule A). A nation with no realm is seated on its LOWEST SEED
+    // INSIDE ITS TERRITORY (the walk below), so a lower seed on a remote
+    // island, or on ground an island absorption left beyond the strait,
+    // seats nobody.
     std::vector<char> in_territory;
     if (strait_rule_here)
     {
@@ -1438,12 +1491,13 @@ std::vector<entity_id> generate_nations(
             const int rep = nation_rep_seed[static_cast<std::size_t>(ni)];
             if (rep < 0) continue;
             core_tile[static_cast<std::size_t>(ni)] = seeds[static_cast<std::size_t>(rep)];
-            const int p = seed_polity_of(rep);
-            if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size())
+            const int ct = seed_core[static_cast<std::size_t>(rep)];
+            if (ct >= 0 && ct < total && land_owner[static_cast<std::size_t>(ct)] == ni)
+                core_tile[static_cast<std::size_t>(ni)] = ct;
+            if (seed_polity_of(rep) >= 0)
             {
-                const int ct = params.polity_core_tiles[static_cast<std::size_t>(p)];
-                if (ct >= 0 && ct < total && land_owner[static_cast<std::size_t>(ct)] == ni)
-                    core_tile[static_cast<std::size_t>(ni)] = ct;
+                const entity_id tid = tile_ids[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(ni)])];
+                if (tid != null_entity) nation_data[static_cast<std::size_t>(ni)].capital_tile = tid;
             }
         }
         in_territory = territory_tiles(land_owner, water, gw, gh, core_tile);
@@ -2354,6 +2408,20 @@ bool key_is_one_territory(const std::vector<int>& owner, const std::vector<char>
         if (!in_terr[static_cast<std::size_t>(c)] && !reach_of(g, c, owner, water, gw, gh, wdist).empty())
             return false;
     return true;
+}
+
+int nearest_tile_among(const std::vector<int>& tiles, int target, int gw)
+{
+    if (gw <= 0 || target < 0) return -1;
+    const int tc = target % gw, tr = target / gw;
+    int best = -1, best_d = 0;
+    for (const int t : tiles)
+    {
+        if (t < 0) continue;
+        const int d = grid_distance(tc, tr, t % gw, t / gw, gw);
+        if (best < 0 || d < best_d || (d == best_d && t < best)) { best = t; best_d = d; }
+    }
+    return best;
 }
 
 std::vector<char> territory_tiles(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
