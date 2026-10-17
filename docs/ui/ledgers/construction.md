@@ -77,6 +77,13 @@ buttons, the expanded site card — is **one line**, and it reads in glyphs: the
 (`../ICONS.md`), the cost, the materials, a **resource pip** for what it makes, the stack as `2/4`,
 a state mark, the progress bar, the press. A word appears only where no glyph carries the meaning.
 
+**The line is a grid, not a sentence (Ben, 2026-10-17).** Each thing it carries sits in its **own
+column**, the same column in every row, so a column reads down the list as a column: every cost
+under every cost, every stack under every stack. A row of chips flowing left to right at whatever
+width its text happens to need would compact the surface and still refuse to be scanned — the
+alignment *is* the compaction. A row whose figure is absent leaves its column empty rather than
+closing the gap.
+
 **Everything the line drops belongs to the hover card** (`../TOOLTIP.md`), not to a second line and
 not to nothing: the sentence a chip replaced, the stall's named good, what the building makes in
 words, and what filled a tile when it is full. The rule this enforces is that **a scan and a read
