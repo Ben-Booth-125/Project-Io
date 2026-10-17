@@ -1015,6 +1015,18 @@ in `tools/verify/README.md`.
   every harness 60 s. Build with `bash tools/verify/build_lua_harness.sh stockpile_budget_check`.
   With the span off every shipped world's stock is empty, so the 16-seed `player_seed_sweep
   --digest-check` proves nothing about the split — this harness is what does.
+- **`lp_coverage_census`** — BL-1351: does the fold's `seed_logistics_sources` give every nation
+  Logistic Points across its ground, and is a centralised capital with points fading outward even
+  possible? A **report, no gate**. Per nation per seed: sources by network, hubs landed on a market
+  `centre_tile` against a consumer's own tile, pool against claim and the realised margin against
+  `k_pool_margin`, the coverage distribution over the nation's ground / its building tiles / its
+  consumers, and points incident at the capital tile against the most distant covered tile with
+  four distance rings. Buckets majors / minors and coastal / landlocked, names every nation whose
+  pool falls short of its claim, and times the seeding pass (it runs at every world fold). It holds
+  back the fold's last three calls (`harness_charter_input::skip_state_handover`) and makes them
+  itself so the pass can be timed alone — cross-checked against `lp_pool_harness`'s shipped `[lp]`
+  line, same hubs and pools. Build with `bash tools/verify/build_lua_harness.sh lp_coverage_census`;
+  sweep with `bash tools/verify/par_seeds.sh lp_coverage_census --tier full`.
 
 ## Running the whole suite (CTest — BL-104)
 
