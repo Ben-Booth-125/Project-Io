@@ -11,6 +11,7 @@
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
+#include "road_tool.hpp"        // BL-1370: the crossings an armed road press may reach
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
 #include "ground_bake.hpp"      // k_tilt_sy: the one camera angle (BL-1246)
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
@@ -2580,6 +2581,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // carry no terrain-affinity signal — valid-but-not-affine tiles stay uncoloured.
     const bool          suitability_affine_kind =
         (suitability_btype == building_type::extraction_site);
+
+    // ARMED ROAD TARGETING (BL-1370; construction.md § "A road is built from a road
+    // to a tile, in two presses"). The road row's press armed a TILE and a TIER; the
+    // crossings it may legally reach are resolved here, once, from the rules
+    // themselves (`ui::road_crossing_targets` -> `placement_rules::can_place_road`),
+    // and every one of them is outlined below. Resolved BEFORE the draw loop and off
+    // the world rather than off what is on screen, so the set a check reads is the
+    // rules' answer and not a function of the camera.
+    std::vector<road_target> road_arm_targets;
+    if (state.construction.road_arm_tile != null_entity)
+        road_arm_targets = road_crossing_targets(w, state.construction.road_arm_tile,
+                                                 state.construction.road_arm_tier);
+    state.construction_ui.road_arm_tile = state.construction.road_arm_tile;
+    state.construction_ui.road_arm_tier = state.construction.road_arm_tier;
+    state.construction_ui.road_drawn    = 0;
+    state.construction_ui.road_highlights.clear();
+    for (const road_target& rt : road_arm_targets)
+    {
+        const auto tit = w.tiles.find(rt.tile);
+        if (tit == w.tiles.end())
+            continue;
+        state.construction_ui.road_highlights.push_back(
+            {tit->second.grid_x, tit->second.grid_y, rt.side});
+    }
 
     // Scarcity lens pre-pass (BL-018): a market-level field, not a per-tile one.
     // Scarcity is driven by **supply shortfall** — how much demand outran supply
@@ -5441,6 +5466,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             draw_hex_highlight(dl, verts,
                 resolve_highlight(selected, /*hovered=*/false, /*pinned=*/false));
 
+            // BL-1370: A LEGAL CROSSING, OFFERED. While a road row is armed every
+            // tile the rules admit a crossing to is outlined in the road ladder's
+            // own tone, with a faint wash so the OFFER reads as ground you may
+            // press rather than as a selection. The refusal is the absence of this
+            // mark: a tile with nowhere left to go simply has no target to press.
+            if (!road_arm_targets.empty())
+            {
+                bool is_target = false;
+                for (const road_target& rt : road_arm_targets)
+                    if (rt.tile == id) { is_target = true; break; }
+                if (is_target)
+                {
+                    dl->AddConvexPolyFilled(verts, 6, IM_COL32(205, 188, 140, 48));
+                    dl->AddPolyline(verts, 6, IM_COL32(225, 205, 150, 255),
+                                    ImDrawFlags_Closed, 2.5f);
+                    ++state.construction_ui.road_drawn;
+                }
+            }
+
             // Province outline (BL-511). The OUTER boundary of the cell, drawn
             // edge by edge on every side facing a different province, never the
             // interior seams. This is the crisp affordance the faint always-on
@@ -6250,7 +6294,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 shift_pick_owner = owner;
         }
 
-        if (state.pending_march_unit != null_entity)
+        // BL-1370: THE SECOND PRESS. While a road row is armed this click's whole
+        // job is to name the neighbour the crossing runs to, exactly as march-pick
+        // and placement mode claim their own click. A press on a highlighted tile
+        // resolves the SIDE and enqueues the one crossing (app::render runs
+        // place_road and charges it once); a press anywhere else disarms, which is
+        // the cancel. Either way the click is consumed, so a stray press cannot
+        // retarget the Selection element and leave the player armed.
+        if (state.construction.road_arm_tile != null_entity)
+        {
+            int chosen = -1;
+            for (const road_target& rt : road_arm_targets)
+                if (rt.tile == hovered_tile) { chosen = rt.side; break; }
+            if (chosen >= 0)
+            {
+                state.construction.pending_road_tile = state.construction.road_arm_tile;
+                state.construction.pending_road_side = static_cast<std::uint8_t>(chosen);
+                state.construction.pending_road_tier = state.construction.road_arm_tier;
+            }
+            state.construction.road_arm_tile = null_entity;
+        }
+        else if (state.pending_march_unit != null_entity)
         {
             const uint32_t march_prov = (hovered_tile != null_entity)
                                         ? w.provinces.province_of(hovered_tile) : 0u;

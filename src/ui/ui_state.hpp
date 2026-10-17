@@ -194,6 +194,22 @@ struct construction_state
     /// `null_entity` = nothing pending; `pending_road_tier` carries which tier (1/2/3) to place.
     entity_id     pending_road_tile = null_entity;
     std::uint8_t  pending_road_tier = 1;
+    /// BL-1370: the hex SIDE of `pending_road_tile` the crossing runs across —
+    /// a road is an edge, so the request names the neighbour (LOGISTICS.md § 4).
+    /// `k_road_side_auto` is no longer written by any player surface: the armed
+    /// second press resolves a real side, and the auto guess is what made a
+    /// roaded tile answer "this tile already has an equal or better road".
+    std::uint8_t  pending_road_side = k_road_side_auto;
+
+    /// ARMED ROAD TARGETING (BL-1370; construction.md § "A road is built from a
+    /// road to a tile, in two presses"). The road row's Build press arms rather
+    /// than builds: it records the tile the crossing starts FROM and the tier,
+    /// the Planetary canvas highlights every neighbour
+    /// `placement_rules::can_place_road` admits, and the next press on one of
+    /// them resolves the side into `pending_road_*` above. A press anywhere else
+    /// disarms. `null_entity` = not armed. VIEW state, not serialised.
+    entity_id     road_arm_tile = null_entity;
+    std::uint8_t  road_arm_tier = 1;
 
     /// BL-1255 (rail construction UI). Rail is built from the per-tile building
     /// list like anything else (LOGISTICS.md 4c). `pending_track_tile` is a Track
@@ -356,6 +372,13 @@ struct construction_controls
         /// different draw site from the build list's, so "they are the same grid"
         /// is only an assertion if each row reports its own metric.
         float       h = 0.0f;
+        /// BL-1371: how many lines the NAME column drew (1 or 2), and whether it
+        /// still had to elide. The two-line row exists to stop a name losing its
+        /// tail, so "it wrapped rather than eliding" is the assertion — and a
+        /// capture cannot make it, because the elided and the wrapped row are the
+        /// same height by construction.
+        int         name_lines  = 0;
+        bool        name_elided = false;
         /// BL-1368: one entry per COLUMN, in drawn order — the hover is per column
         /// now, so a check hovers each cell's own centre and asserts that column's
         /// own explainer. `hover` above stays the union of these, which is the one
@@ -369,8 +392,44 @@ struct construction_controls
     /// candidate loop; they are the same grid, the same metric and the same
     /// per-column cards, which is the property the check asserts.
     std::vector<grid_row> rail_rows;
-    float row_h  = 0.0f; ///< The grid's row height as drawn (one line plus padding).
-    float line_h = 0.0f; ///< One text line, so a check can assert row_h is one of them.
+    float row_h  = 0.0f; ///< The grid's row height as drawn (two lines plus padding, BL-1371).
+    float line_h = 0.0f; ///< One text line, so a check can assert row_h is N of them.
+
+    /// BL-1370: the road ladder's three rows as they drew this frame — where the
+    /// press landed, what it charges, and whether it will arm at all. A press
+    /// that ARMS has no visible result of its own (the result is a highlight on
+    /// the canvas), so a check has to press the real control and then read the
+    /// armed state back; this is where it finds the control.
+    struct road_row
+    {
+        std::uint8_t tier    = 0;     ///< 1=Track, 2=Road, 3=Highway.
+        std::string  name;            ///< "Track" / "Road" / "Highway".
+        float        x       = -1.0f; ///< The Build press's centre, screen px.
+        float        y       = -1.0f;
+        float        cost    = 0.0f;  ///< Credits the press charges (materials priced in).
+        bool         enabled = false; ///< Whether the press will arm (targets + funds).
+        int          targets = 0;     ///< How many crossings the rules admit at this tier.
+        std::string  explainer;       ///< The press's own one-or-two-sentence card.
+    };
+    std::vector<road_row> road_rows;
+
+    /// BL-1370: the armed targeting state as the CANVAS resolved it this frame —
+    /// the tile the crossing starts from, the tier, and the grid position of every
+    /// tile it highlighted. Resolved from the rules BEFORE the draw loop, so the
+    /// set is independent of which tiles happened to be on screen; `drawn` counts
+    /// how many of them the loop actually outlined.
+    struct road_highlight
+    {
+        int x = 0, y = 0; ///< The target tile's grid position.
+        int side = -1;    ///< The armed tile's hex side the crossing runs across.
+    };
+    std::vector<road_highlight> road_highlights;
+    entity_id    road_arm_tile = null_entity; ///< Armed tile, null when not armed.
+    std::uint8_t road_arm_tier = 0;
+    /// How many target outlines the draw loop actually emitted - one per visible
+    /// WRAP COPY of a target tile, so it is a "the mark was drawn" count rather
+    /// than a second copy of `road_highlights.size()`.
+    int          road_drawn    = 0;
 };
 
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
@@ -1148,6 +1207,10 @@ struct ui_state
         int         count = 1;
         entity_id   first = null_entity;   ///< The member a press selects.
         float       x = -1.0f, y = -1.0f;  ///< Button centre, screen px.
+        /// BL-1371: how many lines the NAME column drew, and whether it elided
+        /// anyway — the two-line row's own assertion (see `grid_row`).
+        int         name_lines  = 0;
+        bool        name_elided = false;
         /// BL-1368: the stack row's per-COLUMN explainers, in drawn order.
         std::vector<ui_grid_col> cols;
     };

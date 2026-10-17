@@ -182,7 +182,13 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         // Column 1: the name.
         ImGui::TableSetColumnIndex(1);
         const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", name);
+        // BL-1371: the same wrapping draw as every other name column, so these
+        // rows keep being the SAME grid rather than two rows that resemble it.
+        ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
+        bool      name_elided = false;
+        const int name_lines  = construction_grid_text("rail.row.name", name, name_w,
+                                                       /*disabled=*/false, &name_elided);
+        ImGui::PopStyleColor();
         cells.push_back(construction_cell(
             "name", gp, construction_grid::glyph + construction_grid::pad * 2.0f + name_w,
             std::string("State industry: the seat nation builds it, not your corporation.")));
@@ -301,7 +307,9 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         pub.hover = construction_cells_text(cells);
         pub.x     = gp.x + 24.0f;
         pub.y     = gp.y + line_h * 0.5f;
-        pub.h     = row_h;
+        pub.h           = row_h;
+        pub.name_lines  = name_lines;
+        pub.name_elided = name_elided;
         for (const grid_explainer& e : cells)
             pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f, (e.mn.y + e.mx.y) * 0.5f});
         cc.rail_rows.push_back(std::move(pub));

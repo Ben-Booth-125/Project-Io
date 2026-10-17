@@ -49,6 +49,24 @@ enum class text_align : std::uint8_t { left, right, centre };
 bool fit_text(text_box box, const char* site, const char* text, float max_w,
               bool disabled = false);
 
+/// Draw @p text into AT MOST @p max_lines lines of @p max_w px, breaking at word
+/// boundaries — the fixed-height-row form of wrapping (BL-1371,
+/// `docs/ui/ledgers/construction.md` § "A row is two lines tall, and text wraps
+/// rather than truncating").
+///
+/// Between `fit_text` (one line, elide) and `wrap_text` (any number of lines) sits
+/// the case a grid row actually has: a row whose height is a FIXED budget of N text
+/// lines, inside which text should wrap rather than lose its tail. The lines are
+/// drawn with zero item spacing between them, so N lines occupy exactly
+/// N * `GetTextLineHeight()` and the caller's row metric is the whole budget.
+///
+/// Elides the LAST line only when the whole budget cannot hold the string (and then
+/// records `elided` and hangs the full string on a tooltip, exactly as `fit_text`
+/// does). A single word wider than @p max_w is hard-broken rather than left to clip.
+/// @return the number of lines drawn (1..@p max_lines; 0 for empty text).
+int fit_wrapped_text(text_box box, const char* site, const char* text, float max_w,
+                     int max_lines, bool disabled = false, bool* elided = nullptr);
+
 /// Draw @p text wrapped to @p max_w as an ImGui item. Wrapping containers (1, 3, 6, 8, 9-desc).
 /// Records `unfittable` when a single unbreakable token exceeds @p max_w — the only
 /// way a wrapping box can still clip. Never elides.

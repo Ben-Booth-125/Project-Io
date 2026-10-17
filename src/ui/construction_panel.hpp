@@ -159,12 +159,28 @@ inline constexpr float act   = 44.0f; ///< The Build press.
 inline constexpr float eta   = 32.0f; ///< Quarters left (the queue) - sized so its
                                       ///< "Qtrs" header is not itself elided.
 inline constexpr float pad   = 2.0f;  ///< Horizontal cell padding, per side.
+/// HOW MANY TEXT LINES A ROW RESERVES (BL-1371) — two, since Ben's live click of
+/// the one-line grid: *"we are going to have to use two row spaces for each
+/// building, this is so that text can wrap to the second row."* A column whose
+/// text does not fit wraps into the second line instead of eliding; a row that
+/// needs only one still occupies two, so the grid stays a grid. The one place
+/// that knows the number is `construction_row_height`, which reads it from here.
+inline constexpr int   lines = 2;
 } // namespace construction_grid
 
-/// The height of ONE construction grid row: a single text line plus the cell
-/// padding below. Every one of the four surfaces measures against this, so a row
-/// cannot quietly grow back to the seven lines BL-1344 left behind.
+/// The height of ONE construction grid row: `construction_grid::lines` text
+/// lines plus the cell padding. Every one of the five surfaces measures against
+/// this, so a row cannot quietly grow back to the seven lines BL-1344 left
+/// behind, and the two-line budget BL-1371 bought is stated in ONE place.
 float construction_row_height();
+
+/// Draw a grid cell's text, wrapping into the row's second line rather than
+/// eliding (BL-1371). A thin wrapper over `ui::fit_wrapped_text` at
+/// `construction_grid::lines`, so no surface has to restate the budget.
+/// @return the number of lines drawn; @p elided is set only when even the whole
+///         budget could not hold the string.
+int construction_grid_text(const char* site, const char* text, float max_w,
+                           bool disabled = false, bool* elided = nullptr);
 
 /// The grid's BAR: a track and a fill, and no figure at all.
 ///

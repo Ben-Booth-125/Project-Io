@@ -89,7 +89,138 @@ std::string elide(const char* text, float max_w)
     return s + "...";
 }
 
+/// Greedy word wrap of @p text into at most @p max_lines lines of @p max_w px.
+/// A word wider than the whole box is hard-broken by characters — a wrapping box's
+/// only clip case — rather than left to overrun. @p overran is set when text
+/// remained after the last allowed line, which is the one case that still elides.
+std::vector<std::string> wrap_to_lines(const char* text, float max_w, int max_lines,
+                                       bool& overran, std::string* tail_from_last = nullptr)
+{
+    overran = false;
+    std::size_t last_start = 0;
+    std::vector<std::string> lines;
+    if (text == nullptr || text[0] == '\0' || max_lines <= 0)
+        return lines;
+    const std::string s = text;
+    std::size_t       i = 0;
+    while (i < s.size() && static_cast<int>(lines.size()) < max_lines)
+    {
+        while (i < s.size() && s[i] == ' ')
+            ++i;
+        if (i >= s.size())
+            break;
+        const std::size_t line_start = i;
+        std::string       line;
+        while (i < s.size())
+        {
+            // The next word, with the space that joins it to what we have.
+            std::size_t j = s.find(' ', i);
+            if (j == std::string::npos)
+                j = s.size();
+            const std::string word = s.substr(i, j - i);
+            const std::string with = line.empty() ? word : line + " " + word;
+            if (max_w > 0.0f && ImGui::CalcTextSize(with.c_str()).x > max_w)
+            {
+                if (!line.empty())
+                    break; // the word starts the next line
+                // A single word wider than the box: hard-break it by characters so
+                // the tail survives onto the next line instead of being clipped.
+                std::string part;
+                while (i < j)
+                {
+                    const std::string grown = part + s[i];
+                    if (!part.empty() && ImGui::CalcTextSize(grown.c_str()).x > max_w)
+                        break;
+                    part = grown;
+                    ++i;
+                }
+                line = part;
+                break;
+            }
+            line = with;
+            i    = j;
+        }
+        if (line.empty())
+            break; // nothing fits at all; the caller's record says so
+        last_start = line_start;
+        lines.push_back(std::move(line));
+    }
+    while (i < s.size() && s[i] == ' ')
+        ++i;
+    overran = (i < s.size());
+    // WHAT THE LAST LINE SHOULD CARRY WHEN THE BUDGET RAN OUT. Eliding the last
+    // line as it was drops the words that fitted on it; eliding the REMAINDER
+    // from where that line began keeps as many characters of the tail as the
+    // column holds, which is strictly more of the string for the same pixels.
+    if (overran && tail_from_last != nullptr && !lines.empty())
+        *tail_from_last = s.substr(last_start);
+    return lines;
+}
+
 } // namespace
+
+int fit_wrapped_text(text_box box, const char* site, const char* text, float max_w,
+                     int max_lines, bool disabled, bool* elided_out)
+{
+    if (g_recording) ++g_observations; // BL-714: the ledger looked here
+    if (elided_out != nullptr)
+        *elided_out = false;
+    if (text == nullptr || text[0] == '\0')
+    {
+        ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
+        return 0;
+    }
+    bool        overran = false;
+    std::string tail;
+    const auto  lines   = wrap_to_lines(text, std::max(max_w, 0.0f),
+                                        std::max(max_lines, 1), overran, &tail);
+    if (lines.empty())
+    {
+        // Not even one character fits: keep the slot, keep the value one hover
+        // away, and record the hard failure — the container must reflow.
+        ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
+        ImGui::SetItemTooltip("%s", text);
+        record(box, site, text, ImGui::CalcTextSize(text).x, max_w,
+               overflow_severity::clipped);
+        if (elided_out != nullptr)
+            *elided_out = true;
+        return 0;
+    }
+    // ZERO SPACING BETWEEN THE LINES. The caller's row is a budget of N text
+    // lines; ImGui's default item spacing between two text items would push the
+    // second line out of it, and the row would clip exactly where it was meant
+    // to wrap.
+    const ImVec2 sp = ImGui::GetStyle().ItemSpacing;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {sp.x, 0.0f});
+    std::string last = lines.back();
+    if (overran)
+    {
+        // The budget could not hold it: the LAST line elides, which is the only
+        // place this helper ever elides, and the full string goes on a tooltip.
+        const std::string e = elide(tail.empty() ? last.c_str() : tail.c_str(),
+                                    std::max(max_w, 0.0f));
+        if (!e.empty())
+            last = e;
+    }
+    for (std::size_t i = 0; i < lines.size(); ++i)
+    {
+        const char* draw = (i + 1 == lines.size()) ? last.c_str() : lines[i].c_str();
+        if (disabled)
+            ImGui::TextDisabled("%s", draw);
+        else
+            ImGui::TextUnformatted(draw);
+    }
+    ImGui::PopStyleVar();
+    if (overran)
+    {
+        ImGui::SetItemTooltip("%s", text);
+        record(box, site, text, ImGui::CalcTextSize(text).x, max_w,
+               overflow_severity::elided);
+        if (elided_out != nullptr)
+            *elided_out = true;
+    }
+    return static_cast<int>(lines.size());
+}
 
 bool fit_text(text_box box, const char* site, const char* text, float max_w,
               bool disabled)

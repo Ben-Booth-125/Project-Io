@@ -27,7 +27,7 @@
   ],
   [
    "gameplay.place_road",
-   "Three road-tier rows (Track / Road / Highway) at the bottom of the tile construction ledger, below the building candidates."
+   "Three road-tier rows (Track / Road / Highway) at the bottom of the tile construction ledger, below the building candidates - plus the Planetary canvas, which is the second half of the control: the row ARMS and the canvas is where the crossing is aimed (BL-1370; docs/ui/ledgers/construction.md 'A road is built from a road to a tile, in two presses')."
   ],
   [
    "gameplay.place_sell_order",
@@ -63,7 +63,7 @@
   ],
   [
    "gameplay.lay_track",
-   "Select a tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > road ladder (after Highway) > 'Track' row > 'Build'. No armed tool: rail is built like anything else (LOGISTICS.md § 4c). Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`)."
+   "Select a tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > road ladder (after Highway) > 'Track' row > 'Build'. NO ARMED TOOL, and that is a real difference from the ROAD rows it sits under: a road is a crossing between two tiles and so arms and is then aimed at a neighbour (BL-1370, gameplay.place_road), while rail track is laid ON a tile and names no side at all (LOGISTICS.md 4c) - so this press builds where the road presses arm. Also the command seam (--serve / MCP `issue_command` verb `lay_track` with `nation`; the verify API's `corp_command{verb=lay_track, as_nation=...}`)."
   ],
   [
    "gameplay.set_logistics_shares",

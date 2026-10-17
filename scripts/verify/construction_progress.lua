@@ -41,6 +41,17 @@
 -- bordered box between one-line rows, so the check asserts their published row
 -- height is the build list's own and that they carry the same columns.
 --
+-- BL-1371 makes every one of those rows TWO TEXT LINES tall (construction.md
+-- § "A row is two lines tall, and text wraps rather than truncating"; Ben's live
+-- click of the one-line grid: "many rows truncate the text"). The columns, their
+-- order and their widths are unchanged - what the second line buys is the stretch
+-- NAME column, which resolves to ~70 px at the fold-out's narrowest. So the row
+-- metric assertions move from "one line plus padding" to "two lines plus padding",
+-- and each row additionally publishes how its name resolved: two lines means it
+-- wrapped, and `name_elided` is the failure the second line exists to remove. A
+-- capture cannot make that assertion, because a wrapped row and an elided one are
+-- the same HEIGHT by construction.
+--
 -- Run with: ProjectIo --verify scripts/verify/construction_progress.lua
 
 -- 1720x1080, the resolution the shell's widths are tuned against (the same one
@@ -54,6 +65,36 @@ verify.econ_step(6) -- let the markets hold real inventory, not just a flow
 -- about affordability — so fund it.
 verify.set_balance(5000000.0)
 
+-- BL-1371: the row metric, asserted the same way on all five surfaces. TWO text
+-- lines plus the cell padding, and no more - a row that grew a third line would
+-- be the seven-line row creeping back.
+local function assert_two_line(what, row_h, line_h)
+    verify.expect(row_h > 0 and row_h >= line_h * 2.0 and row_h <= line_h * 2.0 + 8.0,
+                  string.format("%s is TWO lines plus padding (%.1f px against a %.1f px line)",
+                                what, row_h, line_h))
+end
+-- ...and that the NAME column wrapped rather than eliding, which is the whole
+-- point of the second line. Counts the rows that actually used it, so the run
+-- prints whether the worst case was exercised at all.
+local wrapped_names, elided_names = 0, 0
+-- MEASURED 2026-10-17: 15 of the build list's names use the second line and one
+-- ("Inland Logistics Hub", three words in a ~70 px column) does not fit even two,
+-- so it still elides - with the full string on its own tooltip. That is the honest
+-- limit of a two-line budget, not a defect in the wrap, so the assertion is the
+-- CONTRACT rather than "never elides": an elision may only happen after BOTH lines
+-- have been spent. A name elided on line one would mean the wrap never ran.
+local function assert_name_wraps(what, row)
+    verify.expect(row.name_lines >= 1 and row.name_lines <= 2,
+                  string.format("%s '%s' name fits the two-line budget (%d lines)",
+                                what, row.name, row.name_lines))
+    if row.name_elided then
+        verify.expect(row.name_lines == 2,
+                      string.format("%s '%s' elided only after spending BOTH lines (%d)",
+                                    what, row.name, row.name_lines))
+    end
+    if row.name_lines > 1 then wrapped_names = wrapped_names + 1 end
+    if row.name_elided then elided_names = elided_names + 1 end
+end
 local dep = verify.find_deposit_tile("iron_ore")
 verify.expect(dep.ok, "found a tile carrying iron ore")
 
@@ -99,9 +140,7 @@ verify.capture("construction_queue_rows")
 -- hover card instead.
 local q = verify.construction_queue()
 verify.expect(q.n_rows > 0, "the queue published " .. tostring(q.n_rows) .. " grid rows")
-verify.expect(q.row_h > 0 and q.row_h <= q.line_h + 8.0,
-              string.format("a queue row is one line plus padding (%.1f px against a %.1f px line)",
-                            q.row_h, q.line_h))
+assert_two_line("a queue row", q.row_h, q.line_h)
 -- The authored stall clauses (BL-1342), the exact words this pass must not lose.
 local authored = { "at the market", "priced above the build ceiling",
                    "no market supplies this tile", "market can't supply materials",
@@ -157,6 +196,7 @@ for _, r in ipairs(q.rows) do
                   "queue row '" .. r.name .. "' card carries its status line")
     -- BL-1368: six columns, six explainers, and the STATE mark is the one that
     -- names the good (the authored clause, `construction_stall_reason`'s).
+    assert_name_wraps("queue row", r)
     local cols = assert_columns("queue row", r, { "name", "bar", "eta", "cost", "state" })
     if paused then
         verify.expect(names_a_cause(cols["state"]) ~= nil,
@@ -212,9 +252,7 @@ local door = verify.build_door()
 verify.expect(door.drawn, "the build door drew for the selected tile")
 
 -- BL-1365: ONE LINE A ROW, in a grid, with the words on the card.
-verify.expect(door.row_h > 0 and door.row_h <= door.line_h + 8.0,
-              string.format("a build row is one line plus padding (%.1f px against a %.1f px line)",
-                            door.row_h, door.line_h))
+assert_two_line("a build row", door.row_h, door.line_h)
 verify.expect(door.n_rows > 0, "the build door published " .. tostring(door.n_rows) .. " grid rows")
 local stalling, refused = 0, 0
 for _, r in ipairs(door.rows) do
@@ -228,6 +266,7 @@ for _, r in ipairs(door.rows) do
                   "row '" .. r.name .. "' carries the MATERIALS the line dropped")
     verify.expect(r.hover:find("here", 1, true) ~= nil or r.hover:find("Full", 1, true) ~= nil,
                   "row '" .. r.name .. "' card carries the stack's own sentence")
+    assert_name_wraps("build row", r)
     -- BL-1368: EIGHT columns, eight explainers, each about its own column.
     local cols = assert_columns("build row", r,
                                 { "name", "cost", "makes", "stack", "state", "bar", "act" })
@@ -259,6 +298,22 @@ for _, r in ipairs(door.rows) do
 end
 print(string.format("construction_progress: %d build rows, %d will stall or stretch, %d refused full",
                     door.n_rows, stalling, refused))
+-- BL-1371: the two-line row's own evidence. At least one row's name must have
+-- used the second line, or the budget bought nothing on this world and the
+-- assertion above is vacuous.
+print(string.format("construction_progress: %d row name(s) wrapped to the second line, %d elided",
+                    wrapped_names, elided_names))
+verify.expect(elided_names <= 1,
+              string.format("at most one name outruns the two-line budget (%d did)",
+                            elided_names))
+verify.expect(wrapped_names > 0,
+              "at least one row name USED the second line (the budget is not vacuous)")
+-- A capture of a wrapped row: scrolled to the head of the list, where the long
+-- Extraction names are, with no hover card over it.
+verify.hover(5.0, 5.0, 1)
+verify.scroll_panel("build_list", 0.0)
+verify.frames(2)
+verify.capture("construction_wrapped_row")
 -- Hover a real build row and capture the card: the half no other capture shows.
 verify.hover(door.rows[1].x, door.rows[1].y, 2)
 verify.frames(2)
@@ -280,9 +335,8 @@ for _, r in ipairs(door.rail_rows) do
     verify.expect(r.h > 0 and math.abs(r.h - door.row_h) < 0.5,
                   string.format("rail row '%s' is drawn at the SHARED row height (%.1f vs %.1f)",
                                 r.name, r.h, door.row_h))
-    verify.expect(r.h <= door.line_h + 8.0,
-                  string.format("rail row '%s' is one line plus padding (%.1f px / %.1f px line)",
-                                r.name, r.h, door.line_h))
+    assert_two_line("rail row '" .. r.name .. "'", r.h, door.line_h)
+    assert_name_wraps("rail row", r)
     local cols = assert_columns("rail row", r,
                                 { "name", "cost", "makes", "stack", "state", "bar", "act" })
     verify.expect(cols["cost"]:find("treasury", 1, true) ~= nil,
@@ -321,9 +375,11 @@ verify.capture("construction_tile_card_stacks")
 
 local card = verify.tile_card()
 verify.expect(card.drawn, "the tile card drew")
-verify.expect(card.row_h > 0 and card.row_h <= card.line_h + 8.0,
-              string.format("a tile-card stack row is one line plus padding (%.1f px / %.1f px line)",
-                            card.row_h, card.line_h))
+assert_two_line("a tile-card stack row", card.row_h, card.line_h)
+for _, b in ipairs(card.buttons) do
+    verify.expect(not b.name_elided,
+                  "tile-card stack row '" .. b.label .. "' name WRAPS rather than eliding")
+end
 local saw_reading = false
 for _, b in ipairs(card.buttons) do
     if b.detail and (b.detail:find("ETA") or b.detail:find("Paused")) then

@@ -36,6 +36,7 @@
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
 #include "rail_tool.hpp" // BL-1255: the Track / Railway Station rows
+#include "road_tool.hpp" // BL-1370: the crossings a road row may arm
 #include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger_body
 
 #include <imgui.h>
@@ -2331,7 +2332,11 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
                                                ImGuiSelectableFlags_SpanAllColumns);
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
-        fit_text(text_box::table_cell, "selection.tile.stack_name", name.c_str(), name_w);
+        // BL-1371: wraps into the row's second line rather than eliding.
+        bool      name_elided = false;
+        const int name_lines  = construction_grid_text("selection.tile.stack_name",
+                                                       name.c_str(), name_w,
+                                                       /*disabled=*/false, &name_elided);
         ImGui::PopStyleColor();
         {
             // Whose it is, and that the row is a press. A rival's name is the
@@ -2448,6 +2453,8 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
         readout.first  = first;
         readout.x      = gp.x + 24.0f;
         readout.y      = gp.y + line_h * 0.5f;
+        readout.name_lines  = name_lines;   // BL-1371
+        readout.name_elided = name_elided;
         ui.tile_card.buttons.push_back(std::move(readout));
     }
 
@@ -2659,7 +2666,11 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
             ImGui::TableSetColumnIndex(1);
             const float label_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
-            ImGui::TextDisabled("Building");
+            // BL-1371: through the shared wrapping draw like every other name
+            // column, so the budget is stated in one place even where the label
+            // is a literal that always fits.
+            construction_grid_text("selection.site.label", "Building", label_w,
+                                   /*disabled=*/true);
             cells.push_back(construction_cell(
                 "name", gp, construction_grid::glyph + construction_grid::pad * 2.0f + label_w,
                 method.empty()
@@ -4246,6 +4257,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
     ui.construction_ui.door_rows.clear();
     ui.construction_ui.rail_rows.clear(); // BL-1366: both rail rows draw below this loop
+    ui.construction_ui.road_rows.clear(); // BL-1370: the road ladder draws below it too
     ui.construction_ui.row_h  = row_h;
     ui.construction_ui.line_h = ImGui::GetTextLineHeight();
 
@@ -4299,7 +4311,13 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         ImGui::TableSetColumnIndex(1);
         const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
         ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
-        fit_text(text_box::table_cell, "build.row.name", c.name.c_str(), name_w);
+        // BL-1371: the name WRAPS into the row's second line rather than eliding.
+        // This column is the whole reason the row grew: at the fold-out's
+        // narrowest it resolves to ~70 px, and most building names did not fit.
+        bool      name_elided = false;
+        const int name_lines  = construction_grid_text("build.row.name", c.name.c_str(),
+                                                       name_w, /*disabled=*/false,
+                                                       &name_elided);
         ImGui::PopStyleColor();
         // The glyph and the name are ONE subject, so they share one explainer and
         // one cell: which building this row offers, said in full where the column
@@ -4511,7 +4529,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             pub.hover = construction_cells_text(cells);
             pub.x     = gp.x + 24.0f;
             pub.y     = gp.y + line_h * 0.5f;
-            pub.h     = row_h;
+            pub.h           = row_h;
+            pub.name_lines  = name_lines;
+            pub.name_elided = name_elided;
             for (const grid_explainer& e : cells)
                 pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f,
                                     (e.mn.y + e.mx.y) * 0.5f});
@@ -4572,10 +4592,18 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     }
 
     // Road placement (BL-147 core, BL-172 tier ladder) — a per-tile mutation, not a building, so
-    // it takes its own affordances + the pending_road_tile/tier path (place_road). Three tiers:
-    // Track (1) / Road (2) / Highway (3); the glyph weight + brightness mirror the on-canvas
-    // render, and each shows its own cost + validity (upgrade-in-place is allowed, so a tile that
-    // already carries an equal-or-better road greys out only the tiers it meets or exceeds).
+    // it takes its own affordances + the pending_road_tile/tier/side path (place_road). Three
+    // tiers: Track (1) / Road (2) / Highway (3); the glyph weight + brightness mirror the
+    // on-canvas render, and each shows its own cost.
+    //
+    // BL-1370: THE PRESS ARMS, IT DOES NOT BUILD (construction.md § "A road is built from a road
+    // to a tile, in two presses"). A road is a crossing between two tiles, so the request has to
+    // name a SIDE — and until this item nothing did: the press passed `k_road_side_auto` and the
+    // rules guessed, which is how a tile the player was building OUT of came back "this tile
+    // already has an equal or better road". Each row now asks the real gate once per side
+    // (`ui::road_crossing_targets`), arms on the press, and the canvas highlights exactly the
+    // neighbours the rules admit. The refusal moved from a sentence to the absence of a
+    // highlight, so these rows carry no refusal text at all.
     {
         struct road_tier_affordance
         {
@@ -4595,8 +4623,17 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             ImGui::PushID(static_cast<int>(rt.level)); // unique ImGui ids per tier
 
             const road_economics& re = reg.road_econ(rt.level);
-            const placement_rules::placement_result pr =
-                placement_rules::can_place_road(tile, rt.level);
+            // BL-1370: A ROAD NAMES WHICH NEIGHBOUR IT CROSSES TO. The row no
+            // longer asks the weak "may this TILE be roaded?" form — that is the
+            // question that answered "this tile already has an equal or better
+            // road" for a tile the player was trying to build OUT of. It asks the
+            // real gate, once per side, and the answer is a SET of neighbours
+            // (`ui::road_crossing_targets` -> `placement_rules::can_place_road`).
+            // The press arms; the targets highlight; the second press lays one
+            // crossing. The refusal is therefore the ABSENCE of a target, which is
+            // why there is no refusal sentence in this row any more.
+            const std::vector<road_target> targets =
+                road_crossing_targets(w, tile_id, rt.level);
 
             // Same affordability defect as the building path: place_road gates on
             // build_cost PLUS materials priced at the local market, so gating on
@@ -4629,28 +4666,80 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             // One credit total, materials priced in — the same figure the gate uses.
             ImGui::TextDisabled("%d cr", static_cast<int>(road_capex));
 
-            if (pr.ok())
+            // THE PRESS ARMS. Always the same control in the same place: enabled
+            // when the rules admit a crossing and the balance covers it, disabled
+            // (never swapped for a sentence) when they do not. Pressing it while
+            // this tier is already armed DISARMS it — the armed state is visible
+            // on the canvas, so the standing Toggle rule applies to it.
+            const bool armed    = (ui.construction.road_arm_tile == tile_id
+                                   && ui.construction.road_arm_tier == rt.level);
+            // ENABLED WHENEVER THE BALANCE COVERS IT, even with nothing to cross
+            // to: the refusal for "nowhere left to go" is the ABSENCE of a
+            // highlight, not a disabled control (construction.md § "A road is
+            // built from a road to a tile, in two presses"). A press that arms and
+            // lights nothing is the honest answer, and the explainer says so
+            // before the press as well as after.
+            const bool can_arm  = affordable;
+            ImGui::BeginDisabled(!can_arm && !armed);
+            const ImVec2 press_p = ImGui::GetCursorScreenPos();
+            if (ImGui::Button(armed ? "Cancel" : "Build"))
             {
-                ImGui::BeginDisabled(!affordable);
-                if (ImGui::Button("Build"))
+                if (armed)
                 {
-                    ui.construction.pending_road_tile = tile_id;
-                    ui.construction.pending_road_tier = rt.level;
+                    ui.construction.road_arm_tile = null_entity;
                 }
-                ImGui::EndDisabled();
-                if (!affordable)
+                else
                 {
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("Can't afford");
+                    ui.construction.road_arm_tile = tile_id;
+                    ui.construction.road_arm_tier = rt.level;
                 }
             }
+            ImGui::EndDisabled();
+            // The press's own rect, read while the button is still the last item
+            // (EndGroup below replaces it with the group's).
+            const ImVec2 press_sz  = ImGui::GetItemRectSize();
+            const bool   press_vis = ImGui::IsItemVisible();
+            // ONE SHORT EXPLAINER, ON THE PRESS, per construction.md's
+            // per-column rule: what the two presses are, or which of the two
+            // things is missing. The refusal a sentence used to carry is the
+            // absence of a highlight; this says that in advance.
+            std::string why;
+            if (!affordable)
+                why = "Can't afford it: the crossing charges "
+                    + std::to_string(static_cast<int>(road_capex)) + " cr.";
+            else if (targets.empty())
+                why = "Nowhere left to cross to from this tile at this tier, so pressing "
+                      "highlights nothing.";
+            else if (armed)
+                why = "Armed: press one of the highlighted tiles to lay the crossing to it. "
+                      "A press anywhere else cancels.";
             else
-            {
-                ImGui::PushTextWrapPos(0.0f);
-                ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
-                ImGui::PopTextWrapPos();
-            }
+                why = "Press, then press a highlighted neighbour - a road crosses between two "
+                      "tiles, so it has to name which one.";
+            if (construction_row_hovered(press_p,
+                                         {press_p.x + press_sz.x, press_p.y + press_sz.y}))
+                construction_row_card(rt.name, [&]() {
+                    ImGui::PushTextWrapPos(0.0f);
+                    ImGui::TextDisabled("%s", why.c_str());
+                    ImGui::PopTextWrapPos();
+                });
             ImGui::EndGroup();
+
+            {
+                construction_controls::road_row pub;
+                pub.tier      = rt.level;
+                pub.name      = rt.name;
+                pub.cost      = road_capex;
+                pub.enabled   = can_arm;
+                pub.targets   = static_cast<int>(targets.size());
+                pub.explainer = why;
+                if (press_vis)
+                {
+                    pub.x = press_p.x + press_sz.x * 0.5f;
+                    pub.y = press_p.y + press_sz.y * 0.5f;
+                }
+                ui.construction_ui.road_rows.push_back(std::move(pub));
+            }
 
             ImGui::EndChild();
             ImGui::Spacing();

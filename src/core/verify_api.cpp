@@ -4238,6 +4238,108 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // === BL-1370 (a road names which neighbour it crosses to): roads.lua ===
+    //
+    // The road ladder arms rather than builds, so the press has NO visible result
+    // of its own - the result is a set of highlights on the canvas. Three things
+    // therefore have to be readable: where the real press is, what the UI armed and
+    // highlighted, and what the RULES admit. The script compares the last two
+    // itself, so a bug in the highlight cannot agree with itself.
+    //
+    // `edges` is `count_road_edges` - every roaded crossing in the world, each one
+    // once - which is how "the press laid exactly one crossing" is asserted without
+    // reading a tile.
+    v.set_function("road_state", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const auto& c   = m_ui.construction_ui;
+        sol::table  rows = st.create_table();
+        int         n    = 0;
+        for (const construction_controls::road_row& r : c.road_rows)
+        {
+            sol::table row = st.create_table();
+            row["tier"]      = static_cast<int>(r.tier);
+            row["name"]      = r.name;
+            row["x"]         = r.x;
+            row["y"]         = r.y;
+            row["cost"]      = r.cost;
+            row["enabled"]   = r.enabled;
+            row["targets"]   = r.targets;
+            row["explainer"] = r.explainer;
+            rows[++n]        = row;
+        }
+        out["rows"]   = rows;
+        out["n_rows"] = n;
+        out["armed"]    = (c.road_arm_tile != null_entity);
+        out["arm_tier"] = static_cast<int>(c.road_arm_tier);
+        {
+            const auto tit = m_world.tiles.find(c.road_arm_tile);
+            out["arm_x"] = tit != m_world.tiles.end() ? tit->second.grid_x : -1;
+            out["arm_y"] = tit != m_world.tiles.end() ? tit->second.grid_y : -1;
+        }
+        sol::table hl = st.create_table();
+        int         hn = 0;
+        for (const construction_controls::road_highlight& h : c.road_highlights)
+        {
+            sol::table e = st.create_table();
+            e["x"] = h.x; e["y"] = h.y; e["side"] = h.side;
+            hl[++hn] = e;
+        }
+        out["highlights"]   = hl;
+        out["n_highlights"] = hn;
+        out["drawn"]        = c.road_drawn;
+        out["edges"]        = count_road_edges(m_world);
+        out["message"]      = m_ui.construction.last_message;
+        return out;
+    });
+
+    // THE RULES' OWN ANSWER for one tile at one tier: every hex side
+    // `placement_rules::can_place_road` admits, as { side, x, y } of the neighbour it
+    // crosses to. This is the ORACLE the highlight is checked against, and the
+    // scanner a check uses to find a tile with nowhere left to go.
+    //
+    // It is a second, independent call site of the same gate `place_road` runs - not
+    // a copy of the canvas's loop - so "the highlight is exactly what the rules
+    // admit" is an assertion rather than a tautology. It answers only WHERE a road
+    // may be laid, which is what the highlight already shows on screen; no
+    // substrate, deposit, owner or tier is exposed (the standing no-tile-data rule,
+    // same shape as `find_deposit_tile`'s grant).
+    v.set_function("road_admits", [this](int col, int row, int tier) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        entity_id   tile = null_entity;
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+            {
+                tile = tid;
+                break;
+            }
+        sol::table sides = st.create_table();
+        int        n     = 0;
+        if (tile != null_entity)
+        {
+            for (int s = 0; s < 6; ++s)
+            {
+                if (!placement_rules::can_place_road(m_world, tile, s,
+                                                     static_cast<std::uint8_t>(tier)))
+                    continue;
+                const entity_id other = road_edge_neighbour(m_world, tile, s);
+                const auto      oit   = m_world.tiles.find(other);
+                if (oit == m_world.tiles.end())
+                    continue;
+                sol::table e = st.create_table();
+                e["side"] = s;
+                e["x"]    = oit->second.grid_x;
+                e["y"]    = oit->second.grid_y;
+                sides[++n] = e;
+            }
+        }
+        out["ok"]      = (tile != null_entity);
+        out["sides"]   = sides;
+        out["n_sides"] = n;
+        return out;
+    });
+
     // === BL-1255 (rail construction UI): rail_construction.lua ===
     //
     // What the tile list's rail rows left in the world and on screen: the seat
@@ -4398,6 +4500,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["x"]     = r.x;
             row["y"]     = r.y;
             row["h"]     = r.h;
+            // BL-1371: how the NAME column resolved - two lines means it wrapped,
+            // and `name_elided` is the failure the two-line row exists to remove.
+            row["name_lines"]  = r.name_lines;
+            row["name_elided"] = r.name_elided;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)
@@ -4428,6 +4534,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["x"]     = r.x;
             row["y"]     = r.y;
             row["h"]     = r.h;
+            // BL-1371: how the NAME column resolved - two lines means it wrapped,
+            // and `name_elided` is the failure the two-line row exists to remove.
+            row["name_lines"]  = r.name_lines;
+            row["name_elided"] = r.name_elided;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)
@@ -4466,6 +4576,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["x"]     = r.x;
             row["y"]     = r.y;
             row["h"]     = r.h;
+            // BL-1371: how the NAME column resolved - two lines means it wrapped,
+            // and `name_elided` is the failure the two-line row exists to remove.
+            row["name_lines"]  = r.name_lines;
+            row["name_elided"] = r.name_elided;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)
@@ -5071,6 +5185,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["first"]  = static_cast<unsigned>(b.first);
             row["x"]      = b.x;
             row["y"]      = b.y;
+            row["name_lines"]  = b.name_lines;  // BL-1371
+            row["name_elided"] = b.name_elided;
             // BL-1368: the stack row's per-column explainers.
             sol::table cols = st.create_table();
             int        cn   = 0;

@@ -248,7 +248,24 @@ ImVec4 construction_status_colour(const construction_read& rd)
 
 float construction_row_height()
 {
-    return ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2.0f;
+    // TWO lines, since BL-1371 (construction.md § "A row is two lines tall, and
+    // text wraps rather than truncating"; Ben, 2026-10-17: *"we are going to have
+    // to use two row spaces for each building, this is so that text can wrap to
+    // the second row. Many rows truncate the text"*). The columns and their widths
+    // are unchanged — what the second line buys is the stretch NAME column, which
+    // resolves to ~70 px at the fold-out's narrowest and was eliding most names.
+    //
+    // A row that needs only one line still occupies two, so the grid stays a
+    // grid: this is a BUDGET, not a measurement of the text in hand.
+    return ImGui::GetTextLineHeight() * static_cast<float>(construction_grid::lines)
+         + ImGui::GetStyle().CellPadding.y * 2.0f;
+}
+
+int construction_grid_text(const char* site, const char* text, float max_w, bool disabled,
+                           bool* elided)
+{
+    return fit_wrapped_text(text_box::table_cell, site, text, max_w,
+                            construction_grid::lines, disabled, elided);
 }
 
 void construction_grid_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx, float frac, ImU32 colour)
@@ -290,9 +307,12 @@ grid_explainer construction_cell(const char* key, ImVec2 cursor, float w, std::s
     const float py = ImGui::GetStyle().CellPadding.y;
     grid_explainer e;
     e.key  = key;
+    // The cell is the WHOLE row's height (BL-1371: two text lines), not one
+    // line of it — a column's explainer answers for the column, so pointing at
+    // the blank half of a one-line row must still reach it.
     e.mn   = {cursor.x - construction_grid::pad, cursor.y - py};
     e.mx   = {cursor.x + w + construction_grid::pad,
-              cursor.y + ImGui::GetTextLineHeight() + py};
+              cursor.y - py + construction_row_height()};
     e.text = std::move(text);
     e.ink  = ink;
     return e;
@@ -574,7 +594,11 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         // ELIDED to its column instead of pushing the columns right.
         ImGui::SameLine(0.0f, 0.0f);
         ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
-        fit_text(text_box::table_cell, "construction.queue.name", row.name.c_str(), name_w);
+        // BL-1371: the name WRAPS into the row's second line rather than eliding.
+        bool      name_elided = false;
+        const int name_lines  = construction_grid_text("construction.queue.name",
+                                                       row.name.c_str(), name_w,
+                                                       /*disabled=*/false, &name_elided);
         ImGui::PopStyleColor();
         ImGui::PopID();
         // The glyph and the name are one subject: WHICH site this is, where it
@@ -679,7 +703,9 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         pub.hover = construction_cells_text(cells);
         pub.x     = gp.x + 24.0f;
         pub.y     = gp.y + line_h * 0.5f;
-        pub.h     = row_h;
+        pub.h           = row_h;
+        pub.name_lines  = name_lines;
+        pub.name_elided = name_elided;
         for (const grid_explainer& e : cells)
             pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f, (e.mn.y + e.mx.y) * 0.5f});
         ui.construction_ui.queue_rows.push_back(std::move(pub));

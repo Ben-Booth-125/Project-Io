@@ -187,11 +187,21 @@ do
     for _, b in ipairs(c.buttons) do
         verify.expect(b.detail ~= "", "every stack row publishes its reading: " .. b.label)
     end
-    -- BL-1365: the row is ONE LINE of the construction grid, and the reading it
-    -- used to spend a third line on is on the shared hover card.
-    verify.expect(c.row_h > 0 and c.row_h <= c.line_h + 8.0,
-                  string.format("a stack row is one line plus padding (%.1f px / %.1f px line)",
+    -- BL-1365: the row is a construction GRID row, and the reading it used to
+    -- spend a third line on is on the shared hover card. BL-1371: that row is
+    -- TWO text lines tall, so a name too wide for its column wraps into the
+    -- second rather than eliding - the one-line budget was cutting most names.
+    verify.expect(c.row_h > 0 and c.row_h >= c.line_h * 2.0
+                  and c.row_h <= c.line_h * 2.0 + 8.0,
+                  string.format("a stack row is TWO lines plus padding (%.1f px / %.1f px line)",
                                 c.row_h, c.line_h))
+    for _, b in ipairs(c.buttons) do
+        verify.expect(not b.name_elided,
+                      "stack row '" .. b.label .. "' name WRAPS rather than eliding")
+        verify.expect(b.name_lines >= 1 and b.name_lines <= 2,
+                      string.format("stack row '%s' name fits the two-line budget (%d lines)",
+                                    b.label, b.name_lines))
+    end
     -- BL-1368: the hover is PER COLUMN here too - the owner and the press on the
     -- name, the good on the pip, the net on the net column, and the stall's named
     -- good with the progress on the state mark.
