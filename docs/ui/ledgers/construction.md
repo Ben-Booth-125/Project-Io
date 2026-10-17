@@ -70,6 +70,19 @@ press.
 
 **Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can actually give it; below `1 / max_stretch` the build is **paused**. **What "can give it" means is the whole defect this surface once had (Ben, 2026-10-16 playtest):** the sim draws the market's **persistent `inventory`**, adds the `capacity_per_build_tick` row, and counts a good priced above `reservation_mult × base` as absent (`shelf_admits`). The panel's own mirror read `supply` — the per-tick flow, reset every tick — carried no capacity row and ignored the price ceiling, so it reported "ETA ~2 qtrs" while the sim held the same build at the `1 / max_stretch` floor for twenty. **One shared read now serves both**, and the mirror matching `run_construction`'s `site_rate` is the contract its declaration cites. A stall also **names the good** that holds it, in the status line, the stack reading, the queue row and the build door. The building carries `ticks_remaining` (an integer gate) and `construction_progress` (the fractional accumulator that lets a starved build stretch over many ticks). The display word is **qtr**, never tick (NR-002, Ben 2026-08-01) — a Tick is literally a calendar quarter.
 
+**One line a row, and the words live in the hover (Ben, 2026-10-17).** *"We should move a lot of the
+text on each construction panel to tooltips, and favour using icons where possible. We really need
+to compact this."* Every row on this ledger — the build list, the queue, the tile card's stack
+buttons, the expanded site card — is **one line**, and it reads in glyphs: the building glyph
+(), the cost, the materials, a **resource pip** for what it makes, the stack as , a
+state mark, the progress bar, the press. A word appears only where no glyph can carry the meaning.
+
+**Everything the line drops belongs to the hover card** (), not to a second line and
+not to nothing: the sentence a chip replaced, the stall's named good, what the building makes in
+words, and what filled a tile when it is full. The rule this enforces is that **a scan and a read
+are different acts** — the row serves the scan, the card serves the read — and the surface failed it
+when one row grew to seven lines and four rows filled the panel.
+
 **Default view on open:** Buildings.
 **Cross-cutting selectors that are NOT views (toggle-exempt):** none. The Buildings view's method
 grid and workforce slider are levers on the selected building, not sub-views; the type-group

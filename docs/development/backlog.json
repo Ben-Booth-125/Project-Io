@@ -1505,6 +1505,28 @@
    ],
    "title": "Every placement refusal but the launchpad collapses into \"invalid tile\", so the toast misnames a full stack",
    "design": "SPRINT 56 (found investigating BL-1341, 2026-10-16). construct_building maps every can_place_in_world refusal except launchpad_exists into construction_result::invalid_tile (construction.cpp:213), so a full extraction stack, a full non-extraction stack and a full province ceiling all report 'invalid tile' in the post-hoc toast - a tile that is perfectly valid. The build-door row is honest (BL-1341 gave it the real wording and the numbers); it is the seam's own result enum that is lossy, and the seam is also the AI-facing one, where a wrong reason is a wrong signal. Carry the placement_reason through instead of flattening it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17, revising the delivered build card); filed by Claude",
+   "id": "BL-1365",
+   "short_name": "CONSTRUCTION_ONE_LINE_ROWS",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "requires": [],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/construction_panel.cpp"
+   ],
+   "title": "Compact every construction row to one line, with icons over words and the words in the hover card",
+   "design": "SPRINT 55 (Ben, 2026-10-17, revising BL-1344 the day it landed): 'We should move a lot of the text on each construction panel to tooltips, and favour using icons where possible. We really need to compact this.' RULED from a mockup: option B, ONE LINE a row, and the pass covers ALL construction surfaces - the build list, the queue table, the tile-card stack buttons and the expanded site card. DESIGNED: construction.md section One line a row. BL-1344 grew the build row from 5 to 7 reserved lines, which fits about 4 rows in the panel; one line fits about 20. The line reads in glyphs: building glyph, cost, materials, a RESOURCE PIP for the output (not the word), the stack as 2/4, a state mark (green dot fine / amber triangle stalling), the progress bar, the press. The hover card takes everything the line drops - the sentence each chip replaced, the stall's named good, the output in words, and what filled a full tile. Keep every FACT that BL-1341..1344 added; this changes where it is read, never whether it is there. A live click is owed."
   }
  ]
 }
