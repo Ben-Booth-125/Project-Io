@@ -7,6 +7,7 @@
 
 #include <imgui.h> // ImVec4 — the status colour this header hands out
 
+#include <functional> // the hover card's content closure (BL-1365)
 #include <string>
 #include <vector>
 
@@ -76,6 +77,16 @@ std::string ticks_label(int ticks);
 /// nothing is holding the build. For a narrow reading (a stack button).
 std::string construction_blocker_phrase(const construction_read& rd);
 
+/// The stall's REASON CLAUSE, in the authored words and nothing else: "no Steel
+/// at the market", "Steel is priced above the build ceiling", "no market
+/// supplies this tile", "its treasury could not fund it this quarter", "market
+/// can't supply materials". "" when nothing is stalling the build.
+///
+/// ONE source for the clause, so the two tenses cannot drift (BL-1365): a site
+/// says "Paused - <clause>" (`construction_status`) and a candidate the player
+/// has not committed to yet says "Will stall - <clause>" in its hover card.
+std::string construction_stall_reason(const construction_read& rd);
+
 /// The full status line: "Building... ~3 qtrs", "Building... ~9 qtrs (short of
 /// Steel)", "Paused - no Steel at the market", "Paused - Steel is priced above
 /// the build ceiling".
@@ -111,6 +122,73 @@ float construction_progress_fraction(const world& w, const recipe_registry& reg,
 /// player would call the same thing belong on the same row, and nothing finer is
 /// visible to them.
 std::string building_group_name(const world& w, const recipe_registry& reg, const building_component& b);
+
+// --- The one-line GRID row, and its hover card (BL-1365) ---------------------
+//
+// construction.md § "One line a row, and the words live in the hover" and § "The
+// line is a grid, not a sentence" (Ben, 2026-10-17). Every construction row — the
+// build list, the queue, the tile card's stack buttons, the expanded site card —
+// is ONE LINE of FIXED COLUMNS, reading in glyphs, and everything the line drops
+// goes to the shared hover card (../docs/ui/TOOLTIP.md's `draw_hover_card`), never
+// to a second line and never to nothing.
+//
+// These three helpers are what makes the four surfaces one treatment rather than
+// four look-alikes: the same row metric, the same hit-test, the same card frame.
+
+/// The grid's FIXED column widths, in pixels — shared by the four surfaces so a
+/// column is the same column on each of them, and so the budget is stated in one
+/// place rather than re-guessed per table.
+///
+/// Measured against the fold-out column's narrowest case: `shell_column_width`
+/// floors at 380 px, less `nav_pane_width`, the ledger's window padding, the
+/// build list's own scroller and scrollbar and a `TreeNodeEx` indent leaves the
+/// build list ~265 px. At that width NINE columns do not fit, so the MATERIALS
+/// column is the one dropped into the hover card (construction.md's rule: drop
+/// the lowest-value column, never wrap and never widen the panel) — the credit
+/// cost beside it already prices exactly those materials at the local market, and
+/// the quantities, which are the half a player can act on, were never on the line
+/// at all. The hover names them in full.
+namespace construction_grid {
+inline constexpr float glyph = 15.0f; ///< The building glyph.
+inline constexpr float cost  = 34.0f; ///< Credits, abbreviated ("940", "1.2k").
+inline constexpr float makes = 14.0f; ///< The resource pip for what it makes.
+inline constexpr float stack = 28.0f; ///< "2/4".
+inline constexpr float state = 12.0f; ///< The state mark.
+inline constexpr float bar   = 38.0f; ///< The profit / progress bar.
+inline constexpr float act   = 44.0f; ///< The Build press.
+inline constexpr float eta   = 32.0f; ///< Quarters left (the queue) - sized so its
+                                      ///< "Qtrs" header is not itself elided.
+inline constexpr float pad   = 2.0f;  ///< Horizontal cell padding, per side.
+} // namespace construction_grid
+
+/// The height of ONE construction grid row: a single text line plus the cell
+/// padding below. Every one of the four surfaces measures against this, so a row
+/// cannot quietly grow back to the seven lines BL-1344 left behind.
+float construction_row_height();
+
+/// The grid's BAR: a track and a fill, and no figure at all.
+///
+/// `charts::draw_value_bar` cannot serve a grid column — it reserves at least
+/// 52 px for the number it prints right-aligned, so inside a 38 px column the
+/// plot width goes negative and the "bar" is the figure alone. That is the one
+/// thing this pass is undoing: the figure is a word, and words live on the
+/// hover card. @p frac is the already-normalised magnitude in [0,1]; a zero
+/// keeps a 2 px stub so zero reads as zero rather than as an absent bar.
+void construction_grid_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx, float frac, ImU32 colour);
+
+/// Is the pointer over the row occupying [@p mn, @p mx]?
+///
+/// A hit-test rather than an ImGui item, deliberately: a row-wide `Selectable`
+/// would claim the click that the row's own Build press needs, and an
+/// `InvisibleButton` would advertise a press the build list does not have. Gated
+/// on the host window being hovered so a card cannot appear through the ledger
+/// above it.
+bool construction_row_hovered(ImVec2 mn, ImVec2 mx);
+
+/// The shared hover card, drawn for a construction row: `ui::draw_hover_card` at
+/// the live cursor with @p content as its body. @p title is drawn first in the
+/// selection ink (the row's name, which the grid itself may have elided).
+void construction_row_card(const char* title, const std::function<void()>& content);
 
 /// One row of the Buildings view: a building TYPE the player owns at least one of.
 struct building_group

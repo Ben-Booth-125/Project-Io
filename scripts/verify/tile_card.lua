@@ -17,8 +17,14 @@
 --   (round 2 also asserts the province card's own window never scrolls, and the
 --    expanded card's header count, method, net / expenses figures and the
 --    read-only workforce row, BL-1322)
---   tile_card_built        a player tile: one button per stack, three across,
---                          glyph + count, name, net profit per quarter.
+--   tile_card_built        a player tile: ONE LINE A STACK in the construction
+--                          grid (BL-1365) - glyph | name | count | a resource pip
+--                          for what it makes | how far built | what it earns | a
+--                          state mark - with the reading in words on the shared
+--                          hover card. It was three buttons across, three lines
+--                          deep, until 2026-10-17.
+--   tile_card_stack_hover  a stack row hovered: the card carrying the reading,
+--                          what it makes and (for a rival) the owner.
 --   tile_card_stacked      a tile carrying two or more buildings.
 --   tile_card_expanded     a building button PRESSED (a real click at the
 --                          button's published centre): the stack expands in the
@@ -179,8 +185,16 @@ do
     verify.expect(#c.buttons > 0, "a built tile shows at least one building button")
     verify.expect(c.province_scroll_max == 0, "built tile: the province card's own window does not scroll")
     for _, b in ipairs(c.buttons) do
-        verify.expect(b.detail ~= "", "every button carries its third line: " .. b.label)
+        verify.expect(b.detail ~= "", "every stack row publishes its reading: " .. b.label)
     end
+    -- BL-1365: the row is ONE LINE of the construction grid, and the reading it
+    -- used to spend a third line on is on the shared hover card.
+    verify.expect(c.row_h > 0 and c.row_h <= c.line_h + 8.0,
+                  string.format("a stack row is one line plus padding (%.1f px / %.1f px line)",
+                                c.row_h, c.line_h))
+    verify.hover(c.buttons[1].x, c.buttons[1].y, 2)
+    verify.frames(2)
+    verify.capture("tile_card_stack_hover")
     verify.hover(860, 300, 2) -- park the pointer on the canvas, off the band (no press)
     verify.frames(2)
     verify.capture("tile_card_built")
