@@ -1527,6 +1527,27 @@
    ],
    "title": "Compact every construction row to one line, with icons over words and the words in the hover card",
    "design": "SPRINT 55 (Ben, 2026-10-17, revising BL-1344 the day it landed): 'We should move a lot of the text on each construction panel to tooltips, and favour using icons where possible. We really need to compact this.' RULED from a mockup: option B, ONE LINE a row, and the pass covers ALL construction surfaces - the build list, the queue table, the tile-card stack buttons and the expanded site card. DESIGNED: construction.md section One line a row. BL-1344 grew the build row from 5 to 7 reserved lines, which fits about 4 rows in the panel; one line fits about 20. The line reads in glyphs: building glyph, cost, materials, a RESOURCE PIP for the output (not the word), the stack as 2/4, a state mark (green dot fine / amber triangle stalling), the progress bar, the press. The hover card takes everything the line drops - the sentence each chip replaced, the stall's named good, the output in words, and what filled a full tile. Keep every FACT that BL-1341..1344 added; this changes where it is read, never whether it is there. A live click is owed. GRID (Ben, 2026-10-17): the one line is a COLUMN GRID, not a sentence - each figure in its own column, the same column in every row, so a column reads down the list; a missing figure leaves its column empty rather than closing up. A fixed-width table, not inline chips, on all four surfaces; the queue is already a table, so it is the shape the others match. If the columns will not fit the panel width, the lowest-value column drops into the hover card - the panel is never widened and a column never wraps. Written into construction.md (The line is a grid, not a sentence)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found delivering BL-1365, 2026-10-17)",
+   "requires": [],
+   "id": "BL-1366",
+   "short_name": "RAIL_ROWS_JOIN_THE_GRID",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/rail_tool.cpp"
+   ],
+   "title": "The rail rows are the one non-grid row left in the build list, a four-line box among one-line rows",
+   "design": "SPRINT 55 (found delivering BL-1365, 2026-10-17). Every construction row is now one line in a fixed-column grid (construction.md: One line a row / The line is a grid). draw_rail_rows lives in src/ui/rail_tool.cpp, which was outside that lane's owned files, so the Track and Railway Station rows still draw a four-line bordered box - and they now sit visibly taller between the one-line Infrastructure rows above and below them (see the lane's construction_build_door_extraction.png capture). The lane passed them their OLD metric so they are not clipped, which is the right holding action and not the end state. THE WORK: bring both rail rows into ui::construction_grid's columns and the shared hover card, reusing construction_row_height / construction_row_hovered / construction_row_card / construction_grid_bar rather than a second idiom. Note BL-1255's live click asked for the track row to be restyled like the road rows, which this subsumes."
   }
  ]
 }
