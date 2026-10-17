@@ -206,8 +206,10 @@ bool demolish_state_building(world& w, entity_id nation, entity_id building);
 ///              where `side` had been inserted compiled and silently read the tier as a
 ///              side. Appending it keeps every existing call correct.
 /// @return      `placed` on success; `invalid_tile` (no neighbour that way, a side no walk
-///              can cross, already at or above `tier`), `insufficient_funds`, `no_corp`,
-///              or `no_tile`.
+///              can cross, WATER AT BOTH ENDS — a crossing the player lays must touch land
+///              at one end, Ben 2026-10-17 — or already at or above `tier`),
+///              `insufficient_funds`, `no_corp`, or `no_tile`. A refusal mutates nothing
+///              and costs nothing.
 construction_result place_road(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id tile, std::uint8_t tier = 1,
                                std::uint8_t side = k_road_side_auto);

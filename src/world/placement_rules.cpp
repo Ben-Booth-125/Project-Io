@@ -139,6 +139,15 @@ placement_result can_place_road(const world& w, entity_id tile, int side, std::u
     const auto oit = w.tiles.find(other);
     if (oit == w.tiles.end())
         return placement_reason::ocean;
+    // A CROSSING THE PLAYER LAYS MUST TOUCH LAND AT ONE END (Ben, 2026-10-17;
+    // LOGISTICS.md § 4). A bridge spans a strait, and spanning is all it does: without
+    // this, the only brake on walking a road out across open ocean, cell by paid cell, is
+    // the price of each crossing. Generation never threads open sea, so the two rules
+    // differ only in the middle of a two-cell strait, where the player builds from a shore
+    // rather than from the water — accepted as the cost of the brake. GENERATION IS NOT
+    // GATED HERE: `lay_road_edge` stays permissive and its routes refuse open sea already.
+    if (is_water_tile(tit->second.substrate) && is_water_tile(oit->second.substrate))
+        return placement_reason::ocean;
     if (road_tier_on_side(tit->second, side) >= tier)
         return placement_reason::already_road;
     return placement_reason::ok;

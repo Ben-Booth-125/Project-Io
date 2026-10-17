@@ -36,6 +36,13 @@
 //   E2  AND IT IS SYMMETRIC, UNLIKE A RIVER. The same crossing prices the step
 //       the same way round — `road_edge_discount` read from either end is one
 //       number — so a road adds no direction to a path, where a river does.
+//   P1  A CROSSING THE PLAYER LAYS MUST TOUCH LAND AT ONE END (Ben, 2026-10-17). A
+//       bridge spans a strait and spanning is all it does: a shore-to-water crossing is
+//       legal, a water-to-water one is REFUSED, the refusal mutates nothing and costs
+//       nothing, and the command seam refuses it too (`place_road` is the one door, and
+//       `apply_corp_command` goes through it). Generation is NOT gated by this -- its
+//       routes already refuse open sea -- so the row asks the player's door only, and
+//       asks separately that the generated field still holds its mid-strait crossings.
 //   S1  THE SAVE ROUND-TRIPS BYTE-IDENTICALLY at v53, mask for mask.
 //   S2  A PRE-v53 SAVE MIGRATES to the LOWER-tier rule: between each pair of
 //       4-cardinal neighbours that both carried a road, an edge at the lower of
@@ -56,6 +63,10 @@
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/construction.hpp"     // place_road: the player's one door
+#include "world/placement_rules.hpp"   // can_place_road: the per-side gate
+#include "world/recipe_registry.hpp"   // default road_econ without Lua (Track 25 / Road 45 / Highway 90)
+#include "world/corp_command.hpp"     // apply_corp_command: the seam routes through it
 #include "world/logistics.hpp"
 #include "world/road_generation.hpp" // kMaxCrossingTiles: a bridge is a strait span
 #include "world/river_generation.hpp"
@@ -387,6 +398,112 @@ int main(int argc, char** argv)
                       || road_tier_on_side(w.tiles.at(a), side) != 0,
                   "E2c the restored field prices the hop as it did before");
         }
+    }
+
+    // --- P1: the player's crossing must touch land at one end --------------
+    {
+        recipe_registry reg; // default road_econ (no Lua): Track 25 / Road 45 / Highway 90 cr
+        // The three cases are found on the generated world, so the row is asked of real
+        // ground: a mid-strait crossing (water both ends, which generation laid and the
+        // player may not), a shore crossing (one end land), and a tier that would be a
+        // genuine upgrade on each.
+        entity_id wet_a = null_entity, wet_b = null_entity, shore = null_entity;
+        int wet_side = -1, shore_side = -1;
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            if (!is_water(tc.substrate))
+                continue;
+            for (int s = 0; s < 6; ++s)
+            {
+                if (!road_side_is_crossable(s, tc.grid_y))
+                    continue;
+                const entity_id nb = road_edge_neighbour(w, tid, s);
+                if (nb == null_entity)
+                    continue;
+                const bool nb_wet = is_water(w.tiles.at(nb).substrate);
+                if (nb_wet && wet_a == null_entity) { wet_a = tid; wet_b = nb; wet_side = s; }
+                if (!nb_wet && shore == null_entity) { shore = tid; shore_side = s; }
+            }
+            if (wet_a != null_entity && shore != null_entity)
+                break;
+        }
+        std::printf("       probe sides: water-to-water %s, shore-to-water %s\n",
+                    wet_a != null_entity ? "found" : "none on this seed",
+                    shore != null_entity ? "found" : "none on this seed");
+        check(shore != null_entity, "P1a found a shore-to-water crossing to ask of");
+        if (shore != null_entity)
+        {
+            // A tier above whatever stands there, so `already_road` cannot mask the answer.
+            const std::uint8_t t = static_cast<std::uint8_t>(
+                std::min<int>(3, road_tier_on_side(w.tiles.at(shore), shore_side) + 1));
+            check(static_cast<bool>(placement_rules::can_place_road(w, shore, shore_side, t)),
+                  "P1b a crossing with LAND at one end is allowed (the bridge the player builds)");
+        }
+        if (wet_a != null_entity)
+        {
+            const std::uint8_t t = static_cast<std::uint8_t>(
+                std::min<int>(3, road_tier_on_side(w.tiles.at(wet_a), wet_side) + 1));
+            const placement_rules::placement_result pr =
+                placement_rules::can_place_road(w, wet_a, wet_side, t);
+            check(!pr, "P1c a crossing with WATER AT BOTH ENDS is refused to the player");
+
+            // Through the one door, on a corp that can afford it: refused, and the world
+            // is byte-identical either side of the attempt.
+            world probe = w;
+            entity_id corp = null_entity;
+            for (const auto& [cid, cc] : probe.corporations)
+                if (corp == null_entity || cid < corp) corp = cid;
+            if (corp != null_entity)
+            {
+                probe.corporations.at(corp).balance = 1.0e6f;
+                const std::string before = to_bytes(probe);
+                const construction_result r =
+                    place_road(probe, reg, corp, wet_a, t, static_cast<std::uint8_t>(wet_side));
+                const float bal = probe.corporations.at(corp).balance;
+                check(r == construction_result::invalid_tile,
+                      "P1d place_road refuses it as invalid_tile");
+                check(to_bytes(probe) == before && bal == 1.0e6f,
+                      "P1e the refusal mutated nothing and cost nothing");
+            }
+            // And the command seam, which routes through the same door.
+            {
+                world probe2 = w;
+                entity_id corp2 = null_entity;
+                for (const auto& [cid, cc] : probe2.corporations)
+                    if (corp2 == null_entity || cid < corp2) corp2 = cid;
+                if (corp2 != null_entity)
+                {
+                    probe2.corporations.at(corp2).balance = 1.0e6f;
+                    const std::string before = to_bytes(probe2);
+                    corp_command cmd;
+                    cmd.corp      = corp2;
+                    cmd.verb      = corp_verb::place_road;
+                    cmd.tile      = wet_a;
+                    cmd.road_side = static_cast<std::uint8_t>(wet_side);
+                    cmd.road_tier = t;
+                    const corp_command_result cr = apply_corp_command(probe2, reg, cmd);
+                    check(cr != corp_command_result::applied,
+                          "P1f the command seam refuses the whole command");
+                    check(to_bytes(probe2) == before,
+                          "P1g and the world is byte-identical either side of it");
+                }
+            }
+        }
+        // Generation keeps its mid-strait crossings: the rule narrows the PLAYER's door
+        // only, and M2b above has already walked those bridges shore to shore.
+        int mid_strait = 0;
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            if (!is_water(tc.substrate)) continue;
+            for (int s = 0; s < 6; ++s)
+            {
+                if (road_tier_on_side(tc, s) == 0) continue;
+                const entity_id nb = road_edge_neighbour(w, tid, s);
+                if (nb != null_entity && is_water(w.tiles.at(nb).substrate)) ++mid_strait;
+            }
+        }
+        std::printf("       generation holds %d mid-strait tile-side(s) the player could not"
+                    " have laid\n", mid_strait);
     }
 
     // --- S1: the save round-trips ------------------------------------------
