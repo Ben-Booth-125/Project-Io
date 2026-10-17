@@ -69,39 +69,21 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                                  const std::vector<polity>& polities,
                                  const std::vector<int>&    cell_region,
                                  int gw, int gh,
-                                 int min_tiles, bool keep_city_states, int total_target)
+                                 int min_tiles, bool keep_city_states, int total_target,
+                                 const std::vector<terrain_substrate>* sub)
 {
     closing_plan plan;
     const std::size_t R = regions.size();
-    const std::vector<int64_t> tiles = closing_cell_tiles(cell_region, R);
+    const int total = (gw > 0 && gh > 0) ? gw * gh : 0;
+    const bool grid_ok = total > 0 && cell_region.size() >= static_cast<std::size_t>(total);
+    const bool strait_rule = sub != nullptr && grid_ok && sub->size() >= static_cast<std::size_t>(total);
 
-    // --- Cell adjacency: two regions whose carve cells touch cardinally -----
-    // Column-wrapped, rows clamped, the carve's own neighbourhood
-    // (`cardinal_neighbours`). Right and down cover every pair once.
-    std::vector<std::vector<int>> adj(R);
-    if (gw > 0 && gh > 0 && cell_region.size() >= static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
-    {
-        for (int idx = 0; idx < gw * gh; ++idx)
-        {
-            const int a = cell_region[static_cast<std::size_t>(idx)];
-            if (a < 0 || static_cast<std::size_t>(a) >= R) continue;
-            const int col = idx % gw, row = idx / gw;
-            const int nb[2] = { row * gw + (col + 1) % gw, row + 1 < gh ? idx + gw : -1 };
-            for (const int n : nb)
-            {
-                if (n < 0) continue;
-                const int b = cell_region[static_cast<std::size_t>(n)];
-                if (b < 0 || b == a || static_cast<std::size_t>(b) >= R) continue;
-                adj[static_cast<std::size_t>(a)].push_back(b);
-                adj[static_cast<std::size_t>(b)].push_back(a);
-            }
-        }
-        for (std::vector<int>& v : adj)
-        {
-            std::sort(v.begin(), v.end());
-            v.erase(std::unique(v.begin(), v.end()), v.end());
-        }
-    }
+    // THE CARVE AS THE ROUNDS LEAVE IT. A copy of the oracle the cessions
+    // relabel (§ Pass 2e); everything after them reads this one.
+    std::vector<int> cells = cell_region;
+    std::vector<char> water(static_cast<std::size_t>(total), 0);
+    if (strait_rule)
+        for (int t = 0; t < total; ++t) water[static_cast<std::size_t>(t)] = is_water((*sub)[static_cast<std::size_t>(t)]) ? 1 : 0;
 
     // --- The plan's own copy of who holds what ------------------------------
     std::vector<int>  cur_polity(R), cur_seat(R);
@@ -127,6 +109,171 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             if (cur_polity[h] == p) return static_cast<int>(h);
         return -1;
     };
+    const auto anchor_of = [&](int r) { return regions[static_cast<std::size_t>(r)].anchor; };
+    // A region whose cell still holds its own anchor: a seed of the fold.
+    const auto live_cell = [&](int r) {
+        const int a = anchor_of(r);
+        return a >= 0 && a < total && grid_ok && cells[static_cast<std::size_t>(a)] == r;
+    };
+
+    // --- THE CESSIONS (BL-1310; NATION_GENERATION.md § Pass 2e) -------------
+    // Owner keys at the fold's grain: realm p -> p; a region no realm holds is
+    // a nation of its own -> KP + r. The rank is the region the fold's
+    // representative will be (the lowest live region), so ties fall as the
+    // tail's nation indices do. A realm's core is its capital's group.
+    // KP grows with the successors a secession founds (the late repair).
+    int KP = max_p + 1;
+    int K  = KP + static_cast<int>(R);
+    const auto key_of = [&](int r) { return cur_polity[static_cast<std::size_t>(r)] >= 0 ? cur_polity[static_cast<std::size_t>(r)] : KP + r; };
+    std::vector<int> own(static_cast<std::size_t>(total), -1), core_tile, order;
+    const auto build_keys = [&]() {
+        KP = static_cast<int>(cap.size());
+        for (std::size_t r = 0; r < R; ++r) KP = std::max(KP, cur_polity[r] + 1);
+        K = KP + static_cast<int>(R);
+        for (int t = 0; t < total; ++t)
+        {
+            const int r = cells[static_cast<std::size_t>(t)];
+            own[static_cast<std::size_t>(t)] =
+                (!water[static_cast<std::size_t>(t)] && r >= 0 && static_cast<std::size_t>(r) < R) ? key_of(r) : -1;
+        }
+        core_tile.assign(static_cast<std::size_t>(K), -1);
+        order.assign(static_cast<std::size_t>(K), INT_MAX);
+        for (std::size_t r = 0; r < R; ++r)
+        {
+            if (!live_cell(static_cast<int>(r))) continue;
+            const int k = key_of(static_cast<int>(r));
+            if (order[static_cast<std::size_t>(k)] == INT_MAX) order[static_cast<std::size_t>(k)] = static_cast<int>(r);
+        }
+        for (int k = 0; k < K; ++k)
+        {
+            if (order[static_cast<std::size_t>(k)] == INT_MAX) continue;
+            int cr = order[static_cast<std::size_t>(k)];
+            if (k < KP)
+            {
+                const int s = seat_of(k);
+                if (s >= 0 && live_cell(s)) cr = s;
+            }
+            core_tile[static_cast<std::size_t>(k)] = anchor_of(cr);
+        }
+    };
+
+    const auto run_cessions = [&](bool late) {
+        if (!strait_rule) return;
+        // Every cession moves one group and lowers (non-territory tiles, land
+        // groups) lexicographically, so the walk ends; the cap is a seatbelt.
+        for (int guard = 0; guard < total; ++guard)
+        {
+            build_keys();
+            exclave_cession ex;
+            if (!next_exclave_cession(own, water, gw, gh, core_tile, order, ex)) break;
+            const int a = ex.from, b = ex.to;
+            const bool b_realm = b < KP;
+            const int q = cells[static_cast<std::size_t>(ex.contact)]; // the receiver's region at the contact
+            const int ca = cells[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(a)])]; // the cedent's core region
+            const auto in_x = [&](int t) { return std::binary_search(ex.tiles.begin(), ex.tiles.end(), t); };
+
+            // The provinces in the exclave: regions whose live cell's anchor lies in it.
+            std::vector<int>  moved;
+            std::vector<char> moving(R, 0);
+            int lowest_ground = INT_MAX;
+            for (const int t : ex.tiles) lowest_ground = std::min(lowest_ground, cells[static_cast<std::size_t>(t)]);
+            for (std::size_t r = 0; r < R; ++r)
+                if (live_cell(static_cast<int>(r)) && in_x(anchor_of(static_cast<int>(r))))
+                {
+                    moved.push_back(static_cast<int>(r));
+                    moving[r] = 1;
+                }
+
+            // GROUND ONLY: the exclave moves, nothing else. A moved province's
+            // cell ground OUTSIDE the exclave (an islet Pass 2b hung on it)
+            // stays with the cedent, under its core region.
+            for (int t = 0; t < total; ++t)
+            {
+                if (water[static_cast<std::size_t>(t)]) continue;
+                const int r = cells[static_cast<std::size_t>(t)];
+                if (r < 0 || !moving[static_cast<std::size_t>(r)] || in_x(t)) continue;
+                cells[static_cast<std::size_t>(t)] = ca;
+            }
+            const int into_seat = b_realm ? seat_of(b) : -1;
+            const int from_seat = a < KP ? seat_of(a) : -1;
+            if (b_realm)
+            {
+                // A REALM RECEIVES: its provinces change hands as regions; any
+                // other ground of the exclave joins the receiver's cell at the contact.
+                for (const int t : ex.tiles)
+                    if (!moving[static_cast<std::size_t>(cells[static_cast<std::size_t>(t)])]) cells[static_cast<std::size_t>(t)] = q;
+                for (const int r : moved)
+                {
+                    cur_polity[static_cast<std::size_t>(r)] = b;
+                    if (!seat_flag[static_cast<std::size_t>(r)]) cur_seat[static_cast<std::size_t>(r)] = into_seat;
+                }
+            }
+            else
+            {
+                // GROUND NO REALM HELD RECEIVES. It cannot take a province as
+                // a realm does (a region nobody holds is a nation of its own,
+                // so a moved region would add one): the exclave joins the
+                // unheld cell at the contact, and its provinces fall out of
+                // every realm with no ground of their own left.
+                ++plan.cessions_to_unheld;
+                for (const int t : ex.tiles) cells[static_cast<std::size_t>(t)] = q;
+                for (const int r : moved)
+                {
+                    cur_polity[static_cast<std::size_t>(r)] = -1;
+                    if (!seat_flag[static_cast<std::size_t>(r)]) cur_seat[static_cast<std::size_t>(r)] = -1;
+                }
+            }
+            // The cedent's ground that pointed at a departing seat re-points at its own.
+            if (a < KP)
+                for (std::size_t h = 0; h < R; ++h)
+                    if (cur_polity[h] == a && cur_seat[h] >= 0 && moving[static_cast<std::size_t>(cur_seat[h])])
+                        cur_seat[h] = from_seat;
+            rederive_carve_water(cells, *sub, gw, gh);
+
+            closing_step st;
+            st.kind        = closing_step_kind::exclave_cede;
+            st.from_polity = a < KP ? a : -1;
+            st.into_polity = b_realm ? b : -1;
+            st.region      = moved.empty() ? lowest_ground : moved.front();
+            st.moved       = moved;
+            st.late        = late;
+            plan.steps.push_back(std::move(st));
+            ++plan.cessions;
+            if (moved.empty()) ++plan.cessions_islet;
+            if (late) ++plan.cessions_late;
+        }
+    };
+    run_cessions(false);
+
+    const std::vector<int64_t> tiles = closing_cell_tiles(cells, R);
+
+    // --- Cell adjacency: two regions whose carve cells touch cardinally -----
+    // Column-wrapped, rows clamped, the carve's own neighbourhood
+    // (`cardinal_neighbours`). Right and down cover every pair once.
+    std::vector<std::vector<int>> adj(R);
+    if (grid_ok)
+    {
+        for (int idx = 0; idx < gw * gh; ++idx)
+        {
+            const int a = cells[static_cast<std::size_t>(idx)];
+            if (a < 0 || static_cast<std::size_t>(a) >= R) continue;
+            const int col = idx % gw, row = idx / gw;
+            const int nb[2] = { row * gw + (col + 1) % gw, row + 1 < gh ? idx + gw : -1 };
+            for (const int n : nb)
+            {
+                if (n < 0) continue;
+                const int b = cells[static_cast<std::size_t>(n)];
+                if (b < 0 || b == a || static_cast<std::size_t>(b) >= R) continue;
+                adj[static_cast<std::size_t>(a)].push_back(b);
+                adj[static_cast<std::size_t>(b)].push_back(a);
+            }
+        }
+        for (std::vector<int>& v : adj)
+        {
+            std::sort(v.begin(), v.end());
+            v.erase(std::unique(v.begin(), v.end()), v.end());
+        }
+    }
 
     // --- The groups the fold would make --------------------------------------
     std::vector<fold_group> groups;
@@ -202,14 +349,26 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         }
         return s;
     };
+    // Land tiles by fold group, for the water reads below.
+    const auto group_owner = [&]() {
+        std::vector<int> o(static_cast<std::size_t>(total), -1);
+        for (int t = 0; t < total; ++t)
+        {
+            const int r = cells[static_cast<std::size_t>(t)];
+            if (water[static_cast<std::size_t>(t)] || r < 0 || static_cast<std::size_t>(r) >= R) continue;
+            o[static_cast<std::size_t>(t)] = gid[static_cast<std::size_t>(r)];
+        }
+        return o;
+    };
 
     // WHO ABSORBS `s`: (absorbed, absorber) groups, or (-1, -1). The largest
     // neighbour across a cell border (ties: the lower anchored region, the
     // carve's own seed order). A neighbour no realm held cannot absorb, so a
     // REALM beside it takes that ground instead — the same union, the realm
     // keeping its name. Ownerless ground beside no realm goes to the largest
-    // realm it touches, then to the largest realm on the body (the island
-    // case, as the post-pass always had it).
+    // realm it touches, then -- the island case -- to the NEAREST realm across
+    // the water (BL-1310, § Pass 2e: "never the globally largest"), the
+    // largest realm on the body only where the water reaches none.
     const auto choose = [&](int s, bool allow_exempt) -> std::pair<int, int> {
         std::vector<int> nbr;
         for (const int r : groups[static_cast<std::size_t>(s)].anchored)
@@ -234,6 +393,19 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             if (groups[static_cast<std::size_t>(best)].polity >= 0) return {s, best};
             if (s_realm) return {best, s};                 // the realm takes the unheld ground beside it
             if (best_realm >= 0) return {s, best_realm};
+        }
+        if (strait_rule)
+        {
+            std::vector<char> eligible(groups.size(), 0);
+            std::vector<int>  rank(groups.size(), INT_MAX);
+            for (int g = 0; g < static_cast<int>(groups.size()); ++g)
+            {
+                const fold_group& G = groups[static_cast<std::size_t>(g)];
+                rank[static_cast<std::size_t>(g)] = G.lowest;
+                eligible[static_cast<std::size_t>(g)] = (g != s && G.alive && usable(g) && G.polity >= 0) ? 1 : 0;
+            }
+            const int near = nearest_key_across_water(group_owner(), water, gw, gh, s, eligible, rank);
+            if (near >= 0) return {s, near};
         }
         int global = -1;
         for (int g = 0; g < static_cast<int>(groups.size()); ++g)
@@ -328,6 +500,10 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         // `network_supply_q` first, then the lower index), never so many that
         // the realm keeps no cell. Every prefix of that growth is a candidate.
         //
+        // ONE TERRITORY FIRST (BL-1310, § Pass 2e: "a secession is chosen so
+        // both sides remain one territory"): a split leaving the successor and
+        // the realm each one territory is always preferred where one exists.
+        //
         // THE TOTAL OUTRANKS THE FLOOR (Ben, 2026-10-11; NATION_GENERATION.md
         // sec The nation count is a target). A FLOOR-SAFE split -- the block
         // and what the realm keeps both clear the floor -- is always preferred
@@ -335,17 +511,32 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         // SHORTFALL below the floor (summed over both sides) is taken, so the
         // total is still hit; only "no split of any kind" (every realm holds
         // one anchored region) stops the rounds short, and the caller records
-        // that miss. Tie order: shortfall; then the fewest regions; then the
-        // ground furthest from its seat's reach (the sim's own secession
-        // reading); then the larger block; then the lower index.
+        // that miss. Tie order: one territory; shortfall; then the fewest
+        // regions; then the ground furthest from its seat's reach (the sim's
+        // own secession reading); then the larger block; then the lower index.
+        // A split that could not keep both sides one territory is repaired by
+        // a late cession after the rounds.
+        std::vector<std::vector<int>> region_land(R);
+        if (strait_rule)
+            for (int t = 0; t < total; ++t)
+            {
+                const int r = cells[static_cast<std::size_t>(t)];
+                if (!water[static_cast<std::size_t>(t)] && r >= 0 && static_cast<std::size_t>(r) < R)
+                    region_land[static_cast<std::size_t>(r)].push_back(t);
+            }
+        bool any_split = false;
         while (N < total_target)
         {
             if (static_cast<std::size_t>(next_id) >= owner_index_limit) break;
+            std::vector<int> gown;
+            if (strait_rule) gown = group_owner();
+            const int scratch_key = static_cast<int>(groups.size());
             int              best = -1;
             std::vector<int> best_block;
             int64_t          best_tiles = 0;
             int64_t          best_short = 0;
             int              best_supply = 0;
+            bool             best_whole = false;
             for (std::size_t r = 0; r < R; ++r)
             {
                 const int g = gid[r];
@@ -366,13 +557,29 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                     const int64_t shortfall =
                         min_tiles > 0 ? std::max<int64_t>(0, min_tiles - bt) + std::max<int64_t>(0, min_tiles - keep)
                                       : 0;
+                    // Both sides one territory? Read on the group map with the
+                    // block relabelled to a scratch key, then restored.
+                    bool whole = true;
+                    if (strait_rule)
+                    {
+                        for (const int m : block)
+                            for (const int t : region_land[static_cast<std::size_t>(m)]) gown[static_cast<std::size_t>(t)] = scratch_key;
+                        int parent_core = -1;
+                        if (pseat >= 0 && live_cell(pseat)) parent_core = anchor_of(pseat);
+                        whole = key_is_one_territory(gown, water, gw, gh, scratch_key, anchor_of(static_cast<int>(r)))
+                             && key_is_one_territory(gown, water, gw, gh, g, parent_core);
+                        for (const int m : block)
+                            for (const int t : region_land[static_cast<std::size_t>(m)]) gown[static_cast<std::size_t>(t)] = g;
+                    }
                     const bool better =
                         best < 0
-                        || shortfall < best_short
-                        || (shortfall == best_short
-                            && (block.size() < best_block.size()
-                                || (block.size() == best_block.size()
-                                    && (supply < best_supply || (supply == best_supply && bt > best_tiles)))));
+                        || (whole && !best_whole)
+                        || (whole == best_whole
+                            && (shortfall < best_short
+                                || (shortfall == best_short
+                                    && (block.size() < best_block.size()
+                                        || (block.size() == best_block.size()
+                                            && (supply < best_supply || (supply == best_supply && bt > best_tiles)))))));
                     if (better)
                     {
                         best = static_cast<int>(r);
@@ -380,6 +587,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                         best_tiles = bt;
                         best_short = shortfall;
                         best_supply = supply;
+                        best_whole = whole;
                     }
                     // Grow only while the block is under the floor, and never
                     // to the realm's last cell.
@@ -406,6 +614,11 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             }
             if (best >= 0 && best_short > 0) ++plan.subfloor_secessions;
             if (best < 0) break;
+            if (!best_whole)
+            {
+                ++plan.secessions_split;
+                any_split = true;
+            }
 
             const std::size_t br = static_cast<std::size_t>(best);
             const int g = gid[br];
@@ -467,7 +680,42 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             plan.steps.push_back(std::move(st));
         }
         plan.short_of_target = N != total_target;
+
+        // THE REPAIR: a secession that could not keep both sides one territory
+        // leaves ground cut off; it is ceded as at the open. Ground only, so
+        // the count the total reached stands.
+        (void)any_split;
     }
+    // THE REPAIR, always: whatever the floor and the total left outside the
+    // rule -- a split with no one-territory candidate, or an absorption whose
+    // neighbourhood (cells touching across owned coast or a lake) reached
+    // farther than a strait -- is ceded as at the open. Ground only, so every
+    // count above stands.
+    if (!plan.steps.empty() && (plan.floor_absorptions + plan.target_absorptions + plan.target_secessions) > 0)
+        run_cessions(/*late=*/true);
     plan.nations_after = N;
+
+    // The overrides the tail applies, and the diagnostic read of the
+    // representative against the capital.
+    if (strait_rule)
+    {
+        build_keys();
+        plan.polity_core_tiles.assign(static_cast<std::size_t>(KP), -1);
+        for (int k = 0; k < KP; ++k) plan.polity_core_tiles[static_cast<std::size_t>(k)] = core_tile[static_cast<std::size_t>(k)];
+        for (int k = 0; k < KP; ++k)
+        {
+            if (order[static_cast<std::size_t>(k)] == INT_MAX) continue;
+            const int rep_tile = anchor_of(order[static_cast<std::size_t>(k)]);
+            if (rep_tile == core_tile[static_cast<std::size_t>(k)]) continue;
+            if (key_is_one_territory(own, water, gw, gh, k, core_tile[static_cast<std::size_t>(k)])
+                && !key_is_one_territory(own, water, gw, gh, k, rep_tile))
+                ++plan.reps_off_core;
+        }
+        for (int t = 0; t < total; ++t)
+            if (!water[static_cast<std::size_t>(t)] && cells[static_cast<std::size_t>(t)] != cell_region[static_cast<std::size_t>(t)]
+                && cells[static_cast<std::size_t>(t)] >= 0)
+                plan.cell_overrides.emplace_back(t, cells[static_cast<std::size_t>(t)]);
+    }
     return plan;
 }
+

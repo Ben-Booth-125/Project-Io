@@ -581,7 +581,8 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
                              int min_tiles, int gw, int gh,
                              const std::vector<bool>& exempt,
                              std::vector<int>* absorbed_into = nullptr,
-                             std::vector<int>* remap_out = nullptr)
+                             std::vector<int>* remap_out = nullptr,
+                             const std::vector<char>* water = nullptr)
 {
     if (absorbed_into) absorbed_into->assign(static_cast<std::size_t>(seed_count), -1);
     const auto is_exempt = [&](int ni) {
@@ -648,7 +649,28 @@ int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
             }
         }
 
-        // Island with no land neighbour: absorb into the globally largest nation.
+        // Island with no land neighbour: absorb into the NEAREST nation across
+        // the water (BL-1310, NATION_GENERATION.md § Pass 2c / § Pass 2e:
+        // "never the globally largest"), by water tiles, ties to the lower
+        // index then the lower tile. With no water mask (a world the strait
+        // rule does not reach) the pre-BL-1310 globally-largest rule stands.
+        if (best < 0 && water != nullptr)
+        {
+            std::vector<int>  land_owner(owner_map);
+            std::vector<char> eligible(static_cast<std::size_t>(seed_count), 0);
+            std::vector<int>  rank(static_cast<std::size_t>(seed_count));
+            for (int idx = 0; idx < total; ++idx)
+                if ((*water)[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
+            for (int ni = 0; ni < seed_count; ++ni)
+            {
+                rank[static_cast<std::size_t>(ni)] = ni;
+                eligible[static_cast<std::size_t>(ni)] =
+                    (active[static_cast<std::size_t>(ni)] && ni != small && !is_exempt(ni)) ? 1 : 0;
+            }
+            best = nearest_key_across_water(land_owner, *water, gw, gh, small, eligible, rank);
+        }
+        // Island with no land neighbour and no water mask (or no nation the
+        // water reaches): absorb into the globally largest nation.
         if (best < 0)
             for (int ni = 0; ni < seed_count; ++ni)
             {
@@ -1057,6 +1079,34 @@ std::vector<entity_id> generate_nations(
     const nation_carve_ground ground = nation_carve_ground_of(w, tile_ids, gw, gh);
     std::vector<int> owner_map = carve_from_seeds(seeds, unclaimable, ground, seed, progress);
 
+    // BL-1310 — the ground a cession moved (NATION_GENERATION.md § Pass 2e).
+    // `ceded` marks every land tile whose holder the strait rule changed, here
+    // (the closing rounds' relabels, by the receiving region's anchor) or in
+    // the tile-level pass after the fold: a seed standing on ceded ground is
+    // no longer its nation's capital or tongue (§ Pass 2e: a cession moves
+    // ground, never a name).
+    std::vector<char> water(static_cast<std::size_t>(total), 0);
+    for (int idx = 0; idx < total; ++idx)
+        water[static_cast<std::size_t>(idx)] = unclaimable[static_cast<std::size_t>(idx)] ? 1 : 0;
+    std::vector<char> ceded(static_cast<std::size_t>(total), 0);
+    if (!params.cell_overrides.empty())
+    {
+        std::vector<int> seed_at(static_cast<std::size_t>(total), -1);
+        for (int si = 0; si < seed_count; ++si) seed_at[static_cast<std::size_t>(seeds[static_cast<std::size_t>(si)])] = si;
+        bool any = false;
+        for (const auto& [tile, anchor] : params.cell_overrides)
+        {
+            if (tile < 0 || tile >= total || anchor < 0 || anchor >= total) continue;
+            if (water[static_cast<std::size_t>(tile)]) continue;
+            const int si = seed_at[static_cast<std::size_t>(anchor)];
+            if (si < 0 || owner_map[static_cast<std::size_t>(tile)] == si) continue;
+            owner_map[static_cast<std::size_t>(tile)] = si;
+            ceded[static_cast<std::size_t>(tile)] = 1;
+            any = true;
+        }
+        if (any) rederive_carve_water(owner_map, ground.sub, gw, gh);
+    }
+
     // --- Pass 2d: THE POLITY FOLD (BL-769) ---------------------------------
     //
     // Phase 5 finalises what the history produced rather than inventing it. The
@@ -1132,6 +1182,63 @@ std::vector<entity_id> generate_nations(
         }
     }
 
+    // --- Pass 2e: ONE TERRITORY, the strait rule (BL-1310) -------------------
+    // NATION_GENERATION.md § Pass 2e (Ben, 2026-10-16): every nation's ground
+    // is one territory -- land groups joined by land or by straits of at most
+    // `strait_tiles` water tiles to the group holding its capital -- and any
+    // other group is ceded to the nation around it, save the remote island.
+    // After the fold and BEFORE the floor, so the floor judges territories as
+    // the player will see them. Where the history's closing rounds ran, they
+    // ceded at the history's grain and this pass finds nothing (a cession here
+    // is drift, which the caller guards); where no history ran, this IS the
+    // rule. The core is the REALM'S capital where the history supplies it
+    // (`nation_params::polity_core_tiles`, the closing rounds' own core), else
+    // the representative seed's tile; Pass 5 then seats the nation inside
+    // the territory that core anchors.
+    //
+    // SCOPE: the two cases § Pass 2e names -- after closing rounds (the
+    // guarantee) and where no history ran (the rule). A world whose history
+    // ran WITHOUT the Industrialisation span (the legacy arc, an Empires-round
+    // launch) carves exactly as before: the doc does not name it, and the
+    // legacy arc's pins are never overwritten.
+    bool history_ran = false;
+    for (const int p : seed_polity) history_ran = history_ran || p >= 0;
+    const bool strait_rule_here = params.floor_in_history || !history_ran;
+    int tail_cessions = 0;
+    if (strait_rule_here)
+    {
+        std::vector<int> land_owner(owner_map);
+        for (int idx = 0; idx < total; ++idx)
+            if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
+        std::vector<int> core_tile(static_cast<std::size_t>(seed_count), -1), rank(static_cast<std::size_t>(seed_count));
+        for (int si = 0; si < seed_count; ++si)
+        {
+            core_tile[static_cast<std::size_t>(si)] = seeds[static_cast<std::size_t>(si)];
+            rank[static_cast<std::size_t>(si)]      = si;
+            const int p = si < static_cast<int>(seed_polity.size()) ? seed_polity[static_cast<std::size_t>(si)] : -1;
+            if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size())
+            {
+                const int ct = params.polity_core_tiles[static_cast<std::size_t>(p)];
+                if (ct >= 0 && ct < total && land_owner[static_cast<std::size_t>(ct)] == si)
+                    core_tile[static_cast<std::size_t>(si)] = ct;
+            }
+        }
+        exclave_cession ex;
+        for (int guard = 0; guard < total; ++guard)
+        {
+            if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex)) break;
+            for (const int t : ex.tiles)
+            {
+                land_owner[static_cast<std::size_t>(t)] = ex.to;
+                owner_map[static_cast<std::size_t>(t)]  = ex.to;
+                ceded[static_cast<std::size_t>(t)]      = 1;
+            }
+            ++tail_cessions;
+        }
+        if (tail_cessions > 0) rederive_carve_water(owner_map, sub, gw, gh);
+    }
+    if (fold_out) fold_out->cessions = tail_cessions;
+
     // --- Pass 2c: light "in history" merges — absorb anything below the size floor ---
     // No target count: the loop stops when every survivor holds a viable territory,
     // so the final nation count is whatever the landmass and coastline produce.
@@ -1162,7 +1269,8 @@ std::vector<entity_id> generate_nations(
     if (floor_here || params.floor_in_history)
         nation_count = merge_undersized_nations(owner_map, seed_count,
                                                 floor_here ? params.min_nation_tiles : 0,
-                                                gw, gh, city_states, &absorbed_into, &seed_to_nation);
+                                                gw, gh, city_states, &absorbed_into, &seed_to_nation,
+                                                strait_rule_here ? &water : nullptr);
 
     // BL-305: 2b and 2c both rewrite owner indices wholesale (the merge also
     // COMPACTS them), so this is the one place the published map has to be
@@ -1268,12 +1376,47 @@ std::vector<entity_id> generate_nations(
     // than a tongue. Unlike the speech pick this one is unconditional (no
     // "usable()" gate — every surviving seed has a real tile), so it is set on
     // the FIRST si whose owner is this nation, full stop.
+    // BL-1310: THE CAPITAL STANDS IN THE TERRITORY. A nation's territory is
+    // anchored on its core (§ Pass 2e) -- the realm's capital where the
+    // history supplies it, else its representative's seed (the absorber's,
+    // after the floor: merge rule A) -- and Pass 5 seats it on the lowest
+    // seed INSIDE that territory, which is the representative's own wherever
+    // it stands there (nearly always). A lower seed on a remote island, or
+    // on ground an island absorption left beyond the strait, seats nobody,
+    // so "the group holding its capital" means one thing everywhere.
+    std::vector<char> in_territory;
+    if (strait_rule_here)
+    {
+        std::vector<int> land_owner(owner_map);
+        for (int idx = 0; idx < total; ++idx)
+            if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
+        std::vector<int> core_tile(static_cast<std::size_t>(nation_count), -1);
+        for (int ni = 0; ni < nation_count; ++ni)
+        {
+            const int rep = nation_rep_seed[static_cast<std::size_t>(ni)];
+            if (rep < 0) continue;
+            core_tile[static_cast<std::size_t>(ni)] = seeds[static_cast<std::size_t>(rep)];
+            const int p = seed_polity_of(rep);
+            if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size())
+            {
+                const int ct = params.polity_core_tiles[static_cast<std::size_t>(p)];
+                if (ct >= 0 && ct < total && land_owner[static_cast<std::size_t>(ct)] == ni)
+                    core_tile[static_cast<std::size_t>(ni)] = ct;
+            }
+        }
+        in_territory = territory_tiles(land_owner, water, gw, gh, core_tile);
+    }
+
     std::mt19937 name_rng(seed_name);
     std::vector<tongue> nation_speech(static_cast<std::size_t>(nation_count));
     for (std::size_t si = 0; si < seeds.size(); ++si)
     {
         const int ni = owner_map[static_cast<std::size_t>(seeds[si])];
         if (ni < 0 || ni >= nation_count) continue;
+        // BL-1310: a seed on ceded ground left its realm with the ground; it
+        // names and seats nobody (§ Pass 2e: a cession moves ground, never a name).
+        if (ceded[static_cast<std::size_t>(seeds[si])]) continue;
+        if (!in_territory.empty() && !in_territory[static_cast<std::size_t>(seeds[si])]) continue;
         if (nation_data[static_cast<std::size_t>(ni)].capital_tile == null_entity)
             nation_data[static_cast<std::size_t>(ni)].capital_tile =
                 tile_ids[static_cast<std::size_t>(seeds[si])];
@@ -1785,4 +1928,395 @@ std::vector<int> preview_nation_carve(const nation_carve_ground& ground,
             out[static_cast<std::size_t>(idx)] = source[static_cast<std::size_t>(k)];
     }
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1310 — one territory: the strait rule (NATION_GENERATION.md § Pass 2e)
+// ---------------------------------------------------------------------------
+// Shared by the closing rounds (which cede at the history's grain, planning
+// on the carve oracle) and by `generate_nations`' tile-level pass after the
+// fold (the guarantee, and the whole of the rule where no history ran), so
+// the plan and the carve read ONE rule. Integer reads, ascending walks, fixed
+// tie-breaks, no draw.
+namespace {
+
+constexpr int k_far = 1 << 20;
+
+int strait_nb4(int idx, int gw, int gh, int out[4])
+{
+    const int col = idx % gw, row = idx / gw;
+    int n = 0;
+    out[n++] = row * gw + (col + 1) % gw;
+    out[n++] = row * gw + (col - 1 + gw) % gw;
+    if (row > 0) out[n++] = idx - gw;
+    if (row + 1 < gh) out[n++] = idx + gw;
+    return n;
+}
+
+/// Land groups: per-key connected land, cardinal, column-wrapped. Groups are
+/// numbered in raster order of their lowest tile, which is `min_tile`.
+struct land_groups
+{
+    std::vector<int>              comp;
+    std::vector<int>              owner;
+    std::vector<int>              min_tile;
+    std::vector<std::vector<int>> tiles;
+};
+
+land_groups find_land_groups(const std::vector<int>& owner, int gw, int gh, int only_key = -1)
+{
+    const int total = gw * gh;
+    land_groups g;
+    g.comp.assign(static_cast<std::size_t>(total), -1);
+    std::vector<int> stack;
+    for (int s = 0; s < total; ++s)
+    {
+        const int k = owner[static_cast<std::size_t>(s)];
+        if (k < 0 || g.comp[static_cast<std::size_t>(s)] >= 0) continue;
+        if (only_key >= 0 && k != only_key) continue;
+        const int id = static_cast<int>(g.tiles.size());
+        g.owner.push_back(k);
+        g.min_tile.push_back(s);
+        g.tiles.emplace_back();
+        g.comp[static_cast<std::size_t>(s)] = id;
+        stack.assign(1, s);
+        while (!stack.empty())
+        {
+            const int t = stack.back();
+            stack.pop_back();
+            g.tiles[static_cast<std::size_t>(id)].push_back(t);
+            int nb[4];
+            const int n = strait_nb4(t, gw, gh, nb);
+            for (int i = 0; i < n; ++i)
+                if (owner[static_cast<std::size_t>(nb[i])] == k && g.comp[static_cast<std::size_t>(nb[i])] < 0)
+                {
+                    g.comp[static_cast<std::size_t>(nb[i])] = id;
+                    stack.push_back(nb[i]);
+                }
+        }
+    }
+    return g;
+}
+
+/// Per group: 1 when it is its key's core or joined to it by land or chained
+/// straits. @p wdist is scratch (all `k_far` on entry and on exit).
+std::vector<char> find_territories(const land_groups& g, const std::vector<int>& owner,
+                                   const std::vector<char>& water, int gw, int gh,
+                                   const std::vector<int>& core_tile, std::vector<int>& wdist)
+{
+    const int total = gw * gh;
+    const int K = static_cast<int>(core_tile.size());
+    const auto core_held = [&](int k) {
+        const int ct = core_tile[static_cast<std::size_t>(k)];
+        return ct >= 0 && ct < total && owner[static_cast<std::size_t>(ct)] == k && g.comp[static_cast<std::size_t>(ct)] >= 0;
+    };
+    std::vector<int> core(static_cast<std::size_t>(K), -1);
+    for (int k = 0; k < K; ++k)
+        if (core_held(k)) core[static_cast<std::size_t>(k)] = g.comp[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(k)])];
+    // A key with no core tile on its own land: its largest group (ties: lowest).
+    for (int c = 0; c < static_cast<int>(g.tiles.size()); ++c)
+    {
+        const int k = g.owner[static_cast<std::size_t>(c)];
+        if (k < 0 || k >= K || core_held(k)) continue;
+        int& cur = core[static_cast<std::size_t>(k)];
+        if (cur < 0 || g.tiles[static_cast<std::size_t>(c)].size() > g.tiles[static_cast<std::size_t>(cur)].size())
+            cur = c;
+    }
+
+    std::vector<char> in_terr(g.tiles.size(), 0);
+    std::vector<int>  q, touched;
+    for (int k = 0; k < K; ++k)
+    {
+        const int c0 = core[static_cast<std::size_t>(k)];
+        if (c0 < 0) continue;
+        q.clear();
+        touched.clear();
+        const auto join = [&](int c) {
+            in_terr[static_cast<std::size_t>(c)] = 1;
+            for (const int t : g.tiles[static_cast<std::size_t>(c)]) q.push_back(t);
+        };
+        join(c0);
+        std::size_t head = 0;
+        while (head < q.size())
+        {
+            const int t = q[head++];
+            const int d = water[static_cast<std::size_t>(t)] ? wdist[static_cast<std::size_t>(t)] : 0;
+            int nb[4];
+            const int n = strait_nb4(t, gw, gh, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (d + 1 > strait_tiles || wdist[static_cast<std::size_t>(u)] <= d + 1) continue;
+                    if (wdist[static_cast<std::size_t>(u)] == k_far) touched.push_back(u);
+                    wdist[static_cast<std::size_t>(u)] = d + 1;
+                    q.push_back(u);
+                }
+                else if (owner[static_cast<std::size_t>(u)] == k)
+                {
+                    const int c = g.comp[static_cast<std::size_t>(u)];
+                    if (c >= 0 && !in_terr[static_cast<std::size_t>(c)]) join(c);
+                }
+            }
+        }
+        for (const int t : touched) wdist[static_cast<std::size_t>(t)] = k_far;
+    }
+    return in_terr;
+}
+
+/// The land within strait reach of group @p c: per reached land tile, its
+/// water distance (0 = a land neighbour), level by level so the list ascends
+/// in distance. Reports ANOTHER key's land, or with @p include_own every land
+/// tile outside @p c. A leg is water only: land is reported, never crossed.
+/// @p wdist scratch as above.
+struct reach_hit { int dist; int tile; };
+std::vector<reach_hit> reach_of(const land_groups& g, int c, const std::vector<int>& owner,
+                                const std::vector<char>& water, int gw, int gh,
+                                std::vector<int>& wdist, bool include_own = false)
+{
+    const int k = g.owner[static_cast<std::size_t>(c)];
+    std::vector<reach_hit> hits;
+    std::vector<int> frontier = g.tiles[static_cast<std::size_t>(c)], next, touched;
+    for (int d = 0; d <= strait_tiles && !frontier.empty(); ++d)
+    {
+        next.clear();
+        for (const int t : frontier)
+        {
+            int nb[4];
+            const int n = strait_nb4(t, gw, gh, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (d + 1 > strait_tiles || wdist[static_cast<std::size_t>(u)] != k_far) continue;
+                    wdist[static_cast<std::size_t>(u)] = d + 1;
+                    touched.push_back(u);
+                    next.push_back(u);
+                }
+                else
+                {
+                    const int o = owner[static_cast<std::size_t>(u)];
+                    if (o < 0) continue;
+                    if (o != k || (include_own && g.comp[static_cast<std::size_t>(u)] != c)) hits.push_back({ d, u });
+                }
+            }
+        }
+        frontier.swap(next);
+    }
+    for (const int t : touched) wdist[static_cast<std::size_t>(t)] = k_far;
+    return hits;
+}
+
+} // namespace
+
+bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                          const std::vector<int>& core_tile, const std::vector<int>& order,
+                          exclave_cession& out)
+{
+    const int total = gw * gh;
+    if (total <= 0 || static_cast<int>(owner.size()) < total || static_cast<int>(water.size()) < total) return false;
+    const land_groups g = find_land_groups(owner, gw, gh);
+    std::vector<int> wdist(static_cast<std::size_t>(total), k_far);
+    const std::vector<char> in_terr = find_territories(g, owner, water, gw, gh, core_tile, wdist);
+    const int K = static_cast<int>(order.size());
+    const auto rank = [&](int k) { return (k >= 0 && k < K) ? order[static_cast<std::size_t>(k)] : INT32_MAX; };
+    const auto emit = [&](int c, int to, int contact, int kind) {
+        out.from    = g.owner[static_cast<std::size_t>(c)];
+        out.to      = to;
+        out.contact = contact;
+        out.kind    = kind;
+        out.tiles   = g.tiles[static_cast<std::size_t>(c)];
+        std::sort(out.tiles.begin(), out.tiles.end());
+        return true;
+    };
+    const int C = static_cast<int>(g.tiles.size());
+
+    // 1 — land-bordered exclaves, lowest tile first: to the key sharing the
+    // most cardinal land edges (ties: lower rank, then the lower touching tile).
+    for (int c = 0; c < C; ++c)
+    {
+        if (in_terr[static_cast<std::size_t>(c)]) continue;
+        const int k = g.owner[static_cast<std::size_t>(c)];
+        std::vector<std::pair<int, int>> edges; // (key, touching tile), one per shared edge
+        for (const int t : g.tiles[static_cast<std::size_t>(c)])
+        {
+            int nb[4];
+            const int n = strait_nb4(t, gw, gh, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int o = owner[static_cast<std::size_t>(nb[i])];
+                if (o >= 0 && o != k) edges.emplace_back(o, nb[i]);
+            }
+        }
+        if (edges.empty()) continue;
+        std::sort(edges.begin(), edges.end());
+        int best = -1, best_n = 0, best_tile = -1;
+        for (std::size_t i = 0; i < edges.size();)
+        {
+            std::size_t j = i;
+            while (j < edges.size() && edges[j].first == edges[i].first) ++j;
+            const int key = edges[i].first, n = static_cast<int>(j - i), tile = edges[i].second;
+            if (best < 0 || n > best_n
+                || (n == best_n && (rank(key) < rank(best) || (rank(key) == rank(best) && tile < best_tile))))
+            {
+                best      = key;
+                best_n    = n;
+                best_tile = tile;
+            }
+            i = j;
+        }
+        return emit(c, best, best_tile, 0);
+    }
+
+    // 2 — islands within strait reach of another key's TERRITORY: to the
+    // nearest by water tiles (ties: lower rank, then lower tile). Landing in a
+    // territory makes the cession final.
+    for (int c = 0; c < C; ++c)
+    {
+        if (in_terr[static_cast<std::size_t>(c)]) continue;
+        int best = -1, best_d = 0, best_tile = -1;
+        for (const reach_hit& h : reach_of(g, c, owner, water, gw, gh, wdist))
+        {
+            const int hc = g.comp[static_cast<std::size_t>(h.tile)];
+            if (hc < 0 || !in_terr[static_cast<std::size_t>(hc)]) continue;
+            const int key = owner[static_cast<std::size_t>(h.tile)];
+            if (best < 0 || h.dist < best_d
+                || (h.dist == best_d && (rank(key) < rank(best) || (rank(key) == rank(best) && h.tile < best_tile))))
+            {
+                best      = key;
+                best_d    = h.dist;
+                best_tile = h.tile;
+            }
+        }
+        if (best >= 0) return emit(c, best, best_tile, 1);
+    }
+
+    // 3 — what is left outside every territory is islands, none in reach of
+    // another key's territory. One that still reaches another key's ground
+    // sits in an archipelago several keys hold, remote from every territory:
+    // the archipelago goes whole to the owner of its largest island (ties:
+    // lower rank, then lower tile), islet by islet, after which it is the
+    // remote island of one nation.
+    for (int c = 0; c < C; ++c)
+    {
+        if (in_terr[static_cast<std::size_t>(c)]) continue;
+        if (reach_of(g, c, owner, water, gw, gh, wdist).empty()) continue; // the remote island
+        std::vector<int>  cluster{ c };
+        std::vector<char> in_cluster(static_cast<std::size_t>(C), 0);
+        in_cluster[static_cast<std::size_t>(c)] = 1;
+        for (std::size_t h = 0; h < cluster.size(); ++h)
+            for (const reach_hit& rh : reach_of(g, cluster[h], owner, water, gw, gh, wdist, /*include_own=*/true))
+            {
+                const int o = g.comp[static_cast<std::size_t>(rh.tile)];
+                if (o < 0 || in_terr[static_cast<std::size_t>(o)] || in_cluster[static_cast<std::size_t>(o)]) continue;
+                in_cluster[static_cast<std::size_t>(o)] = 1;
+                cluster.push_back(o);
+            }
+        int big = -1;
+        for (const int m : cluster)
+        {
+            if (big < 0) { big = m; continue; }
+            const std::size_t sm = g.tiles[static_cast<std::size_t>(m)].size();
+            const std::size_t sb = g.tiles[static_cast<std::size_t>(big)].size();
+            const int rm = rank(g.owner[static_cast<std::size_t>(m)]), rb = rank(g.owner[static_cast<std::size_t>(big)]);
+            if (sm > sb || (sm == sb && (rm < rb || (rm == rb && g.min_tile[static_cast<std::size_t>(m)] < g.min_tile[static_cast<std::size_t>(big)]))))
+                big = m;
+        }
+        const int to = g.owner[static_cast<std::size_t>(big)];
+        if (to != g.owner[static_cast<std::size_t>(c)])
+            return emit(c, to, g.min_tile[static_cast<std::size_t>(big)], 2);
+    }
+    return false;
+}
+
+int nearest_key_across_water(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                             int from, const std::vector<char>& eligible, const std::vector<int>& order)
+{
+    const int total = gw * gh;
+    if (total <= 0) return -1;
+    const int K = static_cast<int>(order.size());
+    const auto ok = [&](int k) {
+        return k >= 0 && k != from && k < static_cast<int>(eligible.size()) && eligible[static_cast<std::size_t>(k)];
+    };
+    const auto rank = [&](int k) { return (k >= 0 && k < K) ? order[static_cast<std::size_t>(k)] : INT32_MAX; };
+    std::vector<char> seen(static_cast<std::size_t>(total), 0);
+    std::vector<int>  frontier, next;
+    for (int t = 0; t < total; ++t)
+        if (owner[static_cast<std::size_t>(t)] == from) frontier.push_back(t);
+    while (!frontier.empty())
+    {
+        int best = -1, best_tile = -1;
+        next.clear();
+        for (const int t : frontier)
+        {
+            int nb[4];
+            const int n = strait_nb4(t, gw, gh, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (seen[static_cast<std::size_t>(u)]) continue;
+                    seen[static_cast<std::size_t>(u)] = 1;
+                    next.push_back(u);
+                }
+                else
+                {
+                    const int o = owner[static_cast<std::size_t>(u)];
+                    if (!ok(o)) continue;
+                    if (best < 0 || rank(o) < rank(best) || (rank(o) == rank(best) && u < best_tile))
+                    {
+                        best      = o;
+                        best_tile = u;
+                    }
+                }
+            }
+        }
+        if (best >= 0) return best;
+        frontier.swap(next);
+    }
+    return -1;
+}
+
+bool key_is_one_territory(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                          int key, int core_tile)
+{
+    const int total = gw * gh;
+    if (key < 0 || total <= 0) return true;
+    const land_groups g = find_land_groups(owner, gw, gh, key);
+    if (g.tiles.size() <= 1) return true;
+    std::vector<int> wdist(static_cast<std::size_t>(total), k_far);
+    std::vector<int> cores(static_cast<std::size_t>(key + 1), -1);
+    cores[static_cast<std::size_t>(key)] = core_tile;
+    const std::vector<char> in_terr = find_territories(g, owner, water, gw, gh, cores, wdist);
+    for (int c = 0; c < static_cast<int>(g.tiles.size()); ++c)
+        if (!in_terr[static_cast<std::size_t>(c)] && !reach_of(g, c, owner, water, gw, gh, wdist).empty())
+            return false;
+    return true;
+}
+
+std::vector<char> territory_tiles(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
+                                  const std::vector<int>& core_tile)
+{
+    const int total = gw * gh;
+    std::vector<char> out(static_cast<std::size_t>(total > 0 ? total : 0), 0);
+    if (total <= 0) return out;
+    const land_groups g = find_land_groups(owner, gw, gh);
+    std::vector<int> wdist(static_cast<std::size_t>(total), k_far);
+    const std::vector<char> in_terr = find_territories(g, owner, water, gw, gh, core_tile, wdist);
+    for (int c = 0; c < static_cast<int>(g.tiles.size()); ++c)
+        if (in_terr[static_cast<std::size_t>(c)])
+            for (const int t : g.tiles[static_cast<std::size_t>(c)]) out[static_cast<std::size_t>(t)] = 1;
+    return out;
+}
+
+void rederive_carve_water(std::vector<int>& owner_map, const std::vector<terrain_substrate>& sub, int gw, int gh)
+{
+    const int total = gw * gh;
+    if (total <= 0 || static_cast<int>(owner_map.size()) < total || static_cast<int>(sub.size()) < total) return;
+    for (int t = 0; t < total; ++t)
+        if (is_water(sub[static_cast<std::size_t>(t)])) owner_map[static_cast<std::size_t>(t)] = -1;
+    derive_water_ownership(owner_map, sub, gw, gh);
 }

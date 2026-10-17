@@ -183,6 +183,20 @@ std::vector<nation_history_row> nation_timeline(const generation_report::body_en
                 if (mine) text = realm_name(be, *t, e.polity) + " freed itself from "
                                + realm_name(be, *t, e.other) + ".";
                 break;
+            case lapse_event_kind::exclave_ceded:
+                // BL-1310 (NATION_GENERATION.md sec Pass 2e): ground cut off
+                // from the realm's core, ceded to the nation around it. A
+                // realm can cede several: they fill what is left, as conquests do.
+                rank = 2;
+                if (mine && e.other != lapse_event_none)
+                    text = realm_name(be, *t, e.polity) + " ceded ground it could not reach to "
+                         + realm_name(be, *t, e.other) + ".";
+                else if (mine)
+                    text = realm_name(be, *t, e.polity) + " gave up ground it could not reach.";
+                else if (other && e.polity != lapse_event_none)
+                    text = realm_name(be, *t, e.other) + " received ground cut off from "
+                         + realm_name(be, *t, e.polity) + ".";
+                break;
             case lapse_event_kind::absorbed_at_close:
                 if (mine)
                     text = realm_name(be, *t, e.polity) + " was absorbed by "

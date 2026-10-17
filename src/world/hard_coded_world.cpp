@@ -2069,7 +2069,7 @@ void run_industrialisation(generation_cursor& c)
                 kepler_settlement.regions, kepler_exploration.polities,
                 closing_carve_cells(*closing, kepler_settlement.regions), closing->ground.gw,
                 closing->ground.gh, closing->min_nation_tiles, closing->keep_city_states,
-                /*total_target=*/0);
+                /*total_target=*/0, &closing->ground.sub);
             const int n_open = std::max(1, open_plan.nations_after_floor);
             const int gap_q  = std::clamp((n_open - params.nation_total_target) * 1000 / n_open, -1000, 1000);
             dp.campaign_appetite_q = gap_q / 2;
@@ -2149,6 +2149,17 @@ void run_industrialisation(generation_cursor& c)
         // tail holds the fold to the count the closing rounds planned.
         c.closing_predicted = kepler_industrialisation_hs.closing_predicted;
         if (c.closing_predicted >= 0) c.kepler_np.floor_in_history = true;
+        // BL-1310 (NATION_GENERATION.md sec Pass 2e): the cessions relabelled
+        // the carve where a region move could not carry them; the tail draws
+        // the same relabels, by the receiving region's anchor tile.
+        c.kepler_np.cell_overrides.clear();
+        for (const auto& [tile, reg] : kepler_industrialisation_hs.closing_cell_overrides)
+            if (reg >= 0 && static_cast<std::size_t>(reg) < kepler_settlement.regions.size()
+                && kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor >= 0)
+                c.kepler_np.cell_overrides.emplace_back(
+                    tile, kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor);
+        c.kepler_np.polity_core_tiles.assign(kepler_industrialisation_hs.closing_polity_core_tiles.begin(),
+                                             kepler_industrialisation_hs.closing_polity_core_tiles.end());
         // A TARGET MISSED IS A DEFECT, never a reported outcome (sec The
         // nation count is a target: "both targets are always hit"). The
         // closing rounds stop short only when no legal step is left -- no
@@ -2527,6 +2538,13 @@ void run_tail(generation_cursor& c)
                                  "the fold made " + std::to_string(kepler_nations.size())
                                      + " nations; the closing rounds planned "
                                      + std::to_string(c.closing_predicted));
+    // BL-1310 -- THE SAME GUARD FOR THE STRAIT RULE: after closing rounds the
+    // history ceded every exclave, so the tail's tile-level pass has nothing
+    // left to cede. A cession there is the plan and the carve parting.
+    if (c.closing_predicted >= 0 && kepler_fold.cessions > 0)
+        record_pattern_miss(c, "closing_rounds",
+                                 "the tail ceded " + std::to_string(kepler_fold.cessions)
+                                     + " exclave(s) the closing rounds left (sec Pass 2e)");
     if (report != nullptr)
         for (generation_report::body_entry& be : report->bodies)
             if (be.id == kepler)
