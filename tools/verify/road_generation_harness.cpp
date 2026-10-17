@@ -527,7 +527,7 @@ struct market_road_row
     int tiers_after[4]  = { 0, 0, 0, 0 };
     int off_here = 0;               // R6a: off the backbone, asked here
     int exempt_no_backbone = 0;     // R6a: nation holds no town
-    int exempt_no_route = 0;        // R6a: no land or strait route to its nation's towns
+    int exempt_no_route = 0;        // R6a: no land or strait route to its nation's ROAD network
     int off_unexcused = 0;          // R6a: off with neither excuse (a FAIL)
     int trunk_bad = 0;              // R6b: pairs whose test or stamp disagrees
     int trunk_stamped = 0;          // R6d: laid trunk links actually stamped
@@ -616,21 +616,55 @@ static void read_market_rows(world& w, const generation_report& rep, market_road
         }
         if (on) continue;
         ++r.off_here;
-        // A route the nation could lay: over its own land and the straits between.
+        // A route the nation could lay: over its own land and the straits between, TO ITS
+        // OWN ROAD NETWORK — which is what the join pass itself requires (LOGISTICS.md
+        // § 4: "the network it must reach is its nation's own roads from its nation's
+        // towns"). This row used to ask only for a route to a TOWN, which is a weaker
+        // question: a market can have a land route to a town that carries no road and
+        // stands on no road network, and the join then has nothing to join to. The
+        // network is rebuilt here from the towns outward, independently of the pass.
+        std::vector<char> joined(g.wgt.size(), 0);
+        for (const int t : tc->second)
+        {
+            const std::vector<std::int64_t> rt = h_walk(g, t, /*roads_only=*/true, n);
+            for (std::size_t i = 0; i < g.wgt.size(); ++i)
+                if (rt[i] >= 0 && g.kind[i] == 0 && g.road[i]) joined[i] = 1;
+        }
         const std::vector<std::int64_t> f = h_walk(g, c, /*roads_only=*/false, n);
         bool route = false;
-        for (const int t : tc->second) if (f[static_cast<std::size_t>(t)] >= 0) { route = true; break; }
+        for (std::size_t i = 0; i < g.wgt.size(); ++i)
+            if (joined[i] && f[i] >= 0) { route = true; break; }
         if (!route)
         {
             ++r.exempt_no_route;
-            std::snprintf(buf, sizeof buf, "market %u exempt: no route over its nation's own land and straits to its towns",
-                          static_cast<unsigned>(mid));
+            std::snprintf(buf, sizeof buf, "market %u exempt: no route over its nation's own land"
+                          " and straits to its nation's ROAD NETWORK (its reachable ground carries"
+                          " none)", static_cast<unsigned>(mid));
         }
         else
         {
             ++r.off_unexcused;
             std::snprintf(buf, sizeof buf, "market %u OFF its nation's backbone, with a route to it (FAIL)",
                           static_cast<unsigned>(mid));
+            // The pass's own view, printed beside the verdict so an unexcused market can
+            // be read without a second run: whether its cell carries a road, how much of
+            // its nation's ground does, and whether the join pass even laid anything.
+            const std::size_t ci = static_cast<std::size_t>(c);
+            int joins = 0, joins_laid = 0;
+            for (const market_road_trace::link& l : tr.links)
+                if (l.k == market_road_trace::kind::join && l.market_a == mid)
+                { ++joins; if (l.laid) ++joins_laid; }
+            int roaded_own = 0;
+            for (std::size_t i = 0; i < g.road.size(); ++i)
+                if (g.road[i] && g.nation[i] == n) ++roaded_own;
+            r.notes.push_back(buf);
+            std::snprintf(buf, sizeof buf,
+                          "   ... market %u: cell kind %d (0 land/1 shore/2 ocean), roaded %d,"
+                          " nation %u with %zu town(s) and %d roaded cell(s); join links %d"
+                          " (%d laid)",
+                          static_cast<unsigned>(mid), g.kind[ci], g.road[ci] ? 1 : 0,
+                          static_cast<unsigned>(n), tc->second.size(), roaded_own,
+                          joins, joins_laid);
         }
         r.notes.push_back(buf);
     }
@@ -1375,7 +1409,8 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
                 median_of(med_b), median_of(med_a));
     check(unexcused == 0,
           "R6a every market centre is on its nation's own backbone, per market (exempt, each listed:"
-          " a nation holding no town, or no route over its own land and straits to its towns)");
+          " a nation holding no town, or no route over its own land and straits to its nation's own"
+          " ROAD NETWORK \u2014 the two things the join pass itself requires)");
     std::printf("      (R6e tier: %lld laid trunk(s) off the rule | R6f pull: %lld steps checked, %lld"
                 " out of order, %lld town(s) left failing | R6a' seeds disagreeing %d)\n",
                 tier_bad, pull_tests, pull_order_bad, pull_unserved, seeds_count_mismatch);
