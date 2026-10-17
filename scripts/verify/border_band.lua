@@ -45,12 +45,15 @@ verify.expect(not verify.pointer_target().has_selection, "cleared selection befo
 -- ---------------------------------------------------------------------------
 -- Find the corridor, and assert that one exists.
 -- ---------------------------------------------------------------------------
--- A horizontal sweep across the canvas at three heights, so a frame whose
--- frontier happens to run flat through one scan line is not the only chance.
+-- A horizontal sweep across the canvas at eleven heights, the canvas band
+-- above the comms dock (y 110..410), so a frontier anywhere in the frame is
+-- crossed. Three fixed lines (220/300/380) missed both frontiers in the frame
+-- when BL-1319 first let the fixture through (2026-10-17): the player's nation
+-- sat inland and its borders ran above and below them. The claim is unchanged.
 local CANVAS_L, CANVAS_R = 70, 920
 local hit_x, hit_y, hit_nation = nil, nil, nil
 
-for _, y in ipairs({ 220, 300, 380 }) do
+for y = 110, 410, 30 do
     for x = CANVAS_L, CANVAS_R, 6 do
         verify.click(x, y)
         verify.frames(2)

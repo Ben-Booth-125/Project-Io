@@ -1302,6 +1302,29 @@
    ],
    "title": "The Release seat wait meets the 15 s pre-bake budget",
    "design": "BL-1247 benchmark (2026-10-17): the Release reader-paced seat wait reads 24 s (34.8 s click-through) against the 15 s budget, while Debug read 12.7 s on seed 0 under lighter load. Re-measure on an idle machine first; the per-pixel base pass is 57-70% of bake CPU."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (sprint 56, 2026-10-17)",
+   "requires": [],
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1376",
+   "short_name": "UNBLOCKED_UI_CHECKS_FAIL",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "scripts/verify/border_band.lua",
+    "scripts/verify/lens_structure_pivot.lua",
+    "scripts/verify/shell_pass.lua"
+   ],
+   "title": "The UI checks BL-1319 unblocked pass their own claims",
+   "design": "BL-1319 (fixture base stall) let stage_ui_fixture complete again on 2026-10-17: all 10 consumer scripts run with 0 script errors. Their own claims, unexercised for months, then failed on the sprint 56 tip: border_band.lua finds no clickable border corridor at zoom 5 even with an 11-line sweep (the frame does show frontiers); lens_structure_pivot.lua 7 fails (under the Market and Corporation lenses a press on ground selects nothing and opens no ledger); shell_pass.lua 15 golden diffs (goldens predate many world movers; re-bless is Ben's, per the golden policy). Decide per script whether the UI or the check is wrong; never weaken a check to pass."
   }
  ]
 }

@@ -3409,6 +3409,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1319: the market whose catchment holds grid tile (col, row) on the active
+    // body, or 0 — so the UI fixture can stock the shelf its own muster base draws
+    // (`stock_market`), not every shelf on the body. The catchment is what the
+    // Market lens already paints; no tile data beyond it is returned.
+    v.set_function("market_at", [this](int col, int row) -> unsigned {
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+                return static_cast<unsigned>(market_for_tile(m_world, tid));
+        return 0u;
+    });
+
     // BL-1315: a market's display name, as every surface shows it
     // (`ui::market_city_name`) — so a script can count distinct names per body.
     v.set_function("market_name", [this](entity_id mid) -> std::string {

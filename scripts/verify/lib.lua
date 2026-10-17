@@ -234,6 +234,24 @@ function raise_player_force(corp)
         error("fixture could not place a military base near the player's works: " .. tostring(why))
     end
 
+    -- 1b. Stock the base's own shelf (BL-1319, Ben 2026-10-17: option A). A site
+    --     draws its materials and construction capacity off its market's shelf
+    --     only, and measured 2026-10-16 the opening economy is short of both:
+    --     107 of 149 sites short at handoff on seed 0 (construction_stall), so the
+    --     base paused for want of steel past any bound. The fixture stocks THIS
+    --     market's shelf with the base's whole need — never every shelf on the
+    --     body, which would feed the rivals' sites too — as sea_lane.lua stocks
+    --     its Ports' upkeep. The shortage itself is economy work, filed apart.
+    do
+        local mkt = verify.market_at(placed.x, placed.y)
+        if mkt == 0 then
+            error("fixture's military base at (" .. placed.x .. "," .. placed.y
+                  .. ") stands in no market's catchment, so nothing can stock its shelf")
+        end
+        verify.stock_market(mkt, "steel", 120.0)                -- 35 at up to ~3x site time
+        verify.stock_market(mkt, "construction_capacity", 200.0)
+    end
+
     -- 2. Wait for it. Construction is durative and pay-as-you-build, so the tick
     --    count is a property of the recipe and the corp's cash, not something a
     --    script may assume. Step until the base reports complete, with a bound so
