@@ -211,6 +211,15 @@ them (0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE, odd-r offset), each holding 0 = none, 1 
 of a river crossing do: the road on side *i* of a tile is the road on side *i+3 mod 6* of its
 neighbour, and the two agreeing is an invariant, asserted rather than assumed.
 
+**Only a side a walk can cross may carry a road.** The cost walks are 4-cardinal, so of a tile's six
+sides exactly four are reachable, and which four depends on the row's parity — an even row reaches
+E, NE, W, SE; an odd row reaches E, NW, W, SW. A road laid on one of the other two could be bought,
+counted, billed and still be crossed by nothing and drawn by nothing, which is not a road but a
+receipt. **So laying one is refused**, and nothing that picks a side for the player or for
+generation may offer one. The six-side field is kept because it is the river pass's geometry and the
+mirror rule reads from either tile; the restriction is on what may be *written*, not on how it is
+stored. Should movement itself ever go six-ways, this paragraph is what changes, and nothing else.
+
 **What the ladder means now.** A tier is a property of a crossing, so *"this tile has a Highway"* is
 no longer a thing the world can say. Every reading that used to count roaded **tiles** — the
 Logistic Point pool, network upkeep, the reach field, the interdiction surfaces — counts roaded
