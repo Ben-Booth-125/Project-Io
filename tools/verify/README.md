@@ -1231,6 +1231,38 @@ bash tools/verify/build_lua_harness.sh scorer_clock
 ./build_gen/verify/scorer_clock.exe [--seeds 11,0] [--ticks 50]
 ```
 
+## lp_coverage_census (BL-1351)
+
+The Logistic Point coverage census on the world the player is handed: does the fold's
+`seed_logistics_sources` (logistic_points.cpp) really give every nation points across its ground,
+and can the expected picture — a centralised capital with many points, fading with distance,
+extended by outlying hubs — appear at all? A **report; no gate, no pinned band.**
+
+Per seed it builds the shipped start with the fold's last three calls held back
+(`harness_charter_input::skip_state_handover`), makes the state and rail handovers itself, then
+**times** `seed_logistics_sources` on its own — the pass runs at every world fold. Then, per nation:
+sources by network; how many of the hubs THIS pass placed stand on a market `centre_tile` against a
+consumer's own tile (with `centres_on_land`, the ceiling on the centre route, since the pass allows
+at most one hub per centre); pool against claim and the realised margin against `k_pool_margin`;
+the coverage distribution over the nation's ground (and over its DRY ground alone — a nation owns
+its shelf water and lakes, which no road or rail field can enter), over its building tiles and over
+its consumers;
+and **points incident** at the capital tile against the most distant covered tile, plus mean points
+per tile in four distance rings from the capital. Points incident is the harness's own derived
+quantity (the sum of the host's sources' made points × their reach at that tile) — the shape of the
+source field, not a cap, since the pool is not spatial. Buckets: majors / minors, coastal /
+landlocked. Every nation whose pool falls short of its claim is named with its shortfall (`S` lines).
+
+Every line is `key=value` records (`K` markets, `W` world, `N` nation, `B` bucket, `S` shortfall,
+`T` totals) so two runs diff cleanly — it is the BEFORE baseline for roads-as-edges, the road-tier
+reach extension and rail's point-to-point carry.
+
+```
+bash tools/verify/build_lua_harness.sh lp_coverage_census
+./build_gen/verify/lp_coverage_census.exe [--seeds 0,28,46] [--no-nations]
+bash tools/verify/par_seeds.sh lp_coverage_census --tier full      # the 16 library seeds
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:
