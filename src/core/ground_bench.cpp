@@ -84,6 +84,11 @@ void app::bench_mem(const char* label)
                 "  ground RAM %.2f GB\n",
                 label, m.working_set / k_gib, m.peak_working_set / k_gib, m.private_bytes / k_gib,
                 m.peak_private / k_gib, s.ram_total / k_gib);
+    // BL-1311: the fixed ground budget and how the chunks are held.
+    std::printf("BENCH_GROUND ground @ %-22s budget %.2f GB (others' share now %.2f GB); chunks held RGB %d "
+                "(%.2f GB) / RGBA %d (%.2f GB)\n",
+                label, s.ground_budget / k_gib, s.others_budget / k_gib, s.rgb_chunks, s.rgb_bytes / k_gib,
+                s.rgba_chunks, s.rgba_bytes / k_gib);
     std::fflush(stdout);
 }
 
@@ -106,6 +111,7 @@ void app::bench_ground_frame()
                 B.prebake_t0 = t;
                 ++B.prebake_starts;
                 B.was_current = false;
+                bench_mem("pre-bake start");
             }
             const bool cur = m_ground.master_current(target);
             if (cur && !B.was_current)
