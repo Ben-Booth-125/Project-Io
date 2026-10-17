@@ -118,12 +118,15 @@ ground retires only as coverage arrives.
   wrap period.
 - **Resident set — two tiers of memory:**
   - **System RAM** holds each baked body's master and its mip chain, chunk by
-    chunk (~6.7 GB for the 261×121 home body at 128 px per hex), plus its far page. **The home body's master is pinned in RAM** and never dropped (Ben, 2026-10-10: at
+    chunk, plus its far page. **The game process peaks under 6 GB on every machine** (Ben,
+    2026-10-17). A master chunk that is fully opaque is held **losslessly as RGB**, its alpha
+    implied, and only a chunk with any transparency keeps RGBA; the pixels drawn are the same
+    either way. **The home body's master is pinned in RAM** and never dropped (Ben, 2026-10-10: at
     128 px a single visit elsewhere had evicted it, and coming home re-baked for ~71 s).
-    Other bodies share the rest of a **RAM budget that scales with the machine** — the ground as a
-    whole may hold **45% of installed RAM**, home included, so other bodies get what the pinned
-    home leaves of it (Ben, 2026-10-10; ~0.5 GB on a 16 GB PC, so other bodies there stream
-    from the disk cache on each visit, ~7.7 GB on 32 GB): when a body's master must
+    Other bodies share a **fixed ground budget** — what the pinned home leaves under the 6 GB
+    process ceiling, the same on every machine rather than a share of installed RAM (Ben,
+    2026-10-17, replacing 2026-10-10's 45%) — so they usually stream from the disk cache on
+    each visit: when a body's master must
     leave RAM it **spills to a disk cache** — its finished chunks written to local disk —
     and streams back from there on the next visit, in seconds from an SSD instead of a
     re-bake; only chunks whose content hash moved meanwhile re-bake. The far page stays
@@ -590,7 +593,7 @@ been a fresh, expensive bake, and that bake was the lag.
   shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
   with zoom; only scale does.
 - **The master is held in RAM; the GPU holds what is on screen.** The master and its
-  chain live in system memory (about 6.7 GB for an Earth-sized body); each frame uploads
+  chain live in system memory (about 5 GB for an Earth-sized body, opaque chunks as RGB); each frame uploads
   the visible chunks of the level in use, within a per-frame upload budget so a pan
   never hitches, and keeps an LRU of uploaded textures.
 - **Pre-baked during generation.** The home body's master bakes while the player watches
