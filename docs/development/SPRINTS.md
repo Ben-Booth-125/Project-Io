@@ -77,7 +77,7 @@ and/or a version goal (v0.1.1 etc.).
 Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11.
 
 ### Sprint 56 — trustworthy ground
-*Open · opened 2026-10-16 · Ben (2026-10-16)*
+*Gated · opened 2026-10-16 · Ben (2026-10-16)*
 
 **Goal.** Every nation holds one territory (contiguous by land or a short strait), the ground paints inside 1 minute and 6 GB, and the failing quarterly-return and digest-pin gates tell the truth again.
 
@@ -170,9 +170,9 @@ Calls 2026-10-16 (Ben): add-ons BL-1247, BL-1214, BL-1319; water rule = short st
 | 53 | the player is a nation | CLOSED 2026-10-15, cut as v0.1.32. The player is a major nation operating its champion: nation counts hit as targets, one champion per major, state industry and state ports, the five history patterns, the setup round and the nation selection screen with history; the sprint-52 tech tail (effects, panel); railways; one-pool Logistic Points; the economy pass re-laddered to rate 1 (all five market_viability targets pass). |
 | 54 | UI improvements | CLOSED 2026-10-14 (Ben: every live click passed, merge to main). Run beside sprint 53 from origin/main: the tile card split, the market pass, a Nations lens, the trade value record, the workforce stepped auto, the settle's readings handed to play. |
 | 55 | spectator to the end of Era 1 | PROPOSED 2026-10-15; CALLS ANSWERED same day (Ben): full space assets, nations launch, AI space grant, prices rise with RP matching, GDP/output charts. Items BL-1324..BL-1333. Former 55 items moved to 56. |
-| 56 | trustworthy ground | OPENED 2026-10-16 in worktree claude/sprint-56-456d2b, beside sprint 55 on main (Ben playtesting). Calls answered same day (Ben). Items BL-1310, BL-1311, BL-1337, BL-1338, BL-1247, BL-1214, BL-1319. |
+| 56 | trustworthy ground | GATED 2026-10-17 on claude/sprint-56-456d2b (unmerged, unpushed): all seven items delivered, BL-1338 re-pin and the hot-row archive owed at integration after sprint 55 lands. Handoff: docs/development/HANDOFF_SPRINT_56.md. |
 
-**Next up.** SPRINT 55 in progress on main (spectator to the end of Era 1). SPRINT 56 open in parallel on claude/sprint-56-456d2b (trustworthy ground). Handoff: docs/development/NEXT_SESSION.md.
+**Next up.** SPRINT 55 in progress on main. SPRINT 56 GATED on claude/sprint-56-456d2b, awaiting integration after Ben's playtest (docs/development/HANDOFF_SPRINT_56.md).
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
