@@ -745,7 +745,14 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
         // BL-1253: a revealed tile's route (a masked one carries none). Roads
         // on land, lanes on water, as the world lays them; rail (k_route_rail)
         // from the world's track field (BL-1255), over any road on the tile.
-        if (!water && tile_has_road(t))
+        // BL-1375: a road edge may have a WATER end and a run of them IS a bridge
+        // (../economy/LOGISTICS.md § 4), so a water tile that carries a crossing is baked
+        // like any other: its tier and its side mask are the DECK's. Gating this on land
+        // (the pre-bridge guard) left such a tile off the network entirely — so the deck
+        // drew nothing, and the LAND side of a shore crossing drew nothing either, because
+        // road_links_of asks whether the neighbour is on the network before it sets a link
+        // bit. Rail stays a land field (it has no bridge rung yet).
+        if (tile_has_road(t))
         {
             // BL-1340: the tile's own tier is the best crossing meeting at it (the weight
             // its run draws at); the mask says which boundaries that run crosses.

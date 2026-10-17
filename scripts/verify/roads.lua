@@ -39,6 +39,85 @@ verify.capture("roads_surface")
 verify.set_zoom(0.5)                    -- wider view: the lattice spanning the body
 verify.capture("roads_wide")
 
+-- ===========================================================================
+-- BL-1375: A CROSSING WITH A WATER END DRAWS
+-- ===========================================================================
+-- Ben, at a live click on 2026-10-17: "the logic seems to work, but not every road is
+-- rendering". The cause was the bake refusing road data to a WATER tile, from before
+-- bridges existed (LOGISTICS.md § 4: a road edge may have a water end, and a run of them
+-- IS a bridge). Two roads went missing for it, and only one of them is on the water: a
+-- link bit is set only where the NEIGHBOUR reads as on the network, so the LAND side of
+-- every shore crossing lost its run too.
+--
+-- THE ASSERTION IS THE BIT, NOT THE PIXELS, so it survives a restyle: a road draws as a
+-- run across the edge it crosses (RENDERING.md § "Roads draw across the edge they cross"),
+-- and the bake expresses that as a link bit per tile per direction. `route_link_audit`
+-- walks every crossing on the body and counts how many publish their bit at each end —
+-- counts only, so no tile data leaves the sim, and the whole network is swept rather than
+-- one hand-picked coordinate.
+local au = verify.route_link_audit()
+print(string.format("roads: %d crossings; %d publish a link bit on BOTH tiles, %d on one, %d on neither",
+                    au.edges, au.linked_both, au.linked_one, au.linked_none))
+print(string.format("roads: %d shore crossings (land side drawn %d, deck drawn %d); %d water-to-water spans (%d drawn)",
+                    au.shore, au.shore_land, au.shore_water, au.span, au.span_both))
+print(string.format("roads: the bake gave %d water tile(s) road data, %d drawn piece(s); %d of them also carry a sea lane",
+                    au.deck_tiles, au.deck_pieces, au.deck_and_lane))
+print(string.format("roads: %d deck(s) carry ONE link - a crossing that ends in the water, drawn as the jetty it is",
+                    au.deck_dead_ends))
+
+verify.expect(au.edges > 0, "the generated lattice has crossings to audit (" .. au.edges .. ")")
+-- The OTHER way a road could fail to render: a tier written on one of the two sides no
+-- 4-cardinal walk can cross (components.hpp road_side_is_crossable). The world refuses to
+-- write one, and nothing would draw it if it did.
+verify.expect(au.uncrossable == 0,
+              "no road is written on a side nothing can cross (" .. au.uncrossable .. ")")
+-- THE INVARIANT: every crossing the world laid draws, on both of its tiles. The audit
+-- reads a REVEALED source, so the survey mask is not an excuse here.
+verify.expect(au.linked_both == au.edges,
+              string.format("EVERY crossing publishes its link bit on both tiles (%d of %d; %d half-drawn, %d not drawn at all)",
+                            au.linked_both, au.edges, au.linked_one, au.linked_none))
+if au.shore + au.span == 0 then
+    print("roads: this seed's lattice touches no water at all - the BRIDGE case is NOT exercised")
+else
+    verify.expect(au.shore_land == au.shore,
+                  string.format("the LAND side of every shore crossing draws (%d of %d)", au.shore_land, au.shore))
+    verify.expect(au.shore_water == au.shore,
+                  string.format("...and so does its DECK, over the water (%d of %d)", au.shore_water, au.shore))
+    verify.expect(au.span_both == au.span,
+                  string.format("a span with water at BOTH ends draws at both (%d of %d)", au.span_both, au.span))
+    verify.expect(au.deck_tiles > 0 and au.deck_pieces > 0,
+                  string.format("the bake fills road data AND geometry on the water (%d tiles, %d pieces)",
+                                au.deck_tiles, au.deck_pieces))
+end
+
+-- The bridge on screen, aimed rather than hoped for: `find_water_crossing` names the land
+-- end of one existing crossing with a water end, so the capture looks at a bridge instead
+-- of wherever the view happened to rest.
+local br = verify.find_water_crossing()
+if not br.span.ok then
+    print("roads: no water-to-water span on this body - no bridge capture")
+else
+    print(string.format("roads: a span (water at both ends) at (%d,%d) -> (%d,%d)",
+                        br.span.x, br.span.y, br.span.wx, br.span.wy))
+    verify.center_tile(br.span.x, br.span.y)
+    verify.set_zoom(6.0)
+    verify.frames(2)
+    verify.capture("roads_bridge_close")   -- the deck itself, at the width a tier reads
+    verify.set_zoom(2.0)
+    verify.frames(2)
+    verify.capture("roads_bridge_context") -- the crossing in its coastline
+end
+if not br.shore.ok then
+    print("roads: no shore crossing on this body - no shore capture")
+else
+    print(string.format("roads: a shore crossing, land at (%d,%d) and water at (%d,%d)",
+                        br.shore.x, br.shore.y, br.shore.wx, br.shore.wy))
+    verify.center_tile(br.shore.x, br.shore.y)
+    verify.set_zoom(6.0)
+    verify.frames(2)
+    verify.capture("roads_shore_crossing") -- the half that drew NOTHING before BL-1375
+end
+
 -- The tile build front door: a land tile now offers a Road (BL-147) and an Inland
 -- Logistics Hub (BL-149) alongside the extraction / processing / port / launchpad types.
 verify.set_zoom(1.0)
@@ -201,6 +280,17 @@ if from ~= nil then
     verify.expect(after.message:find("Track", 1, true) ~= nil,
                   "the outcome line names what was built: '" .. after.message .. "'")
     verify.capture("roads_crossing_laid")
+    -- BL-1375: and the crossing just laid DRAWS — the whole-network invariant again, now
+    -- over a network the player has changed. A crossing that is bought and billed and
+    -- drawn by nothing is the defect this check exists for.
+    local au2 = verify.route_link_audit()
+    verify.expect(au2.edges == au.edges + 1,
+                  string.format("the audit sees the new crossing (%d -> %d)", au.edges, au2.edges))
+    verify.expect(au2.linked_both == au2.edges,
+                  string.format("...and every crossing still draws on both tiles (%d of %d)",
+                                au2.linked_both, au2.edges))
+    -- An inland road at the same zoom, for the eye to compare the deck against.
+    verify.capture("roads_inland_close")
 
     -- ── 3. ...and that side is no longer admitted ───────────────────────────
     local left = admitted(from.x, from.y, 1)

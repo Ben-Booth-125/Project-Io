@@ -86,7 +86,8 @@ inline int nb_index(const bake_source& s, int i, int side)
 inline bool has_routes(const bake_source& s)
 {
     const std::size_t n = static_cast<std::size_t>(s.gw) * s.gh;
-    return n > 0 && s.road.size() == n && s.lane.size() == n && s.route_links.size() == n
+    return n > 0 && s.road.size() == n && s.lane.size() == n && s.road_sides.size() == n
+        && s.route_links.size() == n
         && s.route_first.size() == n && s.route_count.size() == n && s.near_route.size() == n;
 }
 
@@ -209,6 +210,9 @@ constexpr double k_spoil_w    = 0.014; ///< A slope: the downhill spoil edge.
 constexpr double k_bank_w     = 0.024; ///< Wet / low ground: the embankment's side slope.
 constexpr double k_verge_w    = 0.014; ///< Open ground: the worn verge.
 constexpr double k_kerb_w     = 0.006; ///< A town: the street's kerb.
+/// BL-1375: open water — the deck's shadow on it, the only mark a bridge makes
+/// beside the run itself (no verge, no bank: there is no ground to build one on).
+constexpr double k_deck_sh_w  = 0.012;
 
 /// A tier's scale for its treatments: a Track's cut is shallower than a
 /// Highway's; a railway's cuttings and embankments are deeper than a road's.
@@ -229,6 +233,8 @@ inline double piece_out(std::uint8_t tier, std::uint8_t flags)
 {
     if ((tier & 0x80u) || (flags & route_piece::f_street))
         return tier_out(tier) + ((tier & 0x80u) ? 0.0 : k_kerb_w);
+    if (flags & route_piece::f_deck) // BL-1375: a deck reaches only as far as its shadow
+        return std::max(tier_out(tier), k_deck_sh_w);
     const double ts = treat_scale(tier);
     const double ground = std::max({ k_cut_w * (tier == k_route_rail ? 1.25 : 1.0), k_bank_w, k_verge_w }) * ts;
     return std::max(tier_out(tier), (flags & route_piece::f_wood) ? std::max(ground, k_corridor_w * ts) : ground);
@@ -601,6 +607,11 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
                  const road_plan* plan, std::vector<route_piece>& out)
 {
     const bool lane = (tier & 0x80u) != 0;
+    // BL-1375: a road piece on a WATER tile is a bridge DECK (LOGISTICS.md § 4). It is the
+    // same run carried over the strait — same tier, same crossing points — so it spans
+    // straight (no ground to bow along) and carries no terrain treatment.
+    const bool deck = !lane && i < s.cls.size()
+                   && s.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::water);
     const int r = static_cast<int>(i) / s.gw, c = static_cast<int>(i) % s.gw;
     double mx[4], my[4];
     route_end xc[4]; // the crossings, heading OUT across their edges
@@ -622,21 +633,27 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         }
     const double hw = tier_hw(tier);
     const bool roaded = plan && plan->roaded;
-    const std::uint8_t flags = lane ? 0 : tile_flags(s, i);
+    const std::uint8_t flags = lane  ? 0
+                             : deck  ? static_cast<std::uint8_t>(route_piece::f_deck)
+                                     : tile_flags(s, i);
     const std::size_t mine = out.size(); // this tile's pieces start here
 
     if (deg == 0)
     {
         // A lone tile: a small yard where the canvas drew a cap. Nothing on a
         // tile that stands something: its own forms carry the ground there.
+        // BL-1375: and nothing at all on water — a yard is a piece of ground, and a
+        // deck whose far end is masked or unroaded is simply not a crossing yet.
+        if (deck)
+            return;
         const bool built = s.inst.of_tile.size() == s.cls.size() && s.inst.of_tile[i] >= 0;
         if (!built)
             out.push_back(straight(0.0, 0.0, 0.0, 0.0, tier, route_piece::yard, flags));
         return;
     }
 
-    const tile_ground tg = lane ? tile_ground{} : make_ground(s, i);
-    const bool search = !lane;
+    const tile_ground tg = (lane || deck) ? tile_ground{} : make_ground(s, i);
+    const bool search = !lane && !deck; // a deck spans; the water is flat (as a lane's is)
     const double keep = roaded ? plan->radius + hw + tier_out(tier) + 0.02 : 0.0;
     const double kx = roaded ? plan->kx : 0.0, ky = roaded ? plan->ky : 0.0;
 
@@ -1057,7 +1074,37 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             route_hit h;
             int t0 = -1;
             double cx0 = 0.0;
-            query(s, qx, qy, water, h, &t0, &cx0);
+            if (water)
+            {
+                // BL-1375: WATER CARRIES BOTH MARKS, in the order they lie. The lane's
+                // WAKE is the water's own (it is the water disturbed), so it is painted
+                // first; a bridge DECK stands over it and is painted after, by the road
+                // path below — so a strait that is both a sea lane and a crossing reads
+                // as a bridge over a shipping lane rather than one or the other.
+                route_hit hl;
+                int tl = -1;
+                double cl = 0.0;
+                query(s, qx, qy, /*lanes=*/true, hl, &tl, &cl);
+                if (hl.tile >= 0 && hl.e - hl.out < 0.0)
+                {
+                    // THE WAKE: a faint, broken, pale trail on the lane's water — at a
+                    // thread's width (BL-1257) a soft profile broken along its length; no
+                    // edge line or foam flecks, which alias there.
+                    const int    lw  = tl % s.gw;
+                    const double lbx = qx - cl + kSqrt3 * (lw + (((tl / s.gw) & 1) ? 0.5 : 0.0));
+                    std::uint32_t& wdst = out[idx];
+                    float wr = static_cast<float>(palette::col_r(wdst));
+                    float wg = static_cast<float>(palette::col_g(wdst));
+                    float wb = static_cast<float>(palette::col_b(wdst));
+                    const double prof = 1.0 - smooth01(hl.hw * 0.4, hl.hw + tier_out(hl.tier), hl.d);
+                    const double brk  = smooth01(0.34, 0.62, rnoise(lbx, qy, wake_c, wake_n, 0x3A11u));
+                    mixc(wr, wg, wb, 216.0f, 230.0f, 236.0f, 0.26 * prof * brk * k);
+                    wdst = palette::col32(std::clamp(static_cast<int>(wr + 0.5f), 0, 255),
+                                          std::clamp(static_cast<int>(wg + 0.5f), 0, 255),
+                                          std::clamp(static_cast<int>(wb + 0.5f), 0, 255), 255);
+                }
+            }
+            query(s, qx, qy, /*lanes=*/false, h, &t0, &cx0);
             if (h.tile < 0)
                 continue;
             if (h.e - h.out >= 0.0)
@@ -1082,22 +1129,10 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             const double cov = std::clamp((std::min(d + 0.5 * pxc, hw) - std::max(d - 0.5 * pxc, -hw)) / pxc, 0.0, 1.0);
             const bool junction = h.covers >= 2;
             const bool lined = !junction && (h.kind == route_piece::curve || h.kind == route_piece::spoke);
-            const bool edged = h.kind == route_piece::curve || h.kind == route_piece::spoke; // verges, ditches, shoulders
-
-            if (water)
-            {
-                // THE WAKE: a faint, broken, pale trail on the lane's water —
-                // at a thread's width (BL-1257) a soft profile broken along
-                // its length; no edge line or foam flecks, which alias there.
-                const double prof = 1.0 - smooth01(hw * 0.4, hw + tier_out(h.tier), d);
-                const double brk  = smooth01(0.34, 0.62, rnoise(abx, aby, wake_c, wake_n, 0x3A11u));
-                const double a = 0.26 * prof;
-                mixc(r_, g_, b_, 216.0f, 230.0f, 236.0f, a * brk * k);
-                dst = palette::col32(std::clamp(static_cast<int>(r_ + 0.5f), 0, 255),
-                                     std::clamp(static_cast<int>(g_ + 0.5f), 0, 255),
-                                     std::clamp(static_cast<int>(b_ + 0.5f), 0, 255), 255);
-                continue;
-            }
+            // Verges, ditches and shoulders are ground; over water (BL-1375) the deck
+            // carries none of them, so its surface edge is its own.
+            const bool edged = !water
+                            && (h.kind == route_piece::curve || h.kind == route_piece::spoke);
 
             // The ground's VISUAL slope under the road (BL-1291): the tile
             // gradient interpolated over the nearest centres plus the hills
@@ -1159,8 +1194,11 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             // BL-1291: the surface takes a share of the ground it crosses —
             // dust off a dark slope darkens it, a pale plain lifts it — so a
             // road reads as made of the land it runs on, not laid over it.
+            // A DECK TAKES NOTHING FROM THE WATER (BL-1375): the share above is dust off
+            // the ground a road is cut into, and a bridge is not made of the strait it
+            // crosses — so over water the surface keeps its own tier value.
             const double gl  = 0.299 * gr + 0.587 * gg + 0.114 * gb;
-            const double env = std::clamp(0.62 + 0.38 * gl / 100.0, 0.70, 1.10);
+            const double env = water ? 1.0 : std::clamp(0.62 + 0.38 * gl / 100.0, 0.70, 1.10);
             const double lit = L * wear * env;
 
             // THE TREATMENT (BL-1291, RENDERING.md § Roads and sea lanes: the
@@ -1169,6 +1207,22 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             // ground, never the line: each band is a few master pixels, and
             // its strength is its share of a pixel where a pixel is wider
             // than it (the far page), so a treatment never smears.
+            //
+            // OVER WATER (BL-1375) there is no ground to treat: the deck's one mark on the
+            // water is its SHADOW, cast the way the NW light every pass uses throws it.
+            // A verge, a ditch or an embankment on open water would be a bank built on
+            // nothing, which is why the branch is a different mark and not a narrower one.
+            if (water)
+            {
+                const double o    = d - hw;
+                const double face = h.nx * Lx + h.ny * Ly; // > 0: the side facing the light
+                const double side = 0.45 + 0.55 * std::max(0.0, -face);
+                const double a = 0.70 * side * smooth01(-pxc, 0.0, o)
+                               * (1.0 - smooth01(0.35 * k_deck_sh_w, k_deck_sh_w, o))
+                               * std::min(1.0, k_deck_sh_w / pxc);
+                mixc(r_, g_, b_, gr * 0.50f, gg * 0.54f, gb * 0.62f, a * k);
+            }
+            else
             {
                 const double o  = d - hw; // past the surface's edge (negative on it)
                 const double ts = treat_scale(h.tier);
@@ -1402,10 +1456,16 @@ std::uint64_t route_hash(const bake_source& s, const geometry& g, int px0, int p
     bool any = false;
     auto mix = [&h](std::uint64_t v) { h ^= v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2); };
     walk_tiles(s, g, px0, py0, pw, ph, k_route_margin, [&](int, int, std::size_t i) {
-        if (s.road[i] | s.lane[i])
+        if (s.road[i] | s.lane[i] | s.road_sides[i])
         {
             any = true;
-            mix((static_cast<std::uint64_t>(i) << 16) | (static_cast<std::uint64_t>(s.road[i]) << 8) | s.lane[i]);
+            // BL-1375: the SIDE MASK folds in too. A tile's tier alone cannot see a
+            // crossing laid on a fresh side at a tier the tile already carried — and a
+            // window whose hash does not move is never re-baked, so the new crossing
+            // simply never appeared (BL-1340 added the mask and not this).
+            mix((static_cast<std::uint64_t>(i) << 32)
+                | (static_cast<std::uint64_t>(s.road_sides[i]) << 16)
+                | (static_cast<std::uint64_t>(s.road[i]) << 8) | s.lane[i]);
         }
     });
     // No route in reach: nothing to fold, so a window far from every road keeps

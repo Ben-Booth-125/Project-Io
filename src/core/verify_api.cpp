@@ -50,6 +50,8 @@
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/placement_rules.hpp"
+#include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
+#include "ui/ground_bake.hpp"        // BL-1375: prepare_source, the bake the audit reads
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
 #include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
@@ -4337,6 +4339,202 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["ok"]      = (tile != null_entity);
         out["sides"]   = sides;
         out["n_sides"] = n;
+        return out;
+    });
+
+    // === BL-1375 (a crossing with a water end draws): roads.lua ===
+    //
+    // THE BIT, NOT THE PIXELS. A road draws as a run across the edge it crosses
+    // (ui/RENDERING.md § "Roads draw across the edge they cross"), and the bake expresses
+    // that as a LINK BIT per tile per cardinal direction (bake_source::route_links): no
+    // bit, no run, whatever the style. The defect Ben saw — "not every road is rendering"
+    // — was the bake refusing road data to a WATER tile, which cost a bridge deck its own
+    // run AND the land side of every shore crossing its link bit, because a link is only
+    // set where the neighbour reads as on the network.
+    //
+    // So this is an AUDIT, not a tile read: it walks every road crossing on the active
+    // body and returns COUNTS of how many publish their bit on each end. No substrate,
+    // tier, owner or position leaves the sim — the standing no-tile-data rule holds, and
+    // the numbers are what an assertion can be written against.
+    //
+    // The source is taken fresh and REVEALED, so the claim is structural ("every crossing
+    // the world laid publishes a bit on both of its tiles") rather than a statement about
+    // what the player has surveyed; a masked tile legitimately carries no route.
+    //
+    // The cardinal -> hex-side mapping below is a SECOND, independent call site of
+    // hex_side_for_offset, as road_admits is of can_place_road: a bug in the bake's own
+    // loop cannot agree with itself here.
+    v.set_function("route_link_audit", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const ui::ground::bake_source src =
+            ui::ground::prepare_source(m_world, m_ui.active_body, /*reveal_all=*/true, &m_registry);
+        const std::size_t n = static_cast<std::size_t>(src.gw) * src.gh;
+        const auto water_cls = static_cast<std::uint8_t>(ui::ground::bake_source::tile_class::water);
+        int edges = 0, linked_both = 0, linked_one = 0, linked_none = 0;
+        int shore = 0, shore_land = 0, shore_water = 0;
+        int span = 0, span_both = 0;
+        int deck_tiles = 0, deck_pieces = 0, deck_and_lane = 0, deck_dead_ends = 0;
+        int uncrossable = 0;
+        if (n > 0 && src.route_links.size() == n && src.route_count.size() == n
+            && src.road.size() == n && src.lane.size() == n && src.cls.size() == n)
+        {
+            // The canvas's four cardinal directions, in its order: E, W, S, N — bits 0-3
+            // of route_links' low nibble (ui/route_paint.cpp k_card).
+            constexpr int card[4][2] = { { +1, 0 }, { -1, 0 }, { 0, +1 }, { 0, -1 } };
+            const auto wrap = [&](int c) { return ((c % src.gw) + src.gw) % src.gw; };
+            const auto at   = [&](int c, int r) {
+                return static_cast<std::size_t>(r) * src.gw + wrap(c);
+            };
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (src.cls[i] != water_cls || src.road[i] == 0)
+                    continue;
+                ++deck_tiles;
+                deck_pieces += src.route_count[i];
+                if (src.lane[i] != 0)
+                    ++deck_and_lane;
+                // A deck with ONE link is a crossing that ends in the water — a jetty, not
+                // a bridge. The renderer draws what the world laid, so this counts how
+                // often the world lays one (it is a world question, not a drawing one).
+                int links = 0;
+                for (int d = 0; d < 4; ++d)
+                    links += (src.route_links[i] >> d) & 1u;
+                if (links == 1)
+                    ++deck_dead_ends;
+            }
+            for (const auto& [tid, tc] : m_world.tiles)
+            {
+                (void)tid;
+                if (tc.body != m_ui.active_body || tc.grid_x < 0 || tc.grid_y < 0
+                    || tc.grid_x >= src.gw || tc.grid_y >= src.gh)
+                    continue;
+                // A road on a side NO 4-cardinal walk can cross is drawn by nothing and
+                // crossed by nothing ("not a road but a receipt" — components.hpp
+                // road_side_is_crossable). The world refuses to write one; this counts
+                // whether any exists anyway, because it would be a second, invisible way
+                // for a road not to render.
+                for (int side = 0; side < 6; ++side)
+                    if (road_tier_on_side(tc, side) != 0 && !road_side_is_crossable(side, tc.grid_y))
+                        ++uncrossable;
+                for (int d = 0; d < 4; ++d)
+                {
+                    const int side = hex_side_for_offset(card[d][0], card[d][1], (tc.grid_y & 1) != 0);
+                    if (side < 0 || road_tier_on_side(tc, side) == 0)
+                        continue;
+                    const int nr = tc.grid_y + card[d][1];
+                    if (nr < 0 || nr >= src.gh)
+                        continue; // off the top or bottom: not a crossing
+                    const std::size_t i  = at(tc.grid_x, tc.grid_y);
+                    const std::size_t ni = at(tc.grid_x + card[d][0], nr);
+                    if (ni < i)
+                        continue; // each edge counted once, from its lower raster index
+                    ++edges;
+                    const bool mine  = (src.route_links[i] & (1u << d)) != 0;
+                    // The neighbour's own bit for the same edge: the opposite cardinal,
+                    // which is this one with its low bit flipped (E<->W, S<->N).
+                    const bool their = (src.route_links[ni] & (1u << (d ^ 1))) != 0;
+                    if (mine && their) ++linked_both;
+                    else if (mine || their) ++linked_one;
+                    else ++linked_none;
+                    const bool w0 = src.cls[i] == water_cls, w1 = src.cls[ni] == water_cls;
+                    if (w0 && w1)
+                    {
+                        ++span;
+                        if (mine && their) ++span_both;
+                    }
+                    else if (w0 || w1)
+                    {
+                        ++shore;
+                        shore_land  += ((w0 ? their : mine) ? 1 : 0);
+                        shore_water += ((w0 ? mine : their) ? 1 : 0);
+                    }
+                }
+            }
+        }
+        out["edges"]         = edges;        ///< every road crossing on the body, each once
+        out["linked_both"]   = linked_both;  ///< ...publishing its bit on BOTH tiles
+        out["linked_one"]    = linked_one;
+        out["linked_none"]   = linked_none;
+        out["shore"]         = shore;        ///< crossings with exactly one water end
+        out["shore_land"]    = shore_land;   ///< ...whose LAND side publishes its bit
+        out["shore_water"]   = shore_water;  ///< ...whose water side (the deck) does
+        out["span"]          = span;         ///< crossings with water at both ends
+        out["span_both"]     = span_both;
+        out["deck_tiles"]    = deck_tiles;   ///< water tiles the bake gave road data
+        out["deck_pieces"]   = deck_pieces;  ///< ...and the drawn geometry on them
+        out["deck_and_lane"] = deck_and_lane;
+        out["uncrossable"]  = uncrossable;   ///< road tiers written on an uncrossable side
+        out["deck_dead_ends"] = deck_dead_ends; ///< decks with one link: a crossing into open water///< a deck over a sea lane: both marks
+        return out;
+    });
+
+    // WHERE ONE SUCH CROSSING IS, so a capture can be AIMED at it. Same shape and same
+    // reason as `find_deposit_tile`'s scoped grant (a check that cannot aim is not a
+    // check): the road network's own geometry, which is drawn on the canvas and already
+    // published per tile by `road_admits` and `road_state().highlights` — one crossing in
+    // raster order, its two ends, and whether both ends are water. No substrate, tier,
+    // deposit or owner, and nothing that can be walked into a map of the coast: it answers
+    // only "here is a bridge", which is the thing the capture must photograph.
+    v.set_function("find_water_crossing", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        // Two aims, because the two halves of the defect look different on screen: a SPAN
+        // (water at both ends — the middle of a strait, the deck proper) and a SHORE
+        // crossing (one end on land — whose LAND side was the half nobody would have
+        // guessed was missing). Each is the one nearest the equator, then raster order, so
+        // the capture lands somewhere worth photographing rather than on the ice cap, and
+        // the answer is stable for a seed.
+        const tile_component* b_land[2]  = { nullptr, nullptr }; // [0] span, [1] shore
+        const tile_component* b_water[2] = { nullptr, nullptr };
+        int b_key[2] = { 0, 0 };
+        int mid_row = 0;
+        if (const auto bit = m_world.bodies.find(m_ui.active_body); bit != m_world.bodies.end())
+            mid_row = bit->second.grid_height / 2;
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != m_ui.active_body)
+                continue;
+            for (int side = 0; side < 6; ++side)
+            {
+                if (road_tier_on_side(tc, side) == 0)
+                    continue;
+                const entity_id other = road_edge_neighbour(m_world, tid, side);
+                const auto oit = m_world.tiles.find(other);
+                if (oit == m_world.tiles.end())
+                    continue;
+                const bool w0 = placement_rules::is_water_tile(tc.substrate);
+                const bool w1 = placement_rules::is_water_tile(oit->second.substrate);
+                if (!w0 && !w1)
+                    continue;
+                // The LAND end first when there is one: a capture centres on the shore and
+                // looks across.
+                const tile_component& land_end  = w0 ? oit->second : tc;
+                const tile_component& water_end = w0 ? tc : oit->second;
+                const int k = (w0 && w1) ? 0 : 1;
+                const int key = std::abs(land_end.grid_y - mid_row) * 1000000
+                              + land_end.grid_y * 1000 + land_end.grid_x;
+                if (b_land[k] == nullptr || key < b_key[k])
+                {
+                    b_land[k]  = &land_end;
+                    b_water[k] = &water_end;
+                    b_key[k]   = key;
+                }
+            }
+        }
+        for (int k = 0; k < 2; ++k)
+        {
+            sol::table t = st.create_table();
+            t["ok"] = (b_land[k] != nullptr);
+            if (b_land[k] != nullptr)
+            {
+                t["x"]  = b_land[k]->grid_x;
+                t["y"]  = b_land[k]->grid_y;
+                t["wx"] = b_water[k]->grid_x;
+                t["wy"] = b_water[k]->grid_y;
+            }
+            out[k == 0 ? "span" : "shore"] = t;
+        }
         return out;
     });
 

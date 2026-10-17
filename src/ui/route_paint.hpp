@@ -88,7 +88,12 @@ struct route_piece
     /// flags: the road's treatment that the TILE decides (the rest — forest
     /// corridor, hillside cut — the route pass reads per pixel from the cover
     /// and the slope under it).
-    enum flag_t : std::uint8_t { f_street = 1, f_wet = 2, f_wood = 4 };
+    /// BL-1375: f_deck is a road piece on a WATER tile - a bridge deck
+    /// (../economy/LOGISTICS.md § 4: a road edge may have a water end, and a run of
+    /// them is a bridge). The deck is the run's own tier carried over the water, so it
+    /// spans straight rather than bowing with ground it has none of, and it carries no
+    /// verge, ditch or embankment - a bank built on open water would be nonsense.
+    enum flag_t : std::uint8_t { f_street = 1, f_wet = 2, f_wood = 4, f_deck = 8 };
     float x[k_pts] = {}, y[k_pts] = {};
     float cum[k_pts] = {};      ///< Cumulative arclength at each point.
     float split = 0.0f;         ///< Arclength where the two halves meet (a curve's apex); spokes: 0.
