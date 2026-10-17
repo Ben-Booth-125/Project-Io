@@ -4381,6 +4381,52 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["tile"]    = static_cast<unsigned>(c.door_tile);
         out["recipes"] = names;
         out["count"]   = n;
+        // BL-1365: the one-line GRID row's own report. A row carries its figures
+        // as glyphs and abbreviations and its sentences in the shared hover card,
+        // so a capture cannot prove the words survived the move — the surface
+        // publishes the row metric it drew at and each row's card text, and the
+        // check hovers the REAL row at (x, y).
+        out["row_h"]  = c.row_h;
+        out["line_h"] = c.line_h;
+        sol::table rows = st.create_table();
+        int        rn   = 0;
+        for (const construction_controls::grid_row& r : c.door_rows)
+        {
+            sol::table row = st.create_table();
+            row["name"]  = r.name;
+            row["hover"] = r.hover;
+            row["x"]     = r.x;
+            row["y"]     = r.y;
+            rows[++rn]   = row;
+        }
+        out["rows"]  = rows;
+        out["n_rows"] = rn;
+        return out;
+    });
+
+    // BL-1365: the Construction ledger's QUEUE as one-line grid rows — the name,
+    // the hover card's words (which carry the stall's named good in the authored
+    // sentence) and a point inside the row, so a check can hover it. Empty when
+    // the queue's CollapsingHeader is shut, which is its default.
+    v.set_function("construction_queue", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const auto& c   = m_ui.construction_ui;
+        sol::table  rows = st.create_table();
+        int         n    = 0;
+        for (const construction_controls::grid_row& r : c.queue_rows)
+        {
+            sol::table row = st.create_table();
+            row["name"]  = r.name;
+            row["hover"] = r.hover;
+            row["x"]     = r.x;
+            row["y"]     = r.y;
+            rows[++n]    = row;
+        }
+        out["rows"]   = rows;
+        out["n_rows"] = n;
+        out["row_h"]  = c.row_h;
+        out["line_h"] = c.line_h;
         return out;
     });
 
@@ -4929,6 +4975,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["count"]             = c.count;
         out["title"]             = c.title;
         out["method"]            = c.method;
+        out["row_h"]             = c.row_h;  // BL-1365: the stack list's grid metric
+        out["line_h"]            = c.line_h;
         out["net"]               = c.net;
         out["expenses"]          = c.expenses;
         out["population"]        = c.population;

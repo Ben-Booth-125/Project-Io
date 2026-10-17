@@ -5,8 +5,12 @@
 #include <cmath>   // std::ceil (construction ETA, BL-095)
 #include <string>  // status strings (BL-095)
 
+#include "charts.hpp"          // draw_value_bar - the queue row's progress column (BL-1365)
 #include "foldout_column.hpp"  // shell fold-out column host (BL-122) + nav_button (the tab strip)
 #include "format.hpp"          // fmt::signed_delta / sign_of - the roster's profit column
+#include "hover_card.hpp"      // draw_hover_card - the SHARED hover frame (BL-1365)
+#include "icons.hpp"           // the glyph vocabulary the one-line rows read in (BL-1365)
+#include "text_fit.hpp"        // fit_text - the name column's elision
 #include "presentation.hpp"    // building_type_name / extraction_building_name — the shared roster vocabulary
 #include "selection_panel.hpp" // the build bar and the two relocated levers
 #include "ui_state.hpp"
@@ -190,22 +194,30 @@ std::string construction_blocker_phrase(const construction_read& rd)
     return rd.binding_priced_out ? good + " priced out" : "no " + good;
 }
 
+// The stall's reason clause, authored ONCE (BL-1365). `construction_status`
+// below says "Paused - <clause>" about a site; the build door's hover card says
+// "Will stall - <clause>" about a candidate. Two tenses, one set of words.
+std::string construction_stall_reason(const construction_read& rd)
+{
+    const std::string good = rd.has_binding ? resource_name(rd.binding) : std::string();
+    if (rd.waiting_on_funding)
+        return "its treasury could not fund it this quarter";
+    if (rd.has_binding && rd.binding_priced_out)
+        return good + " is priced above the build ceiling";
+    if (rd.has_binding)
+        return "no " + good + " at the market";
+    if (rd.no_market)
+        return "no market supplies this tile";
+    return "market can't supply materials";
+}
+
 // The status line — a stall NAMES the good holding it (BL-1342), because "Paused"
 // alone tells a player nothing they can act on.
 std::string construction_status(const construction_read& rd, int ticks_left)
 {
     const std::string good = rd.has_binding ? resource_name(rd.binding) : std::string();
-    if (rd.waiting_on_funding)
-        return "Paused - its treasury could not fund it this quarter";
-    if (rd.paused)
-    {
-        if (rd.has_binding && rd.binding_priced_out)
-            return "Paused - " + good + " is priced above the build ceiling";
-        if (rd.has_binding)
-            return "Paused - no " + good + " at the market";
-        return rd.no_market ? "Paused - no market supplies this tile"
-                            : "Paused - market can't supply materials";
-    }
+    if (rd.waiting_on_funding || rd.paused)
+        return "Paused - " + construction_stall_reason(rd);
     const int eta = construction_eta_qtrs(rd, ticks_left);
     if (rd.rate >= 1.0f)
         return "Building... ~" + ticks_label(eta);
@@ -226,6 +238,45 @@ ImVec4 construction_rate_colour(float rate)
 ImVec4 construction_status_colour(const construction_read& rd)
 {
     return construction_rate_colour(rd.rate);
+}
+
+// --- The one-line GRID row and its hover card (BL-1365) ----------------------
+// construction.md § "One line a row, and the words live in the hover" / § "The
+// line is a grid, not a sentence". One metric and one card frame, shared by all
+// four construction surfaces, so "the same treatment" is literally the same code
+// rather than four surfaces that merely resemble each other.
+
+float construction_row_height()
+{
+    return ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2.0f;
+}
+
+void construction_grid_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx, float frac, ImU32 colour)
+{
+    dl->AddRectFilled(mn, mx, IM_COL32(48, 50, 58, 255), 2.0f); // track
+    const float w    = mx.x - mn.x;
+    const float fill = std::min(std::max(w * std::clamp(frac, 0.0f, 1.0f), 2.0f), std::max(w, 0.0f));
+    if (w > 0.0f)
+        dl->AddRectFilled(mn, {mn.x + fill, mx.y}, colour, 2.0f);
+}
+
+bool construction_row_hovered(ImVec2 mn, ImVec2 mx)
+{
+    return ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)
+        && ImGui::IsMouseHoveringRect(mn, mx, /*clip=*/false);
+}
+
+void construction_row_card(const char* title, const std::function<void()>& content)
+{
+    // The SHARED primitive (TOOLTIP.md § The frame), not a bespoke tooltip: one
+    // frame, one max width, one position rule, so a ledger row's read looks like
+    // every other read in the game. `NoInputs` keeps it out of the hit-test, so
+    // the card cannot cover the Build press it is describing.
+    draw_hover_card(ImGui::GetMousePos(), [&]() {
+        if (title != nullptr && title[0] != '\0')
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
+        content();
+    });
 }
 
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
@@ -306,6 +357,9 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
     const bool open = ImGui::CollapsingHeader(hdr);
     if (open != ui.construction.queue_open)
         ui.construction.queue_open = open;
+    ui.construction_ui.queue_rows.clear(); // published per frame; a shut queue has none
+    ui.construction_ui.row_h  = construction_row_height();
+    ui.construction_ui.line_h = ImGui::GetTextLineHeight();
     if (!open)
         return;
 
@@ -318,6 +372,12 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         float             cost_left = 0.0f;
         construction_read rd;
         int               ticks_left = 0;
+        // BL-1365: the row reads in glyphs, so it needs what the glyph and the
+        // pip key on as well as the words.
+        building_type type  = building_type::none;
+        resource_type ident = resource_type::iron_ore; ///< The glyph's identity (§ 1c).
+        bool          makes = false;                   ///< Does it make a good at all?
+        resource_type good  = resource_type::iron_ore; ///< That good — the pip.
     };
     std::vector<queue_row> rows;
     for (const auto& [id, b] : w.buildings)
@@ -333,6 +393,21 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
                                            b.state_idle);
         const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
         row.cost_left     = std::max(0.0f, capex - b.construction_paid);
+        row.type          = b.type;
+        if (b.type == building_type::extraction_site)
+        {
+            row.makes = true;
+            row.good  = b.target_resource;
+        }
+        else if (b.type == building_type::processing_facility)
+            if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
+            {
+                row.makes = true;
+                row.good  = primary_output_resource(*rc);
+            }
+        // ICONS.md § 1c: the named-building shape keys on what the site works or
+        // makes, so the glyph matches the name the row carries.
+        row.ident = row.makes ? row.good : b.target_resource;
         if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
         {
             const auto bod = w.bodies.find(tit->second.body);
@@ -354,85 +429,143 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         return;
     }
 
+    // SIX FIXED COLUMNS (BL-1365), one line a row. The widths are
+    // `construction_grid`'s, shared with the build list below, so the glyph, the
+    // bar, the quarters, the cost and the state mark land in the same place on
+    // both surfaces — the alignment IS the compaction (construction.md § The line
+    // is a grid, not a sentence). `BordersInnerV` is gone: at these widths the
+    // rules cost ~7 px of name column and the alignment already separates the
+    // columns.
     constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_BordersOuter |
-        ImGuiTableFlags_BordersInnerV |
         ImGuiTableFlags_RowBg |
-        ImGuiTableFlags_SizingStretchProp;
+        ImGuiTableFlags_NoPadInnerX |
+        ImGuiTableFlags_SizingFixedFit;
 
-    if (!ImGui::BeginTable("##construction_queue", 4, table_flags))
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,
+                        {construction_grid::pad, ImGui::GetStyle().CellPadding.y});
+    if (!ImGui::BeginTable("##construction_queue", 6, table_flags))
+    {
+        ImGui::PopStyleVar();
         return;
+    }
 
-    ImGui::TableSetupColumn("Building",  ImGuiTableColumnFlags_WidthStretch, 2.2f);
-    // "Done", not "Progress": measured at 1720x1080 the column is ~55 px and
+    ImGui::TableSetupColumn("##glyph", ImGuiTableColumnFlags_WidthFixed, construction_grid::glyph);
+    ImGui::TableSetupColumn("Building", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    // "Done", not "Progress": measured at 1720x1080 the column is ~46 px and
     // elided the longer header to "Progre...", which is a header that has stopped
-    // naming its column.
-    ImGui::TableSetupColumn("Done",      ImGuiTableColumnFlags_WidthStretch, 1.2f);
-    ImGui::TableSetupColumn("Qtrs left", ImGuiTableColumnFlags_WidthStretch, 1.2f);
-    ImGui::TableSetupColumn("Cost left", ImGuiTableColumnFlags_WidthStretch, 1.3f);
+    // naming its column. The cell is now a BAR carrying its own percentage, the
+    // authored 25/75 % colour bands moving from the cell background onto the fill.
+    ImGui::TableSetupColumn("Done",  ImGuiTableColumnFlags_WidthFixed, construction_grid::bar);
+    ImGui::TableSetupColumn("Qtrs",  ImGuiTableColumnFlags_WidthFixed, construction_grid::eta);
+    ImGui::TableSetupColumn("Cost",  ImGuiTableColumnFlags_WidthFixed, construction_grid::cost);
+    ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
     ImGui::TableHeadersRow();
 
+    const float row_h = construction_row_height();
+    ImDrawList* dl    = ImGui::GetWindowDrawList();
     for (const queue_row& row : rows)
     {
-        ImGui::TableNextRow();
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, row_h);
         ImGui::TableSetColumnIndex(0);
+        const float  line_h = ImGui::GetTextLineHeight();
+        const ImVec2 gp     = ImGui::GetCursorScreenPos();
+        icons::building(dl, {gp.x + construction_grid::glyph * 0.5f, gp.y + line_h * 0.5f},
+                        construction_grid::glyph * 0.5f, row.type, row.ident,
+                        IM_COL32(150, 235, 160, 255));
+        ImGui::Dummy({construction_grid::glyph, line_h});
+
+        ImGui::TableSetColumnIndex(1);
         ImGui::PushID(static_cast<int>(row.id));
         // Pressing a row SELECTS the building — the same navigation the group
         // member rows below offer, and it decides nothing for the player.
-        if (ImGui::Selectable(row.name.c_str(), ui.selected_entity == row.id,
+        if (ImGui::Selectable("##qrow", ui.selected_entity == row.id,
                               ImGuiSelectableFlags_SpanAllColumns))
             ui.selected_entity = row.id;
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::BeginTooltip();
-            ImGui::TextUnformatted(row.name.c_str());
-            if (!row.where.empty())
-                ImGui::TextDisabled("%s", row.where.c_str());
-            ImGui::TextColored(construction_status_colour(row.rd), "%s",
-                               construction_status(row.rd, row.ticks_left).c_str());
-            ImGui::EndTooltip();
-        }
+        const bool hovered = ImGui::IsItemHovered();
+        // Drawn over the Selectable rather than as its label, so the name can be
+        // ELIDED to its column instead of pushing the columns right.
+        ImGui::SameLine(0.0f, 0.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
+        fit_text(text_box::table_cell, "construction.queue.name", row.name.c_str(),
+                 std::max(16.0f, ImGui::GetContentRegionAvail().x));
+        ImGui::PopStyleColor();
         ImGui::PopID();
 
-        ImGui::TableSetColumnIndex(1);
-        const ImU32 cell_colour = (row.progress < 0.25f) ? IM_COL32(80, 80, 80, 160)
-                                : (row.progress < 0.75f) ? IM_COL32(200, 180, 0, 160)
-                                                         : IM_COL32(0, 160, 80, 160);
-        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cell_colour);
-        ImGui::Text("%.0f%%", static_cast<double>(row.progress * 100.0f));
-
         ImGui::TableSetColumnIndex(2);
+        // The authored bands, now the bar's FILL colour: dim (<25 %) / mid
+        // (25-75 %) / high (>75 %).
+        const ImU32 band = (row.progress < 0.25f) ? IM_COL32(120, 120, 120, 255)
+                         : (row.progress < 0.75f) ? IM_COL32(200, 180, 0, 255)
+                                                  : IM_COL32(0, 180, 95, 255);
+        {
+            const ImVec2 bp = ImGui::GetCursorScreenPos();
+            construction_grid_bar(dl, {bp.x, bp.y + 3.0f},
+                                  {bp.x + construction_grid::bar, bp.y + line_h - 3.0f},
+                                  row.progress, band);
+            ImGui::Dummy({construction_grid::bar, line_h});
+        }
+
+        ImGui::TableSetColumnIndex(3);
         // The ETA the status line gives, not the raw tick count: a stretched build
-        // takes longer than its ticks say, and a paused one has no honest ETA.
+        // takes longer than its ticks say, and a paused one has no honest ETA — so
+        // a paused row prints an em dash and leaves the saying-why to the card.
         const int eta = construction_eta_qtrs(row.rd, row.ticks_left);
         if (eta < 0)
-            ImGui::TextColored(construction_status_colour(row.rd), "paused");
+            ImGui::TextColored(construction_status_colour(row.rd), "\xe2\x80\x94");
         else
             ImGui::TextColored(construction_status_colour(row.rd), "%d", eta);
 
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%.0f cr", static_cast<double>(row.cost_left));
+        ImGui::TableSetColumnIndex(4);
+        ImGui::TextDisabled("%s", fmt::abbreviate(static_cast<double>(row.cost_left)).c_str());
+
+        ImGui::TableSetColumnIndex(5);
+        // THE STATE MARK — `icons::value_mark`, the vocabulary's single filled dot
+        // (ICONS.md § 1): quiet grey while the build is on schedule, amber while it
+        // is stretching, red while it is stalled. Colour is the ordered channel
+        // here, which is what the catalogue asks of an ordered axis.
+        {
+            const ImVec2 sp = ImGui::GetCursorScreenPos();
+            const ImU32  c  = (row.rd.rate >= 1.0f)
+                                 ? IM_COL32(110, 116, 128, 255)
+                                 : ImGui::ColorConvertFloat4ToU32(construction_status_colour(row.rd));
+            icons::value_mark(dl, {sp.x + construction_grid::state * 0.5f, sp.y + line_h * 0.5f},
+                              3.0f, c);
+            ImGui::Dummy({construction_grid::state, line_h});
+        }
+
+        // EVERYTHING THE LINE DROPPED, in the shared hover card (BL-1365): where
+        // it stands, what it makes in words, the figures the columns abbreviate,
+        // and the stall's named good in the authored sentence — which no ~38 px
+        // cell could ever carry ("Steel is priced above the build ceiling").
+        const std::string status = construction_status(row.rd, row.ticks_left);
+        if (hovered)
+            construction_row_card(row.name.c_str(), [&]() {
+                if (!row.where.empty())
+                    ImGui::TextDisabled("%s", row.where.c_str());
+                if (row.makes)
+                    ImGui::TextDisabled("Makes %s", resource_name(row.good));
+                ImGui::TextDisabled("%.0f%% built", static_cast<double>(row.progress * 100.0f));
+                ImGui::TextDisabled("%.0f cr still to pay", static_cast<double>(row.cost_left));
+                ImGui::PushTextWrapPos(0.0f);
+                ImGui::TextColored(construction_status_colour(row.rd), "%s", status.c_str());
+                ImGui::PopTextWrapPos();
+            });
+
+        // The surface reporting its own rows, so a check can hover the REAL row
+        // and assert the card's words rather than infer them from a picture.
+        construction_controls::grid_row pub;
+        pub.name  = row.name;
+        pub.hover = row.where + "\n" + (row.makes ? std::string("Makes ") + resource_name(row.good)
+                                                  : std::string())
+                  + "\n" + status;
+        pub.x     = gp.x + 24.0f;
+        pub.y     = gp.y + line_h * 0.5f;
+        ui.construction_ui.queue_rows.push_back(std::move(pub));
     }
 
     ImGui::EndTable();
-
-    // A STALL NAMES ITS GOOD, under the table rather than inside it (BL-1342):
-    // no cell in a ~380 px column can carry "Steel is priced above the build
-    // ceiling", and the good is the only part of it the player can act on.
-    for (const queue_row& row : rows)
-    {
-        if (row.rd.rate >= 1.0f)
-            continue;
-        const std::string blocker = construction_blocker_phrase(row.rd);
-        if (blocker.empty())
-            continue;
-        // Short, because the table above already carries the ETA: the NAME, whether
-        // it is paused or merely stretched, and the good.
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextColored(construction_status_colour(row.rd), "%s: %s - %s", row.name.c_str(),
-                           row.rd.paused ? "paused" : "stretched", blocker.c_str());
-        ImGui::PopTextWrapPos();
-    }
+    ImGui::PopStyleVar();
 }
 
 

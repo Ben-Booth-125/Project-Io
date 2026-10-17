@@ -324,6 +324,24 @@ struct construction_controls
     /// own list, read by the `air_gate.lua` check. VIEW state, not serialised.
     std::vector<std::uint16_t> door_recipes;
     entity_id                  door_tile = null_entity;
+
+    /// BL-1365: one entry per construction GRID row drawn this frame — the build
+    /// list's rows and the queue's. A one-line row carries its figures as glyphs
+    /// and abbreviations, so a capture cannot prove the words survived; the
+    /// surface publishes its own hover-card text instead, and a check hovers the
+    /// REAL row at (`x`, `y`) and asserts the card names the stall's good.
+    /// VIEW state, not serialised.
+    struct grid_row
+    {
+        std::string name;        ///< The row's name, unelided.
+        std::string hover;       ///< The hover card's body, newline-joined.
+        float       x = -1.0f;   ///< A point inside the row, in screen pixels.
+        float       y = -1.0f;
+    };
+    std::vector<grid_row> queue_rows; ///< The in-flight queue's rows.
+    std::vector<grid_row> door_rows;  ///< The build list's rows, in drawn order.
+    float row_h  = 0.0f; ///< The grid's row height as drawn (one line plus padding).
+    float line_h = 0.0f; ///< One text line, so a check can assert row_h is one of them.
 };
 
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
@@ -1113,6 +1131,11 @@ struct ui_state
         int         count    = 1;           ///< The expanded stack's member count.
         std::string title;                  ///< The expanded header's name + " ×N" as drawn.
         std::string method;                 ///< The production method line, "" when none.
+        /// BL-1365: the stack LIST's row height and one text line, as drawn —
+        /// so a check can assert the construction grid's "one line a row" rule
+        /// on this surface too rather than inferring it from a capture.
+        float       row_h  = 0.0f;
+        float       line_h = 0.0f;
         std::string net;                    ///< Net per quarter as drawn, "" when not drawn.
         std::string expenses;               ///< Expenses per quarter as drawn.
         int         population = 0;         ///< The province card's header figure, thousands.

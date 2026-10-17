@@ -16,11 +16,24 @@
 --   3. the build door below it on a tile that ALREADY carries one of a type —
 --      the cost in goods and credits, what the building gives, and how many
 --      stand here;
---   4. the tile card: the stack button's reading (ETA or "Paused - no <Good>")
---      with its progress strip, and the expanded site card's progress bar.
+--   4. the tile card: the stack row's reading (ETA or "Paused - no <Good>")
+--      and the expanded site card's progress bar.
+--
+-- BL-1365 extends it to the SHAPE of those rows (construction.md § "One line a
+-- row, and the words live in the hover", § "The line is a grid, not a
+-- sentence"): every build-list and queue row is ONE LINE of fixed columns, and
+-- every sentence the line dropped is on the shared hover card. A capture cannot
+-- prove the second half - the card is drawn at the cursor and the line itself
+-- carries glyphs and abbreviations - so the surfaces publish their own row
+-- metric and card text, and the check asserts on those AND hovers a real row to
+-- capture the card.
 --
 -- Run with: ProjectIo --verify scripts/verify/construction_progress.lua
 
+-- 1720x1080, the resolution the shell's widths are tuned against (the same one
+-- tile_card.lua captures at): at the 1280 default the Selection band's tile
+-- column is half as wide and the grid captures do not show what a player meets.
+verify.window(1720, 1080)
 verify.goto_surface("home")
 verify.econ_step(6) -- let the markets hold real inventory, not just a flow
 -- The staged player corp cannot afford a site at the Digitisation baseline
@@ -68,6 +81,51 @@ verify.section("construction_queue", true)
 verify.frames(2)
 verify.capture("construction_queue_rows")
 
+-- BL-1365: the queue's rows are ONE LINE, and the stall sentence that used to be
+-- printed UNDER the table (one wrapped line per stalled build) is on the row's
+-- hover card instead.
+local q = verify.construction_queue()
+verify.expect(q.n_rows > 0, "the queue published " .. tostring(q.n_rows) .. " grid rows")
+verify.expect(q.row_h > 0 and q.row_h <= q.line_h + 8.0,
+              string.format("a queue row is one line plus padding (%.1f px against a %.1f px line)",
+                            q.row_h, q.line_h))
+-- The authored stall clauses (BL-1342), the exact words this pass must not lose.
+local authored = { "at the market", "priced above the build ceiling",
+                   "no market supplies this tile", "market can't supply materials",
+                   "could not fund it this quarter" }
+local function names_a_cause(text)
+    for _, clause in ipairs(authored) do
+        if text:find(clause, 1, true) then return clause end
+    end
+    return nil
+end
+local stalled_in_queue = 0
+for _, r in ipairs(q.rows) do
+    verify.expect(r.hover ~= "", "queue row '" .. r.name .. "' publishes a hover card")
+    local paused = r.hover:find("Paused - ", 1, true) ~= nil
+    local short  = r.hover:find("short of ", 1, true) ~= nil
+                or r.hover:find("priced out", 1, true) ~= nil
+    if paused then
+        stalled_in_queue = stalled_in_queue + 1
+        local clause = names_a_cause(r.hover)
+        verify.expect(clause ~= nil,
+                      "a paused queue row's card names its CAUSE in the authored words: '"
+                      .. r.hover:gsub("%s+", " ") .. "'")
+    elseif short then
+        stalled_in_queue = stalled_in_queue + 1
+    end
+    verify.expect(r.hover:find("Building%.%.%.") ~= nil or paused,
+                  "queue row '" .. r.name .. "' card carries its status line")
+end
+print(string.format("construction_progress: %d of %d queue rows are stalled or stretched",
+                    stalled_in_queue, q.n_rows))
+-- Hover the first queue row and capture the card itself.
+if q.n_rows > 0 then
+    verify.hover(q.rows[1].x, q.rows[1].y, 2)
+    verify.frames(2)
+    verify.capture("construction_queue_row_hover")
+end
+
 -- ── 3. The build door on a tile that already carries one of a type ──────────
 -- Collapse the queue first: open, it and its stall lines take most of the column
 -- and the build list below is left a few pixels tall. That is the ledger working
@@ -96,6 +154,35 @@ verify.capture("construction_build_door_extraction")
 local door = verify.build_door()
 verify.expect(door.drawn, "the build door drew for the selected tile")
 
+-- BL-1365: ONE LINE A ROW, in a grid, with the words on the card.
+verify.expect(door.row_h > 0 and door.row_h <= door.line_h + 8.0,
+              string.format("a build row is one line plus padding (%.1f px against a %.1f px line)",
+                            door.row_h, door.line_h))
+verify.expect(door.n_rows > 0, "the build door published " .. tostring(door.n_rows) .. " grid rows")
+local stalling, refused = 0, 0
+for _, r in ipairs(door.rows) do
+    verify.expect(r.hover:find("Cost ", 1, true) == 1,
+                  "row '" .. r.name .. "' card opens with the cost in full")
+    verify.expect(r.hover:find("Materials ", 1, true) ~= nil
+                  or r.hover:find("No materials", 1, true) ~= nil,
+                  "row '" .. r.name .. "' card carries the MATERIALS the line dropped")
+    verify.expect(r.hover:find("here", 1, true) ~= nil or r.hover:find("Full", 1, true) ~= nil,
+                  "row '" .. r.name .. "' card carries the stack's own sentence")
+    if r.hover:find("Will stall", 1, true) or r.hover:find("Will stretch", 1, true) then
+        stalling = stalling + 1
+        verify.expect(names_a_cause(r.hover) ~= nil,
+                      "a stalling row's card names the GOOD in the authored words: '"
+                      .. r.hover:gsub("%s+", " ") .. "'")
+    end
+    if r.hover:find("Full:", 1, true) then refused = refused + 1 end
+end
+print(string.format("construction_progress: %d build rows, %d will stall or stretch, %d refused full",
+                    door.n_rows, stalling, refused))
+-- Hover a real build row and capture the card: the half no other capture shows.
+verify.hover(door.rows[1].x, door.rows[1].y, 2)
+verify.frames(2)
+verify.capture("construction_build_row_hover")
+
 -- ── 4. The tile card: stack reading + the site card's progress bar ──────────
 verify.show_panel("construction", false)
 verify.select_tile(dep.x, dep.y)
@@ -104,6 +191,9 @@ verify.capture("construction_tile_card_stacks")
 
 local card = verify.tile_card()
 verify.expect(card.drawn, "the tile card drew")
+verify.expect(card.row_h > 0 and card.row_h <= card.line_h + 8.0,
+              string.format("a tile-card stack row is one line plus padding (%.1f px / %.1f px line)",
+                            card.row_h, card.line_h))
 local saw_reading = false
 for _, b in ipairs(card.buttons) do
     if b.detail and (b.detail:find("ETA") or b.detail:find("Paused")) then
@@ -112,6 +202,13 @@ for _, b in ipairs(card.buttons) do
     end
 end
 verify.expect(saw_reading, "at least one stack reads as under construction")
+
+-- The stack row's own hover card (BL-1365): the reading in words lives here now.
+if #card.buttons > 0 then
+    verify.hover(card.buttons[1].x, card.buttons[1].y, 2)
+    verify.frames(2)
+    verify.capture("construction_tile_card_row_hover")
+end
 
 -- The expanded site card: header, method, status line and the progress bar.
 verify.select_building(dep.x, dep.y)
