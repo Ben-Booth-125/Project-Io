@@ -84,7 +84,15 @@ width its text happens to need would compact the surface and still refuse to be 
 alignment *is* the compaction. A row whose figure is absent leaves its column empty rather than
 closing the gap.
 
-**Everything the line drops belongs to the hover card** (`../TOOLTIP.md`), not to a second line and
+**Each element explains itself, and only itself (Ben, 2026-10-17).** The hover is **per column**, not
+per row: hovering the cost explains the cost, the pip says what the building makes, the stack figure
+says which cap it is counting against, the state mark names the good that stalls it. A card that
+answered every column at once was the first cut, and it was long enough that reading it cost more
+than the seven lines it replaced — *"I would expect the tooltip to be shorter, and give each element
+in the row a different explainer."* A column's explainer is **one or two short sentences**; if it
+needs more, the column is carrying two facts and should be two columns or one fact.
+
+**What the line drops belongs to those explainers** (`../TOOLTIP.md`), not to a second line and
 not to nothing: the sentence a chip replaced, the stall's named good, what the building makes in
 words, and what filled a tile when it is full. The rule this enforces is that **a scan and a read
 are different acts** — the row serves the scan, the card serves the read — and the surface failed it
