@@ -5175,6 +5175,10 @@ struct history_sim_state
     /// Per polity id, the anchor tile of the realm's core after the rounds
     /// (`closing_plan::polity_core_tiles`), for the tail's territory reads.
     std::vector<int32_t> closing_polity_core_tiles;
+    /// BL-1310 review: `closing_plan::core_tiles_lost` (0 expected) and
+    /// `closing_plan::ceded_regions` (the regions a cession moved).
+    int32_t              closing_core_tiles_lost = 0;
+    std::vector<int32_t> closing_ceded_regions;
 
     /// BL-1287 — THE RISE AND FALL'S OWN READING (all -1/0/false on a run
     /// whose params did not carry `rise_fall_target`). Taken at the recorded

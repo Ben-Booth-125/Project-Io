@@ -2160,6 +2160,17 @@ void run_industrialisation(generation_cursor& c)
                     tile, kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor);
         c.kepler_np.polity_core_tiles.assign(kepler_industrialisation_hs.closing_polity_core_tiles.begin(),
                                              kepler_industrialisation_hs.closing_polity_core_tiles.end());
+        // The provinces a cession moved as regions: their seeds stand on
+        // ceded ground (Pass 5 seats and names nobody by them).
+        c.kepler_np.ceded_seed_tiles.clear();
+        for (const int32_t reg : kepler_industrialisation_hs.closing_ceded_regions)
+            if (reg >= 0 && static_cast<std::size_t>(reg) < kepler_settlement.regions.size()
+                && kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor >= 0)
+                c.kepler_np.ceded_seed_tiles.push_back(kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor);
+        if (kepler_industrialisation_hs.closing_core_tiles_lost > 0)
+            record_pattern_miss(c, "closing_rounds",
+                                "the opening cessions moved " + std::to_string(kepler_industrialisation_hs.closing_core_tiles_lost)
+                                    + " tile(s) of a realm's core (sec Pass 2e: a cession moves only ground outside a territory)");
         // A TARGET MISSED IS A DEFECT, never a reported outcome (sec The
         // nation count is a target: "both targets are always hit"). The
         // closing rounds stop short only when no legal step is left -- no

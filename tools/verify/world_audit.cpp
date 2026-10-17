@@ -447,6 +447,36 @@ static int count_cessions(const generation_report& rep)
     return n;
 }
 
+// THE RANDOM-PLACEMENT PATH (BL-1310 review). A `no_prehistory` world holds
+// no realm and runs no closing rounds (measured: every nation's polity -1),
+// so it is a no-history world on the SETTLEMENT anchors. This carves the same
+// ground again through `generate_nations` with default params -- no seed
+// tiles, no polities: Pass 1's random placement, Pass 2e as the post-pass
+// after the fold, the size floor at its real minimum, and the repair after it
+// -- and audits the strait rule on that too.
+static strait_stats audit_no_history(world sw, uint32_t seed, int& nations_out)
+{
+    nations_out = 0;
+    const entity_id body = sw.home_body;
+    const auto      bit  = sw.bodies.find(body);
+    if (bit == sw.bodies.end()) return {};
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height, total = gw * gh;
+    if (total <= 0) return {};
+    std::vector<entity_id> tile_ids(static_cast<std::size_t>(total), null_entity);
+    for (const auto& [tid, tc] : sw.tiles)
+    {
+        if (tc.body != body) continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx >= 0 && idx < total) tile_ids[static_cast<std::size_t>(idx)] = tid;
+    }
+    sw.nations.clear();
+    sw.tile_to_nation.clear();
+    const nation_params np{}; // no seed tiles, no polities: the no-history path
+    nations_out = static_cast<int>(generate_nations(sw, body, tile_ids, gw, gh, np, seed ^ 0x5EED1310u).size());
+    const generation_report none{};
+    return audit_strait_rule(sw, none);
+}
+
 static std::vector<uint32_t> parse_seed_list(const char* s)
 {
     std::vector<uint32_t> out;
@@ -503,7 +533,13 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
             // recorded events, so the sim still visibly produces the
             // fragmentation the rule resolves" -- at least one on every world.
             const bool events_ok = ce == hs.closing_cessions && ce > 0;
-            const bool ok = s.illegal == 0 && events_ok && rep.handoff_violation.empty();
+            // No capital off its own land (Pass 5 seats inside the
+            // territory), and the frozen cores intact: no opening cession moved
+            // a tile of a realm's core group (the review's row -- a core that
+            // drifted onto received ground ceded the mainland under it).
+            const bool ok = s.illegal == 0 && events_ok && rep.handoff_violation.empty()
+                         && s.capital_off == 0 && hs.closing_core_tiles_lost == 0;
+            std::printf("        core tiles lost %d\n", hs.closing_core_tiles_lost);
             ++checks;
             fails += ok ? 0 : 1;
             std::printf("%s", ok ? "PASS" : "FAIL");
@@ -1439,25 +1475,46 @@ int main(int argc, char** argv)
         for (uint32_t s : sweep_seeds)
         {
             frag_stats   fs;
-            strait_stats st;
-            int          ce = 0;
-            if (s == 0)
+            strait_stats st, nh;
+            int          ce = 0, nh_nations = 0;
+            bool         closing_ran = false;
+            std::string  violation;
             {
-                fs = measure_fragmentation(w, report);
-                st = audit_strait_rule(w, report);
-                ce = count_cessions(report);
-            }
-            else
-            {
-                world_params      wp; wp.seed = s;
-                generation_report rp;
-                const world       sw = make_hard_coded_world(no_prehistory(wp), &rp);
+                // Built with a fixture so the closing rounds' own cession
+                // count is readable: these worlds record no playback, so the
+                // events `count_cessions` reads are not kept here.
+                world_params          wp; wp.seed = s;
+                generation_report     rp;
+                era_minus_one_fixture fx{};
+                const world sw = make_hard_coded_world(no_prehistory(wp), &rp, world_gen_config{}, nullptr, nullptr, &fx);
                 fs = measure_fragmentation(sw, rp);
                 st = audit_strait_rule(sw, rp);
-                ce = count_cessions(rp);
+                ce = fx.industrialisation_state.closing_cessions;
+                violation = rp.handoff_violation;
+                int realms = 0;
+                for (const auto& be : rp.bodies)
+                    if (be.is_homeworld)
+                        for (const int32_t p : be.nation_polity) realms += p >= 0 ? 1 : 0;
+                closing_ran = fx.industrialisation_state.closing_predicted >= 0;
+                std::printf("    no-prehistory seed %u: %d nation(s) from a realm, closing rounds %s\n", s, realms,
+                            closing_ran ? "ran" : "did not run");
+                nh = audit_no_history(sw, s, nh_nations);
             }
-            strait_illegal += st.illegal;
+            // THE STRAIT RULE WHERE NO HISTORY RAN (settlement anchors, no
+            // realm, no closing rounds): no illegal exclave, no capital off
+            // its own nation's land (Pass 5 seats a nation on a seed inside its
+            // territory, so the count is a check: 0), no handoff violation;
+            // and IF closing rounds ever run here, they must have ceded.
+            strait_illegal += st.illegal + st.capital_off + (violation.empty() ? 0 : 1)
+                            + ((closing_ran && ce == 0) ? 1 : 0);
             print_strait("no-prehistory", s, st, ce);
+            if (!violation.empty()) std::printf("    VIOLATION: %s\n", violation.c_str());
+            // AND THE RANDOM-PLACEMENT PATH over the same ground: Pass 2e as
+            // the post-pass, then the floor at its real minimum, then the
+            // repair after it.
+            strait_illegal += nh.illegal + nh.capital_off;
+            print_strait("no-history", s, nh, 0);
+            std::printf("    no-history: %d nations from random seeds\n", nh_nations);
             std::printf("  seed %u: %d nations, %d with an exclave | emergent %d (%d tiles), "
                         "Pass 2b %d (%d tiles) | %d landmasses, %d seedless\n",
                         s, fs.nations, fs.nations_with_exclave,
@@ -1486,13 +1543,34 @@ int main(int argc, char** argv)
     // fragmentation, measured; § Pass 2e). The old bar asserted the sim
     // produces exclaves at all; the strait rule now cedes every one, so the
     // finished world is asserted to hold NO exclave outside the rule save the
-    // remote island. `no_prehistory` drops only the pre-epoch year-tick sim:
-    // the spans and their closing rounds still run, so these cessions are the
-    // history's. That every shipped world records them as events (at least
-    // one, one per closing step) is asserted by `world_audit --seeds`
-    // (library mode, the app's data layer, natural and targeted).
+    // remote island: on six no-history worlds twice over (settlement anchors,
+    // random placement), and on one world with its history, where the
+    // closing rounds must also have ceded (the sim still produces the
+    // fragmentation the rule resolves) with the frozen cores intact. Library
+    // mode (`--seeds`) asserts the same on the app's data layer, natural and
+    // targeted, plus events == steps.
+    // ONE WORLD WITH ITS HISTORY (the review's gap): `no_prehistory` worlds
+    // hold no realm and run no closing rounds, so the fragmentation the
+    // history produces is read here, on the shipped arc's seed 0: the closing
+    // rounds ran, they ceded (recorded as steps), and the rule holds.
+    {
+        world_params          wp; wp.seed = 0;
+        generation_report     rp;
+        era_minus_one_fixture fx{};
+        const world sw = make_hard_coded_world(wp, &rp, world_gen_config{}, nullptr, nullptr, &fx);
+        const strait_stats st = audit_strait_rule(sw, rp);
+        const history_sim_state& hs = fx.industrialisation_state;
+        const bool ok = hs.closing_predicted >= 0 && hs.closing_cessions > 0 && st.illegal == 0
+                     && st.capital_off == 0 && rp.handoff_violation.empty() && hs.closing_core_tiles_lost == 0;
+        print_strait("history", 0, st, hs.closing_cessions);
+        std::printf("    history seed 0: closing rounds %s, cessions %d, core tiles lost %d%s%s : %s\n",
+                    hs.closing_predicted >= 0 ? "ran" : "did NOT run", hs.closing_cessions,
+                    hs.closing_core_tiles_lost, rp.handoff_violation.empty() ? "" : " | VIOLATION: ",
+                    rp.handoff_violation.c_str(), ok ? "PASS" : "FAIL");
+        strait_illegal += ok ? 0 : 1;
+    }
     const bool frag_ok = strait_illegal == 0;
-    std::printf("  BL-1310 R1 no exclave outside the strait rule across the 6-seed sweep "
+    std::printf("  BL-1310 R1 strait rule across the 6-seed sweep, history and no-history worlds "
                 "(saw %d): %s\n",
                 strait_illegal, frag_ok ? "PASS" : "FAIL");
 
