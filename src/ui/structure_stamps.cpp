@@ -185,7 +185,7 @@ struct sink
         }
         if (m == mode::shadow)
         {
-            float& s = R.shadow[static_cast<std::size_t>(y) * R.pw + x];
+            float& s = R.shadow.data()[static_cast<std::size_t>(y) * R.pw + x]; // unchecked (BL-1311)
             s = std::max(s, cov * alpha);
             return;
         }

@@ -151,12 +151,43 @@ public:
     /// master_ready on that path waits forever at the view's coverage (2026-10-09:
     /// 1960 of 2975 at the 1720x1080 home view).
     bool complete_master(const world& w, entity_id body, double timeout_ms);
+    /// BL-1311, verify-only — the paint in miniature, without a generation
+    /// run: @p body's whole master baked on the pool against a snapshot of
+    /// @p w with every @p drop_every-th installed tile stripped of its
+    /// installation, then the true snapshot landed and swept, so the master
+    /// re-bakes exactly as a round boundary that adds installations makes it
+    /// (the partial re-bake). Blocks; times both on the wall clock.
+    struct paint_bench
+    {
+        bool   ok = false;
+        double first_ms = 0.0, rebake_ms = 0.0;
+        int    chunks = 0, moved = 0, dropped = 0;
+    };
+    paint_bench bench_paint(const world& w, entity_id body, int drop_every, double timeout_ms);
     /// IO_GROUND_BENCH is set: --verify runs the live pool path (pump feeds the
     /// pool, the master fills in the background), not the synchronous one.
     static bool pool_path_under_verify();
 
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
+
+    /// BL-1247 (the ground benchmark, `--bench-ground`): false holds back the
+    /// speculative background bakes of other bodies, so the bench can time a
+    /// true first visit. True in play.
+    bool background_enabled = true;
+    /// BL-1247: the body the pre-bake is filling (null = none), and when the
+    /// latest pre-bake of it began (a restart — a new gate world — moves it).
+    entity_id prebake_target() const { return m_prebake; }
+    /// The last tick's view was final (stats_snapshot().view_final, without the
+    /// snapshot's per-chunk walk — the bench reads it every frame).
+    bool view_final() const { return m_view_final; }
+    std::chrono::steady_clock::time_point prebake_started() const { return m_prebake_started; }
+    /// BL-1247: the bytes one whole master of @p body holds (every level), 0 unknown.
+    long long master_size(entity_id body) const
+    {
+        const body_state* b = find(body);
+        return b ? master_bytes(*b) : 0;
+    }
 
     /// Bake-cost and residency instrumentation, read by verify.ground_stats().
     /// Slot 0 = the far page; slot 1 + l = level l (0 = the master). bake_ms /
@@ -179,6 +210,19 @@ public:
         std::uint64_t uploads = 0;   ///< Texture uploads since reset_stats().
         int       pending_uploads = 0; ///< Visible chunks of the drawn level not yet on the GPU (last tick).
         bool      view_final = false;  ///< Last tick: every master chunk under the view landed, current and uploaded.
+        /// BL-1311: worker ms per bake pass (ui::ground::bake_pass), then the
+        /// re-bake window rule, the content hash and the mip chain — summed over
+        /// every job since reset_stats(). Wall per job / workers ~ wall.
+        static constexpr int k_pass_slots = ui::ground::bp_count + 3;
+        double    pass_ms[k_pass_slots] = {};
+        /// The same, for the partial re-bakes alone (a chunk re-baked as
+        /// windows), and how many there were / how many found nothing to bake.
+        double    patch_pass_ms[k_pass_slots] = {};
+        int       patch_jobs = 0, patch_empty = 0;
+        double    patch_ms = 0.0;
+        /// Thread CPU time of the master jobs (all, and the partial ones), ms:
+        /// the work itself, which a busy machine cannot inflate as it does wall.
+        double    cpu_ms = 0.0, patch_cpu_ms = 0.0;
     };
     stats stats_snapshot() const;
     void  reset_stats();
@@ -420,6 +464,8 @@ private:
         bool               patched = false;
         std::vector<patch> patches;
         double             ms = 0.0;           ///< Worker bake time (master jobs).
+        double             rects_ms = 0.0;     ///< BL-1311: the window rule (installation_patch_rects).
+        double             hash_ms  = 0.0;     ///< BL-1311: region_hash of the chunk.
         bool               loaded = false;     ///< Load jobs: the file decoded (else: re-bake).
         double             read_ms = 0.0;      ///< Load jobs: opening and reading the file.
         entity_id     neigh_tile = null_entity;
@@ -615,6 +661,7 @@ private:
     bool              m_master_pending = false; ///< The visited body's whole master, timed from the visit.
     bool              m_prebake_pending = false;
     clock::time_point m_prebake_t0{};
+    clock::time_point m_prebake_started{}; ///< Always recorded (BL-1247's bench reads it).
     bool              m_boundary_log = false; ///< resnapshot() moved the source: log its sweep.
     bool              m_rebake_pending = false;
     clock::time_point m_rebake_t0{};

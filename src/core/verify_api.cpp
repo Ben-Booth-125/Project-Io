@@ -1159,6 +1159,24 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         r["ms"]      = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         return r;
     });
+    // BL-1311: the paint in miniature (ground_layer::bench_paint) — the active
+    // body's whole master against a snapshot with every `drop_every`-th
+    // installation stripped, then the true one: a first bake and a partial
+    // re-bake, timed, with GROUND_PAINT lines per pass. A reading, no
+    // assertion. Returns { ok, first_ms, rebake_ms, chunks, moved, dropped }.
+    v.set_function("ground_paint_bench", [this](sol::optional<int> drop_every, sol::optional<double> timeout_s) {
+        const ground_layer::paint_bench r =
+            m_ground.bench_paint(m_world, m_ui.active_body, drop_every.value_or(3),
+                                 timeout_s.value_or(1800.0) * 1000.0);
+        sol::table t = m_lua.state().create_table();
+        t["ok"]        = r.ok;
+        t["first_ms"]  = r.first_ms;
+        t["rebake_ms"] = r.rebake_ms;
+        t["chunks"]    = r.chunks;
+        t["moved"]     = r.moved;
+        t["dropped"]   = r.dropped;
+        return t;
+    });
     // A part-baked frame: at most n master chunk bakes per tick (-1 =
     // unlimited, the --verify default) — a first visit caught mid-bake.
     v.set_function("ground_fill_limit", [this](int n) { m_ground.verify_fill_limit = n; });

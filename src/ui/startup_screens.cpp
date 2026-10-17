@@ -208,7 +208,9 @@ void app::prime_wizard_setup()
     if (!m_seed_rolled)
     {
         m_seed_rolled = true;
-        if (m_golden_dir.empty())
+        if (m_bench.on)
+            wp.seed = m_bench.seed; // BL-1247: a benchmark compares like with like
+        else if (m_golden_dir.empty())
         {
             std::random_device rd_seed;
             wp.seed = static_cast<uint32_t>(rd_seed());
@@ -3208,10 +3210,12 @@ void app::draw_generation_screen()
             // IO_AUTOSTART_DWELL_MS (BL-1246, a measurement switch): a player
             // watches each lapse round before pressing Next; the walk dwells
             // that long from its arrival on every lapse round.
-            static const long long dwell_ms = [] {
+            static const long long env_dwell_ms = [] {
                 const char* v = SDL_getenv("IO_AUTOSTART_DWELL_MS");
                 return v ? std::atoll(v) : 0LL;
             }();
+            // BL-1247: the ground bench walks as a reader (--dwell).
+            const long long dwell_ms = m_bench.on ? m_bench.dwell_ms : env_dwell_ms;
             if (m_autostart_round_t0 == std::chrono::steady_clock::time_point{})
                 m_autostart_round_t0 = std::chrono::steady_clock::now();
             bool dwelling =
@@ -3221,10 +3225,11 @@ void app::draw_generation_screen()
             // IO_AUTOSTART_BEGIN_DWELL_MS: Begin is held this long after round
             // 6's world has landed -- the player reading the close, and the
             // seat canvas a player is shown and the walk skips.
-            static const long long begin_dwell_ms = [] {
+            static const long long env_begin_dwell_ms = [] {
                 const char* v = SDL_getenv("IO_AUTOSTART_BEGIN_DWELL_MS");
                 return v ? std::atoll(v) : 0LL;
             }();
+            const long long begin_dwell_ms = m_bench.on ? m_bench.dwell_ms : env_begin_dwell_ms;
             if (begin_dwell_ms > 0 && !round_building && m_wiz_round == wizard_round_count - 1)
             {
                 if (m_autostart_landed_t0 == std::chrono::steady_clock::time_point{})
