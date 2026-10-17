@@ -1457,27 +1457,6 @@
    "design": "SPRINT 56 (found investigating BL-1341, 2026-10-16). construct_building maps every can_place_in_world refusal except launchpad_exists into construction_result::invalid_tile (construction.cpp:213), so a full extraction stack, a full non-extraction stack and a full province ceiling all report 'invalid tile' in the post-hoc toast - a tile that is perfectly valid. The build-door row is honest (BL-1341 gave it the real wording and the numbers); it is the seam's own result enum that is lossy, and the seam is also the AI-facing one, where a wrong reason is a wrong signal. Carry the placement_reason through instead of flattening it."
   },
   {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-17",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (found delivering BL-1365, 2026-10-17)",
-   "requires": [],
-   "id": "BL-1366",
-   "short_name": "RAIL_ROWS_JOIN_THE_GRID",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/rail_tool.cpp"
-   ],
-   "title": "The rail rows are the one non-grid row left in the build list, a four-line box among one-line rows",
-   "design": "SPRINT 55 (found delivering BL-1365, 2026-10-17). Every construction row is now one line in a fixed-column grid (construction.md: One line a row / The line is a grid). draw_rail_rows lives in src/ui/rail_tool.cpp, which was outside that lane's owned files, so the Track and Railway Station rows still draw a four-line bordered box - and they now sit visibly taller between the one-line Infrastructure rows above and below them (see the lane's construction_build_door_extraction.png capture). The lane passed them their OLD metric so they are not clipped, which is the right holding action and not the end state. THE WORK: bring both rail rows into ui::construction_grid's columns and the shared hover card, reusing construction_row_height / construction_row_hovered / construction_row_card / construction_grid_bar rather than a second idiom. Note BL-1255's live click asked for the track row to be restyled like the road rows, which this subsumes. CONFIRMED BY BEN AT THE LIVE CLICK (2026-10-17): \"I have noticed that the railway station does not fold to one row.\" So this is seen in play, not only in a capture."
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 55,
@@ -1501,28 +1480,6 @@
    "design": "SPRINT 55 (from the BL-1351 census, 2026-10-17). Ben, 2026-10-16: 'What we want to see is a centralised market capital city, with a high number of logistics points, and logistics diminishing as we get further away, but extended by logistics buildings further away.' The census measured the opposite shape: 10.3% of hubs at market centres, points fading 83/73/65/39 across distance rings with the capital the peak in only 19% of cases and empty in 28%, and 78% of national ground at coverage 0 while every consumer is fully covered. The pass is honest - it walks CONSUMERS and covers each with one hub - so this is not a defect in it; it is that nothing ever asked it for a hierarchy. THE GAP THAT BLOCKS THE WORK: LOGISTICS.md section Logistic Points defines what a source IS and how reach fades, and says NOTHING about where the fold should put one, so Ben's picture has no owning doc and findings above have nothing to be pass/fail against. SO: Ben rules whether the centralised picture is the intent; it is written into LOGISTICS.md (or a generation doc) as the layout the fold owes; then the seeding pass is changed to seed hierarchically - centres and the capital first, outward after - and the census is re-run against it as pass/fail rather than as description. Sequenced after the road-tier reach extension (BL-1360) and rail point-to-point, both of which move these numbers."
   },
   {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-17",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-17, at the live click); filed by Claude",
-   "requires": [],
-   "id": "BL-1368",
-   "short_name": "PER_COLUMN_EXPLAINERS",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/construction_panel.cpp",
-    "src/ui/selection_panel.cpp"
-   ],
-   "title": "One hover card answers every column at once; each element should explain itself, briefly",
-   "design": "SPRINT 55 (Ben, 2026-10-17, at the live click on BL-1365): 'I would expect the tooltip to be shorter, and give each element in the row a different explainer.' BL-1365 put everything the line dropped onto ONE row-wide card (construction_row_card, hit-tested across the whole row) - correct against the brief it had, and too long in the hand: reading it costs more than the seven lines it replaced. RULED and written into construction.md (Each element explains itself, and only itself): the hover is PER COLUMN. Hovering the cost explains the cost; the pip says what the building makes; the stack figure says which cap it counts against (per-deposit or the ground's aggregate); the state mark names the good that stalls it; the bar explains the net estimate and its 50%-staffing caveat. One or two short sentences each - if a column's explainer needs more, that column is carrying two facts and should be split or trimmed. Keep construction_stall_reason as the single author of the stall clause. Apply to all four surfaces, and note the row-wide hit test must not steal the Build press (the reason the lane used a rect hit-test rather than a Selectable)."
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 55,
@@ -1542,29 +1499,6 @@
    ],
    "title": "The road ladder is the last tall row on the build list, and its first rung is called Track like the rail row above it",
    "design": "SPRINT 55 (found delivering BL-1366/1368, 2026-10-17). TWO THINGS, one surface. (1) Every construction row is now one line in the shared eight-column grid - build list, queue, tile-card stacks, expanded site card, and as of BL-1366 the rail rows too. The ROAD LADDER's three tier rows are the last exception: tall bordered boxes with a 56 px glyph, and now the only tall rows on the panel. Bring them into ui::construction_begin_build_grid and the per-column explainers, as the rail rows were. (2) A NAME COLLISION, pre-existing but newly visible now both are compact: the road ladder's first rung is 'Track' (LOGISTICS.md's road tier 1) and the rail row directly above it is also 'Track' (the railway line). Two adjacent one-line rows, same word, different networks. BEN'S CALL whether to rename one - the road tier names Track/Road/Highway are LOGISTICS.md's ladder and the rail 'Track' is GLOSSARY-adjacent, so a rename moves a term, not a label. Raise it rather than pick."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-17",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-17, at the live click); filed by Claude",
-   "id": "BL-1371",
-   "short_name": "TWO_LINE_GRID_ROWS",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "requires": [],
-   "files": [
-    "src/ui/construction_panel.cpp",
-    "src/ui/selection_panel.cpp",
-    "src/ui/rail_tool.cpp"
-   ],
-   "title": "A construction row is two lines tall so text wraps instead of truncating",
-   "design": "SPRINT 55 (Ben, 2026-10-17, at the live click on BL-1365/1368): 'looking at the building grids, we are going to have to use two row spaces for each building, this is so that text can wrap to the second row. Many rows truncate the text, and it will look better with text wrap taking up more space.' DESIGNED: construction.md (A row is two lines tall, and text wraps rather than truncating). The columns, their order and their widths all stand - only the row height changes, from one line to TWO, and a column whose text does not fit wraps into the second line instead of eliding through fit_text. The name column was the worst case at about 70 px of stretch. A row needing one line still occupies two, so the grid stays a grid. Apply to all five surfaces that use ui::construction_begin_build_grid - build list, rail rows, queue, tile-card stacks, expanded site card - and update the harness rows that assert the one-line metric (construction_progress asserts row h 20.0 against a 16.0 line; both move). Keep the per-column explainers; wrapping reduces what they must carry but does not replace them."
   },
   {
    "status": "proposed",
