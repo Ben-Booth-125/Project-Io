@@ -49,6 +49,28 @@ float road_traversal_multiplier(std::uint8_t tier);
 /// @param side  Hex side index (0-5, hex_side_for_offset's ordering) the hop crosses.
 float road_edge_discount(const tile_component& from, int side);
 
+/// A BRIDGE DECK'S OWN WEIGHT (BL-1340; LOGISTICS.md § 4, "A road runs from one tile
+/// centre to another, and may span water", Ben 2026-10-17). A road edge may span water,
+/// and a run of such edges IS a bridge; what a crossing on one costs is its ROAD tier's
+/// price, not the water's sea leg — "a bridge that did not beat the water it crosses
+/// would be a decoration". So the water node of a roaded edge is priced as the road's own
+/// surface, plains 1.0, before the tier discount. Neither the sea leg nor a sea lane is
+/// read on a bridged node: a bridge is road, not water.
+inline constexpr float k_bridge_deck_cost = 1.0f;
+
+/// One NODE's weight inside an edge whose road tier is @p tier: the bridge deck where the
+/// node is water and the edge carries a road, `tile_traversal_cost` otherwise (BL-1340).
+float road_edge_node_cost(const tile_component& tc, std::uint8_t tier);
+
+/// THE ONE HOP PRICE (BL-1340), shared by every consumer so none can drift: the step that
+/// leaves @p from across its hex side @p side and lands on @p to costs the MEAN of the two
+/// nodes' weights, times the river discount of that side of @p from (directed — downstream
+/// is cheaper), times the ROAD discount of the crossing (symmetric). Water nodes of a
+/// roaded edge are priced as the bridge deck. @p side < 0 (not neighbours) prices the mean
+/// alone. Called by both intra-body floods (`flood_edge_cost`), the reach field, the sea
+/// leg, `lane_clock`, and `run_unit_march`.
+float edge_traversal_cost(const tile_component& from, const tile_component& to, int side);
+
 /// A tile's traversal-cost WEIGHT — ocean or landform cost, discounted by a sea lane
 /// where one lies on it. The per-node weight A*, body_reach_field's Dijkstra, and
 /// (BL-470) a marching unit all share; a hop's cost is the mean of its two nodes times
@@ -79,9 +101,13 @@ entity_id road_edge_neighbour(const world& w, entity_id tile, int side);
 /// above @p tier is left alone. Does NOT invalidate the logistics caches; the caller does
 /// that once per batch.
 ///
+/// EITHER END MAY BE WATER (Ben, 2026-10-17): a run of such edges is a bridge, and no
+/// second mechanism or field expresses one. What is still impossible is a road belonging
+/// to no crossing — the thing the ruling was aimed at.
+///
 /// @return false (nothing written) if the tile is unknown, @p side has no neighbour on the
-///         grid, either end is water (a road is a land feature, BL-516), or the edge
-///         already stands at @p tier or better.
+///         grid (the top and bottom rows do not wrap), or the edge already stands at
+///         @p tier or better.
 bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier);
 
 /// Every road edge in the world, counted ONCE (BL-1340): a tile's sides 0-2 (E, NE, NW)

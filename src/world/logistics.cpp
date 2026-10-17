@@ -87,6 +87,24 @@ float road_traversal_multiplier(std::uint8_t tier)
     return 1.0f / (1.0f + 0.5f * static_cast<float>(tier));
 }
 
+float road_edge_node_cost(const tile_component& tc, std::uint8_t tier)
+{
+    // A BRIDGE IS ROAD, NOT WATER (BL-1340, Ben 2026-10-17). Where a roaded edge spans
+    // water, the water node is priced as the road's own deck — so neither the sea leg nor
+    // a sea lane is read there, and the crossing costs its tier's price.
+    if (tier > 0 && is_water(tc.substrate))
+        return k_bridge_deck_cost;
+    return tile_traversal_cost(tc);
+}
+
+float edge_traversal_cost(const tile_component& from, const tile_component& to, int side)
+{
+    const std::uint8_t tier = road_tier_on_side(from, side);
+    const float river = (side >= 0) ? river_edge_discount(from, side) : 1.0f;
+    return 0.5f * (road_edge_node_cost(from, tier) + road_edge_node_cost(to, tier))
+           * river * road_traversal_multiplier(tier);
+}
+
 float road_edge_discount(const tile_component& from, int side)
 {
     // BL-1340 — THE LADDER MOVED TO THE EDGE (LOGISTICS.md § 4). The same
@@ -230,14 +248,17 @@ bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier)
     if (side < 0 || side > 5 || tier == 0 || tier > 3)
         return false;
     const auto tit = w.tiles.find(tile);
-    if (tit == w.tiles.end() || is_water(tit->second.substrate)) // BL-516: a road is land
+    if (tit == w.tiles.end())
         return false;
     const entity_id other = road_edge_neighbour(w, tile, side);
     if (other == null_entity)
         return false; // a road to nowhere cannot be expressed (LOGISTICS.md § 4)
     const auto oit = w.tiles.find(other);
-    if (oit == w.tiles.end() || is_water(oit->second.substrate))
+    if (oit == w.tiles.end())
         return false;
+    // EITHER END MAY BE WATER (Ben, 2026-10-17): a run of such edges is a bridge. The old
+    // BL-516 refusal — "a road is a land feature" — was a statement about a road being a
+    // TILE property; an edge between two centres can span the water between them.
     if (road_tier_on_side(tit->second, side) >= tier)
         return false; // raises only — max on overlap
     set_road_tier_on_side(tit->second, side, tier);
@@ -344,23 +365,32 @@ constexpr int k_flood_off_dr[4] = { -1,  1,  0, 0 };
 /// prices is TRAVEL TOWARD the anchor (BL-1126, path cost reads the cache;
 /// LOGISTICS.md § 1: a path is directed, and its cost is always origin ->
 /// destination). So reaching neighbour @p n_tc (row @p n_row) from the settled
-/// cell (node weight @p cur_cost) along offset @p i prices the hop n -> settled:
+/// cell @p cur_tc along offset @p i prices the hop n -> settled:
 /// the mean of the two node weights, times the river discount of the side of
 /// @p n_tc the hop LEAVES by (river_edge_discount reads the tile being left;
 /// downstream is cheaper than upstream). A field anchored at D then holds, at
 /// every cell O, the cost of travelling O -> D, which is what intra_body_path(O,
 /// D) reads. Both floods share this one expression so they cannot disagree.
-inline float flood_edge_cost(float cur_cost, const tile_component& n_tc, int n_row, int i)
+inline float flood_edge_cost(const tile_component& cur_tc, const tile_component& n_tc,
+                             int n_row, int i)
 {
-    // River discount (BL-170) and ROAD discount (BL-1340), both per-EDGE and stacking
-    // multiplicatively over the mean of the two node weights. The hop runs n -> settled:
-    // the reverse of offset i, from n's row parity. The river reads the tile being LEFT
-    // (it is directed); the road is the same tier read from either end (mirrored), so
-    // reading it off n_tc's side is the whole edge.
+    // ONE HOP PRICE, held in `edge_traversal_cost` (BL-1340) so no reader can drift from
+    // another: the mean of the two node weights, the river discount of the side LEFT
+    // (directed), the ROAD discount of the crossing (symmetric), and a water node of a
+    // roaded edge priced as the bridge deck. The hop runs n -> settled: the reverse of
+    // offset i, from n's row parity.
     const int hex_side = hex_side_for_offset(-k_flood_off_dc[i], -k_flood_off_dr[i], (n_row & 1) != 0);
-    const float river_mult = (hex_side >= 0) ? river_edge_discount(n_tc, hex_side) : 1.0f;
-    const float road_mult  = (hex_side >= 0) ? road_edge_discount(n_tc, hex_side) : 1.0f;
-    return 0.5f * (cur_cost + tile_traversal_cost(n_tc)) * river_mult * road_mult;
+    return edge_traversal_cost(n_tc, cur_tc, hex_side);
+}
+
+/// BL-1340: does the crossing between the settled cell and neighbour @p n_tc (reached by
+/// offset @p i out of row @p n_row) carry a road? A LAND leg crosses water only on a
+/// bridge — that is what a bridge is for — so the water gates below read this rather
+/// than refusing every water hop (BL-1125 refused them all, before a bridge existed).
+inline bool flood_edge_is_bridge(const tile_component& n_tc, int n_row, int i)
+{
+    const int hex_side = hex_side_for_offset(-k_flood_off_dc[i], -k_flood_off_dr[i], (n_row & 1) != 0);
+    return road_tier_on_side(n_tc, hex_side) > 0;
 }
 
 /// Fetch or build the COMPLETED flood field anchored at @p anchor_tile — the
@@ -423,7 +453,6 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
         const tile_component* cur_tc = tile_at(idx);
         if (!cur_tc)
             continue;
-        const float cur_cost = tile_traversal_cost(*cur_tc);
 
         for (int i = 0; i < 4; ++i)
         {
@@ -438,7 +467,7 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
             if (!n_tc)
                 continue; // absent grid cell — impassable
 
-            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
+            const float edge = flood_edge_cost(*cur_tc, *n_tc, nr, i);
             const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
             if (nd < f.dist[static_cast<std::size_t>(nidx)])
             {
@@ -505,7 +534,6 @@ std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body
         const tile_component* cur_tc = tile_at(idx);
         if (!cur_tc)
             continue;
-        const float cur_cost = tile_traversal_cost(*cur_tc);
         for (int i = 0; i < 4; ++i)
         {
             const int nr = cur.row + k_flood_off_dr[i];
@@ -518,10 +546,11 @@ std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body
             const tile_component* n_tc = tile_at(nidx);
             if (!n_tc)
                 continue;
-            if (land_only && is_water(n_tc->substrate))
-                continue; // BL-1125: no water hop without a port at both ends
+            if (land_only && is_water(n_tc->substrate) && !flood_edge_is_bridge(*n_tc, nr, i))
+                continue; // BL-1125: no water hop without a port at both ends — OR a
+                          // bridge (BL-1340, Ben 2026-10-17), which is what one is for
             const float nd = dist[static_cast<std::size_t>(idx)]
-                           + flood_edge_cost(cur_cost, *n_tc, nr, i);
+                           + flood_edge_cost(*cur_tc, *n_tc, nr, i);
             if (nd <= max_cost && nd < dist[static_cast<std::size_t>(nidx)])
             {
                 dist[static_cast<std::size_t>(nidx)] = nd;
@@ -682,7 +711,6 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
         // the anchor is where a leg ENDS, never a cell it passes through.
         if (domain == leg_domain::sea && !cur_water && idx != f.anchor_idx)
             continue;
-        const float cur_cost = tile_traversal_cost(*cur_tc);
 
         for (int i = 0; i < 4; ++i)
         {
@@ -697,12 +725,12 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
             if (!n_tc)
                 continue;
             const bool n_water = wet(*n_tc);
-            if (domain == leg_domain::land && n_water)
-                continue; // a land leg never enters water
+            if (domain == leg_domain::land && n_water && !flood_edge_is_bridge(*n_tc, nr, i))
+                continue; // a land leg enters water only across a bridge (BL-1340)
             if (domain == leg_domain::sea && !cur_water && !n_water)
                 continue; // the anchor port leaves by water, never overland
 
-            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
+            const float edge = flood_edge_cost(*cur_tc, *n_tc, nr, i);
             const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
             if (nd < f.dist[static_cast<std::size_t>(nidx)])
             {
@@ -742,8 +770,10 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
                 const bool n_water = wet(*n_tc);
                 if (cur_water == n_water)
                     continue; // only the port <-> water hop
-                const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc))
-                                 * river_edge_discount(*n_tc, (side + 3) % 6);
+                // BL-1340: the ONE hop price, as the cardinal hops above — priced from
+                // the neighbour leaving by the side facing back, so a bridge or a river
+                // on that side is read here too.
+                const float edge = edge_traversal_cost(*n_tc, *cur_tc, (side + 3) % 6);
                 const float nd = f.dist[static_cast<std::size_t>(idx)] + edge;
                 if (nd < f.dist[static_cast<std::size_t>(nidx)])
                 {
@@ -1409,7 +1439,6 @@ lp_anchor_field build_lp_anchor_field(world& w, entity_id body, std::vector<enti
         const tile_component* cur_tc = tile_at(cur.idx);
         if (!cur_tc)
             continue;
-        const float cur_cost = tile_traversal_cost(*cur_tc);
         const int   col      = cur.idx % gw;
         const int   row      = cur.idx / gw;
 
@@ -1427,7 +1456,7 @@ lp_anchor_field build_lp_anchor_field(world& w, entity_id body, std::vector<enti
             if (!n_tc)
                 continue; // absent grid cell — impassable
 
-            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
+            const float edge = flood_edge_cost(*cur_tc, *n_tc, nr, i);
             const float nd   = f.cost[ci] + edge;
             if (nd < f.cost[ni] || (nd == f.cost[ni] && f.nearest[ci] < f.nearest[ni]))
             {
@@ -1636,10 +1665,11 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
     if (n < 2)
         return at;
 
-    // The cost of the hop a -> b as the flood prices it (flood_edge_cost, and the
-    // sea leg's diagonal port hop): node mean, times river_edge_discount on the side
-    // of `a` facing `b` (the tile being LEFT; downstream cheaper than upstream).
-    // The east-west wrap is undone so a hop across the seam finds its side.
+    // The cost of the hop a -> b as the flood prices it: `edge_traversal_cost`, the ONE
+    // hop price (BL-1340) — node mean, the river discount on the side of `a` facing `b`
+    // (the tile being LEFT; downstream cheaper than upstream), the road discount of that
+    // crossing, and a bridged water node at its deck. The east-west wrap is undone so a
+    // hop across the seam finds its side.
     const auto hop_cost = [&](entity_id ta, entity_id tb) {
         const auto ia = w.tiles.find(ta);
         const auto ib = w.tiles.find(tb);
@@ -1647,7 +1677,6 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
             return 1.0f;
         const tile_component& a = ia->second;
         const tile_component& b = ib->second;
-        float mult = 1.0f;
         const auto bit = w.bodies.find(a.body);
         const int gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
         int dc = b.grid_x - a.grid_x;
@@ -1657,9 +1686,7 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
             if (dc < -1) dc += gw;
         }
         const int side = hex_side_for_offset(dc, b.grid_y - a.grid_y, (a.grid_y & 1) != 0);
-        if (side >= 0)
-            mult = river_edge_discount(a, side);
-        return 0.5f * (tile_traversal_cost(a) + tile_traversal_cost(b)) * mult;
+        return edge_traversal_cost(a, b, side);
     };
 
     std::vector<float> hop(n - 1, 0.0f); // days spent on hop i -> i+1

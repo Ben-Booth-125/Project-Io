@@ -4355,15 +4355,13 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
                 continue; // re-evaluate the loop condition against the fresh path
             }
 
-            // Same edge-cost convention intra_body_path/body_reach_field use: the mean of
-            // the two nodes' traversal-cost weights, times the EDGE's own road discount
-            // (BL-1340 — a road is an edge, so a marching unit pays the crossing's tier,
-            // not either tile's). The river discount stays the flood's: a march is
-            // priced the same way round whichever way it walks.
+            // THE ONE HOP PRICE the floods use (`edge_traversal_cost`, BL-1340): the mean
+            // of the two nodes, the crossing's road tier, its river discount, and a
+            // bridged water node at its deck — so a unit marching over a bridge pays the
+            // road, as a convoy does, and neither invents a second model.
             const int march_side = road_side_between(w, u.position, next_id);
-            const float step_cost = 0.5f * (tile_traversal_cost(cur_it->second)
-                                            + tile_traversal_cost(next_it->second))
-                                  * road_edge_discount(cur_it->second, march_side);
+            const float step_cost =
+                edge_traversal_cost(cur_it->second, next_it->second, march_side);
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;

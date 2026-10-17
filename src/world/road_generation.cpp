@@ -261,8 +261,8 @@ struct road_snapper
         const tile_component* tb = tile_at(b);
         if (side < 0 || ta == nullptr || tb == nullptr)
             return 0;
-        if (is_water(ta->substrate) || is_water(tb->substrate))
-            return 0; // a road is never laid on water (BL-516), so no crossing is discounted
+        // Water is no bar (BL-1340, Ben 2026-10-17): the stamp lays a crossing over it and
+        // the run is a bridge, so the hop is priced at the tier like any other.
         return std::max(road_tier_on_side(*ta, side), level);
     }
 
@@ -292,13 +292,11 @@ struct road_snapper
         }
     }
 
-    /// A cell's own traversal cost. BL-1340: no road term — a road discounts the EDGE
-    /// the hop crosses (`walk_cost` below), never the node.
-    float cell_cost(int r) const { return tile_traversal_cost(*tile_at(r)); }
-
-    /// A raster walk priced as the flood prices it (logistics.cpp § flood_edge_cost):
-    /// hop a -> b = mean of the two cells' costs x a's river discount on the side left
-    /// x the ROAD discount of that same side, at the tier the stamp at @p level leaves it.
+    /// A raster walk priced as the flood prices it (`edge_traversal_cost`, the one hop
+    /// price): hop a -> b = mean of the two nodes x a's river discount on the side left
+    /// x the ROAD discount of that side, at the tier the stamp at @p level leaves it, with
+    /// a bridged water node at its deck. Written out rather than delegated because the
+    /// tier here is HYPOTHETICAL — what the stamp would leave, not what stands.
     float walk_cost(const std::vector<int>& cells, std::uint8_t level) const
     {
         float c = 0.0f;
@@ -307,9 +305,11 @@ struct road_snapper
             const int a = cells[k], b = cells[k + 1];
             const int side = side_between(a, b);
             const tile_component& ta = *tile_at(a);
+            const tile_component& tb = *tile_at(b);
+            const std::uint8_t tier = edge_tier_after(a, b, level);
             const float rm = side >= 0 ? river_edge_discount(ta, side) : 1.0f;
-            const float dm = road_traversal_multiplier(edge_tier_after(a, b, level));
-            c += 0.5f * (cell_cost(a) + cell_cost(b)) * rm * dm;
+            c += 0.5f * (road_edge_node_cost(ta, tier) + road_edge_node_cost(tb, tier))
+                 * rm * road_traversal_multiplier(tier);
         }
         return c;
     }
@@ -472,9 +472,11 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     // of 4-cardinal neighbours, so each consecutive pair names one crossing: the edge
     // between them takes the max of what stands and @p level, both halves written
     // together (`lay_road_edge`). A single-tile route lays nothing — a road to nowhere
-    // cannot be expressed — and a water tile ends the run it is in (roads are a land
-    // feature, BL-516). `stamped` still reports the TILES the route touched, which is
-    // what its readers (the traces, the spur's "is this tile joined") ask of it.
+    // cannot be expressed. WATER NO LONGER ENDS THE RUN (Ben, 2026-10-17): the crossings
+    // over a strait are the BRIDGE, and the route was already refused unless its water
+    // runs are straits (`crossing_kind`), so no bridge is laid over open sea. `stamped`
+    // still reports the TILES the route touched, which is what its readers (the traces,
+    // the spur's "is this tile joined") ask of it.
     bool raised = false; // probe-only reading
     for (std::size_t k = 0; k + 1 < g_last_laid.size(); ++k)
     {
@@ -488,7 +490,7 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
         for (const entity_id t : g_last_laid)
         {
             const auto it = w.tiles.find(t);
-            if (it != w.tiles.end() && !is_water(it->second.substrate) && tile_has_road(it->second))
+            if (it != w.tiles.end() && tile_has_road(it->second))
                 stamped->push_back(t);
         }
     if (g_road_probe_fresh_floods && raised) // BL-1119 probe: price the next route on the field as it stands
@@ -698,38 +700,47 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     //     single-centre special case) and order-independent: std::max means a centre that
     //     later sits on a Highway keeps the higher tier.
     //     BL-1340: a street is an EDGE now, so "this centre's own tile carries a Track"
-    //     becomes ONE Track edge out of the centre — to the cheapest land neighbour by
+    //     becomes ONE Track edge out of the centre — to the cheapest LAND neighbour by
     //     traversal cost, ties broken by the lower hex-side index. One edge, not six: a
     //     ring of streets round every centre would be the lattice this pass exists to
     //     avoid, while a tile with no edge at all could not be on the network at all.
-    //     Deterministic (the cost is the tile's own weight and the tie-break is the side
-    //     order) and order-independent (`lay_road_edge` only ever raises).
+    //     A centre with no land neighbour at all — a one-tile island — takes its street
+    //     as a BRIDGE to the cheapest water side instead (Ben, 2026-10-17: a road edge may
+    //     span water), so no centre is left unable to express a road. Deterministic (the
+    //     cost is the neighbour's own weight, the tie-break is the side order, and land is
+    //     preferred to water whatever the costs) and order-independent (`lay_road_edge`
+    //     only ever raises).
     for (const road_node& node : nodes)
     {
         const auto it = w.tiles.find(node.tile);
-        if (it == w.tiles.end() || is_water(it->second.substrate)) // BL-516
+        if (it == w.tiles.end())
             continue;
         if (tile_has_road(it->second))
             continue; // already on the network: a later Highway through it keeps its tier
-        int   best_side = -1;
-        float best_cost = 0.0f;
+        int   best_side = -1, best_wet_side = -1;
+        float best_cost = 0.0f, best_wet_cost = 0.0f;
         for (int s = 0; s < 6; ++s)
         {
             const entity_id nb = road_edge_neighbour(w, node.tile, s);
             if (nb == null_entity)
                 continue;
             const auto nit = w.tiles.find(nb);
-            if (nit == w.tiles.end() || is_water(nit->second.substrate))
+            if (nit == w.tiles.end())
                 continue;
             const float c = tile_traversal_cost(nit->second);
-            if (best_side < 0 || c < best_cost)
+            if (is_water(nit->second.substrate))
+            {
+                if (best_wet_side < 0 || c < best_wet_cost) { best_wet_side = s; best_wet_cost = c; }
+            }
+            else if (best_side < 0 || c < best_cost)
             {
                 best_side = s;
                 best_cost = c;
             }
         }
-        if (best_side >= 0)
-            lay_road_edge(w, node.tile, best_side, kTrack);
+        const int lay_side = best_side >= 0 ? best_side : best_wet_side;
+        if (lay_side >= 0)
+            lay_road_edge(w, node.tile, lay_side, kTrack);
     }
 
     // Group node indices by nation (std::map → nation ids ascending, deterministic;
@@ -1422,13 +1433,15 @@ market_cost_grid build_market_cost_grid(world& w, entity_id body)
         const tile_component& tc = it->second;
         g.q[i] = market_cell_weight(tc);
         g.nation[i] = nation_of(w, g.tile[i]);
+        // BL-1340: a bridged water cell is ON the network too (a run of crossings over a
+        // strait is a bridge), so `roaded` reads the field rather than the substrate. The
+        // walk still admits water only inside a strait run, whatever this says.
+        g.roaded[i] = tile_has_road(tc) ? 1 : 0;
         if (is_water(tc.substrate))
         {
             if (is_open_ocean(tc.substrate)) g.ocean[i] = 1;
             else                             g.water[i] = 1;
-            continue;
         }
-        g.roaded[i] = tile_has_road(tc) ? 1 : 0;
     }
     return g;
 }
@@ -1637,10 +1650,14 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
     // the link's two end scales @p sa / @p sb), so a sub-0.40 nation's ground stays Track
     // and unowned land (percentile 0) reads Track. Returns the land cells on the route: a
     // route with none lays nothing.
-    // BL-1340: the route lays EDGES between consecutive cells. A crossing takes the lower
-    // of the two ends' national gates — the same "lower of its two nations" reading the
+    // BL-1340: the route lays EDGES between consecutive cells, WATER INCLUDED — a run of
+    // crossings over a strait is a bridge (Ben, 2026-10-17). A crossing takes the lower of
+    // the two ends' national gates — the same "lower of its two nations" reading the
     // trunk's tier already takes (Ben, 2026-10-03) — so a sub-0.40 nation's border still
-    // stays Track and unowned land reads Track, whichever end of the edge is walked.
+    // stays Track and unowned land reads Track, whichever end of the edge is walked. A
+    // WATER end gates nothing: nobody holds the sea, so reading its (absent) nation as
+    // percentile 0 would drop every bridge to Track and cap a Highway at the first strait,
+    // which is a gate on the WEATHER rather than on a nation's development.
     auto stamp = [&](const std::vector<int>& cells, std::uint8_t link_level, int sa, int sb,
                      std::vector<entity_id>* path) {
         int land = 0;
@@ -1654,13 +1671,17 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
         {
             const std::size_t ca = static_cast<std::size_t>(cells[k]);
             const std::size_t cb = static_cast<std::size_t>(cells[k + 1]);
-            if (!is_land(cells[k]) || !is_land(cells[k + 1])) continue;
             const entity_id ta = g.tile[ca], tb = g.tile[cb];
+            if (ta == null_entity || tb == null_entity) continue;
             const int side = road_side_between(w, ta, tb);
             if (side < 0) continue;
-            const std::uint8_t level =
-                std::min(link_level, std::min(edge_tier(sa, sb, pct_of(g.nation[ca])),
-                                              edge_tier(sa, sb, pct_of(g.nation[cb]))));
+            // The gate of each LAND end; a water end gates nothing (above). Both ends
+            // water — the middle of a strait — takes the link's own level.
+            std::uint8_t level = link_level;
+            if (is_land(cells[k]))
+                level = std::min(level, edge_tier(sa, sb, pct_of(g.nation[ca])));
+            if (is_land(cells[k + 1]))
+                level = std::min(level, edge_tier(sa, sb, pct_of(g.nation[cb])));
             const auto ait = w.tiles.find(ta);
             const auto bit = w.tiles.find(tb);
             if (ait == w.tiles.end() || bit == w.tiles.end()) continue;
@@ -1680,10 +1701,10 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
             g.q[cb] = market_cell_weight(bit->second);
         }
         // BL-1340: A LINK IS LAID ONLY IF A CROSSING WAS WRITTEN. A road is an edge, so a
-        // route whose land cells do not adjoin one another — a single cell of shore either
-        // side of a strait — lays nothing, however many land cells it holds. Reporting such
-        // a link as laid would have the pass claim a trunk it never stamped; it counts as
+        // route of one cell lays nothing however much land it holds. Reporting such a link
+        // as laid would have the pass claim a trunk it never stamped; it counts as
         // `trunk_empty` instead, which is what "admitted, but nothing laid" already means.
+        // (A strait no longer causes this: the bridge over it is laid like any other run.)
         return laid > 0 ? land : 0;
     };
     auto raises_now = [&]() { return trace != nullptr ? trace->raises.size() : std::size_t{ 0 }; };

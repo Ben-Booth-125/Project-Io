@@ -91,9 +91,9 @@ bool can_place_population_centre(const tile_component& tc)
 
 placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
 {
-    // No road on water — roads are land infrastructure.
-    if (is_water_tile(tc.substrate))
-        return placement_reason::ocean;
+    // BL-1340 (Ben, 2026-10-17): water is NO LONGER a refusal. A road edge may span water
+    // and a run of such edges is a bridge, so a water tile with a neighbour can carry one;
+    // the real gate is the per-side form below, which this weak form cannot reach.
     // Upgrade-in-place (BL-172, BL-1340): a tile every side of which already stands at or
     // above @p tier has nothing this tier can add. Reject rather than silently re-charge
     // (BL-147 rejected any road; the tier check generalises that).
@@ -115,15 +115,15 @@ placement_result can_place_road(const world& w, entity_id tile, int side, std::u
         return placement_reason::ocean; // no tile: nothing to lay a road from
     if (side < 0 || side > 5 || tier == 0 || tier > 3)
         return placement_reason::ocean;
-    if (is_water_tile(tit->second.substrate))
-        return placement_reason::ocean;
-    // A ROAD TO NOWHERE CANNOT BE EXPRESSED (LOGISTICS.md § 4): a side with no neighbour,
-    // or a neighbour under water, is not a crossing.
+    // A ROAD TO NOWHERE CANNOT BE EXPRESSED (LOGISTICS.md § 4): a side with no neighbour
+    // is not a crossing. WATER AT EITHER END IS FINE (Ben, 2026-10-17: "Roads can go over
+    // water with bridges no problem") — a run of such edges IS the bridge, and the cost
+    // per crossing is what keeps a pointless span over open water from being free.
     const entity_id other = road_edge_neighbour(w, tile, side);
     if (other == null_entity)
         return placement_reason::ocean;
     const auto oit = w.tiles.find(other);
-    if (oit == w.tiles.end() || is_water_tile(oit->second.substrate))
+    if (oit == w.tiles.end())
         return placement_reason::ocean;
     if (road_tier_on_side(tit->second, side) >= tier)
         return placement_reason::already_road;
