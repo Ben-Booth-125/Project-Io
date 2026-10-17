@@ -208,7 +208,9 @@ void app::prime_wizard_setup()
     if (!m_seed_rolled)
     {
         m_seed_rolled = true;
-        if (m_golden_dir.empty())
+        if (m_bench.on)
+            wp.seed = m_bench.seed; // BL-1247: a benchmark compares like with like
+        else if (m_golden_dir.empty())
         {
             std::random_device rd_seed;
             wp.seed = static_cast<uint32_t>(rd_seed());

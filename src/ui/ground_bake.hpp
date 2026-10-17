@@ -407,6 +407,28 @@ int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_param
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out);
 
+/// BL-1311 (ground paint perf): where a bake's time goes, per pass — the
+/// calling thread's running totals in ms (a reading only: it never touches a
+/// pixel, and each thread has its own, so the bake stays pure). The pool's
+/// workers fold theirs into ground_layer::stats after every job.
+enum bake_pass : int
+{
+    bp_window = 0, ///< bake_window: base ground, borders, relief, water — the per-pixel field.
+    bp_ink,        ///< edge_ink (cover and shore lines).
+    bp_trees,      ///< stamp_trees.
+    bp_features,   ///< landforms and rivers.
+    bp_install,    ///< installations, with the roads and lanes inside them.
+    bp_shadows,    ///< cast shadows.
+    bp_grade,      ///< the near-future grade.
+    bp_unsharp,    ///< the unsharp mask.
+    bp_count
+};
+struct pass_clock
+{
+    double ms[bp_count] = {};
+};
+pass_clock& thread_pass_clock();
+
 /// THE ONE CAMERA ANGLE (RENDERING.md § One angle, Ben 2026-10-09): the
 /// planetary ground is viewed at 22.5 degrees at every rung and under every
 /// lens — the canvas squashes y by this, and every bake is oblique by it.

@@ -161,6 +161,13 @@ ground retires only as coverage arrives.
   - **The mip chain is the worker's:** the worker that bakes a master chunk
     box-downsamples it into its pieces of the 48/24/12/6 levels before
     returning; the render thread only copies the pieces into place.
+  - **Optimised in every build** (BL-1311, ground paint perf): the bake's
+    pure translation units build as their own library at full optimisation
+    in a Debug build too (`io_ground_bake` in CMakeLists.txt; the
+    `IO_OPTIMISE_GROUND_BAKE_IN_DEBUG` option turns it off to single-step
+    the bake). Unoptimised, a Debug build's home master cost ~5x the CPU of
+    the optimised one (`scripts/bench/ground_paint_bench.lua`: 6,089 s
+    against 1,248 s; Release 897 s), and its pixels are the same byte for byte.
   - **Results are keyed by job:** each slot records the sequence number of
     its one outstanding job, and only that job's result can land in it, so
     arrival order cannot matter and a result that outlives its body (a drop,
@@ -170,8 +177,8 @@ ground retires only as coverage arrives.
   returns:** the master chunks under the view bake on the pool and the main
   thread waits for them; every visible texture uploads with no budget; no
   pre-bake or background bake runs — a capture must never race the pool.
-  (In a Debug build the home master is ~2 minutes of pool time, paid by the
-  first whole-body framing of a run.) So the master **never fills by itself**
+  (The home master is ~1-3 minutes of pool time, paid by the first
+  whole-body framing of a run.) So the master **never fills by itself**
   under `--verify`: it holds what the views so far have covered. A script
   that needs the whole master asks for it (`verify.ground_complete_master`,
   which bakes the rest and returns once the master is complete and current,
@@ -770,6 +777,10 @@ guarantees about it:
 - **Benchmark:** `ProjectIo --bench-ground` — the five target-hardware budgets
   (TECH_FOUNDATIONS.md § Target hardware) measured on the live pool path, with
   the total paint time, the per-chunk bake cost and the peak process memory.
+  `scripts/bench/ground_paint_bench.lua` (under `--verify`, kept out of the
+  suite) is the paint in miniature: a whole master, then the partial re-bake
+  a round boundary's new installations cause, with the worker CPU per pass —
+  a reading that starts in seconds, for comparing builds and bake changes.
 - **Headless:** chunk invalidation (a build dirties exactly the intersecting
   chunks; nothing else re-bakes) and brush-manifest integrity are display-free
   checks.

@@ -1044,8 +1044,9 @@ int main(int argc, char* argv[])
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--bench-ground")
             {
-                long long dwell_ms     = 10000;
-                double    background_s = 0.0;
+                long long     dwell_ms     = 10000;
+                double        background_s = 0.0;
+                std::uint32_t seed         = 0; // the reference world: runs compare like with like
                 for (int j = 1; j + 1 < argc; ++j)
                 {
                     const std::string a = argv[j];
@@ -1053,12 +1054,14 @@ int main(int argc, char* argv[])
                         dwell_ms = std::max(0LL, std::atoll(argv[j + 1]));
                     if (a == "--bench-background")
                         background_s = std::max(0.0, std::atof(argv[j + 1]));
+                    if (a == "--bench-seed")
+                        seed = static_cast<std::uint32_t>(std::strtoul(argv[j + 1], nullptr, 10));
                 }
                 auto a_owner = std::make_unique<app>();
                 app& a = *a_owner;
                 if (epoch_set) a.set_epoch_year(epoch_year);
                 if (seat_set) a.set_seat_pick(seat_corp);
-                a.set_bench_ground(dwell_ms, background_s);
+                a.set_bench_ground(dwell_ms, background_s, seed);
                 return a.run(app::autostart_mode::bench_ground);
             }
 

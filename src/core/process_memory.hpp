@@ -17,4 +17,9 @@ struct process_memory
 
 process_memory query();
 
+/// CPU time the calling thread has used, ms (kernel + user): a bake's cost
+/// that a busy machine's other processes cannot inflate, as wall time can.
+/// -1 where the platform does not say.
+double thread_cpu_ms();
+
 } // namespace io_mem

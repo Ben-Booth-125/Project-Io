@@ -136,6 +136,10 @@ void app::bench_ground_frame()
         std::printf("BENCH_GROUND play opened: seat wait %.1f s; ground paint wall time %.1f s "
                     "(pre-bake start -> home master current; %d pre-bake start(s))\n",
                     B.seat_wait_s, B.paint_total_s, B.prebake_starts);
+        std::printf("BENCH_GROUND bake CPU: %.1f s over %d master jobs (%.1f ms each), %.1f s of it partial "
+                    "re-bakes (thread CPU time, which other processes on the machine do not inflate)\n",
+                    s.cpu_ms / 1000.0, s.bakes[1], s.bakes[1] ? s.cpu_ms / s.bakes[1] : 0.0,
+                    s.patch_cpu_ms / 1000.0);
         std::printf("BENCH_GROUND per chunk: %d master chunk bakes, %.1f ms worker time each "
                     "(mip levels %.1f ms each); far page %d pieces, %.1f ms each; "
                     "one whole master %.2f GB\n",
@@ -143,8 +147,39 @@ void app::bench_ground_frame()
                     s.bakes[1] ? (s.bake_ms[2] + s.bake_ms[3] + s.bake_ms[4] + s.bake_ms[5]) / s.bakes[1] : 0.0,
                     s.bakes[0], s.bakes[0] ? s.bake_ms[0] / s.bakes[0] : 0.0,
                     m_ground.master_size(m_world.home_body) / k_gib);
+        {
+            // BL-1311: where the master jobs' worker time went, per pass.
+            static const char* const names[ground_layer::stats::k_pass_slots] = {
+                "base field", "edge ink", "trees", "landforms+rivers", "installations+routes",
+                "cast shadows", "grade", "unsharp", "re-bake window rule", "content hash", "mip chain"
+            };
+            double total = 0.0;
+            for (const double v : s.pass_ms)
+                total += v;
+            std::printf("BENCH_GROUND worker time by pass (master jobs, %.1f s in all):", total / 1000.0);
+            for (int k = 0; k < ground_layer::stats::k_pass_slots; ++k)
+                std::printf("%s %s %.1f s (%.0f%%)", k ? "," : "", names[k], s.pass_ms[k] / 1000.0,
+                            total > 0.0 ? 100.0 * s.pass_ms[k] / total : 0.0);
+            std::printf("\n");
+            std::printf("BENCH_GROUND partial re-bakes: %d chunks (%d with nothing to bake), %.1f s worker "
+                        "(%.1f ms each):", s.patch_jobs, s.patch_empty, s.patch_ms / 1000.0,
+                        s.patch_jobs ? s.patch_ms / s.patch_jobs : 0.0);
+            for (int k = 0; k < ground_layer::stats::k_pass_slots - 1; ++k)
+                std::printf("%s %s %.1f s", k ? "," : "", names[k], s.patch_pass_ms[k] / 1000.0);
+            std::printf("\n");
+        }
         std::fflush(stdout);
         bench_mem("play open");
+        {
+            // The main thread re-takes the drawn body's source snapshot every
+            // 30 frames (RENDERING.md § Chunks, cache and invalidation): its
+            // cost lands on one frame in thirty, so it is [4]'s first suspect.
+            const auto ts = bclock::now();
+            const ui::ground::bake_source snap =
+                ui::ground::prepare_source(m_world, m_world.home_body, false, &m_registry);
+            std::printf("BENCH_GROUND source snapshot of the home body (main thread, every 30 frames): "
+                        "%.1f ms (%d tiles)\n", secs_since(ts) * 1000.0, snap.gw * snap.gh);
+        }
 
         // Set the stage: the sim held still (the readings are the ground's), no
         // speculative bakes (a first visit must be one), the home surface.
@@ -411,8 +446,8 @@ void app::bench_report()
     int ww = 0, wh = 0;
     SDL_GetWindowSize(m_window, &ww, &wh);
     std::printf("\nBENCH_GROUND ===== the ground benchmark (TECH_FOUNDATIONS.md § Target hardware) =====\n");
-    std::printf("BENCH_GROUND build %s  window %dx%d  dwell %lld ms/round  hardware threads %u  RAM %d MB\n",
-                build, ww, wh, B.dwell_ms, std::thread::hardware_concurrency(), SDL_GetSystemRAM());
+    std::printf("BENCH_GROUND build %s  window %dx%d  seed %u  dwell %lld ms/round  hardware threads %u  RAM %d MB\n",
+                build, ww, wh, B.seed, B.dwell_ms, std::thread::hardware_concurrency(), SDL_GetSystemRAM());
     int pass = 0;
 
     // [1] The pre-bake added to generation.

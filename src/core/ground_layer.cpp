@@ -1,5 +1,6 @@
 #include "ground_layer.hpp"
 
+#include "process_memory.hpp" // BL-1311: thread CPU time per job
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -325,7 +326,11 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
         if (j.old_src)
         {
             std::vector<gb::pixel_rect> rects;
-            if (gb::installation_patch_rects(*j.old_src, *j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, rects))
+            const auto t_rects = std::chrono::steady_clock::now();
+            const bool windows =
+                gb::installation_patch_rects(*j.old_src, *j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, rects);
+            d.rects_ms = ms_since(t_rects);
+            if (windows)
             {
                 d.patched = true;
                 d.patches.resize(rects.size());
@@ -338,7 +343,9 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
                     gb::bake_region(*j.src, j.geom, j.prm, r.x0, r.y0, r.w, r.h, pc.px.data());
                     gb::derive_mip_pieces(pc.px.data(), r.w, r.h, pc.mip);
                 }
+                const auto t_hash = std::chrono::steady_clock::now();
                 d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
+                d.hash_ms = ms_since(t_hash);
                 d.ms = ms_since(t_job);
                 if (level_ms)
                     level_ms[0] = d.ms;
@@ -347,9 +354,13 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
         }
         d.px.assign(static_cast<std::size_t>(j.pw) * j.ph, 0u);
         gb::bake_region(*j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, d.px.data());
-        d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
         if (level_ms)
             level_ms[0] = ms_since(t0);
+        {
+            const auto t_hash = std::chrono::steady_clock::now();
+            d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
+            d.hash_ms = ms_since(t_hash);
+        }
         // A master chunk normally bakes in well under a second; one far past
         // that is a worker held off the CPU (the pool runs below normal
         // priority) or a pathological window — either way it is the wait's
@@ -406,9 +417,13 @@ void ground_layer::worker_main()
         }
         result d;
         double lms[L] = {};
+        const gb::pass_clock pc0 = gb::thread_pass_clock();
+        const double cpu0 = io_mem::thread_cpu_ms();
         const auto t0 = std::chrono::steady_clock::now();
         run_job(j, d, lms);
         const double ms = ms_since(t0);
+        const double cpu = io_mem::thread_cpu_ms() - cpu0;
+        const gb::pass_clock& pc1 = gb::thread_pass_clock();
         {
             std::lock_guard lk(m_mx);
             if (j.kind == job_kind::far)
@@ -417,11 +432,36 @@ void ground_layer::worker_main()
                 ++m_stats.bakes[0];
             }
             else if (j.kind == job_kind::master)
+            {
                 for (int l = 0; l < L; ++l)
                 {
                     m_stats.bake_ms[1 + l] += lms[l];
                     ++m_stats.bakes[1 + l];
                 }
+                double* const pm = m_stats.pass_ms;
+                double* const pp = m_stats.patch_pass_ms;
+                for (int k = 0; k < gb::bp_count; ++k)
+                {
+                    pm[k] += pc1.ms[k] - pc0.ms[k];
+                    if (d.patched)
+                        pp[k] += pc1.ms[k] - pc0.ms[k];
+                }
+                m_stats.cpu_ms += cpu;
+                if (d.patched)
+                    m_stats.patch_cpu_ms += cpu;
+                pm[gb::bp_count]     += d.rects_ms;
+                pm[gb::bp_count + 1] += d.hash_ms;
+                for (int l = 1; l < L; ++l)
+                    pm[gb::bp_count + 2] += lms[l];
+                if (d.patched)
+                {
+                    pp[gb::bp_count]     += d.rects_ms;
+                    pp[gb::bp_count + 1] += d.hash_ms;
+                    ++m_stats.patch_jobs;
+                    m_stats.patch_empty += d.patches.empty() ? 1 : 0;
+                    m_stats.patch_ms += ms;
+                }
+            }
             m_results.push_back(std::move(d));
             --m_inflight; // counted from enqueue until the result LANDS
         }
@@ -909,6 +949,118 @@ bool ground_layer::complete_master(const world& w, entity_id body, double timeou
         if (ms_since(t0) > timeout_ms)
             return master_current(body);
     }
+}
+
+ground_layer::paint_bench ground_layer::bench_paint(const world& w, entity_id body, int drop_every,
+                                                    double timeout_ms)
+{
+    paint_bench out;
+    body_state* bp = ensure_body(w, body);
+    if (!bp || drop_every < 1)
+        return out;
+    body_state& b = *bp;
+    b.last_visit = m_frame;
+    make_room(master_bytes(b), body, m_active);
+    // The true snapshot, and the same with every drop_every-th installed tile
+    // bare: an installations-only difference, which the window rule re-bakes
+    // as windows (a tile whose installation goes is a tile whose structures
+    // and cleared ground change).
+    const auto full = std::make_shared<const gb::bake_source>(gb::prepare_source(w, body, b.reveal_all, registry));
+    auto bare = std::make_shared<gb::bake_source>(*full);
+    int seen = 0;
+    for (std::int32_t& k : bare->inst.of_tile)
+        if (k >= 0 && seen++ % drop_every == 0)
+        {
+            k = -1;
+            ++out.dropped;
+        }
+    // Bake every chunk not current against the source in hand, and wait.
+    const auto fill = [&](double& ms) -> bool {
+        const auto t0 = clock::now();
+        for (;;)
+        {
+            drain();
+            bool any = false;
+            for (int i = 0; i < b.n_chunks && !any; ++i)
+                any = b.ready[i] || b.job[i];
+            if (any && b.swept_digest != b.src_digest && b.sweep_job == 0)
+            {
+                job j = make_sweep_job(b);
+                b.sweep_job = j.seq;
+                bake_sync(std::move(j));
+            }
+            if (master_current(body))
+            {
+                ms = ms_since(t0);
+                return true;
+            }
+            for (int i = 0; i < b.n_chunks; ++i)
+                if (b.job[i] == 0 && (!b.ready[i] || b.dirty[i]))
+                {
+                    job j = make_master_job(b, i, k_prio_view + i);
+                    b.job[i] = j.seq;
+                    enqueue(std::move(j));
+                }
+            for (;;)
+            {
+                drain();
+                bool busy = b.sweep_job != 0;
+                for (int i = 0; i < b.n_chunks && !busy; ++i)
+                    busy = b.job[i] != 0;
+                if (!busy)
+                    break;
+                if (ms_since(t0) > timeout_ms)
+                    return false;
+                std::unique_lock lk(m_mx);
+                m_done_cv.wait_for(lk, std::chrono::milliseconds(20), [&] { return !m_results.empty(); });
+            }
+        }
+    };
+    const auto report = [&](const char* phase, double ms) {
+        stats s;
+        {
+            std::lock_guard lk(m_mx);
+            s = m_stats;
+            m_stats = stats{};
+        }
+        static const char* const names[stats::k_pass_slots] = {
+            "base", "ink", "trees", "landforms+rivers", "installations+routes", "shadows", "grade",
+            "unsharp", "window rule", "hash", "mips" };
+        std::printf("GROUND_PAINT %s: %.1f s wall, %d master bakes, CPU %.1f s (%.1f ms a bake; partial %.1f s), "
+                    "worker wall by pass:", phase, ms / 1000.0, s.bakes[1], s.cpu_ms / 1000.0,
+                    s.bakes[1] ? s.cpu_ms / s.bakes[1] : 0.0, s.patch_cpu_ms / 1000.0);
+        for (int k = 0; k < stats::k_pass_slots; ++k)
+            std::printf(" %s %.1f", names[k], s.pass_ms[k] / 1000.0);
+        std::printf("\nGROUND_PAINT %s: %d partial (%d empty) %.1f s worker:", phase, s.patch_jobs,
+                    s.patch_empty, s.patch_ms / 1000.0);
+        for (int k = 0; k < stats::k_pass_slots - 1; ++k)
+            std::printf(" %s %.1f", names[k], s.patch_pass_ms[k] / 1000.0);
+        std::printf("\n");
+        std::fflush(stdout);
+    };
+    drop_master(b);
+    set_source(b, bare);
+    {
+        std::lock_guard lk(m_mx);
+        m_stats = stats{};
+    }
+    if (!fill(out.first_ms))
+        return out;
+    report("first bake", out.first_ms);
+    set_source(b, full);
+    {
+        // The sweep alone, to count what moved.
+        job j = make_sweep_job(b);
+        b.sweep_job = j.seq;
+        bake_sync(std::move(j));
+        for (int i = 0; i < b.n_chunks; ++i)
+            out.moved += b.dirty[i];
+    }
+    out.ok = fill(out.rebake_ms);
+    out.chunks = b.n_chunks;
+    if (out.ok)
+        report("re-bake", out.rebake_ms);
+    return out;
 }
 
 void ground_layer::shutdown()

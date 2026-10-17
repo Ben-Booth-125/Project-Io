@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.25)
+# BL-1311: MSVC runtime checks (/RTC1) as a per-target property rather than a
+# Debug flag, so the ground bake's library below can drop them and optimise in
+# a Debug build. Every other target keeps the default (/RTC1 in Debug). Older
+# CMake has no such policy: there the bake stays unoptimised in Debug.
+if(POLICY CMP0184)
+    cmake_policy(SET CMP0184 NEW)
+endif()
 project(ProjectIo LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -258,7 +265,45 @@ endif()
 # ---------------------------------------------------------------------------
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-add_executable(ProjectIo ${GAME_SOURCES})
+# THE GROUND BAKE, OPTIMISED IN EVERY BUILD (BL-1311). The bake's pure TUs
+# (docs/ui/RENDERING.md § The bake) are a per-pixel loop over ~1.4 billion
+# master pixels a body; unoptimised, with the runtime checks on, a Debug build
+# spent ~5x the CPU on the home master (scripts/bench/ground_paint_bench.lua:
+# 6,089 s against 1,248 s optimised, 897 s Release) and the BL-1247 bench
+# waited 12.5 minutes at the seat for it. They build as their own object
+# library at /O2 in Debug too, without /RTC1 (incompatible with /O2). The
+# debug runtime and iterator checks stay — they must match the rest of the
+# image — so a Debug build still catches an out-of-range index here; what it
+# loses is single-stepping through the bake's locals. Output is unchanged:
+# /fp:precise is the same in both, and the captures compare byte for byte.
+set(IO_GROUND_BAKE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ground_bake.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/structure_stamps.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/route_paint.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/terrain_palette.cpp")
+list(REMOVE_ITEM GAME_SOURCES ${IO_GROUND_BAKE_SOURCES})
+if(MSVC AND POLICY CMP0184)
+    # A tree configured before CMP0184 holds /RTC1 in its cached Debug flags;
+    # here the target property supplies it (the same checks), so strip the
+    # flag for this directory's targets or it would reach the bake library.
+    string(REGEX REPLACE "/RTC[1csu]+" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(REGEX REPLACE "/RTC[1csu]+" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+endif()
+add_library(io_ground_bake OBJECT ${IO_GROUND_BAKE_SOURCES})
+target_include_directories(io_ground_bake PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_compile_features(io_ground_bake PRIVATE cxx_std_20)
+# OFF to single-step the bake in a Debug build (it then paints ~5x slower).
+option(IO_OPTIMISE_GROUND_BAKE_IN_DEBUG "Build the ground bake at /O2 in Debug too (BL-1311)" ON)
+if(IO_OPTIMISE_GROUND_BAKE_IN_DEBUG)
+    if(MSVC)
+        set_property(TARGET io_ground_bake PROPERTY MSVC_RUNTIME_CHECKS "")
+        target_compile_options(io_ground_bake PRIVATE $<$<CONFIG:Debug>:/O2 /Ob2>)
+    else()
+        target_compile_options(io_ground_bake PRIVATE $<$<CONFIG:Debug>:-O2>)
+    endif()
+endif()
+
+add_executable(ProjectIo ${GAME_SOURCES} $<TARGET_OBJECTS:io_ground_bake>)
 
 target_include_directories(ProjectIo PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -310,6 +355,7 @@ set(IO_WARNING_FLAGS
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wextra>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>)
 target_compile_options(ProjectIo PRIVATE ${IO_WARNING_FLAGS})
+target_compile_options(io_ground_bake PRIVATE ${IO_WARNING_FLAGS})
 
 # verify_api.cpp needs /bigobj on MSVC.
 #

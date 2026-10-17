@@ -26,4 +26,19 @@ process_memory query()
     return m;
 }
 
+double thread_cpu_ms()
+{
+#ifdef _WIN32
+    FILETIME c, e, k, u;
+    if (!GetThreadTimes(GetCurrentThread(), &c, &e, &k, &u))
+        return -1.0;
+    const auto v = [](const FILETIME& f) {
+        return static_cast<double>((static_cast<unsigned long long>(f.dwHighDateTime) << 32) | f.dwLowDateTime);
+    };
+    return (v(k) + v(u)) / 10000.0; // 100 ns units
+#else
+    return -1.0;
+#endif
+}
+
 } // namespace io_mem

@@ -86,11 +86,14 @@ public:
     /// before Begin (0 = clicks straight through, the tracked-only case);
     /// @p background_s lets the background bodies bake that long after the
     /// measures, for the memory reading (0 = not at all). Call before run().
-    void set_bench_ground(long long dwell_ms, double background_s)
+    /// @p seed is the world's (default 0, the reference world — a rolled seed
+    /// would make two runs two different paints).
+    void set_bench_ground(long long dwell_ms, double background_s, std::uint32_t seed = 0)
     {
         m_bench.on           = true;
         m_bench.dwell_ms     = dwell_ms;
         m_bench.background_s = background_s;
+        m_bench.seed         = seed;
     }
 
     /// BL-412: ask run() to host the live agent control seam on
@@ -1264,6 +1267,7 @@ private:
         bool        on = false;
         long long   dwell_ms = 10000;
         double      background_s = 0.0;
+        std::uint32_t seed = 0;            ///< The world seed (the wizard's roll is pinned).
         // Before play.
         tp          prebake_t0{};          ///< The latest pre-bake start.
         int         prebake_starts = 0;

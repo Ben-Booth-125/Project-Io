@@ -6,12 +6,31 @@
 #include "world/hex_neighbors.hpp" // the shared odd-r side table — landform runs, river chains
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
 namespace ui::ground {
 
+pass_clock& thread_pass_clock()
+{
+    thread_local pass_clock c;
+    return c;
+}
+
 namespace {
+
+/// Times one pass into the calling thread's pass_clock (BL-1311, a reading).
+struct pass_timer
+{
+    bake_pass k;
+    std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    ~pass_timer()
+    {
+        thread_pass_clock().ms[k] +=
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    }
+};
 
 constexpr double kSqrt3 = 1.7320508075688772;
 
@@ -2663,7 +2682,17 @@ void edge_ink(std::uint32_t* buf, const std::uint8_t* cover, int pw, int ph,
 void unsharp(std::uint32_t* buf, const std::uint8_t* tag, int pw, int ph, float amount)
 {
     const std::size_t n = static_cast<std::size_t>(pw) * ph;
-    std::vector<float> br(n), bg(n), bb(n), tr(n), tg(n), tb(n);
+    // Six planes in one allocation, read through raw pointers: the same
+    // arithmetic in the same order (byte-identical), without a checked
+    // vector index per tap in a Debug build's iterator-debugging library
+    // (BL-1311: this pass ran ~2x its Release time there).
+    std::vector<float> planes(n * 6);
+    float* const br = planes.data();
+    float* const bg = br + n;
+    float* const bb = bg + n;
+    float* const tr = bb + n;
+    float* const tg = tr + n;
+    float* const tb = tg + n;
     for (std::size_t i = 0; i < n; ++i)
     {
         br[i] = static_cast<float>(palette::col_r(buf[i]));
@@ -3731,28 +3760,40 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     std::vector<std::uint32_t> abuf(an);
     std::vector<std::uint8_t>  atag(an, 0u), acov(an, 0u);
     std::vector<feature_px>    afpx(an);
-    bake_window(src, g, p, px0 - A, py0 - A, apw, aph,
-                abuf.data(), atag.data(), acov.data(), afpx.data());
+    {
+        const pass_timer pt{ bp_window };
+        bake_window(src, g, p, px0 - A, py0 - A, apw, aph,
+                    abuf.data(), atag.data(), acov.data(), afpx.data());
+    }
 
     // Cover-boundary ink BEFORE the stamps: a tree may straddle an inked
     // boundary and should occlude the line, never carry it.
     // Under supersampling the 1 px ink line is 1/ss of a nominal pixel after
     // the downsample, so its strength scales by ss to keep the same weight.
     if (A > 0)
+    {
+        const pass_timer pt{ bp_ink };
         edge_ink(abuf.data(), acov.data(), apw, aph,
                  std::min(0.9f, p.edge_ink  * static_cast<float>(g.ss)),
                  std::min(0.9f, p.shore_ink * static_cast<float>(g.ss)));
+    }
 
     // BL-1253: a tree standing over a painted road draws after the road (the
     // route slot below); the rest of the stand draws here, as it always has.
     const bool trees = ns >= 40.0 && p.tree_density > 0.0f;
     const bool split = trees && !src.route_pieces.empty();
     if (trees)
+    {
+        const pass_timer pt{ bp_trees };
         stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(),
                     split ? tree_set::clear_of_roads : tree_set::all);
+    }
 
     // Landform relief and carved rivers (BL-1242).
-    bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data());
+    {
+        const pass_timer pt{ bp_features };
+        bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data());
+    }
     // Roads and sea lanes (BL-1253, route_paint.hpp), then the installations
     // (BL-1241): the route pass runs INSIDE the installation pass, between its
     // ground parts (pads, yards, aprons, a town's paving) and its shadows and
@@ -3781,23 +3822,30 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     };
     route_call rc{ src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data(),
                    split };
-    if (p.installations)
-        stamp_installations(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(),
-                            &route_call::run, &rc);
-    else
-        route_call::run(&rc);
+    {
+        const pass_timer pt{ bp_install };
+        if (p.installations)
+            stamp_installations(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(),
+                                &route_call::run, &rc);
+        else
+            route_call::run(&rc);
+    }
 
     // BL-1256: cast shadows from the low NW sun, over everything the ground
     // carries (a tree or a works in a ridge's shadow is in it too), before
     // the grade so the S-curve takes them toward black.
     if (p.shadow_strength > 0.0f)
+    {
+        const pass_timer pt{ bp_shadows };
         bake_cast_shadows(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(), afpx.data());
+    }
 
     // The separable near-future grade. Its haze lift falls and its contrast
     // rises with resolution (BL-736): haze is blur-adjacent, and the close
     // tiers need their local contrast more than their atmosphere.
     if (p.grade_enabled)
     {
+        const pass_timer pt{ bp_grade };
         const float res_t = static_cast<float>(std::clamp((ns - 24.0) / 48.0, 0.0, 1.0));
         const float lift     = p.grade_lift * (1.0f - 0.5f * res_t);
         const float haze_r = 15.0f, haze_g = 15.0f, haze_b = 20.0f;
@@ -3856,7 +3904,10 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     // A supersampled bake defers it: bake_region runs it ONCE, at nominal
     // resolution, after the downsample (never stacked on both).
     if (g.ss <= 1.0 && ns >= 40.0 && p.unsharp_amount > 0.0f)
+    {
+        const pass_timer pt{ bp_unsharp };
         unsharp(abuf.data(), atag.data(), apw, aph, p.unsharp_amount);
+    }
 
     for (int y = 0; y < ph; ++y)
     {

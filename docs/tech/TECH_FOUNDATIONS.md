@@ -200,8 +200,9 @@ hope:
 
 The check is `ProjectIo --bench-ground` (`src/core/ground_bench.cpp`): the live app, not
 `--verify`, walking the wizard as a reader (`--dwell <ms>` per round, default 10 s; `--dwell 0`
-is the click-through case) and then driving the Planetary canvas at the reference 1720×1080
-window. It prints PASS/FAIL per budget with the number, the ground's total paint wall time and
+is the click-through case) on one world (`--bench-seed <n>`, default 0, the reference world; a
+rolled seed would make two runs two different paints) and then driving the Planetary canvas at
+the reference 1720×1080 window. It prints PASS/FAIL per budget with the number, the ground's total paint wall time and
 the process's peak memory (working set and private bytes), then exits. A stand-in is a frame
 whose drawn level is not wholly final under the view; frame time is the frame's own work (the
 vsync wait excluded), judged on the 1%-low of a sustained pan at each rung.
