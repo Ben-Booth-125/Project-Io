@@ -160,24 +160,29 @@ resource_type richest_extractable(const tile_component& tc, bool& any);
 ///
 /// @param w     World (read-only) — the neighbour across @p side.
 /// @param tile  One end of the crossing.
-/// @param side  Hex side 0-5 (0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE).
+/// @param side  Hex side 0-5 (0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE). A side no cost walk can
+///              cross is refused (`road_side_is_crossable`; Ben, 2026-10-17).
 /// @param tier  The road tier to place (BL-172): 1=Track, 2=Road, 3=Highway. Upgrade-in-place —
 ///              valid only if strictly higher than the tier the crossing already holds.
 /// @return    `ok`, or `ocean` (either end water, or no neighbour that way) /
 ///            `already_road` (the crossing is already at or above @p tier).
 placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier = 1);
 
-/// The WEAK form, for a surface that has a tile but no direction yet: could ANY side of
-/// this tile take a road at @p tier? Refuses water, and refuses a tile every side of
-/// which already stands at or above @p tier. It cannot see neighbours, so it is an
-/// affordance test only — `can_place_road(w, tile, side, tier)` is the real gate and
-/// `place_road` runs it on the side it resolves.
+/// The WEAK form, for a surface that has a tile but no direction yet — the affordance
+/// behind `k_road_side_auto`. UPGRADE BEFORE EXTEND: `ok` when the tile carries no
+/// crossing at all, or when some crossable side carries a LOWER tier; `already_road` when
+/// every crossing it has already stands at or above @p tier. It cannot see neighbours, so
+/// it is an affordance only — `can_place_road(w, tile, side, tier)` is the real gate and
+/// `place_road` runs it on the side `auto_road_side` resolves.
 placement_result can_place_road(const tile_component& tc, std::uint8_t tier = 1);
 
-/// The side `place_road` lays when the caller named none (`k_road_side_auto`, BL-1340):
-/// the cheapest land neighbour of @p tile — lowest `tile_traversal_cost`, ties broken by
-/// the lower side index — among the sides @p tier would actually upgrade. -1 where no
-/// side qualifies. Deterministic and world-order independent.
+/// The side `place_road` lays when the caller named none (`k_road_side_auto`, BL-1340).
+/// UPGRADE BEFORE EXTEND: the crossing the tile already has that @p tier would raise (the
+/// highest such, ties to the lower side index), else — only if the tile carries none at
+/// all — the cheapest crossable neighbour by `tile_traversal_cost`, ties to the lower
+/// side index. -1 where no side qualifies, which includes a tile whose every crossing
+/// already stands at or above @p tier. A side no cost walk can cross is never offered
+/// (Ben, 2026-10-17). Deterministic and world-order independent.
 int auto_road_side(const world& w, entity_id tile, std::uint8_t tier);
 
 /// Returns true if a population centre may be placed on this tile.

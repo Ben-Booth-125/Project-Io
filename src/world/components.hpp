@@ -862,6 +862,27 @@ inline constexpr std::uint16_t road_edges_on_every_side(std::uint8_t tier)
     return static_cast<std::uint16_t>((tier > 3 ? 3u : static_cast<unsigned>(tier)) * 0x555u);
 }
 
+/// ONLY A SIDE A COST WALK CAN CROSS MAY CARRY A ROAD (Ben, 2026-10-17, ruling on the
+/// BL-1340 review; LOGISTICS.md § 4). Every cost walk is 4-cardinal, so of a tile's six
+/// sides exactly four are reachable, and which four depends on the ROW's parity: an even
+/// row reaches E(0), NE(1), W(3), SE(5); an odd row reaches E(0), NW(2), W(3), SW(4). A
+/// road on one of the other two could be bought, counted and billed and still be crossed
+/// by nothing and drawn by nothing — "not a road but a receipt" — so writing one is
+/// refused. The field stays six wide (it is the river pass's geometry, and the mirror rule
+/// reads from either tile); the restriction is on what may be WRITTEN.
+///
+/// @param side   Hex side 0-5.
+/// @param grid_y The row of the tile the side belongs to (parity is all that is read).
+inline constexpr bool road_side_is_crossable(int side, int grid_y)
+{
+    if (side < 0 || side > 5)
+        return false;
+    if (side == 0 || side == 3) // E and W, whatever the parity
+        return true;
+    return (grid_y & 1) ? (side == 2 || side == 4)  // odd row: NW, SW
+                        : (side == 1 || side == 5); // even row: NE, SE
+}
+
 /// "No side named" — the one value a `place_road` caller may pass instead of a side
 /// (BL-1340). The implementation then picks the cheapest land neighbour deterministically
 /// (`placement_rules::auto_road_side`): lowest traversal cost, ties to the lower side

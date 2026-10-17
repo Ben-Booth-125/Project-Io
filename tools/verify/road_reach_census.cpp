@@ -10,7 +10,9 @@
 //   C1 road-less nations   — count and share, per seed and in total.
 //   C2 single-centre share — how much of C1 is nations with one centre
 //                            (road_generation.cpp's <2-centre early return).
-//   C3 no-ocean invariant  — no tile carrying a road edge is ocean.
+//   C3 no-ocean invariant  — no tile carrying a road edge is OPEN OCEAN. A crossing may
+//                            span water since Ben's 2026-10-17 ruling (a run of them is a
+//                            bridge), but generation only ever bridges a strait.
 //   C4 determinism         — regenerating seed 0 yields an identical road edge
 //                            field AND an identical state_hash.
 //   C5 stranded tracks     — (added 2026-08-21) how many nations hold a roaded tile
@@ -72,13 +74,14 @@ seed_result census(const world& w)
         if (it != w.tile_to_nation.end() && it->second != null_entity)
             centres[it->second]++;
     }
-    // Any roaded tile per nation; ocean-road violations.
+    // Any roaded tile per nation; OPEN-OCEAN crossings (BL-1340: a bridge over a strait is
+    // legal, one over open ocean is not, and generation never routes through open sea).
     std::set<entity_id> has_road;
     for (const auto& [tid, tc] : w.tiles)
     {
         if (!tile_has_road(tc))
             continue;
-        if (is_water(tc.substrate))
+        if (is_open_ocean(tc.substrate))
             ++r.roaded_ocean;
         const auto it = w.tile_to_nation.find(tid);
         if (it != w.tile_to_nation.end() && it->second != null_entity)
@@ -183,7 +186,8 @@ int main()
                 tot_nations ? 100.0 * tot_one_centre / tot_nations : 0.0, tot_stranded,
                 tot_nations ? 100.0 * tot_stranded / tot_nations : 0.0);
     check(tot_nations > 0, "C1 census measured a non-empty nation set");
-    check(tot_ocean == 0, "C3 no road edge stamped on an ocean tile");
+    check(tot_ocean == 0, "C3 no road edge stamped on an OPEN-OCEAN tile (a bridge spans a"
+                         " strait only, BL-1340)");
 
     // C4 determinism — same seed twice, identical road field and state hash.
     world_params wp0;

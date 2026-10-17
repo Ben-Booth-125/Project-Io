@@ -13,8 +13,18 @@
 //       the invariant the whole model rests on: break it and a convoy's cost
 //       depends on which way it is asked, which is exactly what BL-1126 proved
 //       a loaded game cannot survive.
-//   M2  AND NOTHING LEAKS ONTO WATER. A road is a land feature (BL-516): no
-//       crossing has a water tile at either end.
+//   M2  A BRIDGE IS A CHAIN OF CROSSINGS OVER WATER (Ben, 2026-10-17: "edge means
+//       from one tile centre to another, but not only one tile centre. This should
+//       allow spanning water with bridges"). A road edge over water is LEGAL and
+//       mirrored like any other, a strait is crossed by a CHAIN of them that joins
+//       two shores, and no bridge stands on OPEN OCEAN -- generation refuses a route
+//       whose water run is not a strait (`crossing_kind`), so a bridge is a strait
+//       span, never an ocean crossing. That is the row the old "no road touches
+//       water" one became: strictly stronger, because it says where a bridge may be.
+//   B1  AND A BRIDGE BEATS THE WATER IT CROSSES. The hop over a bridged edge costs
+//       its road tier's price (the deck, not the sea leg), so it is strictly cheaper
+//       than the same hop with the crossing taken away -- "a bridge that did not beat
+//       the water it crosses would be a decoration".
 //   C1  EVERY EDGE COUNTS ONCE. `count_road_edges` reads a tile's sides 0-2
 //       only; an independent count that walks ALL SIX sides of every tile must
 //       come to exactly twice it. That is the property every count of the
@@ -47,6 +57,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/hex_neighbors.hpp"
 #include "world/logistics.hpp"
+#include "world/road_generation.hpp" // kMaxCrossingTiles: a bridge is a strait span
 #include "world/river_generation.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
@@ -147,7 +158,7 @@ int main(int argc, char** argv)
 
     // --- M1 / M2: the mirror, and no road on water -------------------------
     {
-        long long sides_set = 0, mirrored = 0, orphan = 0, on_water = 0;
+        long long sides_set = 0, mirrored = 0, orphan = 0, on_water = 0, on_ocean = 0;
         for (const auto& [tid, tc] : w.tiles)
         {
             const auto bit = w.bodies.find(tc.body);
@@ -158,14 +169,22 @@ int main(int argc, char** argv)
                 const std::uint8_t tier = road_tier_on_side(tc, s);
                 if (tier == 0) continue;
                 ++sides_set;
-                if (is_water(tc.substrate)) ++on_water;
+                if (is_water(tc.substrate))
+                {
+                    ++on_water;
+                    if (is_open_ocean(tc.substrate)) ++on_ocean;
+                }
                 const hex_neighbors::coord c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
                 if (c.gy < 0 || (gh > 0 && c.gy >= gh)) { ++orphan; continue; }
                 const int nx = gw > 0 ? (((c.gx % gw) + gw) % gw) : c.gx;
                 const auto nit = idx.find(std::make_tuple(tc.body, c.gy, nx));
                 if (nit == idx.end()) { ++orphan; continue; }
                 const tile_component& ntc = w.tiles.at(nit->second);
-                if (is_water(ntc.substrate)) ++on_water;
+                if (is_water(ntc.substrate))
+                {
+                    ++on_water;
+                    if (is_open_ocean(ntc.substrate)) ++on_ocean;
+                }
                 if (road_tier_on_side(ntc, opposite_hex_side(s)) == tier) ++mirrored;
             }
         }
@@ -176,7 +195,11 @@ int main(int argc, char** argv)
               fmt("M1b every tile-side agrees with its neighbour's facing side (%lld/%lld)",
                   mirrored, sides_set));
         check(road_edges_mirrored(w), "M1c road_edges_mirrored agrees, over the whole world");
-        check(on_water == 0, fmt("M2 no crossing has water at either end (%lld)", on_water));
+        std::printf("       %lld tile-side(s) of a crossing stand on water (the bridges);"
+                    " %lld on open ocean\n", on_water, on_ocean);
+        check(on_ocean == 0,
+              fmt("M2a no crossing stands on OPEN OCEAN \u2014 a bridge is a strait span (%lld)",
+                  on_ocean));
     }
 
     // --- C1: each edge counted once ----------------------------------------
@@ -194,6 +217,117 @@ int main(int argc, char** argv)
                   once, all_sides));
         check(once == per_tier[0] + per_tier[1] + per_tier[2],
               "C1b the per-tier split sums to the total");
+
+        // C2 — THE COUNTER THE BILL USES. network_upkeep bills per nation off
+        // `count_road_edges_by_nation`, so the two must agree: every edge is one
+        // nation's or nobody's, and none is counted twice (review of 0831de6d: the
+        // hand-rolled loop it replaced dropped a frontier road whose canonical half lay
+        // on unowned ground).
+        int owned = 0;
+        for (const auto& [nid, tiers] : count_road_edges_by_nation(w))
+            for (int t = 0; t < 3; ++t) owned += tiers[static_cast<std::size_t>(t)];
+        std::printf("       %d of %d edges are some nation's; %d on nobody's ground\n",
+                    owned, once, once - owned);
+        check(owned > 0 && owned <= once,
+              fmt("C2 count_road_edges_by_nation attributes each edge at most once"
+                  " (%d of %d)", owned, once));
+    }
+
+    // --- M2b: a strait is crossed by a CHAIN of crossings, shore to shore ---
+    {
+        // Walk every bridged water tile and follow its road edges: a bridge must join
+        // two LAND tiles through a run of water, or it joins nothing and is the "road
+        // belonging to no crossing" the ruling forbade in the first place.
+        // A BRIDGE IS A COMPONENT, not a tile: the connected set of bridged WATER cells
+        // joined by roaded crossings. Every such component must touch at least TWO
+        // distinct LAND tiles across roaded crossings — that is what makes it a span
+        // rather than a pier — and no component may be longer than a strait.
+        std::set<entity_id> wet_roaded;
+        for (const auto& [tid, tc] : w.tiles)
+            if (is_water(tc.substrate) && tile_has_road(tc))
+                wet_roaded.insert(tid);
+        std::set<entity_id> seen;
+        int comps = 0, spans = 0, piers = 0, longest = 0;
+        for (const entity_id start : wet_roaded) // ascending id: a stable walk
+        {
+            if (seen.count(start))
+                continue;
+            std::vector<entity_id> stack{ start };
+            std::set<entity_id> comp, shores;
+            seen.insert(start);
+            while (!stack.empty())
+            {
+                const entity_id cur = stack.back();
+                stack.pop_back();
+                comp.insert(cur);
+                const tile_component& ctc = w.tiles.at(cur);
+                for (int s = 0; s < 6; ++s)
+                {
+                    if (road_tier_on_side(ctc, s) == 0)
+                        continue;
+                    const entity_id nb = road_edge_neighbour(w, cur, s);
+                    if (nb == null_entity)
+                        continue;
+                    const tile_component& ntc = w.tiles.at(nb);
+                    if (!is_water(ntc.substrate)) { shores.insert(nb); continue; }
+                    if (seen.insert(nb).second)
+                        stack.push_back(nb);
+                }
+            }
+            ++comps;
+            longest = std::max(longest, static_cast<int>(comp.size()));
+            if (shores.size() >= 2) ++spans; else ++piers;
+        }
+        std::printf("       %zu bridged water tile(s) in %d bridge(s); %d span shore to"
+                    " shore, %d reach only one; longest span %d cell(s)\n",
+                    wet_roaded.size(), comps, spans, piers, longest);
+        check(comps > 0, "M2b the generated world laid at least one bridge (non-vacuity)");
+        check(piers == 0,
+              fmt("M2b every bridge joins TWO shores \u2014 a chain of crossings, never a pier"
+                  " (%d of %d span)", spans, comps));
+        check(longest <= kMaxCrossingTiles,
+              fmt("M2c no bridge is longer than a strait (%d cell(s), cap %d)",
+                  longest, kMaxCrossingTiles));
+    }
+
+    // --- B1: a bridge beats the water it crosses ---------------------------
+    {
+        entity_id a = null_entity, b = null_entity;
+        int side = -1;
+        for (const auto& [tid, tc] : w.tiles) // ascending id: a stable pick
+        {
+            if (!is_water(tc.substrate) || !tile_has_road(tc))
+                continue;
+            for (int s = 0; s < 6 && a == null_entity; ++s)
+            {
+                if (road_tier_on_side(tc, s) == 0) continue;
+                const entity_id other = road_edge_neighbour(w, tid, s);
+                if (other == null_entity) continue;
+                a = tid; b = other; side = s;
+            }
+            if (a != null_entity) break;
+        }
+        check(a != null_entity, "B1a found a bridged crossing to price");
+        if (a != null_entity)
+        {
+            const std::uint8_t tier = road_tier_on_side(w.tiles.at(a), side);
+            const float bridged = edge_traversal_cost(w.tiles.at(a), w.tiles.at(b), side);
+            tile_component sa = w.tiles.at(a), sb = w.tiles.at(b);
+            set_road_tier_on_side(w.tiles.at(a), side, 0);
+            set_road_tier_on_side(w.tiles.at(b), opposite_hex_side(side), 0);
+            const float bare = edge_traversal_cost(w.tiles.at(a), w.tiles.at(b), side);
+            w.tiles.at(a) = sa;
+            w.tiles.at(b) = sb;
+            invalidate_logistics_caches(w);
+            std::printf("       bridged hop %u->%u tier %u: %.6f on the deck,"
+                        " %.6f over open water\n", a, b, static_cast<unsigned>(tier),
+                        bridged, bare);
+            check(bridged < bare,
+                  fmt("B1b the hop over a bridge is paid at its road price, not the sea"
+                      " leg's (%.6f < %.6f)", bridged, bare));
+            check(bridged <= road_traversal_multiplier(tier) * k_bridge_deck_cost + 1e-6f,
+                  "B1c and it is no dearer than the deck at that tier");
+        }
     }
 
     // --- E1 / E2: the discount falls with tier, and is symmetric -----------
@@ -316,6 +450,26 @@ int main(int argc, char** argv)
             }
             std::printf("       migrated tile-sides: %lld expected, %lld laid, %lld disagree\n",
                         want, got, wrong);
+            // WHAT THE MIGRATION COSTS, reported for Ben (review of 0831de6d): a tile
+            // whose only road was its own street — a lone centre with no roaded
+            // neighbour — has no pair to lay an edge between, so it comes back with no
+            // road. That is exactly the ruled rule ("a road crosses only where both ends
+            // were roaded"), so it stands; this says how big it is.
+            const auto migrated_cells = cell_index(r); // one index, not a scan per tile
+            int legacy_roaded = 0, dropped = 0;
+            for (const auto& [key, lvl] : legacy)
+            {
+                if (lvl == 0) continue;
+                ++legacy_roaded;
+                const auto cit = migrated_cells.find(key);
+                if (cit == migrated_cells.end()) continue;
+                const auto tit = r.tiles.find(cit->second);
+                if (tit != r.tiles.end() && !tile_has_road(tit->second)) ++dropped;
+            }
+            std::printf("       migration drops %d of %d roaded tiles (%.2f%%) \u2014 a tile"
+                        " with no roaded neighbour has no pair to cross between\n",
+                        dropped, legacy_roaded,
+                        legacy_roaded > 0 ? 100.0 * dropped / legacy_roaded : 0.0);
             check(want > 0, "S2c the pre-edge field had adjacent roaded pairs to migrate");
             check(wrong == 0, fmt("S2d every migrated crossing is the LOWER of its two"
                                   " tiers (%lld disagree)", wrong));

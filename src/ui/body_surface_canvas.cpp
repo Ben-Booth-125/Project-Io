@@ -3894,9 +3894,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // record is in cache (BL-1260): a later read of a tile record is a miss.
         // BL-1340: the whole six-side road mask, so a stroke cache keyed on this invalidates
         // when ANY crossing of the tile moves — a max-over-sides reading would miss a new
-        // Track beside a Highway.
+        // Track beside a Highway. THE LAYOUT, which the neighbour signature below shares
+        // and must not overlap: bits 0-11 the road mask (two a side), bits 12-19 the lane
+        // tier, bit 20 survey visibility, bits 24+ the vision fold. The road mask needs
+        // twelve bits where `road_level` needed two, so the lane sits at 12 and the survey
+        // bit moved clear of it (review of 0831de6d: at 16 the lane and the survey bit
+        // overlapped, and a lane tile's signature stopped moving when its visibility
+        // flipped — the stroke cache then never invalidated).
         route_levels[ci] = static_cast<std::uint32_t>(
-            ct.road_edges | (static_cast<std::uint32_t>(ct.lane_level) << 16));
+            ct.road_edges | (static_cast<std::uint32_t>(ct.lane_level) << 12));
         if (cache_nations)
             nation_cache[ci] = nation_of(cid);
         tile_shade& sh = shade_cache[ci];
@@ -4554,10 +4560,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 else
                 {
                     const tile_component* t = tile_rc(cc, rr);
-                    v = t ? (std::uint64_t{ t->road_edges } | (std::uint64_t{ t->lane_level } << 16))
+                    v = t ? (std::uint64_t{ t->road_edges } | (std::uint64_t{ t->lane_level } << 12))
                           : 0xFFFFFFu;
                 }
-                v |= std::uint64_t{ survey_tile_visible(body.survey, gw, gh, cc, rr) } << 16;
+                // Bit 20: clear of the road mask (0-11) and the lane (12-19). See the
+                // layout note in the shade pass above.
+                v |= std::uint64_t{ survey_tile_visible(body.survey, gw, gh, cc, rr) } << 20;
                 v ^= fbits(vision_rc(cc, rr)) << 24;
                 if (draw_border_band)
                     v = mix(v, nation_rc(cc, rr));

@@ -69,7 +69,14 @@ float road_edge_node_cost(const tile_component& tc, std::uint8_t tier);
 /// roaded edge are priced as the bridge deck. @p side < 0 (not neighbours) prices the mean
 /// alone. Called by both intra-body floods (`flood_edge_cost`), the reach field, the sea
 /// leg, `lane_clock`, and `run_unit_march`.
-float edge_traversal_cost(const tile_component& from, const tile_component& to, int side);
+///
+/// @param read_river  false suppresses the river term alone (the road, the bridge deck and
+///        the node mean are unchanged). `body_reach_field` passes false: reach is a SCALAR
+///        per tile, read as "can this be supplied", and a river's discount runs one way
+///        only — a directed term in an undirected field would make reach depend on which
+///        way it was asked. Everything that prices a DIRECTED hop leaves it true.
+float edge_traversal_cost(const tile_component& from, const tile_component& to, int side,
+                          bool read_river = true);
 
 /// A tile's traversal-cost WEIGHT — ocean or landform cost, discounted by a sea lane
 /// where one lies on it. The per-node weight A*, body_reach_field's Dijkstra, and
@@ -116,6 +123,16 @@ bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier);
 /// counts each edge exactly once. @p per_tier (optional, 3 ints) takes the Track / Road /
 /// Highway split.
 int count_road_edges(const world& w, int* per_tier = nullptr);
+
+/// The same count, SPLIT BY THE NATION THAT HOLDS IT (BL-1340; review of 0831de6d): per
+/// nation, how many road edges at tier 1 / 2 / 3. Attribution is by EITHER END — the
+/// nation of the tile that sees the edge from its canonical half, or, where that ground is
+/// unowned, the nation at the other end. Billing the canonical half alone left about half
+/// of every frontier road unbilled, selected by nothing but grid orientation. An edge
+/// between two nations is one nation's; an edge nobody holds is nobody's and appears under
+/// no key. THE ONE COUNTER every production reader shares, so the rule verified in
+/// tools/verify/road_edges.cpp is the rule that runs.
+std::map<entity_id, std::array<int, 3>> count_road_edges_by_nation(const world& w);
 
 /// THE MIRROR INVARIANT (BL-1340; LOGISTICS.md § 4): for every tile and every side whose
 /// neighbour is present on the grid, the neighbour's facing side carries the same tier.

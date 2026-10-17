@@ -531,8 +531,8 @@ bool demolish_building(world& w, entity_id corp, entity_id building)
 }
 
 construction_result place_road(world& w, const recipe_registry& reg,
-                               entity_id corp, entity_id tile, std::uint8_t side,
-                               std::uint8_t tier)
+                               entity_id corp, entity_id tile, std::uint8_t tier,
+                               std::uint8_t side)
 {
     const auto corp_it = w.corporations.find(corp);
     if (corp_it == w.corporations.end())
@@ -583,15 +583,14 @@ construction_result place_road(world& w, const recipe_registry& reg,
     if (cc.balance < total_cost)
         return construction_result::insufficient_funds;
 
-    // Commit: debit, raise the EDGE to the chosen road tier (both halves — BL-1340),
-    // invalidate the logistics caches (the road field moved, so cached path and reach
-    // costs are stale — world.hpp invalidation contract).
-    cc.balance -= total_cost;
+    // Commit: raise the EDGE to the chosen road tier (both halves — BL-1340), THEN debit,
+    // and invalidate the logistics caches (the road field moved, so cached path and reach
+    // costs are stale — world.hpp invalidation contract). The lay goes first so no float
+    // ever makes the round trip out of the balance and back: a debit-then-refund is not
+    // exactly the identity (review of 0831de6d).
     if (!lay_road_edge(w, tile, chosen, tier)) // BL-172: 1=Track, 2=Road, 3=Highway
-    {
-        cc.balance += total_cost; // nothing was written: refund rather than charge for air
         return construction_result::invalid_tile;
-    }
+    cc.balance -= total_cost;
     invalidate_logistics_caches(w);
 
     return construction_result::placed;

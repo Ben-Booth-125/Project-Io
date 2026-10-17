@@ -1,5 +1,6 @@
 #include "network_upkeep.hpp"
 
+#include "logistics.hpp" // BL-1340: count_road_edges_by_nation — the one edge counter
 #include "world.hpp"
 
 #include <algorithm>
@@ -104,25 +105,16 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
     // serialisation seam. Both source maps are unordered, but only integer
     // increments land here, which commute; the keyed std::map makes every walk
     // AFTER this point ascending-order.
-    // BL-1340 — A ROAD IS AN EDGE, SO THE BILL COUNTS EDGES. Only a tile's sides 0-2
-    // (E, NE, NW) are read: every crossing is one of those three sides of exactly one of
-    // its two tiles, so each edge is billed ONCE — walking all six sides would bill every
-    // road twice. An edge therefore belongs to the nation holding the end that sees it
-    // from the canonical half, which for an interior road is the nation either way and for
-    // a border crossing is one of the two, never both.
+    // BL-1340 — A ROAD IS AN EDGE, SO THE BILL COUNTS EDGES, through the ONE counter
+    // (`count_road_edges_by_nation`, logistics.cpp) rather than a loop of its own: each
+    // crossing once, attributed to the nation at either end so a road whose canonical half
+    // sits on unowned frontier ground is still billed to the nation that holds the other
+    // end (review of 0831de6d — the hand-rolled loop here dropped about half of every
+    // frontier road, selected by grid orientation alone).
     std::map<entity_id, network_size> sizes;
-    for (const auto& [tile, nid] : w.tile_to_nation)
-    {
-        const auto tit = w.tiles.find(tile);
-        if (tit == w.tiles.end())
-            continue;
-        for (int s = 0; s < 3; ++s)
-        {
-            const std::uint8_t lvl = road_tier_on_side(tit->second, s);
-            if (lvl >= 1 && lvl <= 3)
-                ++sizes[nid].roads[lvl - 1];
-        }
-    }
+    for (const auto& [nid, tiers] : count_road_edges_by_nation(w))
+        for (std::size_t i = 0; i < 3; ++i)
+            sizes[nid].roads[i] = tiers[i];
     for (const auto& [bid, bc] : w.buildings)
     {
         if (bc.type != building_type::port && bc.type != building_type::inland_logistics_hub)

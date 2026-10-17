@@ -1450,7 +1450,7 @@ int main(int argc, char** argv)
 
     // Raster index of Kepler tiles (grid_y*gw + grid_x -> tile), for adjacency.
     std::vector<entity_id> grid(static_cast<std::size_t>(gw) * gh, null_entity);
-    int roaded_land = 0, roaded_ocean = 0;
+    int roaded_land = 0, roaded_ocean = 0, roaded_strait = 0;
     int track_tiles = 0, road_tiles = 0, highway_tiles = 0, over_highway = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
@@ -1459,8 +1459,14 @@ int main(int argc, char** argv)
             grid[static_cast<std::size_t>(tc.grid_y) * gw + tc.grid_x] = tid;
         if (tile_has_road(tc))
         {
-            if (is_water(tc.substrate)) ++roaded_ocean;
-            else                                              ++roaded_land;
+            // BL-1340 (Ben, 2026-10-17): a crossing MAY span water — a run of them is a
+            // bridge — but generation refuses a route whose water run is not a strait
+            // (`crossing_kind` rejects open ocean outright), so a bridged cell is shore
+            // water or a lake and NEVER open ocean. That is what this row asks now; the
+            // old "no road on water" reading was retired by the ruling.
+            if (is_open_ocean(tc.substrate))  ++roaded_ocean;
+            else if (is_water(tc.substrate))  ++roaded_strait;
+            else                              ++roaded_land;
             const std::uint8_t lvl = tile_tier(tc);
             if      (lvl == 1) ++track_tiles;
             else if (lvl == 2) ++road_tiles;
@@ -1470,8 +1476,11 @@ int main(int argc, char** argv)
     }
 
     // R1 presence.
+    std::printf("      (bridges: %d water tile(s) carry a crossing, %d of them open ocean)\n",
+                roaded_strait + roaded_ocean, roaded_ocean);
     check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile carries a road edge)");
-    check(roaded_ocean == 0, "R1 no road edge stamped on ocean tiles");
+    check(roaded_ocean == 0,
+          "R1 no crossing stands on OPEN OCEAN — a bridge is a strait span (BL-1340)");
 
     // R2 three-tier ladder (BL-172), gated by qualification PERCENTILE (BL-618 as
     // amended by BL-621 — Ben's 2026-08-25 ruling on NR-641). The no_prehistory
@@ -1572,12 +1581,15 @@ int main(int argc, char** argv)
         const auto it = w.population_centres.find(cid);
         return it != w.population_centres.end() && it->second.province_anchor;
     };
-    // BL-1340 — THE ONE EXEMPT CLASS A ROAD BEING AN EDGE CREATES. A road crosses the
-    // boundary between two tiles, so a centre with NO land neighbour on any of its six
-    // sides — a one-tile island — cannot carry one at all: "a road to nowhere is
-    // therefore impossible to express, which is the point" (LOGISTICS.md § 4). Before the
-    // move such a centre took a Track on its own tile that joined nothing. They are
-    // counted and named rather than quietly folded into the pass rate.
+    // BL-1340 — WHAT THE TWO RULINGS LEAVE OUT, counted rather than assumed. A road is an
+    // EDGE, and only a side a 4-cardinal walk can cross may carry one (Ben, 2026-10-16 and
+    // 2026-10-17), so a centre whose every CROSSABLE side faces water has no street to lay:
+    // not because the pass skipped it, but because no road out of it could be crossed by
+    // anything. Before the move such a centre took a Track on its own tile, which is
+    // exactly the "road belonging to one tile" the first ruling abolished. They are named
+    // and counted here — `stranded` — and the rest are asked at 100%. A stranded centre
+    // still joins the network when a real route bridges a strait to it, and those that do
+    // are counted in `connected` like any other.
     const auto land_at = [&](int rr, int cc) {
         if (rr < 0 || rr >= gh) return false;
         const entity_id t = grid[static_cast<std::size_t>(rr) * gw + ((cc % gw) + gw) % gw];
@@ -1591,17 +1603,18 @@ int main(int argc, char** argv)
         const auto tit = w.tiles.find(tile);
         if (tit == w.tiles.end() || tit->second.body != kepler) continue;
         const int  r = tit->second.grid_y, c = tit->second.grid_x;
-        bool has_land_neighbour = false;
+        bool has_land_step = false;
         for (int s = 0; s < 6; ++s)
         {
+            if (!road_side_is_crossable(s, r)) continue; // a step nothing can make
             const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, s);
-            has_land_neighbour = has_land_neighbour || land_at(nb.gy, nb.gx);
+            has_land_step = has_land_step || land_at(nb.gy, nb.gx);
         }
-        if (!has_land_neighbour) { ++islanders; continue; }
         const bool own       = road_at(r, c);
         const bool neighbour = road_at(r, (c + 1) % gw) || road_at(r, (c + gw - 1) % gw)
                                || road_at(r - 1, c) || road_at(r + 1, c);
         const bool touches = own || neighbour;
+        if (!has_land_step && !touches) { ++islanders; continue; } // stranded: see above
         ++total;
         if (touches) ++connected;
         else         ++off_lattice;
@@ -1614,11 +1627,11 @@ int main(int argc, char** argv)
     }
     std::printf("      (connectivity: %d/%d centres touch a road; %d/%d anchors;"
                 " %d street-only — below the spur floor (BL-1119), or spur-cap/open-sea"
-                " survivors; %d exempt with no land neighbour at all, BL-1340)\n",
+                " survivors; %d stranded — no crossable side faces land, BL-1340)\n",
                 connected, total, anchors_connected, anchors, street_only, islanders);
     check(total > 0 && connected == total,
-          "R3 every population centre with a land neighbour touches the road lattice"
-          " (anchors included, BL-623; an island centre cannot carry an edge, BL-1340)");
+          "R3 every population centre a road can leave touches the lattice (anchors"
+          " included, BL-623; the stranded are counted, BL-1340)");
 
     // R4 determinism — regenerate and compare the whole road EDGE field by tile (BL-1340).
     world w2 = make_hard_coded_world(no_prehistory());

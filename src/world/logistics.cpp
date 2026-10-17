@@ -97,10 +97,11 @@ float road_edge_node_cost(const tile_component& tc, std::uint8_t tier)
     return tile_traversal_cost(tc);
 }
 
-float edge_traversal_cost(const tile_component& from, const tile_component& to, int side)
+float edge_traversal_cost(const tile_component& from, const tile_component& to, int side,
+                          bool read_river)
 {
     const std::uint8_t tier = road_tier_on_side(from, side);
-    const float river = (side >= 0) ? river_edge_discount(from, side) : 1.0f;
+    const float river = (read_river && side >= 0) ? river_edge_discount(from, side) : 1.0f;
     return 0.5f * (road_edge_node_cost(from, tier) + road_edge_node_cost(to, tier))
            * river * road_traversal_multiplier(tier);
 }
@@ -250,6 +251,12 @@ bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier)
     const auto tit = w.tiles.find(tile);
     if (tit == w.tiles.end())
         return false;
+    // ONLY A SIDE A WALK CAN CROSS (Ben, 2026-10-17): the one writer refuses the two
+    // diagonals the 4-cardinal walks skip, so no caller — generation, placement or a
+    // harness — can leave an edge nothing is able to cross. The mirror survives it: a
+    // crossable side's facing side is crossable from the neighbour's own parity.
+    if (!road_side_is_crossable(side, tit->second.grid_y))
+        return false;
     const entity_id other = road_edge_neighbour(w, tile, side);
     if (other == null_entity)
         return false; // a road to nowhere cannot be expressed (LOGISTICS.md § 4)
@@ -288,6 +295,45 @@ int count_road_edges(const world& w, int* per_tier)
         }
     }
     return total;
+}
+
+std::map<entity_id, std::array<int, 3>> count_road_edges_by_nation(const world& w)
+{
+    std::map<entity_id, std::array<int, 3>> out;
+    const auto idx = road_tile_index(w);
+    const auto holder = [&](entity_id t) {
+        const auto it = w.tile_to_nation.find(t);
+        return it != w.tile_to_nation.end() ? it->second : null_entity;
+    };
+    // The canonical half (sides 0-2) counts each crossing once; the OWNER is this tile's
+    // nation, or the far end's where this ground is unowned (see the header).
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        const int gw = road_grid_width(w, tc.body);
+        const auto bit = w.bodies.find(tc.body);
+        const int gh = bit != w.bodies.end() ? bit->second.grid_height : 0;
+        for (int s = 0; s < 3; ++s)
+        {
+            const std::uint8_t tier = road_tier_on_side(tc, s);
+            if (tier == 0 || tier > 3)
+                continue;
+            entity_id owner = holder(tid);
+            if (owner == null_entity)
+            {
+                int nx = 0, ny = 0;
+                if (road_neighbour_cell(tc.grid_x, tc.grid_y, s, gw, gh, nx, ny))
+                {
+                    const auto nit = idx.find(std::make_tuple(tc.body, ny, nx));
+                    if (nit != idx.end())
+                        owner = holder(nit->second);
+                }
+            }
+            if (owner == null_entity)
+                continue; // a road nobody holds is nobody's to maintain
+            ++out[owner][static_cast<std::size_t>(tier) - 1];
+        }
+    }
+    return out;
 }
 
 bool road_edges_mirrored(const world& w, entity_id* bad_tile)
@@ -998,9 +1044,16 @@ const std::vector<float>& body_reach_field(world& w, entity_id body)
     }
 
     // Multi-source Dijkstra over the same 4-cardinal, column-wrapping grid the
-    // A* uses, with the same edge cost (mean of the two node weights). Sharing
-    // the cost function is the point: reach means "suppliable", not a second
+    // A* uses, with the same edge cost: `edge_traversal_cost`, the ONE hop price.
+    // Sharing the cost function is the point: reach means "suppliable", not a second
     // distance metric invented for placement.
+    //
+    // BL-1340 (review of 0831de6d): when the road discount moved off the node and onto
+    // the crossing, this walk — which built its own edge out of two node weights — lost
+    // roads ALTOGETHER, so a road bought no reach and the AI's road candidate scored
+    // against a field it could not move. It reads the crossing now. The RIVER term is
+    // deliberately suppressed (`read_river = false`): reach is one scalar a tile, and a
+    // discount that runs one way only would make it depend on the direction asked.
     while (!open.empty())
     {
         const pq_entry cur = open.top();
@@ -1014,7 +1067,6 @@ const std::vector<float>& body_reach_field(world& w, entity_id body)
         const auto cur_tc = w.tiles.find(grid[static_cast<std::size_t>(cur_idx)]);
         if (cur_tc == w.tiles.end())
             continue;
-        const float cur_weight = tile_traversal_cost(cur_tc->second);
 
         const int dr[4] = { -1, 1, 0, 0 };
         const int dc[4] = { 0, 0, -1, 1 };
@@ -1031,7 +1083,12 @@ const std::vector<float>& body_reach_field(world& w, entity_id body)
             if (n_tc == w.tiles.end())
                 continue;
 
-            const float edge = 0.5f * (cur_weight + tile_traversal_cost(n_tc->second));
+            // The hop n -> settled, priced as every flood prices it: the side read off
+            // the neighbour facing back (the reverse of this offset, at the neighbour's
+            // own row parity), so a crossing between them is read once.
+            const int side = hex_side_for_offset(-dc[d], -dr[d], (nrow & 1) != 0);
+            const float edge = edge_traversal_cost(n_tc->second, cur_tc->second, side,
+                                                   /*read_river=*/false);
             const float next = cur.cost + edge;
             if (next < cost[static_cast<std::size_t>(nidx)])
             {
@@ -1675,18 +1732,9 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
         const auto ib = w.tiles.find(tb);
         if (ia == w.tiles.end() || ib == w.tiles.end())
             return 1.0f;
-        const tile_component& a = ia->second;
-        const tile_component& b = ib->second;
-        const auto bit = w.bodies.find(a.body);
-        const int gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
-        int dc = b.grid_x - a.grid_x;
-        if (gw > 2)
-        {
-            if (dc > 1)  dc -= gw;
-            if (dc < -1) dc += gw;
-        }
-        const int side = hex_side_for_offset(dc, b.grid_y - a.grid_y, (a.grid_y & 1) != 0);
-        return edge_traversal_cost(a, b, side);
+        // ONE wrap rule, through the one helper (`road_side_between`): three different
+        // guards for the same cylinder (gw > 1, gw > 2, none) lived in this file.
+        return edge_traversal_cost(ia->second, ib->second, road_side_between(w, ta, tb));
     };
 
     std::vector<float> hop(n - 1, 0.0f); // days spent on hop i -> i+1

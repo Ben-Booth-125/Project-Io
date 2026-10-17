@@ -478,6 +478,7 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     // still reports the TILES the route touched, which is what its readers (the traces,
     // the spur's "is this tile joined") ask of it.
     bool raised = false; // probe-only reading
+    int  joined = 0;      // crossings of the route that carry a road once the stamp is done
     for (std::size_t k = 0; k + 1 < g_last_laid.size(); ++k)
     {
         const entity_id a = g_last_laid[k], b = g_last_laid[k + 1];
@@ -485,6 +486,9 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
         if (side < 0)
             continue;
         raised = lay_road_edge(w, a, side, level) || raised;
+        const auto ait = w.tiles.find(a);
+        if (ait != w.tiles.end() && road_tier_on_side(ait->second, side) > 0)
+            ++joined;
     }
     if (stamped)
         for (const entity_id t : g_last_laid)
@@ -495,7 +499,13 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
         }
     if (g_road_probe_fresh_floods && raised) // BL-1119 probe: price the next route on the field as it stands
         invalidate_logistics_caches(w);
-    return true;
+    // A STAMP THAT LAID NO CROSSING IS NOT A LINK (review of 0831de6d). A road is an edge,
+    // so a route of one tile — or one whose every pair is unwritable — joins nothing,
+    // and returning true had the spur loop mark its centre on-network, count the spur and
+    // stop trying the remaining candidates. `joined`, not `raised`: a route laid along a
+    // road that already stands raises nothing and yet IS joined, and refusing that would
+    // have the loop re-try a candidate already served.
+    return joined > 0;
 }
 
 // BL-768 — THE ANCIENT TIER RULE. Its own rule, not the industrial one: the
@@ -704,12 +714,13 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     //     traversal cost, ties broken by the lower hex-side index. One edge, not six: a
     //     ring of streets round every centre would be the lattice this pass exists to
     //     avoid, while a tile with no edge at all could not be on the network at all.
-    //     A centre with no land neighbour at all — a one-tile island — takes its street
-    //     as a BRIDGE to the cheapest water side instead (Ben, 2026-10-17: a road edge may
-    //     span water), so no centre is left unable to express a road. Deterministic (the
-    //     cost is the neighbour's own weight, the tie-break is the side order, and land is
-    //     preferred to water whatever the costs) and order-independent (`lay_road_edge`
-    //     only ever raises).
+    //     A centre with no land neighbour at all — a one-tile island — lays NO street:
+    //     the only edge available to it would be a pier, a crossing onto open water that
+    //     reaches nothing, and a pier is billed by upkeep and drawn for no gain. Such a
+    //     centre joins the network only when a real route reaches it, which since the
+    //     2026-10-17 ruling a route may do by bridging a strait. Deterministic (the cost
+    //     is the neighbour's own weight, the tie-break is the side order) and
+    //     order-independent (`lay_road_edge` only ever raises).
     for (const road_node& node : nodes)
     {
         const auto it = w.tiles.find(node.tile);
@@ -717,30 +728,29 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
             continue;
         if (tile_has_road(it->second))
             continue; // already on the network: a later Highway through it keeps its tier
-        int   best_side = -1, best_wet_side = -1;
-        float best_cost = 0.0f, best_wet_cost = 0.0f;
+        int   best_side = -1;
+        float best_cost = 0.0f;
         for (int s = 0; s < 6; ++s)
         {
+            // Only a side a walk can cross (Ben, 2026-10-17): a street on one of the two
+            // diagonals would be billed and crossed by nothing.
+            if (!road_side_is_crossable(s, it->second.grid_y))
+                continue;
             const entity_id nb = road_edge_neighbour(w, node.tile, s);
             if (nb == null_entity)
                 continue;
             const auto nit = w.tiles.find(nb);
-            if (nit == w.tiles.end())
-                continue;
+            if (nit == w.tiles.end() || is_water(nit->second.substrate))
+                continue; // a street goes to LAND; the pier case is explained above
             const float c = tile_traversal_cost(nit->second);
-            if (is_water(nit->second.substrate))
-            {
-                if (best_wet_side < 0 || c < best_wet_cost) { best_wet_side = s; best_wet_cost = c; }
-            }
-            else if (best_side < 0 || c < best_cost)
+            if (best_side < 0 || c < best_cost)
             {
                 best_side = s;
                 best_cost = c;
             }
         }
-        const int lay_side = best_side >= 0 ? best_side : best_wet_side;
-        if (lay_side >= 0)
-            lay_road_edge(w, node.tile, lay_side, kTrack);
+        if (best_side >= 0)
+            lay_road_edge(w, node.tile, best_side, kTrack);
     }
 
     // Group node indices by nation (std::map → nation ids ascending, deterministic;
@@ -1686,12 +1696,18 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
             const auto bit = w.tiles.find(tb);
             if (ait == w.tiles.end() || bit == w.tiles.end()) continue;
             if (road_tier_on_side(ait->second, side) >= level) continue;
+            // The masks BEFORE the lay, recorded only if the lay happens: pushing first
+            // let a refused lay (a side no walk can cross, no neighbour) inflate
+            // `raises_before`, which every replay in road_generation_harness indexes by
+            // (review of 0831de6d).
+            const std::uint16_t was_a = ait->second.road_edges;
+            const std::uint16_t was_b = bit->second.road_edges;
+            if (!lay_road_edge(w, ta, side, level)) continue;
             if (trace != nullptr)
             {
-                trace->raises.push_back({ ta, ait->second.road_edges });
-                trace->raises.push_back({ tb, bit->second.road_edges });
+                trace->raises.push_back({ ta, was_a });
+                trace->raises.push_back({ tb, was_b });
             }
-            if (!lay_road_edge(w, ta, side, level)) continue;
             ++laid;
             raised.insert(ta);
             raised.insert(tb);

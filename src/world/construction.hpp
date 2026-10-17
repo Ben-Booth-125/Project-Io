@@ -195,14 +195,19 @@ bool demolish_state_building(world& w, entity_id nation, entity_id building);
 /// @param reg   Loaded registry (per-tier road cost).
 /// @param corp  Corporation placing (and paying) — usually w.player_entity.
 /// @param tile  Target tile entity — one end of the crossing.
-/// @param side  Hex side of `tile` the road crosses: 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE
-///              (hex_neighbors.hpp). `k_road_side_auto` picks the cheapest land neighbour
-///              deterministically — lowest traversal cost, ties to the lower side index —
-///              which is what a caller with a tile but no direction (the AI's road
-///              candidate, a UI that has not yet grown a direction) gets.
 /// @param tier  Road tier to place: 1=Track (default, = BL-147 behaviour), 2=Road, 3=Highway.
-/// @return      `placed` on success; `invalid_tile` (ocean / no neighbour that way /
-///              already at or above `tier`), `insufficient_funds`, `no_corp`, or `no_tile`.
+/// @param side  Hex side of `tile` the road crosses: 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE
+///              (hex_neighbors.hpp). `k_road_side_auto` (the default) picks the cheapest
+///              crossable neighbour deterministically — lowest traversal cost, ties to the
+///              lower side index — which is what a caller with a tile but no direction
+///              (the AI's road candidate, a UI that has not grown a direction) gets.
+///              **It is the LAST parameter deliberately** (review of 0831de6d): `side` and
+///              `tier` are both uint8_t, so an older 5-argument call that passed its tier
+///              where `side` had been inserted compiled and silently read the tier as a
+///              side. Appending it keeps every existing call correct.
+/// @return      `placed` on success; `invalid_tile` (no neighbour that way, a side no walk
+///              can cross, already at or above `tier`), `insufficient_funds`, `no_corp`,
+///              or `no_tile`.
 construction_result place_road(world& w, const recipe_registry& reg,
-                               entity_id corp, entity_id tile,
-                               std::uint8_t side = k_road_side_auto, std::uint8_t tier = 1);
+                               entity_id corp, entity_id tile, std::uint8_t tier = 1,
+                               std::uint8_t side = k_road_side_auto);

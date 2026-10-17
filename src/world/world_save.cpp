@@ -164,8 +164,11 @@ void migrate_legacy_roads(world& s,
         if (tit == cell.end())
             continue;
         const auto self = s.tiles.find(tit->second);
-        if (self == s.tiles.end() || is_water(self->second.substrate))
+        if (self == s.tiles.end())
             continue;
+        // Water is no bar either end (BL-1340, Ben 2026-10-17): a pre-v53 field could
+        // carry a road on a water tile — a bridge — and its crossings migrate like any
+        // other pair. (A stream written before the bridge ruling simply has none.)
         for (int k = 0; k < 4; ++k)
         {
             int nx = col + dc[k];
@@ -181,7 +184,7 @@ void migrate_legacy_roads(world& s,
             if (ncell == cell.end())
                 continue;
             const auto other = s.tiles.find(ncell->second);
-            if (other == s.tiles.end() || is_water(other->second.substrate))
+            if (other == s.tiles.end())
                 continue;
             // The side is read from the UNWRAPPED step (dc/dr), never the wrapped column
             // difference, which at the seam would be +-(gw-1) and name no neighbour.

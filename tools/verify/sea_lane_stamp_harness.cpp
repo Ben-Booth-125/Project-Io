@@ -882,14 +882,17 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
         const auto it = L.w.tiles.find(L.grid[static_cast<std::size_t>(i)]);
         if (it == L.w.tiles.end()) continue;
         if (it->second.lane_level > 0) { ++lane_tiles; if (!is_sea(it->second.substrate)) ++lane_on_land; }
-        if (is_water(it->second.substrate) && tile_has_road(it->second)) ++road_on_water;
+        // BL-1340 (Ben, 2026-10-17): a crossing may span water — a bridge — so what is
+        // still impossible is one on OPEN OCEAN, which generation never routes through.
+        if (is_open_ocean(it->second.substrate) && tile_has_road(it->second)) ++road_on_water;
     }
     int earned = 0;
     for (const sea_leg& l : L.legs) if (l.uses >= lp.sea_lane_tier1_uses) ++earned;
     std::printf("      lane record: %zu legs, %d earned a lane; lane tiles on the 1960 world: %d\n",
                 L.legs.size(), earned, lane_tiles);
     check(lane_on_land == 0, "W1  lanes lie on sea tiles only");
-    check(road_on_water == 0, "W1  no road lies on water, so the road lens has none to draw there");
+    check(road_on_water == 0, "W1  no road crossing stands on open ocean (a bridge spans a"
+                             " strait; BL-1340)");
 
     // W0: THE REALM SNAPSHOT IS THE LAST CLOSE. What world setup handed the stamp
     // (`setup_lane_realms`) must be, region for region, the `nation` field of the

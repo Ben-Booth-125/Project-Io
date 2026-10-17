@@ -94,18 +94,27 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
     // BL-1340 (Ben, 2026-10-17): water is NO LONGER a refusal. A road edge may span water
     // and a run of such edges is a bridge, so a water tile with a neighbour can carry one;
     // the real gate is the per-side form below, which this weak form cannot reach.
-    // Upgrade-in-place (BL-172, BL-1340): a tile every side of which already stands at or
-    // above @p tier has nothing this tier can add. Reject rather than silently re-charge
-    // (BL-147 rejected any road; the tier check generalises that).
-    if (max_road_tier(tc) >= tier && tier > 0)
+    //
+    // UPGRADE BEFORE EXTEND, which is what "no side named" means (BL-147's `already_road`,
+    // generalised; review of 0831de6d). With no direction given, a press on this tile is
+    // "improve the road HERE": it is `ok` when the tile carries no crossing at all (the
+    // first one is laid) or when some crossable side carries a LOWER tier (that crossing
+    // is raised). A tile whose every crossing already stands at or above @p tier is
+    // `already_road` — the press does not quietly buy a second crossing on a fresh side,
+    // which would let one tile be paid for up to eighteen times. A caller that really
+    // wants another direction names the side.
+    if (tier == 0 || tier > 3)
+        return placement_reason::already_road;
+    if (max_road_tier(tc) == 0)
+        return placement_reason::ok; // nothing here yet: the first crossing
+    bool upgradable = false;
+    for (int s = 0; s < 6 && !upgradable; ++s)
     {
-        bool room = false;
-        for (int s = 0; s < 6 && !room; ++s)
-            room = road_tier_on_side(tc, s) < tier;
-        if (!room)
-            return placement_reason::already_road;
+        const std::uint8_t t = road_tier_on_side(tc, s);
+        upgradable = road_side_is_crossable(s, tc.grid_y) && t > 0 && t < tier;
     }
-    return placement_reason::ok;
+    return upgradable ? placement_result{placement_reason::ok}
+                      : placement_result{placement_reason::already_road};
 }
 
 placement_result can_place_road(const world& w, entity_id tile, int side, std::uint8_t tier)
@@ -114,6 +123,11 @@ placement_result can_place_road(const world& w, entity_id tile, int side, std::u
     if (tit == w.tiles.end())
         return placement_reason::ocean; // no tile: nothing to lay a road from
     if (side < 0 || side > 5 || tier == 0 || tier > 3)
+        return placement_reason::ocean;
+    // ONLY A SIDE A WALK CAN CROSS (Ben, 2026-10-17; LOGISTICS.md § 4): the two diagonals
+    // the 4-cardinal walks skip are refused — a road there would be bought, counted and
+    // billed and crossed by nothing, "not a road but a receipt".
+    if (!road_side_is_crossable(side, tit->second.grid_y))
         return placement_reason::ocean;
     // A ROAD TO NOWHERE CANNOT BE EXPRESSED (LOGISTICS.md § 4): a side with no neighbour
     // is not a crossing. WATER AT EITHER END IS FINE (Ben, 2026-10-17: "Roads can go over
@@ -132,6 +146,34 @@ placement_result can_place_road(const world& w, entity_id tile, int side, std::u
 
 int auto_road_side(const world& w, entity_id tile, std::uint8_t tier)
 {
+    // UPGRADE BEFORE EXTEND (review of 0831de6d). "No side named" means "improve the road
+    // here", so the crossing the tile ALREADY has comes first: the highest existing tier
+    // this press would raise, ties to the lower side index. Only a tile with no crossing
+    // at all takes a NEW one, and then the cheapest neighbour. Without this an auto press
+    // bought a fresh edge on a fresh side every time — one tile paid for up to eighteen
+    // times, nothing joined. `can_place_road` refuses a side no walk can cross (Ben,
+    // 2026-10-17), so only the four the row parity reaches are ever offered.
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return -1;
+    {
+        int best_up = -1;
+        std::uint8_t have = 0;
+        for (int s = 0; s < 6; ++s)
+        {
+            const std::uint8_t t = road_tier_on_side(tit->second, s);
+            if (t == 0 || t >= tier || t <= have)
+                continue;
+            if (!can_place_road(w, tile, s, tier))
+                continue;
+            have    = t;
+            best_up = s;
+        }
+        if (best_up >= 0)
+            return best_up;
+        if (max_road_tier(tit->second) > 0)
+            return -1; // every crossing it has is already at or above this tier
+    }
     int   best = -1;
     float best_cost = 0.0f;
     for (int s = 0; s < 6; ++s)

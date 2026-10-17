@@ -2973,7 +2973,7 @@ void app::render()
     {
         const construction_result r = place_road(
             m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile,
-            k_road_side_auto, m_ui.construction.pending_road_tier);
+            m_ui.construction.pending_road_tier, k_road_side_auto);
         m_play_log.direct(m_world, "place_road", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_road_tile, null_entity, -1, -1,
                           static_cast<int>(m_ui.construction.pending_road_tier));
