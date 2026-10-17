@@ -1679,6 +1679,28 @@
    ],
    "title": "construction_ledger_tabs dies in staging: the fixture cannot afford a military base",
    "design": "SPRINT 55 (found verifying BL-1370/1371 on main, 2026-10-17). scripts/verify/construction_ledger_tabs.lua exits 1 with ZERO assertions run - it dies in base.stage_ui_fixture (lib.lua:340, raised at :223) with 'fixture could not place a military base near the player's works: insufficient_funds'. The fixture runs up to 20 verify.econ_step(1) waiting out tech_locked and then places; the corp cannot pay by then. The delivering lane flagged it rather than claiming it pre-existing, which was right, and I could not attribute it either without a build at an older commit. CANDIDATES, in order: (1) BL-1335 taxes, merged the day before, now charge a share of operating profit every quarter the fixture steps - though the tax is floored at 0 so a loss-making fixture corp should pay nothing, which is the first thing to check; (2) the construction rate work changed what a build charges per tick; (3) market prices moved under the fixture so the base simply costs more. NOT a defect in the road or grid work: construction_progress (910), tile_card (71) and roads (31) all pass on the same build with zero failures. THE WORK: find which, then either fix the cause or fund the fixture honestly - never by widening the loop count, which would hide a real cost change."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-17",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-17: \"not every road is rendering\"); diagnosed and filed by Claude",
+   "requires": [],
+   "id": "BL-1375",
+   "short_name": "BRIDGES_DO_NOT_DRAW",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/route_paint.cpp"
+   ],
+   "title": "A crossing with a water end never draws: the bake still skips road data on water tiles",
+   "design": "SPRINT 55 (Ben, 2026-10-17, at the live click: 'The logic seems to work, but not every road is rendering'). DIAGNOSED BY READING: ground_bake.cpp:748 gates the road copy on 'if (!water && tile_has_road(t))', so a WATER tile never gets s.road[i] or s.road_sides[i] filled at all - that guard predates bridges and Ben's 2026-10-17 bridge ruling invalidated it. Two consequences, both matching what he sees: a bridge deck over water draws nothing, AND the LAND side of a shore crossing draws nothing either, because route_paint.cpp road_links_of (:130) gates every neighbour on on_net(s.road, nc, nr) (:139) and the water neighbour reads as not-on-net, so no link bit is set and no stroke is drawn. Inland roads are unaffected, which is why it reads as 'not EVERY road'. Row parity is NOT the cause - road_links_of already derives the side per parity via hex_side_for_offset. THE WORK: fill s.road / s.road_sides for a water tile that carries a road edge (the deck), let on_net and road_links_of see it, and paint the deck in route_paint, which today has only a sea-lane wake on water. Check the bake_source tile_class water branch does not skip route painting as well. RENDERING.md already rules a road draws as a run crossing the boundary it crosses, so the doc is right and the code is behind it. Verify with a capture of a bridge at a strait and of a shore crossing, and extend scripts/verify/roads.lua to assert a bridged crossing publishes a link bit."
   }
  ]
 }
