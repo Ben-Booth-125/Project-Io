@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 27 open, 2 resolved.*
+*29 entries — 25 open, 4 resolved.*
 
 ---
 
@@ -227,20 +227,6 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 
 **Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
 
-### NR-1049 — Sprint 56 calls taken on Ben's behalf: strait width 3 tiles; paint target build; BL-1337 exact net reaches the acquisition price
-*decision · raised 2026-10-16 · from Sprint 56 cut (branch claude/sprint-56-456d2b); NATION_GENERATION.md § Pass 2e*
-
-(1) BL-1310 (nations contiguous): "short strait only (a few sea tiles)" is set at strait_tiles = 3, about 380 km at 128 km per tile. (2) The remote island beyond any strait is exempt and goes to the nearest nation; the floor island case now goes to the nearest nation, not the globally largest. (3) BL-1311 (ground paint perf): the 1 minute / 6 GB target is measured on the Debug build that produced 3-5 min / 12 GB, with Release reported beside it. (4) BL-1337 (return net crosses zero): net is now the exact double, so corp_trailing_net (the acquisition price and the AI that prices buyouts) and spawn_seat trailing_net read the exact figure, which differs from the old float-rounded delta by about 1 ULP on quarters where a balance crossed zero. Deterministic; it can move a buyout debit by ~1e-6 credits and could in principle flip a threshold. Taken as a correction (cold review 2026-10-17, finding 2), not reverted.
-
-**Why it matters.** Strait width sets how many exclaves are ceded and how far an island realm may reach; the build the target is read on decides whether BL-1311 needs code at all.
-
-### NR-1051 — BL-1311 (ground paint perf) builds the ground bake at /O2 in Debug: a new object library and CMake policy CMP0184
-*novel-work · raised 2026-10-17 · from BL-1311 lane report (commit 3af45cdb); CMakeLists.txt*
-
-The four bake files (ground_bake, structure_stamps, route_paint, terrain_palette) now build as their own library at /O2 even in Debug, with runtime checks off; CMake policy CMP0184 is switched on so Debug runtime checks become a per-target property, and /RTC1 is stripped from the cached Debug flags for top-level targets (they keep the checks through the property). IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=OFF restores single-stepping. Existing build trees rebuild once. This cut the Debug seat wait from 750 s to 12.7 s with byte-identical captures.
-
-**Why it matters.** It changes what the Debug build means for one subsystem (no runtime checks, not steppable by default) and touches every build tree; a build-system change is project-wide scope.
-
 ---
 
 ## Resolved
@@ -257,6 +243,15 @@ score_national_budgets walks every landed nation and run_nation_step writes the 
 
 > **RESOLVED.** Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11.
 
+### NR-1049 — Sprint 56 calls taken on Ben's behalf: strait width 3 tiles; paint target build; BL-1337 exact net reaches the acquisition price
+*decision · raised 2026-10-16 · from Sprint 56 cut (branch claude/sprint-56-456d2b); NATION_GENERATION.md § Pass 2e*
+
+(1) BL-1310 (nations contiguous): "short strait only (a few sea tiles)" is set at strait_tiles = 3, about 380 km at 128 km per tile. (2) The remote island beyond any strait is exempt and goes to the nearest nation; the floor island case now goes to the nearest nation, not the globally largest. (3) BL-1311 (ground paint perf): the 1 minute / 6 GB target is measured on the Debug build that produced 3-5 min / 12 GB, with Release reported beside it. (4) BL-1337 (return net crosses zero): net is now the exact double, so corp_trailing_net (the acquisition price and the AI that prices buyouts) and spawn_seat trailing_net read the exact figure, which differs from the old float-rounded delta by about 1 ULP on quarters where a balance crossed zero. Deterministic; it can move a buyout debit by ~1e-6 credits and could in principle flip a threshold. Taken as a correction (cold review 2026-10-17, finding 2), not reverted.
+
+**Why it matters.** Strait width sets how many exclaves are ceded and how far an island realm may reach; the build the target is read on decides whether BL-1311 needs code at all.
+
+> **RESOLVED.** Ben: keep strait_tiles = 3; keep the exact net in the acquisition price (the honest figure); the paint target was the seat wait, met (34.4 s Debug, idle). The 6 GB ceiling is decided later: BL-1377 stays in the backlog.
+
 ### NR-1050 — BL-1310 (nations contiguous) changed how Pass 5 picks a nation's capital tile
 *novel-work · raised 2026-10-17 · from BL-1310 lane report (commit 7b17ea08); NATION_GENERATION.md § Pass 2e, § Pass 5*
 
@@ -265,4 +260,13 @@ The strait rule anchors a territory at its core, the group holding the capital. 
 **Why it matters.** Pass 5 capital placement feeds the seat, the treasury's home and every capital-keyed reading; a quiet rule change there is scope growth.
 
 > **RESOLVED.** Ben: A, the realm's seat at the close is always the capital tile. Same form: every launch obeys the strait rule (Empires-round launches included); the remote island is exempt at any size; the late repair after absorption stays. Written into NATION_GENERATION.md § Pass 2d and § Pass 2e.
+
+### NR-1051 — BL-1311 (ground paint perf) builds the ground bake at /O2 in Debug: a new object library and CMake policy CMP0184
+*novel-work · raised 2026-10-17 · from BL-1311 lane report (commit 3af45cdb); CMakeLists.txt*
+
+The four bake files (ground_bake, structure_stamps, route_paint, terrain_palette) now build as their own library at /O2 even in Debug, with runtime checks off; CMake policy CMP0184 is switched on so Debug runtime checks become a per-target property, and /RTC1 is stripped from the cached Debug flags for top-level targets (they keep the checks through the property). IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=OFF restores single-stepping. Existing build trees rebuild once. This cut the Debug seat wait from 750 s to 12.7 s with byte-identical captures.
+
+**Why it matters.** It changes what the Debug build means for one subsystem (no runtime checks, not steppable by default) and touches every build tree; a build-system change is project-wide scope.
+
+> **RESOLVED.** Ben: keep the /O2 ground-bake library in Debug, on by default (IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=ON).
 

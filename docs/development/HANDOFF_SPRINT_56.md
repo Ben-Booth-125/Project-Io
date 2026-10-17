@@ -32,7 +32,7 @@ This note is for the session that brings the branch onto main after sprint 55 la
 4. **Re-run the gates on the integrated tree** (both sprints move the world): `market_viability`
    full, `history_patterns` full, `history_sim_harness`, `world_audit --seeds` (library),
    `nation_targets_harness`, `world_determinism`, `save_roundtrip`, `quarterly_return`.
-5. **Re-pin the digests (BL-1338)** on the integrated tree, with Ben's authorisation:
+5. **Re-pin the digests (BL-1338)** on the integrated tree — authorised in principle (Ben, 2026-10-17) once both sprints are merged and the gates pass:
    `player_seed_sweep --digest-check --arc shipped|legacy` over the 16 library seeds. The mover
    table and the method are in `drafts/sprint-56-digest-attribution.md`; add sprint 55's movers
    and BL-1310 (which moves both arcs since every launch obeys the strait rule).
@@ -44,8 +44,8 @@ This note is for the session that brings the branch onto main after sprint 55 la
 
 ## Open for Ben
 
-- NR-1049: strait width 3 tiles; paint target read on Debug; BL-1337's exact net in the
-  acquisition price.
-- NR-1051: the Debug-optimised bake library.
-- BL-1377: under 6 GB needs option C (stream the master) or D (96 px).
-- The wizard footer's live click.
+- BL-1377 (ground under six GB): decided later (Ben, 2026-10-17); options C (stream the master) or D (96 px).
+- The wizard footer's live click, if not yet taken.
+
+Resolved 2026-10-17: NR-1049 (strait 3 tiles kept; exact net in the acquisition price kept), NR-1051
+(Debug-optimised bake kept, on by default), the BL-1338 re-pin authorised in principle.

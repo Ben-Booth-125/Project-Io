@@ -1016,7 +1016,7 @@
     "tools/verify/player_seed_sweep.cpp"
    ],
    "title": "player_seed_sweep digest pins fail on every digest for every seed, both arcs",
-   "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben. RULED (Ben, 2026-10-16): attribute the movers on the sprint 56 branch; re-pin at integration after sprint 55 lands, not on the branch."
+   "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben. RULED (Ben, 2026-10-16): attribute the movers on the sprint 56 branch; re-pin at integration after sprint 55 lands, not on the branch. RE-PIN AUTHORISED IN PRINCIPLE (Ben, 2026-10-17): the integrating session may re-pin both arcs on the integrated tree once sprints 55 and 56 are merged and gated; movers in docs/development/drafts/sprint-56-digest-attribution.md."
   },
   {
    "status": "proposed",
