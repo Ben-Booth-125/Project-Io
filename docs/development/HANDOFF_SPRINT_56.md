@@ -40,7 +40,7 @@ This note is for the session that brings the branch onto main after sprint 55 la
    BL-1338 once re-pinned) with `archive_landed.js` — it evicts on any call, so run it once, on
    purpose.
 7. **Debug build trees rebuild once**: BL-1311 switches on CMake policy CMP0184 and builds the
-   ground bake at /O2 in Debug (NR-1051 asks Ben whether to keep it).
+   ground bake at /O2 in Debug (kept, on by default: Ben, 2026-10-17, NR-1051).
 
 ## Open for Ben
 
