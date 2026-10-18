@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*30 entries — 26 open, 4 resolved.*
+*31 entries — 27 open, 4 resolved.*
 
 ---
 
@@ -233,6 +233,13 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).
 
 **Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
+
+### NR-1053 — No doc owns who holds a Logistic Points hub placed during generation; a broke major idles its hubs and starves its consumers
+*novel-work · raised 2026-10-18 · from BL-1382 economy trace (seed 28), src/world/logistic_points.cpp seed_logistics_sources / place_hub, src/world/state_industry.cpp plan_state_funding*
+
+seed_logistics_sources gives every hub on a major's ground to the nation as state industry (NATIONS.md § State industry: transport is state industry; a losing building idles, never debt). A major leaving generation with treasury 0.0 idles all its hubs at tick 0, so its consumers get 0 Logistic Points and the loss reflex decommissions them. BL-1382's merges moved 181 consumers onto such a major on seed 28 (G1 96.8 -> 44.7). Present before BL-1382 at smaller scale (seeds 9, 32, 40). The seeding report also claims 100% coverage before the funding gate runs.
+
+**Why it matters.** Hub ownership at generation is a design rule no economy doc states; LOGISTICS.md says anyone may build one, NATIONS.md makes transport state industry.
 
 ---
 
