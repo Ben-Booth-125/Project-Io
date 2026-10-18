@@ -117,6 +117,9 @@ struct closing_plan
     int cessions_late      = 0;
     int cessions_split     = 0; ///< BL-1310 round 4: exclaves split among two or more bordering keys (each part is one step)
     int city_states        = 0; ///< BL-1310 round 4: realms exempt as city states, judged before any cession
+    int parts_detached     = 0; ///< BL-1310 round 4 review: ceded parts not touching their receiver (0 by construction)
+    int provinces_split    = 0; ///< BL-1310 round 4 review: moved provinces spanning two parts (0 by construction)
+    int cores_floor_moved  = 0; ///< BL-1310 (Ben 2026-10-18): realms under the floor whose core is a larger piece than the seat's group
     int secessions_split   = 0; ///< secessions where no candidate kept both sides one territory
     /// Realms whose representative (the lowest region they hold, which the
     /// tail reads as the nation's capital tile) is NOT in the territory of

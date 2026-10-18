@@ -2182,6 +2182,12 @@ void run_industrialisation(generation_cursor& c)
             if (reg >= 0 && static_cast<std::size_t>(reg) < kepler_settlement.regions.size()
                 && kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor >= 0)
                 c.kepler_np.ceded_seed_tiles.push_back(kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor);
+        if (kepler_industrialisation_hs.closing_parts_detached > 0 || kepler_industrialisation_hs.closing_provinces_split > 0)
+            record_pattern_miss(c, "closing_rounds",
+                                std::to_string(kepler_industrialisation_hs.closing_parts_detached)
+                                    + " ceded part(s) did not join their receiver, "
+                                    + std::to_string(kepler_industrialisation_hs.closing_provinces_split)
+                                    + " province(s) split (sec Pass 2e)");
         if (kepler_industrialisation_hs.closing_core_tiles_lost > 0)
             record_pattern_miss(c, "closing_rounds",
                                 "the opening cessions moved " + std::to_string(kepler_industrialisation_hs.closing_core_tiles_lost)
@@ -2587,6 +2593,21 @@ void run_tail(generation_cursor& c)
         record_pattern_miss(c, "closing_rounds",
                                  "the tail ceded " + std::to_string(kepler_fold.cessions)
                                      + " exclave(s) the closing rounds left (sec Pass 2e)");
+    // BL-1310 round 4 review -- the tail's split, checked: every ceded part
+    // joined its receiver, and no province was split on a settled world. Both
+    // hold by construction; a breach is a handoff violation.
+    if (fixture != nullptr)
+    {
+        fixture->tail_cessions        = kepler_fold.cessions;
+        fixture->tail_cessions_split  = kepler_fold.cessions_split;
+        fixture->tail_parts_detached  = kepler_fold.parts_detached;
+        fixture->tail_provinces_split = kepler_fold.provinces_split;
+        fixture->tail_cores_floor_moved = kepler_fold.cores_floor_moved;
+    }
+    if (kepler_fold.parts_detached > 0 || kepler_fold.provinces_split > 0)
+        record_pattern_miss(c, "strait_rule",
+                            std::to_string(kepler_fold.parts_detached) + " ceded part(s) did not join their receiver, "
+                                + std::to_string(kepler_fold.provinces_split) + " province(s) split (sec Pass 2e)");
     // BL-1310 -- EVERY LAUNCH OBEYS THE RULE (NATION_GENERATION.md sec Pass
     // 2e, Ben 2026-10-17). A launch that closed before Industrialisation ran
     // no closing round, so the tail's post-pass took its cessions: each is an
@@ -2632,7 +2653,7 @@ void run_tail(generation_cursor& c)
                 lapse->events.push_back(e);
             }
             const std::string ground =
-                reg >= 0 ? kepler_settlement.regions[static_cast<std::size_t>(reg)].name : std::string("an islet");
+                reg >= 0 ? kepler_settlement.regions[static_cast<std::size_t>(reg)].name : std::string("Ground");
             kepler_settlement.history.push_back(history_event{
                 years_from_calendar_year(close_year), chain_stage::legacy,
                 ground + ", cut off from " + (cr.from_polity >= 0 ? realm_label(cr.from_polity)

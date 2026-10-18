@@ -12406,9 +12406,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 note_event(lapse_event_kind::exclave_ceded, st.region, from, into);
                 ++out.closing_cessions;
                 const std::string ground_name =
-                    st.region >= 0 ? ss.regions[static_cast<std::size_t>(st.region)].name : std::string("an islet");
+                    st.region >= 0 ? ss.regions[static_cast<std::size_t>(st.region)].name : std::string("Ground");
                 // The cause, in the line: the ground was cut off from its realm.
-                const std::string whose = st.moved.empty() ? "Ground off " + ground_name : ground_name;
+                const std::string whose = (st.moved.empty() || st.region < 0) ? std::string("Ground") : ground_name; // a part names only a province that moved
                 out.history.push_back(history_event{
                     years_from_calendar_year(y), chain_stage::legacy,
                     whose + (from >= 0 ? ", cut off from " + realm_label(from) : std::string(", cut off from the ground around it"))
@@ -12591,6 +12591,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.closing_reps_off_core       = plan.reps_off_core;
         out.closing_cessions_split      = plan.cessions_split;
         out.closing_city_states         = plan.city_states;
+        out.closing_parts_detached      = plan.parts_detached;
+        out.closing_provinces_split     = plan.provinces_split;
+        out.closing_cores_floor_moved   = plan.cores_floor_moved;
         out.closing_cell_overrides.assign(plan.cell_overrides.begin(), plan.cell_overrides.end());
         out.closing_polity_core_tiles.assign(plan.polity_core_tiles.begin(), plan.polity_core_tiles.end());
         out.closing_core_tiles_lost = plan.core_tiles_lost;

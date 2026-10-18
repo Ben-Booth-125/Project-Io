@@ -515,7 +515,7 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
     lua.load("scripts/economy.lua");
     reg.load_from_lua(lua);
 
-    int checks = 0, fails = 0, cessions_total = 0;
+    int checks = 0, fails = 0, cessions_total = 0, splits_seen = 0;
     std::printf("world_audit strait rule (BL-1310), %zu seed(s), %zu target pair(s) beside natural\n",
                 seeds.size(), pairs.size());
     for (const uint32_t seed : seeds)
@@ -580,8 +580,21 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
             // territory), and the frozen cores intact: no opening cession moved
             // a tile of a realm's core group (the review's row -- a core that
             // drifted onto received ground ceded the mainland under it).
+            // THE SPLIT, CHECKED (BL-1310 round 4 review): every ceded part
+            // joined its receiver, and no province spanned two parts -- in the
+            // closing rounds (the plan's counts) and in the tail (an early
+            // launch's cessions, through the fixture). Both are 0 by
+            // construction; these rows make that a check, not a claim.
+            const int parts_detached  = hs.closing_parts_detached + fx.tail_parts_detached;
+            const int provinces_split = hs.closing_provinces_split + fx.tail_provinces_split;
+            splits_seen += hs.closing_cessions_split + fx.tail_cessions_split;
             const bool ok = s.illegal == 0 && events_ok && rep.handoff_violation.empty()
-                         && s.capital_off == 0 && hs.closing_core_tiles_lost == 0;
+                         && s.capital_off == 0 && hs.closing_core_tiles_lost == 0
+                         && parts_detached == 0 && provinces_split == 0;
+            std::printf("        split: parts not joined %d, provinces split %d, split cessions %d (rounds) + %d (tail)\n",
+                        parts_detached, provinces_split, hs.closing_cessions_split, fx.tail_cessions_split);
+            std::printf("        under the floor, a larger piece kept as the core: %d (rounds) + %d (tail)\n",
+                        hs.closing_cores_floor_moved, fx.tail_cores_floor_moved);
             std::printf("        core tiles lost %d\n", hs.closing_core_tiles_lost);
             ++checks;
             fails += ok ? 0 : 1;
@@ -599,8 +612,8 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
             // Territorial fragmentation, measured). At the wizard default
             // (20:4), after the finish (majors are nations home to a
             // non-background corporation, nation_sizes.cpp's reading): the
-            // minors' median tile count must be at least 227 (the lowest
-            // pre-BL-1310 median over the library) and the majors may hold at
+            // minors' median tile count must reach 80% of the SAME seed's
+            // pre-BL-1310 median (the table below), and the majors may hold at
             // most 80% of the land. A READING, never a clamp: nothing is tuned
             // to it.
             if (launch == 0 && tt == 20 && mt == 4)
@@ -631,15 +644,38 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                 std::sort(minor_sizes.begin(), minor_sizes.end(), [](int a, int b) { return a > b; });
                 const int    median = minor_sizes.empty() ? 0 : minor_sizes[minor_sizes.size() / 2];
                 const double share  = total_tiles ? 100.0 * static_cast<double>(major_tiles) / static_cast<double>(total_tiles) : 0.0;
-                const bool   size_ok = median >= 227 && share <= 80.0;
+                // THE BAR IS EACH SEED'S OWN (Ben, 2026-10-18): 80% of that
+                // seed's PRE-BL-1310 minors' median. The baseline is
+                // tools/verify/nation_sizes at 20:4 on aa3c6304 (the tree
+                // before BL-1310), one row per library seed. A seed with no row
+                // has no baseline and FAILS loudly -- it never passes.
+                static const std::map<uint32_t, int> k_pre_bl1310_median = {
+                    { 0, 390 },  { 9, 524 },  { 10, 547 }, { 11, 605 }, { 12, 455 }, { 13, 644 },
+                    { 25, 608 }, { 28, 227 }, { 31, 566 }, { 32, 460 }, { 37, 456 }, { 38, 455 },
+                    { 40, 471 }, { 41, 631 }, { 43, 236 }, { 46, 558 },
+                };
+                const auto   base_it  = k_pre_bl1310_median.find(seed);
+                const bool   has_base = base_it != k_pre_bl1310_median.end();
+                const double bar      = has_base ? 0.8 * static_cast<double>(base_it->second) : 0.0;
+                const bool   size_ok  = has_base && static_cast<double>(median) >= bar && share <= 80.0;
                 ++checks;
                 fails += size_ok ? 0 : 1;
-                std::printf("%s  SIZE seed %u 20:4: minors %zu median %d (>= 227) | majors hold %.1f%% (<= 80) | under floor(80) %d\n",
-                            size_ok ? "PASS" : "FAIL", seed, minor_sizes.size(), median, share, under_floor);
+                if (!has_base)
+                    std::printf("FAIL  SIZE seed %u 20:4: NO PRE-BL-1310 BASELINE for this seed (median %d, majors hold %.1f%%)\n",
+                                seed, median, share);
+                else
+                    std::printf("%s  SIZE seed %u 20:4: minors %zu median %d (bar %.1f = 80%% of pre-BL-1310 %d) | majors hold %.1f%% (<= 80) | under floor(80) %d\n",
+                                size_ok ? "PASS" : "FAIL", seed, minor_sizes.size(), median, bar, base_it->second, share,
+                                under_floor);
             }
             std::fflush(stdout);
         }
     }
+    // The split happens at all: at least one exclave split among two or more
+    // neighbours over the worlds this run built (each shard: one library seed).
+    ++checks;
+    fails += splits_seen > 0 ? 0 : 1;
+    std::printf("%s  splits seen: %d exclave(s) split among 2+ neighbours\n", splits_seen > 0 ? "PASS" : "FAIL", splits_seen);
     std::printf("\nSUMMARY strait rule: %d check(s), %d failure(s), %d cession event(s) -- %s\n", checks, fails,
                 cessions_total, fails == 0 ? "PASS" : "FAIL");
     return fails == 0 ? 0 : 1;

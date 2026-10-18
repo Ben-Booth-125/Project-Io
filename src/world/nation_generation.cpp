@@ -1215,6 +1215,9 @@ std::vector<entity_id> generate_nations(
     // very tile.
     const bool strait_rule_here = true;
     std::vector<int> seed_core(static_cast<std::size_t>(seed_count), -1); // per representative seed
+    const auto polity_of_seed_early = [&](int si) {
+        return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;
+    };
     {
         std::vector<int> land_owner(owner_map);
         for (int idx = 0; idx < total; ++idx)
@@ -1251,33 +1254,147 @@ std::vector<entity_id> generate_nations(
                 if (near >= 0) seed_core[static_cast<std::size_t>(si)] = near;
             }
         }
+        // A REALM UNDER THE SIZE FLOOR KEEPS THE LARGER PIECE (§ Pass 2e, Ben
+        // 2026-10-18), on the map as it stands here -- before the first
+        // cession. Where a nation's land (water excluded) is under
+        // `min_nation_tiles`, its core is the larger of its seat's group and
+        // its largest group holding one of its seeds, ties to the seat's group
+        // then the lower seed; the core tile is that group's lowest seed, and
+        // Pass 5 seats the nation on it. The closing rounds already read it
+        // where they ran (`polity_core_tiles` wins above), so it is read here
+        // only for a core the rounds did not fix.
+        if (params.min_nation_tiles > 0)
+            for (int si = 0; si < seed_count; ++si)
+            {
+                const int p = polity_of_seed_early(si);
+                if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size()
+                    && params.polity_core_tiles[static_cast<std::size_t>(p)] == seed_core[static_cast<std::size_t>(si)])
+                    continue;
+                const int seat = seed_core[static_cast<std::size_t>(si)];
+                if (seat < 0 || seat >= total || land_owner[static_cast<std::size_t>(seat)] != si) continue;
+                int land = 0;
+                for (int t = 0; t < total; ++t) land += land_owner[static_cast<std::size_t>(t)] == si ? 1 : 0;
+                if (land >= params.min_nation_tiles) continue;
+                std::vector<int> comp(static_cast<std::size_t>(total), -1), size;
+                for (int s0 = 0; s0 < total; ++s0)
+                {
+                    if (land_owner[static_cast<std::size_t>(s0)] != si || comp[static_cast<std::size_t>(s0)] >= 0) continue;
+                    const int id = static_cast<int>(size.size());
+                    size.push_back(0);
+                    std::vector<int> stack{ s0 };
+                    comp[static_cast<std::size_t>(s0)] = id;
+                    while (!stack.empty())
+                    {
+                        const int t = stack.back();
+                        stack.pop_back();
+                        ++size[static_cast<std::size_t>(id)];
+                        std::pair<int, int> nbrs[4];
+                        int n = 0;
+                        cardinal_neighbours(t % gw, t / gw, gw, gh, nbrs, n);
+                        for (int i = 0; i < n; ++i)
+                        {
+                            const int u = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+                            if (land_owner[static_cast<std::size_t>(u)] == si && comp[static_cast<std::size_t>(u)] < 0)
+                            {
+                                comp[static_cast<std::size_t>(u)] = id;
+                                stack.push_back(u);
+                            }
+                        }
+                    }
+                }
+                const int seat_comp = comp[static_cast<std::size_t>(seat)];
+                int best_size = size[static_cast<std::size_t>(seat_comp)];
+                int best_tile = seat;
+                for (int sj = 0; sj < seed_count; ++sj) // ascending: a group's first seed is its lowest
+                {
+                    const int t = seeds[static_cast<std::size_t>(sj)];
+                    if (land_owner[static_cast<std::size_t>(t)] != si || ceded[static_cast<std::size_t>(t)]) continue;
+                    const int c = comp[static_cast<std::size_t>(t)];
+                    if (c < 0 || c == seat_comp) continue;
+                    if (size[static_cast<std::size_t>(c)] > best_size) // strictly: ties keep the seat's group
+                    {
+                        best_size = size[static_cast<std::size_t>(c)];
+                        best_tile = t;
+                    }
+                }
+                if (best_tile != seat)
+                {
+                    seed_core[static_cast<std::size_t>(si)] = best_tile;
+                    if (fold_out) ++fold_out->cores_floor_moved;
+                }
+            }
     }
     const auto polity_of_seed = [&](int si) {
         return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;
     };
     // The seed a ceded group grew from: the lowest seed standing in it, else
     // the carve cell under its lowest tile.
+    // A part NAMES ONLY A PROVINCE THAT MOVED (the review): the lowest seed
+    // standing in it, or none -- never the cell under its lowest tile, which
+    // could name a province that stayed put or went to another receiver.
     const auto ceded_seed_tile = [&](const std::vector<int>& tiles) -> int32_t {
         for (int si = 0; si < seed_count; ++si)
             if (std::binary_search(tiles.begin(), tiles.end(), seeds[static_cast<std::size_t>(si)]))
                 return seeds[static_cast<std::size_t>(si)];
-        const int c0 = tiles.empty() ? -1 : cell_seed[static_cast<std::size_t>(tiles.front())];
-        return (c0 >= 0 && c0 < seed_count) ? seeds[static_cast<std::size_t>(c0)] : -1;
+        return -1;
     };
+    // UNITS FOR THE SPLIT (§ Pass 2e: "province by province on a settled
+    // world, where a province never splits, and tile by tile where no history
+    // ran"). A history ran -- an Empires- or Exploration-round launch, or the
+    // guarantee after closing rounds -- when any seed carries a polity: then a
+    // province is a seed's carve cell (`cell_seed`), anchored at its seed tile.
+    // Where no history ran, every tile is its own unit.
+    bool history_ran = false;
+    for (const int p : seed_polity) history_ran = history_ran || p >= 0;
+    const std::vector<int>* split_unit        = history_ran ? &cell_seed : nullptr;
+    const std::vector<int>* split_unit_anchor = history_ran ? &seeds : nullptr;
     // A tail cession, applied: each tile to the key its part went to (the
     // split, § Pass 2e), and ONE logged record per receiving part, naming the
     // seed its ground grew from (the caller records each as an event).
     const auto apply_cession = [&](const exclave_cession& ex, std::vector<int>& land_owner, auto polity_of_key) {
         std::map<int, std::vector<int>> parts; // receiver -> its tiles, ascending
         for (std::size_t i = 0; i < ex.tiles.size(); ++i)
+            parts[i < ex.part_key.size() ? ex.part_key[i] : ex.to].push_back(ex.tiles[i]);
+        // THE CHECKS (world_audit reads them through the fixture): every part
+        // touches its receiver's land as it stood BEFORE the cession (so it
+        // joins it), and on a settled world no province spans two parts.
+        if (fold_out)
         {
-            const int t  = ex.tiles[i];
-            const int to = i < ex.part_key.size() ? ex.part_key[i] : ex.to;
-            land_owner[static_cast<std::size_t>(t)] = to;
-            owner_map[static_cast<std::size_t>(t)]  = to;
-            ceded[static_cast<std::size_t>(t)]      = 1;
-            parts[to].push_back(t);
+            for (const auto& [to, tiles] : parts)
+            {
+                bool joined = false;
+                for (const int t : tiles)
+                {
+                    std::pair<int, int> nbrs[4];
+                    int n = 0;
+                    cardinal_neighbours(t % gw, t / gw, gw, gh, nbrs, n);
+                    for (int i = 0; i < n && !joined; ++i)
+                        joined = land_owner[static_cast<std::size_t>(raster_idx(nbrs[i].first, nbrs[i].second, gw))] == to;
+                    if (joined) break;
+                }
+                if (!joined && ex.kind == 0) ++fold_out->parts_detached; // the split; an island joins across a strait (kind 1) or is remote (kind 2)
+            }
+            if (split_unit != nullptr)
+                for (int si = 0; si < seed_count; ++si)
+                {
+                    if (!std::binary_search(ex.tiles.begin(), ex.tiles.end(), seeds[static_cast<std::size_t>(si)])) continue;
+                    int key = -2;
+                    for (std::size_t i = 0; i < ex.tiles.size(); ++i)
+                    {
+                        if (cell_seed[static_cast<std::size_t>(ex.tiles[i])] != si) continue;
+                        if (key == -2) key = ex.part_key[i];
+                        else if (ex.part_key[i] != key) { ++fold_out->provinces_split; break; }
+                    }
+                }
+            if (parts.size() > 1) ++fold_out->cessions_split;
         }
+        for (const auto& [to, tiles] : parts)
+            for (const int t : tiles)
+            {
+                land_owner[static_cast<std::size_t>(t)] = to;
+                owner_map[static_cast<std::size_t>(t)]  = to;
+                ceded[static_cast<std::size_t>(t)]      = 1;
+            }
         if (fold_out)
             for (const auto& [to, tiles] : parts)
                 fold_out->cession_log.push_back({ polity_of_key(ex.from), polity_of_key(to), ceded_seed_tile(tiles) });
@@ -1295,7 +1412,7 @@ std::vector<entity_id> generate_nations(
         exclave_cession ex;
         for (int guard = 0; guard < total; ++guard)
         {
-            if (!next_exclave_cession(land_owner, water, gw, gh, seed_core, rank, ex)) break;
+            if (!next_exclave_cession(land_owner, water, gw, gh, seed_core, rank, ex, split_unit, split_unit_anchor)) break;
             apply_cession(ex, land_owner, [&](int key) { return polity_of_seed(key); });
             ++tail_cessions;
         }
@@ -1365,7 +1482,7 @@ std::vector<entity_id> generate_nations(
         int repaired = 0;
         for (int guard = 0; guard < total; ++guard)
         {
-            if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex)) break;
+            if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex, split_unit, split_unit_anchor)) break;
             apply_cession(ex, land_owner,
                           [&](int key) { return polity_of_seed(survivor[static_cast<std::size_t>(key)]); });
             ++repaired;
@@ -2262,10 +2379,14 @@ bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>
     // edge grows into the exclave at once, one level at a time; a tile
     // reached claims its whole UNIT (its province where the caller names
     // them -- a province never splits -- else itself) for the key that
-    // reached it, ties to the lower rank, then the lower contact tile. Each
-    // part is connected to its receiver's edge, so it joins a group the
-    // receiver already holds: the exclave's group goes and none is made,
-    // which keeps the walk finite.
+    // reached it, ties to the lower rank, then the lower contact tile.
+    // "NEAREST" IS NEAREST BY THE GROWTH ACROSS WHOLE PROVINCES: a claim jumps
+    // a province at a time, so a province's distance is that of its first
+    // tile the growth reaches, not of its anchor or its far side (on a
+    // settled world; tile by tile where no history ran). Each part is
+    // connected to its receiver's edge, so it joins a group the receiver
+    // already holds: the exclave's group goes and none is made, which keeps
+    // the walk finite.
     for (int c = 0; c < C; ++c)
     {
         if (in_terr[static_cast<std::size_t>(c)]) continue;

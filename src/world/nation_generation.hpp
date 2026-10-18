@@ -330,6 +330,16 @@ struct nation_fold_record
     /// one whose carve cell held its lowest tile).
     struct cession_record { int32_t from_polity = -1; int32_t to_polity = -1; int32_t seed_tile = -1; };
     std::vector<cession_record> cession_log;
+    /// BL-1310 round 4 review — the tail's own checks: parts that did not
+    /// touch their receiver's land before the cession (0 by construction),
+    /// provinces that spanned two parts on a settled world (0 by
+    /// construction), and exclaves split among two or more receivers.
+    int32_t parts_detached  = 0;
+    int32_t provinces_split = 0;
+    int32_t cessions_split  = 0;
+    /// BL-1310 (Ben 2026-10-18): nations under the floor whose core the tail
+    /// moved to a larger piece than the seat's group.
+    int32_t cores_floor_moved = 0;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.
