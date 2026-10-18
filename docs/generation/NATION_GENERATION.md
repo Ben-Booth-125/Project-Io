@@ -280,7 +280,9 @@ same colour. A realm's territory is **one territory** (§ Pass 2e): a polity tha
 a neighbour does not keep the far side, which the closing rounds cede to the nation around it.
 
 **A city state crosses as itself.** A polity that reached the close holding one region with a
-population centre on it is a nation on its own account — exempt from the size floor, and never an
+population centre on it is a nation on its own account. It is judged **as the realm stood at the
+close, before any cession** (Ben, 2026-10-18): a realm the strait rule cut down to its seat is not
+thereby a city state, and stays open to the floor and the total like any small nation — exempt from the size floor, and never an
 absorber. A world with no city state is a legitimate outcome; the exemption is a permission, never
 a quota.
 
@@ -317,9 +319,11 @@ is fixed before the first cession: ground a nation receives never becomes its co
 `body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
 
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
-**ceded to the nation that surrounds it**: the nation sharing the most cardinal land edges with it,
-or, for an island with no land neighbour, the nation whose ground is fewest ocean tiles away (ties
-to the lower nation index, then the lower tile index). The cession moves ground only. The nation
+**split among the nations that border it** (Ben, 2026-10-18): each part goes to the bordering
+nation nearest to it — province by province on a settled world, where a province never splits,
+and tile by tile where no history ran — so no one neighbour takes a large exclave whole. An island
+with no land neighbour goes whole to the nation whose ground is fewest ocean tiles away. Ties go
+to the lower nation index, then the lower tile index. The cession moves ground only. The nation
 keeps its core, its name and its chest, so a cession never changes the nation count, and the
 receiver's own contiguity is re-checked after each one until no exclave is left.
 
@@ -372,7 +376,11 @@ share. Those figures describe the carve **before** § Pass 2e. The cession turns
 fragmentation into history — a cut-off province changing hands — rather than into a map defect.
 So the audit asserts two things on the finished world: **no exclave outside the strait rule**, save
 the remote island; and the cessions counted as recorded events, so the sim still visibly
-produces the fragmentation the rule resolves.
+produces the fragmentation the rule resolves. **The rule must not starve the minors (Ben,
+2026-10-18).** The audit also reads the nations' sizes on every library seed at the default
+targets, and fails a seed whose minors' median falls below the lowest median measured before the
+strait rule (227 tiles), or whose majors hold more than 80% of the land. It is a reading of the
+world, never a clamp on it.
 
 ### Pass 3 — Resource profile derivation
 
