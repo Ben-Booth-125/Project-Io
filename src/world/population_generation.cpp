@@ -702,6 +702,15 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
 // with one leftover province apiece (`province_absorption_stats::
 // uncentred_regions`); each keeps the scale-1 founding below. The walk itself
 // is unchanged: it founds in whatever land province still holds no centre.
+//
+// BL-1382 (the normalising pass, Ben 2026-10-18): the other province that
+// reaches this walk is a SPLIT PIECE — a piece the normalising pass cut from a
+// province over its ceiling that holds no seed centre (`province_absorption_
+// stats::norm_unseeded_pieces`). It receives the same founding, on its best
+// ground, normally the tile the pass grew it from (one site score,
+// `province_anchor_site_score`). The village is a scale-1 centre carrying
+// `k_population_for_scale[0]` people, NEW people, exactly as an island's
+// founding is: nothing is drawn down from the centre whose province was split.
 
 int ensure_province_anchor_centres(world& w, entity_id body_id, int* gate_relaxed)
 {
@@ -735,14 +744,14 @@ int ensure_province_anchor_centres(world& w, entity_id body_id, int* gate_relaxe
                 continue;
             const tile_component& tc = tit->second;
 
-            double richness = 0.0;
-            for (const resource_type er : placement_rules::k_extractable)
-                richness += static_cast<double>(
-                    tc.resource_deposit[static_cast<std::size_t>(er)]);
-            const double score = static_cast<double>(tc.habitability) * (1.0 + richness);
+            // ONE score, shared with the normalising pass's choice of where a
+            // split piece grows from (province.hpp, BL-1382), so a piece's
+            // village is founded on the tile its piece grew from.
+            bool         gated = false;
+            const double score = province_anchor_site_score(tc, gated);
 
             if (score > any_score) { any_score = score; best_any = tid; }
-            if (placement_rules::can_place_population_centre(tc) && score > gated_score)
+            if (gated && score > gated_score)
             {
                 gated_score = score;
                 best_gated  = tid;

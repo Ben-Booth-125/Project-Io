@@ -2,6 +2,7 @@
 
 #include "hex_neighbors.hpp"
 #include "logistics.hpp" // body_tile_grid — the raster index every body-grid pass walks
+#include "placement_rules.hpp" // the anchor site score's gate and deposit list (BL-1382)
 
 #include <algorithm>
 #include <cmath>
@@ -355,7 +356,404 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spe
     }
 }
 
+// ---------------------------------------------------------------------------
+// Pass 4 — THE NORMALISING PASS (Ben, 2026-10-18; BL-1382)
+// ---------------------------------------------------------------------------
+
+/// The anchor scale of a tile set: the highest SUMMED seed-centre scale on any
+/// one tile, clamped to 1-5, and 1 where no seed centre stands (a split piece
+/// whose village is founded after the partition ships). @p anchor_out, when
+/// given, receives that tile — ties to the lowest tile id, the same pick
+/// `province_anchors` makes — or null_entity.
+int tiles_anchor_scale(const std::vector<entity_id>& tiles, const std::map<entity_id, int>& centre_scale,
+                       entity_id* anchor_out = nullptr)
+{
+    int       best   = 0;
+    entity_id anchor = null_entity;
+    for (const entity_id t : tiles)
+    {
+        const auto it = centre_scale.find(t);
+        if (it == centre_scale.end())
+            continue;
+        if (it->second > best || (it->second == best && t < anchor))
+        {
+            best   = it->second;
+            anchor = t;
+        }
+    }
+    if (anchor_out != nullptr)
+        *anchor_out = anchor;
+    return best < 1 ? 1 : (best > 5 ? 5 : best);
+}
+
+/// Grow @p seeds SIMULTANEOUSLY inside the tile set @p tiles (ascending) only —
+/// the same weighted multi-source fill `grow_regions` runs (cost × the seed's
+/// reach multiplier, ties on (cost, seed tile, tile)), with no budget and no
+/// ceiling, because covered land has neither. Writes each tile's piece index
+/// and path cost into @p piece / @p cost (parallel to @p tiles). A tile no
+/// seed can reach inside the set keeps piece -1 — unreachable for a province,
+/// which is hex-connected by construction.
+void grow_within(const world& w, uint32_t seed, const body_work& bw, const std::vector<entity_id>& tiles,
+                 const std::vector<std::pair<entity_id, long long>>& seeds, std::vector<int>& piece,
+                 std::vector<long long>& cost)
+{
+    piece.assign(tiles.size(), -1);
+    cost.assign(tiles.size(), 0);
+    const auto index_of = [&](entity_id t) -> long long {
+        const auto it = std::lower_bound(tiles.begin(), tiles.end(), t);
+        return (it == tiles.end() || *it != t) ? -1 : static_cast<long long>(it - tiles.begin());
+    };
+
+    std::priority_queue<frontier_entry, std::vector<frontier_entry>, frontier_worse> pq;
+    for (std::size_t i = 0; i < seeds.size(); ++i)
+    {
+        frontier_entry e;
+        e.seed         = seeds[i].first;
+        e.tile         = seeds[i].first;
+        e.region_index = i;
+        pq.push(e);
+    }
+    while (!pq.empty())
+    {
+        const frontier_entry f = pq.top();
+        pq.pop();
+        const long long fi = index_of(f.tile);
+        if (fi < 0 || piece[static_cast<std::size_t>(fi)] >= 0)
+            continue;
+        piece[static_cast<std::size_t>(fi)] = static_cast<int>(f.region_index);
+        cost[static_cast<std::size_t>(fi)]  = f.cost;
+
+        const tile_component& tc = w.tiles.at(f.tile);
+        for (int s = 0; s < 6; ++s)
+        {
+            int nx = 0, ny = 0;
+            if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, bw.gw, bw.gh, nx, ny))
+                continue;
+            const entity_id n = bw.grid[static_cast<std::size_t>(ny) * bw.gw + nx];
+            if (n == null_entity)
+                continue;
+            const long long ni = index_of(n);
+            if (ni < 0 || piece[static_cast<std::size_t>(ni)] >= 0)
+                continue; // outside the old province, or already claimed
+            frontier_entry e;
+            e.step         = edge_cost_impl(seed, f.tile, tc, n, w.tiles.at(n), s);
+            e.cost         = f.cost + static_cast<long long>(e.step) * seeds[f.region_index].second;
+            e.seed         = f.seed;
+            e.tile         = n;
+            e.region_index = f.region_index;
+            pq.push(e);
+        }
+    }
+}
+
+/// How many candidate sites a cut tries, best first, before it concludes the
+/// piece it is cutting cannot be cut without leaving some piece under its own
+/// floor. A search bound, not a band: it decides how hard the greedy search
+/// looks, never what a province may be.
+constexpr int k_norm_cut_attempts = 8;
+
+/// Run pass 4 over one covered body's land. @p settled flags the regions it
+/// may touch (the centre-seeded ones; never an uncentred island). Regions it
+/// splits gain pieces appended to @p regions (flagged settled), and
+/// @p bw.owner is kept in step, so the emit below reads the result directly.
+void normalise_settled_land(const world& w, uint32_t seed, body_work& bw, std::vector<region>& regions,
+                            std::vector<bool>& settled, const std::map<entity_id, int>& centre_scale,
+                            province_absorption_stats& tally)
+{
+    const auto has_seed_centre = [&](const std::vector<entity_id>& tiles) {
+        for (const entity_id t : tiles)
+            if (centre_scale.count(t))
+                return true;
+        return false;
+    };
+    const auto min_tile = [](const std::vector<entity_id>& tiles) {
+        entity_id lo = null_entity;
+        for (const entity_id t : tiles)
+            if (lo == null_entity || t < lo)
+                lo = t;
+        return lo;
+    };
+    // Settled regions in ascending province id (the lowest member tile).
+    const auto settled_in_id_order = [&]() {
+        std::vector<std::pair<entity_id, std::size_t>> order;
+        for (std::size_t ri = 0; ri < regions.size(); ++ri)
+            if (settled[ri] && !regions[ri].tiles.empty())
+                order.emplace_back(min_tile(regions[ri].tiles), ri);
+        std::sort(order.begin(), order.end());
+        return order;
+    };
+
+    int seeded_before = 0;
+    for (const auto& [id, ri] : settled_in_id_order())
+    {
+        (void)id;
+        ++tally.norm_settled_before;
+        if (has_seed_centre(regions[ri].tiles))
+            ++seeded_before;
+    }
+
+    // --- SPLITS, ascending id. Only the regions present before the pass are
+    // walked; a piece is never itself re-split (it was built under its ceiling,
+    // or its parent is counted indivisible).
+    for (const auto& [id, ri] : settled_in_id_order())
+    {
+        (void)id;
+        std::vector<entity_id> tiles = regions[ri].tiles;
+        std::sort(tiles.begin(), tiles.end());
+
+        entity_id anchor = null_entity;
+        const int scale  = tiles_anchor_scale(tiles, centre_scale, &anchor);
+        if (tiles.size() <= province_norm_ceiling(scale))
+            continue;
+        if (anchor == null_entity)
+            anchor = regions[ri].seed; // unreachable: a settled region holds its seed centre
+
+        // A piece's scale is its own anchor's (1 for a piece with no seed
+        // centre: its village is a scale-1 founding).
+        const auto piece_sizes_scales = [&](const std::vector<int>& piece, std::size_t k,
+                                            std::vector<std::size_t>& sizes, std::vector<int>& scales) {
+            std::vector<std::vector<entity_id>> members(k);
+            for (std::size_t i = 0; i < tiles.size(); ++i)
+                if (piece[i] >= 0)
+                    members[static_cast<std::size_t>(piece[i])].push_back(tiles[i]);
+            sizes.assign(k, 0);
+            scales.assign(k, 1);
+            for (std::size_t p = 0; p < k; ++p)
+            {
+                sizes[p]  = members[p].size();
+                scales[p] = tiles_anchor_scale(members[p], centre_scale);
+            }
+        };
+        const auto floors_hold = [&](const std::vector<int>& piece, std::size_t k) {
+            std::vector<std::size_t> sizes;
+            std::vector<int>         scales;
+            piece_sizes_scales(piece, k, sizes, scales);
+            for (std::size_t p = 0; p < k; ++p)
+                if (sizes[p] < province_norm_floor(scales[p]))
+                    return false;
+            for (const int pc : piece)
+                if (pc < 0)
+                    return false; // a tile no seed reached: never accept the cut
+            return true;
+        };
+
+        // The anchor keeps its piece, growing with its own reach weight.
+        std::vector<std::pair<entity_id, long long>> seeds{ { anchor, k_reach_scale_lcm / scale } };
+        std::vector<int>       piece;
+        std::vector<long long> cost;
+        grow_within(w, seed, bw, tiles, seeds, piece, cost);
+
+        // FEWEST PIECES, greedily: add one piece at a time, cutting the piece
+        // most over its ceiling, until every piece is under its own. A cut
+        // grows a new piece from the BEST GROUND in the far half of the piece
+        // it cuts (path cost at least half that piece's furthest); a cut that
+        // would leave ANY piece under its own floor is not taken, the next-best
+        // site tried instead, and when none of them serves the province stops
+        // at fewer pieces. More pieces than the land holds villages' floors
+        // is never tried.
+        const std::size_t max_pieces = tiles.size() / k_province_norm_floor_base;
+        bool              under_all  = false;
+        while (seeds.size() < max_pieces)
+        {
+            std::vector<std::size_t> sizes;
+            std::vector<int>         scales;
+            piece_sizes_scales(piece, seeds.size(), sizes, scales);
+            long long   worst_excess = 0;
+            std::size_t cut          = 0;
+            for (std::size_t p = 0; p < seeds.size(); ++p)
+            {
+                const long long excess = static_cast<long long>(sizes[p])
+                                         - static_cast<long long>(province_norm_ceiling(scales[p]));
+                if (excess > worst_excess) // strict: ties to the lower piece index
+                {
+                    worst_excess = excess;
+                    cut          = p;
+                }
+            }
+            if (worst_excess <= 0)
+            {
+                under_all = true;
+                break;
+            }
+
+            long long far = 0;
+            for (std::size_t i = 0; i < tiles.size(); ++i)
+                if (piece[i] == static_cast<int>(cut) && cost[i] > far)
+                    far = cost[i];
+            struct site { bool gated; double score; entity_id tile; };
+            std::vector<site> sites;
+            for (std::size_t i = 0; i < tiles.size(); ++i)
+            {
+                if (piece[i] != static_cast<int>(cut) || cost[i] * 2 < far)
+                    continue;
+                bool         gated = false;
+                const double sc    = province_anchor_site_score(w.tiles.at(tiles[i]), gated);
+                sites.push_back({ gated, sc, tiles[i] });
+            }
+            // Gated before ungated, higher score, lower tile — the founding's
+            // own pick, so a piece's village stands where it grew from unless a
+            // later cut moved better ground into it (the founding reads the final piece).
+            std::sort(sites.begin(), sites.end(), [](const site& a, const site& b) {
+                if (a.gated != b.gated) return a.gated;
+                if (a.score != b.score) return a.score > b.score;
+                return a.tile < b.tile;
+            });
+
+            bool advanced = false;
+            for (std::size_t c = 0; c < sites.size() && c < static_cast<std::size_t>(k_norm_cut_attempts); ++c)
+            {
+                if (sites[c].tile == anchor)
+                    continue;
+                std::vector<std::pair<entity_id, long long>> trial = seeds;
+                trial.emplace_back(sites[c].tile, k_reach_scale_lcm); // a scale-1 village's reach
+                std::vector<int>       tpiece;
+                std::vector<long long> tcost;
+                grow_within(w, seed, bw, tiles, trial, tpiece, tcost);
+                if (!floors_hold(tpiece, trial.size()))
+                    continue;
+                seeds    = std::move(trial);
+                piece    = std::move(tpiece);
+                cost     = std::move(tcost);
+                advanced = true;
+                break;
+            }
+            if (!advanced)
+                break;
+        }
+        (void)under_all; // a piece still over its ceiling is counted at the end (INDIVISIBLE)
+        if (seeds.size() < 2)
+            continue; // no cut kept every piece at its floor: the province stands whole
+
+        // Apply: piece 0 (the anchor's) stays in `ri`; every other piece is a
+        // new settled region, keyed by the tile it grew from.
+        const std::size_t first_new = regions.size();
+        for (std::size_t p = 1; p < seeds.size(); ++p)
+        {
+            region r;
+            r.seed       = seeds[p].first;
+            r.nation     = regions[ri].nation;
+            r.target     = std::numeric_limits<std::size_t>::max();
+            r.reach_mult = seeds[p].second;
+            regions.push_back(std::move(r));
+            settled.push_back(true);
+        }
+        regions[ri].tiles.clear();
+        for (std::size_t i = 0; i < tiles.size(); ++i)
+        {
+            const std::size_t dest = piece[i] == 0 ? ri : first_new + static_cast<std::size_t>(piece[i]) - 1u;
+            regions[dest].tiles.push_back(tiles[i]);
+            bw.owner[tiles[i]] = static_cast<uint32_t>(dest) + 1u;
+        }
+        ++tally.norm_split;
+        tally.norm_pieces_added += static_cast<int>(seeds.size()) - 1;
+    }
+
+    // --- MERGES, to a fixpoint in ascending id. A province under its floor
+    // joins the same-nation settled neighbour sharing the most border (hex
+    // edges between them), ties to the smaller, then the lower id, skipping
+    // any the merge would push over the merged province's ceiling (the
+    // merged anchor is the higher of the two: their centres stand on
+    // different tiles, so the highest summed scale is the larger of theirs).
+    for (;;)
+    {
+        bool any = false;
+        for (const auto& [id, ri] : settled_in_id_order())
+        {
+            (void)id;
+            if (regions[ri].tiles.empty())
+                continue; // merged away earlier in this walk
+            const int         scale = tiles_anchor_scale(regions[ri].tiles, centre_scale);
+            const std::size_t size  = regions[ri].tiles.size();
+            if (size >= province_norm_floor(scale))
+                continue;
+
+            std::map<std::size_t, int> border; // neighbour region -> shared edges
+            for (const entity_id t : regions[ri].tiles)
+            {
+                const tile_component& tc = w.tiles.at(t);
+                for (int s = 0; s < 6; ++s)
+                {
+                    int nx = 0, ny = 0;
+                    if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, bw.gw, bw.gh, nx, ny))
+                        continue;
+                    const entity_id n = bw.grid[static_cast<std::size_t>(ny) * bw.gw + nx];
+                    if (n == null_entity)
+                        continue;
+                    const auto oit = bw.owner.find(n);
+                    if (oit == bw.owner.end())
+                        continue; // not this domain's tile
+                    const std::size_t nri = static_cast<std::size_t>(oit->second) - 1u;
+                    if (nri == ri || !settled[nri] || regions[nri].nation != regions[ri].nation)
+                        continue; // never across a border, never into an island
+                    ++border[nri];
+                }
+            }
+
+            bool        found = false;
+            std::size_t best = 0, best_size = 0;
+            int         best_edges = 0;
+            entity_id   best_id = null_entity;
+            for (const auto& [nri, edges] : border)
+            {
+                const std::size_t nsize = regions[nri].tiles.size();
+                const int nscale = tiles_anchor_scale(regions[nri].tiles, centre_scale);
+                if (size + nsize > province_norm_ceiling(scale > nscale ? scale : nscale))
+                    continue;
+                const entity_id nid = min_tile(regions[nri].tiles);
+                if (!found || edges > best_edges
+                    || (edges == best_edges && (nsize < best_size || (nsize == best_size && nid < best_id))))
+                {
+                    found      = true;
+                    best       = nri;
+                    best_edges = edges;
+                    best_size  = nsize;
+                    best_id    = nid;
+                }
+            }
+            if (!found)
+                continue;
+            for (const entity_id t : regions[ri].tiles)
+            {
+                regions[best].tiles.push_back(t);
+                bw.owner[t] = static_cast<uint32_t>(best) + 1u;
+            }
+            regions[ri].tiles.clear();
+            ++tally.norm_merged;
+            any = true;
+        }
+        if (!any)
+            break;
+    }
+
+    int seeded_after = 0;
+    for (const auto& [id, ri] : settled_in_id_order())
+    {
+        (void)id;
+        ++tally.norm_settled_after;
+        if (has_seed_centre(regions[ri].tiles))
+            ++seeded_after;
+        else
+            ++tally.norm_unseeded_pieces; // only a split piece can hold no seed centre
+        const int         sc = tiles_anchor_scale(regions[ri].tiles, centre_scale);
+        const std::size_t sz = regions[ri].tiles.size();
+        if (sz < province_norm_floor(sc))
+            ++tally.norm_no_merge_target; // the fixpoint found it no neighbour: counted
+        if (sz > province_norm_ceiling(sc))
+            ++tally.norm_indivisible; // no cut kept every piece at its floor: counted
+    }
+    tally.norm_seeded_delta += seeded_after - seeded_before;
+}
+
 } // namespace
+
+double province_anchor_site_score(const tile_component& tc, bool& gated)
+{
+    double richness = 0.0;
+    for (const resource_type er : placement_rules::k_extractable)
+        richness += static_cast<double>(tc.resource_deposit[static_cast<std::size_t>(er)]);
+    gated = placement_rules::can_place_population_centre(tc);
+    return static_cast<double>(tc.habitability) * (1.0 + richness);
+}
 
 province_kind province_kind_of(const world& w, const province& pr)
 {
@@ -548,7 +946,7 @@ const province* province_partition::find(uint32_t id) const
     return &*it;
 }
 
-void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats)
+void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats, bool normalise)
 {
     province_partition out;
     out.seed = seed;
@@ -639,6 +1037,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         // domains and an unsettled body's land see exactly the band they did.
         domain_spec eff = dom;
         bool covered = false;
+        std::size_t centre_regions = 0; ///< Pass 1's regions: [0, this) are centre-seeded (BL-1382).
 
         // --- Pass 1: SETTLEMENT GROWTH — A PROVINCE IS ITS CENTRE'S GROUND.
         //
@@ -688,6 +1087,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 tally.covered_bodies += 1;
             }
             grow_regions(bw, w, seed, eff, regions, active);
+            centre_regions = regions.size();
         }
 
         // --- Pass 2: HINTERLAND — water's primary mechanism, land's retired one.
@@ -1003,6 +1403,29 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
             for (const region& r : regions)
                 if (r.tiles.size() == 1)
                     ++tally.true_islands;
+        }
+
+        // --- Pass 4: THE NORMALISING PASS (Ben, 2026-10-18; BL-1382;
+        // PROVINCES.md § The normalising pass). SETTLED LAND ONLY: the
+        // centre-seeded regions of covered land, as singleton absorption left
+        // them. Never water, never an uncentred island (a leftover region),
+        // never an unsettled body's hinterland — their band stays 7-12.
+        //
+        // WHERE IT RUNS IN GENERATION. Inside the partition, so it runs where
+        // the partition does: the homeworld's pre-road call in
+        // make_hard_coded_world, which follows generate_nations (the strait
+        // rule and the closing rounds, NATION_GENERATION.md § Pass 2e — nations
+        // are final) and precedes ensure_province_anchor_centres (which founds
+        // the split pieces' villages), generate_roads and every firm. The
+        // canonical rebuild at the end of generation reproduces it, because
+        // it is a pure function of the same inputs the fill reads and the
+        // villages it causes are seed-skipped (`province_anchor`).
+        if (normalise && covered && dom.kind == province_kind::land)
+        {
+            std::vector<bool> settled(regions.size(), false);
+            for (std::size_t ri = 0; ri < centre_regions && ri < regions.size(); ++ri)
+                settled[ri] = true;
+            normalise_settled_land(w, seed, bw, regions, settled, centre_scale_by_tile, tally);
         }
 
         // --- Emit. Identity is DERIVED: the lowest member tile id. No id is
