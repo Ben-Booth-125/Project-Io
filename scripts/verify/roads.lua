@@ -28,8 +28,12 @@
 --             4. the crossing just laid is gone from the admitted set — the rule that refused
 --                the old press ("equal or better road") now refuses one SIDE, which is the
 --                whole correction;
---             5. a tile with nowhere left to go arms and highlights NOTHING. The refusal is
---                the absence of a mark, not a sentence after the fact.
+--             5. a tile with nowhere left to go MUTES THE PRESS (BL-1379, Ben 2026-10-18;
+--                construction.md § "A tile with nowhere to go mutes the press"). This
+--                assertion was the OPPOSITE until BL-1379 — it asserted the press armed and
+--                lit nothing — and it is inverted, not deleted: Ben overruled that reading,
+--                because a press which arms and then does nothing teaches nothing about why.
+--                The press is now dead and its own explainer carries the reason.
 -- Run with: ProjectIo --verify scripts/verify/roads.lua
 
 verify.econ_step(4)                     -- populate market state (build-cost context)
@@ -328,15 +332,15 @@ if from ~= nil then
     end -- track.x > 0
 end
 
--- ── 5. A tile with nowhere left to go arms and highlights NOTHING ───────────
+-- ── 5. A tile with nowhere left to go MUTES THE PRESS (BL-1379) ─────────────
 -- Found by scanning a window with the rules themselves rather than asserted of a
 -- hand-picked coordinate: which tiles are landlocked in water (or fully roaded)
 -- is a property of the seed, not of this script.
 -- BL-1348 widened what this finds: a tile carrying no road at all now admits no crossing
 -- either (a road is laid FROM a road), so the scan lands on one of those long before it
 -- reaches a landlocked or fully-roaded one. Both are the same assertion here -- the press
--- arms, highlights nothing, and says why -- so the case is exercised on more seeds than
--- before rather than fewer.
+-- is MUTED and its explainer says which refusal it is -- so the case is exercised on more
+-- seeds than before rather than fewer.
 local dead = nil
 if from ~= nil then
     for dy = -12, 12 do
@@ -377,20 +381,33 @@ else
         verify.expect(trow.explainer:find("Nowhere left", 1, true) ~= nil
                       or trow.explainer:find("laid from a road", 1, true) ~= nil,
                       "and SAYS so on the press: '" .. trow.explainer .. "'")
+        -- AND IT IS NOT THE MONEY REFUSAL. The two muted cases must not share a phrase
+        -- (BL-1379): a corp funded to 5,000,000 cr can pay for any crossing, so an
+        -- explainer reading "Can't afford it" here would mean the ground refusal had
+        -- been swallowed by the affordability branch.
+        verify.expect(trow.explainer:find("afford", 1, true) == nil,
+                      "the ground refusal does not read as the money one")
+        -- THE INVERSION ITSELF (BL-1379). The press is MUTED, so the row publishes
+        -- `enabled = false`; and because a muted control is a dead one, a real click on
+        -- it must change nothing at all -- not arm, not highlight, not lay.
+        verify.expect(not trow.enabled,
+                      "the Build press is MUTED on a tile with nowhere to go")
         if trow.x > 0 then
             local edges_before = rd.edges
+            -- The explainer is the ONLY place the reason lives, so it is read off the
+            -- real control: hover the press and the card that opens is the refusal.
+            verify.hover(trow.x, trow.y, 2)
+            verify.capture("roads_muted_press")
             verify.click(trow.x, trow.y)
             verify.frames(2)
             local da = verify.road_state()
-            verify.expect(da.armed, "it still ARMS - the refusal is the absent highlight")
-            verify.expect(da.n_highlights == 0, "and highlights NOTHING ("
+            verify.expect(not da.armed,
+                          "a press on the muted control does NOT arm - it is dead, not silent")
+            verify.expect(da.n_highlights == 0, "nothing is highlighted ("
                           .. da.n_highlights .. ")")
             verify.expect(da.drawn == 0, "nothing was outlined on the canvas")
-            verify.capture("roads_armed_nothing")
-            verify.click_tile(dead.x, dead.y)
-            verify.frames(2)
-            verify.expect(verify.road_state().edges == edges_before,
-                          "and no crossing was laid")
+            verify.expect(da.edges == edges_before,
+                          "and no crossing was laid (" .. da.edges .. ")")
         end
     end
 end

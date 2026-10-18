@@ -4602,8 +4602,11 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // rules guessed, which is how a tile the player was building OUT of came back "this tile
     // already has an equal or better road". Each row now asks the real gate once per side
     // (`ui::road_crossing_targets`), arms on the press, and the canvas highlights exactly the
-    // neighbours the rules admit. The refusal moved from a sentence to the absence of a
-    // highlight, so these rows carry no refusal text at all.
+    // neighbours the rules admit.
+    //
+    // BL-1379: where that set is EMPTY the press is muted and unpressable, and the reason sits
+    // on the press's own explainer — not in a row of red text (construction.md § "A tile with
+    // nowhere to go mutes the press").
     {
         struct road_tier_affordance
         {
@@ -4679,13 +4682,17 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             // on the canvas, so the standing Toggle rule applies to it.
             const bool armed    = (ui.construction.road_arm_tile == tile_id
                                    && ui.construction.road_arm_tier == rt.level);
-            // ENABLED WHENEVER THE BALANCE COVERS IT, even with nothing to cross
-            // to: the refusal for "nowhere left to go" is the ABSENCE of a
-            // highlight, not a disabled control (construction.md § "A road is
-            // built from a road to a tile, in two presses"). A press that arms and
-            // lights nothing is the honest answer, and the explainer says so
-            // before the press as well as after.
-            const bool can_arm  = affordable;
+            // BL-1379: A TILE WITH NOWHERE TO GO MUTES THE PRESS (construction.md
+            // § "A tile with nowhere to go mutes the press", Ben 2026-10-18). The
+            // first cut left this live on an empty target set, reasoning that
+            // arming and lighting nothing said the refusal more quietly than a
+            // sentence does; Ben overruled it, and he is right — a press that arms
+            // and then does nothing teaches the player nothing about WHY, where a
+            // dead control that explains itself does. So the empty set mutes the
+            // press by the SAME mechanism affordability already used, and the
+            // reason lives in this column's own explainer and nowhere else (never
+            // back as a row of red text, which is what the grid moved away from).
+            const bool can_arm  = affordable && !targets.empty();
             ImGui::BeginDisabled(!can_arm && !armed);
             const ImVec2 press_p = ImGui::GetCursorScreenPos();
             if (ImGui::Button(armed ? "Cancel" : "Build"))
@@ -4706,14 +4713,17 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             const ImVec2 press_sz  = ImGui::GetItemRectSize();
             const bool   press_vis = ImGui::IsItemVisible();
             // ONE SHORT EXPLAINER, ON THE PRESS, per construction.md's
-            // per-column rule: what the two presses are, or which of the two
-            // things is missing. The refusal a sentence used to carry is the
-            // absence of a highlight; this says that in advance.
+            // per-column rule: what the two presses are, or which one thing is
+            // missing. THE EXPLAINER IS THE ONLY PLACE THE REASON LIVES — the
+            // muted press is silent on its own, so this column has to carry the
+            // whole of why, and the three muted cases must not share a phrase:
+            // a ground refusal does not read like a money one, and the player can
+            // act on each differently.
             std::string why;
-            if (!affordable)
-                why = "Can't afford it: the crossing charges "
-                    + std::to_string(static_cast<int>(road_capex)) + " cr.";
-            else if (targets.empty() && !tile_carries_road)
+            // GROUND BEFORE MONEY. Where both refuse, the one that reads is the
+            // one the player cannot fix by waiting: no funding ever opens a side
+            // the rules will not cross.
+            if (targets.empty() && !tile_carries_road)
                 // BL-1348 (LOGISTICS.md § 4): a road is laid FROM a road. This tile carries
                 // none, so there is nothing here to build out of -- a different refusal
                 // from "nowhere left to go", and one the player can act on by bringing a
@@ -4721,8 +4731,13 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                 why = "A road is laid from a road: this tile carries none, so there is "
                       "nowhere to cross from. Bring one to a neighbour first.";
             else if (targets.empty())
-                why = "Nowhere left to cross to from this tile at this tier, so pressing "
-                      "highlights nothing.";
+                // BL-1379: the press is dead, not armed-and-silent, so the sentence
+                // says what the ground refuses rather than what a press would show.
+                why = "Nowhere left to cross to from this tile at this tier: every side is "
+                      "either already roaded to this standard or one no crossing may take.";
+            else if (!affordable)
+                why = "Can't afford it: the crossing charges "
+                    + std::to_string(static_cast<int>(road_capex)) + " cr.";
             else if (armed)
                 why = "Armed: press one of the highlighted tiles to lay the crossing to it. "
                       "A press anywhere else cancels.";

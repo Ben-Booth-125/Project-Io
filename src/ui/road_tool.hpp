@@ -37,8 +37,10 @@ struct road_target
 
 /// Every crossing `placement_rules::can_place_road` admits out of @p tile at
 /// @p tier, in side order (so the walk is deterministic and world-order
-/// independent). Empty for a tile with nowhere left to go — which is how the
-/// refusal is said now: the absence of a highlight rather than a sentence.
+/// independent). Empty for a tile with nowhere left to go — and an EMPTY SET MUTES
+/// THE PRESS (BL-1379, construction.md § "A tile with nowhere to go mutes the
+/// press"): the row disables its Build and its explainer says why, because a press
+/// that arms and highlights nothing teaches nothing about the refusal.
 /// @p actor is the CORPORATION the highlight is drawn FOR -- the player's. BL-1357 reads
 /// it: a tile another nation holds is one a road may cross INTO and not build OUT of, so
 /// the set it admits depends on who is asking. Passing `null_entity` asks the

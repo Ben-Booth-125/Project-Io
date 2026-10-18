@@ -98,11 +98,16 @@ bool rail_track_tile_ok(const world& w, entity_id nation, entity_id tile,
     if (run.empty())
     {
         if (!is_city_tile(w, tile) && !touches_track(w, tile, nation, false))
-            return fail("Start at a city or your own line");
+            // BL-1379: THE GROUND REFUSAL, in its own words. This is the track row's
+            // "nowhere to go" case (construction.md § "A tile with nowhere to go mutes
+            // the press"), and it must not read like the treasury one below: no funding
+            // ever makes a tile touch a line it does not touch.
+            return fail("Nowhere to lay it from: a line starts at one of your nation's "
+                        "cities, or touches track you already own");
         return true;
     }
     if (!rail_tiles_adjacent(w, run.back(), tile))
-        return fail("Must touch the run's last tile");
+        return fail("Nowhere to lay it from: this tile does not touch the run's last one");
     return true;
 }
 
@@ -332,9 +337,9 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             const float shelf = mit == w.markets.end()
                 ? 0.0f : mit->second.inventory[static_cast<std::size_t>(resource_type::steel)];
             if (steel > 0.0f && !(shelf >= steel))
-                why = "No steel on the shelf";
+                why = "Can't afford it: no Steel on this market's shelf";
             else if (!std::isfinite(cost) || cost > treasury)
-                why = "Treasury cannot cover it";
+                why = "Can't afford it: the treasury cannot cover the track";
         }
         bool pressed = false;
         grid_row("rail_track##build", "Track", /*rail_glyph=*/true,
@@ -351,7 +356,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         const float cost = construction_capex(w, reg, tile, building_type::railway_station,
                                               resource_type::iron_ore);
         if (rail_station_tile_ok(w, nation, tile, &why) && (!std::isfinite(cost) || cost > treasury))
-            why = "Treasury cannot cover it";
+            why = "Can't afford it: the treasury cannot cover the station";
         int standing = 0;
         for (const auto& [bid, b] : w.buildings)
         {
