@@ -654,9 +654,19 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                     { 25, 608 }, { 28, 227 }, { 31, 566 }, { 32, 460 }, { 37, 456 }, { 38, 455 },
                     { 40, 471 }, { 41, 631 }, { 43, 236 }, { 46, 558 },
                 };
+                // ACCEPTED EXCEPTIONS (Ben, 2026-10-18): a seed Ben accepted
+                // below its 80% bar, pinned at the reading he accepted, so a
+                // further drop still fails. Seed 43: 145 against a bar of
+                // 188.8 (pre-BL-1310 236) -- its many small realms seat on
+                // their smaller piece, and the floor absorbs them (trace in
+                // HANDOFF_SPRINT_56.md). The majors' 80% ceiling still applies.
+                static const std::map<uint32_t, int> k_accepted_median = { { 43, 145 } };
+                const auto   acc_it   = k_accepted_median.find(seed);
+                const bool   accepted = acc_it != k_accepted_median.end();
                 const auto   base_it  = k_pre_bl1310_median.find(seed);
                 const bool   has_base = base_it != k_pre_bl1310_median.end();
-                const double bar      = has_base ? 0.8 * static_cast<double>(base_it->second) : 0.0;
+                const double bar      = accepted ? static_cast<double>(acc_it->second)
+                                      : has_base ? 0.8 * static_cast<double>(base_it->second) : 0.0;
                 const bool   size_ok  = has_base && static_cast<double>(median) >= bar && share <= 80.0;
                 ++checks;
                 fails += size_ok ? 0 : 1;
@@ -664,9 +674,9 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                     std::printf("FAIL  SIZE seed %u 20:4: NO PRE-BL-1310 BASELINE for this seed (median %d, majors hold %.1f%%)\n",
                                 seed, median, share);
                 else
-                    std::printf("%s  SIZE seed %u 20:4: minors %zu median %d (bar %.1f = 80%% of pre-BL-1310 %d) | majors hold %.1f%% (<= 80) | under floor(80) %d\n",
-                                size_ok ? "PASS" : "FAIL", seed, minor_sizes.size(), median, bar, base_it->second, share,
-                                under_floor);
+                    std::printf("%s  SIZE seed %u 20:4: minors %zu median %d (bar %.1f = %s, pre-BL-1310 %d) | majors hold %.1f%% (<= 80) | under floor(80) %d\n",
+                                size_ok ? (accepted ? "ACCEPTED" : "PASS") : "FAIL", seed, minor_sizes.size(), median, bar,
+                                accepted ? "the reading Ben accepted" : "80% of", base_it->second, share, under_floor);
             }
             std::fflush(stdout);
         }

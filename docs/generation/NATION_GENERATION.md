@@ -318,7 +318,7 @@ the **core** — the group holding its capital, which is the realm's seat at the
 nation with no realm is seated on its lowest seed inside its territory — through joins. **A realm
 under the size floor keeps the larger piece (Ben, 2026-10-18):** where a realm's land at the close,
 before any cession, is under the floor, its core is the larger of its seat's group and its largest
-group, and its capital follows the core; a realm at or over the floor keeps its seat's group. The
+group — land tiles only, and only a group holding one of its provinces (Ben, 2026-10-18) — and its capital follows the core; a realm at or over the floor keeps its seat's group. The
 core is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
 `body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
 
@@ -384,7 +384,8 @@ produces the fragmentation the rule resolves. **The rule must not starve the min
 2026-10-18).** The audit also reads the nations' sizes on every library seed at the default
 targets, and fails a seed whose minors' median falls below **80% of that seed's own median
 measured before the strait rule** (Ben, 2026-10-18), or whose majors hold more than 80% of the land. It is a reading of the
-world, never a clamp on it.
+world, never a clamp on it. A seed Ben accepts below its bar is recorded in the audit at the
+reading he accepted, so a further drop still fails.
 
 ### Pass 3 — Resource profile derivation
 
