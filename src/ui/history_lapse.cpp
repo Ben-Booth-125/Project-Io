@@ -5207,7 +5207,11 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         // realm's core is ceded to the nation around it -- the cause is in the
         // kind. `polity` the cedent (none: unheld ground), `other` the receiver
         // (none: the unheld ground around it).
-        if (e.polity == lapse_event_none)
+        if (e.region == lapse_event_none && e.polity != lapse_event_none)
+            // A part that moved no province (BL-1310 round 4: it names none).
+            std::snprintf(buf, sizeof buf, "Ground cut off from %s is ceded to %s.", polity_name_of(h, e.polity),
+                          e.other == lapse_event_none ? "the unheld ground around it" : polity_name_of(h, e.other));
+        else if (e.polity == lapse_event_none)
             std::snprintf(buf, sizeof buf, "The ground at %s passes to %s.", R,
                           e.other == lapse_event_none ? "the unheld ground around it" : polity_name_of(h, e.other));
         else if (e.other == lapse_event_none)

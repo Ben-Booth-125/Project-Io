@@ -212,6 +212,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             if (!next_exclave_cession(own, water, gw, gh, core_tile, order, ex, &cells, &unit_anchor)) break;
             const int a  = ex.from;
             const int ca = cells[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(a)])]; // the cedent's core region
+            const std::vector<int> pre_cells = cells; // the cells as the cession was found (the province check)
             const auto at = [&](int t) -> std::size_t { // index of tile t in ex.tiles (sorted)
                 return static_cast<std::size_t>(std::lower_bound(ex.tiles.begin(), ex.tiles.end(), t) - ex.tiles.begin());
             };
@@ -252,22 +253,94 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 const bool b_realm   = b < KP;
                 const int  into_seat = b_realm ? seat_of(b) : -1;
                 std::vector<int> part_moved;
-                int lowest_ground = INT_MAX;
-                for (const std::size_t i : idx)
-                    lowest_ground = std::min(lowest_ground, cells[static_cast<std::size_t>(ex.tiles[i])]);
                 for (const int r : moved)
                     if (moved_to[static_cast<std::size_t>(r)] == b) part_moved.push_back(r);
-                if (b_realm)
+                // THE CHECK the audit reads: the part touches the receiver's
+                // land as it stood before the cession, so it joins it.
                 {
-                    // A REALM RECEIVES: its provinces change hands as regions;
-                    // any other ground of the part joins the receiver's cell at
-                    // the edge it grew from.
+                    bool joined = false;
                     for (const std::size_t i : idx)
                     {
                         const int t = ex.tiles[i];
-                        if (!moving[static_cast<std::size_t>(cells[static_cast<std::size_t>(t)])])
-                            cells[static_cast<std::size_t>(t)] = cells[static_cast<std::size_t>(ex.part_contact[i])];
+                        const int col = t % gw, row = t / gw;
+                        const int nb[4] = { row * gw + (col + 1) % gw, row * gw + (col - 1 + gw) % gw,
+                                            row > 0 ? t - gw : -1, row + 1 < gh ? t + gw : -1 };
+                        for (const int u : nb)
+                            if (u >= 0 && own[static_cast<std::size_t>(u)] == b) joined = true;
+                        if (joined) break;
                     }
+                    if (!joined && ex.kind == 0) ++plan.parts_detached; // the split; an island joins across a strait (kind 1) or is remote (kind 2)
+                }
+                if (b_realm)
+                {
+                    // A REALM RECEIVES: its provinces change hands as regions.
+                    // Any other ground of the part (tiles of no moved province)
+                    // joins a receiver cell ADJACENT TO IT WITHIN THE PART (the
+                    // review): grown level by level from the provinces the
+                    // part carries and from the receiver's own edge, each tile
+                    // taking the cell of the tile that reached it first
+                    // (ascending tile order). So every relabelled tile is joined
+                    // to its cell's ground through tiles of the same cell, and
+                    // a later cession can never find a detached fragment of it.
+                    std::vector<int> pt;
+                    for (const std::size_t i : idx) pt.push_back(ex.tiles[i]);
+                    std::sort(pt.begin(), pt.end());
+                    const auto in_part = [&](int t) { return std::binary_search(pt.begin(), pt.end(), t); };
+                    std::vector<char> done(pt.size(), 0);
+                    const auto slot = [&](int t) {
+                        return static_cast<std::size_t>(std::lower_bound(pt.begin(), pt.end(), t) - pt.begin());
+                    };
+                    const auto nb4 = [&](int t, int out[4]) {
+                        const int col = t % gw, row = t / gw;
+                        out[0] = row * gw + (col + 1) % gw;
+                        out[1] = row * gw + (col - 1 + gw) % gw;
+                        out[2] = row > 0 ? t - gw : -1;
+                        out[3] = row + 1 < gh ? t + gw : -1;
+                    };
+                    std::vector<int> frontier, nxt;
+                    for (const int t : pt)
+                    {
+                        if (moving[static_cast<std::size_t>(cells[static_cast<std::size_t>(t)])])
+                        {
+                            done[slot(t)] = 1; // a moved province's own ground: its cell stays
+                            frontier.push_back(t);
+                            continue;
+                        }
+                        int nb[4];
+                        nb4(t, nb);
+                        int best = -1; // the lowest receiver tile touching it
+                        for (const int u : nb)
+                            if (u >= 0 && !in_part(u) && own[static_cast<std::size_t>(u)] == b && (best < 0 || u < best)) best = u;
+                        if (best >= 0)
+                        {
+                            cells[static_cast<std::size_t>(t)] = cells[static_cast<std::size_t>(best)];
+                            done[slot(t)] = 1;
+                            frontier.push_back(t);
+                        }
+                    }
+                    while (!frontier.empty())
+                    {
+                        nxt.clear();
+                        std::sort(frontier.begin(), frontier.end());
+                        for (const int f : frontier)
+                        {
+                            int nb[4];
+                            nb4(f, nb);
+                            for (const int u : nb)
+                            {
+                                if (u < 0 || !in_part(u) || done[slot(u)]) continue;
+                                cells[static_cast<std::size_t>(u)] = cells[static_cast<std::size_t>(f)];
+                                done[slot(u)] = 1;
+                                nxt.push_back(u);
+                            }
+                        }
+                        frontier.swap(nxt);
+                    }
+                    // A part is connected to its receiver's edge, so nothing is
+                    // left; the contact cell is the seatbelt.
+                    for (const std::size_t i : idx)
+                        if (!done[slot(ex.tiles[i])])
+                            cells[static_cast<std::size_t>(ex.tiles[i])] = cells[static_cast<std::size_t>(ex.part_contact[i])];
                     for (const int r : part_moved)
                     {
                         cur_polity[static_cast<std::size_t>(r)] = b;
@@ -294,7 +367,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 st.kind        = closing_step_kind::exclave_cede;
                 st.from_polity = a < KP ? a : -1;
                 st.into_polity = b_realm ? b : -1;
-                st.region      = part_moved.empty() ? lowest_ground : part_moved.front();
+                st.region      = part_moved.empty() ? -1 : part_moved.front(); // names only a province that moved
                 st.moved       = part_moved;
                 st.late        = late;
                 plan.ceded_regions.insert(plan.ceded_regions.end(), part_moved.begin(), part_moved.end());
@@ -304,6 +377,17 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 if (late) ++plan.cessions_late;
             }
             if (split) ++plan.cessions_split;
+            // THE CHECK the audit reads: no moved province spans two parts.
+            for (const int r : moved)
+                for (std::size_t i = 0; i < ex.tiles.size(); ++i)
+                    if (ex.part_key[i] != moved_to[static_cast<std::size_t>(r)]
+                        && unit_anchor[static_cast<std::size_t>(r)] >= 0
+                        && std::find(moved.begin(), moved.end(), r) != moved.end())
+                    {
+                        // tile i of the exclave belongs to r's province only
+                        // where it sat in r's cell when the cession was found
+                        if (pre_cells[ex.tiles[i]] == r) { ++plan.provinces_split; break; }
+                    }
             // The cedent's ground that pointed at a departing seat re-points at its own.
             if (a < KP)
                 for (std::size_t h = 0; h < R; ++h)
