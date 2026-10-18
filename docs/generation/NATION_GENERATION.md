@@ -273,8 +273,9 @@ polity is its founding core — the lowest-indexed region it held, because regio
 founding order — and the nation the fold makes carries the realm's identity through that
 representative: its **name**, coined once at the realm's founding and never re-coined (§ Pass 5);
 its **colour slot**, the one the wizard's rounds painted it in (§ Pass 5); its **treasury** at
-the close (§ Pass 7); and its capital. **The realm's seat at the close is always the nation's
-capital tile (Ben, 2026-10-17).** Nothing about a realm is recalculated at the handoff:
+the close (§ Pass 7); and its capital. **The realm's seat at the close is the nation's
+capital tile (Ben, 2026-10-17)**, save a realm under the size floor, whose capital follows the
+larger piece it keeps (§ Pass 2e, Ben 2026-10-18). Nothing about a realm is recalculated at the handoff:
 the nation the player meets at Begin is the realm they watched rise, under the same name and the
 same colour. A realm's territory is **one territory** (§ Pass 2e): a polity that conquered across
 a neighbour does not keep the far side, which the closing rounds cede to the nation around it.
