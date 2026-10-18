@@ -707,6 +707,32 @@ into passive and active. What follows replaces the bifold model, the city genera
 - **Trade points stay separate** (`TRADE.md`): how much an owner can ship, beside the capacity to
   move and produce.
 
+#### Where generation puts the sources — the capital is the peak (Ben, 2026-10-18)
+
+**A nation's logistics field peaks at its capital and thins outward, and buildings further out are
+what extend it.** Generation seeds the sources hierarchically rather than evenly: the strongest
+source stands at the **capital**, lesser ones at the nation's other **market centres**, and the
+periphery is left uncovered on purpose — ground a player or a rival covers later by building a hub,
+a station or a port where it is wanted. The field is therefore a slope away from the capital, not a
+blanket, and an outlying hub reads as a deliberate reach into thin ground.
+
+Three things follow, and each is a check rather than a preference:
+
+- **Every capital holds a source.** A nation whose capital makes no points has no centre for its
+  chain to be anchored to (§ How a tile's points get to it), so a capital with zero points is a
+  generation defect, not a poor nation.
+- **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
+  points than its capital at generation. A later build may overtake it — that is the player's doing
+  and is allowed — but the world does not start that way.
+- **Ground is uncovered, and consumers are not.** A nation's ground is mostly outside any source's
+  reach at the start; what must be covered is what **consumes** points. Uncovered ground is the
+  room the logistics game is played in, so a sweep reporting most ground uncovered is reporting the
+  intended world.
+
+How many sources, at what tier, and how the lesser centres are ranked are **in-band calibration**:
+chosen against these three rules, logged, and re-measured by the coverage census rather than fixed
+here.
+
 #### How a tile's points get to it (Ben, 2026-10-16)
 
 **Every tile asks for what it needs, and the answer is routed.** A tile's request is the sum of its

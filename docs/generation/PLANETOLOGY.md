@@ -1020,7 +1020,7 @@ for BL-209 (molecular trace)):
 | R5 | The homeworld corridor holds across the whole knob space (100/100 combinations) |
 | R6 | **Wizard stability** — a decision at stage N never rewrites the history of a stage before N |
 | R7 | Every new knob demonstrably moves its own outcome |
-| R8 | **Preferences and reroll** — resolution is pure in (preferences, seed); a reroll redraws its own round and leaves earlier ones alone; **every** resolved homeworld clears the strict floor across 400 preference combinations; a dimmer star pulls the orbit inward |
+| R8 | **Preferences and reroll** — resolution is pure in (preferences, seed); a reroll redraws its own round, and may move another round's draw where it changes the rejection attempt count, which is accepted: the rounds are one pre-commit search (Ben, 2026-10-18); **every** resolved homeworld clears the strict floor across 400 preference combinations; a dimmer star pulls the orbit inward |
 | R13 | **The checkpoint model** — same seed → identical `checkpoints`, different seed → different; the S5–S8 checkpoints mirror what `died_at`/`archetype` already encode; a synthetic checkpoint class proves an all-ineligible candidate set forces a reroll rather than a silent fallback |
 | R14 | **The dated timestamp** — the conversions from Gya and from a calendar year, every display band *and both edges of every band*, total oldest-first ordering, and a historical line interleaving between deep time and the epoch |
 

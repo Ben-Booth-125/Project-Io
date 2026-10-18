@@ -294,8 +294,21 @@ resolved_world resolve_preferences(const world_preferences& pref, uint32_t seed)
 
     for (uint32_t k = 0; k < max_attempts; ++k)
     {
-        // One stream per round, so bumping a later round's reroll counter cannot
-        // disturb an earlier round's already-committed draw.
+        // One stream per round, so a round's draw depends on ITS OWN roll counter and
+        // not on the others'.
+        //
+        // IT DOES DEPEND ON THE ATTEMPT INDEX (BL-1345, measured by
+        // tools/verify/life_reroll.cpp): k is folded into all three streams, so a reroll
+        // that changes how many attempts the search needs moves the OTHER rounds' draws
+        // too - campaign seed 0, Life roll 7 resolves at attempt 2 and theta goes
+        // 1.519 -> 1.462, plates 9 -> 8. This comment used to claim an earlier round's
+        // committed draw could not be disturbed; it can.
+        //
+        // BEN RULED THE LEAK ACCEPTABLE (2026-10-18), so the claim comes out rather than
+        // the behaviour: the rounds are a pre-commit search, nothing is promised to the
+        // player until the search ends, and k must stay in the stream for the reroll to
+        // be a reroll at all. Determinism is untouched - the world is still a pure
+        // function of (preferences, seed).
         rng ra(seed ^ (pref.roll[0] * 0x1000193u), 0xA000u ^ k);
         rng rb(seed ^ (pref.roll[1] * 0x1000193u), 0xB000u ^ k);
         rng rc(seed ^ (pref.roll[2] * 0x1000193u), 0xC000u ^ k);

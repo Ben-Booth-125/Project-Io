@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 25 open, 1 resolved.*
+*26 entries — 24 open, 2 resolved.*
 
 ---
 
@@ -220,6 +220,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-1047 — Space asset calibration (BL-1327 space asset model): costs, reach, upkeep, decay chosen in-band
 *decision · raised 2026-10-15 · from BL-1327 lane + cold review, merged to main 2026-10-15*
 
@@ -227,12 +234,7 @@ Destinations are named slots (body + orbit|surface), tiered from the owner home 
 
 **Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
 
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
+> **RESOLVED.** Ben, 2026-10-18: keep the calibration as chosen and let the 2040 run judge it. No dial named; a dial moves on the run's evidence, not ahead of it.
 
 ### NR-1048 — The player's nation has its budget scored by nation_ai, against NATIONS.md and AI_OPPONENT.md § 11
 *question · raised 2026-10-15 · from BL-1275 (nation research AI) lane report, confirmed by reading src/world/nation_ai.cpp:543 and nation_step.cpp:54*
