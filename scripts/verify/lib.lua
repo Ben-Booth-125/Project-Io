@@ -170,6 +170,32 @@ end
 -- the captures depict a world a player can actually reach, and the muster gate
 -- (BL-325 S2: hire onto a COMPLETED military_base of your own) gets exercised on
 -- every fixture run instead of only in its own harness.
+-- GIVE A FIXTURE'S GROUND THE ROAD THE GATE REQUIRES (BL-1380), and say so loudly
+-- if it could not be given.
+--
+-- No building stands on a tile with no roaded edge (PRODUCTION.md § "A building needs
+-- a road"), and a generated lattice reaches the sites generation stamped — not the
+-- remote deposit a check picks with `verify.find_deposit_tile`. So a script that places
+-- a building on ground of its own choosing has to road that ground first, exactly as the
+-- nine headless fixtures do with `road_edges_on_every_side(1)`. It is the FIXTURE that
+-- was wrong, never the gate: a check that wanted the refusal should simply not call this.
+--
+-- `verify.stage_road` lays ONE crossing, which is all the rule asks and the least a
+-- staging call can perturb (every roaded edge is counted by the Logistic Point pool,
+-- billed by network upkeep and discounted by the reach field).
+--
+--   col, row : the tile the script is about to build on.
+--   tier     : 1 Track (default) / 2 Road / 3 Highway.
+-- Returns true when the ground carries a road afterwards.
+function road_ground(col, row, tier)
+    local r = verify.stage_road(col, row, tier or 1)
+    verify.expect(r.ok and r.roaded,
+                  string.format("the fixture's ground at (%d,%d) carries a road, so the "
+                                .. "placement gate can pass on its own terms (%d laid)",
+                                col, row, r.laid))
+    return r.ok and r.roaded
+end
+
 -- Place the building selected by place_mode on the nearest placeable tile to
 -- the player's own works: rings of growing radius around the player's first
 -- listed building, each ring walked in a fixed order so the pick is

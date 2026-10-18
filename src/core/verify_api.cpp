@@ -3758,13 +3758,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::placed                 ? "placed" :
                 r == construction_result::invalid_tile           ? "invalid_tile" :
                 r == construction_result::insufficient_funds     ? "insufficient_funds" :
+                r == construction_result::out_of_range           ? "out_of_range" :
                 r == construction_result::no_corp                ? "no_corp" :
                 r == construction_result::no_tile                ? "no_tile" :
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
                 r == construction_result::tech_locked            ? "tech_locked" :
                 r == construction_result::era_locked             ? "era_locked" :
-                r == construction_result::wrong_air              ? "wrong_air" : "failed";
+                r == construction_result::wrong_air              ? "wrong_air" :
+                r == construction_result::needs_road             ? "needs_road" :
+                r == construction_result::foreign_ground         ? "foreign_ground" : "failed";
             if (r == construction_result::placed)
             {
                 m_ui.selected_entity = built;
@@ -3798,13 +3801,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::placed                 ? "placed" :
                 r == construction_result::invalid_tile           ? "invalid_tile" :
                 r == construction_result::insufficient_funds     ? "insufficient_funds" :
+                r == construction_result::out_of_range           ? "out_of_range" :
                 r == construction_result::no_corp                ? "no_corp" :
                 r == construction_result::no_tile                ? "no_tile" :
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
                 r == construction_result::tech_locked            ? "tech_locked" :
                 r == construction_result::era_locked             ? "era_locked" :
-                r == construction_result::wrong_air              ? "wrong_air" : "failed";
+                r == construction_result::wrong_air              ? "wrong_air" :
+                r == construction_result::needs_road             ? "needs_road" :
+                r == construction_result::foreign_ground         ? "foreign_ground" : "failed";
             if (r == construction_result::placed)
             {
                 m_ui.selected_entity = built;
@@ -4357,6 +4363,80 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["ok"]      = (tile != null_entity);
         out["sides"]   = sides;
         out["n_sides"] = n;
+        return out;
+    });
+
+    // STAGE THE GROUND, NEVER THE GATE (BL-1380). No building may stand on a tile with no
+    // roaded edge (PRODUCTION.md § A building needs a road), and the nine headless fixtures
+    // that place one therefore write `road_edges_on_every_side(1)` on their hand-built tiles.
+    // A Lua check had no way to do the same, so `construction_progress.lua` — whose fixture
+    // places an extraction site on a deposit the generated lattice never reached — went red
+    // on its FIRST assertion and cascaded. This is that idiom, reachable from a script: it
+    // gives the fixture's ground a road so the gate PASSES on its own terms. It is not a way
+    // round the gate; a tile this did not reach is still refused.
+    //
+    // ONE CROSSING, NOT SIX, and the restraint is the point: a roaded edge is counted by the
+    // Logistic Point pool, billed by network upkeep and discounted by the reach field
+    // (LOGISTICS.md § 4), so a six-sided stamp would move three economies to satisfy one
+    // rule. The side is picked deterministically — the lowest crossable side with a LAND
+    // neighbour, falling back to any crossable neighbour — so a run is reproducible, and
+    // land is preferred because a single crossing onto water is a jetty, which generation is
+    // forbidden to lay (LOGISTICS.md § 4, "a bridge is laid whole or not at all").
+    //
+    // Reports `laid` (crossings written: 0 when the ground was already roaded) and `roaded`
+    // (does this tile now carry a road at all) — "this tile is on the network", the one road
+    // question components.hpp keeps legitimate. No tier, substrate, owner or deposit.
+    v.set_function("stage_road", [this](int col, int row, sol::optional<int> tier) {
+        sol::table out = m_lua.state().create_table();
+        out["ok"] = false; out["laid"] = 0; out["roaded"] = false;
+        const int t = tier.value_or(1);
+        if (t < 1 || t > 3)
+            return out; // out of the domain: reject whole, write nothing
+        entity_id tile = null_entity;
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+            {
+                tile = tid;
+                break;
+            }
+        const auto tit = m_world.tiles.find(tile);
+        if (tile == null_entity || tit == m_world.tiles.end())
+            return out;
+        out["ok"] = true;
+        const auto water = [](const tile_component& tc) {
+            return tc.substrate == terrain_substrate::ocean
+                || tc.substrate == terrain_substrate::coast
+                || tc.substrate == terrain_substrate::lake;
+        };
+        int pick = -1, fallback = -1;
+        for (int s = 0; s < 6 && pick < 0; ++s)
+        {
+            if (!road_side_is_crossable(s, tit->second.grid_y))
+                continue;
+            const auto oit = m_world.tiles.find(road_edge_neighbour(m_world, tile, s));
+            if (oit == m_world.tiles.end())
+                continue;
+            if (water(oit->second))
+            {
+                if (fallback < 0)
+                    fallback = s;
+                continue;
+            }
+            pick = s;
+        }
+        if (pick < 0)
+            pick = fallback;
+        int laid = 0;
+        if (pick >= 0 && lay_road_edge(m_world, tile, pick, static_cast<std::uint8_t>(t)))
+        {
+            ++laid;
+            invalidate_logistics_caches(m_world); // the network changed; the caller is one call
+            m_ground.touch();                     // ...and the ground draws it (BL-1246)
+        }
+        out["laid"]   = laid;
+        out["roaded"] = tile_has_road(tit->second);
+        SDL_Log("verify.stage_road: (%d,%d) tier %d - %d crossing(s) laid on side %d, roaded %d",
+                col, row, t, laid, pick, tile_has_road(tit->second) ? 1 : 0);
         return out;
     });
 
@@ -4956,7 +5036,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                    r == construction_result::insufficient_materials ? "insufficient_materials" :
                    r == construction_result::tech_locked            ? "tech_locked" :
                    r == construction_result::era_locked             ? "era_locked" :
-                   r == construction_result::wrong_air              ? "wrong_air" : "failed";
+                   r == construction_result::wrong_air              ? "wrong_air" :
+                   r == construction_result::needs_road             ? "needs_road" :
+                   r == construction_result::foreign_ground         ? "foreign_ground" : "failed";
             // A refusal that is not about THIS tile ends the scan: every tile would
             // refuse it the same way, and that refusal is the answer.
             if (r == construction_result::tech_locked || r == construction_result::era_locked

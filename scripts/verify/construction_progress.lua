@@ -99,6 +99,15 @@ local dep = verify.find_deposit_tile("iron_ore")
 verify.expect(dep.ok, "found a tile carrying iron ore")
 
 -- ── 1. Two of the same type on one tile ────────────────────────────────────
+-- THE GROUND IS ROADED FIRST (BL-1380). No building stands on a tile with no roaded
+-- edge (PRODUCTION.md § "A building needs a road"), and the deposit `find_deposit_tile`
+-- hands back is a remote one the generated lattice never reached — so every placement
+-- below answered `invalid_tile` and all thirteen of this script's failures were that one
+-- refusal, cascading. The fixture is what was wrong: this is the Lua form of the
+-- `road_edges_on_every_side(1)` the nine headless fixtures write (lib.lua § road_ground).
+-- All three placements use this ONE tile, so one crossing is the whole staging.
+road_ground(dep.x, dep.y)
+
 verify.place_mode("extraction", "iron_ore")
 local first = verify.build_at(dep.x, dep.y)
 verify.expect(first == "placed", "first extraction site placed (" .. first .. ")")
