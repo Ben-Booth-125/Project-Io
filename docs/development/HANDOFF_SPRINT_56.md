@@ -38,6 +38,9 @@ pre-BL-1310 median, and seed 43 is an accepted exception pinned at its reading (
 3. **Ids.** This branch minted BL-1370..BL-1377 and NR-1049..NR-1051 from the main tip of
    2026-10-17 (main then held BL-1369, NR-1048). Sprint 55 may have minted the same numbers since:
    compare and renumber the later ones with their cross-references.
+   **Confirmed 2026-10-18:** main holds BL-1372 (rail is a crossing), BL-1374 (ledger tabs fixture
+   broke) and BL-1377 (verify world not roaded) — this branch's BL-1372, BL-1374 and BL-1377 must be
+   renumbered. BL-1382 (province normalising pass) was minted clear of main's BL-1381.
 4. **Re-run the gates on the integrated tree** (both sprints move the world): `market_viability`
    full, `history_patterns` full, `history_sim_harness`, `world_audit --seeds` (library),
    `nation_targets_harness`, `world_determinism`, `save_roundtrip`, `quarterly_return`.
