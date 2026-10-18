@@ -13,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <queue>
 #include <random>
 #include <set>
@@ -1263,6 +1264,27 @@ std::vector<entity_id> generate_nations(
         const int c0 = tiles.empty() ? -1 : cell_seed[static_cast<std::size_t>(tiles.front())];
         return (c0 >= 0 && c0 < seed_count) ? seeds[static_cast<std::size_t>(c0)] : -1;
     };
+    // A tail cession, applied: each tile to the key its part went to (the
+    // split, § Pass 2e), and ONE logged record per receiving part, naming the
+    // seed its ground grew from (the caller records each as an event).
+    const auto apply_cession = [&](const exclave_cession& ex, std::vector<int>& land_owner, auto polity_of_key) {
+        std::map<int, std::vector<int>> parts; // receiver -> its tiles, ascending
+        for (std::size_t i = 0; i < ex.tiles.size(); ++i)
+        {
+            const int t  = ex.tiles[i];
+            const int to = i < ex.part_key.size() ? ex.part_key[i] : ex.to;
+            land_owner[static_cast<std::size_t>(t)] = to;
+            owner_map[static_cast<std::size_t>(t)]  = to;
+            ceded[static_cast<std::size_t>(t)]      = 1;
+            parts[to].push_back(t);
+        }
+        if (fold_out)
+            for (const auto& [to, tiles] : parts)
+                fold_out->cession_log.push_back({ polity_of_key(ex.from), polity_of_key(to), ceded_seed_tile(tiles) });
+    };
+    // The map AT THE CLOSE, before any cession: the city states are judged on
+    // it (Ben, 2026-10-18), not on what the strait rule left a realm.
+    const std::vector<int> owner_at_close = owner_map;
     int tail_cessions = 0;
     {
         std::vector<int> land_owner(owner_map);
@@ -1274,14 +1296,7 @@ std::vector<entity_id> generate_nations(
         for (int guard = 0; guard < total; ++guard)
         {
             if (!next_exclave_cession(land_owner, water, gw, gh, seed_core, rank, ex)) break;
-            for (const int t : ex.tiles)
-            {
-                land_owner[static_cast<std::size_t>(t)] = ex.to;
-                owner_map[static_cast<std::size_t>(t)]  = ex.to;
-                ceded[static_cast<std::size_t>(t)]      = 1;
-            }
-            if (fold_out)
-                fold_out->cession_log.push_back({ polity_of_seed(ex.from), polity_of_seed(ex.to), ceded_seed_tile(ex.tiles) });
+            apply_cession(ex, land_owner, [&](int key) { return polity_of_seed(key); });
             ++tail_cessions;
         }
         if (tail_cessions > 0) rederive_carve_water(owner_map, sub, gw, gh);
@@ -1301,7 +1316,7 @@ std::vector<entity_id> generate_nations(
     const bool floor_here = params.min_nation_tiles > 0 && !params.floor_in_history;
     const std::vector<bool> city_states =
         (params.keep_city_states && floor_here)
-            ? mark_city_states(w, tile_ids, owner_map, fold, seed_polity, seed_count, total)
+            ? mark_city_states(w, tile_ids, owner_at_close, fold, seed_polity, seed_count, total)
             : std::vector<bool>{};
 
     // BL-1089: the merge's own record of who folded into whom, and the
@@ -1351,16 +1366,8 @@ std::vector<entity_id> generate_nations(
         for (int guard = 0; guard < total; ++guard)
         {
             if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex)) break;
-            for (const int t : ex.tiles)
-            {
-                land_owner[static_cast<std::size_t>(t)] = ex.to;
-                owner_map[static_cast<std::size_t>(t)]  = ex.to;
-                ceded[static_cast<std::size_t>(t)]      = 1;
-            }
-            if (fold_out)
-                fold_out->cession_log.push_back({ polity_of_seed(survivor[static_cast<std::size_t>(ex.from)]),
-                                                  polity_of_seed(survivor[static_cast<std::size_t>(ex.to)]),
-                                                  ceded_seed_tile(ex.tiles) });
+            apply_cession(ex, land_owner,
+                          [&](int key) { return polity_of_seed(survivor[static_cast<std::size_t>(key)]); });
             ++repaired;
         }
         if (repaired > 0) rederive_carve_water(owner_map, sub, gw, gh);
@@ -2226,7 +2233,9 @@ std::vector<reach_hit> reach_of(const land_groups& g, int c, const std::vector<i
 
 bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
                           const std::vector<int>& core_tile, const std::vector<int>& order,
-                          exclave_cession& out)
+                          exclave_cession& out,
+                          const std::vector<int>* unit,
+                          const std::vector<int>* unit_anchor)
 {
     const int total = gw * gh;
     if (total <= 0 || static_cast<int>(owner.size()) < total || static_cast<int>(water.size()) < total) return false;
@@ -2242,45 +2251,157 @@ bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>
         out.kind    = kind;
         out.tiles   = g.tiles[static_cast<std::size_t>(c)];
         std::sort(out.tiles.begin(), out.tiles.end());
+        out.part_key.assign(out.tiles.size(), to);
+        out.part_contact.assign(out.tiles.size(), contact);
         return true;
     };
     const int C = static_cast<int>(g.tiles.size());
 
-    // 1 — land-bordered exclaves, lowest tile first: to the key sharing the
-    // most cardinal land edges (ties: lower rank, then the lower touching tile).
+    // 1 — land-bordered exclaves, lowest tile first, SPLIT among the keys
+    // that border them (§ Pass 2e, Ben 2026-10-18): every bordering key's
+    // edge grows into the exclave at once, one level at a time; a tile
+    // reached claims its whole UNIT (its province where the caller names
+    // them -- a province never splits -- else itself) for the key that
+    // reached it, ties to the lower rank, then the lower contact tile. Each
+    // part is connected to its receiver's edge, so it joins a group the
+    // receiver already holds: the exclave's group goes and none is made,
+    // which keeps the walk finite.
     for (int c = 0; c < C; ++c)
     {
         if (in_terr[static_cast<std::size_t>(c)]) continue;
         const int k = g.owner[static_cast<std::size_t>(c)];
-        std::vector<std::pair<int, int>> edges; // (key, touching tile), one per shared edge
-        for (const int t : g.tiles[static_cast<std::size_t>(c)])
+        const std::vector<int>& xt = g.tiles[static_cast<std::size_t>(c)];
+        bool bordered = false;
+        for (const int t : xt)
         {
             int nb[4];
             const int n = strait_nb4(t, gw, gh, nb);
-            for (int i = 0; i < n; ++i)
+            for (int i = 0; i < n && !bordered; ++i)
             {
                 const int o = owner[static_cast<std::size_t>(nb[i])];
-                if (o >= 0 && o != k) edges.emplace_back(o, nb[i]);
+                bordered = o >= 0 && o != k;
             }
+            if (bordered) break;
         }
-        if (edges.empty()) continue;
-        std::sort(edges.begin(), edges.end());
-        int best = -1, best_n = 0, best_tile = -1;
-        for (std::size_t i = 0; i < edges.size();)
+        if (!bordered) continue;
+
+        const auto unit_of = [&](int t) -> int {
+            if (unit == nullptr || unit_anchor == nullptr) return -1;
+            const int u = (*unit)[static_cast<std::size_t>(t)];
+            if (u < 0 || u >= static_cast<int>(unit_anchor->size())) return -1;
+            const int a = (*unit_anchor)[static_cast<std::size_t>(u)];
+            if (a < 0 || a >= total || g.comp[static_cast<std::size_t>(a)] != c) return -1;
+            return u;
+        };
+        // The exclave's tiles of each named unit (ascending: `xt` is sorted below).
+        std::vector<int> xs = xt;
+        std::sort(xs.begin(), xs.end());
+        std::map<int, std::vector<int>> unit_tiles;
+        for (const int t : xs)
         {
-            std::size_t j = i;
-            while (j < edges.size() && edges[j].first == edges[i].first) ++j;
-            const int key = edges[i].first, n = static_cast<int>(j - i), tile = edges[i].second;
-            if (best < 0 || n > best_n
-                || (n == best_n && (rank(key) < rank(best) || (rank(key) == rank(best) && tile < best_tile))))
-            {
-                best      = key;
-                best_n    = n;
-                best_tile = tile;
-            }
-            i = j;
+            const int u = unit_of(t);
+            if (u >= 0) unit_tiles[u].push_back(t);
         }
-        return emit(c, best, best_tile, 0);
+        std::vector<int> claim_key(static_cast<std::size_t>(total), -1), claim_contact(static_cast<std::size_t>(total), -1);
+        std::vector<char> unit_done; // indexed by unit id, sized lazily
+        struct cand { int r, key, contact; };
+        const auto better = [](const cand& a, const cand& b) {
+            return a.r != b.r ? a.r < b.r : a.contact < b.contact;
+        };
+        std::vector<int> frontier, next;
+        // Candidates at one level: per unreached tile in the exclave, the best
+        // (rank, contact) among its reached-or-foreign land neighbours.
+        const auto claim_level = [&](const std::vector<std::pair<int, cand>>& tile_cands) {
+            // best per unit (named) or per tile (unnamed), applied in ascending order
+            std::map<int, std::pair<cand, int>> best; // unit key -> (cand, any tile)
+            for (const auto& [t, cd] : tile_cands)
+            {
+                const int u = unit_of(t);
+                const int uk = u >= 0 ? u : -(t + 1);
+                auto it = best.find(uk);
+                if (it == best.end() || better(cd, it->second.first)) best[uk] = { cd, t };
+            }
+            next.clear();
+            for (const auto& [uk, bc] : best)
+            {
+                const cand& cd = bc.first;
+                if (uk >= 0)
+                {
+                    for (const int t : unit_tiles[uk])
+                        if (claim_key[static_cast<std::size_t>(t)] < 0)
+                        {
+                            claim_key[static_cast<std::size_t>(t)]     = cd.key;
+                            claim_contact[static_cast<std::size_t>(t)] = cd.contact;
+                            next.push_back(t);
+                        }
+                }
+                else
+                {
+                    const int t = -uk - 1;
+                    if (claim_key[static_cast<std::size_t>(t)] >= 0) continue;
+                    claim_key[static_cast<std::size_t>(t)]     = cd.key;
+                    claim_contact[static_cast<std::size_t>(t)] = cd.contact;
+                    next.push_back(t);
+                }
+            }
+            std::sort(next.begin(), next.end());
+            frontier.swap(next);
+        };
+        // Level 0: the exclave's own edge against each bordering key.
+        {
+            std::vector<std::pair<int, cand>> tc;
+            for (const int t : xs)
+            {
+                int nb[4];
+                const int n = strait_nb4(t, gw, gh, nb);
+                bool have = false;
+                cand bc{};
+                for (int i = 0; i < n; ++i)
+                {
+                    const int o = owner[static_cast<std::size_t>(nb[i])];
+                    if (o < 0 || o == k) continue;
+                    const cand cd{ rank(o), o, nb[i] };
+                    if (!have || better(cd, bc)) { bc = cd; have = true; }
+                }
+                if (have) tc.emplace_back(t, bc);
+            }
+            claim_level(tc);
+        }
+        // Later levels: grow from the tiles claimed last.
+        while (!frontier.empty())
+        {
+            std::map<int, cand> per_tile;
+            for (const int f : frontier)
+            {
+                int nb[4];
+                const int n = strait_nb4(f, gw, gh, nb);
+                const cand cd{ rank(claim_key[static_cast<std::size_t>(f)]), claim_key[static_cast<std::size_t>(f)],
+                               claim_contact[static_cast<std::size_t>(f)] };
+                for (int i = 0; i < n; ++i)
+                {
+                    const int u = nb[i];
+                    if (g.comp[static_cast<std::size_t>(u)] != c || claim_key[static_cast<std::size_t>(u)] >= 0) continue;
+                    auto it = per_tile.find(u);
+                    if (it == per_tile.end() || better(cd, it->second)) per_tile[u] = cd;
+                }
+            }
+            std::vector<std::pair<int, cand>> tc(per_tile.begin(), per_tile.end());
+            if (tc.empty()) break;
+            claim_level(tc);
+        }
+        out.from  = k;
+        out.kind  = 0;
+        out.tiles = xs;
+        out.part_key.resize(xs.size());
+        out.part_contact.resize(xs.size());
+        for (std::size_t i = 0; i < xs.size(); ++i)
+        {
+            out.part_key[i]     = claim_key[static_cast<std::size_t>(xs[i])];
+            out.part_contact[i] = claim_contact[static_cast<std::size_t>(xs[i])];
+        }
+        out.to      = out.part_key.front();
+        out.contact = out.part_contact.front();
+        return true;
     }
 
     // 2 — islands within strait reach of another key's TERRITORY: to the

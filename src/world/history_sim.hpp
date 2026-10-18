@@ -5168,6 +5168,8 @@ struct history_sim_state
     int32_t closing_cessions_late      = 0;
     int32_t closing_secessions_split   = 0;
     int32_t closing_reps_off_core      = 0;
+    int32_t closing_cessions_split     = 0; ///< BL-1310 round 4: exclaves split among 2+ neighbours
+    int32_t closing_city_states        = 0; ///< BL-1310 round 4: exempt city states, judged at the close
     /// The carve as the cessions left it (`closing_plan::cell_overrides`):
     /// per pair a land tile and the REGION whose cell now holds it. The tail
     /// hands these to `generate_nations` by the region's anchor tile.

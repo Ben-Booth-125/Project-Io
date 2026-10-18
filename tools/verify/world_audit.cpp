@@ -20,6 +20,8 @@
 #include "world/terrain_combat.hpp"
 #include "world/world.hpp"
 #include "world/era_minus_one.hpp"
+#include "world/finish_campaign_world.hpp"
+#include "world/recipe_registry.hpp"
 #include "world/era_timelapse.hpp"
 #include "world/history_sim.hpp"
 #include "world/works_roster.hpp"
@@ -508,6 +510,10 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
     cfg.load_from_lua(lua);
     lua.load("scripts/works.lua");
     works.load_from_lua(lua);
+    recipe_registry reg; // the finish's settle runs on it (the size reading's majors)
+    lua.load("scripts/recipes.lua");
+    lua.load("scripts/economy.lua");
+    reg.load_from_lua(lua);
 
     int checks = 0, fails = 0, cessions_total = 0;
     std::printf("world_audit strait rule (BL-1310), %zu seed(s), %zu target pair(s) beside natural\n",
@@ -522,6 +528,10 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
         struct run_spec { int tt, mt, launch; };
         std::vector<run_spec> runs{ { 0, 0, 0 } };
         for (const auto& [t, m] : pairs) runs.push_back({ t, m, 0 });
+        // 20:4, the wizard default, always: the nation size reading runs there.
+        bool have_default = false;
+        for (const run_spec& r : runs) have_default = have_default || (r.tt == 20 && r.mt == 4 && r.launch == 0);
+        if (!have_default) runs.push_back({ 20, 4, 0 });
         runs.push_back({ 0, 0, 1 });
         runs.push_back({ 0, 0, 2 });
         for (const auto& [tt, mt, launch] : runs)
@@ -534,7 +544,7 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
             if (launch >= 1) p.industrialisation_span_enabled = false;
             generation_report     rep{};
             era_minus_one_fixture fx{};
-            const world       sw = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
+            world             sw = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
             const strait_stats s  = audit_strait_rule(sw, rep);
             const int          ce = count_cessions(rep);
             const history_sim_state& hs = fx.industrialisation_state;
@@ -583,6 +593,50 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                         hs.closing_cessions_late, hs.closing_secessions_split, hs.closing_reps_off_core,
                         hs.closing_cell_overrides.size(), hs.closing_predicted,
                         rep.handoff_violation.empty() ? "" : " | VIOLATION: ", rep.handoff_violation.c_str());
+            std::printf("        split cessions %d, city states %d (judged at the close)\n", hs.closing_cessions_split,
+                        hs.closing_city_states);
+            // THE RULE MUST NOT STARVE THE MINORS (Ben, 2026-10-18; sec
+            // Territorial fragmentation, measured). At the wizard default
+            // (20:4), after the finish (majors are nations home to a
+            // non-background corporation, nation_sizes.cpp's reading): the
+            // minors' median tile count must be at least 227 (the lowest
+            // pre-BL-1310 median over the library) and the majors may hold at
+            // most 80% of the land. A READING, never a clamp: nothing is tuned
+            // to it.
+            if (launch == 0 && tt == 20 && mt == 4)
+            {
+                recipe_registry seed_reg = reg;
+                (void)finish_campaign_world(sw, rep, seed_reg, p, cfg, nullptr);
+                entity_id home = null_entity;
+                for (const auto& be : rep.bodies)
+                    if (be.is_homeworld) { home = be.id; break; }
+                std::set<entity_id> majors;
+                for (const auto& kv : sw.corporations)
+                    if (!kv.second.is_background && kv.second.home_nation != null_entity) majors.insert(kv.second.home_nation);
+                std::vector<int> minor_sizes;
+                long total_tiles = 0, major_tiles = 0;
+                int  under_floor = 0;
+                for (const auto& kv : sw.nations)
+                {
+                    const nation_component& n = kv.second;
+                    if (n.tiles.empty()) continue;
+                    const auto t = sw.tiles.find(n.tiles.front());
+                    if (t == sw.tiles.end() || t->second.body != home) continue;
+                    const int sz = static_cast<int>(n.tiles.size());
+                    total_tiles += sz;
+                    if (majors.count(kv.first)) major_tiles += sz;
+                    else minor_sizes.push_back(sz);
+                    if (sz < 80) ++under_floor;
+                }
+                std::sort(minor_sizes.begin(), minor_sizes.end(), [](int a, int b) { return a > b; });
+                const int    median = minor_sizes.empty() ? 0 : minor_sizes[minor_sizes.size() / 2];
+                const double share  = total_tiles ? 100.0 * static_cast<double>(major_tiles) / static_cast<double>(total_tiles) : 0.0;
+                const bool   size_ok = median >= 227 && share <= 80.0;
+                ++checks;
+                fails += size_ok ? 0 : 1;
+                std::printf("%s  SIZE seed %u 20:4: minors %zu median %d (>= 227) | majors hold %.1f%% (<= 80) | under floor(80) %d\n",
+                            size_ok ? "PASS" : "FAIL", seed, minor_sizes.size(), median, share, under_floor);
+            }
             std::fflush(stdout);
         }
     }
