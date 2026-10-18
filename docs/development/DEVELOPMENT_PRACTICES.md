@@ -616,6 +616,24 @@ these are the recurring "do not" rules that come up while building:
 
 ---
 
+## A baseline is a commit, not a probe-off
+
+**Measure "before" by building the commit, not by switching your own change off.** A probe-off —
+the new rules disabled, the new pass short-circuited — is a *simulation* of the baseline, and it
+drifts from it wherever disabling code is not the same as code never having been there. Two lanes
+measured `market_viability` against 29af-era main on 2026-10-18 and disagreed by 5.5 points of G2;
+the shard count was ruled out (a 2-shard and a 16-shard run of one commit reproduce the pooled
+figures digit for digit), and what was left was that one lane's "before" was a probe-off rather
+than the commit (BL-1378).
+
+Two further traps in the same family, both of which have cost a wrong conclusion:
+
+- **`market_viability` exits 0 on a failed gate.** "All shards exit 0" is not "no failing row" —
+  read the MERGED block, never the exit code.
+- **A harness argument may be a count rather than a list.** `haulage_measure --seeds N` is *how
+  many* seeds, with `--first-seed S` choosing where they start, so two runs quoting "`--seeds`"
+  can be measuring different worlds entirely. Quote the arguments with the numbers.
+
 ## Save-format versions (`world_save_version`)
 
 `world_save_version` in [`../../src/world/world_save.hpp`](../../src/world/world_save.hpp) is
