@@ -79,7 +79,8 @@ and Ben overruled it, 2026-08-21: *"packing each province perfectly looks nice, 
 how borders were defined in history."* What a province *is*, and everything downstream, is
 independent of how the shapes are drawn.
 
-**A province is its centre's ground (Ben, 2026-09-26; BL-1133).** The fill no longer stops at a
+**A province is grown as its centre's ground (Ben, 2026-09-26; BL-1133)**, then evened out once
+(§ The normalising pass, Ben 2026-10-18). The fill no longer stops at a
 growth budget: every centre's province grows until its nation's land is covered, across the settled
 line as well as within it (§ Colonisation seeds the partition), so every province holds a
 centre and no centre's ground goes unclaimed. A world has at most as many provinces as centres,
@@ -119,14 +120,17 @@ provinces rather than of thousands of villages founded on empty ground.
    standing without one, held and taken through its recorded holder. *Superseded original ruling,
    kept for the record:*
    country no centre reaches became hinterland, seeded from the least-accessible tile.
-4. **Size is not clamped.** *"Don't reject tiny provinces"* — nothing is merged away to satisfy a
-   floor, **boundaries win ties**, and on settled land nothing stops the fill before the land is
-   covered (a province is its centre's ground). The band below still draws the water domains and
+4. **Size is evened out once, after the fill (Ben, 2026-10-18; § The normalising pass).** The
+   fill itself is still unclamped — **boundaries win ties**, and on settled land nothing stops it
+   before the land is covered (a province is grown as its centre's ground). Once nations are final,
+   one pass splits the provinces that grew too large and merges the ones too small to stand alone.
+   *Superseded wording (2026-08-21): "nothing is merged away to satisfy a floor".* The band below still draws the water domains and
    an unsettled body's hinterland.
 5. **A national border is a hard edge.** Seeds are placed per nation and the terrain cost function
    operates only *within* a nation's territory, so a region's frontier is the border wherever it
    reaches one (Ben, 2026-08-22; BL-563, province respects nation). Regions grown to fit the border
-   need no cutting, so there is no scatter of one- and two-tile offcuts and no merge pass.
+   need no cutting, so there is no scatter of one- and two-tile offcuts to merge away. (The
+   normalising pass, which evens sizes once nations are final, is a separate later step.)
 
 **SETTLED (Ben, 2026-10-01, NR-962): a river divides its banks.** The fill pays the river's cost
 to CROSS a course — to step from one bank onto the river and off it to the other — not to travel
@@ -244,6 +248,38 @@ domains, where the size columns above are land's.) The harness asserts the cap a
 accounting identity (every tile above 12 arrived by absorption, so growth's own clamp
 is still proven separately) and **reports** the 7.63% — whether that counts as "rare"
 is Ben's judgement against a number, and no threshold for it has been chosen.
+
+### The normalising pass (Ben, 2026-10-18)
+
+The fill draws provinces as far as each centre's reach carries, so on settled land their sizes
+spread widely: across six seeds the settled land provinces measured a median of 48 tiles, a p90 of
+177 and a largest of 4,929. One pass evens that out **after nations are final** — after the strait
+rule and the closing rounds (`NATION_GENERATION.md` § Pass 2e) — and **before roads and firms are
+placed**, so everything downstream is built on the normalised partition.
+
+**The band scales with the anchor.** A metropolis still holds a larger province than a village. A
+province whose anchor centre has scale *s* (1–5) is **too small below 24·f(s)** land tiles and **too
+large above 100·f(s)**, where f(s) = 1 + (s − 1)/2 — 1, 1.5, 2, 2.5 and 3 for scales 1 to 5, so a
+village's band is 24–100 and a scale-5 city's 72–300. The base band is Ben's; the scaling factor
+is a calibration that follows the measured ordering (a scale-3 province is about twice a scale-1's).
+
+**Too large: split.** A province above its ceiling is split into the fewest pieces that bring every
+piece under it. The original centre keeps the piece around it. Every other piece **founds a
+scale-1 anchor centre** on its best ground — the same founding an uncentred island receives
+(§ Colonisation seeds the partition) — and the pieces are grown by the same weighted fill, inside
+the old province only. No piece may fall below its own floor; where that cannot be met the
+province splits into fewer pieces.
+
+**Too small: merge.** A province below its floor joins a **same-nation, same-domain neighbour**: the
+one sharing the most border, ties to the smaller, then the lower id — skipping any neighbour the
+merge would push over its ceiling. A merged province holds both centres, and its anchor is the
+highest summed centre scale as always. A province with no such neighbour stays as it is, counted
+rather than hidden.
+
+**What the pass never does.** It never crosses a national border, never mixes domains, and never
+touches the water domains, an uncentred island or an unsettled body's hinterland, whose band stays
+7–12. It is deterministic: provinces are walked in ascending id, splits before merges, with the
+tie-breaks above. Province ids are derived after it, as always (§ Two contracts).
 
 ### Three domains, never mixed
 
