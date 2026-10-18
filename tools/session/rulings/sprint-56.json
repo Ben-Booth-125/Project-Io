@@ -1,11 +1,102 @@
 [
-  { "ruling": "Every nation holds one territory: land, or groups joined by a strait of at most 3 ocean tiles", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "Every nation holds one territory \\(Ben, 2026-10-16\\)", "stale": ["A realm's territory can be \\*\\*non-contiguous\\*\\*", "fact of the history\\s+rather than a defect"], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "An exclave is ceded to the nation that surrounds it, as a closing-round event run first", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "An exclave is ceded, not kept", "stale": ["and nothing splits\\s+one\\."], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "The floor's island case goes to the nearest nation across water, not the globally largest", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "absorbed by the nearest nation across the water, never the globally largest", "stale": ["absorbed\\s+into the globally largest nation"], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "The realm's seat at the close is always the nation's capital tile", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "The realm's seat at the close is always the nation's", "stale": [], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "Every launch obeys the strait rule, Empires-round launches included", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "Every launch obeys the rule \\(Ben, 2026-10-17\\)", "stale": [], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "The remote island is exempt at any size", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "group exempt from the rule, \\*\\*at any size\\*\\*", "stale": [], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "The late repair after absorption through owned water stays", "doc": "docs/generation/NATION_GENERATION.md", "anchor": "cede what is left over \\(Ben, 2026-10-17\\)", "stale": [], "owner": "BL-1310 (nations contiguous)" },
-  { "ruling": "Reroll, Back and Next are anchored at the bottom of the wizard window", "doc": "docs/ui/STARTUP.md", "anchor": "Next are anchored at the bottom of the window \\(Ben, 2026-10-16\\)", "stale": ["Reroll, Back and Next sit higher"], "owner": "wizard footer (sprint 56, unnumbered)" },
-  { "ruling": "The game process peaks under 6 GB; opaque master chunks as RGB; other bodies share a fixed budget", "doc": "docs/ui/RENDERING.md", "anchor": "The game process peaks under 6 GB on every machine", "stale": ["\\*\\*45% of installed RAM\\*\\*", "whole ground held to 45% of installed RAM"], "owner": "BL-1311 (ground paint perf); unbuilt part BL-1377 (ground under six GB)" }
+  {
+    "ruling": "Every nation holds one territory: land, or groups joined by a strait of at most 3 ocean tiles",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "Every nation holds one territory \\(Ben, 2026-10-16\\)",
+    "stale": [
+      "A realm's territory can be \\*\\*non-contiguous\\*\\*",
+      "fact of the history\\s+rather than a defect"
+    ],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "An exclave is split among the nations that border it, province by province on a settled world",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "split among the nations that border it",
+    "stale": [
+      "ceded to the nation that surrounds it\\*\\*:"
+    ],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "The floor's island case goes to the nearest nation across water, not the globally largest",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "absorbed by the nearest nation across the water, never the globally largest",
+    "stale": [
+      "absorbed\\s+into the globally largest nation"
+    ],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "The realm's seat at the close is the nation's capital tile, save a realm under the size floor",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "The realm's seat at the close is the nation's",
+    "stale": [
+      "seat at the close is always the nation"
+    ],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "Every launch obeys the strait rule, Empires-round launches included",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "Every launch obeys the rule \\(Ben, 2026-10-17\\)",
+    "stale": [],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "The remote island is exempt at any size",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "group exempt from the rule, \\*\\*at any size\\*\\*",
+    "stale": [],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "The late repair after absorption through owned water stays",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "cede what is left over \\(Ben, 2026-10-17\\)",
+    "stale": [],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "Reroll, Back and Next are anchored at the bottom of the wizard window",
+    "doc": "docs/ui/STARTUP.md",
+    "anchor": "Next are anchored at the bottom of the window \\(Ben, 2026-10-16\\)",
+    "stale": [
+      "Reroll, Back and Next sit higher"
+    ],
+    "owner": "wizard footer (sprint 56, unnumbered)"
+  },
+  {
+    "ruling": "The game process peaks under 6 GB; opaque master chunks as RGB; other bodies share a fixed budget",
+    "doc": "docs/ui/RENDERING.md",
+    "anchor": "The game process peaks under 6 GB on every machine",
+    "stale": [
+      "\\*\\*45% of installed RAM\\*\\*",
+      "whole ground held to 45% of installed RAM"
+    ],
+    "owner": "BL-1311 (ground paint perf); unbuilt part BL-1377 (ground under six GB)"
+  },
+  {
+    "ruling": "A city state is judged as the realm stood at the close, before any cession",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "judged \\*\\*as the realm stood at the\\s+close, before any cession\\*\\*",
+    "stale": [],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "A realm under the size floor keeps the larger of its seat group and its largest group",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "A realm\\s+under the size floor keeps the larger piece",
+    "stale": [],
+    "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "The audit fails a seed whose minors median falls below 80% of its own pre-strait-rule median, or whose majors hold over 80%",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "80% of that seed's own median",
+    "stale": [
+      "the lowest median measured before the\\s+strait rule \\(227 tiles\\)"
+    ],
+    "owner": "BL-1310 (nations contiguous)"
+  }
 ]

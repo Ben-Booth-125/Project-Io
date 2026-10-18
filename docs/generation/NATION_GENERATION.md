@@ -273,8 +273,9 @@ polity is its founding core — the lowest-indexed region it held, because regio
 founding order — and the nation the fold makes carries the realm's identity through that
 representative: its **name**, coined once at the realm's founding and never re-coined (§ Pass 5);
 its **colour slot**, the one the wizard's rounds painted it in (§ Pass 5); its **treasury** at
-the close (§ Pass 7); and its capital. **The realm's seat at the close is always the nation's
-capital tile (Ben, 2026-10-17).** Nothing about a realm is recalculated at the handoff:
+the close (§ Pass 7); and its capital. **The realm's seat at the close is the nation's
+capital tile (Ben, 2026-10-17)**, save a realm under the size floor, whose capital follows the
+larger piece it keeps (§ Pass 2e, Ben 2026-10-18). Nothing about a realm is recalculated at the handoff:
 the nation the player meets at Begin is the realm they watched rise, under the same name and the
 same colour. A realm's territory is **one territory** (§ Pass 2e): a polity that conquered across
 a neighbour does not keep the far side, which the closing rounds cede to the nation around it.
@@ -314,8 +315,11 @@ history produced them.
 **joined** when a path between them crosses **at most `strait_tiles` ocean tiles and no land
 another nation holds**. Joins chain: a nation's groups form one territory when every group reaches
 the **core** — the group holding its capital, which is the realm's seat at the close (§ Pass 2d); a
-nation with no realm is seated on its lowest seed inside its territory — through joins. The core
-is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
+nation with no realm is seated on its lowest seed inside its territory — through joins. **A realm
+under the size floor keeps the larger piece (Ben, 2026-10-18):** where a realm's land at the close,
+before any cession, is under the floor, its core is the larger of its seat's group and its largest
+group, and its capital follows the core; a realm at or over the floor keeps its seat's group. The
+core is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
 `body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
 
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
@@ -378,8 +382,8 @@ So the audit asserts two things on the finished world: **no exclave outside the 
 the remote island; and the cessions counted as recorded events, so the sim still visibly
 produces the fragmentation the rule resolves. **The rule must not starve the minors (Ben,
 2026-10-18).** The audit also reads the nations' sizes on every library seed at the default
-targets, and fails a seed whose minors' median falls below the lowest median measured before the
-strait rule (227 tiles), or whose majors hold more than 80% of the land. It is a reading of the
+targets, and fails a seed whose minors' median falls below **80% of that seed's own median
+measured before the strait rule** (Ben, 2026-10-18), or whose majors hold more than 80% of the land. It is a reading of the
 world, never a clamp on it.
 
 ### Pass 3 — Resource profile derivation
