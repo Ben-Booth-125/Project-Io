@@ -419,6 +419,17 @@
    "call": "Keep (default ON), keep but default OFF, or revert to a plain Debug bake.",
    "resolved": "2026-10-17",
    "resolution": "Ben: keep the /O2 ground-bake library in Debug, on by default (IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=ON)."
+  },
+  {
+   "id": "NR-1052",
+   "title": "BL-1382 band scaling: f(s) = 1 + (s-1)/2 by anchor scale",
+   "raised": "2026-10-18",
+   "kind": "decision",
+   "status": "open",
+   "source": "PROVINCES.md § The normalising pass",
+   "what": "Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).",
+   "why_it_matters": "It sets how much larger a city province may be than a village one, and so how many splits a world takes.",
+   "call": "Confirm, or name another scaling (e.g. linear in s, or the reach weight 60/s)."
   }
  ]
 }

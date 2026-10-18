@@ -1346,6 +1346,32 @@
    ],
    "title": "The game process peaks under 6 GB: the first visit to another body no longer crosses the ceiling",
    "design": "RENDERING.md § Resident set (Ben, 2026-10-17): the process peaks under 6 GB on every machine. BL-1311 options A+B measured 2026-10-17 (seed 0, Debug, quiet machine, --bench-ground --bench-background 150): 5.85 GB at play open, 6.13 after zoom/pan, 6.64 after the first visit to another body (its drawn body adds ~0.64 GB), 6.66 peak. The pinned home master as RGB is 5.15 GB and the rest of the process ~0.55-0.9 GB, so A+B alone cannot meet the ceiling. Options from the BL-1311 lane: C) keep the master level out of RAM, streaming it around the view from the disk cache (ground ~1.7 GB, overturns home pinned, stand-in risk at the top rung); D) 96 px master (changes the look; Ben chose 128 over 96). Ben's call between them."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-18",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-18); filed by Claude",
+   "requires": [
+    "BL-1310"
+   ],
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 4,
+   "id": "BL-1382",
+   "short_name": "PROVINCE_NORMALISING_PASS",
+   "authority_doc": "docs/generation/PROVINCES.md",
+   "files": [
+    "src/world/province_partition.cpp",
+    "src/world/population_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "tools/verify/province_partition_harness.cpp"
+   ],
+   "title": "One pass at the end of generation evens out province sizes: split the too-large, merge the too-small",
+   "design": "SETTLED: PROVINCES.md § The normalising pass (Ben, 2026-10-18). WORK: after nations are final (after the strait rule and the closing rounds) and before roads and firms, split settled land provinces above 100·f(s) land tiles (each extra piece founds a scale-1 anchor centre, pieces grown by the weighted fill inside the old province) and merge those below 24·f(s) into the same-nation same-domain neighbour sharing the most border; f(s) = 1 + (s-1)/2 by the anchor scale. Measured before (province_partition_harness, 6 seeds): settled land median 48, p90 177, max 4,929. World mover: re-run world_audit library, nation_sizes, market_viability full, history_patterns, the partition harness; report digests moved."
   }
  ]
 }

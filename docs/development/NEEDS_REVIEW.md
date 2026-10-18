@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 25 open, 4 resolved.*
+*30 entries — 26 open, 4 resolved.*
 
 ---
 
@@ -226,6 +226,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 Destinations are named slots (body + orbit|surface), tiered from the owner home body: home orbit, moon orbit, moon surface, far orbit, far surface. Launch cost: satellite 10000, rover 20000, crewed 60000, station module 40000; reach 0/8000/15000/30000/45000 + 20000 per AU (far tiers). Travel quarters 0/1/1/2/3 + floor(AU), clamped at 400 extra. Upkeep/quarter: 500/1000/3000/2000. Lost after 4 unpaid quarters (hard ceiling 64). Launch cost and upkeep are pure treasury sinks until BL-1328 (launch infrastructure) buys goods from corporations.
 
 **Why it matters.** These set how many launches a nation can afford by 2040; BL-1325 runs will show whether moon landings and stations happen at all.
+
+### NR-1052 — BL-1382 band scaling: f(s) = 1 + (s-1)/2 by anchor scale
+*decision · raised 2026-10-18 · from PROVINCES.md § The normalising pass*
+
+Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).
+
+**Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
 
 ---
 
