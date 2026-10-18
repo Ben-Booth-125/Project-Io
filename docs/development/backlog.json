@@ -1450,7 +1450,7 @@
    "design": "SPRINT 56 (Ben, 2026-10-17: 'File rail as a crossing'). FOUND delivering BL-1370: the rail track row cannot take the two-press targeting flow because w.rail_track is per TILE and lay_track(tile) names no side - rail has no crossing to aim at. The delivering lane was right to refuse the brief that called it 'the same kind of crossing' and corrected its ACTIONS entry to say it does not arm and why. THE WORK: rail becomes an edge as roads did in BL-1340 - a tier (or presence) per hex side, both tiles carrying it, the discount on the crossing, counts over edges each once, placement naming a tile and a side with the same armed two-press flow and the same crossable-side and land-end rules. A WORLD-MOVER with its own save bump and a migration (between 4-cardinal neighbours that both carried track, lay the edge), and it touches rail reach, which LOGISTICS.md already rules carries 20 tiles point-to-point delivering only at the tile it connects. Measure haulage before and after; sequence after the Logistic Point work, since rail reach feeds it."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 55,
    "written": "2026-10-17",
@@ -1467,8 +1467,8 @@
    "files": [
     "scripts/verify/lib.lua"
    ],
-   "title": "construction_ledger_tabs dies in staging: the fixture cannot afford a military base",
-   "design": "SPRINT 55 (found verifying BL-1370/1371 on main, 2026-10-17). scripts/verify/construction_ledger_tabs.lua exits 1 with ZERO assertions run - it dies in base.stage_ui_fixture (lib.lua:340, raised at :223) with 'fixture could not place a military base near the player's works: insufficient_funds'. The fixture runs up to 20 verify.econ_step(1) waiting out tech_locked and then places; the corp cannot pay by then. The delivering lane flagged it rather than claiming it pre-existing, which was right, and I could not attribute it either without a build at an older commit. CANDIDATES, in order: (1) BL-1335 taxes, merged the day before, now charge a share of operating profit every quarter the fixture steps - though the tax is floored at 0 so a loss-making fixture corp should pay nothing, which is the first thing to check; (2) the construction rate work changed what a build charges per tick; (3) market prices moved under the fixture so the base simply costs more. NOT a defect in the road or grid work: construction_progress (910), tile_card (71) and roads (31) all pass on the same build with zero failures. THE WORK: find which, then either fix the cause or fund the fixture honestly - never by widening the loop count, which would hide a real cost change."
+   "title": "construction_ledger_tabs dies in staging: its fixture is refused for want of a road, not for want of funds",
+   "design": "SPRINT 55 (found verifying BL-1370/1371 on main, 2026-10-17). scripts/verify/construction_ledger_tabs.lua exits 1 with ZERO assertions run - it dies in base.stage_ui_fixture (lib.lua:340, raised at :223) with 'fixture could not place a military base near the player's works: insufficient_funds'. The fixture runs up to 20 verify.econ_step(1) waiting out tech_locked and then places; the corp cannot pay by then. The delivering lane flagged it rather than claiming it pre-existing, which was right, and I could not attribute it either without a build at an older commit. CANDIDATES, in order: (1) BL-1335 taxes, merged the day before, now charge a share of operating profit every quarter the fixture steps - though the tax is floored at 0 so a loss-making fixture corp should pay nothing, which is the first thing to check; (2) the construction rate work changed what a build charges per tick; (3) market prices moved under the fixture so the base simply costs more. NOT a defect in the road or grid work: construction_progress (910), tile_card (71) and roads (31) all pass on the same build with zero failures. THE WORK: find which, then either fix the cause or fund the fixture honestly - never by widening the loop count, which would hide a real cost change. CORRECTED 2026-10-18, and MY FILED PREMISE WAS WRONG. The refusal is not affordability: once verify_api stopped collapsing refusals into 'failed' (see below), the message reads 'fixture could not place a military base near the player's works: needs_road' (lib.lua:249). It is the same BL-1347 gate, reached through place_near_player, which walks up to a 24-ring and is refused needs_road on every tile - so the three candidates I listed (taxes, construction rate, market prices) were all wrong, and the insufficient_funds text I quoted came from the collapsed enum, not from the treasury. THE SHAPE OF THE FIX IS A REAL DECISION, not a one-liner: roading every candidate before trying it would stamp about 2400 crossings, so the honest form is road-on-demand - try build_at, and only on needs_road road THAT tile and retry - which is correct ONLY IF needs_road is the LAST refusal can_place_in_world returns (otherwise a tile refused for the stack or the ceiling gets a road it never needed). Check that ordering first. It reaches about 20 scripts through stage_ui_fixture, so measure what roading each fixture switches on (reach discounts, and in one case the power-wire path) rather than assuming the placement is the only effect."
   },
   {
    "status": "proposed",
@@ -1520,20 +1520,19 @@
    "written": "2026-10-18",
    "parked": false,
    "blocked_on": null,
-   "author": "Claude (found by the BL-1379 lane, confirmed by the main session, 2026-10-18)",
+   "author": "Claude (found by the BL-1380 lane, 2026-10-18)",
    "requires": [],
-   "id": "BL-1380",
-   "short_name": "CONSTRUCTION_PROGRESS_BROKEN_BY_ROAD_GATE",
+   "id": "BL-1381",
+   "short_name": "VERIFY_SUMMARY_MISLABELS_FAILURES",
    "category": "Verification",
    "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/ui/ledgers/construction.md",
+   "difficulty": 1,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
    "files": [
-    "scripts/verify/construction_progress.lua",
-    "scripts/verify/lib.lua"
+    "src/core/verify_api.cpp"
    ],
-   "title": "construction_progress fails 13 assertions since the road gate landed: its fixture places a building on a roadless tile",
-   "design": "SPRINT 55 (found by the BL-1379 lane, confirmed on main by the main session, 2026-10-18). scripts/verify/construction_progress.lua was 910/0 before BL-1347 and is now 793 pass / 13 FAIL. First failure 'first extraction site placed (failed)', and every later assertion cascades off it - the queue publishes 0 grid rows, the two-line row metric reads 0.0 px against 0.0, and so on. CAUSE: BL-1347's gate refuses a building on a tile with no roaded edge, and this script's fixture places its extraction site on bare ground. The delivering lane roaded NINE headless fixtures for exactly this reason but this is a LUA visual script, not a tools/verify harness, so it was outside the set it swept - and MY OWN gate set for the road rules omitted it, which is how three items were closed with it red. The BL-1379 lane found it, checkpointed, detached to 098fa183 and reproduced it there with its own changes absent, which is the right way to attribute it. THE WORK: road the fixture's ground where it asserts a placement, the way the nine harnesses were roaded - and mind the lesson from those: roading a fixture is NOT neutral (it switches on reach discounts and in one case the power-wire path), so re-measure rather than assume, and never widen the gate to make the script pass. 13 capture goldens also diff and must be re-blessed only with Ben's go, once the assertions are green for the right reason."
+   "title": "The verify summary calls every failure a golden diff, which has now sent two readers to the wrong conclusion",
+   "design": "SPRINT 55 (found by the BL-1380 lane, 2026-10-18). verify_api.cpp:7088 prints 'verify: %d capture(s) failed golden diff, %d script error(s)' from m_verify_failures - a counter that totals verify.expect failures AND golden diffs together. So a run with 13 failed assertions and no image diff at all reports '13 capture(s) failed golden diff'. CONSEQUENCE, twice over in one day: the delivering lane started from a false premise, and so did I - BL-1380 was filed saying 13 capture goldens diffed and would need Ben's ruling on a re-bless, when construction_progress.lua has NO goldens whatsoever (all 28 of its captures log 'no golden ... (capture-only)'). A re-bless is the most authorisation-sensitive act in this project (goldens are contracts, re-blessed only with Ben's go), so a line that invents one out of a failed assertion is worse than merely imprecise. THE WORK: say what is true - count assertion failures and golden diffs separately and name them separately, e.g. 'N assertion failure(s), M golden diff(s), K script error(s)'. One line, and it stops a class of wrong triage."
   }
  ]
 }
