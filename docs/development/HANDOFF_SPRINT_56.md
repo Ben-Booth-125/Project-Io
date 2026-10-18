@@ -17,6 +17,15 @@ This note is for the session that brings the branch onto main after sprint 55 la
 | BL-1311 (ground paint perf) | Delivered; the 6 GB rest is BL-1377 (ground under six GB). |
 | Wizard footer anchored | Delivered (STARTUP.md, Ben 2026-10-16). Owes Ben's live click. |
 
+## BLOCKER found at the live click (2026-10-18): BL-1310 starves minors
+
+At 20/4 on the 16 library seeds (tools/verify/nation_sizes.cpp), the pre-BL-1310 tree keeps
+minors at a median of 227-644 tiles; with BL-1310, 8 of 16 seeds collapse to remnants (median
+4-22 tiles) and on seeds 0 and 31 one or two majors hold 99% of the land. Round 2 (445195b9,
+before the seat ruling) already collapses, so the cause is the cession step itself, not the
+seat ruling, the floor or the total (no secessions ran). Options are with Ben; **do not
+integrate BL-1310 until it is fixed and nation_sizes reads healthy.**
+
 ## Integration steps, in order
 
 1. **Merge main into the branch, not the other way first**, and resolve there.
