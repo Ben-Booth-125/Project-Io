@@ -381,6 +381,17 @@
    "call": "A) skip the player's nation in the scorer and give it a fixed default budget until a budget control exists; B) keep scoring it as a stand-in and record that as a dated exception in § 11; C) build the player's budget control now.",
    "resolved": "2026-10-16",
    "resolution": "Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11."
+  },
+  {
+   "id": "NR-1049",
+   "title": "BL-1352 (one LP system): three readings taken so a march could draw the nation's pool",
+   "raised": "2026-10-18",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1352 build, main session",
+   "what": "The march now draws Logistic Points and claims ahead of production. Four readings the doc does not settle, each cheap to change. (1) WHOSE POOL - THE MOVER'S. A corporation's march draws its HOME NATION's points, a nation's garrison its own; never the pool of the ground it stands on. The first cut read the ground's nation and a cold review caught both consequences: a unit whose points ran out on unowned wilderness could never be granted again (a refusal moves nothing, so it re-fired for ever and the unit was stranded for good), and a unit invading another nation drew ITS VICTIM's pool, starving the defender's industry to fund the attack. LOGISTICS.md's 'Movement a player or rival DIRECTS' is the reading taken. The alternative - the ground's nation, with a stranding escape and a foreign-ground rule - is a real design and is Ben's if he wants it. (2) NO REACH TEST ON A MARCH - a unit draws its own nation's pool at full strength wherever it stands, because the off-network military reach is still 'military detail later' (LOGISTICS.md). (3) THE CLAIM IS GATHERED BEFORE THE BATTLE PHASE - the resolve runs at tick phase 4 and the march at phase 11, with battles at 10, so a unit killed in battle has already consumed its nation's points for that tick; the alternative is resolving the pool twice a tick. (4) THE EXCHANGE RATE IS UNCHANGED - one point admits one march-point of movement (infantry 1.0, cavalry 1.5 a tick) against a production need of 10 per unit of run, so a 50-unit army asks for ~60 points of a pool measured in the hundreds. Nothing measured says a soldier-tick and a unit of grain burden a nation equally; the old per-anchor rate (20/tick at every city) carried the same assumption.",
+   "why_it_matters": "Reading 4 decides whether 'guns, butter and freight compete in one currency' is felt at all: at these numbers a march is a rounding error against production, which is the opposite of the campaign-starves-its-industry cost the doc describes. Reading 1 is the one that changes what a war looks like - who pays for an invasion's logistics. The 2040 spectator run is the measurement that should settle 4.",
+   "call": "Accept the four, or name the one to move - most likely the march's weight (4), once the 2040 run shows what an army actually costs a nation."
   }
  ]
 }

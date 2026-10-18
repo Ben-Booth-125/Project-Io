@@ -156,10 +156,26 @@ struct warm_read
     lp_anchor_field field;             ///< the warm field (the cached one when reused)
 };
 
+/// THE ANCHOR POOL THIS HARNESS FEEDS THE FIELD (BL-1352). `active_lp_anchor_pools`
+/// built this map and was retired with the second Logistic Point system it belonged to;
+/// `body_lp_anchor_field` - the subject of this check - survives, because BL-1361 needs
+/// "which anchor does a shipment leave from". Only the KEY SET reaches the field, so the
+/// harness builds that key set itself from the public predicate (`is_supply_anchor`),
+/// walking the body's RASTER grid so the order is a pure function of the body, exactly
+/// as the retired generator did.
+std::unordered_map<entity_id, float> anchor_pool_of(world& w, entity_id body)
+{
+    std::unordered_map<entity_id, float> pool;
+    for (const entity_id tid : body_tile_grid(w, body))
+        if (tid != null_entity && is_supply_anchor(w, tid))
+            pool.emplace(tid, 1.0f);
+    return pool;
+}
+
 warm_read take_warm_read(world& w, entity_id body)
 {
     warm_read r;
-    const std::unordered_map<entity_id, float> pool = active_lp_anchor_pools(w, body, 1.0f);
+    const std::unordered_map<entity_id, float> pool = anchor_pool_of(w, body);
     if (pool.empty())
         return r;
     r.anchored  = true;
@@ -172,9 +188,10 @@ warm_read take_warm_read(world& w, entity_id body)
 body_rows check_body(world& w, entity_id body, std::uint32_t seed, bool brute, const warm_read& wr)
 {
     body_rows out;
-    // The tick's pool: `active_lp_anchor_pools` is what lp_pool_for_body builds
-    // each tick (any positive rate: only the KEY SET reaches the field).
-    const std::unordered_map<entity_id, float> pool = active_lp_anchor_pools(w, body, 1.0f);
+    // The tick's pool (anchor_pool_of, above: the same key set, from the public
+    // predicate now the retired generator is gone - only the KEY SET reaches the
+    // field, so the rate is a placeholder 1.0).
+    const std::unordered_map<entity_id, float> pool = anchor_pool_of(w, body);
     if (pool.empty())
         return out;
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
@@ -464,9 +481,23 @@ int main(int argc, char** argv)
         }
         std::printf("  F1 counted on %d of %d anchored body(ies) (a warm field the ticks built and "
                     "the read reused)\n", f1_bodies, anchored_bodies);
-        check(all.f1 && f1_bodies > 0,
-              "F1 the ticks' own nearest-anchor field is identical after invalidate_logistics_caches",
-              seed);
+        // F1 ASKS ABOUT A FIELD THE TICKS BUILT, AND SINCE BL-1352 THE TICKS BUILD NONE.
+        // The march was this field's only live consumer (it looked up its nearest anchor
+        // every tick); the march now draws its nation's pool instead, so a play year
+        // leaves no cached field for the warm read to compare against, and F1 has no
+        // subject rather than a failing one. BL-1361 (a shipment draws points at the
+        // anchor it leaves) is the consumer that gives it one back, and BL-1384 carries
+        // restoring the row. It is reported LOUDLY either way: counted and compared when
+        // a field exists, named as uncountable when none does - never quietly passed,
+        // which is the BL-714 rule (a check that never looked is not a pass).
+        if (f1_bodies > 0)
+            check(all.f1,
+                  "F1 the ticks' own nearest-anchor field is identical after invalidate_logistics_caches",
+                  seed);
+        else
+            std::printf("  SKIP: F1 has no subject - no live consumer builds the nearest-anchor "
+                        "field since BL-1352 retired the march's anchor draw (BL-1384 restores "
+                        "this row with BL-1361's shipment draw) (seed %u)\n", seed);
         check(all.f3, "F3 answering from cold builds no per-anchor flood field and no pair", seed);
         if (brute)
         {

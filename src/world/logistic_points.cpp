@@ -211,7 +211,7 @@ using field_key = std::tuple<entity_id, int, entity_id>; // nation, network, bod
 
 } // namespace
 
-lp_tick resolve_logistic_points(world& w)
+lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& marches)
 {
     lp_tick out;
     resolver_input in;
@@ -230,21 +230,56 @@ lp_tick resolve_logistic_points(world& w)
         if (tit == w.tiles.end())
             continue;
         const entity_id nation = host_nation(w, b.tile);
-        out.sources.push_back({bid, b.tile, nation, net});
-        if (nation == null_entity)
-            continue; // nobody's ground: adds to no pool
-        lp_nation_row& r = rows[nation];
-        r.nation = nation;
         const std::size_t ni = static_cast<std::size_t>(net);
         // Ben 2026-10-14: a source makes points IN PROPORTION to the upkeep
         // goods it receives (half its stone, half its points), never zeroed
         // outright — the building's upkeep supply factor (BL-641), linear.
-        r.made[ni] += lp_source_points[ni] * building_supply_scalar(b);
+        const float made = lp_source_points[ni] * building_supply_scalar(b);
+        out.sources.push_back({bid, b.tile, nation, net, made});
+        if (nation == null_entity)
+            continue; // nobody's ground: adds to no pool
+        lp_nation_row& r = rows[nation];
+        r.nation = nation;
+        r.made[ni] += made;
         ++r.sources[ni];
         seeds[{nation, static_cast<int>(net), tit->second.body}].push_back(b.tile);
     }
     for (auto& [nid, r] : rows)
         r.pool = r.made[0] + r.made[1] + r.made[2];
+
+    // 1b. THE MARCH CLAIMS FIRST (BL-1352; LOGISTICS.md § How a tile's points get to
+    // it). The claims arrive in the march pass's own order, and each is served whole
+    // or refused — a half-fed march is not a thing the movement rule can spend — so
+    // what production claims against below is `pool - march_granted`, not `pool`.
+    // A claim on nobody's ground, or on a nation with no pool at all, is refused;
+    // nothing about that unit moves, exactly as a building there produces nothing.
+    for (const lp_march_claim& m : marches)
+    {
+        lp_march_row mr;
+        mr.unit   = m.unit;
+        mr.nation = m.nation;
+        mr.need   = m.need;
+        if (m.nation != null_entity && m.need > 0.0f)
+        {
+            // The row is created if this nation has none yet: a nation with no sources
+            // still ASKED, and `march_claim` is the ledger of what was asked. Its pool
+            // is 0, so the claim is granted nothing and production - which creates its
+            // own row at step 2 - sees exactly what it saw before (cold review).
+            //
+            // `march_granted` IS the running total, so what is left is the pool minus
+            // it — no second accumulator to keep in step with it.
+            lp_nation_row& r = rows[m.nation];
+            r.nation = m.nation;
+            r.march_claim += m.need;
+            if (m.need <= (r.pool - r.march_granted) + 1e-6f)
+            {
+                r.march_granted += m.need;
+                mr.granted = m.need;
+            }
+        }
+        out.marches.push_back(mr);
+        out.march_granted[mr.unit] = mr.granted;
+    }
 
     // 2. Consumers: need, coverage, class.
     std::map<field_key, std::unordered_map<entity_id, float>> fields;
@@ -307,7 +342,11 @@ lp_tick resolve_logistic_points(world& w)
         if (!rule)
         {
             const float total = r.claim[0] + r.claim[1] + r.claim[2];
-            const float f = total > 0.0f ? std::min(1.0f, r.pool / total) : 0.0f;
+            // BL-1352: what the march left. A nation row created by a CONSUMER below
+            // (no sources, so no row at 1b) has pool 0 and granted 0, so this is 0 for
+            // it exactly as `pool` was before the march joined.
+            const float avail = std::max(0.0f, r.pool - r.march_granted);
+            const float f = total > 0.0f ? std::min(1.0f, avail / total) : 0.0f;
             g.fill(f);
             for (std::size_t k = 0; k < lp_class_count; ++k)
                 r.granted[k] = r.claim[k] * f;
@@ -319,7 +358,7 @@ lp_tick resolve_logistic_points(world& w)
             float surplus = 0.0f, short_total = 0.0f;
             for (std::size_t k = 0; k < lp_class_count; ++k)
             {
-                const float alloc = r.pool * sh[k];
+                const float alloc = std::max(0.0f, r.pool - r.march_granted) * sh[k];
                 base[k]      = std::min(alloc, r.claim[k]);
                 surplus     += std::max(0.0f, alloc - r.claim[k]);
                 shortfall[k] = r.claim[k] - base[k];

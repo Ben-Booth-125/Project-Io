@@ -11,7 +11,7 @@
 // (`price_trade_leg`, `commit_trade_shipment`); this file decides what ships.
 
 #include "economy_system.hpp" // economy_report: the want/fill registers a trade buys through
-#include "logistics.hpp"      // lp_pool_map
+#include "logistics.hpp"      // the network: legs, reach, anchor pathing
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
@@ -146,7 +146,7 @@ void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nod
 /// The player's shipments are recorded for the Trade-flow lens
 /// (`world::player_trade_flow`). Deterministic: sorted walks only.
 ///
-/// @param shared_lp_pools  The tick's shared Logistic Point pool (the march
-///                         drew first). Null: a private pool for this pass.
-trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& report,
-                      lp_pool_map* shared_lp_pools = nullptr);
+/// BL-1352: the retired per-anchor Logistic Point pool this pass used to be handed
+/// is gone (logistics.hpp says why), and nothing here drew it. BL-1361 revives a
+/// shipment's draw, by cargo quantity, against the NATION's pool.
+trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& report);

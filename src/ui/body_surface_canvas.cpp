@@ -17,6 +17,7 @@
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
+#include "world/logistic_points.hpp" // BL-1352: the Throughput lens reads the REAL sources
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
 #include "world/river_generation.hpp"   // BL-1340: hex_side_for_offset — a road draws across its edge
@@ -1489,14 +1490,14 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     float x, y, bar_w;
     begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Throughput (active LP)"); // fit-exempt: legend box sized to its measured entries (container 2)
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Throughput (Logistic Points)"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + (have ? 4.0f : 6.0f);
 
     if (!have)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No anchor generates"); // fit-exempt: legend box sized to its measured entries (container 2)
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No source makes"); // fit-exempt: legend box sized to its measured entries (container 2)
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "active LP on this body."); // fit-exempt: legend box sized to its measured entries (container 2)
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "Logistic Points here."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
@@ -1511,11 +1512,12 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     }
     y += bar_h + 2.0f;
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "far"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const ImVec2 nts = ImGui::CalcTextSize("at anchor");
-    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), "at anchor"); // fit-exempt: legend box sized to its measured entries (container 2)
+    const ImVec2 nts = ImGui::CalcTextSize("at source");
+    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), "at source"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
 
-    // Row 2 — the anchor MARK, carrying the LP quantity itself. Two ramps in one
+    // Row 2 — the SOURCE MARK, carrying the points quantity itself. BL-1352: these
+    // are hubs, stations and ports, never cities, and the words say so. Two ramps in one
     // key because the lens genuinely shows two things: where capacity is, and how
     // far the ground is from it. The mark is drawn here exactly as the map draws
     // it (ring, dark backing included) so the legend shows the treatment, not a
@@ -1524,13 +1526,13 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     dl->AddCircle({x + mr + 1.0f, y + mr}, mr, IM_COL32(10, 18, 30, 220), 18, 4.0f);
     dl->AddCircle({x + mr + 1.0f, y + mr}, mr, throughput_anchor_colour(1.0f), 18, 2.0f);
     char per[48];
-    std::snprintf(per, sizeof(per), "anchor: %.0f LP/tick", state.lp_anchor_max);
+    std::snprintf(per, sizeof(per), "source: %.0f pts/tick", state.lp_anchor_max);
     dl->AddText({x + mark_d + 8.0f, y + (mark_d - line_h) * 0.5f}, // fit-exempt: legend box sized to its measured entries (container 2)
                 IM_COL32(235, 235, 235, 255), per);
     y += std::max(line_h, mark_d) + 4.0f;
 
     char totals[64];
-    std::snprintf(totals, sizeof(totals), "%d anchors - %.0f LP/tick total",
+    std::snprintf(totals, sizeof(totals), "%d sources - %.0f pts/tick total",
                   static_cast<int>(state.lp_anchors.size()), state.lp_anchor_total);
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), totals); // fit-exempt: legend box sized to its measured entries (container 2)
 }
@@ -1996,8 +1998,16 @@ entity_id resolve_structure_hit(const std::vector<structure_hit_zone>& zones,
 
 } // namespace
 
-void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg)
+void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg,
+                            const lp_tick& resolved)
 {
+    // IT READS THE TICK'S OWN RESOLVE, IT DOES NOT RUN ONE (BL-1352). The economy
+    // step already resolves this tick's Logistic Points and the report carries the
+    // answer, so the lens reads @p resolved — a walk over its source rows, no
+    // Dijkstra. A resolve costs a bounded flood per (nation, network, body), which
+    // is affordable once a tick in the sim and not affordable again per frame: the
+    // first cut of this read did resolve its own, and a verify run of the lens went
+    // from seconds to not finishing.
     state.lp_anchors.clear();
     state.lp_anchor_total = 0.0f;
     state.lp_anchor_max   = 0.0f;
@@ -2011,18 +2021,66 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     if (state.overlay != overlay_mode::throughput || state.active_body == null_entity)
         return;
 
-    // Fresh every call, never cached and never stored on `world` — the contract
-    // active_lp_anchor_pools states in its own doc comment. `world&` is needed
-    // only because it may populate the RASTER INDEX cache (body_tile_grid); it
-    // runs no Dijkstra and no A*, so the cost of a miss here is one grid build,
-    // not a reach-field rebuild. The reach field the tile pass reads is warmed
-    // separately by app.cpp, one call before the draw.
-    const std::unordered_map<entity_id, float> pools =
-        active_lp_anchor_pools(w, state.active_body, reg.military().active_lp_per_anchor_tick);
+    // BL-1352: THE REAL SOURCES, and only those. This read used to be
+    // `active_lp_anchor_pools` — a flat rate at every population centre, port and
+    // hub, from a Logistic Point system that had already been retired — so the lens
+    // showed cities supplying logistics while the economy ran on a different model
+    // entirely, and that is what Ben saw in play. What it shows now is what
+    // `resolve_logistic_points` resolves: each running hub, station and port on this
+    // body with the points it actually makes, its upkeep shortfall already folded in.
+    // Cities make none and so appear nowhere.
+    //
+    // The surface itself — per-tile numbers, the player's own nation, the taglines
+    // dropped — is BL-1353's; this item only stops the lens drawing a quantity that
+    // does not exist. The field ramp below is still PLACEMENT's reach field, which
+    // is a different question again, and BL-1353 owns replacing it.
+    //
+    // What lands in `ui_state` is a photograph of the last resolved tick, retaken
+    // every frame from the report — never banked, never fed back to the sim.
+    (void)reg;
 
-    state.lp_anchors.reserve(pools.size());
-    for (const auto& [tile, lp] : pools)
-        state.lp_anchors.push_back({ tile, lp });
+    // BEFORE THE FIRST ECONOMY STEP the report holds no resolve, and a world that
+    // has not ticked still has its generated hubs: a capture of the lens on the
+    // 1960 start read "No source makes Logistic Points here", which is a worse lie
+    // than the one this item came to fix. So an empty report falls back to ONE
+    // resolve — guarded by the frame stamp `update_body_vision` uses, which carries
+    // `current_day_tick`, the building count and the logistics generation, so a
+    // paused game resolves once rather than once a frame.
+    static body_frame_stamp s_fallback_stamp;
+    static lp_tick          s_fallback;
+    const lp_tick* chosen = &resolved;
+    if (resolved.sources.empty() && resolved.nations.empty())
+    {
+        const body_frame_stamp stamp = make_body_frame_stamp(w, state.active_body);
+        if (stamp != s_fallback_stamp)
+        {
+            s_fallback_stamp = stamp;
+            s_fallback       = resolve_logistic_points(w);
+        }
+        chosen = &s_fallback;
+    }
+    const lp_tick& lp = *chosen;
+    state.lp_anchors.reserve(lp.sources.size());
+    for (const lp_source_row& src : lp.sources)
+    {
+        // A source on NOBODY'S GROUND feeds no nation's pool (logistic_points.cpp), so
+        // drawing its ring would be the very lens-versus-economy disagreement this item
+        // came to end (cold review).
+        if (src.nation == null_entity)
+            continue;
+        const auto tit = w.tiles.find(src.tile);
+        if (tit == w.tiles.end() || tit->second.body != state.active_body)
+            continue;
+        // ONE MARK A TILE. A tile can carry a hub AND a station; the mark is read back
+        // by a lower_bound on the tile, so two rows for one tile would show one of them
+        // and count both. They are summed instead, which is what the tile makes.
+        const auto at = std::find_if(state.lp_anchors.begin(), state.lp_anchors.end(),
+                                     [&](const ui_state::lp_anchor& a) { return a.tile == src.tile; });
+        if (at != state.lp_anchors.end())
+            at->lp += src.made;
+        else
+            state.lp_anchors.push_back({ src.tile, src.made });
+    }
 
     // SORT BEFORE REDUCING. `pools` is an unordered_map, so both the legend's
     // total and the draw's lower_bound would otherwise depend on hash layout —

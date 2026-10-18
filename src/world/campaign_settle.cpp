@@ -4,7 +4,7 @@
 #include "world/corp_command.hpp"      // run_firm_exits
 #include "world/economy_system.hpp"    // run_economy_step
 #include "world/hard_coded_world.hpp"  // generation_progress
-#include "world/logistics.hpp"         // lp_pool_map
+#include "world/logistics.hpp"         // the network: reach and traversal cost
 #include "world/market_clearing.hpp"   // clear_markets
 #include "world/nation_step.hpp"       // run_nation_step
 #include "world/nation_tech.hpp"       // clear_research_at_handover (BL-1273)
@@ -45,7 +45,6 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // pass (active) so the two genuinely contend for one anchor's capacity,
     // per LOGISTICS.md's bifold table. Local to this tick; never persisted
     // (LP is a per-tick RATE, ruling on NR-343).
-    lp_pool_map tick_lp_pools;
     // BL-1066 / BL-995 (Ben, 2026-09-23): the convoy ORDER within the tick is
     // advance -> credit arrivals -> economy -> DISPATCH -> clearing -> budget
     // (SUPPLY.md § A shipment, "One beat per haul"). A delivery lands
@@ -62,13 +61,13 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // through which nobody is seated yet -- the strategic tier evaluates every
     // corp, the player's included: the prohibition the flag lifts has no
     // subject to protect, and every corp files real returns.
-    out.report = run_economy_step(w, reg, spectating, &tick_lp_pools);
+    out.report = run_economy_step(w, reg, spectating);
     // BL-1266 (TRADE.md): the trade pass, BEFORE the clear -- a trade buys on
     // its source shelf this tick and the clear bills it at the posted price. It
     // draws the same tick's LP pool the march (inside run_economy_step) already
     // drew from: armies claim first (the goods-vs-force priority LOGISTICS.md
     // says must be chosen, not inherited).
-    out.trades = run_trades(w, reg, out.report, &tick_lp_pools);
+    out.trades = run_trades(w, reg, out.report);
     lap_done(1); // economy step (production + corp AI) + trade
 
     out.flows = clear_markets(w, reg, out.report);

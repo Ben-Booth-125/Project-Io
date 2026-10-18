@@ -345,7 +345,6 @@ int main()
         // subject is the seam's verb contract, not BL-597's admissibility gate,
         // so the gate is set up to never bind here.
         military_capability_params mp = reg.military();
-        mp.active_lp_per_anchor_tick = 1.0e6f;
         reg.set_military(mp);
         // BL-1266: iron moves k_cap units per trade point; a Marketplace makes
         // one point per unit of effective workforce.

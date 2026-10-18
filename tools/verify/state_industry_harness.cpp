@@ -511,14 +511,13 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         world& t = w;
         const int tick = next_tick++;
         t.current_econ_tick = tick;
-        lp_pool_map pools;
         advance_convoys(t);
         credit_arrived_convoys(t, 90);
         const auto T0 = treasuries(t);
         const std::size_t dec0 = t.ai_decisions.total;
-        economy_report r = run_economy_step(t, reg, /*spectating=*/false, &pools);
+        economy_report r = run_economy_step(t, reg, /*spectating=*/false);
         const auto T1 = treasuries(t);
-        (void)run_trades(t, reg, r, &pools);
+        (void)run_trades(t, reg, r);
         const auto T2 = treasuries(t);
         auto flows = clear_markets(t, reg, r);
         const auto T3 = treasuries(t);

@@ -240,7 +240,6 @@ int main()
     };
     auto make_haul = [](haul_fixture& f) {
         military_capability_params mil = f.reg.military();
-        mil.active_lp_per_anchor_tick = 1000.0f; // the cap is not under test here
         f.reg.set_military(mil);
         f.corp = f.w.create_entity();
         corporation_component cc{}; cc.is_player = true; cc.balance = 1000.0f;

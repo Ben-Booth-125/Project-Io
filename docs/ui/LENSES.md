@@ -1012,9 +1012,16 @@ here, over the reach-cost field the network itself produces.
   `tile_reach_cost` — the weighted cost from that tile to its nearest supply
   anchor. The Reach rule spends this field as a *binary placement predicate*
   (reachable / not); the lens spends the quantity the predicate throws away.
-- The **magnitude** is `active_lp_anchor_pools` — this tick's active Logistic
-  Points at every supply anchor (a city, or a built and active port or inland
-  hub), at the authored `active_lp_per_anchor_tick`.
+- The **magnitude** is the tick's own **Logistic Point sources** — each running
+  logistics hub, railway station and port with the points it actually makes, its
+  upkeep shortfall folded in, read off the economy step's resolve rather than
+  recomputed here. **A city is not a source and carries no mark**
+  (`LOGISTICS.md` § Logistic Points, "Cities make none"), and neither is a source
+  standing on ground no nation holds, which feeds no pool.
+
+  The **field** below is still the reach cost, which is a different question from
+  the points a tile is served — saying which is what BL-1353 (the lens rework)
+  owns.
 
 **Why the field is the reach cost and not "the LP serving this tile".** Because
 the second is a constant, measured rather than assumed: on the home body every

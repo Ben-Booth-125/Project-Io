@@ -303,7 +303,6 @@ int main()
         scenario s = make_scenario();
         recipe_registry reg;
         military_capability_params mp = reg.military();
-        mp.active_lp_per_anchor_tick = 1.0e6f;
         reg.set_military(mp);
 
         s.w.markets.at(s.market_a).inventory[r_iron] = 100.0f;

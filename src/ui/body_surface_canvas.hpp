@@ -76,15 +76,24 @@ float planetary_tilt_sy(float zoom);
 /// @param now_days Current continuous sim time in elapsed days (stored as the beam clock).
 void update_body_vision(world& w, ui_state& state, double now_days);
 
-/// Refresh the Throughput lens's active-LP anchor pools for state.active_body
+/// Refresh the Throughput lens's Logistic Point sources for state.active_body
 /// (BL-606; LOGISTICS.md § Logistic Points). A no-op unless that lens is active.
+///
+/// BL-1352: the sources are the REAL ones — running hubs, stations and ports with the
+/// points they make — read from the tick's OWN resolve (@p resolved, the economy
+/// report's `logistic_points`). It used to read the retired per-anchor pool, which put
+/// a rate on every city and is why the lens disagreed with the economy. The surface
+/// rework is BL-1353's.
+///
+/// It must not resolve its own: a resolve is a bounded flood per (nation, network,
+/// body) and belongs to the tick, not to the frame.
 ///
 /// Here, and non-const, for exactly the reason update_body_vision is: the draw
 /// holds a `const world&` and must not be the thing that populates a cache.
-/// `active_lp_anchor_pools` is pure and uncached — it takes a mutable world only
-/// because it may build the body's raster index — so this runs no Dijkstra and
-/// no A*, and the reach field the lens's tile pass reads through the const
-/// `tile_reach_cost` is warmed by the caller (app.cpp) a line earlier.
+/// The resolve is pure and uncached, and takes a mutable world only because it may
+/// build the body's raster index and the sources' distance fields; the PLACEMENT
+/// reach field the lens's tile pass reads through the const `tile_reach_cost` is
+/// warmed by the caller (app.cpp) a line earlier.
 ///
 /// LP IS A PER-TICK RATE, NEVER A STOCK. What lands in `ui_state` is derived VIEW
 /// state on the same footing as permanent_vision: rebuilt from scratch on every
@@ -94,7 +103,12 @@ void update_body_vision(world& w, ui_state& state, double now_days);
 ///
 /// @param w      World (non-const: the anchor enumeration may build the raster index).
 /// @param state  Shared UI state; lp_anchors and its two reductions are rebuilt.
-/// @param reg    Recipe registry — the authored `military().active_lp_per_anchor_tick`.
-void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg);
+/// @param reg    Recipe registry. Unused since BL-1352 (the retired per-anchor rate
+///               was the only thing read from it); kept so the call site is stable.
+/// @param resolved This tick's resolved Logistic Points (the economy report's). Before
+///               the first economy step it is empty, and the lens then shows no source,
+///               which is the truth about a world that has not ticked.
+void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg,
+                            const lp_tick& resolved);
 
 } // namespace ui

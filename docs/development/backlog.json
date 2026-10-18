@@ -985,7 +985,7 @@
    "design": "SPRINT 55 (Ben, 2026-10-16): \"We can add provisional techs for market pull and approve them later.\" The nodes grant the market-pull modifier BL-1346 reads, and unlock the building family in BL-1349. PROVISIONAL by Ben's own word: file them as the tree's placeholder kind (RESEARCH.md section The grammar of an age's tree) so the tree stays honest about what is authored and what is pending approval. The store is canonical - add them with node tools/session/tech_tree_store.js and re-render DIGITISATION_TREE.md's tables from it; never hand-edit the mirror, and run tech_tree_store.js --check after. Report the node count (160 before) and which branch each node joins."
   },
   {
-   "status": "proposed",
+   "status": "designed",
    "glyph": "○",
    "sprint": 55,
    "written": "2026-10-16",
@@ -1436,6 +1436,51 @@
    ],
    "title": "A newly built road reads as connected in every direction, though the build is pairwise",
    "design": "SPRINT 55. BEN, in play on 2026-10-18: \"It looks like roads are still rendered as adjoining even if the build is pairwise. When I build a new road tile, I see it connect in all possible directions, not just the direction it was built in.\" WHAT THE CODE SAYS, read the same day: the simulation is right - construction.cpp's lay_road_edge raises ONE crossing (both halves of that one edge), and BOTH draw paths gate on the edge mask, not on the neighbour: body_surface_canvas's draw_network skips a direction where road_tier_on_side is 0 ('nothing is laid across THIS boundary'), and the bake's road_links_of does the same before tile_pieces. So the all-directions read is NOT the two paths disagreeing with the mask, and three candidate causes remain, in order of likelihood: (1) the ARMED HIGHLIGHT persists after the lay, so the legal crossings still drawn around the new tile read as built road (BL-1370's highlight, drawn by the same press); (2) the NEIGHBOUR already carried generated edges on its other sides, so the junction genuinely connects several ways and only the new edge is new; (3) a stale bake chunk re-derived from road rather than road_sides. THE WORK: reproduce live at the zoom Ben was at, name which of the three it is, and fix that one - it is a visual triage item, so the live look comes before any code. It matters beyond itself because BL-1353's lens honesty rests on the road picture being true."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-18",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (found running the gates for BL-1352, 2026-10-18)",
+   "requires": [],
+   "id": "BL-1383",
+   "short_name": "LP_POOL_HARNESS_V49_ROW_RED",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/lp_pool_harness.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "lp_pool_harness's L7 old-version row has been red since roads became edges",
+   "design": "SPRINT 55 (found running BL-1352's gates, 2026-10-18; NOT caused by it - that change touches no serialisation and save_roundtrip is green). lp_pool_harness reads 18 pass, 1 fail: 'L7 a v49 stream reads, every nation on the mechanical default'. CAUSE, read in the code rather than guessed: the row FABRICATES an old stream by writing a CURRENT snapshot, truncating the trailing share/space/tax sections, and overwriting the version word with k_world_save_version_pre_lp (49). That worked while the tile RECORD was version-independent. BL-1340 (v53) made it version-dependent - r_tile_v reads a u16 road_edges at the current version and a u8 legacy road_level below it - so a v53 body of bytes labelled v49 desyncs at the first tile and the reader refuses the whole stream. The assertion is therefore failing for a true reason: that stream is not a v49 stream. THE FIX is to produce a REAL old stream the way BL-1340 already does for its own case - world_save.cpp has write_world_snapshot_pre_road_edges / write_world_snapshot_at for exactly this - rather than relabelling bytes, and NOT to relax the row. Worth doing because the row guards a real migration (a pre-LP save must load with every nation on the mechanical share default) and a red row nobody owns is how a gate set rots."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-18",
+   "parked": false,
+   "blocked_on": "BL-1361",
+   "author": "Claude (BL-1352, 2026-10-18)",
+   "requires": [
+    "BL-1361"
+   ],
+   "id": "BL-1384",
+   "short_name": "ANCHOR_FIELD_F1_HAS_NO_CONSUMER",
+   "category": "Verification",
+   "priority": "C",
+   "difficulty": 1,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "tools/verify/lp_anchor_field_check.cpp"
+   ],
+   "title": "lp_anchor_field_check's F1 row lost its subject when the march stopped reading the anchor field",
+   "design": "SPRINT 55, from BL-1352. F1 asks whether the field THE TICKS BUILT survives invalidate_logistics_caches - a question that needs a live consumer to have built one. The march was that consumer (it looked up its nearest anchor every tick); BL-1352 moved the march onto the nation's pool, so a play year now leaves no cached field and F1 is counted on 0 of 1 anchored bodies. It is reported as a loud SKIP naming this item rather than passed quietly (BL-714: a check that never looked is not a pass) and rather than failed, since there is no failure - there is no subject. THE WORK, once BL-1361 lands (a shipment draws points at the anchor it leaves, which reads this same field): turn the SKIP back into the assertion, and check that the warm field the trade pass builds is the one the read reuses. If BL-1361 ends up reading something else entirely, retire F1 and say so in the harness header."
   }
  ]
 }

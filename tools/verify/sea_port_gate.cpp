@@ -807,7 +807,6 @@ int main()
         // R1's port-less cases are refused by `price_convoy_leg` before the LP
         // gate is ever reached, so their `rejected_placement` reason is unchanged.
         military_capability_params mp = reg.military();
-        mp.active_lp_per_anchor_tick = 1.0e6f;
         reg.set_military(mp);
     }
 

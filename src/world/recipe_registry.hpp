@@ -837,15 +837,12 @@ struct military_capability_params
     /// class entry — the hook, not the composite logic.
     std::array<float, unit_class_count> march_points_per_class = {};
 
-    /// BL-596 (LP_ACTIVE_MARCH, LOGISTICS.md § Logistic Points): active LP
-    /// generated per supply anchor per tick, in the SAME units as a march
-    /// point (`march_points_per_class` above) — one active LP admits exactly
-    /// one march-point's worth of a unit's movement this tick, so the cap and
-    /// the thing it caps share a scale rather than needing a conversion
-    /// factor. Zero (the default) means no active LP exists anywhere, which
-    /// refuses every march — economy.lua sets the real first-cut rate.
-    /// Authored under `economy.military.active_lp_per_anchor_tick`.
-    float active_lp_per_anchor_tick = 0.0f;
+    // RETIRED (BL-1352): `active_lp_per_anchor_tick`, the per-anchor rate of the
+    // second Logistic Point system. A march now draws the HOST NATION's pool —
+    // made by hubs, stations and ports, consumed by production, claimed first by
+    // the march (logistic_points.hpp) — so there is no second rate to author. The
+    // exchange is unchanged: one point admits one march-point's worth of movement,
+    // which is the scale `march_points_per_class` above is already in.
 
     /// BL-596: credits charged per (active-LP-unit x head) an active march
     /// draws — "it should cost actual money to resolve LP usage... moving

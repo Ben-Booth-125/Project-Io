@@ -10,7 +10,8 @@
 #include "network_upkeep.hpp"  // network_purchase (BL-643)
 #include "corp_command.hpp"    // firm_exit_record (BL-743)
 #include "logistic_points.hpp" // BL-1309: lp_tick
-#include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
+#include "logistics.hpp"     // the network: traversal cost, reach, the anchor set
+#include "logistic_points.hpp" // BL-1352: lp_tick, lp_march_claim — the one LP system
 #include "world.hpp"
 
 #include <algorithm>
@@ -549,17 +550,13 @@ struct economy_report
 /// @param spectating BL-409: when true the session has no human seat, so the
 ///        strategic tier evaluates EVERY corp including `w.player_entity`.
 ///        Defaulted so no existing caller (harnesses included) changes.
-/// @param shared_lp_pools BL-597: forwarded to `run_unit_march`'s own
-///        parameter of the same name — see that function's doc comment. Null
-///        (the default) keeps every existing caller's behaviour byte-for-byte
-///        unchanged (a private, always-fresh pool per call, as BL-596 built
-///        it); the real per-tick driver (app.cpp/main.cpp) passes the SAME
-///        `lp_pool_map` it handed `dispatch_convoys` moments earlier this
-///        tick, so active and passive draws genuinely contend.
 /// @return    The step report (building states + auto-bought shortfalls).
+///
+/// BL-1352: the step resolves this tick's Logistic Points itself — the marching
+/// claims first, then production's grants on what is left — so no caller hands it a
+/// pool any more. The legacy per-anchor pool (`lp_pool_map`) is gone with it.
 economy_report run_economy_step(world& w, const recipe_registry& reg,
-                                bool spectating = false,
-                                lp_pool_map* shared_lp_pools = nullptr);
+                                bool spectating = false);
 
 /// THE ECONOMY STEP'S PHASE CLOCK (BL-1117, settle tick one) -- REPORTED ONLY.
 /// One settle tick of the twelve cost 30-40x the others, and the lap clock
@@ -819,47 +816,45 @@ bool corp_is_mobilised(const world& w, entity_id corp);
 /// the "deterministic priority over a sorted set" LOGISTICS.md's Refusal
 /// section calls for, reused rather than re-invented.
 ///
-/// BL-596 (LOGISTICS.md § Logistic Points): before spending march points, a
-/// unit draws against its NEAREST supply anchor's active-LP pool for this
-/// tick (`active_lp_anchor_pools`, logistics.hpp — a fresh, uncached map per
-/// body, decremented as this pass's units draw from it; never persisted,
-/// because LP is a per-tick RATE, never a stock). "Nearest" is NOT specified
-/// by LOGISTICS.md for a mid-route unit — this is a reasoned interpretation:
-/// the anchor with the lowest `intra_body_path` cost from the unit's CURRENT
-/// position, among the body's anchor set, reusing the exact anchor
-/// enumeration `body_reach_field` seeds its Dijkstra from (never a second
-/// distance model — BL-325 ruling 3). An anchor with insufficient pool (or a
-/// body with no reachable anchor at all) REFUSES the unit's move outright
-/// this tick — no partial draw, no order/position/balance mutation,
-/// `unit_march_tick::refused_no_lp` counts it. A granted draw both consumes
-/// the anchor's pool AND debits the owning corp's credit balance
-/// (`active_lp_credit_per_unit_distance`) — LP is the cap, credits are the
-/// separate price (LOGISTICS.md rule 1). A nation-owned garrison (no
-/// `w.corporations` entry, BL-571) still draws against the LP cap but pays
-/// no credits — its upkeep is a nation-budget line, not a corp balance.
+/// BL-1352 (LOGISTICS.md § How a tile's points get to it): a march draws LOGISTIC
+/// POINTS FROM THE HOST NATION'S POOL — the one pool hubs, stations and ports make
+/// and production consumes — and it claims BEFORE production does. The claims are
+/// gathered by `collect_march_claims` and served inside
+/// `resolve_logistic_points`, both in this pass's own visit order, so this pass
+/// only spends the answer: `lp->march_granted` holds what each unit got. A unit
+/// granted less than its whole tick's budget is REFUSED outright — no partial draw,
+/// no order/position/balance mutation, `unit_march_tick::refused_no_lp` counts it —
+/// which covers a unit whose nation makes no points and one whose nation's pool ran
+/// out behind higher-priority marches. The pool is the MOVER's nation's (a corp's
+/// home nation, a garrison's own), never the ground's, so standing on unowned or
+/// foreign ground neither strands a unit nor spends its victim's points. A granted march still
+/// pays its PRICE in credits (`active_lp_credit_per_unit_distance`): points are the
+/// cap, credits are the price (LOGISTICS.md rule 1). A nation-owned garrison (BL-571)
+/// draws against the cap and pays no credits.
 ///
-/// At peace this now DOES change something observable where it did not
-/// before: BL-464's shared pool exists (as of BL-596, for the active half
-/// only — BL-597 lands the passive convoy half in the same sprint), so two
-/// corps' units converging on one anchor genuinely contend for it, resolved
-/// by the visit order above.
+/// WHAT THIS REPLACED. Until BL-1352 the march drew a SECOND, unrelated quantity: a
+/// flat `active_lp_per_anchor_tick` pool at every population centre, port and hub
+/// (`active_lp_anchor_pools`), nearest-anchor by path cost. Two LP systems were live
+/// at once, and the one the Throughput lens drew was the retired one — which is why
+/// cities appeared to supply logistics after the doc had ruled they make none.
 ///
-/// Called from run_economy_step in the slot BL-467's (not-yet-built)
-/// battle-discovery phase will occupy — see that call site's comment for why
-/// there is nothing to run after yet.
+/// Called from run_economy_step after the battle phase.
 ///
-/// @param shared_lp_pools BL-597 (LOGISTICS.md § Logistic Points, passive
-///        convoy admissibility): when non-null, this pass draws against —
-///        and leaves its draws visible in — the CALLER'S `lp_pool_map`
-///        rather than a private one, so a passive draw (`commit_convoy`,
-///        supply_system.cpp) earlier THIS tick against the same instance is
-///        already reflected in the pool a march contends for, and vice
-///        versa. Null (the default) reproduces BL-596's original behaviour
-///        exactly: a fresh, private map built and discarded within this one
-///        call, so every existing caller (every harness, and any call site
-///        not yet updated to share a pool) is unaffected byte-for-byte.
+/// @param lp This tick's resolve (`report.logistic_points`). Null means no resolve
+///        was handed in — a harness exercising movement alone — and then the gate is
+///        open and every ordered unit marches, which is the pre-BL-596 behaviour.
 unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
-                               lp_pool_map* shared_lp_pools = nullptr);
+                               const lp_tick* lp = nullptr);
+
+/// BL-1352: the march's visit order — ascending unit id, then NR-344's mobilised-first
+/// partition. Shared by the claim collector and the march pass so the two cannot
+/// disagree about priority. Exposed for the harnesses that assert the order.
+std::vector<entity_id> march_visit_order(const world& w);
+
+/// BL-1352: what each ordered unit asks its host nation's pool for this tick, in the
+/// march's visit order. Handed to `resolve_logistic_points`, which serves the claims
+/// ahead of every producer.
+std::vector<lp_march_claim> collect_march_claims(const world& w, const recipe_registry& reg);
 
 /// BL-430: outcome of a PLAYER-grade recipe-switch attempt (try_switch_recipe).
 enum class recipe_switch_result : uint8_t

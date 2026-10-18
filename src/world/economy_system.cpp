@@ -1756,8 +1756,7 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
     return sink;
 }
 
-economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
-                                lp_pool_map* shared_lp_pools)
+economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
 {
     // BL-1117: the phase clock, WRITE-ONLY (economy_system.hpp). Null
     // outside a finish's settle; nothing below reads a stamp back.
@@ -2545,7 +2544,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
     // ── BL-1309: this tick's Logistic Points — each nation's pool from its
     // sources, each producing building's claim and grant (logistic_points.hpp).
-    report.logistic_points = resolve_logistic_points(w);
+    //
+    // BL-1352: THE MARCH CLAIMS FIRST, so its claims are gathered here, before the
+    // resolve, and the march pass further down (phase 11) spends the answer. The
+    // claims are read at THIS point in the tick, which means a unit killed in the
+    // battle phase between here and there has already consumed its nation's points
+    // for the tick: the logistics were committed to a march that no longer happens.
+    // That is the cheap reading and it is deliberate — the alternative is resolving
+    // the pool twice a tick — and it is logged for Ben (NR, 2026-10-18).
+    report.logistic_points = resolve_logistic_points(w, collect_march_claims(w, reg));
     lp_ready = true;
 
     // ── Pass 5 pre-pass, BL-1209 (MARKETS.md § Price resolution, "A short shelf
@@ -3270,7 +3277,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     }
     phase_stamp(10); // battles
 
-    run_unit_march(w, reg, shared_lp_pools);
+    run_unit_march(w, reg, &report.logistic_points);
     phase_stamp(11); // march
 
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
@@ -4180,52 +4187,76 @@ bool corp_is_mobilised(const world& w, entity_id corp)
     return false;
 }
 
-unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
-                               lp_pool_map* shared_lp_pools)
+// BL-1352: the march's visit order, ONE definition. Both the claim collector (which
+// runs before the Logistic Point resolve, so the march can claim first) and the march
+// pass itself walk this, so a claim and the spend it pays for cannot disagree about
+// who goes first.
+//
+// Ascending unit id, same discipline as run_unit_upkeep, then NR-344's partition: a
+// corp party to any declared hostility (either direction) has its units visited FIRST.
+std::vector<entity_id> march_visit_order(const world& w)
 {
-    unit_march_tick out;
-    if (w.units.empty())
-        return out;
-
-    // Ascending unit id, same discipline as run_unit_upkeep — a marching
-    // unit's own state is never shared with another unit's, so this is not
-    // load-bearing for correctness the way the upkeep pool draw is, but it
-    // keeps one deterministic, reviewable order.
     std::vector<entity_id> ids;
     ids.reserve(w.units.size());
     for (const auto& kv : w.units)
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
-
-    // NR-344: partition corps into mobilised-first / peaceful-after, computed
-    // ONCE at tick start from the stance table (BL-448) — see this function's
-    // header comment and the call site's comment for why this reorders
-    // visitation only, with no observable effect yet.
     std::stable_sort(ids.begin(), ids.end(), [&](entity_id a, entity_id b) {
         const bool a_mob = corp_is_mobilised(w, w.units.at(a).owner);
         const bool b_mob = corp_is_mobilised(w, w.units.at(b).owner);
         return a_mob && !b_mob; // mobilised (true) sorts before peaceful (false)
     });
+    return ids;
+}
+
+std::vector<lp_march_claim> collect_march_claims(const world& w, const recipe_registry& reg)
+{
+    std::vector<lp_march_claim> claims;
+    if (w.units.empty())
+        return claims;
+    const auto& table = unit_roster_table();
+    const military_capability_params& mil = reg.military();
+    for (const entity_id id : march_visit_order(w))
+    {
+        const unit_component& u = w.units.at(id);
+        if (u.order.dest == null_entity)
+            continue; // halted / never ordered: nothing to ask for
+        const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
+        const float base_points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
+        if (base_points <= 0.0f)
+            continue; // this class cannot march under the authored data
+        lp_march_claim c;
+        c.unit = id;
+        c.need = base_points + u.order.progress; // the whole tick's budget, carry-over included
+
+        // WHOSE POOL: THE MOVER'S, NOT THE GROUND'S (BL-1352, cold review).
+        // LOGISTICS.md reads "Movement a player or rival directs draws the same points
+        // production and trade do" - the nation DIRECTING the march. The first cut took
+        // the nation of the ground the unit stood on, and that was wrong twice over: a
+        // unit that ran out of points on unowned wilderness could never be granted
+        // again, so it was immobilised for good; and a unit invading another nation
+        // drew ITS victim's pool, starving the defender's industry to fund the attack.
+        // A corporation's march is its home nation's; a nation-owned garrison (BL-571)
+        // is its own nation's.
+        if (const auto cit = w.corporations.find(u.owner); cit != w.corporations.end())
+            c.nation = cit->second.home_nation;
+        else if (w.nations.find(u.owner) != w.nations.end())
+            c.nation = u.owner;
+        claims.push_back(c);
+    }
+    return claims;
+}
+
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_tick* lp)
+{
+    unit_march_tick out;
+    if (w.units.empty())
+        return out;
+
+    const std::vector<entity_id> ids = march_visit_order(w);
 
     const auto& table = unit_roster_table();
     const military_capability_params& mil = reg.military();
-
-    // BL-596: this tick's active-LP pools, one per body, built lazily on
-    // first encounter and decremented as this pass's units draw from it.
-    // NOT cached on `world` — because LP is a per-tick RATE, never a stock
-    // (LOGISTICS.md § Logistic Points, ruling on NR-343). See run_unit_march's
-    // own doc comment for the nearest-anchor interpretation and the refusal
-    // contract.
-    //
-    // BL-597: `local_pools` backs this ONLY when the caller did not hand us
-    // a shared instance — the byte-identical-to-BL-596 path every existing
-    // caller still takes. When `shared_lp_pools` is non-null (the real
-    // per-tick driver, once wired) this pass draws down the SAME map
-    // `commit_convoy`'s passive draws (supply_system.cpp) already touched
-    // this tick, and `lp_pool_for_body` (logistics.hpp, factored out of the
-    // lambda this replaced) is the one fetch-or-build both consumers call.
-    lp_pool_map local_pools;
-    lp_pool_map& lp_pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
 
     for (const entity_id id : ids)
     {
@@ -4243,72 +4274,61 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
         if (base_points <= 0.0f)
             continue; // this class cannot march under the authored data
 
-        // The full tick's movement budget, banked carry-over included — this
-        // is also exactly the active-LP amount the gate below checks and
-        // draws (BL-596: one active LP admits one march-point's worth of
-        // movement), computed BEFORE anything mutates so a refusal can still
-        // leave u.order.progress untouched.
+        // The full tick's movement budget, banked carry-over included — the same
+        // quantity `collect_march_claims` asked the pool for (BL-1352: one point
+        // admits one march-point's worth of movement), computed BEFORE anything
+        // mutates so a refusal can still leave u.order.progress untouched.
         const float would_be_points = base_points + u.order.progress;
 
-        // --- BL-596: the active-LP gate, before any state mutates ---------
-        const auto cur_it0 = w.tiles.find(u.position);
-        if (cur_it0 != w.tiles.end())
+        // --- BL-1352: the Logistic Point gate, before any state mutates ---
+        //
+        // The points were CLAIMED before this tick's resolve (collect_march_claims,
+        // above), so what arrives here is the answer: `lp->march_granted` holds what
+        // each unit was granted out of its host nation's pool, served in this same
+        // visit order and ahead of every producer. This pass only spends it.
+        //
+        // A unit granted nothing is refused outright — no partial draw, and nothing
+        // about its order, position or balance moves this tick. That covers a unit on
+        // nobody's ground, one whose nation makes no points, and one whose nation's
+        // pool ran out behind higher-priority marches.
+        //
+        // WITH NO RESOLVE HANDED IN (`lp` null: a harness exercising the march alone)
+        // the gate is open and every ordered unit marches, which is the pre-BL-596
+        // behaviour and keeps a movement test a movement test.
+        // A unit whose own tile is GONE is not asked the points question at all, and
+        // falls through to the loop below, where the missing tile dissolves its stale
+        // order (defensive - tiles do not change post-generation). The first cut
+        // refused it here instead, which left the dead order in place for ever and
+        // counted a refusal every tick (cold review).
+        const bool somewhere = w.tiles.find(u.position) != w.tiles.end();
+        if (lp != nullptr && somewhere)
         {
-            const entity_id body = cur_it0->second.body;
-            std::unordered_map<entity_id, float>& pools =
-                lp_pool_for_body(lp_pools_by_body, w, body, mil.active_lp_per_anchor_tick);
-
-            // Nearest anchor by path cost from the unit's CURRENT position to
-            // the anchor — reasoned interpretation (LOGISTICS.md does not name
-            // the mid-route locus rule), on the same cost function every other
-            // consumer of this pathing uses. Deterministic regardless of
-            // `pools`' hash-map iteration order: an anchor at least cost with a
-            // fixed choice among exact ties, answered from the body's one
-            // nearest-anchor field (BL-1117), never from the pair cache, so it
-            // is the same warm or cold. BL-597 factored this into
-            // `nearest_lp_anchor` (logistics.hpp/cpp) so `commit_convoy`'s
-            // passive draw (supply_system.cpp) reuses this exact rule for a
-            // convoy's dispatch tile rather than a second copy of it.
-            const entity_id nearest_anchor = nearest_lp_anchor(w, body, u.position, pools);
-
-            if (nearest_anchor == null_entity)
+            const auto git = lp->march_granted.find(id);
+            const float granted = git != lp->march_granted.end() ? git->second : 0.0f;
+            if (granted + 1e-6f < would_be_points)
             {
-                // No reachable anchor on this body at all — no active LP
-                // exists to draw against. Refused outright: nothing about
-                // this unit's state changes this tick.
                 ++out.refused_no_lp;
                 continue;
-            }
-
-            float& pool = pools.at(nearest_anchor);
-            if (pool + 1e-6f < would_be_points)
-            {
-                // The nearest anchor's pool is already exhausted (by a
-                // higher-priority draw earlier THIS tick, or simply too
-                // small) — refused outright, same "mutates nothing" contract.
-                ++out.refused_no_lp;
-                continue;
-            }
-
-            // Granted: consume the anchor's pool, then price the draw in
-            // credits — LP is the CAP, credits are the separate PRICE
-            // (LOGISTICS.md rule 1; Ben, 2026-08-22, "it should cost actual
-            // money... moving units"). A nation-owned garrison (BL-571) has
-            // no `w.corporations` entry — it still draws against the LP cap
-            // (the physical constraint applies to everyone) but pays no
-            // credits, matching MILITARY.md's "a garrison does not draw the
-            // credits+goods vector run_unit_upkeep charges corp units".
-            pool -= would_be_points;
-            if (const auto corp_it = w.corporations.find(u.owner); corp_it != w.corporations.end())
-            {
-                const float credit_cost = mil.active_lp_credit_per_unit_distance
-                                         * would_be_points * static_cast<float>(u.count);
-                corp_it->second.balance -= credit_cost;
             }
         }
-        // else: the unit's own tile is gone (defensive — see the blocked-step
-        // comment inside the loop below); no LP question to ask about a unit
-        // that isn't anywhere, so it falls through to the existing handling.
+
+        // THE PRICE, charged on every march that happens — LP is the cap, credits are
+        // the separate price (LOGISTICS.md rule 1; Ben, 2026-08-22, "it should cost
+        // actual money... moving units"). Outside the gate deliberately: with no
+        // resolve handed in the march is UNGATED, not FREE, and the first cut made it
+        // free by pricing inside the branch (cold review). A nation-owned garrison
+        // (BL-571) has no `w.corporations` entry: it draws against the cap, as the
+        // physical constraint applies to everyone, but pays no credits, matching
+        // MILITARY.md's "a garrison does not draw the credits+goods vector
+        // run_unit_upkeep charges corp units".
+        if (const auto corp_it = w.corporations.find(u.owner); corp_it != w.corporations.end())
+        {
+            const float credit_cost = mil.active_lp_credit_per_unit_distance
+                                     * would_be_points * static_cast<float>(u.count);
+            corp_it->second.balance -= credit_cost;
+        }
+
+
 
         float points = would_be_points;
         u.order.progress = 0.0f;

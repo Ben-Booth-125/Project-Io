@@ -589,7 +589,6 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_re
     auto step = [&](int econ_tick, int day_tick, int window) {
         w.current_econ_tick = econ_tick;
         w.current_day_tick  = day_tick;
-        lp_pool_map lp;
         advance_convoys(w);
 
         // LOOK 2 — what arrives, what is cut. Prices now are the last clear's:
@@ -663,9 +662,9 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_re
                 ++out.pool_model_mismatches;
         }
 
-        economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
+        economy_report rep = run_economy_step(w, reg, /*spectating=*/true);
         adopt_new(window); // the scorer's own shipments, if any
-        run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys)
+        run_trades(w, reg, rep); // BL-1266: the trade pass (was dispatch_convoys)
         adopt_new(window);
 
         const std::size_t rows_before = w.exchanges.total;

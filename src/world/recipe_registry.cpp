@@ -700,12 +700,10 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 march->get_or("naval", mpc[static_cast<std::size_t>(unit_class::naval)]);
         }
 
-        // BL-596: active Logistic Points (economy.military.active_lp_*).
-        // Absent keys default to 0 = no active LP anywhere = every march
-        // refused, mirroring how march_points_per_class's own absent-table
-        // case leaves no unit able to march.
-        mp.active_lp_per_anchor_tick =
-            military->get_or("active_lp_per_anchor_tick", mp.active_lp_per_anchor_tick);
+        // BL-596 / BL-1352: the PRICE of an active march. The per-anchor CAPACITY
+        // rate that stood beside it is retired with the per-anchor pool itself
+        // (recipe_registry.hpp); an unread `active_lp_per_anchor_tick` left in
+        // economy.lua is ignored, as any unread key is.
         mp.active_lp_credit_per_unit_distance =
             military->get_or("active_lp_credit_per_unit_distance", mp.active_lp_credit_per_unit_distance);
 

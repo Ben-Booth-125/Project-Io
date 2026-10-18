@@ -1032,18 +1032,19 @@ namespace {
 
 } // namespace
 
-float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id,
-                     lp_pool_map& pools)
+float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id)
 {
-    // BL-1309: no passive cap exists any more; nothing is left at an anchor.
-    (void)w; (void)reg; (void)market_id; (void)pools;
+    // BL-1309: no passive cap exists any more; nothing is left at an anchor. BL-1352
+    // took the retired per-anchor pool this used to be handed with it; BL-1361 revives
+    // the shipment draw against the NATION's pool, which is what this will read.
+    (void)w; (void)reg; (void)market_id;
     return 0.0f;
 }
 
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,
-                           lp_pool_map* shared_lp_pools, bool* out_refused_no_lp,
+                           bool* out_refused_no_lp,
                            float* out_sent, float* io_committed)
 {
     if (!leg.viable || ri >= resource_count || !std::isfinite(qty) || !(qty > 0.0f))
@@ -1083,8 +1084,8 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // BL-1309 (LOGISTICS.md § Logistic Points, "One pool", Ben 2026-10-14): the
     // passive-LP cap this gate drew is RETIRED. Logistic Points are a nation's
     // pool, made by its sources and consumed by production; a shipment spends its
-    // owner's trade points (TRADE.md) and nothing at the anchor.
-    (void)shared_lp_pools;
+    // owner's trade points (TRADE.md) and nothing at the anchor. BL-1361 brings the
+    // points draw back, by cargo quantity, against that nation pool.
     (void)out_refused_no_lp;
     (void)src_body;
 

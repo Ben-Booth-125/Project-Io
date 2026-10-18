@@ -183,7 +183,6 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
 {
     w.current_econ_tick = t;
     w.current_day_tick  = t;
-    lp_pool_map lp;
     // BL-745 debt instrumentation: every corp's balance is snapshotted between
     // the tick's phases, so the balance delta is ATTRIBUTED rather than
     // inferred. A corp absent from a snapshot (spawned or wound up mid-tick)
@@ -212,8 +211,8 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
     advance_convoys(w);
     credit_arrived_convoys(w, t); // app order: arrivals before the economy
     attribute(&phase_deltas::convoys);
-    economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
-    run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
+    economy_report rep = run_economy_step(w, reg, /*spectating=*/true);
+    run_trades(w, reg, rep); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     attribute(&phase_deltas::agency);
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,

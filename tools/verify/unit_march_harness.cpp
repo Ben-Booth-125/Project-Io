@@ -157,7 +157,6 @@ recipe_registry registry_with_march(float pts)
     recipe_registry reg;
     military_capability_params mp = reg.military();
     mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = pts;
-    mp.active_lp_per_anchor_tick = 1.0e6f;
     mp.active_lp_credit_per_unit_distance = 0.0f; // isolate march mechanics from credit pricing here
     reg.set_military(mp);
     return reg;

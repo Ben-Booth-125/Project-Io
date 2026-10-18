@@ -7143,6 +7143,75 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "lp-one-system",
+   "title": "BL-1352 - One Logistic Point system: the march draws the nation pool and the legacy anchor model is gone",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1352 - sprint 55 (Ben, 2026-10-16, the logistics visibility message)",
+   "batch": "sprint-55",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: logistic_points_harness - a city-only fixture nation has a pool of zero",
+      "headless: logistics_harness still green on the placement reach rule, which keeps collect_anchor_tile_set"
+     ],
+     "requirement": "The legacy anchor LP model is gone: no caller builds a flat per-anchor pool, no authored active_lp_per_anchor_tick remains, and nothing derives Logistic Points from a population centre. A city tile with no source on it contributes nothing to any pool.",
+     "notes": "logistic_points_harness L1: two cities on a nation's ground are not sources and the pool is zero; one running hub makes exactly lp_source_points[0] with nothing added by the cities. The retirement is complete in the CODE: no call to active_lp_anchor_pools, no lp_pool_map, no lp_pool_for_body, no authored active_lp_per_anchor_tick remains (the names survive only in comments saying what was retired). A COLD REVIEW CAUGHT THREE CALL SITES THIS NOTE ORIGINALLY MISSED - demand_census, chain_conversion_probe and lp_anchor_field_check - so every harness the change touches was then compiled, 18 of them, and lp_anchor_field_check was repointed at a key set built from the public is_supply_anchor predicate. collect_anchor_tile_set and body_reach_field (placement reach) are untouched.",
+     "result_metric": "34/0"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: logistic_points_harness - a fixture where the pool covers the march and part of the need, asserting the march served in full and production's fraction reduced by exactly the march's claim",
+      "headless: logistic_points_harness - a refusal leaves the unit's progress and position untouched"
+     ],
+     "requirement": "A marching unit draws its movement points from the HOST NATION's Logistic Point pool, and claims before production: the march's claim is taken out of the pool in the same tick's resolve, so production's grants are computed on what is left. A unit on ground whose nation has no pool is refused and mutates nothing.",
+     "notes": "logistic_points_harness L2/L3/L4/L6: a granted march moves exactly as its march points predict and pays price x points x head; a march the pool cannot cover is refused with order, path, index, progress, position and balance byte-identical and no credits charged; a nation with no source and ground no nation holds both refuse; with a consumer on the same ground production gets the pool LESS the march claim (120-12)/300 against 120/300 quiet. AND, after the cold review, L4 asks WHOSE pool: a nation with no source refuses its own march; a unit on unowned ground is NOT stranded but marches on its own nation's points; an invader draws the ATTACKER's pool with the defender's untouched; a unit belonging to nobody is refused.",
+     "result_metric": "34/0"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism",
+      "headless: save_roundtrip"
+     ],
+     "requirement": "Refusals and draws are replay-exact: two runs of the same tick refuse the same units in the same order (ascending unit id within the mobilised-first partition), and the world determinism and save round-trip gates stay green with no save-format change - Logistic Points are a rate and nothing new is persisted.",
+     "notes": "logistic_points_harness L5 (two independent runs of a contended pool refuse the same unit, mobilised-first then ascending id) and L6 (the identical scenario run again gives the identical grant). world_determinism ALL PASS (0 failures), save_roundtrip OK. No save version moved: nothing new is persisted.",
+     "result_metric": "34/0, det PASS, save PASS"
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: par_seeds market_viability --tier full, before and after",
+      "headless: haulage_measure, before and after, same --first-seed and --seeds"
+     ],
+     "requirement": "The world-mover question is answered with a measurement, not an argument: market_viability FULL and haulage_measure are measured on the commit before the change and on the change, and any movement is explained by the march now drawing the same pool production does.",
+     "notes": "market_viability FULL on the baseline COMMIT f96ad172 and on the change: pooled G1 92.0 / G1t50 88.1 / G1b 3.1 / G2 182.1 / G3 95.9 both times, and every one of the 16 per-seed verdict lines BYTE-IDENTICAL (diff empty) - the absolutes too (1481/1610, 1750/1986, 753525/413708). haulage_measure AFTER: 944 dispatches, all intra-body, 0 failures. STILL OWED: haulage_measure was not captured on the baseline commit before the change, so its before-figure is missing; the repo reference (1055/802) is from 2026-08-25 and predates nations, state industry and roads-as-edges, so it is not a comparison. The identity of market_viability is the reason to expect no movement - neither harness has a marching unit, so collect_march_claims returns empty and the resolve is unchanged - but that is an argument, and this row asks for a measurement.",
+     "result_metric": "944 after"
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: throughput lens capture - no city appears as a source",
+      "live: Ben's click once BL-1353 lands"
+     ],
+     "requirement": "The Throughput lens stops showing a quantity that does not exist: its anchors are the real sources (hubs, stations, ports) with the points they actually make, and no population centre appears among them. The surface rework itself is BL-1353's.",
+     "notes": "The lens lists the real sources - hubs, stations and ports with the points they make, upkeep folded in, read from the TICK'S OWN resolve (the economy report's logistic_points) rather than resolved per frame; a source on nobody's ground is skipped, since it feeds no pool, and two sources on one tile are summed. Before the first economy step the report is empty, so one guarded fallback resolve runs (frame-stamped, so a paused game resolves once). The legend says Logistic Points and source, not active LP and anchor. scripts/verify/throughput_lens.lua was RE-AIMED: it framed the largest city, which now draws nothing, so it would have passed over empty ground - it now frames a real source (Port at 250,55: ring drawn, 'source: 120 pts/tick', '2 sources - 240 pts/tick total') AND the largest city as the negative (Gigulil: served ground, no disc). LENSES.md and the ACTIONS.json entry updated in the same change. Ben's live click still owed; the surface rework is BL-1353's.",
+     "result_metric": "4 captures, 0 failures"
+    }
+   ]
   }
  ]
 }

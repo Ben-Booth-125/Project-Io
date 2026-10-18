@@ -93,12 +93,11 @@ template <class Read>
 economy_report probe_tick(world& w, const recipe_registry& reg, int econ_step, bool spectating, Read&& read)
 {
     w.current_econ_tick = econ_step;
-    lp_pool_map tick_lp_pools;
     advance_convoys(w);
     credit_arrived_convoys(w, 0);
-    economy_report report = run_economy_step(w, reg, spectating, &tick_lp_pools);
+    economy_report report = run_economy_step(w, reg, spectating);
     read(report); // READ ONLY
-    run_trades(w, reg, report, &tick_lp_pools); // BL-1266: the trade pass (was dispatch_convoys), before the clear
+    run_trades(w, reg, report); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                  &report.buildings, &report.building_labour);

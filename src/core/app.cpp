@@ -2659,14 +2659,17 @@ void app::render()
                 // so this is a map lookup on every frame but the first after an
                 // invalidation (a road laid, a building placed or demolished).
                 body_reach_field(m_world, m_ui.active_body);
-                // BL-606: this tick's active-LP anchor pools for the Throughput
-                // lens, in the same place and for the same reason — the pool
-                // enumeration wants a mutable world, the draw is const. A no-op
-                // unless that lens is active, and never cached: LP is a per-tick
-                // rate, so the map is rebuilt every frame rather than banked.
+                // BL-606 / BL-1352: the Throughput lens's Logistic Point sources,
+                // in the same place and for the same reason — the enumeration wants
+                // a mutable world, the draw is const. A no-op unless that lens is
+                // active, and never cached: points are a per-tick rate, so what
+                // ui_state holds is rebuilt every frame from THE TICK'S OWN RESOLVE
+                // (`m_last_econ_report.logistic_points`) rather than banked — and
+                // rather than resolved a second time, which a frame cannot afford.
                 // Ordered AFTER body_reach_field because the lens draws the reach
-                // envelope under the anchors and both must describe one frame.
-                ui::update_body_throughput(m_world, m_ui, m_registry);
+                // envelope under the sources and both must describe one frame.
+                ui::update_body_throughput(m_world, m_ui, m_registry,
+                                           m_last_econ_report.logistic_points);
                 // BL-732: the baked-ground cache. Bakes the far page on a body
                 // switch and a budgeted few full-res chunks against last frame's
                 // ground_request, then publishes ui_state::ground for the canvas

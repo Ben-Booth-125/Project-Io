@@ -338,58 +338,20 @@ inline bool building_affects_logistics(building_type t)
 // ---------------------------------------------------------------------------
 // Active Logistic Points (BL-596 — LOGISTICS.md § Logistic Points)
 // ---------------------------------------------------------------------------
-// LP is a per-tick RATE, never a stock (Ben, ruling on NR-343, 2026-08-20):
-// this function is PURE and UNCACHED — call it fresh every tick, never store
-// its result on `world` or across a call boundary. A generator per anchor
-// tile only (cities, built-and-active ports/inland hubs — the SAME anchor
-// set body_reach_field seeds from, never a per-corp pool).
-
-/// This tick's ephemeral active-LP capacity at every supply anchor on @p
-/// body, keyed by anchor tile, at @p lp_per_anchor_tick each. An anchorless
-/// body (or one where @p lp_per_anchor_tick <= 0) returns an empty map —
-/// "no active LP exists here", not an error.
-///
-/// FIRST CONSUMER: BL-596's `run_unit_march` (economy_system.cpp), which
-/// builds one of these per body it encounters marching units on, then
-/// decrements it as units draw against their nearest anchor this tick.
-/// EXTENSION POINT for BL-597 (passive convoy LP draw, a later item): call
-/// this again for the convoy layer's own draw against the same anchor set,
-/// rather than re-deriving it.
-std::unordered_map<entity_id, float> active_lp_anchor_pools(world& w, entity_id body,
-                                                             float lp_per_anchor_tick);
-
+// RETIRED: THE PER-ANCHOR LOGISTIC POINT POOL (BL-1352)
 // ---------------------------------------------------------------------------
-// Passive Logistic Points (BL-597 — LOGISTICS.md § Logistic Points, the bifold
-// half BL-596 left as an extension point)
-// ---------------------------------------------------------------------------
-// LOGISTICS.md's bifold table names ONE generated rate per anchor, split by
-// USE — "Passive LP | Drawn by: the market's own flow" vs "Active LP | Drawn
-// by: militaries draw active only" — never two authored numbers. So BL-597
-// does not add a second `passive_lp_per_anchor_tick`; both halves draw the
-// SAME per-anchor pool this scaffolding builds, contested within one tick by
-// whichever consumer reaches an anchor first. That contention is what makes
-// "war flips the queue" (LOGISTICS.md's "finding worth keeping") observable
-// rather than a written rule with nothing to bite on.
-
-/// Per-body -> per-anchor-tile -> LP remaining THIS TICK. The shared shape
-/// both `run_unit_march` (active) and `commit_convoy` (passive, BL-597) draw
-/// down. Never stored on `world` — a caller-owned scratch object, exactly
-/// like the local `lp_pools_by_body` BL-596 built inside `run_unit_march`
-/// alone; BL-597 promotes that shape here so ANY caller wanting the two
-/// halves to contend can hand the SAME instance to both, while a caller that
-/// wants one consumer tested in isolation (a harness exercising only the
-/// march pass, say) can pass none and get a private, always-fresh map,
-/// unchanged from BL-596's original behaviour.
-using lp_pool_map = std::unordered_map<entity_id, std::unordered_map<entity_id, float>>;
-
-/// Fetch (or lazily build via `active_lp_anchor_pools`) @p body's entry inside
-/// @p pools_by_body, so two consumers sharing one `lp_pool_map` instance
-/// within a tick see each other's draws on first touch rather than each
-/// re-deriving their own copy. Factored out of BL-596's `run_unit_march` (its
-/// own inline lazy-build lambda) so BL-597's `commit_convoy` calls the exact
-/// same fetch-or-build rather than a second copy of it.
-std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_body, world& w,
-                                                        entity_id body, float lp_per_anchor_tick);
+// `active_lp_anchor_pools` made a flat pool at EVERY population centre, port and
+// hub, and `lp_pool_map` / `lp_pool_for_body` carried it through the tick. It was a
+// SECOND Logistic Point system, unrelated to the per-nation pool that runs the
+// economy (`logistic_points.hpp`), and the march and the Throughput lens read it -
+// which is why cities appeared to supply logistics after the doc had ruled they make
+// none. Marches now draw the nation's pool and claim first (BL-1352); a shipment's
+// draw comes back against that same pool in BL-1361.
+//
+// WHAT SURVIVES, deliberately: `collect_anchor_tile_set` (file-local) and
+// `body_reach_field`, which are PLACEMENT's distance rule and have nothing to do with
+// points; and the anchor-selection pathing below, which BL-1361 needs to say which
+// anchor a shipment leaves from.
 
 /// An anchor tile in @p pool (a body's per-anchor LP pool) at least
 /// intra-body path cost from @p from_tile (`intra_body_path(from_tile, anchor)`,

@@ -205,8 +205,7 @@ void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nod
     });
 }
 
-trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& report,
-                      lp_pool_map* shared_lp_pools)
+trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& report)
 {
     trade_tick out;
     const trade_params& tp = reg.trade();
@@ -261,8 +260,6 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     trade_flow_pass tf;
     tf.corp = w.player_entity;
 
-    lp_pool_map local_pools;
-    lp_pool_map* lp = (shared_lp_pools != nullptr) ? shared_lp_pools : &local_pools;
     if (!points.empty())
     {
         const logistics_nodes nodes = collect_logistics_nodes(w);
@@ -285,7 +282,7 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
                 return 0.0f;
             bool  refused_lp = false;
             float sent       = 0.0f;
-            if (!commit_trade_shipment(w, reg, report, corp, a, b, ri, units, leg, lp,
+            if (!commit_trade_shipment(w, reg, report, corp, a, b, ri, units, leg,
                                        &refused_lp, &sent, &committed[corp]))
             {
                 if (refused_lp)
@@ -397,7 +394,7 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     // BL-1309: RETIRED with passive LP — no anchor caps a shipment, so nothing is
     // left over; the field stays in the save record (v46) and reads 0.
     for (auto& [mid, mc] : w.markets)
-        mc.trade_lp_spare = market_lp_left(w, reg, mid, *lp);
+        mc.trade_lp_spare = market_lp_left(w, reg, mid);
 
     // BL-1222: roll the player's record into the lens's trailing window.
     w.player_trade_flow.push_back(std::move(tf));

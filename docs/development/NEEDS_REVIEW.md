@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 24 open, 2 resolved.*
+*27 entries — 25 open, 2 resolved.*
 
 ---
 
@@ -219,6 +219,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 > **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
+
+### NR-1049 — BL-1352 (one LP system): three readings taken so a march could draw the nation's pool
+*decision · raised 2026-10-18 · from BL-1352 build, main session*
+
+The march now draws Logistic Points and claims ahead of production. Four readings the doc does not settle, each cheap to change. (1) WHOSE POOL - THE MOVER'S. A corporation's march draws its HOME NATION's points, a nation's garrison its own; never the pool of the ground it stands on. The first cut read the ground's nation and a cold review caught both consequences: a unit whose points ran out on unowned wilderness could never be granted again (a refusal moves nothing, so it re-fired for ever and the unit was stranded for good), and a unit invading another nation drew ITS VICTIM's pool, starving the defender's industry to fund the attack. LOGISTICS.md's 'Movement a player or rival DIRECTS' is the reading taken. The alternative - the ground's nation, with a stranding escape and a foreign-ground rule - is a real design and is Ben's if he wants it. (2) NO REACH TEST ON A MARCH - a unit draws its own nation's pool at full strength wherever it stands, because the off-network military reach is still 'military detail later' (LOGISTICS.md). (3) THE CLAIM IS GATHERED BEFORE THE BATTLE PHASE - the resolve runs at tick phase 4 and the march at phase 11, with battles at 10, so a unit killed in battle has already consumed its nation's points for that tick; the alternative is resolving the pool twice a tick. (4) THE EXCHANGE RATE IS UNCHANGED - one point admits one march-point of movement (infantry 1.0, cavalry 1.5 a tick) against a production need of 10 per unit of run, so a 50-unit army asks for ~60 points of a pool measured in the hundreds. Nothing measured says a soldier-tick and a unit of grain burden a nation equally; the old per-anchor rate (20/tick at every city) carried the same assumption.
+
+**Why it matters.** Reading 4 decides whether 'guns, butter and freight compete in one currency' is felt at all: at these numbers a march is a rounding error against production, which is the opposite of the campaign-starves-its-industry cost the doc describes. Reading 1 is the one that changes what a war looks like - who pays for an invasion's logistics. The 2040 spectator run is the measurement that should settle 4.
 
 ---
 

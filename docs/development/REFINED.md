@@ -1,5 +1,45 @@
 # REFINED — active worklist
 
+## Sprint 55 — spectator to the end of Era 1 (opened 2026-10-15, continuing 2026-10-18)
+
+**Goal.** `sprints.json` holds it. The dependency spine is BL-1346 -> BL-1352 -> BL-1353/BL-1354 ->
+BL-1360 -> BL-1356/BL-1361; `NEXT_SESSION.md` holds the order and the measurement traps. Ben's four
+blocking calls were taken 2026-10-18 and are written in their owning docs.
+
+**Gates.** Every merge: the item's harnesses, `world_determinism`, `save_roundtrip`; world-movers add
+`market_viability` (FULL, par_seeds) and `haulage_measure` measured on the COMMIT before and after,
+never a probe-off. A cold `code-reviewer` pass with a fix round budgeted. UI items: Ben's live click.
+
+### BL-1352 (one Logistic Point system) — Delivery Full
+
+Requirement group `lp-one-system` (requirements.json, R1-R5). Two LP systems are live at once: the
+real per-nation pool made by hubs, stations and ports, and a retired flat 20/tick pool at every
+population centre that the marches and the Throughput lens still read. One system remains.
+
+- [x] **T1** The march's claim enters the resolve: `resolve_logistic_points` takes each nation's
+  marching claim first, so production's grants are computed on what is left, and hands back a
+  per-unit allowance. Files: `logistic_points.{hpp,cpp}`. provides: the allowance map. (R2, R3)
+- [x] **T2** `run_unit_march` spends that allowance instead of the anchor pools; a refusal still
+  mutates nothing and the order stays mobilised-first then ascending unit id. Files:
+  `economy_system.cpp`. consumes: T1. (R2, R3)
+- [x] **T3** Retire the legacy model: `active_lp_anchor_pools`, the `lp_pool_map` march plumbing and
+  the authored `active_lp_per_anchor_tick`; keep `collect_anchor_tile_set`, which the PLACEMENT reach
+  rule owns, and keep the passive-LP remains BL-1361 revives. Files: `logistics.{hpp,cpp}`,
+  `recipe_registry.{hpp,cpp}`, `economy_system.hpp`, the harnesses that set the authored value. (R1)
+- [x] **T4** The Throughput lens's anchors become the real sources with the points they really make,
+  so no city appears. The surface rework is BL-1353's. Files: `body_surface_canvas.{hpp,cpp}`. (R5)
+- [x] **T5** Harness rows for R1-R3 in `logistic_points_harness` (REWRITTEN onto the nation pool,
+  34/0: a city makes no points, a granted march moves and pays, a refused one mutates nothing,
+  whose pool (the mover's - unowned ground does not strand, an invader pays its own), contention in
+  the march's order, the march claims first);
+- [x] **T6 (fix round, cold review)** Three call sites the retirement missed (demand_census,
+  chain_conversion_probe, lp_anchor_field_check) fixed and all 18 touched harnesses compiled; the
+  claim's nation became the MOVER's, not the ground's; the price moved out of the gate; a tile-less
+  unit falls through again; the lens skips sources on nobody's ground, reads `lp_source_row::made`
+  and sums per tile; LENSES.md and ACTIONS.json updated; `throughput_lens.lua` re-aimed at a real
+  source with the city as the negative; `lp_anchor_field_check`'s F1 reports honestly (BL-1384). `market_viability` FULL and
+  `haulage_measure` before (on f96ad172) and after, movement explained. (R1-R4)
+
 ## Sprint 53 — the player is a nation; the history written on purpose (opened 2026-10-11)
 
 **Goal.** Generation first (Ben): measure the patterns, land the tech tail's generation lane, then hit

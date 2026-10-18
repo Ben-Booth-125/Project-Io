@@ -1,7 +1,7 @@
 #pragma once
 
 #include "recipe_registry.hpp"
-#include "logistics.hpp" // lp_pool_map, nearest_lp_anchor, lp_pool_for_body (BL-597)
+#include "logistics.hpp" // nearest_lp_anchor, the convoy leg's pathing
 #include "world.hpp"
 
 #include <cstddef>
@@ -252,21 +252,22 @@ struct economy_report; // economy_system.hpp: the tick's want and fill registers
 /// it lands and is sold on arrival (`credit_arrived_convoys`). The ONE place a
 /// `convoy_component` is created.
 ///
-/// THE SEND is the least of @p qty, the shelf (less the launch's own propellant
-/// when the cargo is that good) and — on a same-body leg — what the PASSIVE
-/// Logistic Point anchor nearest the source market's centre still admits this
-/// tick (BL-597, by cargo quantity; BL-1186 E1 trims rather than refuses).
-/// Trade points are the owner's capacity; LP the place's; a shipment passes both.
-/// A trimmed cargo pays its share of the leg's cost (cost is linear in quantity).
+/// THE SEND is the least of @p qty and the shelf (less the launch's own propellant
+/// when the cargo is that good). A trimmed cargo pays its share of the leg's cost
+/// (cost is linear in quantity).
+///
+/// NO LOGISTIC POINT GATE STANDS HERE TODAY. BL-1309 retired the per-anchor passive
+/// cap, and BL-1352 removed the retired pool this was handed with it; BL-1361 brings
+/// the draw back, by cargo quantity, against the NATION's pool. Until then trade
+/// points (the owner's capacity, TRADE.md) are the only capacity a shipment passes.
 ///
 /// All-or-nothing on refusal: returns false, having mutated nothing, when the
-/// leg is not viable, the ceiling refuses the shelf, the shelf or the LP anchor
-/// admits nothing, or the trader cannot cover the haul plus the purchase.
+/// leg is not viable, the ceiling refuses the shelf, the shelf admits nothing, or
+/// the trader cannot cover the haul plus the purchase.
 ///
-/// @param shared_lp_pools  BL-597: the tick's shared LP pool, so passive draws
-///                         contend with the same tick's marches. Null: private.
 /// @param out_refused_no_lp Optional; set true (never false) when this call
-///                         refused SPECIFICALLY for want of passive LP.
+///                         refused SPECIFICALLY for want of points. Nothing sets it
+///                         while no points gate stands here (BL-1361).
 /// @param out_sent         Optional; the units actually sent on success.
 /// @param io_committed     Optional; the purchases this trader has already
 ///                         committed this tick (billed at the clear, not yet
@@ -275,16 +276,15 @@ struct economy_report; // economy_system.hpp: the tick's want and fill registers
 ///                         shipment's purchase to it — so a trader shipping
 ///                         many routes in one pass cannot overdraw (cold
 ///                         review). Null: the balance alone.
-/// The passive Logistic Points still left this tick at the anchor nearest
-/// market @p market_id's centre, in @p pools (built on first touch, nothing
-/// else mutated); 0 when no anchor reaches the centre or the market is unknown.
-float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id,
-                     lp_pool_map& pools);
+/// The Logistic Points still left this tick for market @p market_id's trading.
+/// ALWAYS 0 since BL-1309 retired the passive cap: kept, rather than deleted, as the
+/// seam BL-1361 revives (a shipment drawing by cargo quantity against the nation's
+/// pool). `market_component::trade_lp_spare` is what reads it.
+float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id);
 
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,
-                           lp_pool_map* shared_lp_pools = nullptr,
                            bool* out_refused_no_lp = nullptr,
                            float* out_sent = nullptr,
                            float* io_committed = nullptr);

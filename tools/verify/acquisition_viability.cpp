@@ -219,11 +219,10 @@ void tick(world& w, const recipe_registry& reg, int t, bool spectating)
 {
     w.current_econ_tick = t;
     w.current_day_tick  = t;
-    lp_pool_map lp;
     advance_convoys(w);
     credit_arrived_convoys(w, t); // app order: arrivals before the economy
-    economy_report rep = run_economy_step(w, reg, spectating, &lp);
-    run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
+    economy_report rep = run_economy_step(w, reg, spectating);
+    run_trades(w, reg, rep); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);

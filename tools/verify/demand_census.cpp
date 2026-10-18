@@ -418,15 +418,14 @@ int touched_by(const res_row& a)
 /// One economy tick in app::step_economy's order, WITHOUT clear_markets — the
 /// caller either finishes it with clear_markets (a warm-start tick) or performs
 /// clear_markets' demand phase itself (the census tick).
-economy_report tick_to_clearing(world& w, const recipe_registry& reg, int t, lp_pool_map& lp)
+economy_report tick_to_clearing(world& w, const recipe_registry& reg, int t)
 {
     w.current_econ_tick = t;
     w.current_day_tick  = t;
-    lp.clear();
     advance_convoys(w);
     credit_arrived_convoys(w, t); // app order: arrivals before the economy
-    economy_report rep = run_economy_step(w, reg, /*spectating=*/false, &lp);
-    run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
+    economy_report rep = run_economy_step(w, reg, /*spectating=*/false);
+    run_trades(w, reg, rep); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     return rep;
 }
 
@@ -745,7 +744,6 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
     out.recipes_allowed  = reg.recipe_count(building_type::processing_facility);
     out.max_depth        = reg.max_depth();
 
-    lp_pool_map lp;
 
     // --- the warm start ----------------------------------------------------
     // Observed production is accumulated over EVERY tick, not just the census
@@ -777,7 +775,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
 
     for (int t = 0; t < warm_ticks; ++t)
     {
-        economy_report rep = tick_to_clearing(w, reg, t, lp);
+        economy_report rep = tick_to_clearing(w, reg, t);
         accumulate_production(rep);
         finish_tick(w, reg, t, rep);
     }
@@ -831,7 +829,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
         }
     }
 
-    economy_report rep = tick_to_clearing(w, reg, warm_ticks, lp);
+    economy_report rep = tick_to_clearing(w, reg, warm_ticks);
     accumulate_production(rep);
 
     // clear_markets' own demand phase, in clear_markets' own order, reading the

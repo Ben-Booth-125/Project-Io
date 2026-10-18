@@ -213,7 +213,6 @@ recipe_registry base_registry()
 {
     recipe_registry reg;
     military_capability_params mp = reg.military();
-    mp.active_lp_per_anchor_tick = 1.0e6f; // the LP gate is not under test here
     reg.set_military(mp);
     trade_params tp;
     tp.capacity[r_iron]   = 1.0e6f; // trade points never bind: the room does
