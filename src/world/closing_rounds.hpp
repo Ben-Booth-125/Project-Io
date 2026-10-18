@@ -115,6 +115,8 @@ struct closing_plan
     int cessions_islet     = 0;
     int cessions_to_unheld = 0;
     int cessions_late      = 0;
+    int cessions_split     = 0; ///< BL-1310 round 4: exclaves split among two or more bordering keys (each part is one step)
+    int city_states        = 0; ///< BL-1310 round 4: realms exempt as city states, judged before any cession
     int secessions_split   = 0; ///< secessions where no candidate kept both sides one territory
     /// Realms whose representative (the lowest region they hold, which the
     /// tail reads as the nation's capital tile) is NOT in the territory of

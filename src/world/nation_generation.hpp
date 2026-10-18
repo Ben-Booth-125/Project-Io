@@ -223,10 +223,20 @@ struct exclave_cession
     /// receiver touching the exclave (a land-bordered exclave), or the nearest
     /// across the water (an island).
     int contact = -1;
-    /// 0 = land-bordered (most shared edges), 1 = an island ceded to the
-    /// nearest nation's ground in strait reach, 2 = an islet of a remote
-    /// archipelago consolidated to the owner of its largest island.
+    /// 0 = land-bordered (SPLIT among the nations bordering it), 1 = an island
+    /// ceded whole to the nearest nation's ground in strait reach, 2 = an islet
+    /// of a remote archipelago consolidated to the owner of its largest island.
     int kind = 0;
+    /// BL-1310 round 4 (§ Pass 2e, Ben 2026-10-18: "split among the nations
+    /// that border it"): parallel to `tiles`, the key each tile goes to and
+    /// the receiver's land tile its part grew from. For kind 0 the exclave is
+    /// grown from every bordering nation's edge at once, one level at a time,
+    /// a whole UNIT per claim (a province where the caller names units, else a
+    /// tile), so each part is connected to its receiver; ties go to the lower
+    /// rank, then the lower contact tile. Kinds 1 and 2: every entry `to` /
+    /// `contact`. `to`/`contact` above name the part of the lowest tile.
+    std::vector<int> part_key;
+    std::vector<int> part_contact;
 };
 
 /// BL-1310 — find the NEXT cession the strait rule asks for, or return false
@@ -250,7 +260,13 @@ struct exclave_cession
 /// remote island and is never ceded.
 bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
                           const std::vector<int>& core_tile, const std::vector<int>& order,
-                          exclave_cession& out);
+                          exclave_cession& out,
+                          const std::vector<int>* unit = nullptr,
+                          const std::vector<int>* unit_anchor = nullptr);
+// @p unit (optional, per tile): the province a tile belongs to (-1: none), and
+// @p unit_anchor (per province) its anchor tile. A tile counts as part of its
+// province only where that anchor stands in the same exclave; otherwise, and
+// without @p unit, every tile is its own unit (the tail's tile-by-tile split).
 
 /// BL-1310 — the honest seat where a realm's seat region has no carve cell of
 /// its own (its anchor stands on coastal water, so it never seeded): the

@@ -12589,6 +12589,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.closing_cessions_late       = plan.cessions_late;
         out.closing_secessions_split    = plan.secessions_split;
         out.closing_reps_off_core       = plan.reps_off_core;
+        out.closing_cessions_split      = plan.cessions_split;
+        out.closing_city_states         = plan.city_states;
         out.closing_cell_overrides.assign(plan.cell_overrides.begin(), plan.cell_overrides.end());
         out.closing_polity_core_tiles.assign(plan.polity_core_tiles.begin(), plan.polity_core_tiles.end());
         out.closing_core_tiles_lost = plan.core_tiles_lost;

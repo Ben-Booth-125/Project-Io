@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <map>
 
 namespace {
 
@@ -201,24 +202,32 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
         for (int guard = 0; guard < total; ++guard)
         {
             build_keys();
+            // Units for the split: a tile belongs to the province (region)
+            // whose cell holds it, counted only where that province's anchor
+            // stands in the exclave (`next_exclave_cession` checks).
+            std::vector<int> unit_anchor(R, -1);
+            for (std::size_t r = 0; r < R; ++r)
+                if (live_cell(static_cast<int>(r))) unit_anchor[r] = anchor_of(static_cast<int>(r));
             exclave_cession ex;
-            if (!next_exclave_cession(own, water, gw, gh, core_tile, order, ex)) break;
-            const int a = ex.from, b = ex.to;
-            const bool b_realm = b < KP;
-            const int q = cells[static_cast<std::size_t>(ex.contact)]; // the receiver's region at the contact
+            if (!next_exclave_cession(own, water, gw, gh, core_tile, order, ex, &cells, &unit_anchor)) break;
+            const int a  = ex.from;
             const int ca = cells[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(a)])]; // the cedent's core region
+            const auto at = [&](int t) -> std::size_t { // index of tile t in ex.tiles (sorted)
+                return static_cast<std::size_t>(std::lower_bound(ex.tiles.begin(), ex.tiles.end(), t) - ex.tiles.begin());
+            };
             const auto in_x = [&](int t) { return std::binary_search(ex.tiles.begin(), ex.tiles.end(), t); };
 
-            // The provinces in the exclave: regions whose live cell's anchor lies in it.
+            // The provinces in the exclave: regions whose live cell's anchor
+            // lies in it -- each goes whole to the key its anchor's part went to.
             std::vector<int>  moved;
             std::vector<char> moving(R, 0);
-            int lowest_ground = INT_MAX;
-            for (const int t : ex.tiles) lowest_ground = std::min(lowest_ground, cells[static_cast<std::size_t>(t)]);
+            std::vector<int>  moved_to(R, -1);
             for (std::size_t r = 0; r < R; ++r)
                 if (live_cell(static_cast<int>(r)) && in_x(anchor_of(static_cast<int>(r))))
                 {
                     moved.push_back(static_cast<int>(r));
-                    moving[r] = 1;
+                    moving[r]   = 1;
+                    moved_to[r] = ex.part_key[at(anchor_of(static_cast<int>(r)))];
                 }
 
             // GROUND ONLY: the exclave moves, nothing else. A moved province's
@@ -231,60 +240,97 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 if (r < 0 || !moving[static_cast<std::size_t>(r)] || in_x(t)) continue;
                 cells[static_cast<std::size_t>(t)] = ca;
             }
-            const int into_seat = b_realm ? seat_of(b) : -1;
             const int from_seat = a < KP ? seat_of(a) : -1;
-            if (b_realm)
+
+            // THE PARTS (sec Pass 2e, Ben 2026-10-18: split among the nations
+            // that border it), one closing step each, in ascending key order.
+            std::map<int, std::vector<std::size_t>> parts; // receiver -> indices into ex.tiles
+            for (std::size_t i = 0; i < ex.tiles.size(); ++i) parts[ex.part_key[i]].push_back(i);
+            const bool split = parts.size() > 1;
+            for (const auto& [b, idx] : parts)
             {
-                // A REALM RECEIVES: its provinces change hands as regions; any
-                // other ground of the exclave joins the receiver's cell at the contact.
-                for (const int t : ex.tiles)
-                    if (!moving[static_cast<std::size_t>(cells[static_cast<std::size_t>(t)])]) cells[static_cast<std::size_t>(t)] = q;
+                const bool b_realm   = b < KP;
+                const int  into_seat = b_realm ? seat_of(b) : -1;
+                std::vector<int> part_moved;
+                int lowest_ground = INT_MAX;
+                for (const std::size_t i : idx)
+                    lowest_ground = std::min(lowest_ground, cells[static_cast<std::size_t>(ex.tiles[i])]);
                 for (const int r : moved)
+                    if (moved_to[static_cast<std::size_t>(r)] == b) part_moved.push_back(r);
+                if (b_realm)
                 {
-                    cur_polity[static_cast<std::size_t>(r)] = b;
-                    if (!seat_flag[static_cast<std::size_t>(r)]) cur_seat[static_cast<std::size_t>(r)] = into_seat;
+                    // A REALM RECEIVES: its provinces change hands as regions;
+                    // any other ground of the part joins the receiver's cell at
+                    // the edge it grew from.
+                    for (const std::size_t i : idx)
+                    {
+                        const int t = ex.tiles[i];
+                        if (!moving[static_cast<std::size_t>(cells[static_cast<std::size_t>(t)])])
+                            cells[static_cast<std::size_t>(t)] = cells[static_cast<std::size_t>(ex.part_contact[i])];
+                    }
+                    for (const int r : part_moved)
+                    {
+                        cur_polity[static_cast<std::size_t>(r)] = b;
+                        if (!seat_flag[static_cast<std::size_t>(r)]) cur_seat[static_cast<std::size_t>(r)] = into_seat;
+                    }
                 }
-            }
-            else
-            {
-                // GROUND NO REALM HELD RECEIVES. It cannot take a province as
-                // a realm does (a region nobody holds is a nation of its own,
-                // so a moved region would add one): the exclave joins the
-                // unheld cell at the contact, and its provinces fall out of
-                // every realm with no ground of their own left.
-                ++plan.cessions_to_unheld;
-                for (const int t : ex.tiles) cells[static_cast<std::size_t>(t)] = q;
-                for (const int r : moved)
+                else
                 {
-                    cur_polity[static_cast<std::size_t>(r)] = -1;
-                    if (!seat_flag[static_cast<std::size_t>(r)]) cur_seat[static_cast<std::size_t>(r)] = -1;
+                    // GROUND NO REALM HELD RECEIVES. It cannot take a province as
+                    // a realm does (a region nobody holds is a nation of its own,
+                    // so a moved region would add one): the part joins the
+                    // unheld cell at its edge, and its provinces fall out of
+                    // every realm with no ground of their own left.
+                    ++plan.cessions_to_unheld;
+                    for (const std::size_t i : idx)
+                        cells[static_cast<std::size_t>(ex.tiles[i])] = cells[static_cast<std::size_t>(ex.part_contact[i])];
+                    for (const int r : part_moved)
+                    {
+                        cur_polity[static_cast<std::size_t>(r)] = -1;
+                        if (!seat_flag[static_cast<std::size_t>(r)]) cur_seat[static_cast<std::size_t>(r)] = -1;
+                    }
                 }
+                closing_step st;
+                st.kind        = closing_step_kind::exclave_cede;
+                st.from_polity = a < KP ? a : -1;
+                st.into_polity = b_realm ? b : -1;
+                st.region      = part_moved.empty() ? lowest_ground : part_moved.front();
+                st.moved       = part_moved;
+                st.late        = late;
+                plan.ceded_regions.insert(plan.ceded_regions.end(), part_moved.begin(), part_moved.end());
+                plan.steps.push_back(std::move(st));
+                ++plan.cessions;
+                if (part_moved.empty()) ++plan.cessions_islet;
+                if (late) ++plan.cessions_late;
             }
+            if (split) ++plan.cessions_split;
             // The cedent's ground that pointed at a departing seat re-points at its own.
             if (a < KP)
                 for (std::size_t h = 0; h < R; ++h)
                     if (cur_polity[h] == a && cur_seat[h] >= 0 && moving[static_cast<std::size_t>(cur_seat[h])])
                         cur_seat[h] = from_seat;
             rederive_carve_water(cells, *sub, gw, gh);
-
-            closing_step st;
-            st.kind        = closing_step_kind::exclave_cede;
-            st.from_polity = a < KP ? a : -1;
-            st.into_polity = b_realm ? b : -1;
-            st.region      = moved.empty() ? lowest_ground : moved.front();
-            st.moved       = moved;
-            st.late        = late;
-            plan.ceded_regions.insert(plan.ceded_regions.end(), moved.begin(), moved.end());
-            plan.steps.push_back(std::move(st));
-            ++plan.cessions;
-            if (moved.empty()) ++plan.cessions_islet;
-            if (late) ++plan.cessions_late;
         }
     };
     // THE CORE STAYS PUT (the review's check): every key's frozen core group
     // as the cessions open, flooded on its own land; after them, no tile of it
     // may have changed hands. A cession only ever moves ground outside a
     // territory, so a lost core tile means a core moved under a realm.
+    // THE CLOSE, as the realms stood before any cession: per polity, how many
+    // regions with a carve cell it held, and whether a settled centre stood
+    // on them -- what the city-state exemption is judged on.
+    std::vector<int>  close_regions(static_cast<std::size_t>(max_p + 1), 0);
+    std::vector<char> close_centre(static_cast<std::size_t>(max_p + 1), 0);
+    {
+        const std::vector<int64_t> close_tiles = closing_cell_tiles(cell_region, R);
+        for (std::size_t r = 0; r < R; ++r)
+        {
+            const int p = cur_polity[r];
+            if (p < 0 || p > max_p) continue;
+            if (close_tiles[r] > 0) ++close_regions[static_cast<std::size_t>(p)];
+            if (regions[r].population > 0 && regions[r].centres > 0) close_centre[static_cast<std::size_t>(p)] = 1;
+        }
+    }
     std::vector<std::pair<int, int>> core_snapshot; // (tile, key)
     if (strait_rule)
     {
@@ -396,15 +442,20 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
     // holding one region with a population centre on it"). The centres are
     // the region's own (`region::centres`), the history's record of the town
     // the campaign-era centre is later stood from.
+    // JUDGED AS THE REALM STOOD AT THE CLOSE, BEFORE ANY CESSION (Ben,
+    // 2026-10-18; `close_regions` / `close_centre`, snapshotted before the
+    // opening cessions): a realm the strait rule cut down to its seat is not
+    // thereby a city state, and stays open to the floor and the total.
     if (keep_city_states)
     {
-        std::vector<char> has_centre(static_cast<std::size_t>(max_p + 1), 0);
-        for (std::size_t r = 0; r < R; ++r)
-            if (cur_polity[r] >= 0 && regions[r].population > 0 && regions[r].centres > 0)
-                has_centre[static_cast<std::size_t>(cur_polity[r])] = 1;
         for (fold_group& g : groups)
-            if (g.polity >= 0 && g.anchored.size() == 1 && has_centre[static_cast<std::size_t>(g.polity)])
+            if (g.polity >= 0 && static_cast<std::size_t>(g.polity) < close_regions.size()
+                && close_regions[static_cast<std::size_t>(g.polity)] == 1
+                && close_centre[static_cast<std::size_t>(g.polity)])
+            {
                 g.exempt = true;
+                ++plan.city_states;
+            }
     }
 
     const auto larger = [&](int a, int b) { // is group a preferred over b as the larger?
