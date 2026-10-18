@@ -378,8 +378,8 @@ So the audit asserts two things on the finished world: **no exclave outside the 
 the remote island; and the cessions counted as recorded events, so the sim still visibly
 produces the fragmentation the rule resolves. **The rule must not starve the minors (Ben,
 2026-10-18).** The audit also reads the nations' sizes on every library seed at the default
-targets, and fails a seed whose minors' median falls below the lowest median measured before the
-strait rule (227 tiles), or whose majors hold more than 80% of the land. It is a reading of the
+targets, and fails a seed whose minors' median falls below **80% of that seed's own median
+measured before the strait rule** (Ben, 2026-10-18), or whose majors hold more than 80% of the land. It is a reading of the
 world, never a clamp on it.
 
 ### Pass 3 — Resource profile derivation
