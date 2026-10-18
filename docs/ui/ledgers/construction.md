@@ -85,9 +85,14 @@ crossing between two tiles (`../../economy/LOGISTICS.md` § 4), so the press mus
 neighbour**: select a tile that carries a road, press Build on the road row, and the tiles it could
 legally cross to **highlight** — exactly the sides a crossing may legally carry, so never a side no
 walk can cross, never a water-to-water span, and never one already holding an equal or better
-road. Pressing a highlighted tile lays that crossing and charges it. The refusal therefore moves
-from the press to the **absence of a highlight**: a tile with nowhere left to go offers nothing to
-click, which is a quieter and more honest way to say it than a sentence after the fact.
+road. Pressing a highlighted tile lays that crossing and charges it.
+
+**A tile with nowhere to go mutes the press (Ben, 2026-10-18).** Where no neighbour admits a
+crossing the Build press is **muted and unpressable**, and its explainer says why. The first cut
+left it live, on the reasoning that arming and lighting nothing says the refusal more quietly than a
+sentence does; Ben overruled that, and he is right that a press which arms and then does nothing
+teaches the player nothing about *why*. A dead control that explains itself is the honest one. The
+explainer is the only place the reason lives — it does not come back as a row of red text.
 
 **One line a row, and the words live in the hover (Ben, 2026-10-17; the row is two lines tall since
 the same day — see above).** *"We should move a lot of the

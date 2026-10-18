@@ -1068,56 +1068,6 @@
    "parked": false,
    "blocked_on": null,
    "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
-   "id": "BL-1347",
-   "short_name": "BUILDINGS_NEED_A_ROAD",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 4,
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "requires": [
-    "BL-1340"
-   ],
-   "files": [
-    "src/world/placement_rules.cpp",
-    "src/world/road_generation.cpp",
-    "src/world/hard_coded_world.cpp"
-   ],
-   "title": "No building may be constructed on a tile with no road, and generation roads every site it stamps",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"buildings should be impossible to construct unless there is a road on that tile.\" DESIGNED: PRODUCTION.md section A building needs a road; LOGISTICS.md section 4 (Generation roads every building site). A tile carries a road when any of its hex sides carries a roaded edge - a crossing INTO the tile is a road ON it, from either side. EXTRACTION IS NOT EXEMPT (Ben's call): a remote deposit is worked only once a road reaches it, which with BL-1348 means a chain of crossings built out to it one tile at a time - the intended cost of far ore. GENERATION IS BOUND TOO (Ben's call): the road pass lays a crossing to every site it stamps, so the 1960 world holds no building the rule would refuse; exempting generated buildings would make the opening world the one place the rule fails. Add the refusal to placement_rules.cpp beside the stack and ceiling checks, with a message that names the road. A WORLD-MOVER and a playability shift (roads gate all expansion): measure market_viability, haulage_measure --far-trade and the generated building count before and after. Sequenced after BL-1340."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
-   "id": "BL-1348",
-   "short_name": "ROAD_FROM_A_ROAD",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "requires": [
-    "BL-1340"
-   ],
-   "files": [
-    "src/world/placement_rules.cpp",
-    "src/world/construction.cpp",
-    "src/world/corp_ai.cpp"
-   ],
-   "title": "A road is laid from a tile that already has one, across to the next tile",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"roads should only be constructible from an existing tile with a road, and across to the next tile. So whenever we build a road, it's unambiguous where it comes and goes.\" DESIGNED: LOGISTICS.md section 4 (A road is laid from a road). The named tile must already carry a roaded edge and the new road crosses one of its sides to the neighbour; a road cannot be dropped in open country. The root is generation's Track on every centre's own tile, so no world begins with nowhere to build from. Also bind the AI's road candidate (corp_ai.cpp:1943) and the refusal wording. Sequenced after BL-1340 (the same placement code and the same edge grain)."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
    "id": "BL-1349",
    "short_name": "MARKET_CENTRE_BUILDINGS",
    "category": "Economy",
@@ -1271,30 +1221,6 @@
    ],
    "title": "A tile requests the points it needs and they are routed to it over one path, split across sources in distance order",
    "design": "SPRINT 55 (Ben, 2026-10-16, on the LP form: \"Both: surfaces now, routing straight after\"). DESIGNED: LOGISTICS.md section How a tile's points get to it. SEQUENCE IS BEN'S: BL-1352 (one system), BL-1353 (lens) and BL-1354 (tile surface) land FIRST, so routing is measured against honest numbers rather than guessed - the real model's reach already fades with distance and extends with outlying hubs, and nobody has yet seen it drawn. THE MODEL: today there is no routing at all - a nation-wide scalar pool scaled by a per-tile reach field (max over the nation's three networks), granted pro-rata or by the share rule. New: a tile's request is the sum of its buildings' needs; it is filled over ONE best path, never two at once; a source fills part of a request only if it both reaches the tile AND is itself connected back toward the market centre (Ben: \"further sources have to both reach the tile, and produce enough to extend backward towards the market centre\"), so points arrive along a chain the centre anchors and an isolated hub supplies nothing; where the nearest source falls short the remainder comes from the next nearest that satisfies both tests, in distance order. This supersedes the older constraint-2 rule that a draw lands on exactly one anchor. SCARCITY (Ben's ruling): distance ORDERS the queue and never raises the bill - requests inside the falloff range are served first, then those beyond, and a far building draws the same points as a near one. The settled rule 'the draw is what moves, not how far' therefore stands; NR-620 measured a 73% convoy-traffic collapse the one time a distance draw was tried, so any implementation that makes a far building cost more points is wrong by ruling, not by taste. MARCHES (Ben's ruling): a march draws the nation pool and competes with production. RULED (Ben, 2026-10-16): the march CLAIMS FIRST, keeping his 2026-09-24 ruling (NR-917) literally now that its other half is gone - it arbitrated armies against trade, and trade draws nothing, so a march is supplied before the production behind it. Written into LOGISTICS.md. Determinism: allocation must stay order-independent - a deterministic priority over a sorted set, never first-come by iteration order (the march draw is first-come in unit-id order today, economy_system.cpp:4210). A WORLD-MOVER: measure market_viability, haulage_measure --far-trade and per-nation output before and after."
-  },
-  {
-   "status": "designed",
-   "glyph": "○",
-   "sprint": 55,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
-   "id": "BL-1357",
-   "short_name": "ROAD_CROSSES_A_BORDER",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "requires": [
-    "BL-1340",
-    "BL-1348"
-   ],
-   "files": [
-    "src/world/placement_rules.cpp"
-   ],
-   "title": "A road may always be built across a national border, and never further",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"if another nation holds the market centre, we may not be able to even build roads to supply LP. So due to this case, it should always be possible to build a road over a national border, but not further.\" DESIGNED: LOGISTICS.md section 4 (A road may always cross a national border). From a tile you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a tile you may build FROM, so the road stops where it lands - a connection, never a corridor. It is the exception that keeps BL-1348 (a road is laid from a road) from making a foreign-held market centre unreachable, which under BL-1356 would make every tile behind it unsuppliable. Sequenced after BL-1340 and BL-1348, whose placement rule it amends."
   },
   {
    "status": "designed",
@@ -1564,6 +1490,28 @@
    ],
    "title": "The verify world can hold a building on a roadless tile, because its roster is stamped after generation lays site roads",
    "design": "SPRINT 55 (found delivering BL-1347, 2026-10-18). PRODUCTION.md rules that no building may stand on a tile with no road, and generation now lays a Track to every site it stamps (lay_site_roads, called from make_hard_coded_world and again in finish_campaign_world). But verify_lay_roster is a THIRD stamper - it lays the roster or charter web AFTER generation's pass - so the --verify world can hold a roadless site, which is the one world where the rule does not hold. Measured there: 346 site tiles, 131 unroaded, 130 joinable, 1 unreachable, 135 crossings - so wiring it costs almost nothing. The delivering lane tried it and its run stalled in roads.lua's first wide capture past 5 GB; it then reproduced the SAME stall twice with the call removed, on a machine that had just run two 16-shard sweeps and where wc -l itself timed out, so the stall is UNATTRIBUTED and not evidence against the pass. A comment at verify_api.cpp ~871 carries that finding. THE WORK: wire the pass after verify_lay_roster, then re-run roads.lua on an idle machine - and note that the 40/40 currently recorded for roads.lua came from an earlier run of the same logic, not a fresh one."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-18",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-18, at the live click); filed by Claude",
+   "requires": [],
+   "id": "BL-1379",
+   "short_name": "MUTE_THE_DEAD_ROAD_PRESS",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 1,
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/rail_tool.cpp"
+   ],
+   "title": "Where no neighbour admits a crossing, the road press should be muted and unpressable, with its explainer saying why",
+   "design": "SPRINT 55 (Ben, 2026-10-18, at the live click on BL-1347/1348/1357): 'When there are no legal road presses on a tile, we should mute the build button and stop it from being pressable, with a tooltip explaining it.' A DIRECT REVERSAL of the judgement BL-1370's lane took and the main session endorsed: it built the press disabled, decided that put the refusal back in the row, and left it live so the tile would arm and highlight nothing. Ben overruled it, and his reason is the better one - a press that arms and then does nothing teaches the player nothing about WHY, where a dead control that explains itself does. RULED into construction.md (A tile with nowhere to go mutes the press). THE WORK: where road_crossing_targets returns an empty set, mute the press (BeginDisabled, as the unaffordable case already does) and put the reason on its per-column explainer - the explainer is the only place the reason lives, it does not come back as a row of red text. Note the affordability case already mutes, so the two must read differently: one says you cannot pay, the other that there is nowhere to go. Cover the rail track row too, which shares the grid. Update the ACTIONS.json entries for the press, and extend scripts/verify/roads.lua - it already asserts a zero-target tile arms and lights nothing, which is now the wrong assertion and must become: the press is disabled and its explainer names the reason."
   }
  ]
 }

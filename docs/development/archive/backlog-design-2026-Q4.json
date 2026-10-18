@@ -6656,6 +6656,137 @@
         "title",
         "design"
       ]
+    },
+    "BL-1347": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 55,
+      "written": "2026-10-16",
+      "parked": false,
+      "blocked_on": null,
+      "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+      "id": "BL-1347",
+      "short_name": "BUILDINGS_NEED_A_ROAD",
+      "category": "Economy",
+      "priority": "A",
+      "difficulty": 4,
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "requires": [
+        "BL-1340"
+      ],
+      "files": [
+        "src/world/placement_rules.cpp",
+        "src/world/road_generation.cpp",
+        "src/world/hard_coded_world.cpp"
+      ],
+      "title": "No building may be constructed on a tile with no road, and generation roads every site it stamps",
+      "design": "SPRINT 55 (Ben, 2026-10-16): \"buildings should be impossible to construct unless there is a road on that tile.\" DESIGNED: PRODUCTION.md section A building needs a road; LOGISTICS.md section 4 (Generation roads every building site). A tile carries a road when any of its hex sides carries a roaded edge - a crossing INTO the tile is a road ON it, from either side. EXTRACTION IS NOT EXEMPT (Ben's call): a remote deposit is worked only once a road reaches it, which with BL-1348 means a chain of crossings built out to it one tile at a time - the intended cost of far ore. GENERATION IS BOUND TOO (Ben's call): the road pass lays a crossing to every site it stamps, so the 1960 world holds no building the rule would refuse; exempting generated buildings would make the opening world the one place the rule fails. Add the refusal to placement_rules.cpp beside the stack and ceiling checks, with a message that names the road. A WORLD-MOVER and a playability shift (roads gate all expansion): measure market_viability, haulage_measure --far-trade and the generated building count before and after. Sequenced after BL-1340.DELIVERED 2026-10-18. placement_rules::can_place_in_world refuses a tile with no roaded edge (reason needs_road), placed AFTER the reach check and BEFORE the stack and province ceilings so an out-of-reach tile still reads out_of_logistics_range. Extraction is not exempt. GENERATION IS BOUND TOO: new lay_site_roads lays one Track from the network to every building tile carrying none, by the village spur's own method, deterministic and idempotent, called at the tail of make_hard_coded_world and again in finish_campaign_world after the logistics hubs. THE COST, measured, answering the question the brief set: 29-35 site tiles a world, 23-29 of them unroaded, joined by 54-90 crossings - tens of Track edges on worlds carrying thousands, so nowhere near 'an implausible amount of road'. Only Track counts move; Road and Highway never do. THREE sites across the 16 generated worlds reach no land or strait route at all: grandfathered, since the rule gates new placement, and counted rather than hidden. Nine headless fixtures built roadless worlds and asserted placements on them, so about half the lane's time went on roading them honestly - and roading a fixture is not neutral (it switches on reach discounts, and in one case the power-wire path), so buildings_rework's reach budget moved 5 to 3 with the measured cause in its comment. BL-1364 came with it: construction_result now carries needs_road and foreign_ground instead of flattening every refusal but the launchpad into invalid_tile. Tail: BL-1377 (the verify world's roster is stamped after the site pass, so that one world can still hold a roadless building). Live click 2026-10-18 (Ben: 'Otherwise, these pass'), with one follow-up taken as BL-1379 (mute the press where no crossing is admitted). GATES on merged main, run by the main session: road_generation_harness ROAD GEN AUDIT OK (0 failures, R7b 452 roaded water tiles with 0 single-crossing), world_determinism ALL PASS, save_roundtrip OK, road_edges 38/0, nation_tech_harness PASS, history_sim_harness at exactly its R3a2/R3a3 baseline, and market_viability FULL all five gates pass pooled (G1 92.0, G1t50 88.1, G1b 3.1, G2 182.1, G3 95.9) - reproducing the lane's figures digit for digit from a differently sharded run.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "requires",
+        "files",
+        "title",
+        "design"
+      ]
+    },
+    "BL-1348": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 55,
+      "written": "2026-10-16",
+      "parked": false,
+      "blocked_on": null,
+      "author": "Ben (2026-10-16, the market attraction form); filed by Claude",
+      "id": "BL-1348",
+      "short_name": "ROAD_FROM_A_ROAD",
+      "category": "Economy",
+      "priority": "A",
+      "difficulty": 2,
+      "authority_doc": "docs/economy/LOGISTICS.md",
+      "requires": [
+        "BL-1340"
+      ],
+      "files": [
+        "src/world/placement_rules.cpp",
+        "src/world/construction.cpp",
+        "src/world/corp_ai.cpp"
+      ],
+      "title": "A road is laid from a tile that already has one, across to the next tile",
+      "design": "SPRINT 55 (Ben, 2026-10-16): \"roads should only be constructible from an existing tile with a road, and across to the next tile. So whenever we build a road, it's unambiguous where it comes and goes.\" DESIGNED: LOGISTICS.md section 4 (A road is laid from a road). The named tile must already carry a roaded edge and the new road crosses one of its sides to the neighbour; a road cannot be dropped in open country. The root is generation's Track on every centre's own tile, so no world begins with nowhere to build from. Also bind the AI's road candidate (corp_ai.cpp:1943) and the refusal wording. Sequenced after BL-1340 (the same placement code and the same edge grain).DELIVERED 2026-10-18. One gate: placement_rules::can_place_road refuses a named tile whose max_road_tier is 0 (reason no_road_to_extend), and the side-less affordance form refuses the same case rather than calling it 'the first crossing'. Every door routes through it - the player's press, auto_road_side, the AI's road candidate and the wire seam - so there is one place to read and one place to change. The AI's reach-fixing candidate used to name the unreached SITE tile, which this rule refuses forever; it now names a roaded 4-cardinal neighbour and the crossing into the site, so a chain out to a far deposit is emergent from re-scoring rather than planned. Same actor, same verb, same scoring block: inside the existing grant, and recorded because the rival's observable behaviour moves. Live click 2026-10-18 (Ben: 'Otherwise, these pass'), with one follow-up taken as BL-1379 (mute the press where no crossing is admitted). GATES on merged main, run by the main session: road_generation_harness ROAD GEN AUDIT OK (0 failures, R7b 452 roaded water tiles with 0 single-crossing), world_determinism ALL PASS, save_roundtrip OK, road_edges 38/0, nation_tech_harness PASS, history_sim_harness at exactly its R3a2/R3a3 baseline, and market_viability FULL all five gates pass pooled (G1 92.0, G1t50 88.1, G1b 3.1, G2 182.1, G3 95.9) - reproducing the lane's figures digit for digit from a differently sharded run.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "requires",
+        "files",
+        "title",
+        "design"
+      ]
+    },
+    "BL-1357": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 55,
+      "written": "2026-10-16",
+      "parked": false,
+      "blocked_on": null,
+      "author": "Ben (2026-10-16, the Logistic Points form); filed by Claude",
+      "id": "BL-1357",
+      "short_name": "ROAD_CROSSES_A_BORDER",
+      "category": "Economy",
+      "priority": "A",
+      "difficulty": 2,
+      "authority_doc": "docs/economy/LOGISTICS.md",
+      "requires": [
+        "BL-1340",
+        "BL-1348"
+      ],
+      "files": [
+        "src/world/placement_rules.cpp"
+      ],
+      "title": "A road may always be built across a national border, and never further",
+      "design": "SPRINT 55 (Ben, 2026-10-16): \"if another nation holds the market centre, we may not be able to even build roads to supply LP. So due to this case, it should always be possible to build a road over a national border, but not further.\" DESIGNED: LOGISTICS.md section 4 (A road may always cross a national border). From a tile you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a tile you may build FROM, so the road stops where it lands - a connection, never a corridor. It is the exception that keeps BL-1348 (a road is laid from a road) from making a foreign-held market centre unreachable, which under BL-1356 would make every tile behind it unsuppliable. Sequenced after BL-1340 and BL-1348, whose placement rule it amends.DELIVERED 2026-10-18. The same gate compares the named tile's tile_to_nation holder against the acting corporation's home nation (reason foreign_ground): nothing refuses the crossing INTO foreign ground, but the tile it lands on is not one that actor may build FROM - a connection, never a corridor. can_place_road and road_crossing_targets gained an actor parameter, null_entity meaning nation-blind for generation and the affordance read, and verify.road_admits takes it too so the oracle and the highlight cannot disagree at a border. It is the exception that stops BL-1348 making a foreign-held market centre unreachable, which under the routed Logistic Point rules would strand every tile behind it. Live click 2026-10-18 (Ben: 'Otherwise, these pass'), with one follow-up taken as BL-1379 (mute the press where no crossing is admitted). GATES on merged main, run by the main session: road_generation_harness ROAD GEN AUDIT OK (0 failures, R7b 452 roaded water tiles with 0 single-crossing), world_determinism ALL PASS, save_roundtrip OK, road_edges 38/0, nation_tech_harness PASS, history_sim_harness at exactly its R3a2/R3a3 baseline, and market_viability FULL all five gates pass pooled (G1 92.0, G1t50 88.1, G1b 3.1, G2 182.1, G3 95.9) - reproducing the lane's figures digit for digit from a differently sharded run.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "requires",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }
