@@ -314,8 +314,11 @@ history produced them.
 **joined** when a path between them crosses **at most `strait_tiles` ocean tiles and no land
 another nation holds**. Joins chain: a nation's groups form one territory when every group reaches
 the **core** — the group holding its capital, which is the realm's seat at the close (§ Pass 2d); a
-nation with no realm is seated on its lowest seed inside its territory — through joins. The core
-is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
+nation with no realm is seated on its lowest seed inside its territory — through joins. **A realm
+under the size floor keeps the larger piece (Ben, 2026-10-18):** where a realm's land at the close,
+before any cession, is under the floor, its core is the larger of its seat's group and its largest
+group, and its capital follows the core; a realm at or over the floor keeps its seat's group. The
+core is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
 `body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
 
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
