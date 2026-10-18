@@ -74,7 +74,7 @@
    "id": "55",
    "theme": "spectator to the end of Era 1",
    "state": "proposed",
-   "status_line": "PROPOSED 2026-10-15; CALLS ANSWERED same day (Ben): full space assets, nations launch, AI space grant, prices rise with RP matching, GDP/output charts. Items BL-1324..BL-1333. Former 55 items moved to 56.",
+   "status_line": "OPEN 2026-10-15, HANDED OFF 2026-10-18 at main fc1f66b3: 27 of its items remain and docs/development/NEXT_SESSION.md carries the order, Ben's four blocking calls and the two owed live clicks. Delivered so far: the construction UI arc (the lying ETA, the live queue, the one-line grid, per-column explainers, two-line wrapping), roads as edges with bridges and the three placement rules, taxes and Discontent, the Life reroll, the space asset model, the headless spectator runner, nation research AI, and the LP coverage census.",
    "opened_date": null,
    "author": "Ben (2026-10-15)",
    "goal": "A spectator run from 1960 to roughly 2040 (80 years) in which nations research at an accelerating rate, grow their economies towards digitisation, and explore other bodies with rovers, satellites and crewed lunar missions, with early orbital stations and the ground infrastructure that supports them.",
@@ -86,7 +86,7 @@
    ],
    "risk": "Wave 3 overturns the DLC parking of all space work (ROADMAP.md, now narrowed to near space). BL-1327 touches the save format. The pacing slider (2.5x) was superseded by Ben's note: no speed-up for the average nation.",
    "done_when": "Set at the cut. Proposed: an unattended spectator run reaches ~2040 on the curated seeds with every major nation past the Digitisation midpoint, at least one crewed lunar landing and one orbital station.",
-   "notes": "Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11."
+   "notes": "Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11. HANDOFF 2026-10-18: the session ran long and is rolled into a fresh one. The dependency spine is BL-1346 (market attraction) -> BL-1352 (one LP system, the root of what Ben saw in the lens) -> BL-1353/BL-1354 (the surfaces) -> BL-1360 (tier reach) -> BL-1356/BL-1361 (routed requests, trade draws). Four calls block work and sit on one form in NEXT_SESSION.md; BL-1381 (the verify summary mislabels every failure as a golden diff) is worth clearing first because it has already sent two readers to a re-bless question that did not exist."
   }
  ],
  "next_up": "SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.",
