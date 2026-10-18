@@ -130,6 +130,7 @@ void app::compare_to_golden(const std::string& name, SDL_Surface* rgba)
         SDL_Log("Golden FAIL %s: size mismatch (capture %dx%d vs golden %dx%d)",
                 name.c_str(), w, h, rw, rh);
         ++m_verify_failures;
+        ++m_verify_golden_failures;
         return;
     }
 
@@ -143,6 +144,7 @@ void app::compare_to_golden(const std::string& name, SDL_Surface* rgba)
         SDL_Log("Golden FAIL %s: %.4f%% differing (> %.4f%%); diff: %s",
                 name.c_str(), frac * 100.0f, k_fail_fraction * 100.0f, diff_path.c_str());
         ++m_verify_failures;
+        ++m_verify_golden_failures;
     }
     else
     {

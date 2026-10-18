@@ -6994,6 +6994,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_golden_dir = (std::filesystem::path{script_path}.parent_path() / "golden").string();
 
         const int failures_before = m_verify_failures;
+        const int golden_before   = m_verify_golden_failures;
 
         // BL-714 / NR-695 — A STALL MUST BE ONE RED ROW, NOT A DEAD SUITE.
         //
@@ -7076,17 +7077,29 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             ++script_errors;
             continue;
         }
-        SDL_Log("verify: %s — %d golden failure(s)",
-                script_path.c_str(), m_verify_failures - failures_before);
+        // BL-1381 — NAME WHAT FAILED. This line and the summary below both read a
+        // counter that totals golden diffs AND script assertions, and both called
+        // every one of them a golden failure. Thirteen failed assertions printed as
+        // thirteen golden diffs, and two readers in one day took that as a re-bless
+        // question that did not exist. The counts are separated, so a red row says
+        // whether to look at an image or at a check.
+        SDL_Log("verify: %s — %d failure(s): %d golden diff(s), %d assertion(s)",
+                script_path.c_str(), m_verify_failures - failures_before,
+                m_verify_golden_failures - golden_before,
+                (m_verify_failures - failures_before)
+                    - (m_verify_golden_failures - golden_before));
     }
 
-    // Non-zero exit if any capture failed its golden diff or any script threw,
+    // Non-zero exit if any capture failed its golden diff, any assertion failed, or
+    // any script threw,
     // so the harness/skill reads an advisory PASS/FAIL off the process result
     // as well as the logs.
     if (m_verify_failures > 0 || script_errors > 0)
     {
-        SDL_Log("verify: %d capture(s) failed golden diff, %d script error(s)",
-                m_verify_failures, script_errors);
+        SDL_Log("verify: %d failure(s) — %d capture(s) failed golden diff, "
+                "%d assertion(s) failed — and %d script error(s)",
+                m_verify_failures, m_verify_golden_failures,
+                m_verify_failures - m_verify_golden_failures, script_errors);
         return 1;
     }
     return 0;

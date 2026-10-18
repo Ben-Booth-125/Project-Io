@@ -512,7 +512,8 @@ private:
     /// Compare a just-captured frame against its golden reference (or, in bless
     /// mode, overwrite the golden). Called from save_screenshot during a verify
     /// run; a no-op for interactive captures (m_golden_dir empty). Emits an
-    /// advisory PASS/FAIL log + a diff image, and bumps m_verify_failures on fail.
+    /// advisory PASS/FAIL log + a diff image, and bumps both m_verify_failures and
+    /// m_verify_golden_failures on fail (BL-1381 — the summary names which kind).
     ///
     /// @param name The capture's base name (matches the golden file stem).
     /// @param rgba The captured RGBA surface (read, not retained).
@@ -1285,7 +1286,11 @@ private:
     // no compare). See DEVELOPMENT_PRACTICES.md § Visual verification and the verifier-visual skill.
     std::string m_golden_dir;            ///< Directory holding golden reference PNGs (script dir / "golden").
     bool        m_verify_bless = false;  ///< When true, captures overwrite the golden instead of comparing.
-    int         m_verify_failures = 0;   ///< Count of captures that failed their golden diff; sets the exit code.
+    int         m_verify_failures = 0;   ///< Every verify failure - golden diffs AND script assertions; sets the exit code.
+    // BL-1381: the summary used to call every one of these a golden diff, and twice
+    // in one day that sent a reader to a re-bless question that did not exist. The
+    // image diffs are counted separately so the summary can name what actually failed.
+    int         m_verify_golden_failures = 0; ///< Of the above, the captures that failed their golden diff.
 
 public:
     /// Per-script wall-clock budget for a verify run, in seconds (BL-714 / NR-695).
