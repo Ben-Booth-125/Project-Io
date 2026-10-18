@@ -2854,11 +2854,19 @@ void run_tail(generation_cursor& c)
     // set) changes after this point, and the anchors founded between the two
     // calls are skipped as seeds by their `province_anchor` flag
     // (province_partition_harness P6 is the identity's guard).
+    //
+    // BL-1382 (the normalising pass, Ben 2026-10-18): this call is also where
+    // settled land provinces are evened out — the partition's pass 4 splits
+    // the too-large and merges the too-small — so it lands exactly where the
+    // ruling puts it: nations final (generate_nations above ran the strait
+    // rule; the closing rounds ran inside the history), roads and firms not
+    // yet placed. The split pieces' villages are founded just below.
     build_province_partition(w, params.seed ^ 0x50524F56u);
 
     // BL-611 (province centre anchor): every land province on the settled body
     // holds a centre — the leftover pockets the centre-seeded fill could not
-    // reach get a scale-1 anchor founded on their best ground. RNG-free. The
+    // reach, and the pieces the normalising pass split off (BL-1382), get a
+    // scale-1 anchor founded on their best ground. RNG-free. The
     // re-name is the byte-stable re-run name_population_centres documents (new
     // ids sort last, the existing prefix of draws reproduces exactly); the
     // re-stamp is idempotent and paves only the new anchors' footprints.

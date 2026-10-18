@@ -98,6 +98,7 @@
 // ---------------------------------------------------------------------------
 
 struct world;
+struct tile_component;
 
 // ---------------------------------------------------------------------------
 // The size band — a GROWTH BUDGET, not a clamp (Ben's ruling, 2026-08-21)
@@ -303,6 +304,49 @@ inline constexpr int k_province_height_cost = 683;
 /// read from.
 inline constexpr int k_province_edge_jitter = 5;
 
+// ---------------------------------------------------------------------------
+// THE NORMALISING PASS (Ben, 2026-10-18; PROVINCES.md § The normalising pass)
+// ---------------------------------------------------------------------------
+//
+// The band a SETTLED land province (covered land, not an uncentred island) is
+// evened into once, scaled by its anchor centre's scale s (1-5): too small
+// below 24·f(s) tiles, too large above 100·f(s), f(s) = 1 + (s - 1)/2 — so
+// 24-100 for a village and 72-300 for a scale-5 city. The base band is Ben's;
+// the scaling is the calibration NR-1052 recorded. Integer by construction:
+// 24·f(s) = 24 + 12(s - 1) and 100·f(s) = 100 + 50(s - 1).
+
+/// The base floor, f(1) = 1: a village's province is too small below 24 tiles.
+inline constexpr std::size_t k_province_norm_floor_base = 24;
+/// The base ceiling, f(1) = 1: a village's province is too large above 100.
+inline constexpr std::size_t k_province_norm_ceiling_base = 100;
+
+/// 24·f(s), the floor for an anchor of scale @p scale (clamped to 1-5).
+inline constexpr std::size_t province_norm_floor(int scale)
+{
+    const int s = scale < 1 ? 1 : (scale > 5 ? 5 : scale);
+    return k_province_norm_floor_base + (k_province_norm_floor_base / 2) * static_cast<std::size_t>(s - 1);
+}
+
+/// 100·f(s), the ceiling for an anchor of scale @p scale (clamped to 1-5).
+inline constexpr std::size_t province_norm_ceiling(int scale)
+{
+    const int s = scale < 1 ? 1 : (scale > 5 ? 5 : scale);
+    return k_province_norm_ceiling_base + (k_province_norm_ceiling_base / 2) * static_cast<std::size_t>(s - 1);
+}
+
+static_assert(province_norm_floor(1) == 24 && province_norm_floor(5) == 72, "24·f(s)");
+static_assert(province_norm_ceiling(1) == 100 && province_norm_ceiling(5) == 300, "100·f(s)");
+
+/// The ground score an anchor founding picks its site by — habitability times
+/// (1 + summed extractable deposit) — with @p gated set when the tile passes
+/// the population-centre placement gate. ONE DEFINITION, shared by the
+/// uncentred-island founding (`ensure_province_anchor_centres`) and the
+/// normalising pass's choice of where a split piece grows from, so the piece
+/// grows from the tile its village is founded on (unless a later cut hands the
+/// piece better ground, which the founding then takes). The pick both
+/// make: gated before ungated, higher score, then the lower tile id.
+double province_anchor_site_score(const tile_component& tc, bool& gated);
+
 /// What pass 3 (singleton absorption) did, so the pass is measurable rather
 /// than merely asserted. Filled on request by `build_province_partition`;
 /// gathering it changes nothing about the partition that is built.
@@ -360,6 +404,41 @@ struct province_absorption_stats
     /// neighbour under pass 3, so its province holds two centres. The one way
     /// covered land ends with fewer provinces than seeded centre tiles.
     int covered_centre_singletons_absorbed = 0;
+
+    // --- The normalising pass (Ben, 2026-10-18) -----------------------------
+    // Counted over SETTLED land only: covered land's centre-seeded provinces,
+    // never an uncentred island, water, or an unsettled body's hinterland.
+
+    /// Settled land provinces as the fill left them, and after the pass.
+    int norm_settled_before = 0;
+    int norm_settled_after  = 0;
+
+    /// Provinces over their ceiling that were split, and the pieces added
+    /// (a province split in three adds two).
+    int norm_split        = 0;
+    int norm_pieces_added = 0;
+
+    /// Settled provinces holding no seed centre once the pass is done — only a
+    /// split piece can be one, and each is a province
+    /// `ensure_province_anchor_centres` founds a scale-1 village in.
+    int norm_unseeded_pieces = 0;
+
+    /// Merges made: a province under its floor joined a neighbour.
+    int norm_merged = 0;
+
+    /// The counted exceptions, read off the finished pass (provinces, not
+    /// parents). INDIVISIBLE: above its ceiling, because no further cut kept
+    /// every piece at or above its own floor (a merge never makes one).
+    /// NO TARGET: still below its floor, with no same-nation settled
+    /// neighbour the merge would not push over that neighbour's ceiling.
+    int norm_indivisible = 0;
+    int norm_no_merge_target = 0;
+
+    /// Provinces holding a seed centre after the pass, minus before it — the
+    /// term the fill's ledger (seeded provinces = seed tiles - hemmed
+    /// singletons absorbed) gains once merges join two seeded provinces and a
+    /// split separates a hemmed centre into its own piece.
+    int norm_seeded_delta = 0;
 };
 
 /// One province — a contiguous run of land tiles on a single body.
@@ -574,9 +653,32 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      centres, the larger its anchor. It is the one way covered land ends
 ///      with fewer provinces than seeded centre tiles.
 ///
-/// There is still NO merge-to-floor repair pass, by ruling: nothing else is
-/// merged away to satisfy a floor, and a province that ran out of land at two
-/// or three tiles ships at two or three tiles.
+///   4. THE NORMALISING PASS (Ben, 2026-10-18; PROVINCES.md § The normalising
+///      pass). SETTLED LAND ONLY — covered land's centre-seeded provinces;
+///      never water, an uncentred island or an unsettled body's hinterland,
+///      whose band stays 7-12. The band scales with the anchor's scale
+///      (`province_norm_floor` / `province_norm_ceiling`). Splits first, in
+///      ascending province id: a province over its ceiling is cut into the
+///      fewest pieces the greedy search finds that bring each under ITS
+///      ceiling — the anchor keeps its piece, each new piece grows from the
+///      best ground (`province_anchor_site_score`) in the far half of the
+///      piece most over its ceiling, all pieces regrown by the same weighted
+///      fill inside the old province — and a cut that would leave any piece
+///      under its own floor is not taken (fewer pieces instead; still over is
+///      counted INDIVISIBLE). Then merges, to a fixpoint in ascending id: a
+///      province under its floor joins the same-nation settled neighbour
+///      sharing the most border, ties to the smaller then the lower id,
+///      skipping one the merge would push over its ceiling; none is counted
+///      (NO TARGET). The pieces' villages are founded AFTER the partition
+///      ships, by `ensure_province_anchor_centres`, on the piece's best ground
+///      — normally the tile it grew from — and are seed-skipped on a rebuild, so
+///      the pass, like the fill, is a pure function of the pre-anchor centre
+///      set, the tiles and the seed.
+///
+/// The 2026-08 "no merge-to-floor repair pass" ruling is superseded on settled
+/// land by pass 4 (ruling 4, Ben 2026-10-18). Elsewhere it stands: a
+/// hinterland or water province that ran out of land at two or three tiles
+/// ships at two or three tiles.
 ///
 /// Columns wrap east-west (the cylinder every other body-grid consumer uses);
 /// rows do not.
@@ -593,7 +695,11 @@ province_kind province_kind_of(const world& w, uint32_t id);
 /// @param stats Optional: filled with the singleton-absorption tally. Purely an
 ///              instrument — it does not change what is built, so passing it or
 ///              not passing it produces byte-identical partitions.
-void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats = nullptr);
+/// @param normalise Run pass 4, the normalising pass (default). False is an
+///              INSTRUMENT only — the harness reads the fill's own sizes
+///              through it, the "before" of the pass. Generation never passes it.
+void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats = nullptr,
+                              bool normalise = true);
 
 /// The cost of stepping between two hex-adjacent LAND tiles, exposed so the
 /// harness can measure the cost model rather than re-implement it (a border
