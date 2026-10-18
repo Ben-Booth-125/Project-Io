@@ -40,6 +40,10 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   so a capture can be aimed at an actual bridge rather than hoping one is on screen or hard-coding
   coordinates that rot when generation moves. One crossing, its position, and whether both ends are
   water; nothing else. Verify-only, behind `--verify`.
+  **Fourth (Ben, 2026-10-18):** a verify-only STAGING call may report whether its own write landed -
+  `verify.stage_road(col, row, tier)` lays a crossing for a fixture and returns whether that tile
+  ended on the network. `components.hpp` already names "is this tile on the network" the one road
+  question that stays legitimate, where "this tile's tier" does not. Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
