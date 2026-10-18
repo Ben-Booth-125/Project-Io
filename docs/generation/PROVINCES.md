@@ -252,8 +252,11 @@ is Ben's judgement against a number, and no threshold for it has been chosen.
 ### The normalising pass (Ben, 2026-10-18)
 
 The fill draws provinces as far as each centre's reach carries, so on settled land their sizes
-spread widely: across six seeds the settled land provinces measured a median of 48 tiles, a p90 of
-177 and a largest of 4,929. One pass evens that out **after nations are final** — after the strait
+spread widely. On a world built with its history, settled land provinces measure a median of about
+10 tiles and a p90 of 24, with a few far larger — so against the band below the pass is chiefly a
+merge, taking one measured world from 773 settled provinces to 212 (median 54, p90 98, largest
+195). On a world built without its history the spread runs the other way (median 48, largest
+4,929), and the pass is chiefly a split. One pass evens that out **after nations are final** — after the strait
 rule and the closing rounds (`NATION_GENERATION.md` § Pass 2e) — and **before roads and firms are
 placed**, so everything downstream is built on the normalised partition.
 
@@ -264,7 +267,8 @@ village's band is 24–100 and a scale-5 city's 72–300. The base band is Ben's
 is a calibration that follows the measured ordering (a scale-3 province is about twice a scale-1's).
 
 **Too large: split.** A province above its ceiling is split into the fewest pieces that bring every
-piece under it. The original centre keeps the piece around it. Every other piece **founds a
+piece under it, found greedily (the piece furthest over its ceiling is cut first); a province no
+cut can bring under is kept and counted as indivisible. The original centre keeps the piece around it. Every other piece **founds a
 scale-1 anchor centre** on its best ground — the same founding an uncentred island receives
 (§ Colonisation seeds the partition) — and the pieces are grown by the same weighted fill, inside
 the old province only. No piece may fall below its own floor; where that cannot be met the
