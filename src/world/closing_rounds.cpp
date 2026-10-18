@@ -128,6 +128,62 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
     const auto key_of = [&](int r) { return cur_polity[static_cast<std::size_t>(r)] >= 0 ? cur_polity[static_cast<std::size_t>(r)] : KP + r; };
     std::vector<int> own(static_cast<std::size_t>(total), -1), core_tile, order;
     std::vector<int> frozen_polity_core, frozen_lone_core(R, -1); // tiles, -1 = not yet read
+    // A REALM UNDER THE SIZE FLOOR KEEPS THE LARGER PIECE (§ Pass 2e, Ben
+    // 2026-10-18). Read when a key's core is first frozen -- before the first
+    // cession, as the realm stood at the close: where its LAND (land tiles,
+    // water excluded) is under `min_tiles`, its core is the larger of its
+    // seat's group and its largest group that holds one of its provinces (a
+    // core with no province would leave the realm no seed at the fold), ties
+    // to the seat's group, then to the lower province; the core tile is that
+    // group's lowest province anchor, and the capital follows it. At or over
+    // the floor, and with no floor set, the seat's group stands.
+    const auto under_floor_core = [&](int k, int seat_tile) -> int {
+        if (min_tiles <= 0 || seat_tile < 0 || seat_tile >= total) return seat_tile;
+        int land = 0;
+        for (int t = 0; t < total; ++t) land += own[static_cast<std::size_t>(t)] == k ? 1 : 0;
+        if (land >= min_tiles) return seat_tile;
+        std::vector<int> comp(static_cast<std::size_t>(total), -1), size;
+        for (int s0 = 0; s0 < total; ++s0)
+        {
+            if (own[static_cast<std::size_t>(s0)] != k || comp[static_cast<std::size_t>(s0)] >= 0) continue;
+            const int id = static_cast<int>(size.size());
+            size.push_back(0);
+            std::vector<int> st{ s0 };
+            comp[static_cast<std::size_t>(s0)] = id;
+            while (!st.empty())
+            {
+                const int t = st.back();
+                st.pop_back();
+                ++size[static_cast<std::size_t>(id)];
+                const int col = t % gw, row = t / gw;
+                const int nb[4] = { row * gw + (col + 1) % gw, row * gw + (col - 1 + gw) % gw,
+                                    row > 0 ? t - gw : -1, row + 1 < gh ? t + gw : -1 };
+                for (const int u : nb)
+                    if (u >= 0 && own[static_cast<std::size_t>(u)] == k && comp[static_cast<std::size_t>(u)] < 0)
+                    {
+                        comp[static_cast<std::size_t>(u)] = id;
+                        st.push_back(u);
+                    }
+            }
+        }
+        const int seat_comp = own[static_cast<std::size_t>(seat_tile)] == k ? comp[static_cast<std::size_t>(seat_tile)] : -1;
+        int best_size = seat_comp >= 0 ? size[static_cast<std::size_t>(seat_comp)] : 0;
+        int best_tile = seat_tile;
+        for (std::size_t r = 0; r < R; ++r) // ascending: a group's first province is its lowest
+        {
+            if (!live_cell(static_cast<int>(r)) || key_of(static_cast<int>(r)) != k) continue;
+            const int a = anchor_of(static_cast<int>(r));
+            const int c = comp[static_cast<std::size_t>(a)];
+            if (c < 0 || c == seat_comp) continue;
+            if (size[static_cast<std::size_t>(c)] > best_size) // strictly: ties keep the seat's group
+            {
+                best_size = size[static_cast<std::size_t>(c)];
+                best_tile = a;
+            }
+        }
+        if (best_tile != seat_tile) ++plan.cores_floor_moved;
+        return best_tile;
+    };
     const auto build_keys = [&]() {
         KP = static_cast<int>(cap.size());
         for (std::size_t r = 0; r < R; ++r) KP = std::max(KP, cur_polity[r] + 1);
@@ -190,6 +246,7 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                     if (near >= 0) ct = near;
                 }
             }
+            ct = under_floor_core(k, ct);
             core_tile[static_cast<std::size_t>(k)] = ct;
             frozen = ct;
         }

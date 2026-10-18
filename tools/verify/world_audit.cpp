@@ -593,6 +593,8 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                          && parts_detached == 0 && provinces_split == 0;
             std::printf("        split: parts not joined %d, provinces split %d, split cessions %d (rounds) + %d (tail)\n",
                         parts_detached, provinces_split, hs.closing_cessions_split, fx.tail_cessions_split);
+            std::printf("        under the floor, a larger piece kept as the core: %d (rounds) + %d (tail)\n",
+                        hs.closing_cores_floor_moved, fx.tail_cores_floor_moved);
             std::printf("        core tiles lost %d\n", hs.closing_core_tiles_lost);
             ++checks;
             fails += ok ? 0 : 1;

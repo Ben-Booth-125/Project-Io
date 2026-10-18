@@ -1215,6 +1215,9 @@ std::vector<entity_id> generate_nations(
     // very tile.
     const bool strait_rule_here = true;
     std::vector<int> seed_core(static_cast<std::size_t>(seed_count), -1); // per representative seed
+    const auto polity_of_seed_early = [&](int si) {
+        return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;
+    };
     {
         std::vector<int> land_owner(owner_map);
         for (int idx = 0; idx < total; ++idx)
@@ -1251,6 +1254,75 @@ std::vector<entity_id> generate_nations(
                 if (near >= 0) seed_core[static_cast<std::size_t>(si)] = near;
             }
         }
+        // A REALM UNDER THE SIZE FLOOR KEEPS THE LARGER PIECE (§ Pass 2e, Ben
+        // 2026-10-18), on the map as it stands here -- before the first
+        // cession. Where a nation's land (water excluded) is under
+        // `min_nation_tiles`, its core is the larger of its seat's group and
+        // its largest group holding one of its seeds, ties to the seat's group
+        // then the lower seed; the core tile is that group's lowest seed, and
+        // Pass 5 seats the nation on it. The closing rounds already read it
+        // where they ran (`polity_core_tiles` wins above), so it is read here
+        // only for a core the rounds did not fix.
+        if (params.min_nation_tiles > 0)
+            for (int si = 0; si < seed_count; ++si)
+            {
+                const int p = polity_of_seed_early(si);
+                if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size()
+                    && params.polity_core_tiles[static_cast<std::size_t>(p)] == seed_core[static_cast<std::size_t>(si)])
+                    continue;
+                const int seat = seed_core[static_cast<std::size_t>(si)];
+                if (seat < 0 || seat >= total || land_owner[static_cast<std::size_t>(seat)] != si) continue;
+                int land = 0;
+                for (int t = 0; t < total; ++t) land += land_owner[static_cast<std::size_t>(t)] == si ? 1 : 0;
+                if (land >= params.min_nation_tiles) continue;
+                std::vector<int> comp(static_cast<std::size_t>(total), -1), size;
+                for (int s0 = 0; s0 < total; ++s0)
+                {
+                    if (land_owner[static_cast<std::size_t>(s0)] != si || comp[static_cast<std::size_t>(s0)] >= 0) continue;
+                    const int id = static_cast<int>(size.size());
+                    size.push_back(0);
+                    std::vector<int> stack{ s0 };
+                    comp[static_cast<std::size_t>(s0)] = id;
+                    while (!stack.empty())
+                    {
+                        const int t = stack.back();
+                        stack.pop_back();
+                        ++size[static_cast<std::size_t>(id)];
+                        std::pair<int, int> nbrs[4];
+                        int n = 0;
+                        cardinal_neighbours(t % gw, t / gw, gw, gh, nbrs, n);
+                        for (int i = 0; i < n; ++i)
+                        {
+                            const int u = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+                            if (land_owner[static_cast<std::size_t>(u)] == si && comp[static_cast<std::size_t>(u)] < 0)
+                            {
+                                comp[static_cast<std::size_t>(u)] = id;
+                                stack.push_back(u);
+                            }
+                        }
+                    }
+                }
+                const int seat_comp = comp[static_cast<std::size_t>(seat)];
+                int best_size = size[static_cast<std::size_t>(seat_comp)];
+                int best_tile = seat;
+                for (int sj = 0; sj < seed_count; ++sj) // ascending: a group's first seed is its lowest
+                {
+                    const int t = seeds[static_cast<std::size_t>(sj)];
+                    if (land_owner[static_cast<std::size_t>(t)] != si || ceded[static_cast<std::size_t>(t)]) continue;
+                    const int c = comp[static_cast<std::size_t>(t)];
+                    if (c < 0 || c == seat_comp) continue;
+                    if (size[static_cast<std::size_t>(c)] > best_size) // strictly: ties keep the seat's group
+                    {
+                        best_size = size[static_cast<std::size_t>(c)];
+                        best_tile = t;
+                    }
+                }
+                if (best_tile != seat)
+                {
+                    seed_core[static_cast<std::size_t>(si)] = best_tile;
+                    if (fold_out) ++fold_out->cores_floor_moved;
+                }
+            }
     }
     const auto polity_of_seed = [&](int si) {
         return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;

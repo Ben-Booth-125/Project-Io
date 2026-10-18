@@ -337,6 +337,9 @@ struct nation_fold_record
     int32_t parts_detached  = 0;
     int32_t provinces_split = 0;
     int32_t cessions_split  = 0;
+    /// BL-1310 (Ben 2026-10-18): nations under the floor whose core the tail
+    /// moved to a larger piece than the seat's group.
+    int32_t cores_floor_moved = 0;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

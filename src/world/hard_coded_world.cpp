@@ -2602,6 +2602,7 @@ void run_tail(generation_cursor& c)
         fixture->tail_cessions_split  = kepler_fold.cessions_split;
         fixture->tail_parts_detached  = kepler_fold.parts_detached;
         fixture->tail_provinces_split = kepler_fold.provinces_split;
+        fixture->tail_cores_floor_moved = kepler_fold.cores_floor_moved;
     }
     if (kepler_fold.parts_detached > 0 || kepler_fold.provinces_split > 0)
         record_pattern_miss(c, "strait_rule",
