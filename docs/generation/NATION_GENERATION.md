@@ -588,7 +588,12 @@ lifting the floor and keeping the order — until none folds an empty chest. Thr
 the standing army carries only a share of the earn, and tribute is a share of the earn rather than
 the chest (`EXPLORATION.md` § Force persists, and the tribute clause). The army share and the
 endowment floor are **calibrated together by sweep** against two targets: no major opens short of a
-year of its state bill, and the median nation still opens inside 1,000–2,000 credits. No
+year of its state bill, and the median nation still opens inside 1,000–2,000 credits.
+**Calibrated (Ben, 2026-10-19):** the army carries **600 per mille** of the earn and the endowment
+floor is **500 per mille** of the average realm's. The sweep met neither target fully — it cut the
+majors short of a year from 20 of 78 to 7 on natural worlds — and Ben accepted it, tracing what
+still drains the rest as its own work. The 1,000–2,000 band is judged on every pair: a world built to
+few nations opens its median above it, and that is accepted rather than cut. No
 nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
