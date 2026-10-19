@@ -88,6 +88,19 @@ struct state_founding
     bool      chain_feasible = false; ///< its inputs are supplied in reach
     float     price    = 0.0f;        ///< the plant's capex
     float     paid     = 0.0f;        ///< what the treasury paid (<= price)
+    /// The founding's world-history entry (`world::history_log` index), so the
+    /// first-tick reserve can say so when it leaves the price short.
+    std::size_t history_index = static_cast<std::size_t>(-1);
+};
+
+/// A coastal seat's founded port, as paid (parallel to the plant above).
+struct state_port_founding
+{
+    entity_id nation   = null_entity;
+    entity_id building = null_entity;
+    float     price    = 0.0f;
+    float     paid     = 0.0f;
+    std::size_t history_index = static_cast<std::size_t>(-1);
 };
 
 /// What the handover did, for the log and the harness.
@@ -107,6 +120,7 @@ struct state_handover_report
     /// ground for one.
     int ports_founded = 0, ports_unplaced = 0;
     std::vector<entity_id> port_buildings; ///< the ports founded, in nation order
+    std::vector<state_port_founding> ports; ///< the same ports with their price and payment
     /// Per major, ascending nation id: (nation, buildings it now owns).
     std::vector<std::pair<entity_id, int>> per_nation;
 };
@@ -179,10 +193,45 @@ float state_uncommitted_treasury(const world& w, entity_id nation);
 bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
                          const building_component& before, const building_component& after);
 
+/// THE FIRST TICK'S STATE BILL — what the funding gate commits @p nation to
+/// when it funds the whole of its state industry: every state building's
+/// `state_building_cost_bound`, plus its track's upkeep, each with the gate's
+/// headroom. Read-only; the same terms `plan_state_funding` sums.
+float state_first_tick_bill(const world& w, const recipe_registry& reg, entity_id nation);
+
 /// The state buildings the funding gate would IDLE if it ran on @p w now —
 /// `plan_state_funding`'s building walk, read-only (no ledger, no flag
 /// written). For a reading that must count only what will run.
 std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_registry& reg);
+
+/// BL-1382 economy follow-up (Ben, 2026-10-19; NATION_GENERATION.md § Pass 7:
+/// "No major leaves generation on a zero treasury").
+///
+/// THE FOUNDING PAYS FROM WHAT THE STATE DOES NOT NEED TO RUN. The fold's
+/// foundings (the plant, the coastal port) are paid from the treasury, and a
+/// treasury short of the price "pays what it holds and the shortfall is
+/// reported, never minted". Ben's ruling narrows what it holds: a major must
+/// leave generation able to fund its state industry at the first tick, so the
+/// foundings may not take the treasury below the first tick's state bill
+/// (`state_first_tick_bill`) — its hubs among it, which is why this runs after
+/// the Logistic Point seeding, once every state building stands. Where they
+/// did, the foundings' payments are reduced — the port's (paid last) first,
+/// then the plant's — by as much as the bill needs and never more than was
+/// paid; the reduction is shortfall, reported and written into the founding's
+/// history entry exactly as a short treasury's always was. Nothing is minted:
+/// the treasury never exceeds the chest it held before the foundings, and a
+/// major whose history left it no chest at all (nothing paid) is untouched.
+struct state_reserve_report
+{
+    int   nations_reserved = 0;  ///< majors whose foundings were reduced
+    int   nations_short    = 0;  ///< of them, still under the bill (their chest is smaller)
+    float returned         = 0.0f; ///< payment reduced, summed (credits)
+};
+state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& reg,
+                                              state_handover_report& handover);
+
+/// Print the reserve's one `[state_reserve]` log line.
+void print_state_reserve(const state_reserve_report& r);
 
 
 /// BL-1255 -- what the rail handover did at the fold.
