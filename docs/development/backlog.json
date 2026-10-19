@@ -1394,6 +1394,30 @@
    ],
    "title": "No realm closes the history empty: the army carries a share of the earn, tribute is on the earn, a small realm's endowment has a floor",
    "design": "SETTLED: NATION_GENERATION.md § Pass 7 (top rules) and EXPLORATION.md § Force persists + the tribute clause (Ben, 2026-10-19, option D). WORK: build A (army sized to at most a share of the round earn), B (tribute a share of the round earn, not the chest), C (endowment floor for small realms); calibrate the army share and the floor together by sweep against: no major short of a year of its state bill, median nation treasury 1,000-2,000. Measured before (treasury_census, 16 seeds): natural 20 of 78 majors short of a year, 8 of 64 at 20:4; tripling the endowment left the floor at 0. Blocks BL-1382 (province normalising pass) going to main: seed 28 G1 44.7 until it lands."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-19",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-19); filed by Claude",
+   "requires": [
+    "BL-1386"
+   ],
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1389",
+   "short_name": "REMAINING_MAJOR_DRAIN",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/treasury_census.cpp"
+   ],
+   "title": "Trace what still empties the majors the 600/500 calibration leaves short of a year",
+   "design": "Follow-up to BL-1386 (no realm closes empty), Ben 2026-10-19: with army 600 per mille and endowment floor 500 per mille, 7 of 79 natural majors and 1 of 64 at 20:4 still open short of a year of their state bill, some near zero (seed 12 major 47373: 4.5 cr vs 363; seed 10 at 20:4 major 47555: 6.1 vs 393; seed 41 major 47658: 10.9 vs 563; seed 10 major 47567: 21.3 vs 183). Candidates the three rules do not touch: the navy bill (kept under NR-878), the world war draw, road building. Trace round by round with treasury_census (--army-share 600 --endow-floor 500) and name the drain before any new rule."
   }
  ]
 }
