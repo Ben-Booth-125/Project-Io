@@ -202,6 +202,7 @@ struct shipped_landscape
     marketplace_retrofit_report retrofit;
     /// BL-1296: the state-industry handover the mirror ran after the recipes.
     state_handover_report   state;
+    state_reserve_report    reserve; ///< BL-1382 economy follow-up
     rail_handover_report    rail; ///< BL-1255
     lp_seed_report          lp;   ///< BL-1309
 };
@@ -319,6 +320,11 @@ inline shipped_landscape apply_shipped_landscape(
     if (!charter.skip_rail_handover && !charter.skip_state_handover)
     {
         out.lp = seed_logistics_sources(w);
+        // BL-1382 economy follow-up: finish_campaign_world's state reserve and
+        // the seeding's reading at the gate, verbatim, right after it.
+        out.reserve = reserve_state_first_tick(w, reg, out.state);
+        print_state_reserve(out.reserve);
+        lp_seed_read_at_gate(w, reg, out.lp);
         print_lp_seed_report(out.lp);
     }
 

@@ -399,6 +399,14 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // stands enough logistics hubs that every producing building is reached and
     // every pool meets its need. After the rail handover (stations are sources).
     out.lp = seed_logistics_sources(w);
+    // BL-1382 economy follow-up (NATION_GENERATION.md § Pass 7, Ben 2026-10-19:
+    // no major leaves generation on a zero treasury) -- THE FOUNDINGS KEEP THE
+    // FIRST TICK'S STATE BILL. After the seeding, so the bill counts the state
+    // hubs; then the seeding's reading is retaken at the funding gate, so the
+    // printed coverage is what the first tick runs.
+    out.reserve = reserve_state_first_tick(w, reg, out.state);
+    print_state_reserve(out.reserve);
+    lp_seed_read_at_gate(w, reg, out.lp);
     print_lp_seed_report(out.lp);
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);

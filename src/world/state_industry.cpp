@@ -287,6 +287,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                                     + " (" + strategic_sector_name(strategic_sector_of(reg, b)) + ")"
                                     + (paid < price ? ", its treasury short of the price" : "");
                         w.history_log.push_back(std::move(e));
+                        f.history_index = w.history_log.size() - 1;
                         break;
                     }
                 }
@@ -330,6 +331,8 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         std::stable_sort(sites.begin(), sites.end(),
                          [](const auto& a, const auto& b) { return a.first < b.first; });
         entity_id built = null_entity;
+        state_port_founding pf;
+        pf.nation = nid;
         for (const auto& [d, tile] : sites)
         {
             (void)d;
@@ -352,9 +355,13 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
             e.event     = "State charter: " + nc.name + " founds a state port at its coastal seat"
                         + std::string(paid < price ? ", its treasury short of the price" : "");
             w.history_log.push_back(std::move(e));
+            pf.building      = built;
+            pf.price         = price;
+            pf.paid          = paid;
+            pf.history_index = w.history_log.size() - 1;
             break;
         }
-        if (built != null_entity) { ++out.ports_founded; out.port_buildings.push_back(built); }
+        if (built != null_entity) { ++out.ports_founded; out.port_buildings.push_back(built); out.ports.push_back(pf); }
         else ++out.ports_unplaced;
     }
 
@@ -574,6 +581,137 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
     if (const auto lit = w.state_ledger.find(nation); lit != w.state_ledger.end())
         committed = lit->second.committed;
     return std::max(0.0f, nit->second.treasury - committed);
+}
+
+// ---------------------------------------------------------------------------
+// BL-1382 economy follow-up -- the first tick's state bill and the founding's
+// reserve (Ben, 2026-10-19; see the header)
+// ---------------------------------------------------------------------------
+namespace {
+
+/// The gate's headroom, the same hair `plan_state_funding` adds to every bound.
+constexpr float k_state_gate_headroom = 1.0005f;
+
+} // namespace
+
+float state_first_tick_bill(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return 0.0f;
+    float bill = 0.0f;
+    for (const entity_id bid : nit->second.state_assets)
+        if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
+        {
+            const float bound = state_building_cost_bound(w, reg, bit->second) * k_state_gate_headroom;
+            if (std::isfinite(bound))
+                bill += bound;
+        }
+    int track = 0;
+    for (const auto& [tile, owner] : w.rail_track)
+    {
+        (void)tile;
+        if (owner == nation)
+            ++track;
+    }
+    if (track > 0)
+        bill += reg.rail().track_upkeep_per_tile * static_cast<float>(track) * k_state_gate_headroom;
+    return bill;
+}
+
+std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_registry& reg)
+{
+    // plan_state_funding's building walk, read-only: nations ascending, each
+    // one's state_assets in stored order, a bound that fits comes off what is
+    // left, one that does not idles.
+    std::vector<entity_id> idled;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nid;
+        float left = std::max(0.0f, nc.treasury);
+        for (const entity_id bid : nc.state_assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const float bound = state_building_cost_bound(w, reg, bit->second) * k_state_gate_headroom;
+            if (std::isfinite(bound) && bound <= left)
+                left -= bound;
+            else
+                idled.push_back(bid);
+        }
+    }
+    std::sort(idled.begin(), idled.end());
+    return idled;
+}
+
+state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& reg,
+                                              state_handover_report& handover)
+{
+    state_reserve_report rep;
+    // Per nation, ascending: its founded port and its founded plant, the
+    // port first (it was paid last).
+    std::map<entity_id, std::pair<state_port_founding*, state_founding*>> paid_by;
+    for (state_founding& f : handover.founded)
+        if (f.building != null_entity && f.paid > 0.0f)
+            paid_by[f.nation].second = &f;
+    for (state_port_founding& p : handover.ports)
+        if (p.building != null_entity && p.paid > 0.0f)
+            paid_by[p.nation].first = &p;
+
+    const char* const k_short = ", its treasury short of the price";
+    const auto mark_short = [&](std::size_t idx) {
+        if (idx >= w.history_log.size())
+            return;
+        std::string& ev = w.history_log[idx].event;
+        if (ev.find(k_short) == std::string::npos)
+            ev += k_short;
+    };
+
+    for (auto& [nid, pf] : paid_by)
+    {
+        const auto nit = w.nations.find(nid);
+        if (nit == w.nations.end())
+            continue;
+        nation_component& nc = nit->second;
+        const float bill = state_first_tick_bill(w, reg, nid);
+        float need = bill - std::max(0.0f, nc.treasury);
+        if (!(need > 0.0f))
+            continue;
+        float back_total = 0.0f;
+        const auto give_back = [&](float& paid, entity_id building, std::size_t history_index) {
+            if (!(need > 0.0f) || !(paid > 0.0f))
+                return;
+            const float back = std::min(need, paid);
+            paid       -= back;
+            need       -= back;
+            back_total += back;
+            nc.treasury += back;
+            if (const auto bit = w.buildings.find(building); bit != w.buildings.end())
+                bit->second.construction_paid = paid;
+            mark_short(history_index);
+        };
+        if (pf.first != nullptr)
+            give_back(pf.first->paid, pf.first->building, pf.first->history_index);
+        if (pf.second != nullptr)
+            give_back(pf.second->paid, pf.second->building, pf.second->history_index);
+        if (back_total > 0.0f)
+        {
+            ++rep.nations_reserved;
+            rep.returned += back_total;
+            if (need > 0.0f)
+                ++rep.nations_short;
+        }
+    }
+    return rep;
+}
+
+void print_state_reserve(const state_reserve_report& r)
+{
+    std::printf("[state_reserve] %d major(s) kept their first tick's state bill from the foundings "
+                "(%.1f credits of payment left short; %d still under the bill)\n",
+                r.nations_reserved, static_cast<double>(r.returned), r.nations_short);
+    std::fflush(stdout);
 }
 
 // ---------------------------------------------------------------------------
