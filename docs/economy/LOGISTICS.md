@@ -258,6 +258,14 @@ cannot reach its centre cannot be supplied (§ How a tile's points get to it). O
 enough to touch the border and no more than that — it buys a connection, never a corridor through
 somebody's country.
 
+**The reach that follows is small, and it is meant to be (Ben, 2026-10-18).** A corporation builds
+from its home nation's ground, so most of a body is ground it may reach into and never build out
+of. Measured in play and confirmed: the rule stands as written, and what was wrong was the REFUSAL
+the surface reported, which blamed the tier for a border. A muted road press names the rule that
+actually refused — another nation's ground, nothing here to build from, already at this tier, no
+crossable side — because each is acted on differently and only one of them a player can fix by
+paying more.
+
 **Generation roads every building site (Ben, 2026-10-16).** A building needs a road on its tile
 (`PRODUCTION.md` § A building needs a road), and that rule binds the generated world as it binds
 play: the road pass lays a crossing to every site it stamps, so the 1960 world contains no building
