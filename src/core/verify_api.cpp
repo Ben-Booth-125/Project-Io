@@ -53,7 +53,7 @@
 #include "world/road_generation.hpp" // BL-1347: lay_site_roads, after this path's own stamper
 #include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
 #include "ui/ground_bake.hpp"        // BL-1375: prepare_source, the bake the audit reads
-#include "ui/route_paint.hpp"       // BL-1382: k_route_rail, the one tile-field rung
+#include "ui/route_paint.hpp"       // BL-1394: k_route_rail, the one tile-field rung
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
 #include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
@@ -4581,7 +4581,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 }
             }
         }
-        // BL-1382 - A LINK DRAWN WHERE THE WORLD LAID NOTHING. Every count above walks
+        // BL-1394 - A LINK DRAWN WHERE THE WORLD LAID NOTHING. Every count above walks
         // the WORLD's edges and asks whether the bake drew them, so it is blind in the
         // one direction Ben's report points: a run drawn ACROSS A BOUNDARY THAT CARRIES
         // NO ROAD ("I see it connect in all possible directions, not just the direction
@@ -4678,7 +4678,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["road_pieces"]     = road_pieces;
         out["mixed_tier_tiles"] = mixed_tier_tiles; ///< BL-1390: tiles carrying two different tiers
         out["mixed_tier_edges"] = mixed_tier_edges; ///< ...and the crossings on them
-        out["drawn_without_edge"] = drawn_without_edge; ///< BL-1382: a run drawn across a roadless boundary
+        out["drawn_without_edge"] = drawn_without_edge; ///< BL-1394: a run drawn across a roadless boundary
         out["drawn_rail_join"]    = drawn_rail_join;    ///< ...excused because one end is rail (a tile field)
         out["edges"]         = edges;        ///< every road crossing on the body, each once
         out["linked_both"]   = linked_both;  ///< ...publishing its bit on BOTH tiles
