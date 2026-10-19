@@ -29,6 +29,8 @@
 #define NOMINMAX
 #include <memory>
 #include <windows.h>
+#include <dbghelp.h>   // BL-1387: name the faulting function when a PDB is beside the exe
+#pragma comment(lib, "dbghelp.lib")
 #endif
 
 #include <algorithm>
@@ -700,20 +702,133 @@ void log_to_stderr(void*, int category, SDL_LogPriority priority, const char* me
 }
 
 #ifdef _WIN32
-/// Last-chance SEH filter: names the fault and the address, then lets the
-/// process die. No unwinding, no allocation beyond fopen — by the time this
-/// runs the process state is not trustworthy.
+/// WHICH MODULE an address is in, and how far into it (BL-1387). A bare
+/// `00007FFC5895DA40` names nothing: the same crash reads as "somewhere in the
+/// process" whether it is ours, SDL's or the CRT's, and the first question any
+/// triage asks is which. Win32 answers it without symbols, allocation or a
+/// debugger, which is what a last-chance filter can afford.
+///
+/// THE FUNCTION, when a PDB is beside the binary (BL-1387). Module+offset says which
+/// component faulted; the name says which call, and without it a crash inside a
+/// library reached from our code is triaged by bisecting the script instead - which
+/// cost this session two wrong fixes before it cost a rebuild with symbols.
+///
+/// dbghelp is initialised lazily and never required: a Release build with no PDB, or a
+/// machine with no dbghelp, degrades to module+offset rather than losing the report.
+/// Not thread-safe and not reentrant, which is correct for a last-chance filter.
+bool symbol_name(void* addr, char* out, std::size_t cap)
+{
+    static int state = 0; // 0 untried, 1 ready, -1 unavailable
+    if (state == 0)
+        state = SymInitialize(GetCurrentProcess(), nullptr, TRUE) ? 1 : -1;
+    if (state != 1 || addr == nullptr)
+        return false;
+    alignas(SYMBOL_INFO) char buf[sizeof(SYMBOL_INFO) + MAX_SYM_NAME];
+    auto* si = reinterpret_cast<SYMBOL_INFO*>(buf);
+    si->SizeOfStruct = sizeof(SYMBOL_INFO);
+    si->MaxNameLen   = MAX_SYM_NAME;
+    DWORD64 disp = 0;
+    if (!SymFromAddr(GetCurrentProcess(), reinterpret_cast<DWORD64>(addr), &disp, si))
+        return false;
+    IMAGEHLP_LINE64 line{};
+    line.SizeOfStruct = sizeof(line);
+    DWORD line_disp = 0;
+    if (SymGetLineFromAddr64(GetCurrentProcess(), reinterpret_cast<DWORD64>(addr),
+                             &line_disp, &line))
+    {
+        const char* file = line.FileName ? line.FileName : "?";
+        for (const char* p = file; *p; ++p)
+            if (*p == '\\' || *p == '/')
+                file = p + 1;
+        std::snprintf(out, cap, "%s+0x%llX  %s:%lu", si->Name,
+                      static_cast<unsigned long long>(disp), file,
+                      static_cast<unsigned long>(line.LineNumber));
+    }
+    else
+    {
+        std::snprintf(out, cap, "%s+0x%llX", si->Name,
+                      static_cast<unsigned long long>(disp));
+    }
+    return true;
+}
+
+/// Writes "name+0xOFFSET" into @p out, or the raw address when the lookup fails.
+void module_and_offset(void* addr, char* out, std::size_t cap)
+{
+    HMODULE mod = nullptr;
+    if (addr != nullptr
+        && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+                                  | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                              static_cast<LPCSTR>(addr), &mod)
+        && mod != nullptr)
+    {
+        char path[MAX_PATH];
+        if (GetModuleFileNameA(mod, path, static_cast<DWORD>(sizeof path)) > 0)
+        {
+            const char* base = path;
+            for (const char* p = path; *p; ++p)
+                if (*p == '\\' || *p == '/')
+                    base = p + 1;
+            const auto off = static_cast<unsigned long long>(
+                reinterpret_cast<const unsigned char*>(addr)
+                - reinterpret_cast<const unsigned char*>(mod));
+            std::snprintf(out, cap, "%s+0x%llX", base, off);
+            return;
+        }
+    }
+    std::snprintf(out, cap, "%p", addr);
+}
+
+/// Last-chance SEH filter: names the fault, the address, the MODULE it is in and
+/// the return addresses above it, then lets the process die. No unwinding, no
+/// allocation beyond fopen — by the time this runs the process state is not
+/// trustworthy, so everything here is a stack buffer and a Win32 call.
+///
+/// BL-1387 added the module and the backtrace. The filter had been reporting a
+/// bare address for a crash in a committed check (`roads_painted.lua`), which
+/// says nothing about whose code faulted, and reading it took a bisect that a
+/// single line of this would have answered.
 LONG WINAPI seh_crash_filter(EXCEPTION_POINTERS* ep)
 {
-    char buf[192];
+    char buf[320];
+    char where[160];
     const DWORD code = ep && ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionCode : 0;
     void* addr = ep && ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionAddress : nullptr;
+    if (!symbol_name(addr, where, sizeof where))
+        module_and_offset(addr, where, sizeof where);
     std::snprintf(buf, sizeof buf,
-                  "ProjectIo: fatal hardware exception 0x%08lX at %p%s",
-                  static_cast<unsigned long>(code), addr,
+                  "ProjectIo: fatal hardware exception 0x%08lX at %p (%s)%s",
+                  static_cast<unsigned long>(code), addr, where,
                   code == 0xC0000005u ? " (access violation)"
                   : code == 0xC00000FDu ? " (stack overflow)" : "");
     crash_log(buf);
+
+    // An access violation also carries WHAT it touched: read or write, and the
+    // address. A null here is a dereferenced null pointer; a wild one is a walk
+    // off an array, and the two are triaged differently.
+    if (code == 0xC0000005u && ep && ep->ExceptionRecord
+        && ep->ExceptionRecord->NumberParameters >= 2)
+    {
+        const ULONG_PTR kind = ep->ExceptionRecord->ExceptionInformation[0];
+        const ULONG_PTR at   = ep->ExceptionRecord->ExceptionInformation[1];
+        std::snprintf(buf, sizeof buf, "ProjectIo:   it tried to %s 0x%llX",
+                      kind == 1 ? "WRITE" : kind == 8 ? "EXECUTE" : "READ",
+                      static_cast<unsigned long long>(at));
+        crash_log(buf);
+    }
+
+    // The frames above it, as module+offset. Symbols are not needed to say which
+    // component faulted and through what, which is the whole question here.
+    void* frames[24] = {};
+    const USHORT n = CaptureStackBackTrace(0, 24, frames, nullptr);
+    for (USHORT i = 0; i < n; ++i)
+    {
+        if (!symbol_name(frames[i], where, sizeof where))
+            module_and_offset(frames[i], where, sizeof where);
+        std::snprintf(buf, sizeof buf, "ProjectIo:   frame %2u  %p  %s",
+                      static_cast<unsigned>(i), frames[i], where);
+        crash_log(buf);
+    }
     return EXCEPTION_CONTINUE_SEARCH; // still crash — this only reports
 }
 #endif

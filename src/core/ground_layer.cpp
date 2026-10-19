@@ -1700,6 +1700,31 @@ bool ground_layer::upload(SDL_Renderer* r, body_state& b, int level, int idx)
         SDL_SetTextureScaleMode(g.tex, SDL_SCALEMODE_LINEAR);
         SDL_SetTextureBlendMode(g.tex, SDL_BLENDMODE_BLEND);
     }
+    // BL-1387: THE BUFFER MUST COVER THE TEXTURE. SDL_UpdateTexture reads `h` rows of
+    // `w * 4` bytes from this pointer and cannot know how long the vector is, so a chunk
+    // whose pixels were baked against a DIFFERENT geometry than the one `w`/`h` were just
+    // computed from would send SDL off the end of our own heap.
+    //
+    // IT IS NOT WHAT roads_painted.lua CRASHES ON - this never fires on that run, and the
+    // fault is inside SDL's own software blitter (SDL_blit_A.c) reached from
+    // SDL_RenderPresent. It is kept because the check is missing either way: SDL cannot
+    // see the length and nothing else here asserts it.
+    //
+    // The refusal is loud and the chunk is dropped rather than drawn: an upload that
+    // cannot be trusted is not an upload, and a silent skip would read as a missing chunk
+    // with no cause attached.
+    const std::size_t need = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+    if (px.size() < need)
+    {
+        SDL_Log("ground_layer::upload REFUSED level %d chunk %d: the baked buffer holds "
+                "%zu px but the texture is %dx%d (%zu) - the chunk was baked against a "
+                "different geometry (BL-1387)",
+                level, idx, px.size(), w, h, need);
+        if (g.tex)
+            SDL_DestroyTexture(g.tex);
+        m_gpu.erase(key);
+        return false;
+    }
     SDL_UpdateTexture(g.tex, nullptr, px.data(), w * 4);
     g.ver = s.ver[idx];
     g.last_used = m_frame;
