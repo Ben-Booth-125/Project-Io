@@ -91,8 +91,8 @@
   {
    "id": "56",
    "theme": "trustworthy ground",
-   "state": "open",
-   "status_line": "REOPENED 2026-10-18: BL-1310 fixed after the live click; BL-1382 (province normalising pass) added. Branch claude/sprint-56-456d2b, unmerged.",
+   "state": "gated",
+   "status_line": "GATED 2026-10-19 on claude/sprint-56-456d2b (unmerged, unpushed). Ten items delivered; BL-1338 re-pin and the hot-row archive owed at integration after sprint 55 lands. Handoff: docs/development/HANDOFF_SPRINT_56.md.",
    "opened_date": "2026-10-16",
    "author": "Ben (2026-10-16)",
    "goal": "Every nation holds one territory (contiguous by land or a short strait), the ground paints inside 1 minute and 6 GB, and the failing quarterly-return and digest-pin gates tell the truth again.",
@@ -108,26 +108,29 @@
    "notes": "Calls 2026-10-16 (Ben): add-ons BL-1247, BL-1214, BL-1319; water rule = short strait only; an illegal exclave is ceded to the nation that surrounds it, recorded as a closing-round event; BL-1338 attributes movers here and re-pins at integration after sprint 55 lands; paint target 1 minute and 6 GB (\"this seems like it was caused by the debug\").",
    "retro": {
     "landed": [
-     "BL-1337 (return net crosses zero): net held exact (double); R2 strengthened; save v54 stacks on BL-1340 v53.",
-     "BL-1214 (eighth field doc drift): FINANCE.md states what a return carries and every mover it does not.",
-     "BL-1338 (digest pins stale): 24 movers attributed since 484ccb29, none unexplained; 16-seed candidate table drafted; re-pin at integration (Ben).",
-     "BL-1319 (fixture base stall): loan before placement, the base's own shelf stocked (verify.market_at); 10 consumer scripts run, 0 script errors.",
-     "BL-1310 (nations contiguous): strait rule, cession as closing-round events, seat = capital, every launch obeys; world_audit 80/80 library rows, 0 illegal exclaves.",
-     "BL-1247 (ground benchmark): --bench-ground reports the five budgets plus paint time and peak memory.",
-     "BL-1311 (ground paint perf): seat wait 750 s -> 34.4 s Debug on an idle machine (target 1 minute met); peak 12.4 -> 6.66 GB; captures byte-identical.",
-     "Wizard footer anchored at the window floor (Ben, 2026-10-16, mid-sprint)."
+     "BL-1337 (return net crosses zero): net held exact; R2 strengthened; save v54 stacks on BL-1340 v53.",
+     "BL-1214 (eighth field doc drift): FINANCE.md states what a return carries and what it does not.",
+     "BL-1338 (digest pins stale): 24 movers attributed, none unexplained; re-pin authorised in principle at integration (Ben).",
+     "BL-1319 (fixture base stall): loan before placement, the base's own shelf stocked; 10 consumer scripts run, 0 script errors.",
+     "BL-1310 (nations contiguous): strait rule; exclaves split among neighbours; seat is capital (under-floor realms keep the larger piece); city states judged at the close; every launch obeys; size check passes 13 seeds, 43/28/13 accepted.",
+     "BL-1247 (ground benchmark) and BL-1311 (ground paint perf): seat wait 750 s -> 34 s Debug; peak 12.4 -> 6.66 GB; captures byte-identical.",
+     "BL-1382 (province normalising pass): split over 100·f(s), merge under 24·f(s), after nations, before roads.",
+     "BL-1386 (no realm closes empty): army 600 per mille of the earn, tribute on the pre-floor earn, endowment floor 500 per mille; foundings keep 16 ticks of the state bill; majors short of a year 20 -> 2 natural.",
+     "Wizard footer anchored at the window floor (live-clicked by Ben)."
     ],
     "slipped": [
-     "The 6 GB ceiling: A+B reaches 6.66 GB peak (5.85 at play open); the pinned home master leaves no room, so BL-1377 (ground under six GB) carries it, Ben to choose C or D."
+     "The 6 GB ceiling: 6.66 GB peak; BL-1377 (ground under six GB) holds options C/D.",
+     "Two natural majors and one at 20:4 still open short of a year: BL-1389 (remaining major drain)."
     ],
     "feedback": [
-     "Three of four isolated lanes were cut from a stale base (169bbabd), six commits behind the sprint branch; the digest walk would have missed BL-1339. Check every lane's merge-base on launch.",
-     "The handoff's market_viability baseline was stale; the quick tier showed a false G1 t50 FAIL (84.7) that the full tier cleared (87.9). Measure the base on the same tree before attributing.",
-     "Cold review paid again: a vacuous refusal row (BL-1337) and a core-drift defect that ceded mainlands (BL-1310) were caught only by the independent reviewer.",
-     "Unblocking the fixture exposed months of unexercised UI claims (BL-1376)."
+     "The live click caught what no gate could: BL-1310 starved the minors while every count stayed at 20. nation_sizes and the size check now read it.",
+     "Measure on the shipped arc: the province spread was first quoted from history-off worlds (median 48 vs 10), and Ben chose a band on the wrong numbers.",
+     "Cold review caught a core-drift defect, a spec breach on early launches, and two Pass 7 rules the code broke; every round paid for itself.",
+     "Lanes were cut from stale bases three times; checking the merge-base on launch saved a missed mover.",
+     "The sprint grew from 7 items to 10 plus three rounds of rulings; the parallel run with sprint 55 still held."
     ],
-    "gates": "Final tip: market_viability full G1 90.6, G1 t50 87.4, G1b 2.9, G2 160.0, G3 94.6 (all pass); history_patterns 16/16 x4, revolution 7/16; history_sim_harness R3a2/R3a3 only (baseline); world_determinism, exploration_sim_harness, save_roundtrip, quarterly_return, ground_bake_check ALL PASS; nation_targets quick 144/144; world_audit 0 illegal exclaves.",
-    "filed": "BL-1370..BL-1377; NR-1049, NR-1050 (resolved), NR-1051."
+    "gates": "Final tip ab2ab22a: market_viability full G1 95.2, G1t50 89.5, G1b 3.2, G2 175.0, G3 96.4 (pooled pass; per-seed t50 dips on 9, 40, 11, 32 accepted as variance); history_patterns 16/16 x4, revolution 8/16; history_sim_harness R3a2/R3a3 only; world_audit library 128 checks 0 fail; world_determinism, exploration_sim_harness, exploration_sweep, save_roundtrip, quarterly_return, state_industry_harness, lp_pool_harness, no_empty_chest_harness ALL PASS; nation_targets quick 144/144; player_seed_sweep --guard PASS.",
+    "filed": "BL-1370..BL-1377, BL-1382, BL-1386, BL-1389; NR-1049..NR-1054 (NR-1052 open)."
    }
   }
  ],

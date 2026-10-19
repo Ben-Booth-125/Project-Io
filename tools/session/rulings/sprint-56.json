@@ -98,5 +98,59 @@
       "the lowest median measured before the\\s+strait rule \\(227 tiles\\)"
     ],
     "owner": "BL-1310 (nations contiguous)"
+  },
+  {
+    "ruling": "One pass evens out settled province sizes: split over 100·f(s), merge under 24·f(s)",
+    "doc": "docs/generation/PROVINCES.md",
+    "anchor": "### The normalising pass \\(Ben, 2026-10-18\\)",
+    "stale": [
+      "nothing is merged away to satisfy a\\s+floor, \\*\\*boundaries win ties",
+      "offcuts and no merge pass\\."
+    ],
+    "owner": "BL-1382 (province normalising pass)"
+  },
+  {
+    "ruling": "No major leaves generation on a zero treasury",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "No major leaves generation on a zero treasury \\(Ben, 2026-10-19\\)",
+    "stale": [],
+    "owner": "BL-1382 economy; BL-1386 (no realm closes empty)"
+  },
+  {
+    "ruling": "A state founding leaves a year of the state bill, counted from the opening (16 ticks)",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "counted from the game.s\\s+opening",
+    "stale": [
+      "\\(four ticks of\\s+what the funding gate would charge"
+    ],
+    "owner": "BL-1382 economy"
+  },
+  {
+    "ruling": "No realm closes the history empty: army share, tribute on the earn, endowment floor, calibrated 600/500",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "Calibrated \\(Ben, 2026-10-19\\)",
+    "stale": [],
+    "owner": "BL-1386 (no realm closes empty)"
+  },
+  {
+    "ruling": "The floor may reorder a few realms, the one exception to keep the order",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "The floor may\\s+reorder a few realms",
+    "stale": [],
+    "owner": "BL-1386 (no realm closes empty)"
+  },
+  {
+    "ruling": "The army carries only a share of the earn",
+    "doc": "docs/generation/EXPLORATION.md",
+    "anchor": "The army carries\\s+only a share of the earn",
+    "stale": [],
+    "owner": "BL-1386 (no realm closes empty)"
+  },
+  {
+    "ruling": "Tribute is a share of the subject earn, read before the floor",
+    "doc": "docs/generation/EXPLORATION.md",
+    "anchor": "Tribute is a share of the subject.s earn, not of its chest",
+    "stale": [],
+    "owner": "BL-1386 (no realm closes empty)"
   }
 ]

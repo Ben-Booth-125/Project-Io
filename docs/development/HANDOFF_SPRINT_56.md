@@ -1,4 +1,4 @@
-# Sprint 56 handoff — trustworthy ground (2026-10-17)
+# Sprint 56 handoff — trustworthy ground (2026-10-17, closed 2026-10-19)
 
 Sprint 56 ran beside sprint 55, on branch `claude/sprint-56-456d2b` in its own worktree, while Ben
 playtested main. It is **gated, not merged and not pushed**. The retro is in `sprints.json`.
@@ -15,7 +15,10 @@ This note is for the session that brings the branch onto main after sprint 55 la
 | BL-1310 (nations contiguous) | Delivered; world mover. |
 | BL-1247 (ground benchmark) | Delivered: `ProjectIo --bench-ground`. |
 | BL-1311 (ground paint perf) | Delivered; the 6 GB rest is BL-1377 (ground under six GB). |
-| Wizard footer anchored | Delivered (STARTUP.md, Ben 2026-10-16). Owes Ben's live click. |
+| Wizard footer anchored | Delivered (STARTUP.md, Ben 2026-10-16); live-clicked by Ben. |
+| BL-1382 (province normalising pass) | Delivered; world mover (PROVINCES.md § The normalising pass). |
+| BL-1386 (no realm closes empty) | Delivered; world mover (Pass 7, EXPLORATION.md). Follow-up BL-1389 (remaining major drain). |
+| Hub seeding and the state reserve | Delivered with BL-1382: LP coverage read at the funding gate; foundings keep 16 ticks of the state bill. |
 
 ## Fixed after the live click (2026-10-18): BL-1310 no longer starves minors
 
@@ -26,7 +29,7 @@ nations that border it, province by province; city states are judged at the clos
 the floor keeps its larger piece. world_audit now reads sizes: 15 seeds pass 80% of their own
 pre-BL-1310 median, and seeds 43 (145), 28 (181) and 13 (496) are accepted exceptions pinned at their readings (Ben,
 2026-10-18 and 2026-10-19). market_viability per-seed: seeds 9, 40 and 11 dip under 85 at tick 50 and
-are accepted as world variance (Ben, 2026-10-19); the pooled gates pass.
+are accepted as world variance, and seed 32 with them (Ben, 2026-10-19); the pooled gates pass.
 
 ## Integration steps, in order
 
@@ -37,7 +40,9 @@ are accepted as world variance (Ben, 2026-10-19); the pooled gates pass.
    (`world_save.hpp`). The five harnesses that cut streams back (`save_roundtrip`, `lp_pool_harness`,
    `railway_harness`, `space_assets_harness`, `tax_discontent_harness`) subtract
    `world_save_net_section_bytes`; recheck them after the stack.
-3. **Ids.** This branch minted BL-1370..BL-1377 and NR-1049..NR-1051 from the main tip of
+3. **Ids.** Minted on this branch since: BL-1382, BL-1386, BL-1389 (each clear of main when minted)
+   and NR-1049..NR-1054. Check them again at the merge.
+    This branch minted BL-1370..BL-1377 and NR-1049..NR-1051 from the main tip of
    2026-10-17 (main then held BL-1369, NR-1048). Sprint 55 may have minted the same numbers since:
    compare and renumber the later ones with their cross-references.
    **Confirmed 2026-10-18:** main holds BL-1372 (rail is a crossing), BL-1374 (ledger tabs fixture
@@ -53,13 +58,18 @@ are accepted as world variance (Ben, 2026-10-19); the pooled gates pass.
 6. **Archive the delivered rows** (BL-1337, BL-1214, BL-1319, BL-1310, BL-1247, BL-1311, and
    BL-1338 once re-pinned) with `archive_landed.js` — it evicts on any call, so run it once, on
    purpose.
-7. **Debug build trees rebuild once**: BL-1311 switches on CMake policy CMP0184 and builds the
+7. **Regenerate the sweep artefacts** (`exploration_sweep.json` and the other checked-in sweep
+   JSONs) after the integrated tree's last world mover; this branch left them as committed.
+8. **Debug build trees rebuild once**: BL-1311 switches on CMake policy CMP0184 and builds the
    ground bake at /O2 in Debug (kept, on by default: Ben, 2026-10-17, NR-1051).
 
 ## Open for Ben
 
+- NR-1052: the province band's scaling f(s) = 1 + (s-1)/2 by anchor scale (Claude's calibration).
 - BL-1377 (ground under six GB): decided later (Ben, 2026-10-17); options C (stream the master) or D (96 px).
-- Live click 2026-10-17 (Ben): wizard footer good; borders contiguous; memory down. Observation: many minors are very small and the world reads as dominated by large powers — see the open question below.
+- BL-1389 (remaining major drain): trace the two natural majors and one at 20:4 still short of a year.
 
-Resolved 2026-10-17: NR-1049 (strait 3 tiles kept; exact net in the acquisition price kept), NR-1051
-(Debug-optimised bake kept, on by default), the BL-1338 re-pin authorised in principle.
+Resolved: NR-1049 (strait 3 tiles; exact net in the acquisition price), NR-1050 (seat is capital),
+NR-1051 (Debug-optimised bake kept), NR-1053 (no major on a zero treasury), NR-1054 (seed 40 herd
+accepted), the BL-1338 re-pin authorised in principle. Live click 2026-10-17 (Ben): wizard footer
+good; borders contiguous; memory down; the tiny-minor finding it raised is fixed above.
