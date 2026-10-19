@@ -3222,13 +3222,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ? static_cast<int>(std::floor((visible_left  - p1.x) / period_px)) : 0;
         const int k_hi = (period_px > 0.0f)
             ? static_cast<int>(std::ceil ((visible_right - p0.x) / period_px)) : 0;
+        // BL-1387 - CLIP THE QUAD TO THE VIEW, AND KEEP ITS UVs. A ground image is drawn
+        // at the scale the camera asks for, so at the closest rung a page can cover a
+        // destination rectangle hundreds of thousands of pixels wide while only a
+        // window-sized sliver of it is on screen. ImGui happily records that quad, the
+        // SDL3 backend hands it to the renderer, and the SOFTWARE renderer - the one
+        // `--verify` forces so goldens stay machine-independent - turns an axis-aligned
+        // textured quad into a scaled blit whose fixed-point source step is computed
+        // from the DESTINATION extent. At these extents that arithmetic walks off the
+        // source surface, and the process dies inside SDL's own blitter
+        // (Blit8888to8888PixelAlphaSwizzleAVX2, SDL_blit_A.c), reading a few bytes past
+        // a live allocation, with nothing of ours on the faulting frame. That is the
+        // crash `roads_painted.lua` has been dying on at its last framing.
+        //
+        // Clipping costs nothing and changes no pixel: the part outside the view was
+        // never drawn, and the UVs are moved by the same fraction the edges were, so
+        // what remains samples exactly the texels it did before. The renderer's own clip
+        // rectangle would have hidden the overflow - it does not stop SDL computing the
+        // blit from the unclipped extent first.
+        const float view_l = visible_left, view_r = visible_right;
+        const float view_t = grid_area_origin.y - hit_r;
+        const float view_b = grid_area_origin.y + grid_area_size.y + hit_r;
         for (int k = k_lo; k <= k_hi; ++k)
         {
             const float off = static_cast<float>(k) * period_px;
             if (p1.x + off < visible_left || p0.x + off > visible_right)
                 continue;
-            dl->AddImage((ImTextureID)(intptr_t)cv.tex,
-                         { p0.x + off, p0.y }, { p1.x + off, p1.y });
+            float x0 = p0.x + off, x1 = p1.x + off, y0 = p0.y, y1 = p1.y;
+            const float w_span = x1 - x0, h_span = y1 - y0;
+            if (!(w_span > 0.0f) || !(h_span > 0.0f))
+                continue;
+            ImVec2 uv0{0.0f, 0.0f}, uv1{1.0f, 1.0f};
+            if (x0 < view_l) { uv0.x += (view_l - x0) / w_span; x0 = view_l; }
+            if (x1 > view_r) { uv1.x -= (x1 - view_r) / w_span; x1 = view_r; }
+            if (y0 < view_t) { uv0.y += (view_t - y0) / h_span; y0 = view_t; }
+            if (y1 > view_b) { uv1.y -= (y1 - view_b) / h_span; y1 = view_b; }
+            if (!(x1 > x0) || !(y1 > y0))
+                continue; // clipped away entirely
+            dl->AddImage((ImTextureID)(intptr_t)cv.tex, { x0, y0 }, { x1, y1 }, uv0, uv1);
         }
     };
     if (ground_on)
