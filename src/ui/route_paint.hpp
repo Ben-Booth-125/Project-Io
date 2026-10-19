@@ -99,9 +99,15 @@ struct route_piece
     float split = 0.0f;         ///< Arclength where the two halves meet (a curve's apex); spokes: 0.
     float bx0 = 0, by0 = 0, bx1 = 0, by1 = 0; ///< Polyline bounding box, tile-relative.
     std::uint8_t tier = 0;      ///< 1-4 road ladder; 0x80 | lane tier for a sea lane.
+    /// BL-1386: THE SECOND HALF'S TIER, for a curve whose two crossings differ - the half
+    /// past @ref split. A ROAD IS AN EDGE and each edge carries its own tier, so a tile
+    /// with a Track one way and a Highway the other must draw each half at its own weight;
+    /// before this the whole tile was painted at `max_road_tier`, and 845 tiles of the
+    /// shipped 1960 start carry two tiers. Equal to @ref tier wherever the piece is
+    /// uniform, which is every spoke, yard, spur, rail and lane piece.
+    std::uint8_t tier_b = 0;
     std::uint8_t kind = curve;
     std::uint8_t flags = 0;
-    std::uint8_t pad_ = 0;
 };
 
 /// BL-1291: where a route crosses tile edge (link @p n of tile (@p c, @p r);

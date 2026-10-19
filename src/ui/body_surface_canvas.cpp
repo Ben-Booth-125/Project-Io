@@ -4125,8 +4125,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // the step actually crosses something laid. A road reads its edge mask there (a run
         // draws across the boundary it crosses, RENDERING.md § Roads draw across the edge
         // they cross); a sea lane, still a tile field, reads the neighbour's own level.
+        // BL-1386: @p weight_of / @p thick_of turn ONE DIRECTION's link value into the
+        // colour and width drawn across it, with the passed col/thick as the fallback for
+        // a network whose value carries no tier (a sea lane, which is a tile field).
         const auto draw_network = [&](auto level_of, auto link_of, ImU32 col, float thick,
-                                      bool skip_rungs)
+                                      bool skip_rungs, auto weight_of, auto thick_of)
         {
             static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
             const auto through = [&](int c, int r, bool horizontal) {
@@ -4136,6 +4139,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             };
             ImVec2 mids[4];
             float  vis[4];
+            ImU32  ecol[4];   // BL-1386: this DIRECTION's colour...
+            float  ethick[4]; // ...and its width, from the edge's own tier
             int    deg = 0;
             for (int n = 0; n < 4; ++n)
             {
@@ -4153,7 +4158,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const tile_component* nb_tile = tile_rc(ncol, nrow);
                 if (!nb_tile || level_of(*nb_tile) == 0)
                     continue;
-                if (link_of(tile, card_off[n][0], card_off[n][1]) == 0)
+                const int link_tier = link_of(tile, card_off[n][0], card_off[n][1]);
+                if (link_tier == 0)
                     continue; // nothing is laid across THIS boundary (BL-1340)
                 if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
                     continue; // BL-408: god view draws into the masked region too
@@ -4172,6 +4178,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                 mids[deg] = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
                 vis[deg]  = std::max(vision, vision_rc(ncol, nrow));
+                // BL-1386: A ROAD IS AN EDGE, SO THE WEIGHT IS THE EDGE'S. This used to
+                // style every half of the tile by `max_road_tier(tile)` - one weight for
+                // the whole cell - so a tile carrying a Track one way and a Highway the
+                // other drew both halves as Highway. Measured on the shipped 1960 start:
+                // 845 tiles carry two different tiers, about one roaded tile in six. The
+                // curve below was ALREADY split at its apex so each half could take its
+                // own edge's fog; the tier rides the same seam.
+                ecol[deg]   = weight_of(link_tier, col);
+                ethick[deg] = thick_of(link_tier, thick);
                 ++deg;
             }
 
@@ -4198,8 +4213,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // the road layer's vertices for a shape no one could see.
                 if (draw_r < k_route_lod_radius_px)
                 {
-                    const ImU32 ea = fog_dim(col, vis[a]);
-                    const ImU32 eb = fog_dim(col, vis[b]);
+                    const ImU32 ea = fog_dim(ecol[a], vis[a]);
+                    const ImU32 eb = fog_dim(ecol[b], vis[b]);
+                    const float ta = ethick[a], tb = ethick[b];
                     const ImVec2 ctl_a = {(mids[a].x + cx) * 0.5f, (mids[a].y + cy) * 0.5f};
                     const ImVec2 ctl_b = {(mids[b].x + cx) * 0.5f, (mids[b].y + cy) * 0.5f};
                     const int segs = coarse_fill ? 1 : 2;
@@ -4210,32 +4226,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         else
                             out->PathBezierQuadraticCurveTo(ctl, to, segs);
                     };
-                    if (ea == eb)
+                    // One stroke only when the two halves agree in BOTH colour and width
+                    // (BL-1386 added the width half of that test).
+                    if (ea == eb && ta == tb)
                     {
                         out->PathLineTo(mids[a]);
                         half(ctl_a, apex);
                         half(ctl_b, mids[b]); // the b half, walked apex-outward
-                        out->PathStroke(ea, ImDrawFlags_None, thick);
+                        out->PathStroke(ea, ImDrawFlags_None, ta);
                     }
                     else
                     {
                         out->PathLineTo(mids[a]);
                         half(ctl_a, apex);
-                        out->PathStroke(ea, ImDrawFlags_None, thick);
+                        out->PathStroke(ea, ImDrawFlags_None, ta);
                         out->PathLineTo(apex);
                         half(ctl_b, mids[b]);
-                        out->PathStroke(eb, ImDrawFlags_None, thick);
+                        out->PathStroke(eb, ImDrawFlags_None, tb);
                     }
                     return apex;
                 }
                 for (const int i : {a, b})
                 {
-                    const ImU32 ec = fog_dim(col, vis[i]);
+                    const ImU32 ec = fog_dim(ecol[i], vis[i]);
                     const ImVec2 ctl = {(mids[i].x + cx) * 0.5f, (mids[i].y + cy) * 0.5f};
-                    out->AddBezierQuadratic(mids[i], ctl, apex, ec, thick, 6);
+                    out->AddBezierQuadratic(mids[i], ctl, apex, ec, ethick[i], 6);
                 }
-                // A round joint at the apex hides the seam between the two halves.
-                out->AddCircleFilled(apex, thick * 0.5f, fog_dim(col, std::max(vis[a], vis[b])));
+                // A round joint at the apex hides the seam between the two halves. It takes
+                // the HEAVIER half, so a Track meeting a Highway is capped by the highway
+                // and the taper reads at the midpoint rather than as a notch (BL-1386).
+                const int heavy = (ethick[a] >= ethick[b]) ? a : b;
+                out->AddCircleFilled(apex, ethick[heavy] * 0.5f,
+                                     fog_dim(ecol[heavy], std::max(vis[a], vis[b])));
                 return apex;
             };
 
@@ -4275,11 +4297,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // a lone tile visible. Four neighbours pair off whole and need neither.
             if (deg == 2 || deg == 4)
                 return;
+            float cap_thick = 0.0f; ImU32 cap_col = col;
             for (int i = 0; i < deg; ++i)
+            {
                 if (!used[i])
-                    out->AddLine(hub, mids[i], fog_dim(col, vis[i]), thick);
-            out->AddCircleFilled(hub, std::max(1.0f, thick * 0.75f),
-                                 fog_dim(col, cap_vision));
+                    out->AddLine(hub, mids[i], fog_dim(ecol[i], vis[i]), ethick[i]);
+                if (ethick[i] > cap_thick) { cap_thick = ethick[i]; cap_col = ecol[i]; }
+            }
+            // The cap is the heaviest edge meeting here (BL-1386), and falls back to the
+            // passed weight for a lone tile with no edge at all.
+            if (cap_thick <= 0.0f) { cap_thick = thick; cap_col = col; }
+            out->AddCircleFilled(hub, std::max(1.0f, cap_thick * 0.75f),
+                                 fog_dim(cap_col, cap_vision));
         };
 
         // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
@@ -4333,7 +4362,28 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                              return road_tier_on_side(
                                  self, hex_side_for_offset(dc, dr, (t_row & 1) != 0));
                          },
-                         col, thick, false);
+                         col, thick, false,
+                         // BL-1386: the EDGE's tier decides its half's weight, not the
+                         // tile's best. The ladder is the same one the legend and the bake
+                         // use - Track thin/dim, Road medium, Highway thick/bright.
+                         [](int tier, ImU32 fallback) -> ImU32 {
+                             switch (tier)
+                             {
+                                 case 1:  return IM_COL32(175, 158, 120, 205);
+                                 case 2:  return IM_COL32(205, 188, 140, 225);
+                                 case 3:  return IM_COL32(225, 205, 150, 238);
+                                 default: return fallback;
+                             }
+                         },
+                         [route_r](int tier, float fallback) -> float {
+                             switch (tier)
+                             {
+                                 case 1:  return route_r * k_road_width_track;
+                                 case 2:  return route_r * k_road_width_road;
+                                 case 3:  return route_r * k_road_width_highway;
+                                 default: return fallback;
+                             }
+                         });
         }
 
         if (metered)
@@ -4345,7 +4395,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (route_drawn && tile.lane_level > 0)
             draw_network([](const tile_component& t) { return t.lane_level; },
                          [](const tile_component&, int, int) { return 1; }, // a lane is a tile field
-                         IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
+                         IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true,
+                         // A lane carries no tier, so every half keeps the lane's own weight.
+                         [](int, ImU32 fallback) { return fallback; },
+                         [](int, float fallback) { return fallback; });
 
         if (metered)
             pm.mark(canvas_pass_meter::lanes, dl);

@@ -4620,8 +4620,32 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             {
                 ++mixed_tier_tiles;
                 mixed_tier_edges += sides_with_road;
+                // ONE EXAMPLE, TO THE LOG, NEVER TO THE SCRIPT (BL-1386). A capture of the
+                // taper has to be aimed at a tile that actually carries two tiers, and no
+                // verify call answers "which tile is that" - nor should one, without a
+                // grant. The LOG is the author's to read; the Lua table above still carries
+                // counts alone, so no tile data reaches a script.
+                if (mixed_tier_tiles == 1)
+                    SDL_Log("verify.route_link_audit: a mixed-tier tile stands at (%d,%d), "
+                            "tiers %d..%d across %d crossing(s)",
+                            tc2.grid_x, tc2.grid_y, static_cast<int>(lo), static_cast<int>(hi),
+                            sides_with_road);
             }
         }
+        // BL-1386: and what the BAKE did about it - curve pieces actually carrying two
+        // tiers, one a half. Before the fix this was 0 by construction, because a piece
+        // took one tier for the whole tile.
+        int two_tier_pieces = 0, road_pieces = 0;
+        for (const ui::ground::route_piece& pc : src.route_pieces)
+        {
+            if ((pc.tier & 0x80u) != 0)
+                continue; // a sea lane
+            ++road_pieces;
+            if (pc.tier_b != pc.tier)
+                ++two_tier_pieces;
+        }
+        out["two_tier_pieces"] = two_tier_pieces; ///< BL-1386: baked runs that taper at the apex
+        out["road_pieces"]     = road_pieces;
         out["mixed_tier_tiles"] = mixed_tier_tiles; ///< BL-1386: tiles carrying two different tiers
         out["mixed_tier_edges"] = mixed_tier_edges; ///< ...and the crossings on them
         out["drawn_without_edge"] = drawn_without_edge; ///< BL-1382: a run drawn across a roadless boundary

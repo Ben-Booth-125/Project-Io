@@ -262,6 +262,7 @@ route_piece straight(double ax, double ay, double bx, double by, std::uint8_t ti
 {
     route_piece pc;
     pc.tier = tier;
+    pc.tier_b = tier; // a straight piece is one edge's: both halves are the same (BL-1386)
     pc.kind = kind;
     pc.flags = flags;
     for (int k = 0; k < route_piece::k_pts; ++k)
@@ -426,10 +427,14 @@ inline void sample(const route_end& a, const route_end& b, double arm, double be
 /// verges). @p search false: no bow (a sea lane: the water is flat).
 route_piece routed(const bake_source& s, const tile_ground& tg, const route_end& a, const route_end& b,
                    std::uint8_t tier, std::uint8_t kind, std::uint8_t flags, bool search,
-                   double kx, double ky, double keep)
+                   double kx, double ky, double keep, std::uint8_t tier_b = 0)
 {
     route_piece pc;
     pc.tier = tier;
+    // BL-1386: the half past the apex takes the OTHER crossing's tier. The geometry is
+    // unchanged - the bow, the clearance and the character are the run's, taken from the
+    // heavier end below - only the painted weight differs between the halves.
+    pc.tier_b = tier_b != 0 ? tier_b : tier;
     pc.kind = kind;
     pc.flags = flags;
     const double chord = std::hypot(b.x - a.x, b.y - a.y);
@@ -615,11 +620,24 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
     const int r = static_cast<int>(i) / s.gw, c = static_cast<int>(i) % s.gw;
     double mx[4], my[4];
     route_end xc[4]; // the crossings, heading OUT across their edges
+    std::uint8_t xt[4]; // BL-1386: and the TIER laid across each of them
     int deg = 0;
     for (int n = 0; n < 4; ++n)
         if (links & (1u << n))
         {
             link_mid(r, n, mx[deg], my[deg]);
+            // THIS EDGE'S OWN TIER (BL-1386). A rail tile and a sea lane are TILE fields
+            // and keep the passed tier; a road reads its own side of the mask, so a tile
+            // carrying a Track one way and a Highway the other paints each half right.
+            xt[deg] = tier;
+            if (!lane && tier != k_route_rail && i < s.road_sides.size())
+            {
+                const int side = hex_side_for_offset(k_card[n][0], k_card[n][1], (r & 1) != 0);
+                const std::uint8_t et = (side >= 0)
+                    ? static_cast<std::uint8_t>((s.road_sides[i] >> (2 * side)) & 0x3u) : 0;
+                if (et != 0)
+                    xt[deg] = et;
+            }
             int net = lane ? 2 : 0;
             if (!lane && tier == k_route_rail)
             {
@@ -682,7 +700,19 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         used[pa] = used[pb] = true;
         const route_end ea{ xc[pa].x, xc[pa].y, -xc[pa].tx, -xc[pa].ty }; // in across edge a
         const route_end eb = xc[pb];                                       // out across edge b
-        out.push_back(routed(s, tg, ea, eb, tier, route_piece::curve, flags, search, kx, ky, keep));
+        // BL-1386: each half at its OWN crossing's tier - a into the apex, b out of it.
+        // The run's SHAPE still comes from the heavier of the two (route_character reads
+        // the first argument), so a Track meeting a Highway bows like the highway it joins
+        // and only the painted weight tapers at the apex.
+        const std::uint8_t ta = xt[pa], tb = xt[pb];
+        out.push_back(routed(s, tg, ea, eb, std::max(ta, tb), route_piece::curve, flags,
+                             search, kx, ky, keep));
+        // `routed` walks a -> b, so the half INTO the apex is a's and the half out of it
+        // is b's. The shape was built from the heavier of the two; the painted weight is
+        // each half's own.
+        route_piece& just = out.back();
+        just.tier   = ta;
+        just.tier_b = tb;
         // The hub an odd branch joins: this curve's middle.
         hubx = out.back().x[kK / 2];
         huby = out.back().y[kK / 2];
@@ -698,7 +728,7 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
             const double ddx = xc[a].x - sx, ddy = xc[a].y - sy;
             const double dl = std::max(1e-9, std::hypot(ddx, ddy));
             const route_end es{ sx, sy, ddx / dl, ddy / dl };
-            out.push_back(routed(s, tg, es, xc[a], tier, route_piece::spoke, flags, search, kx, ky,
+            out.push_back(routed(s, tg, es, xc[a], xt[a], route_piece::spoke, flags, search, kx, ky,
                                  to_apron ? plan->radius + hw : keep)); // the apron stands just off the disc
         }
     if (roaded && have_curve)
@@ -792,10 +822,15 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
             const route_piece& pc = s.route_pieces[first + static_cast<std::size_t>(j)];
             if (((pc.tier & 0x80u) != 0) != lanes)
                 continue;
-            double hw = tier_hw(pc.tier);
+            // BL-1386: A CURVE CAN CARRY TWO TIERS, one a half. The cull below must admit
+            // the piece at its WIDEST, or the heavier half would be clipped at the bbox;
+            // which half a pixel actually belongs to is known only once the nearest point
+            // is found, so the weight is resolved again there.
+            const std::uint8_t wide_tier = pc.tier_b > pc.tier ? pc.tier_b : pc.tier;
+            double hw = tier_hw(wide_tier);
             if (pc.kind == route_piece::yard)
                 hw *= 1.5;
-            const double pout = piece_out(pc.tier, pc.flags);
+            const double pout = piece_out(wide_tier, pc.flags);
             const double reach = hw + pout + slack;
             if (qx < pc.bx0 - reach || qx > pc.bx1 + reach || qy < pc.by0 - reach || qy > pc.by1 + reach)
                 continue;
@@ -815,16 +850,29 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
                     bdx = dx; bdy = dy;
                 }
             }
+            // THE HALF THIS PIXEL IS ON (BL-1386). `bs` is its arclength along the piece
+            // and `split` is the apex, so past the split the second crossing's tier is the
+            // one that paints here. Uniform pieces resolve to exactly what they did before.
+            const std::uint8_t hit_tier =
+                (pc.kind == route_piece::curve && pc.tier_b != pc.tier && bs > pc.split)
+                    ? pc.tier_b : pc.tier;
+            if (hit_tier != wide_tier)
+            {
+                hw = tier_hw(hit_tier);
+                if (pc.kind == route_piece::yard)
+                    hw *= 1.5;
+            }
+            const double hit_out = (hit_tier == wide_tier) ? pout : piece_out(hit_tier, pc.flags);
             const double d = std::sqrt(bd2);
             const double e = d - hw;
             if (e < 0.0)
                 ++h.covers;
-            h.clr = std::min(h.clr, e - pout);
+            h.clr = std::min(h.clr, e - hit_out);
             if (e < h.e)
             {
                 const double total = pc.cum[route_piece::k_pts - 1];
-                h.e = e; h.d = d; h.hw = hw; h.tier = pc.tier; h.kind = pc.kind; h.tile = t;
-                h.flags = pc.flags; h.out = pout;
+                h.e = e; h.d = d; h.hw = hw; h.tier = hit_tier; h.kind = pc.kind; h.tile = t;
+                h.flags = pc.flags; h.out = hit_out;
                 h.nx = d > 1e-12 ? bdx / d : 0.0;
                 h.ny = d > 1e-12 ? bdy / d : 0.0;
                 if (pc.kind == route_piece::curve)
