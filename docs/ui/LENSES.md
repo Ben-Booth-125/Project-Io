@@ -1006,34 +1006,44 @@ ground roads are thin pale threads of the land (RENDERING.md § Roads and sea la
 network as logistics — every road and lane by tier, at the 1 : 1.5 : 2 weights — is read
 here, over the reach-cost field the network itself produces.
 
-**Data definition.** Two reads, both of things that already exist.
+**Data definition (Ben, 2026-10-16).** The lens is **player-facing**: it shows the
+player's own nation's network and points, and nothing else. A rival's sources and ground
+are not drawn — not shaded zero, but left bare, because a neighbour's logistics is not a
+value of zero, it is not the subject.
 
-- The **field** is `body_reach_field`, read per tile through the const
-  `tile_reach_cost` — the weighted cost from that tile to its nearest supply
-  anchor. The Reach rule spends this field as a *binary placement predicate*
-  (reachable / not); the lens spends the quantity the predicate throws away.
-- The **magnitude** is the tick's own **Logistic Point sources** — each running
-  logistics hub, railway station and port with the points it actually makes, its
-  upkeep shortfall folded in, read off the economy step's resolve rather than
-  recomputed here. **A city is not a source and carries no mark**
-  (`LOGISTICS.md` § Logistic Points, "Cities make none"), and neither is a source
-  standing on ground no nation holds, which feeds no pool.
+- The **field** is the **coverage** each of that nation's tiles gets from its own sources
+  — how much of a building's need this ground can be served, in `[0,1]`, which is what
+  decides whether a works here runs at full rate. It is the per-tile quantity
+  `LOGISTICS.md`'s one-pool model holds (`lp_coverage_at`), read with one memo per look
+  so a nation's three network fields are built once and every tile answered from them.
+- **Every tile carries that number**, as a percentage, wherever the rung gives the text
+  room: "a number to each tile, so we can see exactly how many points we have". Below a
+  drawn radius of 18 px the digits do not fit in a hex and the colour field carries the
+  read alone.
+- The **marks** are that nation's **sources** — each running logistics hub, railway
+  station and port with the points it actually makes, upkeep folded in, read off the
+  economy step's own resolve. **A city is not a source** (`LOGISTICS.md` § Logistic
+  Points, "Cities make none"), nor is one on ground no nation holds, nor one on a
+  neighbour's.
+- The **key** carries that nation's arithmetic: what its sources make this tick, how many
+  made it, and what its ground is asking for. No tagline — the lens is named for what it
+  shows.
 
-  The **field** below is still the reach cost, which is a different question from
-  the points a tile is served — saying which is what BL-1353 (the lens rework)
-  owns.
+**What this replaced, and why the old argument expired.** The field was the *reach cost*
+— the weighted distance to the nearest supply anchor — and the reasoning for that was
+explicit: a per-tile points figure *could not vary*, because every anchor made the same
+authored rate and every tile had a finite reach cost, so both "is it reached" and "how
+much reaches it" were flat across the grid. BL-1309 ended that condition: points are made
+by buildings, each on its own network, and they fade with distance along it. The quantity
+the old argument said did not exist is now the one the player asks about, so the lens
+shades it. Reach is still a real question and still has its own lens.
 
-**Why the field is the reach cost and not "the LP serving this tile".** Because
-the second is a constant, measured rather than assumed: on the home body every
-anchor generates the same authored rate and *every* tile has a finite reach cost
-(ocean is crossable at a sea-leg cost), so both "is it reached" and "how much LP
-reaches it" are flat over the whole grid. A per-tile *nearest-anchor attribution*
-would be needed to make the second vary, and deriving one is the second
-distance model [LOGISTICS.md](../economy/LOGISTICS.md) rule 2 refuses. The lens
-therefore draws the quantity that does vary and is the player's actual question:
-how far this ground is from capacity. **It does not assert that LP attenuates with
-distance** — LP is not distance-priced, and a lens implying it were would be
-asserting the model constraint 3 forbids.
+**The roads go brighter white under this lens** (Ben, 2026-10-16). On the ground a road is
+a thin pale thread of the land (`RENDERING.md` § Roads and sea lanes); read as *the
+network*, it is drawn at full weight in the vector pass that already redraws it here, in
+a near-white at the same 1 : 1.5 : 2 tier weights. The painted asphalt in the bake is
+**not** recoloured per lens: the bake is keyed on tile fields alone, so a lens-dependent
+colour there would re-bake every visible chunk on every toggle.
 
 **Rung.** Planetary only — anchors and the reach field are per-tile. Guarded
 behind `overlay_mode::throughput` in

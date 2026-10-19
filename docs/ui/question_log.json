@@ -615,11 +615,12 @@
   },
   "throughput_lens": {
    "surface": "Throughput lens (Planetary canvas)",
-   "answers": "How much can move through here, and how far is this ground from the capacity that would move it?",
-   "because": "Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions. IT ALSO CARRIES THE NETWORK (BL-1257, Ben 2026-10-10): on the ground a road is a thin pale thread of the land, so the road and lane network as logistics -- every road by tier at full weight, every lane in its blue, at every rung -- is read here, over the reach-cost field that network produces; the plain canvas draws no road network at any rung (Ben, 2026-10-10: the drawn web drew too much attention zoomed out).",
+   "answers": "How well is MY ground served with Logistic Points, and where do my own points come from? (BL-1353, Ben 2026-10-16: the lens is player-facing and carries a number on every tile.)",
+   "because": "A nation's Logistic Points decide whether its works run at all - a building short of points produces in proportion - and LOGISTICS.md makes surfacing that non-optional: 'a cap nobody can see is silent interdiction again'. It earns its space by answering the question in the player's own terms: the field is the COVERAGE of their own nation's ground, every tile the rung gives room to carries that figure as a percentage, the marks are their own sources with the points each makes, and the key is their nation's arithmetic - made, by how many, against what the ground asks. A rival's ground is left bare rather than shaded zero, because a neighbour's logistics is not a value of zero, it is not the subject. WHAT IT USED TO ANSWER, and why that expired: the field was the REACH COST, shaded because a per-tile points figure could not vary - every anchor made the same authored rate. BL-1309 ended that condition (points are made by hubs, stations and ports and fade along their own networks), so the lens now shades the quantity the old argument said did not exist. Reach is still a real question and still has its own lens. IT ALSO CARRIES THE NETWORK (BL-1257, Ben 2026-10-10): on the ground a road is a thin pale thread of the land, so the network as logistics is drawn at full weight here - and since BL-1353 in a brighter white, in the vector pass that already redraws it, never in the bake, which is keyed on tile fields and would re-bake every visible chunk on every lens toggle.",
    "backlog_item": [
     "BL-606",
-    "BL-1257"
+    "BL-1257",
+    "BL-1353"
    ],
    "files": [
     "src/ui/body_surface_canvas.cpp"

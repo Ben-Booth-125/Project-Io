@@ -7289,6 +7289,84 @@
      "result_metric": "G1 92.0->90.1, G2 182.1->185.0 (all gates pass); convoys 771->1112 and 841->1159"
     }
    ]
+  },
+  {
+   "brief": "lp-lens-rework",
+   "title": "BL-1353 - The Throughput lens: per-tile points, the player's own nation, no taglines, brighter roads",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1353 - sprint 55 (Ben, 2026-10-16, the logistics visibility message)",
+   "batch": "sprint-55",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: throughput_lens captures show a graded field that follows the sources, not the old reach envelope",
+      "headless: throughput_field_census re-run, as LENSES.md requires whenever the field moves"
+     ],
+     "requirement": "The field is the POINTS story, not the reach cost: each tile is tinted by the coverage its host nation's sources give it, which is the quantity BL-1309 made per-tile and LENSES.md's old argument (that it cannot vary) no longer holds.",
+     "notes": "The field is the coverage of the player nation's own ground, read per tile through lp_coverage_at with one memo per look (three bounded floods for one nation, not one per tile). Captured: the player's side of the border tints and the neighbour's stays bare. The value reads 0 everywhere in the --verify world for an HONEST reason, measured rather than assumed: that world carries only 2 Logistic Point sources and neither belongs to the player's nation (nation 47511, 1543 cells), so there is nothing to be served by. A hub built on their ground mid-capture stays under construction and so is not yet a source, which is also correct.",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "visual: throughput_lens capture at the closest rung shows per-tile numbers",
+      "live: Ben reads a tile's number and it matches what the ledger says"
+     ],
+     "requirement": "Every tile carries its NUMBER where the rung admits text: the coverage as a percentage, so a player can read how well this ground is served rather than infer it from a hue.",
+     "notes": "Every tile of the player's ground carries its number, drawn at a drawn radius of 18 px or more so three glyphs fit in a hex, with the same shadow and cylinder wrap as a settlement label. Visible in the captures.",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "visual: a capture framed on a border shows the player's side filled and the neighbour's bare"
+     ],
+     "requirement": "The lens is PLAYER-FACING: it shows the player's own nation's network and points and nothing else - a rival's sources and ground are not drawn.",
+     "notes": "Player-facing: the coverage field, the per-tile numbers and the source marks are all filtered to the nation the player's seat belongs to (a corp's home nation, or the nation itself). A rival's ground is left bare rather than shaded zero.",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "visual: the key over an open Selection band reads the new lines",
+      "headless: ACTIONS.json's lens.throughput entry matches the surface"
+     ],
+     "requirement": "The taglines are gone - the lens strip's '(active Logistic Points)' and the on-canvas key's title and its two anchor lines - and what the key does say is the player nation's own pool, its sources and what its ground claims.",
+     "notes": "The taglines are gone - the lens strip reads 'Logistic Points' and the on-canvas key's title with it - and the key now carries the player nation's own arithmetic: its sources, what they make, and what its ground asks. ACTIONS.json and the question_log entry updated in the same change; LENSES.md's Data definition rewritten, including why the old 'a per-tile figure cannot vary' argument expired with BL-1309.",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "failed",
+     "verification": [
+      "visual: roads_painted's throughput framings show the brighter network",
+      "visual: ground_bake capture count unchanged across a lens toggle"
+     ],
+     "requirement": "Roads read as the network under this lens: the three tier colours in the VECTOR pass that already redraws them go to a brighter white, and the bake is untouched - no lens toggle re-bakes a chunk.",
+     "notes": "NOT ACHIEVED, and left visible rather than papered over. The three tier colours in the vector pass the item named are changed to a near-white, and a REAL BUG was found and fixed on the way - the static stroke bucket's hash did not include the overlay, so a bucket built under one lens was reused under another and no recolour could ever have appeared. Even with that fixed the roads still read SAND in every captured rung under the lens, so what reaches the screen there is upstream of these colours: either the painted bake dominates at every rung, or this block is not on the path that draws. A 2.4x width multiplier was tried and changed nothing visible, which is the evidence that the strokes are not what is drawn - it was reverted rather than left in. The next session should find which pass actually paints the road under this lens before touching a colour.",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "failed",
+     "verification": [
+      "live: Ben hovers a tile under the lens and the card appears"
+     ],
+     "requirement": "The hover card works under this lens again: its suppression was argued from 'a value field with no structure grain', and the field now carries per-tile numbers.",
+     "notes": "NOT ATTEMPTED, deliberately. Re-enabling the hover card needs a structure_kind that means 'the ground' - there is none - and adding one changes SELECTION.md's click model, since a press under the lens would then select the tile. That is a design call with Ben's live click attached, not a late-session edit.",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

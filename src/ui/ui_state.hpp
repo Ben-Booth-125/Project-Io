@@ -1507,6 +1507,35 @@ struct ui_state
     /// the max, which is the pre-2026-08-28 behaviour rather than a blank map.
     float lp_reach_p90 = 0.0f;
 
+    // --- BL-1353: the lens shows the POINTS, for the player's own nation ---------
+    // Ben, 2026-10-16: "give a number to each tile, so we can see exactly how many
+    // points we have. The lens should also be player facing, so we can see only the
+    // player's home nation's road network and points."
+    //
+    // LENSES.md argued a per-tile points figure could not vary, because every anchor
+    // made the same authored rate and every tile had a finite reach cost. BL-1309
+    // overtook that: points are made by hubs, stations and ports, they fade with
+    // distance along their own network, and `lp_coverage_at` is already a per-tile
+    // function. So the field below is the COVERAGE - how much of a building's need
+    // this ground can be served, in [0,1] - and the number drawn on a tile is that
+    // coverage as a percentage.
+    //
+    /// Coverage per cell of the active body, row-major (y * gw + x), for the PLAYER'S
+    /// OWN NATION's ground only; -1 means "not this nation's" and is drawn as bare
+    /// ground. Empty when the lens is off. Derived view state on the same footing as
+    /// the anchors above: rebuilt from the tick's own resolve, never serialised, never
+    /// in state_hash, never read back by the simulation.
+    std::vector<float> lp_coverage;
+    int lp_coverage_gw = 0, lp_coverage_gh = 0;
+
+    /// The player nation's own figures for the key: the pool its sources make this
+    /// tick, how many sources made it, and what its ground is asking for. The numbers
+    /// a player can act on - everything else on the body is somebody else's business.
+    float lp_player_pool   = 0.0f;
+    float lp_player_claim  = 0.0f;
+    int   lp_player_sources = 0;
+    bool  lp_player_known   = false; ///< false when the player has no nation to show
+
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 
     // --- hover-card state (BL-060) ---

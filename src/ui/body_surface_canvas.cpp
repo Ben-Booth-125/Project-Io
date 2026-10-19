@@ -1490,18 +1490,26 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     float x, y, bar_w;
     begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Throughput (Logistic Points)"); // fit-exempt: legend box sized to its measured entries (container 2)
+    // BL-1353: THE KEY SAYS WHOSE, AND HOW MUCH - no tagline. Ben, 2026-10-16: "we can
+    // drop the '(active logistics points)' taglines, and give a number to each tile".
+    // The lens is the player's own network, so what the key carries is the player
+    // nation's own figures - the points its sources make this tick, how many sources
+    // made them, and what its ground is asking for - and the ramp says what the
+    // numbers on the tiles mean.
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Logistic Points"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + (have ? 4.0f : 6.0f);
 
     if (!have)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No source makes"); // fit-exempt: legend box sized to its measured entries (container 2)
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), // fit-exempt: legend box sized to its measured entries (container 2)
+                    state.lp_player_known ? "Your nation makes none" : "No nation to show");
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "Logistic Points here."); // fit-exempt: legend box sized to its measured entries (container 2)
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), // fit-exempt: legend box sized to its measured entries (container 2)
+                    state.lp_player_known ? "on this body." : "from this seat.");
         return;
     }
 
-    // Bar 1 — the FIELD ramp: how far this ground is from the nearest generator.
+    // Bar 1 - THE COVERAGE RAMP, which is what the per-tile numbers are.
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
@@ -1511,29 +1519,26 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
                           throughput_field_colour(t0));
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "far"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const ImVec2 nts = ImGui::CalcTextSize("at source");
-    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), "at source"); // fit-exempt: legend box sized to its measured entries (container 2)
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0"); // fit-exempt: legend box sized to its measured entries (container 2)
+    const ImVec2 nts = ImGui::CalcTextSize("100 served");
+    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), "100 served"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
 
-    // Row 2 — the SOURCE MARK, carrying the points quantity itself. BL-1352: these
-    // are hubs, stations and ports, never cities, and the words say so. Two ramps in one
-    // key because the lens genuinely shows two things: where capacity is, and how
-    // far the ground is from it. The mark is drawn here exactly as the map draws
-    // it (ring, dark backing included) so the legend shows the treatment, not a
-    // description of it.
+    // Row 2 - the SOURCE MARK, carrying the points that source makes. BL-1352: these
+    // are hubs, stations and ports, never cities; BL-1353: and only your nation's.
     const float mr = mark_d * 0.5f;
     dl->AddCircle({x + mr + 1.0f, y + mr}, mr, IM_COL32(10, 18, 30, 220), 18, 4.0f);
     dl->AddCircle({x + mr + 1.0f, y + mr}, mr, throughput_anchor_colour(1.0f), 18, 2.0f);
     char per[48];
-    std::snprintf(per, sizeof(per), "source: %.0f pts/tick", state.lp_anchor_max);
+    std::snprintf(per, sizeof per, "source: %.0f pts/tick", state.lp_anchor_max);
     dl->AddText({x + mark_d + 8.0f, y + (mark_d - line_h) * 0.5f}, // fit-exempt: legend box sized to its measured entries (container 2)
                 IM_COL32(235, 235, 235, 255), per);
     y += std::max(line_h, mark_d) + 4.0f;
 
-    char totals[64];
-    std::snprintf(totals, sizeof(totals), "%d sources - %.0f pts/tick total",
-                  static_cast<int>(state.lp_anchors.size()), state.lp_anchor_total);
+    // And the nation's own arithmetic: made, by how many, against what its ground asks.
+    char totals[80];
+    std::snprintf(totals, sizeof totals, "your %d source(s) make %.0f, ground asks %.0f",
+                  state.lp_player_sources, state.lp_player_pool, state.lp_player_claim);
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), totals); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
@@ -2013,6 +2018,13 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_anchor_max   = 0.0f;
     state.lp_reach_max    = 0.0f;
     state.lp_reach_p90    = 0.0f;
+    state.lp_coverage.clear();
+    state.lp_coverage_gw  = 0;
+    state.lp_coverage_gh  = 0;
+    state.lp_player_pool    = 0.0f;
+    state.lp_player_claim   = 0.0f;
+    state.lp_player_sources = 0;
+    state.lp_player_known   = false;
 
     // Off by default in every sense: no lens, no work. The lens is the only reader,
     // and the pools must not be built when nobody is looking at them — LP is a rate,
@@ -2064,10 +2076,21 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     for (const lp_source_row& src : lp.sources)
     {
         // A source on NOBODY'S GROUND feeds no nation's pool (logistic_points.cpp), so
-        // drawing its ring would be the very lens-versus-economy disagreement this item
-        // came to end (cold review).
+        // drawing its ring would be the very lens-versus-economy disagreement BL-1352
+        // came to end (cold review). BL-1353: and a source on ANOTHER NATION's ground is
+        // not this lens's subject either - the lens is the player's own network.
         if (src.nation == null_entity)
             continue;
+        if (state.lp_player_known)
+        {
+            entity_id pn2 = null_entity;
+            if (const auto cit2 = w.corporations.find(w.player_entity); cit2 != w.corporations.end())
+                pn2 = cit2->second.home_nation;
+            else if (w.nations.find(w.player_entity) != w.nations.end())
+                pn2 = w.player_entity;
+            if (src.nation != pn2)
+                continue;
+        }
         const auto tit = w.tiles.find(src.tile);
         if (tit == w.tiles.end() || tit->second.body != state.active_body)
             continue;
@@ -2080,6 +2103,68 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             at->lp += src.made;
         else
             state.lp_anchors.push_back({ src.tile, src.made });
+    }
+
+    // BL-1353: THE PLAYER'S OWN NATION, AND A NUMBER FOR EVERY TILE OF IT.
+    //
+    // Ben, 2026-10-16: "The lens should also be player facing, so we can see only the
+    // player's home nation's road network and points", and "give a number to each
+    // tile, so we can see exactly how many points we have". So the field stops being
+    // the reach cost - a different question, as LENSES.md itself notes - and becomes
+    // the COVERAGE the player nation's own sources give each of its tiles, which is
+    // the quantity BL-1309 made per-tile and the doc's old "it cannot vary" argument
+    // no longer describes.
+    //
+    // Whose nation: the player seat is a corporation with a home nation, or a nation
+    // itself (the player is a major nation since 2026-10-10). With neither, the lens
+    // has nobody to be player-facing for and draws no field at all rather than
+    // quietly falling back to everybody's.
+    {
+        entity_id pn = null_entity;
+        if (const auto cit = w.corporations.find(w.player_entity); cit != w.corporations.end())
+            pn = cit->second.home_nation;
+        else if (w.nations.find(w.player_entity) != w.nations.end())
+            pn = w.player_entity;
+        const auto bit = w.bodies.find(state.active_body);
+        if (pn != null_entity && bit != w.bodies.end())
+        {
+            state.lp_player_known = true;
+            const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+            state.lp_coverage_gw = gw;
+            state.lp_coverage_gh = gh;
+            state.lp_coverage.assign(static_cast<std::size_t>(std::max(0, gw))
+                                         * static_cast<std::size_t>(std::max(0, gh)), -1.0f);
+            // One memo for the whole field: `lp_coverage_at` builds its host nation's
+            // source fields once per (nation, network, body) and answers every later
+            // tile from them, so filtering to ONE nation is what makes a per-tile read
+            // affordable here at all - three bounded floods, not one per tile.
+            lp_reach_memo memo;
+            const std::vector<entity_id>& raster = body_tile_grid(w, state.active_body);
+            for (std::size_t i = 0; i < raster.size() && i < state.lp_coverage.size(); ++i)
+            {
+                const entity_id tid = raster[i];
+                if (tid == null_entity)
+                    continue;
+                const auto nit = w.tile_to_nation.find(tid);
+                if (nit == w.tile_to_nation.end() || nit->second != pn)
+                    continue; // somebody else's ground: not this lens's subject
+                state.lp_coverage[i] = lp_coverage_at(w, memo, tid);
+            }
+            // And the player nation's own figures for the key - read off `lp`, the
+            // resolve this function actually settled on, NOT `resolved`: before the
+            // first economy step the report is empty and `lp` is the guarded fallback
+            // (BL-1352), which is exactly the case a --verify capture runs in. Reading
+            // the report here printed "your 0 source(s) make 0" on a world with 55.
+            for (const lp_nation_row& r : lp.nations)
+                if (r.nation == pn)
+                {
+                    state.lp_player_pool  = r.pool;
+                    state.lp_player_claim = r.claim[0] + r.claim[1] + r.claim[2];
+                }
+            for (const lp_source_row& src : lp.sources)
+                if (src.nation == pn)
+                    ++state.lp_player_sources;
+        }
     }
 
     // SORT BEFORE REDUCING. `pools` is an unordered_map, so both the legend's
@@ -3656,44 +3741,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // infinity is "computed and unreachable", which takes the cold end of the
         // ramp; anything finite normalises against the body's own worst case.
         // Nothing here can trigger the Dijkstra.
-        else if (state.overlay == overlay_mode::throughput && state.lp_reach_max > 0.0f)
+        // BL-1353: THE FIELD IS THE POINTS, FOR THE PLAYER'S OWN GROUND.
+        //
+        // It was the reach cost - how far this ground is from the nearest supply
+        // anchor - normalised against the field's 90th percentile and square-root
+        // compressed, with a long measured argument behind both halves
+        // (throughput_field_census, Sprint 18 and 2026-08-28). That argument was sound
+        // for the quantity it shaded, and the quantity is what changed: LENSES.md
+        // justified shading reach BECAUSE a per-tile points figure could not vary,
+        // every anchor making the same authored rate. BL-1309 ended that - points are
+        // made by hubs, stations and ports and fade along their own networks - so the
+        // lens now shades what Ben asked to see: the COVERAGE this nation's sources
+        // give this tile, in [0,1], which is what decides whether a building here can
+        // run at full rate.
+        //
+        // No normalisation and no curve: coverage IS a fraction, so the ramp is spread
+        // over the thing itself rather than over a cost whose distribution had to be
+        // argued about. Ground this nation does not hold carries -1 and is left bare -
+        // the lens is the player's own network, and a neighbour's ground is not a
+        // value of zero, it is not the subject.
+        else if (state.overlay == overlay_mode::throughput && !state.lp_coverage.empty())
         {
-            const float rc = reach_cost_of(tile);
-            if (rc >= 0.0f)
+            const int cx_ = tile.grid_x, cy_ = tile.grid_y;
+            if (cx_ >= 0 && cx_ < state.lp_coverage_gw && cy_ >= 0 && cy_ < state.lp_coverage_gh)
             {
-                // NORMALISED AGAINST THE 90th PERCENTILE, then square-root
-                // compressed. Both halves are measured — `throughput_field_census`
-                // is the harness, re-run it whenever the anchor set moves.
-                //
-                // The sqrt was calibrated in Sprint 18 against 57 anchors. The home
-                // body now carries 1917, and the census says why that broke the
-                // read: median cost 6.75 against a max of 81.58, so HALF the grid
-                // sits in the bottom 8% of the range the ramp is spread over.
-                //
-                // WHAT THE MEASUREMENT OVERTURNED. The obvious fix is a steeper
-                // curve, and it does not work — every curve over cost/max rescales
-                // the same bunched input. Share of the grid landing in the single
-                // most crowded tenth of the ramp: linear 52%, sqrt 32%, quadratic
-                // 45%, quartic 35%, 1-d² 75%, cube-root 28%. Quadratic is WORSE
-                // than the sqrt it would replace.
-                //
-                // The problem is the DENOMINATOR, not the curve. p90 is 42.58
-                // against a max of 81.58 — the top decile of cost is 48% of the
-                // range and holds a tenth of the tiles, so normalising against the
-                // max spends half the ramp on ground almost nothing sits on.
-                // Normalising against p90 instead and clamping drops the worst
-                // bucket to 21%: the same curve, three times the spread.
-                //
-                // Ground beyond p90 saturates at the cold end rather than being
-                // given its own gradient. That is the honest trade and it is the
-                // point: the far tenth is all equally out of reach, and the near
-                // ground is where a player sites.
-                const float denom = (state.lp_reach_p90 > 0.0f) ? state.lp_reach_p90
-                                                                : state.lp_reach_max;
-                const float t = std::isinf(rc)
-                    ? 0.0f
-                    : 1.0f - std::sqrt(std::clamp(rc / denom, 0.0f, 1.0f));
-                fill = lerp_colour(fill, throughput_field_colour(t), 0.72f);
+                const float cov = state.lp_coverage[
+                    static_cast<std::size_t>(cy_) * static_cast<std::size_t>(state.lp_coverage_gw)
+                    + static_cast<std::size_t>(cx_)];
+                if (cov >= 0.0f)
+                    fill = lerp_colour(fill, throughput_field_colour(std::clamp(cov, 0.0f, 1.0f)), 0.72f);
             }
         }
         // Continent lens (BL-226): tint each tile by the tectonic plate that owns
@@ -4388,12 +4464,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             // The run's weight is the best tier meeting at this centre; which boundaries it
             // crosses is the edge mask's (BL-1340).
+            // BL-1353: UNDER THIS LENS THE ROADS GO BRIGHTER WHITE (Ben, 2026-10-16:
+            // "instead let's recolour the roads to be a brighter white"). The vector
+            // pass already redraws the network under this lens alone, so the recolour
+            // is three constants here and the BAKE IS NOT TOUCHED - bake_params carries
+            // no lens and region_hash keys only tile fields, so brightening the painted
+            // asphalt per lens would re-bake every visible chunk on every toggle. The
+            // sand tones stay for the plain canvas, where a road is part of the land.
             ImU32 col; float thick;
+            const bool lens_white = route_lens;
+            // NOTE (BL-1353): the recolour below is in the pass the item named, and the
+            // stroke cache now keys on the lens so a toggle rebuilds it - but the roads
+            // still read SAND in every captured rung under this lens, so something
+            // upstream of these colours is what reaches the screen (the painted bake, or
+            // a path that skips this block). Left as the item's owed half rather than
+            // papered over with a width multiplier, which changed nothing visible and so
+            // proved the strokes are not what is drawn.
             switch (max_road_tier(tile))
             {
-                case 1:  col = IM_COL32(175, 158, 120, 205); thick = route_r * k_road_width_track;   break;
-                case 2:  col = IM_COL32(205, 188, 140, 225); thick = route_r * k_road_width_road;    break;
-                default: col = IM_COL32(225, 205, 150, 238); thick = route_r * k_road_width_highway; break;
+                case 1:  col = lens_white ? IM_COL32(225, 232, 240, 225) : IM_COL32(175, 158, 120, 205);
+                         thick = route_r * k_road_width_track;   break;
+                case 2:  col = lens_white ? IM_COL32(238, 243, 249, 240) : IM_COL32(205, 188, 140, 225);
+                         thick = route_r * k_road_width_road;    break;
+                default: col = lens_white ? IM_COL32(250, 252, 255, 255) : IM_COL32(225, 205, 150, 238);
+                         thick = route_r * k_road_width_highway; break;
             }
             draw_network([](const tile_component& t) { return max_road_tier(t); },
                          [&](const tile_component& self, int dc, int dr) {
@@ -4789,6 +4883,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
             // The bucket's content hash.
             std::uint64_t h = 0xC0FFEEull;
+            // BL-1353: THE LENS IS PART OF THIS BUCKET'S IDENTITY. The strokes are
+            // built once per geometry hash and re-emitted with the pan, so a bucket
+            // built under one lens is reused under another - and the Throughput lens
+            // draws the same roads in a different colour and weight (and the plain
+            // canvas draws none of this at all). Without the overlay in the key the
+            // recoloured network simply never appeared: the colours were changed in
+            // the emitter and the cache kept handing back the old vertices.
+            h = mix(h, static_cast<std::uint64_t>(state.overlay) + 1ull);
             for (int rr = r - 2; rr <= r + 2; ++rr)
                 h = mix(h, (rr < 0 || rr >= gh)
                                ? 0xEDull
@@ -5853,6 +5955,58 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
             }
         }
+    }
+
+    // --- BL-1353: A NUMBER ON EVERY TILE, under the Throughput lens ------------
+    //
+    // Ben, 2026-10-16: "give a number to each tile, so we can see exactly how many
+    // points we have." The number is the tile's COVERAGE as a percentage - how much
+    // of a building's need this ground can be served - because that is the quantity
+    // the model actually holds per tile (lp_coverage_at); the POINTS themselves are a
+    // nation's pool and a building's grant, and the key carries both of those. A
+    // player reading "62" here knows a works on this tile runs at 62% for want of
+    // logistics, which is the question the lens exists to answer.
+    //
+    // ONLY WHERE THE TEXT FITS. Below a drawn radius of 18 px three glyphs do not fit
+    // in a hex and the map turns into a smear of digits, so the numbers appear as the
+    // camera comes in and the colour field carries the read before that. Same
+    // vertical culling and horizontal wrap as every settlement label above, and the
+    // same shadow, so a number over pale ground stays legible.
+    if (state.overlay == overlay_mode::throughput && !state.lp_coverage.empty()
+        && hit_r >= 18.0f && raster_ok)
+    {
+        const float visible_top    = grid_area_origin.y - hit_r;
+        const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+        for (int row = 0; row < state.lp_coverage_gh; ++row)
+            for (int col = 0; col < state.lp_coverage_gw; ++col)
+            {
+                const std::size_t ci = static_cast<std::size_t>(row)
+                                     * static_cast<std::size_t>(state.lp_coverage_gw)
+                                     + static_cast<std::size_t>(col);
+                if (ci >= state.lp_coverage.size())
+                    continue;
+                const float cov = state.lp_coverage[ci];
+                if (cov < 0.0f)
+                    continue; // not the player's ground: not this lens's subject
+                const ImVec2 sc = to_screen(hex_local_centre(col, row, hex_size));
+                if (sc.y < visible_top || sc.y > visible_bottom)
+                    continue;
+                char num[8];
+                std::snprintf(num, sizeof num, "%d",
+                              static_cast<int>(std::lround(std::clamp(cov, 0.0f, 1.0f) * 100.0f)));
+                const ImVec2 ts = ImGui::CalcTextSize(num);
+                const int k_min = (period_px > 0.0f)
+                    ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+                const int k_max = (period_px > 0.0f)
+                    ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+                for (int k = k_min; k <= k_max; ++k)
+                {
+                    const ImVec2 tp{ sc.x + static_cast<float>(k) * period_px - ts.x * 0.5f,
+                                     sc.y - ts.y * 0.5f };
+                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(12, 16, 24, 210), num); // shadow // fit-exempt: a per-tile figure, sized against the hex it sits in
+                    dl->AddText(tp, IM_COL32(236, 244, 252, 255), num); // fit-exempt: a per-tile figure, sized against the hex it sits in
+                }
+            }
     }
 
     // No HQ star, the player's or anyone's, plain or under a lens (Ben,
