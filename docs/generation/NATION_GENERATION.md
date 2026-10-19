@@ -578,7 +578,12 @@ defect, not a skew to report. The lever is **the history banks more**: polities 
 across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
 granted at the handoff. **No major leaves generation on a zero treasury (Ben, 2026-10-19):** a major
 holds state industry — its share of the hubs that make Logistic Points among it — and a state that
-cannot fund any of it idles every hub at the first tick and starves the firms on its ground. No
+cannot fund any of it idles every hub at the first tick and starves the firms on its ground. Two
+rules hold it there. **A state founding leaves a year of the state bill in the chest** (four ticks of
+what the funding gate would charge its state industry, hubs included): it pays only from what lies
+above that, and a shortfall is the founding's, never a mint. **No realm closes the history empty**
+(Ben, 2026-10-19): the poorest realms earn more across the spans — the same earning lever as below,
+lifting the floor and keeping the order — until none folds an empty chest. No
 nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings

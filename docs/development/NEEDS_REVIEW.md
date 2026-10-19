@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 27 open, 4 resolved.*
+*32 entries — 26 open, 6 resolved.*
 
 ---
 
@@ -234,13 +234,6 @@ Ben ruled the band (merge under 24, split over 100) and that it scales with the 
 
 **Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
 
-### NR-1053 — No doc owns who holds a Logistic Points hub placed during generation; a broke major idles its hubs and starves its consumers
-*novel-work · raised 2026-10-18 · from BL-1382 economy trace (seed 28), src/world/logistic_points.cpp seed_logistics_sources / place_hub, src/world/state_industry.cpp plan_state_funding*
-
-seed_logistics_sources gives every hub on a major's ground to the nation as state industry (NATIONS.md § State industry: transport is state industry; a losing building idles, never debt). A major leaving generation with treasury 0.0 idles all its hubs at tick 0, so its consumers get 0 Logistic Points and the loss reflex decommissions them. BL-1382's merges moved 181 consumers onto such a major on seed 28 (G1 96.8 -> 44.7). Present before BL-1382 at smaller scale (seeds 9, 32, 40). The seeding report also claims 100% coverage before the funding gate runs.
-
-**Why it matters.** Hub ownership at generation is a design rule no economy doc states; LOGISTICS.md says anyone may build one, NATIONS.md makes transport state industry.
-
 ---
 
 ## Resolved
@@ -283,4 +276,22 @@ The four bake files (ground_bake, structure_stamps, route_paint, terrain_palette
 **Why it matters.** It changes what the Debug build means for one subsystem (no runtime checks, not steppable by default) and touches every build tree; a build-system change is project-wide scope.
 
 > **RESOLVED.** Ben: keep the /O2 ground-bake library in Debug, on by default (IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=ON).
+
+### NR-1053 — No doc owns who holds a Logistic Points hub placed during generation; a broke major idles its hubs and starves its consumers
+*novel-work · raised 2026-10-18 · from BL-1382 economy trace (seed 28), src/world/logistic_points.cpp seed_logistics_sources / place_hub, src/world/state_industry.cpp plan_state_funding*
+
+seed_logistics_sources gives every hub on a major's ground to the nation as state industry (NATIONS.md § State industry: transport is state industry; a losing building idles, never debt). A major leaving generation with treasury 0.0 idles all its hubs at tick 0, so its consumers get 0 Logistic Points and the loss reflex decommissions them. BL-1382's merges moved 181 consumers onto such a major on seed 28 (G1 96.8 -> 44.7). Present before BL-1382 at smaller scale (seeds 9, 32, 40). The seeding report also claims 100% coverage before the funding gate runs.
+
+**Why it matters.** Hub ownership at generation is a design rule no economy doc states; LOGISTICS.md says anyone may build one, NATIONS.md makes transport state industry.
+
+> **RESOLVED.** Ben: B — no major leaves generation on a zero treasury (Pass 7). Foundings keep a year (four ticks) of the state bill; the poorest realms earn more in the history until none closes empty. The LP coverage report reads the funding gate.
+
+### NR-1054 — Seed 40: background firms herd-build oil power plants in one market; the build check does not see same-window input claims
+*novel-work · raised 2026-10-19 · from BL-1382 economy trace, seed 40 (G1 t50 74.2 with the province pass, 83.7 without)*
+
+Ticks 23-36: 25 background firms each build an oil power plant in market 47446 (grid 15253), oversubscribing petroleum; 24 of 32 are decommissioned by tick 50. The province pass only reshaped the grids (51 vs 31). The fix reaches the corp-AI build scorer (AI_OPPONENT.md § 11 grants).
+
+**Why it matters.** A herd is a scorer behaviour; changing what the scorer sees is AI work under the grant register, outside the economy brief.
+
+> **RESOLVED.** Ben: accept as world variance (seed 40 G1 t50 74.2). Same form: seed 9's hydroponics charter web accepted as world variance (G1 t50 ~83). No AI grant widened.
 

@@ -436,11 +436,26 @@
    "title": "No doc owns who holds a Logistic Points hub placed during generation; a broke major idles its hubs and starves its consumers",
    "raised": "2026-10-18",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1382 economy trace (seed 28), src/world/logistic_points.cpp seed_logistics_sources / place_hub, src/world/state_industry.cpp plan_state_funding",
    "what": "seed_logistics_sources gives every hub on a major's ground to the nation as state industry (NATIONS.md § State industry: transport is state industry; a losing building idles, never debt). A major leaving generation with treasury 0.0 idles all its hubs at tick 0, so its consumers get 0 Logistic Points and the loss reflex decommissions them. BL-1382's merges moved 181 consumers onto such a major on seed 28 (G1 96.8 -> 44.7). Present before BL-1382 at smaller scale (seeds 9, 32, 40). The seeding report also claims 100% coverage before the funding gate runs.",
    "why_it_matters": "Hub ownership at generation is a design rule no economy doc states; LOGISTICS.md says anyone may build one, NATIONS.md makes transport state industry.",
-   "call": "A) a hub on a major that cannot fund it goes to the consumer's owner; B) no major leaves generation with a zero treasury; C) an unfunded state hub runs on upkeep goods; D) the landscape search scores LP supply. Asked in the session form 2026-10-18."
+   "call": "A) a hub on a major that cannot fund it goes to the consumer's owner; B) no major leaves generation with a zero treasury; C) an unfunded state hub runs on upkeep goods; D) the landscape search scores LP supply. Asked in the session form 2026-10-18.",
+   "resolved": "2026-10-19",
+   "resolution": "Ben: B — no major leaves generation on a zero treasury (Pass 7). Foundings keep a year (four ticks) of the state bill; the poorest realms earn more in the history until none closes empty. The LP coverage report reads the funding gate."
+  },
+  {
+   "id": "NR-1054",
+   "title": "Seed 40: background firms herd-build oil power plants in one market; the build check does not see same-window input claims",
+   "raised": "2026-10-19",
+   "kind": "novel-work",
+   "status": "resolved",
+   "source": "BL-1382 economy trace, seed 40 (G1 t50 74.2 with the province pass, 83.7 without)",
+   "what": "Ticks 23-36: 25 background firms each build an oil power plant in market 47446 (grid 15253), oversubscribing petroleum; 24 of 32 are decommissioned by tick 50. The province pass only reshaped the grids (51 vs 31). The fix reaches the corp-AI build scorer (AI_OPPONENT.md § 11 grants).",
+   "why_it_matters": "A herd is a scorer behaviour; changing what the scorer sees is AI work under the grant register, outside the economy brief.",
+   "call": "a) the build supply check counts input claims of buildings under construction or chartered in the same window (raise as an AI grant question); b) accept as world variance.",
+   "resolved": "2026-10-19",
+   "resolution": "Ben: accept as world variance (seed 40 G1 t50 74.2). Same form: seed 9's hydroponics charter web accepted as world variance (G1 t50 ~83). No AI grant widened."
   }
  ]
 }
