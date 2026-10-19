@@ -100,7 +100,8 @@
     "WAVE 1 - GATES TELL THE TRUTH. BL-1337 (return net crosses zero), BL-1214 (eighth field doc drift), BL-1338 (digest pins stale: attribute only), BL-1319 (fixture base stall).",
     "WAVE 2 - GROUND PAINT. BL-1247 (ground benchmark) measures first, then BL-1311 (ground paint perf).",
     "WAVE 3 - ONE TERRITORY. BL-1310 (nations contiguous), the world mover, last so the gates measure it alone.",
-    "ADDED 2026-10-18 (Ben, after the live click). BL-1382 (province normalising pass)."
+    "ADDED 2026-10-18 (Ben, after the live click). BL-1382 (province normalising pass).",
+    "ADDED 2026-10-19 (Ben). BL-1386 (no realm closes empty) — blocks BL-1382 reaching main."
    ],
    "risk": "Runs in parallel with sprint 55 on main; BL-1310 moves the world while sprint 55 also moves it, so every gate here is measured on a world without sprint 55. Re-pins wait for integration. BL-1340 (roads cross tile edges, sprint 55) may touch the ground bake BL-1311 changes.",
    "done_when": "BL-1310: world_audit reports zero illegal exclaves on the curated seeds with nation totals still hit. BL-1311: ground paint under 1 minute and 6 GB peak on the slow case. quarterly_return R2 passes without weakening the row. Digest movers attributed. stage_ui_fixture completes.",

@@ -1372,6 +1372,28 @@
    ],
    "title": "One pass at the end of generation evens out province sizes: split the too-large, merge the too-small",
    "design": "SETTLED: PROVINCES.md § The normalising pass (Ben, 2026-10-18). WORK: after nations are final (after the strait rule and the closing rounds) and before roads and firms, split settled land provinces above 100·f(s) land tiles (each extra piece founds a scale-1 anchor centre, pieces grown by the weighted fill inside the old province) and merge those below 24·f(s) into the same-nation same-domain neighbour sharing the most border; f(s) = 1 + (s-1)/2 by the anchor scale. Measured before (province_partition_harness, 6 seeds): settled land median 48, p90 177, max 4,929. World mover: re-run world_audit library, nation_sizes, market_viability full, history_patterns, the partition harness; report digests moved."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 56,
+   "written": "2026-10-19",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-19); filed by Claude",
+   "requires": [],
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 4,
+   "id": "BL-1386",
+   "short_name": "NO_REALM_CLOSES_EMPTY",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/treasury_census.cpp"
+   ],
+   "title": "No realm closes the history empty: the army carries a share of the earn, tribute is on the earn, a small realm's endowment has a floor",
+   "design": "SETTLED: NATION_GENERATION.md § Pass 7 (top rules) and EXPLORATION.md § Force persists + the tribute clause (Ben, 2026-10-19, option D). WORK: build A (army sized to at most a share of the round earn), B (tribute a share of the round earn, not the chest), C (endowment floor for small realms); calibrate the army share and the floor together by sweep against: no major short of a year of its state bill, median nation treasury 1,000-2,000. Measured before (treasury_census, 16 seeds): natural 20 of 78 majors short of a year, 8 of 64 at 20:4; tripling the endowment left the floor at 0. Blocks BL-1382 (province normalising pass) going to main: seed 28 G1 44.7 until it lands."
   }
  ]
 }

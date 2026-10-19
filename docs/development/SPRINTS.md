@@ -86,6 +86,7 @@ Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 b
 - WAVE 2 - GROUND PAINT. BL-1247 (ground benchmark) measures first, then BL-1311 (ground paint perf).
 - WAVE 3 - ONE TERRITORY. BL-1310 (nations contiguous), the world mover, last so the gates measure it alone.
 - ADDED 2026-10-18 (Ben, after the live click). BL-1382 (province normalising pass).
+- ADDED 2026-10-19 (Ben). BL-1386 (no realm closes empty) — blocks BL-1382 reaching main.
 
 **Done when.** BL-1310: world_audit reports zero illegal exclaves on the curated seeds with nation totals still hit. BL-1311: ground paint under 1 minute and 6 GB peak on the slow case. quarterly_return R2 passes without weakening the row. Digest movers attributed. stage_ui_fixture completes.
 
