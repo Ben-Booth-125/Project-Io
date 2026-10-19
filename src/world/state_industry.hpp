@@ -179,6 +179,11 @@ float state_uncommitted_treasury(const world& w, entity_id nation);
 bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
                          const building_component& before, const building_component& after);
 
+/// The state buildings the funding gate would IDLE if it ran on @p w now —
+/// `plan_state_funding`'s building walk, read-only (no ledger, no flag
+/// written). For a reading that must count only what will run.
+std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_registry& reg);
+
 
 /// BL-1255 -- what the rail handover did at the fold.
 struct rail_handover_report

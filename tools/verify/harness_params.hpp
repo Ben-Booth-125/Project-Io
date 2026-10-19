@@ -319,6 +319,9 @@ inline shipped_landscape apply_shipped_landscape(
     if (!charter.skip_rail_handover && !charter.skip_state_handover)
     {
         out.lp = seed_logistics_sources(w);
+        // BL-1382 economy follow-up: finish_campaign_world's reading at the
+        // funding gate, verbatim, right after it.
+        lp_seed_read_at_gate(w, reg, out.lp);
         print_lp_seed_report(out.lp);
     }
 

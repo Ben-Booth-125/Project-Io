@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"       // body_tile_grid, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
+#include "state_industry.hpp"  // state_gate_would_idle (the reading at the gate)
 
 #include <algorithm>
 #include <cmath>
@@ -541,6 +542,17 @@ lp_seed_report seed_logistics_sources(world& w)
         invalidate_logistics_caches(w);
 
     // 3. The reading.
+    lp_seed_read(w, rep);
+    return rep;
+}
+
+void lp_seed_read(world& w, lp_seed_report& rep)
+{
+    rep.nations = 0;
+    rep.consumers = rep.nobodys_ground = rep.fully_covered = rep.partly_covered = rep.uncovered = 0;
+    rep.need_total = rep.pool_total = rep.granted_total = 0.0f;
+    for (int& n : rep.sources_by_net)
+        n = 0;
     const lp_tick t = resolve_logistic_points(w);
     rep.nations = static_cast<int>(t.nations.size());
     for (const lp_source_row& s : t.sources)
@@ -559,16 +571,42 @@ lp_seed_report seed_logistics_sources(world& w)
         else if (row.coverage > 0.0f) ++rep.partly_covered;
         else ++rep.uncovered;
     }
-    return rep;
+}
+
+void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& rep)
+{
+    // A source the funding gate idles makes no points and reaches nobody
+    // (`lp_source_running`), so the reading counts the world as the first tick
+    // will run it: every state building the gate would idle is idled for the
+    // read and restored after it. Nothing else is touched; the gate itself
+    // runs at the top of the first tick and writes the flag for real.
+    std::vector<entity_id> flipped;
+    rep.gate_idled_sources = 0;
+    for (const entity_id bid : state_gate_would_idle(w, reg))
+    {
+        building_component& b = w.buildings.at(bid);
+        lp_network net;
+        if (lp_source_network(b.type, net) && lp_source_running(b))
+            ++rep.gate_idled_sources;
+        if (!b.state_idle)
+        {
+            b.state_idle = true;
+            flipped.push_back(bid);
+        }
+    }
+    lp_seed_read(w, rep);
+    for (const entity_id bid : flipped)
+        w.buildings.at(bid).state_idle = false;
 }
 
 void print_lp_seed_report(const lp_seed_report& r)
 {
-    std::printf("[lp] seeding: %d hubs placed; sources road %d rail %d sea %d; %d consumers "
+    std::printf("[lp] seeding: %d hubs placed; sources road %d rail %d sea %d (%d more the funding "
+                "gate idles); %d consumers "
                 "(%d full, %d partial, %d uncovered, %d on nobody's ground); need %.1f, pool %.1f, "
                 "granted %.1f (%.1f%%) over %d nations\n",
                 r.hubs_placed, r.sources_by_net[0], r.sources_by_net[1], r.sources_by_net[2],
-                r.consumers, r.fully_covered, r.partly_covered, r.uncovered, r.nobodys_ground,
+                r.gate_idled_sources, r.consumers, r.fully_covered, r.partly_covered, r.uncovered, r.nobodys_ground,
                 static_cast<double>(r.need_total), static_cast<double>(r.pool_total),
                 static_cast<double>(r.granted_total),
                 r.need_total > 0.0f ? 100.0 * r.granted_total / r.need_total : 0.0, r.nations);

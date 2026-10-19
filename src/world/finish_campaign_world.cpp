@@ -399,6 +399,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // stands enough logistics hubs that every producing building is reached and
     // every pool meets its need. After the rail handover (stations are sources).
     out.lp = seed_logistics_sources(w);
+    // BL-1382 economy follow-up (Ben, 2026-10-19): the seeding's reading is
+    // retaken at the funding gate -- a state hub the treasury cannot fund
+    // reaches nobody -- so the printed coverage is what the first tick runs.
+    lp_seed_read_at_gate(w, reg, out.lp);
     print_lp_seed_report(out.lp);
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);

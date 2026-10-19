@@ -577,6 +577,43 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
 }
 
 // ---------------------------------------------------------------------------
+// BL-1382 economy follow-up -- the funding gate read without running it
+// (Ben, 2026-10-19; see the header)
+// ---------------------------------------------------------------------------
+namespace {
+
+/// The gate's headroom, the same hair `plan_state_funding` adds to every bound.
+constexpr float k_state_gate_headroom = 1.0005f;
+
+} // namespace
+
+std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_registry& reg)
+{
+    // plan_state_funding's building walk, read-only: nations ascending, each
+    // one's state_assets in stored order, a bound that fits comes off what is
+    // left, one that does not idles.
+    std::vector<entity_id> idled;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nid;
+        float left = std::max(0.0f, nc.treasury);
+        for (const entity_id bid : nc.state_assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const float bound = state_building_cost_bound(w, reg, bit->second) * k_state_gate_headroom;
+            if (std::isfinite(bound) && bound <= left)
+                left -= bound;
+            else
+                idled.push_back(bid);
+        }
+    }
+    std::sort(idled.begin(), idled.end());
+    return idled;
+}
+
+// ---------------------------------------------------------------------------
 // BL-1255 -- rail ownership and the rail handover (see the header)
 // ---------------------------------------------------------------------------
 namespace {
