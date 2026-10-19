@@ -3276,6 +3276,12 @@ struct exploration_upkeep_spend
     int64_t earn_levy            = 0;
     int64_t army_disbanded_by_earn = 0;
     int64_t army_sized_rounds    = 0;
+    /// BL-1386 review -- THE ARMY SHARE, CHECKED (write-only): polity-rounds
+    /// whose army bill was read against the share, and of them those whose
+    /// bill exceeded `standing_army_earn_share_q` of the round's earn (0 by
+    /// construction; a harness asserts it).
+    int64_t army_share_rounds    = 0;
+    int64_t army_over_share      = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -3471,7 +3477,8 @@ struct polity
     int cohesion_q = 1000;
 
     /// BL-1386 -- GENERATION SCRATCH, NOT SAVED: what the realm EARNED in its
-    /// last upkeep round (levy + endowment + corridor + trade, material),
+    /// last upkeep round (levy + endowment BEFORE the floor's lift + corridor
+    /// + trade, material; Ben, 2026-10-19: the floor's lift stays with it),
     /// written by `run_exploration_upkeep`. Tribute reads it when
     /// `history_sim_params::tribute_on_earn` is on.
     int64_t round_earn = 0;
@@ -4971,6 +4978,14 @@ struct history_sim_state
     int64_t treasury_earned_levy          = 0;
     int64_t army_disbanded_by_earn        = 0;
     int64_t army_sized_rounds             = 0;
+    /// BL-1386 review -- THE NEW RULES, CHECKED (write-only, a harness
+    /// asserts the second of each pair is 0): army bills read against the
+    /// share / over it; tribute payments on the earn / over their share of the
+    /// subject's pre-floor earn.
+    int64_t army_share_rounds             = 0;
+    int64_t army_over_share               = 0;
+    int64_t tribute_payments_on_earn      = 0;
+    int64_t tribute_over_earn             = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
     /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over

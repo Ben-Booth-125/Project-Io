@@ -400,8 +400,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // every pool meets its need. After the rail handover (stations are sources).
     out.lp = seed_logistics_sources(w);
     // BL-1382 economy follow-up (NATION_GENERATION.md § Pass 7, Ben 2026-10-19:
-    // no major leaves generation on a zero treasury) -- THE FOUNDINGS KEEP A
-    // YEAR OF THE STATE BILL. After the seeding, so the bill counts the state
+    // no major leaves generation on a zero treasury) -- THE FOUNDINGS KEEP THE
+    // SETTLE AND A YEAR OF THE STATE BILL, counted from the opening (BL-1386:
+    // `k_state_founding_reserve_ticks`, the twelve settle ticks below plus
+    // four). After the seeding, so the bill counts the state
     // hubs; then the seeding's reading is retaken at the funding gate, so the
     // printed coverage is what the first tick runs.
     out.reserve = reserve_state_first_tick(w, reg, out.state);
