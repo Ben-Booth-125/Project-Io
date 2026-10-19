@@ -210,9 +210,10 @@ std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_regist
 /// THE FOUNDING PAYS FROM WHAT THE STATE DOES NOT NEED TO RUN. The fold's
 /// foundings (the plant, the coastal port) are paid from the treasury, and a
 /// treasury short of the price "pays what it holds and the shortfall is
-/// reported, never minted". Ben's ruling narrows what it holds: a major must
-/// leave generation able to fund its state industry at the first tick, so the
-/// foundings may not take the treasury below the first tick's state bill
+/// reported, never minted". Ben's ruling narrows what it holds: a founding
+/// leaves A YEAR of the state bill in the chest (Ben, 2026-10-19: four ticks,
+/// `k_state_founding_reserve_ticks`), so the foundings may not take the
+/// treasury below four times the first tick's state bill
 /// (`state_first_tick_bill`) — its hubs among it, which is why this runs after
 /// the Logistic Point seeding, once every state building stands. Where they
 /// did, the foundings' payments are reduced — the port's (paid last) first,
@@ -221,10 +222,14 @@ std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_regist
 /// history entry exactly as a short treasury's always was. Nothing is minted:
 /// the treasury never exceeds the chest it held before the foundings, and a
 /// major whose history left it no chest at all (nothing paid) is untouched.
+/// The year a founding leaves in the chest: four quarterly ticks of the state
+/// bill (NATION_GENERATION.md § Pass 7, Ben 2026-10-19).
+inline constexpr int k_state_founding_reserve_ticks = 4;
+
 struct state_reserve_report
 {
     int   nations_reserved = 0;  ///< majors whose foundings were reduced
-    int   nations_short    = 0;  ///< of them, still under the bill (their chest is smaller)
+    int   nations_short    = 0;  ///< of them, still under the year's bill (their chest is smaller)
     float returned         = 0.0f; ///< payment reduced, summed (credits)
 };
 state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& reg,

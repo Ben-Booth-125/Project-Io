@@ -584,8 +584,8 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
 }
 
 // ---------------------------------------------------------------------------
-// BL-1382 economy follow-up -- the first tick's state bill and the founding's
-// reserve (Ben, 2026-10-19; see the header)
+// BL-1382 economy follow-up -- the state bill and the founding's year of it
+// (Ben, 2026-10-19; see the header)
 // ---------------------------------------------------------------------------
 namespace {
 
@@ -674,7 +674,8 @@ state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& r
         if (nit == w.nations.end())
             continue;
         nation_component& nc = nit->second;
-        const float bill = state_first_tick_bill(w, reg, nid);
+        const float bill = state_first_tick_bill(w, reg, nid)
+                         * static_cast<float>(k_state_founding_reserve_ticks);
         float need = bill - std::max(0.0f, nc.treasury);
         if (!(need > 0.0f))
             continue;
@@ -708,7 +709,7 @@ state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& r
 
 void print_state_reserve(const state_reserve_report& r)
 {
-    std::printf("[state_reserve] %d major(s) kept their first tick's state bill from the foundings "
+    std::printf("[state_reserve] %d major(s) kept a year of the state bill from the foundings "
                 "(%.1f credits of payment left short; %d still under the bill)\n",
                 r.nations_reserved, static_cast<double>(r.returned), r.nations_short);
     std::fflush(stdout);

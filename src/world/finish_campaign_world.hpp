@@ -108,7 +108,7 @@ struct finish_campaign_result
     /// BL-1296: what the state-industry handover passed to the majors.
     state_handover_report   state;
     /// BL-1382 economy follow-up: what the foundings left short to keep each
-    /// major's first-tick state bill (`reserve_state_first_tick`).
+    /// major's year (four ticks) of the state bill (`reserve_state_first_tick`).
     state_reserve_report    reserve;
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
     lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
