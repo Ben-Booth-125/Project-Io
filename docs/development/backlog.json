@@ -1550,6 +1550,30 @@
    ],
    "title": "A press on a single-building tile selects the tile, not the building",
    "design": "SPRINT 55 (found smoke-testing BL-1386, 2026-10-19). ground_bake.lua is RED on nine assertions, all the same shape: 'a press on a single-building tile selects the building (hit zone kept)' and its off-centre variants at zoom 5 and 10 - every one reporting 'got tile'. SELECTION.md's repeat-click cycle has the building outrank the tile on the FIRST press (BL-575 moved unit above building for the same reason: a thing standing on the ground must be reachable without cycling). PROVEN PRE-EXISTING: the same nine lines fail on the binary built before BL-1386's renderer change, so the structure hit zone was already missing or mis-sized. SUSPECT: the zones the bake's installation pass publishes (structure_hit_zone, emitted beside the baked stamps) versus what resolve_marker_hit reads - a building drawn INTO the ground has no marker glyph to hit any more (BL-1241 retired the canvas building draw), so the hit zone is the only thing standing in for it. THE WORK: find which side stopped publishing, fix it, and keep the nine rows as the check."
+  },
+  {
+   "status": "complete",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-19",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (in play, 2026-10-19)",
+   "requires": [],
+   "id": "BL-1386",
+   "short_name": "ROAD_HALVES_DRAW_ONE_TIER",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/route_paint.cpp",
+    "src/ui/route_paint.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/verify_api.cpp"
+   ],
+   "title": "A crossing whose halves differ in tier rendered at one tier",
+   "design": "SPRINT 55. BEN, in play 2026-10-19: \"when one half of a road is one tier, and the other half is another tier, only one road tier gets rendered. We should make sure that each half of that tile's road gets rendered as the correct road tier.\" CAUSE: a road is an EDGE and each edge carries its own tier, but both renderers weighted the whole TILE by max_road_tier - the bake took one tier a piece, the canvas one colour and width a cell - so a tile with a Track one way and a Highway the other drew both halves as Highway. MEASURED before the fix: 845 tiles of the shipped 1960 start carry two tiers across 2629 crossings, about one roaded tile in six, before a player builds anything. DELIVERED 2026-10-19 at 654a6a8e: the seam already existed (the canvas curve split at its apex so each half could take its own edge's FOG, and a baked curve recorded the arclength where its halves meet), so the tier rides both - per-direction colour and width on the canvas with the apex capped by the heavier half, route_piece::tier_b for the half past the split, tile_pieces reading each crossing's tier off the edge mask, and the painter resolving which half a pixel is on before taking a width (culling at the wider of the two so the heavy half is never clipped). Rail and sea lanes are TILE fields and keep one tier. PROOF: route_link_audit gained mixed_tier_tiles and two_tier_pieces - 603 of 6831 baked runs now taper at the apex, where the count was 0 by construction before. roads.lua and throughput_lens green; the two red checks found while smoke-testing are BL-1387 and BL-1388, both proven pre-existing."
   }
  ]
 }
