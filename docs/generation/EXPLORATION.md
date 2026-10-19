@@ -309,6 +309,11 @@ its ground lacks and its neighbours hold, not at what the metropole needs. Two c
 and both are wanted: a colony can want something its overlord does not care about, and a colony's
 wants can point at a *rival's* colony across a frontier the metropoles have treatied over.
 
+**Tribute is a share of the subject's earn, not of its chest (Ben, 2026-10-19).** A subject remits
+a share of what it earned that round; what it has saved is its own. A tribute levied on the chest
+decays a subject's savings geometrically, round after round, until a long-held colony closes the
+history with nothing — which is the drain this rule removes.
+
 **A colony that can pay for itself can stop paying.** Tribute is a treaty clause, and a clause
 with a term is a clause that comes up for renewal. The condition under which a subject refuses
 renewal is the phase's own secession mechanism, and it should read the same quantities the Empire
@@ -492,7 +497,11 @@ landscape search. Whether a lane *decays* once its traffic stops is this doc's o
 
 **A realm sizes its army to what it earns (Ben, 2026-10-11; overturns NR-878 for the standing army).**
 The army bill never empties the chest: a realm keeps only the standing army its earn can carry,
-so an army is a cost the realm budgets rather than a drain that bankrupts it. The navy and the
+so an army is a cost the realm budgets rather than a drain that bankrupts it. **The army carries
+only a share of the earn (Ben, 2026-10-19):** a realm sizes its standing army to at most a fixed
+share of the round's earn, and the rest of the earn stays in the chest, so a small realm saves
+something every round instead of spending its whole income on soldiers. The share is calibrated by
+sweep (`NATION_GENERATION.md` § Pass 7 names the two targets). The navy and the
 other stocks keep the ruling below. The census that prompted it: with almost no ongoing income,
 the army bill turned 314 realms that held real chests at 1200 into near-zero nations by 1960
 (`../generation/NATION_GENERATION.md` § Pass 7).

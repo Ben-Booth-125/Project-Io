@@ -583,7 +583,12 @@ rules hold it there. **A state founding leaves a year of the state bill in the c
 what the funding gate would charge its state industry, hubs included): it pays only from what lies
 above that, and a shortfall is the founding's, never a mint. **No realm closes the history empty**
 (Ben, 2026-10-19): the poorest realms earn more across the spans — the same earning lever as below,
-lifting the floor and keeping the order — until none folds an empty chest. No
+lifting the floor and keeping the order — until none folds an empty chest. Three rules carry it:
+**a small realm's endowment has a floor** (a fraction of the average realm's world-share income);
+the standing army carries only a share of the earn, and tribute is a share of the earn rather than
+the chest (`EXPLORATION.md` § Force persists, and the tribute clause). The army share and the
+endowment floor are **calibrated together by sweep** against two targets: no major opens short of a
+year of its state bill, and the median nation still opens inside 1,000–2,000 credits. No
 nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
