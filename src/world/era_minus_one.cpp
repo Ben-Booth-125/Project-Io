@@ -429,6 +429,12 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.standing_army_sized_to_earn = params.standing_army_sized_to_earn;
     hp.treasury_endowment_summed   = true; // Ben, 2026-10-12: summed over held ground
     hp.treasury_endowment_world_share = true; // Ben, 2026-10-12: as a share of the world
+    // BL-1386 (Ben, 2026-10-19): no realm closes the history empty -- the army
+    // carries a share of the earn, a small realm's endowment has a floor
+    // (both calibrated), and tribute is a share of the subject's earn.
+    hp.standing_army_earn_share_q = params.standing_army_earn_share_q;
+    hp.treasury_endowment_floor_q = params.treasury_endowment_floor_q;
+    hp.tribute_on_earn            = true;
 
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration

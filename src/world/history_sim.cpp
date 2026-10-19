@@ -1546,6 +1546,18 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 ? ((static_cast<int64_t>(params.treasury_endowment_income_q) * endowment_sum_q
                     * world_holding_realms) / world_held_endowment_q) * std::max(step_years, 1)
                 : 0;
+        // BL-1386 (NATION_GENERATION.md sec Pass 7, Ben 2026-10-19) -- A SMALL
+        // REALM'S ENDOWMENT HAS A FLOOR: at least `treasury_endowment_floor_q`
+        // per mille of the average realm's world-share income (the rate, a
+        // year), for a realm holding any ground. It lifts the poorest to the
+        // floor and never cuts a realm above it, so the order holds.
+        if (params.treasury_endowment_world_share && params.treasury_endowment_floor_q > 0 && held_count > 0)
+        {
+            const int64_t floor_income =
+                (static_cast<int64_t>(params.treasury_endowment_income_q)
+                 * std::min(params.treasury_endowment_floor_q, 1000) / 1000) * std::max(step_years, 1);
+            endowment_income = std::max(endowment_income, floor_income);
+        }
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
         // BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING.
@@ -1564,6 +1576,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         seat.treasury = clampi64(
             seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
+        // BL-1386: the round's earn, kept for tribute (a share of the earn).
+        q.round_earn = std::max<int64_t>(levy_income + endowment_income + corridor_income + trade_income, 0);
         if (spend) // BL-1298 census, write-only
         {
             spend->earn_endowment += endowment_income;
@@ -1595,10 +1609,17 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             // realm can pay a standing army from), by construction: the fold
             // is credited above, before `purse_before_earn`, and is not in
             // these terms.
+            // BL-1386 (EXPLORATION.md sec Force persists now, Ben 2026-10-19):
+            // THE ARMY CARRIES ONLY A SHARE OF THE EARN -- `standing_army_earn_share_q`
+            // per mille of it; the rest of the earn stays in the chest.
+            const int64_t army_share_q = std::clamp(params.standing_army_earn_share_q, 0, 1000);
+            const auto army_carry = [&](int64_t earn) {
+                return earn >= (INT64_MAX / 1000) ? earn : (earn * army_share_q) / 1000;
+            };
             if (params.standing_army_sized_to_earn && rate > 0)
             {
-                const int64_t round_earn_all = std::max<int64_t>(
-                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                const int64_t round_earn_all = army_carry(std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0));
                 earn_carry_cap = round_earn_all >= (INT64_MAX / 1000) ? INT64_MAX
                                                                       : (round_earn_all * 1000) / rate;
             }
@@ -1613,8 +1634,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             // then within the earn, so the chest is never drawn down by it.
             if (params.standing_army_sized_to_earn && heads > 0 && rate > 0)
             {
-                const int64_t round_earn = std::max<int64_t>(
-                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                const int64_t round_earn = army_carry(std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0));
                 // heads <= 2^48 and rate <= ~2^34 at any sane constant; the
                 // division form keeps the comparison free of the product.
                 const int64_t carried = std::min<int64_t>(heads,
@@ -7243,7 +7264,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     region& sseat = ss.regions[static_cast<std::size_t>(subj.capital)];
                     region& lseat = ss.regions[static_cast<std::size_t>(lord.capital)];
-                    const int64_t amount = (sseat.treasury * params.treaty_tribute_rate_q) / 1000;
+                    // BL-1386 (EXPLORATION.md, Ben 2026-10-19): TRIBUTE IS A
+                    // SHARE OF THE SUBJECT'S EARN, NOT OF ITS CHEST -- what it
+                    // earned in its last upkeep round, capped by the purse;
+                    // what it has saved is its own. Off: the chest, as before.
+                    const int64_t amount = params.tribute_on_earn
+                        ? std::min<int64_t>((std::max<int64_t>(subj.round_earn, 0) * params.treaty_tribute_rate_q) / 1000,
+                                            std::max<int64_t>(sseat.treasury, 0))
+                        : (sseat.treasury * params.treaty_tribute_rate_q) / 1000;
                     if (amount > 0)
                     {
                         sseat.treasury -= amount;

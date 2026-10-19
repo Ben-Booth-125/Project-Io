@@ -2304,6 +2304,31 @@ struct history_sim_params
     /// inherits it).
     bool standing_army_sized_to_earn = false;
 
+    /// BL-1386 -- THE ARMY CARRIES ONLY A SHARE OF THE EARN (EXPLORATION.md
+    /// sec Force persists now, Ben 2026-10-19). Per mille of the round's earn
+    /// the standing army may carry where `standing_army_sized_to_earn` is on:
+    /// the sizing disbands down to it and the army step buys no further, so
+    /// the rest of the earn stays in the chest. 1000 = the whole earn (the
+    /// BL-1298 rule, unchanged); domain 0-1000, clamped. Calibrated by sweep
+    /// (`world_params::standing_army_earn_share_q`).
+    int standing_army_earn_share_q = 1000;
+
+    /// BL-1386 -- A SMALL REALM'S ENDOWMENT HAS A FLOOR (NATION_GENERATION.md
+    /// sec Pass 7, Ben 2026-10-19). Where `treasury_endowment_world_share` is
+    /// on, a living realm holding any ground earns at least this per mille of
+    /// the AVERAGE realm's world-share income (which is
+    /// `treasury_endowment_income_q` a year by construction) -- lifting the
+    /// poorest, never cutting the top. 0 = no floor. Calibrated by sweep
+    /// (`world_params::treasury_endowment_floor_q`).
+    int treasury_endowment_floor_q = 0;
+
+    /// BL-1386 -- TRIBUTE IS A SHARE OF THE SUBJECT'S EARN, NOT OF ITS CHEST
+    /// (EXPLORATION.md, Ben 2026-10-19). When on, `treaty_tribute_rate_q` is
+    /// read per mille of the subject's last upkeep round's earn
+    /// (`polity::round_earn`), capped by its purse; off, of its whole chest
+    /// (the pre-ruling rule every fixture keeps).
+    bool tribute_on_earn = false;
+
     /// BL-1298 -- THE ENDOWMENT IS SUMMED OVER HELD GROUND (NATION_GENERATION.md
     /// sec Pass 7, Ben 2026-10-12). When on, `treasury_endowment_income_q` is
     /// a per-mille of the SUM of the polity's held regions' endowment
@@ -3444,6 +3469,12 @@ struct polity
     /// raw-score comparison Consolidate was never chosen after ~year 176 and
     /// this escape did not exist.
     int cohesion_q = 1000;
+
+    /// BL-1386 -- GENERATION SCRATCH, NOT SAVED: what the realm EARNED in its
+    /// last upkeep round (levy + endowment + corridor + trade, material),
+    /// written by `run_exploration_upkeep`. Tribute reads it when
+    /// `history_sim_params::tribute_on_earn` is on.
+    int64_t round_earn = 0;
 
     /// BL-748 — THE YEAR THIS POLITY CROSSED THE INDUSTRIAL RUNG, or 0 for
     /// never. The sim's industrial clock is the capacity ladder, and the rung
