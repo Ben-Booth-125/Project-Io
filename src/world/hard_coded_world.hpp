@@ -305,8 +305,16 @@ struct world_params
     /// short of a year of its state bill, and every seed's median nation opens
     /// inside 1,000-2,000 credits. Not written by the envelope, on the same
     /// footing as the BL-1298 fields above (these defaults ARE the shipped values).
-    int standing_army_earn_share_q = 1000;
-    int treasury_endowment_floor_q = 0;
+    ///
+    /// MEASURED (treasury_census, 16 library seeds, 2026-10-19; majors short
+    /// of a year / seeds whose Pass 7 median is outside 1,000-2,000, natural
+    /// then 20:4): army share x floor in {500,600,750,850} x {100,250,500},
+    /// against tribute on the earn alone (1000/0: 16/80, 9/16; 2/64, 12/16).
+    /// No cell met both targets; the floor carries most of the lift. Ben chose
+    /// 600/500 (7/79, 3/16; 1/64, 13/16): 20:4 stays above the band (accepted),
+    /// and the 7 short majors are traced as a follow-up.
+    int standing_army_earn_share_q = 600; // Ben, 2026-10-19: the 600/500 cell
+    int treasury_endowment_floor_q = 500; // Ben, 2026-10-19: the 600/500 cell
     /// ...and the treasury's exchange rate into industry points in the
     /// Industrialisation span, points per THOUSAND treasury units
     /// (`history_sim_params::industry_points_per_1000_treasury_units`).
