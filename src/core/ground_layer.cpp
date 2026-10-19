@@ -1,5 +1,6 @@
 #include "ground_layer.hpp"
 
+#include "process_memory.hpp" // BL-1311: thread CPU time per job
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -284,6 +285,12 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
             for (auto& m : d.mip)
                 m.clear();
         }
+        else
+        {
+            // Held as it will be in RAM (BL-1311): RGB when opaque.
+            gb::pack_px(d.px.data(), static_cast<int>(d.px.size()), d.packed);
+            std::vector<std::uint32_t>().swap(d.px);
+        }
         d.ms = ms_since(t0);
         return;
     }
@@ -325,7 +332,11 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
         if (j.old_src)
         {
             std::vector<gb::pixel_rect> rects;
-            if (gb::installation_patch_rects(*j.old_src, *j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, rects))
+            const auto t_rects = std::chrono::steady_clock::now();
+            const bool windows =
+                gb::installation_patch_rects(*j.old_src, *j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, rects);
+            d.rects_ms = ms_since(t_rects);
+            if (windows)
             {
                 d.patched = true;
                 d.patches.resize(rects.size());
@@ -338,7 +349,9 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
                     gb::bake_region(*j.src, j.geom, j.prm, r.x0, r.y0, r.w, r.h, pc.px.data());
                     gb::derive_mip_pieces(pc.px.data(), r.w, r.h, pc.mip);
                 }
+                const auto t_hash = std::chrono::steady_clock::now();
                 d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
+                d.hash_ms = ms_since(t_hash);
                 d.ms = ms_since(t_job);
                 if (level_ms)
                     level_ms[0] = d.ms;
@@ -347,9 +360,13 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
         }
         d.px.assign(static_cast<std::size_t>(j.pw) * j.ph, 0u);
         gb::bake_region(*j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, d.px.data());
-        d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
         if (level_ms)
             level_ms[0] = ms_since(t0);
+        {
+            const auto t_hash = std::chrono::steady_clock::now();
+            d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
+            d.hash_ms = ms_since(t_hash);
+        }
         // A master chunk normally bakes in well under a second; one far past
         // that is a worker held off the CPU (the pool runs below normal
         // priority) or a pathological window — either way it is the wait's
@@ -374,6 +391,10 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
             if (level_ms)
                 level_ms[l] = ms_since(t0);
         }
+        // The master piece as RAM will hold it (BL-1311), packed here on
+        // the worker rather than on the render thread.
+        gb::pack_px(d.px.data(), static_cast<int>(d.px.size()), d.packed);
+        std::vector<std::uint32_t>().swap(d.px);
         d.ms = ms_since(t_job);
         return;
     }
@@ -406,9 +427,13 @@ void ground_layer::worker_main()
         }
         result d;
         double lms[L] = {};
+        const gb::pass_clock pc0 = gb::thread_pass_clock();
+        const double cpu0 = io_mem::thread_cpu_ms();
         const auto t0 = std::chrono::steady_clock::now();
         run_job(j, d, lms);
         const double ms = ms_since(t0);
+        const double cpu = io_mem::thread_cpu_ms() - cpu0;
+        const gb::pass_clock& pc1 = gb::thread_pass_clock();
         {
             std::lock_guard lk(m_mx);
             if (j.kind == job_kind::far)
@@ -417,11 +442,36 @@ void ground_layer::worker_main()
                 ++m_stats.bakes[0];
             }
             else if (j.kind == job_kind::master)
+            {
                 for (int l = 0; l < L; ++l)
                 {
                     m_stats.bake_ms[1 + l] += lms[l];
                     ++m_stats.bakes[1 + l];
                 }
+                double* const pm = m_stats.pass_ms;
+                double* const pp = m_stats.patch_pass_ms;
+                for (int k = 0; k < gb::bp_count; ++k)
+                {
+                    pm[k] += pc1.ms[k] - pc0.ms[k];
+                    if (d.patched)
+                        pp[k] += pc1.ms[k] - pc0.ms[k];
+                }
+                m_stats.cpu_ms += cpu;
+                if (d.patched)
+                    m_stats.patch_cpu_ms += cpu;
+                pm[gb::bp_count]     += d.rects_ms;
+                pm[gb::bp_count + 1] += d.hash_ms;
+                for (int l = 1; l < L; ++l)
+                    pm[gb::bp_count + 2] += lms[l];
+                if (d.patched)
+                {
+                    pp[gb::bp_count]     += d.rects_ms;
+                    pp[gb::bp_count + 1] += d.hash_ms;
+                    ++m_stats.patch_jobs;
+                    m_stats.patch_empty += d.patches.empty() ? 1 : 0;
+                    m_stats.patch_ms += ms;
+                }
+            }
             m_results.push_back(std::move(d));
             --m_inflight; // counted from enqueue until the result LANDS
         }
@@ -498,11 +548,29 @@ const ground_layer::body_state* ground_layer::find(entity_id id) const
     return it == m_bodies.end() ? nullptr : it->second.get();
 }
 
+namespace {
+/// What a whole level of geometry @p g holds once packed (BL-1311): its
+/// top and bottom chunk rows carry the transparent margin and stay RGBA;
+/// every row between is opaque ground, held as RGB. (Pixels an unsurveyed
+/// or narrow body leaves transparent elsewhere make this a slight under-
+/// estimate there; the budget checks read the landed bytes too.)
+long long packed_level_bytes(const ui::ground::geometry& g)
+{
+    const int cp = ui::ground::k_chunk_px;
+    const long long W = g.W;
+    if (g.H <= 2 * cp)
+        return W * g.H * 4;
+    const long long last = g.H - (g.H - 1) / cp * cp; // rows in the bottom chunk row
+    const long long edge = cp + last;
+    return W * edge * 4 + W * (g.H - edge) * 3;
+}
+} // namespace
+
 long long ground_layer::master_bytes(const body_state& b)
 {
     long long n = 0;
     for (int l = 0; l < L; ++l)
-        n += static_cast<long long>(b.lv[l].geom.W) * b.lv[l].geom.H * 4;
+        n += packed_level_bytes(b.lv[l].geom);
     return n;
 }
 
@@ -600,7 +668,7 @@ void ground_layer::drop_master(body_state& b)
     {
         for (std::size_t i = 0; i < b.lv[l].px.size(); ++i)
         {
-            std::vector<std::uint32_t>().swap(b.lv[l].px[i]);
+            b.lv[l].px[i] = ui::ground::packed_px{}; // frees it
             ++b.lv[l].ver[i];
         }
     }
@@ -617,7 +685,8 @@ long long ground_layer::others_budget() const
 {
     if (ram_budget >= 0)
         return ram_budget; // verify override
-    const long long installed = static_cast<long long>(SDL_GetSystemRAM()) * 1024 * 1024; // MiB -> bytes
+    // Fixed, the same on every machine (Ben, 2026-10-17): what the pinned
+    // home leaves of the ground budget.
     long long pinned_ram = 0;
     for (const auto& [id, bp] : m_bodies)
         if (pinned(id))
@@ -625,7 +694,7 @@ long long ground_layer::others_budget() const
     // The home master counts at its whole size even while it is still filling.
     if (const body_state* h = find(m_home))
         pinned_ram = std::max(pinned_ram, master_bytes(*h));
-    return std::max(0LL, static_cast<long long>(installed * k_ram_share) - pinned_ram);
+    return std::max(0LL, k_ground_budget - pinned_ram);
 }
 
 long long ground_layer::budget_total() const
@@ -745,6 +814,7 @@ void ground_layer::prebake(const world& w, entity_id body, bool assume_surveyed)
     m_home = body; // the pre-bake target is the homeworld: pinned (BL-1259)
     b->last_visit = m_frame;
     make_room(master_bytes(*b), body, m_active);
+    m_prebake_started = clock::now();
     if (fill_log_on())
     {
         m_prebake_pending = true;
@@ -908,6 +978,118 @@ bool ground_layer::complete_master(const world& w, entity_id body, double timeou
         if (ms_since(t0) > timeout_ms)
             return master_current(body);
     }
+}
+
+ground_layer::paint_bench ground_layer::bench_paint(const world& w, entity_id body, int drop_every,
+                                                    double timeout_ms)
+{
+    paint_bench out;
+    body_state* bp = ensure_body(w, body);
+    if (!bp || drop_every < 1)
+        return out;
+    body_state& b = *bp;
+    b.last_visit = m_frame;
+    make_room(master_bytes(b), body, m_active);
+    // The true snapshot, and the same with every drop_every-th installed tile
+    // bare: an installations-only difference, which the window rule re-bakes
+    // as windows (a tile whose installation goes is a tile whose structures
+    // and cleared ground change).
+    const auto full = std::make_shared<const gb::bake_source>(gb::prepare_source(w, body, b.reveal_all, registry));
+    auto bare = std::make_shared<gb::bake_source>(*full);
+    int seen = 0;
+    for (std::int32_t& k : bare->inst.of_tile)
+        if (k >= 0 && seen++ % drop_every == 0)
+        {
+            k = -1;
+            ++out.dropped;
+        }
+    // Bake every chunk not current against the source in hand, and wait.
+    const auto fill = [&](double& ms) -> bool {
+        const auto t0 = clock::now();
+        for (;;)
+        {
+            drain();
+            bool any = false;
+            for (int i = 0; i < b.n_chunks && !any; ++i)
+                any = b.ready[i] || b.job[i];
+            if (any && b.swept_digest != b.src_digest && b.sweep_job == 0)
+            {
+                job j = make_sweep_job(b);
+                b.sweep_job = j.seq;
+                bake_sync(std::move(j));
+            }
+            if (master_current(body))
+            {
+                ms = ms_since(t0);
+                return true;
+            }
+            for (int i = 0; i < b.n_chunks; ++i)
+                if (b.job[i] == 0 && (!b.ready[i] || b.dirty[i]))
+                {
+                    job j = make_master_job(b, i, k_prio_view + i);
+                    b.job[i] = j.seq;
+                    enqueue(std::move(j));
+                }
+            for (;;)
+            {
+                drain();
+                bool busy = b.sweep_job != 0;
+                for (int i = 0; i < b.n_chunks && !busy; ++i)
+                    busy = b.job[i] != 0;
+                if (!busy)
+                    break;
+                if (ms_since(t0) > timeout_ms)
+                    return false;
+                std::unique_lock lk(m_mx);
+                m_done_cv.wait_for(lk, std::chrono::milliseconds(20), [&] { return !m_results.empty(); });
+            }
+        }
+    };
+    const auto report = [&](const char* phase, double ms) {
+        stats s;
+        {
+            std::lock_guard lk(m_mx);
+            s = m_stats;
+            m_stats = stats{};
+        }
+        static const char* const names[stats::k_pass_slots] = {
+            "base", "ink", "trees", "landforms+rivers", "installations+routes", "shadows", "grade",
+            "unsharp", "window rule", "hash", "mips" };
+        std::printf("GROUND_PAINT %s: %.1f s wall, %d master bakes, CPU %.1f s (%.1f ms a bake; partial %.1f s), "
+                    "worker wall by pass:", phase, ms / 1000.0, s.bakes[1], s.cpu_ms / 1000.0,
+                    s.bakes[1] ? s.cpu_ms / s.bakes[1] : 0.0, s.patch_cpu_ms / 1000.0);
+        for (int k = 0; k < stats::k_pass_slots; ++k)
+            std::printf(" %s %.1f", names[k], s.pass_ms[k] / 1000.0);
+        std::printf("\nGROUND_PAINT %s: %d partial (%d empty) %.1f s worker:", phase, s.patch_jobs,
+                    s.patch_empty, s.patch_ms / 1000.0);
+        for (int k = 0; k < stats::k_pass_slots - 1; ++k)
+            std::printf(" %s %.1f", names[k], s.patch_pass_ms[k] / 1000.0);
+        std::printf("\n");
+        std::fflush(stdout);
+    };
+    drop_master(b);
+    set_source(b, bare);
+    {
+        std::lock_guard lk(m_mx);
+        m_stats = stats{};
+    }
+    if (!fill(out.first_ms))
+        return out;
+    report("first bake", out.first_ms);
+    set_source(b, full);
+    {
+        // The sweep alone, to count what moved.
+        job j = make_sweep_job(b);
+        b.sweep_job = j.seq;
+        bake_sync(std::move(j));
+        for (int i = 0; i < b.n_chunks; ++i)
+            out.moved += b.dirty[i];
+    }
+    out.ok = fill(out.rebake_ms);
+    out.chunks = b.n_chunks;
+    if (out.ok)
+        report("re-bake", out.rebake_ms);
+    return out;
 }
 
 void ground_layer::shutdown()
@@ -1199,34 +1381,32 @@ void ground_layer::land(result& d, bool sync)
         // A partial re-bake: blit each window over the stored chunk, and its
         // mip pieces over the chunk's share of every coarser level.
         level_store& s0 = b.lv[0];
-        std::vector<std::uint32_t>& base = s0.px[idx];
+        gb::packed_px& base = s0.px[idx];
         if (base.empty())
             return; // nothing stored to patch (a drop clears the slot first, so unreachable)
         const int ci = idx % s0.cw, cj = idx / s0.cw;
         const int cw0 = std::min(gb::k_chunk_px, s0.geom.W - ci * gb::k_chunk_px);
         for (const result::patch& pc : d.patches)
         {
-            for (int y = 0; y < pc.r.h; ++y)
-                std::memcpy(base.data() + static_cast<std::size_t>(pc.r.y0 + y) * cw0 + pc.r.x0,
-                            pc.px.data() + static_cast<std::size_t>(y) * pc.r.w,
-                            static_cast<std::size_t>(pc.r.w) * 4u);
+            b.ram -= static_cast<long long>(base.bytes());
+            gb::write_rect(base, cw0, pc.r.x0, pc.r.y0, pc.r.w, pc.r.h, pc.px.data());
+            b.ram += static_cast<long long>(base.bytes());
             for (int l = 1; l < L; ++l)
             {
                 level_store& s = b.lv[l];
                 const int li = ci >> l, lj = cj >> l;
                 const int lidx = lj * s.cw + li;
                 const int lw = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
-                std::vector<std::uint32_t>& dst = s.px[lidx];
+                gb::packed_px& dst = s.px[lidx];
                 if (dst.empty())
                     continue; // never placed (unreachable once the chunk has landed)
                 const int f  = 1 << l;
                 const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l) + (pc.r.x0 >> l);
                 const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l) + (pc.r.y0 >> l);
                 const int pw = pc.r.w >> l, ph = pc.r.h >> l;
-                for (int y = 0; y < ph; ++y)
-                    std::memcpy(dst.data() + static_cast<std::size_t>(oy + y) * lw + ox,
-                                pc.mip[l].data() + static_cast<std::size_t>(y) * pw,
-                                static_cast<std::size_t>(pw) * 4u);
+                b.ram -= static_cast<long long>(dst.bytes());
+                gb::write_rect(dst, lw, ox, oy, pw, ph, pc.mip[l].data());
+                b.ram += static_cast<long long>(dst.bytes());
                 ++s.ver[lidx];
             }
             ++m_bake_counters.patch_windows;
@@ -1243,10 +1423,10 @@ void ground_layer::land(result& d, bool sync)
             m_bake_counters.rebake_px += static_cast<std::uint64_t>(d.pw) * d.ph;
         {
             level_store& s0 = b.lv[0];
-            std::vector<std::uint32_t>& dst = s0.px[idx];
-            b.ram -= static_cast<long long>(dst.size()) * 4;
-            dst = std::move(d.px);
-            b.ram += static_cast<long long>(dst.size()) * 4;
+            gb::packed_px& dst = s0.px[idx];
+            b.ram -= static_cast<long long>(dst.bytes());
+            dst = std::move(d.packed); // packed by the worker (BL-1311)
+            b.ram += static_cast<long long>(dst.bytes());
             ++s0.ver[idx];
         }
         const int ci = idx % b.lv[0].cw, cj = idx / b.lv[0].cw;
@@ -1257,25 +1437,22 @@ void ground_layer::land(result& d, bool sync)
             const int lidx = lj * s.cw + li;
             const int lw = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
             const int lh = std::min(gb::k_chunk_px, s.geom.H - lj * gb::k_chunk_px);
-            std::vector<std::uint32_t>& dst = s.px[lidx];
+            gb::packed_px& dst = s.px[lidx];
             if (dst.empty())
-            {
-                dst.assign(static_cast<std::size_t>(lw) * lh, 0u); // transparent until its pieces land
-                b.ram += static_cast<long long>(dst.size()) * 4;
-            }
+                gb::alloc_transparent(dst, lw * lh); // transparent until its pieces land
+            else
+                b.ram -= static_cast<long long>(dst.bytes());
             const int f  = 1 << l;
             const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l);
             const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l);
             const int pw = d.pw >> l, ph = d.ph >> l;
-            const std::vector<std::uint32_t>& piece = d.mip[l];
-            for (int y = 0; y < ph; ++y)
-                std::memcpy(dst.data() + static_cast<std::size_t>(oy + y) * lw + ox,
-                            piece.data() + static_cast<std::size_t>(y) * pw,
-                            static_cast<std::size_t>(pw) * 4u);
+            gb::write_rect(dst, lw, ox, oy, pw, ph, d.mip[l].data());
+            b.ram += static_cast<long long>(dst.bytes());
             ++s.ver[lidx];
         }
     }
     b.ready[idx] = 1;
+    narrow_landed(b, idx); // BL-1311: a now-whole opaque chunk is held as RGB
     // A load knows its hash, not the source it was baked against: a later
     // re-bake of it is a whole chunk.
     b.baked_src[idx] = from_disk ? nullptr : d.src;
@@ -1299,6 +1476,31 @@ void ground_layer::land(result& d, bool sync)
     ++m_bake_counters.chunk_bakes;
     if (was_ready)
         ++m_bake_counters.chunk_rebakes;
+}
+
+void ground_layer::narrow_landed(body_state& b, int idx)
+{
+    const level_store& s0 = b.lv[0];
+    const int ci = idx % s0.cw, cj = idx / s0.cw;
+    for (int l = 0; l < L; ++l)
+    {
+        level_store& s = b.lv[l];
+        const int li = ci >> l, lj = cj >> l;
+        gb::packed_px& p = s.px[static_cast<std::size_t>(lj) * s.cw + li];
+        if (p.empty() || p.rgb)
+            continue;
+        // Whole only when every master chunk under it has landed (until then
+        // its unlanded part is transparent, and drawn so).
+        bool whole = true;
+        for (int y = lj << l; y < std::min((lj + 1) << l, s0.ch) && whole; ++y)
+            for (int x = li << l; x < std::min((li + 1) << l, s0.cw) && whole; ++x)
+                whole = b.ready[static_cast<std::size_t>(y) * s0.cw + x] != 0;
+        if (!whole)
+            continue;
+        const long long before = static_cast<long long>(p.bytes());
+        if (gb::narrow_if_opaque(p))
+            b.ram += static_cast<long long>(p.bytes()) - before; // same pixels: no version bump
+    }
 }
 
 ground_layer::window ground_layer::window_of(const body_state& b, int level,
@@ -1433,7 +1635,7 @@ void ground_layer::feed(bool verify)
     // IO_GROUND_NO_BACKGROUND=1 (a measurement switch): no speculative
     // bakes, so a bench can time a true first visit.
     static const bool no_background = env_flag("IO_GROUND_NO_BACKGROUND");
-    if (!m_in_play || queued >= cap || !m_world || no_background)
+    if (!m_in_play || queued >= cap || !m_world || no_background || !background_enabled)
         return;
     if ((act && act->n_ready < act->n_chunks) || (pre && pre->n_ready < pre->n_chunks))
         return;
@@ -1480,7 +1682,7 @@ void ground_layer::feed(bool verify)
             for (int l = 0; l < L; ++l)
             {
                 const gb::geometry gl = gb::level_geometry(m, l);
-                est += static_cast<long long>(gl.W) * gl.H * 4;
+                est += packed_level_bytes(gl);
             }
             if (!pinned(c.id) && total + est > others_budget())
                 continue;
@@ -1674,9 +1876,14 @@ void ground_layer::flush_gpu()
 bool ground_layer::upload(SDL_Renderer* r, body_state& b, int level, int idx)
 {
     const level_store& s = b.lv[level];
-    const std::vector<std::uint32_t>& px = s.px[idx];
-    if (px.empty())
+    const gb::packed_px& held = s.px[idx];
+    if (held.empty())
         return false;
+    // The words the texture takes (BL-1311): an RGB chunk unpacks, its
+    // alpha 255, exactly the pixels it was packed from.
+    m_upload_px.resize(static_cast<std::size_t>(held.n));
+    gb::unpack_px(held, m_upload_px.data());
+    const std::vector<std::uint32_t>& px = m_upload_px;
     const int li = idx % s.cw, lj = idx / s.cw;
     const int w = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
     const int h = std::min(gb::k_chunk_px, s.geom.H - lj * gb::k_chunk_px);
@@ -2243,13 +2450,23 @@ ground_layer::stats ground_layer::stats_snapshot() const
         s.ram_total += bp->ram;
         if (bp->ram > static_cast<long long>(bp->far_px.size()) * 4)
             ++s.bodies_resident;
+        for (int l = 0; l < L; ++l)
+            for (const gb::packed_px& p : bp->lv[l].px)
+            {
+                if (p.empty())
+                    continue;
+                (p.rgb ? s.rgb_chunks : s.rgba_chunks) += 1;
+                (p.rgb ? s.rgb_bytes : s.rgba_bytes) += static_cast<long long>(p.bytes());
+            }
     }
+    s.ground_budget = ram_budget >= 0 ? -1 : k_ground_budget;
+    s.others_budget = others_budget();
     if (const body_state* b = find(m_active))
     {
         s.ram_bytes[0] = static_cast<long long>(b->far_px.size()) * 4;
         for (int l = 0; l < L; ++l)
             for (const auto& px : b->lv[l].px)
-                s.ram_bytes[1 + l] += static_cast<long long>(px.size()) * 4;
+                s.ram_bytes[1 + l] += static_cast<long long>(px.bytes());
         s.master_ready = b->n_ready;
         s.master_total = b->n_chunks;
         s.master_current = master_current(m_active);
@@ -2512,7 +2729,7 @@ int ground_layer::spill_master(body_state& b, bool sync, int* skipped, const cha
         if (!t.chunks.empty())
             t.lv[l] = std::move(s.px);
         else
-            std::vector<std::vector<std::uint32_t>>().swap(s.px);
+            std::vector<gb::packed_px>().swap(s.px);
         s.px.clear();
         s.px.resize(static_cast<std::size_t>(s.cw) * s.ch);
         for (std::uint32_t& v : s.ver)
@@ -2697,7 +2914,7 @@ void ground_layer::run_disk_task(disk_task& t, std::vector<disk_result>& out)
         }
         for (std::size_t i = 0; i < refs[l].size(); ++i)
             if (refs[l][i] == 0)
-                std::vector<std::uint32_t>().swap(t.lv[l][i]); // read by no chunk being written
+                t.lv[l][i] = gb::packed_px{}; // read by no chunk being written
     }
     {
         // The master chunks not being written go now too.
@@ -2707,7 +2924,7 @@ void ground_layer::run_disk_task(disk_task& t, std::vector<disk_result>& out)
                 keep[static_cast<std::size_t>(c.idx)] = 1;
         for (std::size_t i = 0; i < t.lv[0].size(); ++i)
             if (!keep[i])
-                std::vector<std::uint32_t>().swap(t.lv[0][i]);
+                t.lv[0][i] = gb::packed_px{};
     }
     std::vector<std::uint8_t> buf;
     std::vector<std::uint32_t> piece;
@@ -2731,13 +2948,15 @@ void ground_layer::run_disk_task(disk_task& t, std::vector<disk_result>& out)
             const std::size_t n = static_cast<std::size_t>(pw) * ph;
             if (l == 0)
             {
-                const std::vector<std::uint32_t>& src = t.lv[0][static_cast<std::size_t>(c.idx)];
-                if (src.size() != n)
+                const gb::packed_px& src = t.lv[0][static_cast<std::size_t>(c.idx)];
+                if (src.empty() || static_cast<std::size_t>(src.n) != n)
                 {
                     ok = false;
                     break;
                 }
-                encode_piece(src.data(), n, buf);
+                piece.resize(n);
+                gb::unpack_px(src, piece.data()); // the file holds RGBA words, as before
+                encode_piece(piece.data(), n, buf);
             }
             else
             {
@@ -2753,24 +2972,20 @@ void ground_layer::run_disk_task(disk_task& t, std::vector<disk_result>& out)
                     ok = false;
                     break;
                 }
-                const std::vector<std::uint32_t>& src = t.lv[l][lidx];
                 piece.resize(n);
-                for (int y = 0; y < ph; ++y)
-                    std::memcpy(piece.data() + static_cast<std::size_t>(y) * pw,
-                                src.data() + static_cast<std::size_t>(oy + y) * lw + ox,
-                                static_cast<std::size_t>(pw) * 4u);
+                gb::read_rect(t.lv[l][lidx], lw, ox, oy, pw, ph, piece.data());
                 encode_piece(piece.data(), n, buf);
             }
             raw += static_cast<std::uint32_t>(n * 4);
         }
         // The master piece is no longer needed, nor any level chunk this was
         // the last reader of: free them as we go.
-        std::vector<std::uint32_t>().swap(t.lv[0][static_cast<std::size_t>(c.idx)]);
+        t.lv[0][static_cast<std::size_t>(c.idx)] = gb::packed_px{};
         for (int l = 1; l < L; ++l)
         {
             const std::size_t lidx = static_cast<std::size_t>(cj >> l) * t.cw[l] + (ci >> l);
             if (lidx < refs[l].size() && --refs[l][lidx] == 0)
-                std::vector<std::uint32_t>().swap(t.lv[l][lidx]);
+                t.lv[l][lidx] = gb::packed_px{};
         }
         if (!ok)
         {
@@ -3060,7 +3275,9 @@ std::uint64_t ground_layer::master_digest(entity_id body, int* chunks) const
                 continue;
             ++n;
             h = fold64(h, static_cast<std::uint64_t>(i));
-            h = bytes_check(reinterpret_cast<const std::uint8_t*>(s0.px[i].data()), s0.px[i].size() * 4, h);
+            piece.resize(static_cast<std::size_t>(s0.px[i].n));
+            gb::unpack_px(s0.px[i], piece.data()); // the RGBA words, however held
+            h = bytes_check(reinterpret_cast<const std::uint8_t*>(piece.data()), piece.size() * 4, h);
             const int ci = i % s0.cw, cj = i / s0.cw;
             const int pw0 = std::min(gb::k_chunk_px, s0.geom.W - ci * gb::k_chunk_px);
             const int ph0 = std::min(gb::k_chunk_px, s0.geom.H - cj * gb::k_chunk_px);
@@ -3080,10 +3297,7 @@ std::uint64_t ground_layer::master_digest(entity_id body, int* chunks) const
                     continue;
                 }
                 piece.resize(static_cast<std::size_t>(pw) * ph);
-                for (int y = 0; y < ph; ++y)
-                    std::memcpy(piece.data() + static_cast<std::size_t>(y) * pw,
-                                s.px[lidx].data() + static_cast<std::size_t>(oy + y) * lw + ox,
-                                static_cast<std::size_t>(pw) * 4u);
+                gb::read_rect(s.px[lidx], lw, ox, oy, pw, ph, piece.data());
                 h = bytes_check(reinterpret_cast<const std::uint8_t*>(piece.data()), piece.size() * 4, h);
             }
         }

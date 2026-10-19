@@ -1546,6 +1546,22 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 ? ((static_cast<int64_t>(params.treasury_endowment_income_q) * endowment_sum_q
                     * world_holding_realms) / world_held_endowment_q) * std::max(step_years, 1)
                 : 0;
+        // BL-1386 (NATION_GENERATION.md sec Pass 7, Ben 2026-10-19) -- A SMALL
+        // REALM'S ENDOWMENT HAS A FLOOR: at least `treasury_endowment_floor_q`
+        // per mille of the average realm's world-share income (the rate, a
+        // year), for a realm holding any ground. It lifts the poorest to the
+        // floor and never cuts a realm above it, so the order holds.
+        // The earn BEFORE the floor's lift: what tribute reads (Ben,
+        // 2026-10-19: "tribute reads the earn before the floor") -- the lift
+        // stays with the subject.
+        const int64_t endowment_income_prefloor = endowment_income;
+        if (params.treasury_endowment_world_share && params.treasury_endowment_floor_q > 0 && held_count > 0)
+        {
+            const int64_t floor_income =
+                (static_cast<int64_t>(params.treasury_endowment_income_q)
+                 * std::min(params.treasury_endowment_floor_q, 1000) / 1000) * std::max(step_years, 1);
+            endowment_income = std::max(endowment_income, floor_income);
+        }
         const int64_t corridor_income =
             corridor_touch * params.treasury_corridor_income_q * std::max(step_years, 1);
         // BL-954 -- A MARKET EARNS BY WHAT FLOWS THROUGH IT, NOT BY STANDING.
@@ -1564,6 +1580,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         seat.treasury = clampi64(
             seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
+        // BL-1386: the round's earn, kept for tribute (a share of the earn) --
+        // read BEFORE the endowment floor's lift, which stays with the realm.
+        q.round_earn = std::max<int64_t>(levy_income + endowment_income_prefloor + corridor_income + trade_income, 0);
         if (spend) // BL-1298 census, write-only
         {
             spend->earn_endowment += endowment_income;
@@ -1595,10 +1614,17 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             // realm can pay a standing army from), by construction: the fold
             // is credited above, before `purse_before_earn`, and is not in
             // these terms.
+            // BL-1386 (EXPLORATION.md sec Force persists now, Ben 2026-10-19):
+            // THE ARMY CARRIES ONLY A SHARE OF THE EARN -- `standing_army_earn_share_q`
+            // per mille of it; the rest of the earn stays in the chest.
+            const int64_t army_share_q = std::clamp(params.standing_army_earn_share_q, 0, 1000);
+            const auto army_carry = [&](int64_t earn) {
+                return earn >= (INT64_MAX / 1000) ? earn : (earn * army_share_q) / 1000;
+            };
             if (params.standing_army_sized_to_earn && rate > 0)
             {
-                const int64_t round_earn_all = std::max<int64_t>(
-                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                const int64_t round_earn_all = army_carry(std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0));
                 earn_carry_cap = round_earn_all >= (INT64_MAX / 1000) ? INT64_MAX
                                                                       : (round_earn_all * 1000) / rate;
             }
@@ -1613,8 +1639,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             // then within the earn, so the chest is never drawn down by it.
             if (params.standing_army_sized_to_earn && heads > 0 && rate > 0)
             {
-                const int64_t round_earn = std::max<int64_t>(
-                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0);
+                const int64_t round_earn = army_carry(std::max<int64_t>(
+                    levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0));
                 // heads <= 2^48 and rate <= ~2^34 at any sane constant; the
                 // division form keeps the comparison free of the product.
                 const int64_t carried = std::min<int64_t>(heads,
@@ -1653,6 +1679,15 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (heads > 0 && rate > 0)
             {
                 const int64_t due = (heads * rate) / 1000;
+                // BL-1386 review -- THE ARMY SHARE, CHECKED: with the army
+                // sized to the earn, the bill is within the share of it.
+                if (spend && params.standing_army_sized_to_earn)
+                {
+                    const int64_t carry = army_carry(std::max<int64_t>(
+                        levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0));
+                    ++spend->army_share_rounds;
+                    if (due > carry) ++spend->army_over_share;
+                }
                 int64_t heads_paid = heads;
                 int64_t paid_sum   = due;
                 if (seat.treasury < due)
@@ -6373,6 +6408,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_earned_levy          += upkeep_spend.earn_levy;
             out.army_disbanded_by_earn        += upkeep_spend.army_disbanded_by_earn;
             out.army_sized_rounds             += upkeep_spend.army_sized_rounds;
+            out.army_share_rounds             += upkeep_spend.army_share_rounds; // BL-1386 review
+            out.army_over_share               += upkeep_spend.army_over_share;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
@@ -7243,9 +7280,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     region& sseat = ss.regions[static_cast<std::size_t>(subj.capital)];
                     region& lseat = ss.regions[static_cast<std::size_t>(lord.capital)];
-                    const int64_t amount = (sseat.treasury * params.treaty_tribute_rate_q) / 1000;
+                    // BL-1386 (EXPLORATION.md, Ben 2026-10-19): TRIBUTE IS A
+                    // SHARE OF THE SUBJECT'S EARN, NOT OF ITS CHEST -- what it
+                    // earned in its last upkeep round, capped by the purse;
+                    // what it has saved is its own. Off: the chest, as before.
+                    const int64_t amount = params.tribute_on_earn
+                        ? std::min<int64_t>((std::max<int64_t>(subj.round_earn, 0) * params.treaty_tribute_rate_q) / 1000,
+                                            std::max<int64_t>(sseat.treasury, 0))
+                        : (sseat.treasury * params.treaty_tribute_rate_q) / 1000;
                     if (amount > 0)
                     {
+                        // BL-1386 review -- TRIBUTE, CHECKED: on the earn, never
+                        // above its share of the subject's pre-floor earn.
+                        if (params.tribute_on_earn)
+                        {
+                            ++out.tribute_payments_on_earn;
+                            if (amount > (std::max<int64_t>(subj.round_earn, 0) * params.treaty_tribute_rate_q) / 1000)
+                                ++out.tribute_over_earn;
+                        }
                         sseat.treasury -= amount;
                         lseat.treasury = clampi64(lseat.treasury + amount, 0, 1LL << 48);
                         out.tribute_remitted += amount;
@@ -12322,7 +12374,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const std::vector<int> cells = closing_carve_cells(cr, ss.regions);
         const closing_plan plan = plan_closing_rounds(ss.regions, out.polities, cells, cr.ground.gw, cr.ground.gh,
                                                       cr.min_nation_tiles, cr.keep_city_states,
-                                                      cr.total_target);
+                                                      cr.total_target, &cr.ground.sub);
         const int64_t y_floor = params.stop_year > params.start_year ? params.stop_year - 1 : params.start_year;
         const int64_t y_total = params.stop_year;
         const auto realm_label = [&](int pid) -> std::string {
@@ -12335,8 +12387,89 @@ history_sim_state run_history_sim(settlement_state&         ss,
         };
         for (const closing_step& st : plan.steps)
         {
-            const int64_t y = st.kind == closing_step_kind::floor_absorb ? y_floor : y_total;
+            const int64_t y = (st.kind == closing_step_kind::floor_absorb
+                               || (st.kind == closing_step_kind::exclave_cede && !st.late))
+                                  ? y_floor : y_total;
             event_year = y;
+            // BL-1310 (NATION_GENERATION.md sec Pass 2e): A CESSION. Ground cut
+            // off from its realm's core passes to the nation around it, FIRST,
+            // before the floor -- dated with the floor (a late repair after a
+            // split secession, with the total). Ground only: no realm dies and
+            // none is founded, so the count the rounds planned is untouched.
+            // The chest stays with the realm (sec Pass 2e: "the nation keeps
+            // its core, its name and its chest"): treasury standing on a ceded
+            // province -- a captured capital's -- goes home to the cedent's seat.
+            // Everything else on the ground (people, works, stocks) is the
+            // ground's and moves with it, as conquest moves it.
+            if (st.kind == closing_step_kind::exclave_cede)
+            {
+                const int from = st.from_polity;
+                const int into = st.into_polity;
+                int from_seat = -1;
+                if (from >= 0 && from < static_cast<int>(out.polities.size()))
+                {
+                    from_seat = out.polities[static_cast<std::size_t>(from)].capital;
+                    if (from_seat < 0 || static_cast<std::size_t>(from_seat) >= owner.size()
+                        || owner[static_cast<std::size_t>(from_seat)] != from)
+                    {
+                        from_seat = -1;
+                        for (std::size_t h = 0; h < owner.size(); ++h)
+                            if (owner[h] == from && !std::binary_search(st.moved.begin(), st.moved.end(), static_cast<int>(h)))
+                            { from_seat = static_cast<int>(h); break; }
+                    }
+                }
+                int into_seat = -1;
+                if (into >= 0 && into < static_cast<int>(out.polities.size()))
+                {
+                    into_seat = out.polities[static_cast<std::size_t>(into)].capital;
+                    if (into_seat < 0 || static_cast<std::size_t>(into_seat) >= owner.size()
+                        || owner[static_cast<std::size_t>(into_seat)] != into)
+                    {
+                        into_seat = -1;
+                        for (std::size_t h = 0; h < owner.size(); ++h)
+                            if (owner[h] == into) { into_seat = static_cast<int>(h); break; }
+                    }
+                }
+                for (const int r : st.moved)
+                {
+                    const std::size_t ri = static_cast<std::size_t>(r);
+                    region& rg = ss.regions[ri];
+                    if (rg.treasury > 0 && from_seat >= 0)
+                    {
+                        ss.regions[static_cast<std::size_t>(from_seat)].treasury += rg.treasury;
+                        rg.treasury = 0;
+                    }
+                    owner[ri] = into;
+                    rg.nation = into;
+                    void_stale_standing_army(rg);
+                    if (!rg.is_seat) rg.seat_region = into_seat;
+                    out.owner_changes.push_back(owner_change{
+                        static_cast<int32_t>(y), static_cast<uint16_t>(r),
+                        into >= 0 ? static_cast<uint16_t>(into) : owner_none});
+                }
+                // The cedent's ground that pointed at a departing seat re-points at its own.
+                if (from >= 0)
+                    for (std::size_t h = 0; h < owner.size(); ++h)
+                        if (owner[h] == from && ss.regions[h].seat_region >= 0
+                            && std::binary_search(st.moved.begin(), st.moved.end(), ss.regions[h].seat_region))
+                            ss.regions[h].seat_region = from_seat;
+                touch_owner(from);
+                touch_owner(into);
+                note_event(lapse_event_kind::exclave_ceded, st.region, from, into);
+                ++out.closing_cessions;
+                const std::string ground_name =
+                    st.region >= 0 ? ss.regions[static_cast<std::size_t>(st.region)].name : std::string("Ground");
+                // The cause, in the line: the ground was cut off from its realm.
+                const std::string whose = (st.moved.empty() || st.region < 0) ? std::string("Ground") : ground_name; // a part names only a province that moved
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    whose + (from >= 0 ? ", cut off from " + realm_label(from) : std::string(", cut off from the ground around it"))
+                        + ", is ceded to "
+                        + (into >= 0 ? realm_label(into) : std::string("the unheld ground around it"))
+                        + (st.late ? " as the realms settle to their number" : " as the old order closes"),
+                    std::string{}});
+                continue;
+            }
             if (st.kind == closing_step_kind::target_secede)
             {
                 const int qid  = st.from_polity;
@@ -12503,6 +12636,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.closing_predicted           = plan.nations_after;
         out.closing_short_of_target     = plan.short_of_target;
         out.closing_subfloor_secessions = plan.subfloor_secessions;
+        out.closing_cessions_islet      = plan.cessions_islet;
+        out.closing_cessions_to_unheld  = plan.cessions_to_unheld;
+        out.closing_cessions_late       = plan.cessions_late;
+        out.closing_secessions_split    = plan.secessions_split;
+        out.closing_reps_off_core       = plan.reps_off_core;
+        out.closing_cessions_split      = plan.cessions_split;
+        out.closing_city_states         = plan.city_states;
+        out.closing_parts_detached      = plan.parts_detached;
+        out.closing_provinces_split     = plan.provinces_split;
+        out.closing_cores_floor_moved   = plan.cores_floor_moved;
+        out.closing_cell_overrides.assign(plan.cell_overrides.begin(), plan.cell_overrides.end());
+        out.closing_polity_core_tiles.assign(plan.polity_core_tiles.begin(), plan.polity_core_tiles.end());
+        out.closing_core_tiles_lost = plan.core_tiles_lost;
+        out.closing_ceded_regions.assign(plan.ceded_regions.begin(), plan.ceded_regions.end());
     }
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's

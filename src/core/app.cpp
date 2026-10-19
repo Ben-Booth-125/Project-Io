@@ -411,7 +411,17 @@ int app::run(autostart_mode autostart)
         open_new_world_wizard();
         m_autostart_wizard = 0; // the wizard's own draw advances rounds + presses Begin
         std::printf("[autostart-%s] walking the wizard, then Begin\n",
-                    autostart == autostart_mode::play ? "play" : "windowed");
+                    autostart == autostart_mode::play           ? "play"
+                    : autostart == autostart_mode::bench_ground ? "bench-ground"
+                                                                : "windowed");
+        if (autostart == autostart_mode::bench_ground)
+        {
+            // BL-1247: the bench's reference window, windowed.
+            SDL_SetWindowFullscreen(m_window, false);
+            SDL_RestoreWindow(m_window); // a maximised window ignores a size
+            SDL_SetWindowSize(m_window, 1720, 1080);
+            m_bench.on = true;
+        }
         std::fflush(stdout);
     }
     int autostart_ingame_frames = 0;
@@ -427,6 +437,7 @@ int app::run(autostart_mode autostart)
         if (m_screen != app_screen::in_game)
         {
             render();
+            bench_ground_frame(); // BL-1247: no-op unless --bench-ground
             continue;
         }
 
@@ -543,7 +554,8 @@ int app::run(autostart_mode autostart)
         // the screen centre where the loading bar was — i.e. onto the canvas.
         // Synthesise exactly that: motion + a click on each of the first five
         // in-game frames. SDL_PushEvent feeds the same queue real input uses.
-        if (windowed_autostart && autostart_ingame_frames < 5)
+        if (windowed_autostart && autostart != autostart_mode::bench_ground
+            && autostart_ingame_frames < 5)
         {
             int ww = 0, wh = 0;
             SDL_GetWindowSize(m_window, &ww, &wh);
@@ -565,6 +577,7 @@ int app::run(autostart_mode autostart)
         }
 
         render();
+        bench_ground_frame(); // BL-1247: no-op unless --bench-ground
 
         // Windowed autostart: a handful of real in-game frames is the coverage —
         // the first frame builds the raster caches and every shell surface; if
@@ -645,6 +658,9 @@ bool app::same_world_params(const world_params& a, const world_params& b)
         && a.treasury_levy_per_mille_q == b.treasury_levy_per_mille_q
         && a.treasury_endowment_income_q == b.treasury_endowment_income_q
         && a.standing_army_sized_to_earn == b.standing_army_sized_to_earn
+        && a.standing_army_earn_share_q == b.standing_army_earn_share_q // BL-1386
+        && a.treasury_endowment_floor_q == b.treasury_endowment_floor_q // BL-1386
+        && a.tribute_on_earn == b.tribute_on_earn // BL-1386
         && a.industry_points_per_1000_treasury_units == b.industry_points_per_1000_treasury_units
         && a.body_count == b.body_count
         // BL-1279: the setup round's nation targets steer the history's lean
@@ -1816,7 +1832,8 @@ void app::finish_new_game()
         {
             const std::vector<quarterly_return>& rs = pit->second.returns;
             ui::push_capped(m_balance_history,
-                            rs.empty() ? pit->second.balance : rs.front().balance - rs.front().net);
+                            rs.empty() ? pit->second.balance
+                                       : static_cast<float>(rs.front().balance - rs.front().net));
             for (const quarterly_return& r : rs)
             {
                 ui::push_capped(m_balance_history, r.balance);

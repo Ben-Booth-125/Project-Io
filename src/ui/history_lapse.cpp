@@ -5202,6 +5202,25 @@ std::string lapse_event_prose(const history_lapse& h, const lapse_event& e)
         std::snprintf(buf, sizeof buf, "%s breaks from %s as the realms settle to their number.",
                       polity_name_of(h, e.polity), polity_name_of(h, e.other));
         break;
+    case lapse_event_kind::exclave_ceded:
+        // BL-1310 (NATION_GENERATION.md sec Pass 2e): ground cut off from its
+        // realm's core is ceded to the nation around it -- the cause is in the
+        // kind. `polity` the cedent (none: unheld ground), `other` the receiver
+        // (none: the unheld ground around it).
+        if (e.region == lapse_event_none && e.polity != lapse_event_none)
+            // A part that moved no province (BL-1310 round 4: it names none).
+            std::snprintf(buf, sizeof buf, "Ground cut off from %s is ceded to %s.", polity_name_of(h, e.polity),
+                          e.other == lapse_event_none ? "the unheld ground around it" : polity_name_of(h, e.other));
+        else if (e.polity == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "The ground at %s passes to %s.", R,
+                          e.other == lapse_event_none ? "the unheld ground around it" : polity_name_of(h, e.other));
+        else if (e.other == lapse_event_none)
+            std::snprintf(buf, sizeof buf, "%s, cut off from %s, falls to the unheld ground around it.", R,
+                          polity_name_of(h, e.polity));
+        else
+            std::snprintf(buf, sizeof buf, "%s, cut off from %s, is ceded to %s.", R,
+                          polity_name_of(h, e.polity), polity_name_of(h, e.other));
+        break;
     case lapse_event_kind::champion_chartered:
         // BL-1278 lane C: a minor raises a national champion from its own capital.
         std::snprintf(buf, sizeof buf, "%s charters a national champion at %s.",
@@ -5419,6 +5438,9 @@ int ticker_priority(const lapse_event& e)
     // BL-1255: a rail link, one per works-leaning realm per round at most --
     // churn on an industrial world, like a works note.
     case lapse_event_kind::rail_laid:            return 2;
+    // BL-1310: a cession, dozens to hundreds on one close (sec Pass 2e) --
+    // churn at the close, told on the map as ground changing colour.
+    case lapse_event_kind::exclave_ceded:        return 2;
     // BL-1099: a works note is CHURN on a busy world (up to four per region),
     // so it takes the ticker only when the arc is quiet; its glyph on the map
     // is the primary telling.

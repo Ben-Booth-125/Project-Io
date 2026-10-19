@@ -1,0 +1,75 @@
+# Sprint 56 handoff — trustworthy ground (2026-10-17, closed 2026-10-19)
+
+Sprint 56 ran beside sprint 55, on branch `claude/sprint-56-456d2b` in its own worktree, while Ben
+playtested main. It is **gated, not merged and not pushed**. The retro is in `sprints.json`.
+This note is for the session that brings the branch onto main after sprint 55 lands.
+
+## What the branch carries
+
+| Item | State |
+|---|---|
+| BL-1337 (return net crosses zero) | Delivered. Save **v54**. |
+| BL-1214 (eighth field doc drift) | Delivered (FINANCE.md). |
+| BL-1338 (digest pins stale) | Movers attributed; **re-pin owed at integration** (Ben). |
+| BL-1319 (fixture base stall) | Delivered; consumers' own failures filed as BL-1376. |
+| BL-1310 (nations contiguous) | Delivered; world mover. |
+| BL-1247 (ground benchmark) | Delivered: `ProjectIo --bench-ground`. |
+| BL-1311 (ground paint perf) | Delivered; the 6 GB rest is BL-1377 (ground under six GB). |
+| Wizard footer anchored | Delivered (STARTUP.md, Ben 2026-10-16); live-clicked by Ben. |
+| BL-1382 (province normalising pass) | Delivered; world mover (PROVINCES.md § The normalising pass). |
+| BL-1386 (no realm closes empty) | Delivered; world mover (Pass 7, EXPLORATION.md). Follow-up BL-1389 (remaining major drain). |
+| Hub seeding and the state reserve | Delivered with BL-1382: LP coverage read at the funding gate; foundings keep 16 ticks of the state bill. |
+
+## Fixed after the live click (2026-10-18): BL-1310 no longer starves minors
+
+The live click showed tiny minors. Measured with tools/verify/nation_sizes.cpp at 20:4 on the 16
+library seeds, BL-1310 had collapsed 8 seeds (minors' median 4-22 tiles; majors 99% on seeds 0
+and 31). Traced to two causes and fixed by ruling (Ben, 2026-10-18): an exclave is split among the
+nations that border it, province by province; city states are judged at the close; a realm under
+the floor keeps its larger piece. world_audit now reads sizes: 15 seeds pass 80% of their own
+pre-BL-1310 median, and seeds 43 (145), 28 (181) and 13 (496) are accepted exceptions pinned at their readings (Ben,
+2026-10-18 and 2026-10-19). market_viability per-seed: seeds 9, 40 and 11 dip under 85 at tick 50 and
+are accepted as world variance, and seed 32 with them (Ben, 2026-10-19); the pooled gates pass.
+
+## Integration steps, in order
+
+1. **Merge main into the branch, not the other way first**, and resolve there.
+2. **Save versions.** `save_version_reservations.jsonl` holds v53 for BL-1340 (roads cross tile
+   edges, sprint 55) and v54 for BL-1337. If BL-1340 has landed on main, BL-1337's exact-net
+   section goes after its section and `k_world_save_version_pre_net` moves from 52 to 53
+   (`world_save.hpp`). The five harnesses that cut streams back (`save_roundtrip`, `lp_pool_harness`,
+   `railway_harness`, `space_assets_harness`, `tax_discontent_harness`) subtract
+   `world_save_net_section_bytes`; recheck them after the stack.
+3. **Ids.** Minted on this branch since: BL-1382, BL-1386, BL-1389 (each clear of main when minted)
+   and NR-1049..NR-1054. Check them again at the merge.
+    This branch minted BL-1370..BL-1377 and NR-1049..NR-1051 from the main tip of
+   2026-10-17 (main then held BL-1369, NR-1048). Sprint 55 may have minted the same numbers since:
+   compare and renumber the later ones with their cross-references.
+   **Confirmed 2026-10-18:** main holds BL-1372 (rail is a crossing), BL-1374 (ledger tabs fixture
+   broke) and BL-1377 (verify world not roaded) — this branch's BL-1372, BL-1374 and BL-1377 must be
+   renumbered. BL-1382 (province normalising pass) was minted clear of main's BL-1381.
+4. **Re-run the gates on the integrated tree** (both sprints move the world): `market_viability`
+   full, `history_patterns` full, `history_sim_harness`, `world_audit --seeds` (library),
+   `nation_targets_harness`, `world_determinism`, `save_roundtrip`, `quarterly_return`.
+5. **Re-pin the digests (BL-1338)** on the integrated tree — authorised in principle (Ben, 2026-10-17) once both sprints are merged and the gates pass:
+   `player_seed_sweep --digest-check --arc shipped|legacy` over the 16 library seeds. The mover
+   table and the method are in `drafts/sprint-56-digest-attribution.md`; add sprint 55's movers
+   and BL-1310 (which moves both arcs since every launch obeys the strait rule).
+6. **Archive the delivered rows** (BL-1337, BL-1214, BL-1319, BL-1310, BL-1247, BL-1311, and
+   BL-1338 once re-pinned) with `archive_landed.js` — it evicts on any call, so run it once, on
+   purpose.
+7. **Regenerate the sweep artefacts** (`exploration_sweep.json` and the other checked-in sweep
+   JSONs) after the integrated tree's last world mover; this branch left them as committed.
+8. **Debug build trees rebuild once**: BL-1311 switches on CMake policy CMP0184 and builds the
+   ground bake at /O2 in Debug (kept, on by default: Ben, 2026-10-17, NR-1051).
+
+## Open for Ben
+
+- NR-1052: the province band's scaling f(s) = 1 + (s-1)/2 by anchor scale (Claude's calibration).
+- BL-1377 (ground under six GB): decided later (Ben, 2026-10-17); options C (stream the master) or D (96 px).
+- BL-1389 (remaining major drain): trace the two natural majors and one at 20:4 still short of a year.
+
+Resolved: NR-1049 (strait 3 tiles; exact net in the acquisition price), NR-1050 (seat is capital),
+NR-1051 (Debug-optimised bake kept), NR-1053 (no major on a zero treasury), NR-1054 (seed 40 herd
+accepted), the BL-1338 re-pin authorised in principle. Live click 2026-10-17 (Ben): wizard footer
+good; borders contiguous; memory down; the tiny-minor finding it raised is fixed above.

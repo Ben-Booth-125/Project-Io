@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <map>
 #include <memory>
 #include <string>
@@ -287,6 +288,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                                     + " (" + strategic_sector_name(strategic_sector_of(reg, b)) + ")"
                                     + (paid < price ? ", its treasury short of the price" : "");
                         w.history_log.push_back(std::move(e));
+                        f.history_index = w.history_log.size() - 1;
                         break;
                     }
                 }
@@ -330,6 +332,8 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         std::stable_sort(sites.begin(), sites.end(),
                          [](const auto& a, const auto& b) { return a.first < b.first; });
         entity_id built = null_entity;
+        state_port_founding pf;
+        pf.nation = nid;
         for (const auto& [d, tile] : sites)
         {
             (void)d;
@@ -352,9 +356,13 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
             e.event     = "State charter: " + nc.name + " founds a state port at its coastal seat"
                         + std::string(paid < price ? ", its treasury short of the price" : "");
             w.history_log.push_back(std::move(e));
+            pf.building      = built;
+            pf.price         = price;
+            pf.paid          = paid;
+            pf.history_index = w.history_log.size() - 1;
             break;
         }
-        if (built != null_entity) { ++out.ports_founded; out.port_buildings.push_back(built); }
+        if (built != null_entity) { ++out.ports_founded; out.port_buildings.push_back(built); out.ports.push_back(pf); }
         else ++out.ports_unplaced;
     }
 
@@ -363,14 +371,84 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// THE ONE GATE WALK (BL-1386 review): the funding gate, the first tick's bill
+// the foundings' reserve reads, and the gate's idle set the Logistic Point
+// coverage reads all walk the same nations in the same order, the same
+// buildings in the same order, with the same headroom -- here, once -- so the
+// reserve and the LP report can never drift from the gate.
+// ---------------------------------------------------------------------------
+namespace {
+
+/// A hair of headroom on every bound: the tick's float sums group the same
+/// terms differently from the bound's, so an exactly-fitting bound could leave
+/// the treasury an ULP below zero after settlement.
+constexpr float k_state_gate_headroom = 1.0005f;
+
+/// What the gate commits for one state building.
+float gate_bound(const world& w, const recipe_registry& reg, const building_component& b)
+{
+    return state_building_cost_bound(w, reg, b) * k_state_gate_headroom;
+}
+
+/// What the gate commits for a nation's track.
+float gate_track_bill(const recipe_registry& reg, int tiles)
+{
+    return reg.rail().track_upkeep_per_tile * static_cast<float>(tiles) * k_state_gate_headroom;
+}
+
+/// Per owner nation, its track tiles.
+std::map<entity_id, int> gate_rail_tiles(const world& w)
+{
+    std::map<entity_id, int> out;
+    for (const auto& [tile, owner] : w.rail_track)
+    {
+        (void)tile;
+        if (owner != null_entity && w.nations.count(owner) != 0)
+            ++out[owner];
+    }
+    return out;
+}
+
+/// The nations the gate walks: those with state industry or track, ascending.
+std::vector<entity_id> gate_nations(const world& w, const std::map<entity_id, int>& rail_tiles)
+{
+    std::vector<entity_id> ids;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.state_assets.empty() || rail_tiles.count(nid) != 0)
+            ids.push_back(nid);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+/// One nation's buildings, in stored order: a bound that fits comes off what
+/// is left, one that does not idles. `on(bid, building, bound, fits)` sees
+/// each; returns what is left for the track. `W` is `world` or `const world`.
+template <class W, class On>
+float gate_walk_buildings(W& w, const recipe_registry& reg, const nation_component& nc, float left, On&& on)
+{
+    for (const entity_id bid : nc.state_assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const float bound = gate_bound(w, reg, bit->second);
+        const bool  fits  = std::isfinite(bound) && bound <= left;
+        if (fits)
+            left -= bound;
+        on(bid, bit->second, bound, fits);
+    }
+    return left;
+}
+
+} // namespace
+
 bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
                          const building_component& before, const building_component& after)
 {
     if (before.state_idle)
         return true; // unfunded this tick: it runs nothing whatever changes
-    constexpr float k_headroom = 1.0005f; // the gate's own
-    const float delta = (state_building_cost_bound(w, reg, after)
-                         - state_building_cost_bound(w, reg, before)) * k_headroom;
+    const float delta = gate_bound(w, reg, after) - gate_bound(w, reg, before); // the gate's own headroom
     if (!(delta > 0.0f))
         return true;
     if (!std::isfinite(delta) || delta > state_uncommitted_treasury(w, nation))
@@ -489,58 +567,37 @@ void plan_state_funding(world& w, const recipe_registry& reg)
     // reads who owes its upkeep. A no-op on a world with no rail.
     assign_rail_owners(w);
     // BL-1255: per owner, its track tiles (for the gate below).
-    std::map<entity_id, int> rail_tiles_of;
-    for (const auto& [tile, owner] : w.rail_track)
-    {
-        (void)tile;
-        if (owner != null_entity && w.nations.count(owner) != 0)
-            ++rail_tiles_of[owner];
-    }
+    const std::map<entity_id, int> rail_tiles_of = gate_rail_tiles(w);
     const std::set<entity_id> rail_idle_before = w.rail_idle;
     w.rail_idle.clear();
     bool station_flipped = false;
-    std::vector<entity_id> nation_ids;
-    for (const auto& [nid, nc] : w.nations)
-        if (!nc.state_assets.empty() || rail_tiles_of.count(nid) != 0)
-            nation_ids.push_back(nid);
-    std::sort(nation_ids.begin(), nation_ids.end());
-
-    // A hair of headroom on every bound: the tick's float sums group the same
-    // terms differently from the bound's, so an exactly-fitting bound could
-    // leave the treasury an ULP below zero after settlement.
-    constexpr float k_headroom = 1.0005f;
+    const std::vector<entity_id> nation_ids = gate_nations(w, rail_tiles_of);
 
     for (const entity_id nid : nation_ids)
     {
         const nation_component& nc = w.nations.at(nid);
         world::state_tick_ledger& led = w.state_ledger[nid];
         led.treasury_open = nc.treasury;
-        float left = std::max(0.0f, nc.treasury);
-        for (const entity_id bid : nc.state_assets)
-        {
-            const auto bit = w.buildings.find(bid);
-            if (bit == w.buildings.end())
-                continue;
-            building_component& b = bit->second;
-            const float bound = state_building_cost_bound(w, reg, b) * k_headroom;
-            const bool was_idle = b.state_idle;
-            if (std::isfinite(bound) && bound <= left)
-            {
-                left        -= bound;
-                led.committed += bound;
-                b.state_idle  = false;
-                ++led.funded;
-            }
-            else
-            {
-                b.state_idle = true;
-                ++led.idled;
-            }
-            // BL-1255 (review 3): an idle station carries nothing, so its flip
-            // stales the rail network.
-            if (b.type == building_type::railway_station && b.state_idle != was_idle)
-                station_flipped = true;
-        }
+        // THE ONE GATE WALK (gate_walk_buildings): funded or idled, in order.
+        float left = gate_walk_buildings(w, reg, nc, std::max(0.0f, nc.treasury),
+            [&](entity_id, building_component& b, float bound, bool fits) {
+                const bool was_idle = b.state_idle;
+                if (fits)
+                {
+                    led.committed += bound;
+                    b.state_idle   = false;
+                    ++led.funded;
+                }
+                else
+                {
+                    b.state_idle = true;
+                    ++led.idled;
+                }
+                // BL-1255 (review 3): an idle station carries nothing, so its
+                // flip stales the rail network.
+                if (b.type == building_type::railway_station && b.state_idle != was_idle)
+                    station_flipped = true;
+            });
         // BL-1255 fix round (review 2; Ben's state rule "a losing building idles,
         // never debt"): THE TRACK'S UPKEEP IS FUNDED HERE, after the nation's
         // buildings. Funded: committed, and apply_budget charges it. Not: the
@@ -548,7 +605,7 @@ void plan_state_funding(world& w, const recipe_registry& reg)
         // runs over it — and pays nothing.
         if (const auto rt = rail_tiles_of.find(nid); rt != rail_tiles_of.end())
         {
-            const float bill = reg.rail().track_upkeep_per_tile * static_cast<float>(rt->second) * k_headroom;
+            const float bill = gate_track_bill(reg, rt->second);
             if (std::isfinite(bill) && bill <= left)
             {
                 left          -= bill;
@@ -574,6 +631,127 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
     if (const auto lit = w.state_ledger.find(nation); lit != w.state_ledger.end())
         committed = lit->second.committed;
     return std::max(0.0f, nit->second.treasury - committed);
+}
+
+// ---------------------------------------------------------------------------
+// BL-1382 economy follow-up -- the state bill and the founding's year of it
+// (Ben, 2026-10-19; see the header)
+// ---------------------------------------------------------------------------
+float state_first_tick_bill(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    // The gate's own bounds and headroom (gate_bound / gate_track_bill), for
+    // the WHOLE of the nation's state industry: every building as if it fit.
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return 0.0f;
+    float bill = 0.0f;
+    (void)gate_walk_buildings(w, reg, nit->second, std::numeric_limits<float>::infinity(),
+        [&](entity_id, const building_component&, float bound, bool) {
+            if (std::isfinite(bound))
+                bill += bound;
+        });
+    const std::map<entity_id, int> track = gate_rail_tiles(w);
+    if (const auto t = track.find(nation); t != track.end())
+        bill += gate_track_bill(reg, t->second);
+    return bill;
+}
+
+std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_registry& reg)
+{
+    // plan_state_funding's walk, read-only (gate_nations, gate_walk_buildings):
+    // the same nations in the same order, the same buildings, the same bounds.
+    // The track is funded after a nation's buildings, so it idles none of them.
+    std::vector<entity_id> idled;
+    for (const entity_id nid : gate_nations(w, gate_rail_tiles(w)))
+    {
+        const nation_component& nc = w.nations.at(nid);
+        (void)gate_walk_buildings(w, reg, nc, std::max(0.0f, nc.treasury),
+            [&](entity_id bid, const building_component&, float, bool fits) {
+                if (!fits)
+                    idled.push_back(bid);
+            });
+    }
+    std::sort(idled.begin(), idled.end());
+    return idled;
+}
+
+state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& reg,
+                                              state_handover_report& handover)
+{
+    state_reserve_report rep;
+    // Per nation, ascending: its founded port and its founded plant, the
+    // port first (it was paid last).
+    std::map<entity_id, std::pair<state_port_founding*, state_founding*>> paid_by;
+    for (state_founding& f : handover.founded)
+        if (f.building != null_entity && f.paid > 0.0f)
+            paid_by[f.nation].second = &f;
+    for (state_port_founding& p : handover.ports)
+        if (p.building != null_entity && p.paid > 0.0f)
+            paid_by[p.nation].first = &p;
+
+    const char* const k_short = ", its treasury short of the price";
+    const auto mark_short = [&](std::size_t idx) {
+        if (idx >= w.history_log.size())
+            return;
+        std::string& ev = w.history_log[idx].event;
+        if (ev.find(k_short) == std::string::npos)
+            ev += k_short;
+    };
+
+    for (auto& [nid, pf] : paid_by)
+    {
+        const auto nit = w.nations.find(nid);
+        if (nit == w.nations.end())
+            continue;
+        nation_component& nc = nit->second;
+        const float bill = state_first_tick_bill(w, reg, nid)
+                         * static_cast<float>(k_state_founding_reserve_ticks);
+        // The chest as it stood before the foundings: what is held now plus
+        // what they took. The reserve never lifts the treasury past it (the
+        // check below; a harness asserts `minted` is 0).
+        const float chest_before = nc.treasury + (pf.first != nullptr ? pf.first->paid : 0.0f)
+                                 + (pf.second != nullptr ? pf.second->paid : 0.0f);
+        float need = bill - std::max(0.0f, nc.treasury);
+        if (!(need > 0.0f))
+            continue;
+        float back_total = 0.0f;
+        const auto give_back = [&](float& paid, entity_id building, std::size_t history_index) {
+            if (!(need > 0.0f) || !(paid > 0.0f))
+                return;
+            const float back = std::min(need, paid);
+            paid       -= back;
+            need       -= back;
+            back_total += back;
+            nc.treasury += back;
+            if (const auto bit = w.buildings.find(building); bit != w.buildings.end())
+                bit->second.construction_paid = paid;
+            mark_short(history_index);
+        };
+        if (pf.first != nullptr)
+            give_back(pf.first->paid, pf.first->building, pf.first->history_index);
+        if (pf.second != nullptr)
+            give_back(pf.second->paid, pf.second->building, pf.second->history_index);
+        if (back_total > 0.0f)
+        {
+            ++rep.nations_reserved;
+            rep.returned += back_total;
+            if (need > 0.0f)
+                ++rep.nations_short;
+        }
+        // NEVER A MINT (BL-1386 review): a hair of float slack, no more.
+        if (nc.treasury > chest_before * 1.000001f + 1e-3f)
+            ++rep.minted;
+    }
+    return rep;
+}
+
+void print_state_reserve(const state_reserve_report& r)
+{
+    std::printf("[state_reserve] %d major(s) kept the settle and a year of the state bill (%d ticks) from the "
+                "foundings (%.1f credits of payment left short; %d still under the bill; %d minted)\n",
+                r.nations_reserved, k_state_founding_reserve_ticks, static_cast<double>(r.returned),
+                r.nations_short, r.minted);
+    std::fflush(stdout);
 }
 
 // ---------------------------------------------------------------------------

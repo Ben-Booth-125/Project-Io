@@ -79,6 +79,8 @@
 #include <unordered_map>
 #include <vector>
 
+class recipe_registry;
+
 /// Who on a nation's ground a building's claim is counted under.
 enum class lp_class : std::uint8_t
 {
@@ -250,6 +252,10 @@ struct lp_seed_report
     float pool_total     = 0.0f;
     float granted_total  = 0.0f;
     int   sources_by_net[lp_network_count] = {0, 0, 0};
+    /// Sources standing but idled by the state funding gate at the first tick
+    /// (a state hub, station or port its treasury cannot fund): not counted in
+    /// `sources_by_net`, and reaching nobody. Filled by `lp_seed_read_at_gate`.
+    int   gate_idled_sources = 0;
 };
 
 /// Place logistics hubs at the fold so every producing building on a nation's
@@ -259,5 +265,18 @@ struct lp_seed_report
 /// by the nation (state industry) for a major, else by the uncovered building's
 /// owner. Complete and zero-staffed, as every generated holding is. Deterministic.
 lp_seed_report seed_logistics_sources(world& w);
+
+/// The seeding's READING (consumers, coverage, pool, grant), refilled on @p w
+/// as it stands. `seed_logistics_sources` ends with it.
+void lp_seed_read(world& w, lp_seed_report& rep);
+
+/// The reading AT THE FUNDING GATE (BL-1382 economy follow-up, Ben 2026-10-19):
+/// a state source the gate will idle at the first tick (`state_gate_would_idle`)
+/// is not a running source, so the reading is retaken with every state building
+/// the gate would idle counted idle — restored afterwards, nothing else
+/// written — and `gate_idled_sources` says how many sources that removed. The
+/// fold calls it after the state reserve, so the printed line is what the first
+/// tick will run.
+void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& rep);
 
 void print_lp_seed_report(const lp_seed_report& r);

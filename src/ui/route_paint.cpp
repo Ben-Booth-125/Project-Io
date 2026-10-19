@@ -262,7 +262,7 @@ route_piece straight(double ax, double ay, double bx, double by, std::uint8_t ti
 {
     route_piece pc;
     pc.tier = tier;
-    pc.tier_b = tier; // a straight piece is one edge's: both halves are the same (BL-1386)
+    pc.tier_b = tier; // a straight piece is one edge's: both halves are the same (BL-1390)
     pc.kind = kind;
     pc.flags = flags;
     for (int k = 0; k < route_piece::k_pts; ++k)
@@ -431,7 +431,7 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
 {
     route_piece pc;
     pc.tier = tier;
-    // BL-1386: the half past the apex takes the OTHER crossing's tier. The geometry is
+    // BL-1390: the half past the apex takes the OTHER crossing's tier. The geometry is
     // unchanged - the bow, the clearance and the character are the run's, taken from the
     // heavier end below - only the painted weight differs between the halves.
     pc.tier_b = tier_b != 0 ? tier_b : tier;
@@ -620,13 +620,13 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
     const int r = static_cast<int>(i) / s.gw, c = static_cast<int>(i) % s.gw;
     double mx[4], my[4];
     route_end xc[4]; // the crossings, heading OUT across their edges
-    std::uint8_t xt[4]; // BL-1386: and the TIER laid across each of them
+    std::uint8_t xt[4]; // BL-1390: and the TIER laid across each of them
     int deg = 0;
     for (int n = 0; n < 4; ++n)
         if (links & (1u << n))
         {
             link_mid(r, n, mx[deg], my[deg]);
-            // THIS EDGE'S OWN TIER (BL-1386). A rail tile and a sea lane are TILE fields
+            // THIS EDGE'S OWN TIER (BL-1390). A rail tile and a sea lane are TILE fields
             // and keep the passed tier; a road reads its own side of the mask, so a tile
             // carrying a Track one way and a Highway the other paints each half right.
             xt[deg] = tier;
@@ -700,7 +700,7 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         used[pa] = used[pb] = true;
         const route_end ea{ xc[pa].x, xc[pa].y, -xc[pa].tx, -xc[pa].ty }; // in across edge a
         const route_end eb = xc[pb];                                       // out across edge b
-        // BL-1386: each half at its OWN crossing's tier - a into the apex, b out of it.
+        // BL-1390: each half at its OWN crossing's tier - a into the apex, b out of it.
         // The run's SHAPE still comes from the heavier of the two (route_character reads
         // the first argument), so a Track meeting a Highway bows like the highway it joins
         // and only the painted weight tapers at the apex.
@@ -822,7 +822,7 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
             const route_piece& pc = s.route_pieces[first + static_cast<std::size_t>(j)];
             if (((pc.tier & 0x80u) != 0) != lanes)
                 continue;
-            // BL-1386: A CURVE CAN CARRY TWO TIERS, one a half. The cull below must admit
+            // BL-1390: A CURVE CAN CARRY TWO TIERS, one a half. The cull below must admit
             // the piece at its WIDEST, or the heavier half would be clipped at the bbox;
             // which half a pixel actually belongs to is known only once the nearest point
             // is found, so the weight is resolved again there.
@@ -850,7 +850,7 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
                     bdx = dx; bdy = dy;
                 }
             }
-            // THE HALF THIS PIXEL IS ON (BL-1386). `bs` is its arclength along the piece
+            // THE HALF THIS PIXEL IS ON (BL-1390). `bs` is its arclength along the piece
             // and `split` is the apex, so past the split the second crossing's tier is the
             // one that paints here. Uniform pieces resolve to exactly what they did before.
             const std::uint8_t hit_tier =

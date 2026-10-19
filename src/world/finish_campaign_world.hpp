@@ -108,6 +108,11 @@ struct finish_campaign_result
     marketplace_retrofit_report retrofit;
     /// BL-1296: what the state-industry handover passed to the majors.
     state_handover_report   state;
+    /// BL-1382 economy follow-up: what the foundings left short to keep each
+    /// major's reserve, counted from the opening: the settle plus a year
+    /// (`k_state_founding_reserve_ticks` = 12 + 4 ticks) of the state bill
+    /// (`reserve_state_first_tick`).
+    state_reserve_report    reserve;
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
     lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
     /// BL-1347: the crossings laid to the sites the WINNER's charters, the state handover

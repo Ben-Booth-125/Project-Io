@@ -76,6 +76,24 @@ and/or a version goal (v0.1.1 etc.).
 
 Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11. HANDOFF 2026-10-18: the session ran long and is rolled into a fresh one. The dependency spine is BL-1346 (market attraction) -> BL-1352 (one LP system, the root of what Ben saw in the lens) -> BL-1353/BL-1354 (the surfaces) -> BL-1360 (tier reach) -> BL-1356/BL-1361 (routed requests, trade draws). Four calls block work and sit on one form in NEXT_SESSION.md; BL-1381 (the verify summary mislabels every failure as a golden diff) is worth clearing first because it has already sent two readers to a re-bless question that did not exist.
 
+### Sprint 56 — trustworthy ground
+*Gated · opened 2026-10-16 · Ben (2026-10-16)*
+
+**Goal.** Every nation holds one territory (contiguous by land or a short strait), the ground paints inside 1 minute and 6 GB, and the failing quarterly-return and digest-pin gates tell the truth again.
+
+**Planned.**
+- WAVE 1 - GATES TELL THE TRUTH. BL-1337 (return net crosses zero), BL-1214 (eighth field doc drift), BL-1338 (digest pins stale: attribute only), BL-1319 (fixture base stall).
+- WAVE 2 - GROUND PAINT. BL-1247 (ground benchmark) measures first, then BL-1311 (ground paint perf).
+- WAVE 3 - ONE TERRITORY. BL-1310 (nations contiguous), the world mover, last so the gates measure it alone.
+- ADDED 2026-10-18 (Ben, after the live click). BL-1382 (province normalising pass).
+- ADDED 2026-10-19 (Ben). BL-1386 (no realm closes empty) — blocks BL-1382 reaching main.
+
+**Done when.** BL-1310: world_audit reports zero illegal exclaves on the curated seeds with nation totals still hit. BL-1311: ground paint under 1 minute and 6 GB peak on the slow case. quarterly_return R2 passes without weakening the row. Digest movers attributed. stage_ui_fixture completes.
+
+**Risk.** Runs in parallel with sprint 55 on main; BL-1310 moves the world while sprint 55 also moves it, so every gate here is measured on a world without sprint 55. Re-pins wait for integration. BL-1340 (roads cross tile edges, sprint 55) may touch the ground bake BL-1311 changes.
+
+Calls 2026-10-16 (Ben): add-ons BL-1247, BL-1214, BL-1319; water rule = short strait only; an illegal exclave is ceded to the nation that surrounds it, recorded as a closing-round event; BL-1338 attributes movers here and re-pins at integration after sprint 55 lands; paint target 1 minute and 6 GB ("this seems like it was caused by the debug").
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -154,9 +172,10 @@ Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 b
 | 53 | the player is a nation | CLOSED 2026-10-15, cut as v0.1.32. The player is a major nation operating its champion: nation counts hit as targets, one champion per major, state industry and state ports, the five history patterns, the setup round and the nation selection screen with history; the sprint-52 tech tail (effects, panel); railways; one-pool Logistic Points; the economy pass re-laddered to rate 1 (all five market_viability targets pass). |
 | 54 | UI improvements | CLOSED 2026-10-14 (Ben: every live click passed, merge to main). Run beside sprint 53 from origin/main: the tile card split, the market pass, a Nations lens, the trade value record, the workforce stepped auto, the settle's readings handed to play. |
 | 55 | spectator to the end of Era 1 | OPEN 2026-10-15, HANDED OFF 2026-10-18 at main fc1f66b3: 27 of its items remain and docs/development/NEXT_SESSION.md carries the order, Ben's four blocking calls and the two owed live clicks. Delivered so far: the construction UI arc (the lying ETA, the live queue, the one-line grid, per-column explainers, two-line wrapping), roads as edges with bridges and the three placement rules, taxes and Discontent, the Life reroll, the space asset model, the headless spectator runner, nation research AI, and the LP coverage census. |
+| 56 | trustworthy ground | GATED 2026-10-19 on claude/sprint-56-456d2b (unmerged, unpushed). Ten items delivered; BL-1338 re-pin and the hot-row archive owed at integration after sprint 55 lands. Handoff: docs/development/HANDOFF_SPRINT_56.md. |
 
 **Next up.** SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*73 sprints archived cold; 1 open/gated in the hot store.*
+*73 sprints archived cold; 2 open/gated in the hot store.*

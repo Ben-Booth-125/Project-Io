@@ -2304,6 +2304,31 @@ struct history_sim_params
     /// inherits it).
     bool standing_army_sized_to_earn = false;
 
+    /// BL-1386 -- THE ARMY CARRIES ONLY A SHARE OF THE EARN (EXPLORATION.md
+    /// sec Force persists now, Ben 2026-10-19). Per mille of the round's earn
+    /// the standing army may carry where `standing_army_sized_to_earn` is on:
+    /// the sizing disbands down to it and the army step buys no further, so
+    /// the rest of the earn stays in the chest. 1000 = the whole earn (the
+    /// BL-1298 rule, unchanged); domain 0-1000, clamped. Calibrated by sweep
+    /// (`world_params::standing_army_earn_share_q`).
+    int standing_army_earn_share_q = 1000;
+
+    /// BL-1386 -- A SMALL REALM'S ENDOWMENT HAS A FLOOR (NATION_GENERATION.md
+    /// sec Pass 7, Ben 2026-10-19). Where `treasury_endowment_world_share` is
+    /// on, a living realm holding any ground earns at least this per mille of
+    /// the AVERAGE realm's world-share income (which is
+    /// `treasury_endowment_income_q` a year by construction) -- lifting the
+    /// poorest, never cutting the top. 0 = no floor. Calibrated by sweep
+    /// (`world_params::treasury_endowment_floor_q`).
+    int treasury_endowment_floor_q = 0;
+
+    /// BL-1386 -- TRIBUTE IS A SHARE OF THE SUBJECT'S EARN, NOT OF ITS CHEST
+    /// (EXPLORATION.md, Ben 2026-10-19). When on, `treaty_tribute_rate_q` is
+    /// read per mille of the subject's last upkeep round's earn
+    /// (`polity::round_earn`), capped by its purse; off, of its whole chest
+    /// (the pre-ruling rule every fixture keeps).
+    bool tribute_on_earn = false;
+
     /// BL-1298 -- THE ENDOWMENT IS SUMMED OVER HELD GROUND (NATION_GENERATION.md
     /// sec Pass 7, Ben 2026-10-12). When on, `treasury_endowment_income_q` is
     /// a per-mille of the SUM of the polity's held regions' endowment
@@ -3251,6 +3276,12 @@ struct exploration_upkeep_spend
     int64_t earn_levy            = 0;
     int64_t army_disbanded_by_earn = 0;
     int64_t army_sized_rounds    = 0;
+    /// BL-1386 review -- THE ARMY SHARE, CHECKED (write-only): polity-rounds
+    /// whose army bill was read against the share, and of them those whose
+    /// bill exceeded `standing_army_earn_share_q` of the round's earn (0 by
+    /// construction; a harness asserts it).
+    int64_t army_share_rounds    = 0;
+    int64_t army_over_share      = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -3444,6 +3475,13 @@ struct polity
     /// raw-score comparison Consolidate was never chosen after ~year 176 and
     /// this escape did not exist.
     int cohesion_q = 1000;
+
+    /// BL-1386 -- GENERATION SCRATCH, NOT SAVED: what the realm EARNED in its
+    /// last upkeep round (levy + endowment BEFORE the floor's lift + corridor
+    /// + trade, material; Ben, 2026-10-19: the floor's lift stays with it),
+    /// written by `run_exploration_upkeep`. Tribute reads it when
+    /// `history_sim_params::tribute_on_earn` is on.
+    int64_t round_earn = 0;
 
     /// BL-748 — THE YEAR THIS POLITY CROSSED THE INDUSTRIAL RUNG, or 0 for
     /// never. The sim's industrial clock is the capacity ladder, and the rung
@@ -4940,6 +4978,14 @@ struct history_sim_state
     int64_t treasury_earned_levy          = 0;
     int64_t army_disbanded_by_earn        = 0;
     int64_t army_sized_rounds             = 0;
+    /// BL-1386 review -- THE NEW RULES, CHECKED (write-only, a harness
+    /// asserts the second of each pair is 0): army bills read against the
+    /// share / over it; tribute payments on the earn / over their share of the
+    /// subject's pre-floor earn.
+    int64_t army_share_rounds             = 0;
+    int64_t army_over_share               = 0;
+    int64_t tribute_payments_on_earn      = 0;
+    int64_t tribute_over_earn             = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
     /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
@@ -5157,6 +5203,33 @@ struct history_sim_state
     int32_t closing_target_secessions  = 0;
     int32_t closing_subfloor_secessions = 0; ///< Secessions taken below the floor (the target outranks it).
     bool    closing_short_of_target    = false;
+
+    /// BL-1310 — THE CESSIONS (NATION_GENERATION.md sec Pass 2e): the closing
+    /// rounds' `exclave_cede` steps, each noted as `exclave_ceded`. Ground
+    /// only: none of them moves the count above. The plan's split counters
+    /// (closing_rounds.hpp `closing_plan`) are read by harnesses.
+    int32_t closing_cessions           = 0;
+    int32_t closing_cessions_islet     = 0;
+    int32_t closing_cessions_to_unheld = 0;
+    int32_t closing_cessions_late      = 0;
+    int32_t closing_secessions_split   = 0;
+    int32_t closing_reps_off_core      = 0;
+    int32_t closing_cessions_split     = 0; ///< BL-1310 round 4: exclaves split among 2+ neighbours
+    int32_t closing_city_states        = 0; ///< BL-1310 round 4: exempt city states, judged at the close
+    int32_t closing_parts_detached     = 0; ///< BL-1310 round 4 review: ceded parts that did not join their receiver (0 expected)
+    int32_t closing_provinces_split    = 0; ///< BL-1310 round 4 review: provinces split across parts (0 expected)
+    int32_t closing_cores_floor_moved  = 0; ///< BL-1310: realms under the floor that kept a larger piece than the seat's group
+    /// The carve as the cessions left it (`closing_plan::cell_overrides`):
+    /// per pair a land tile and the REGION whose cell now holds it. The tail
+    /// hands these to `generate_nations` by the region's anchor tile.
+    std::vector<std::pair<int32_t, int32_t>> closing_cell_overrides;
+    /// Per polity id, the anchor tile of the realm's core after the rounds
+    /// (`closing_plan::polity_core_tiles`), for the tail's territory reads.
+    std::vector<int32_t> closing_polity_core_tiles;
+    /// BL-1310 review: `closing_plan::core_tiles_lost` (0 expected) and
+    /// `closing_plan::ceded_regions` (the regions a cession moved).
+    int32_t              closing_core_tiles_lost = 0;
+    std::vector<int32_t> closing_ceded_regions;
 
     /// BL-1287 — THE RISE AND FALL'S OWN READING (all -1/0/false on a run
     /// whose params did not carry `rise_fall_target`). Taken at the recorded

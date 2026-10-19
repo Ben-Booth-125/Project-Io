@@ -40,6 +40,7 @@
 #include "world/finish_campaign_world.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/state_industry.hpp"
 #include "world/world.hpp"
 #include "world/works_roster.hpp"
 #include "world/world_gen_config.hpp"
@@ -67,6 +68,10 @@ int   g_levy  = -1;
 int   g_endow = -1;
 long long g_ipu = -1;   // --ipu N: industry points per treasury unit (-1 = shipped)
 bool  g_no_size = false; // --no-size: the army is NOT sized to the earn (the pre-ruling arm)
+int   g_tt = 0, g_mt = 0; // --pair t:m: the nation targets (0:0 = natural)
+int   g_army_share = -1;  // --army-share N: per mille of the earn the army carries (BL-1386; -1 = shipped)
+int   g_endow_floor = -1; // --endow-floor N: per mille of the average realm's endowment (BL-1386; -1 = shipped)
+bool  g_tribute_chest = false; // --tribute-chest: tribute on the subject's chest (the pre-BL-1386 arm)
 FILE* g_dump  = nullptr;
 
 std::vector<uint32_t> library_seeds(const char* path)
@@ -295,6 +300,13 @@ struct seed_out
     int fate_never = 0;   ///< took < 1 cr at 1200
     int fate_drained = 0; ///< took >= 1 cr at 1200, holds < 1 cr at the close
     int fate_kept = 0;    ///< holds >= 1 cr at the close
+    /// NO REALM CLOSES THE HISTORY EMPTY (Ben, 2026-10-19; NATION_GENERATION.md
+    /// sec Pass 7): per major after the finish, its treasury against a YEAR
+    /// (four ticks) of its state bill (`state_first_tick_bill`, the funding
+    /// gate's own cost bound) -- the empty-chest bar.
+    int    majors_le0 = 0, majors_short_year = 0, majors_n = 0;
+    double worst_year_ratio = -1; ///< min over majors of treasury / (4 x bill); -1 = none
+    std::string worst_major;
     double drained_cr = 0; ///< what the drained ones took at 1200
     double charter_paid = 0;
     span_flows emp, exp, ind;
@@ -316,9 +328,14 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
     o.seed = seed;
     world_params p = arc_params(world_arc::shipped);
     p.seed = seed;
+    p.nation_total_target = g_tt;
+    p.major_target        = g_mt;
     if (g_levy  >= 0) p.treasury_levy_per_mille_q   = g_levy;
     if (g_endow >= 0) p.treasury_endowment_income_q = g_endow;
     if (g_no_size)    p.standing_army_sized_to_earn = false;
+    if (g_army_share >= 0)  p.standing_army_earn_share_q = g_army_share;
+    if (g_endow_floor >= 0) p.treasury_endowment_floor_q = g_endow_floor;
+    if (g_tribute_chest)    p.tribute_on_earn = false;
     if (g_ipu >= 1)   p.industry_points_per_1000_treasury_units = g_ipu;
     generation_report     rep{};
     era_minus_one_fixture fx{};
@@ -379,6 +396,42 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
             else if (c < 1.0) { ++o.fate_drained; o.drained_cr += f; }
             else ++o.fate_kept;
         }
+        // THE EMPTY CHESTS, one line each (the floor task's diagnosis): a
+        // living polity closing on under one credit -- its ground, its
+        // endowment and share, whether it holds its capital, what stands on
+        // its seats, and when it was founded.
+        {
+            const std::vector<region>& rr = fx.industrialisation_ran ? fx.industrialisation_handoff.regions
+                                                                     : fx.exploration_handoff.regions;
+            int64_t world_end = 0;
+            for (const region& r : rr)
+                if (r.nation >= 0) world_end += (r.farm_q + r.ore_q + r.energy_q + r.port_q) / 4;
+            for (const polity& q : last)
+            {
+                if (!q.alive) continue;
+                const double c = (q.id >= 0 && static_cast<std::size_t>(q.id) < fx.setup_polity_treasuries.size())
+                    ? static_cast<double>(fx.setup_polity_treasuries[static_cast<std::size_t>(q.id)]) * kCr : 0.0;
+                if (c >= 1.0) continue;
+                int held = 0;
+                int64_t endow = 0, stores = 0, chest_ground = 0;
+                for (const region& r : rr)
+                {
+                    if (r.nation != q.id) continue;
+                    ++held;
+                    endow += (r.farm_q + r.ore_q + r.energy_q + r.port_q) / 4;
+                    if (r.is_seat) stores += r.material_stock;
+                    chest_ground += r.treasury;
+                }
+                const bool cap_held = q.capital >= 0 && static_cast<std::size_t>(q.capital) < rr.size()
+                                   && rr[static_cast<std::size_t>(q.capital)].nation == q.id;
+                std::printf("  POOR polity %d: chest %.2f cr | regions %d, endowment %lld (%.2f%% of the world's held) | "
+                            "capital %s | seat stores %.2f cr\n",
+                            q.id, c, held, static_cast<long long>(endow),
+                            world_end > 0 ? 100.0 * static_cast<double>(endow) / static_cast<double>(world_end) : 0.0,
+                            cap_held ? "held" : "NOT held", static_cast<double>(stores) * kCr);
+                (void)chest_ground;
+            }
+        }
         int alive_last = 0;
         for (const polity& q : last) alive_last += q.alive ? 1 : 0;
         std::printf("  [polities: %zu in the 1200 table (%zu alive), %zu in the last close's (%d alive)]\n",
@@ -402,9 +455,9 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
                           fx.industrialisation_handoff.regions);
 
     std::set<entity_id> majors;
+    recipe_registry seed_reg = dl.reg; // the worker's copy, banded inside the finish
     if (do_finish)
     {
-        recipe_registry seed_reg = dl.reg; // the worker's copy, banded inside the finish
         const finish_campaign_result fr = finish_campaign_world(w, rep, seed_reg, p, dl.cfg, nullptr);
         (void)fr;
         o.finish_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count();
@@ -450,6 +503,24 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
             std::fprintf(g_dump, "%u,%s,%.4f,%.4f,%d\n", seed, w.nations.at(id).name.c_str(), a,
                          do_finish ? w.nations.at(id).treasury : 0.0, maj ? 1 : 0);
     }
+    if (do_finish)
+        for (const entity_id id : ids)
+        {
+            if (!majors.count(id)) continue;
+            const double tr   = w.nations.at(id).treasury;
+            const double year = static_cast<double>(k_state_founding_year_ticks) * static_cast<double>(state_first_tick_bill(w, seed_reg, id)); // a year after the settle
+            ++o.majors_n;
+            if (tr <= 0.0) ++o.majors_le0;
+            if (tr < year) ++o.majors_short_year;
+            const double ratio = year > 0.0 ? tr / year : 1e9;
+            if (o.worst_year_ratio < 0 || ratio < o.worst_year_ratio)
+            {
+                o.worst_year_ratio = ratio;
+                char b[128];
+                std::snprintf(b, sizeof b, "%u %.1f cr vs a year %.1f", static_cast<unsigned>(id), tr, year);
+                o.worst_major = b;
+            }
+        }
     if (do_finish)
         for (std::size_t i = 0; i < ids.size(); ++i)
             if (o.levy_q1[i] > 0)
@@ -511,6 +582,17 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[i], "--levy") == 0 && i + 1 < argc) { g_levy = std::atoi(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--ipu") == 0 && i + 1 < argc) { g_ipu = std::atoll(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--no-size") == 0) { g_no_size = true; continue; }
+        if (std::strcmp(argv[i], "--army-share") == 0 && i + 1 < argc) { g_army_share = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--endow-floor") == 0 && i + 1 < argc) { g_endow_floor = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--tribute-chest") == 0) { g_tribute_chest = true; continue; }
+        if (std::strcmp(argv[i], "--pair") == 0 && i + 1 < argc)
+        {
+            const char* v = argv[++i];
+            g_tt = std::atoi(v);
+            const char* c = std::strchr(v, ':');
+            g_mt = c ? std::atoi(c + 1) : 0;
+            continue;
+        }
         if (std::strcmp(argv[i], "--endow") == 0 && i + 1 < argc) { g_endow = std::atoi(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) { g_dump = std::fopen(argv[++i], "wb"); continue; }
         if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
@@ -548,6 +630,14 @@ int main(int argc, char** argv)
         std::printf("\n=== seed %u  (build %.0f s, finish %.0f s)  polity chests at the last close: %d holding %.0f cr\n",
                     seed, o.build_s, o.finish_s, o.polities_with_chest, o.polity_chest_credits);
         print_seed_block(o, do_finish);
+        // ONE LINE PER SEED (the floor task's reading): min and median nation
+        // treasury after the build and after the finish, and the majors
+        // against a year of their state bill.
+        std::printf("SEEDLINE seed %u pair %d:%d | build min %.2f median %.2f | finish min %.2f median %.2f | "
+                    "majors %d, <=0 %d, short of a year's state bill %d (worst %.3f: %s)\n",
+                    seed, g_tt, g_mt, o.t0.empty() ? 0.0 : *std::min_element(o.t0.begin(), o.t0.end()), median(o.t0),
+                    o.t1.empty() ? 0.0 : *std::min_element(o.t1.begin(), o.t1.end()), median(o.t1),
+                    o.majors_n, o.majors_le0, o.majors_short_year, o.worst_year_ratio, o.worst_major.c_str());
         std::printf("  WHERE THE CHEST WENT (sim material shown in credits)\n");
         std::printf("    %-17s no treasury flows (upkeep off); seats' material stock at 1200 = %.0f cr\n",
                     "Empires", o.empires_material_at_1200 * kCr);

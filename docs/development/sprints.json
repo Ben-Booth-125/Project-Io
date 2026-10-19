@@ -87,6 +87,51 @@
    "risk": "Wave 3 overturns the DLC parking of all space work (ROADMAP.md, now narrowed to near space). BL-1327 touches the save format. The pacing slider (2.5x) was superseded by Ben's note: no speed-up for the average nation.",
    "done_when": "Set at the cut. Proposed: an unattended spectator run reaches ~2040 on the curated seeds with every major nation past the Digitisation midpoint, at least one crewed lunar landing and one orbital station.",
    "notes": "Ben, 2026-10-15: move sprint 55 to 56 and keep its items in backlog; sprint 55 becomes AI/spectator towards the end of Era 1. Calls 2026-10-15: Full assets; Nations launch; AI grant scored utility; RP grows with economy; GDP and output charts. Rulings written into RESEARCH.md § Cost, SPACE_ASSETS.md, ROADMAP.md § The two arcs, AI_OPPONENT.md § 11. HANDOFF 2026-10-18: the session ran long and is rolled into a fresh one. The dependency spine is BL-1346 (market attraction) -> BL-1352 (one LP system, the root of what Ben saw in the lens) -> BL-1353/BL-1354 (the surfaces) -> BL-1360 (tier reach) -> BL-1356/BL-1361 (routed requests, trade draws). Four calls block work and sit on one form in NEXT_SESSION.md; BL-1381 (the verify summary mislabels every failure as a golden diff) is worth clearing first because it has already sent two readers to a re-bless question that did not exist."
+  },
+  {
+   "id": "56",
+   "theme": "trustworthy ground",
+   "state": "gated",
+   "status_line": "GATED 2026-10-19 on claude/sprint-56-456d2b (unmerged, unpushed). Ten items delivered; BL-1338 re-pin and the hot-row archive owed at integration after sprint 55 lands. Handoff: docs/development/HANDOFF_SPRINT_56.md.",
+   "opened_date": "2026-10-16",
+   "author": "Ben (2026-10-16)",
+   "goal": "Every nation holds one territory (contiguous by land or a short strait), the ground paints inside 1 minute and 6 GB, and the failing quarterly-return and digest-pin gates tell the truth again.",
+   "planned": [
+    "WAVE 1 - GATES TELL THE TRUTH. BL-1337 (return net crosses zero), BL-1214 (eighth field doc drift), BL-1338 (digest pins stale: attribute only), BL-1319 (fixture base stall).",
+    "WAVE 2 - GROUND PAINT. BL-1247 (ground benchmark) measures first, then BL-1311 (ground paint perf).",
+    "WAVE 3 - ONE TERRITORY. BL-1310 (nations contiguous), the world mover, last so the gates measure it alone.",
+    "ADDED 2026-10-18 (Ben, after the live click). BL-1382 (province normalising pass).",
+    "ADDED 2026-10-19 (Ben). BL-1386 (no realm closes empty) — blocks BL-1382 reaching main."
+   ],
+   "risk": "Runs in parallel with sprint 55 on main; BL-1310 moves the world while sprint 55 also moves it, so every gate here is measured on a world without sprint 55. Re-pins wait for integration. BL-1340 (roads cross tile edges, sprint 55) may touch the ground bake BL-1311 changes.",
+   "done_when": "BL-1310: world_audit reports zero illegal exclaves on the curated seeds with nation totals still hit. BL-1311: ground paint under 1 minute and 6 GB peak on the slow case. quarterly_return R2 passes without weakening the row. Digest movers attributed. stage_ui_fixture completes.",
+   "notes": "Calls 2026-10-16 (Ben): add-ons BL-1247, BL-1214, BL-1319; water rule = short strait only; an illegal exclave is ceded to the nation that surrounds it, recorded as a closing-round event; BL-1338 attributes movers here and re-pins at integration after sprint 55 lands; paint target 1 minute and 6 GB (\"this seems like it was caused by the debug\").",
+   "retro": {
+    "landed": [
+     "BL-1337 (return net crosses zero): net held exact; R2 strengthened; save v54 stacks on BL-1340 v53.",
+     "BL-1214 (eighth field doc drift): FINANCE.md states what a return carries and what it does not.",
+     "BL-1338 (digest pins stale): 24 movers attributed, none unexplained; re-pin authorised in principle at integration (Ben).",
+     "BL-1319 (fixture base stall): loan before placement, the base's own shelf stocked; 10 consumer scripts run, 0 script errors.",
+     "BL-1310 (nations contiguous): strait rule; exclaves split among neighbours; seat is capital (under-floor realms keep the larger piece); city states judged at the close; every launch obeys; size check passes 13 seeds, 43/28/13 accepted.",
+     "BL-1247 (ground benchmark) and BL-1311 (ground paint perf): seat wait 750 s -> 34 s Debug; peak 12.4 -> 6.66 GB; captures byte-identical.",
+     "BL-1382 (province normalising pass): split over 100·f(s), merge under 24·f(s), after nations, before roads.",
+     "BL-1386 (no realm closes empty): army 600 per mille of the earn, tribute on the pre-floor earn, endowment floor 500 per mille; foundings keep 16 ticks of the state bill; majors short of a year 20 -> 2 natural.",
+     "Wizard footer anchored at the window floor (live-clicked by Ben)."
+    ],
+    "slipped": [
+     "The 6 GB ceiling: 6.66 GB peak; BL-1377 (ground under six GB) holds options C/D.",
+     "Two natural majors and one at 20:4 still open short of a year: BL-1389 (remaining major drain)."
+    ],
+    "feedback": [
+     "The live click caught what no gate could: BL-1310 starved the minors while every count stayed at 20. nation_sizes and the size check now read it.",
+     "Measure on the shipped arc: the province spread was first quoted from history-off worlds (median 48 vs 10), and Ben chose a band on the wrong numbers.",
+     "Cold review caught a core-drift defect, a spec breach on early launches, and two Pass 7 rules the code broke; every round paid for itself.",
+     "Lanes were cut from stale bases three times; checking the merge-base on launch saved a missed mover.",
+     "The sprint grew from 7 items to 10 plus three rounds of rulings; the parallel run with sprint 55 still held."
+    ],
+    "gates": "Final tip ab2ab22a: market_viability full G1 95.2, G1t50 89.5, G1b 3.2, G2 175.0, G3 96.4 (pooled pass; per-seed t50 dips on 9, 40, 11, 32 accepted as variance); history_patterns 16/16 x4, revolution 8/16; history_sim_harness R3a2/R3a3 only; world_audit library 128 checks 0 fail; world_determinism, exploration_sim_harness, exploration_sweep, save_roundtrip, quarterly_return, state_industry_harness, lp_pool_harness, no_empty_chest_harness ALL PASS; nation_targets quick 144/144; player_seed_sweep --guard PASS.",
+    "filed": "BL-1370..BL-1377, BL-1382, BL-1386, BL-1389; NR-1049..NR-1054 (NR-1052 open)."
+   }
   }
  ],
  "next_up": "SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.",

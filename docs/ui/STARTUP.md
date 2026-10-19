@@ -161,7 +161,9 @@ plainly wants to set, hit by in-world events rather than by fiat.
 **The seed is drawn on the Life round and hidden (Ben, 2026-10-15, at the live click).** The player
 never sees or types a seed: the Life round rolls it, and Reroll is how a player gets another world. The
 setup round keeps the nation targets and the abundance. **Every round fits without a scroll bar:**
-Reroll, Back and Next sit higher, so the controls never push off the bottom.
+the leans follow the round's folds, so the controls never push off the bottom. **Reroll, Back and
+Next are anchored at the bottom of the window (Ben, 2026-10-16)**, so a press lands in the same
+place on every round, however short its content.
 
 **It sits between System and Life, and holds the world-wide inputs too (Ben, 2026-10-11).** The
 setup round carries the two nation targets and the **abundance** radio — the inputs that shape the

@@ -230,6 +230,17 @@ end
 function raise_player_force(corp)
     local VERB_HIRE_UNIT = 8 -- corp_verb::hire_unit
 
+    -- 0. The loan (step 3a below) is taken BEFORE the base is placed (BL-1319).
+    --    construct_building's commitment gate wants the whole capex (300 flat +
+    --    35 steel at the site multiplier, BL-1066) on hand to start the build, and
+    --    measured 2026-10-16 the seated corp twelve ticks in cannot commit to it on
+    --    any tile within 24 rings: placement failed `insufficient_funds`. Lent here,
+    --    the same loan covers the pay-as-you-build draws while the base stands up,
+    --    and the repayment after the hire still leaves `opening - actual_spend`.
+    local opening = verify.player_balance()
+    local LOAN = 5000.0
+    verify.set_balance(opening + LOAN)
+
     -- 1. Place the muster base through the same construct_building path a click
     --    uses, on the nearest placeable tile to the player's own works (BL-1066).
     --    Not build_first_valid: its raster-first tile sits in whatever market
@@ -247,6 +258,24 @@ function raise_player_force(corp)
     end
     if not placed then
         error("fixture could not place a military base near the player's works: " .. tostring(why))
+    end
+
+    -- 1b. Stock the base's own shelf (BL-1319, Ben 2026-10-17: option A). A site
+    --     draws its materials and construction capacity off its market's shelf
+    --     only, and measured 2026-10-16 the opening economy is short of both:
+    --     107 of 149 sites short at handoff on seed 0 (construction_stall), so the
+    --     base paused for want of steel past any bound. The fixture stocks THIS
+    --     market's shelf with the base's whole need — never every shelf on the
+    --     body, which would feed the rivals' sites too — as sea_lane.lua stocks
+    --     its Ports' upkeep. The shortage itself is economy work, filed apart.
+    do
+        local mkt = verify.market_at(placed.x, placed.y)
+        if mkt == 0 then
+            error("fixture's military base at (" .. placed.x .. "," .. placed.y
+                  .. ") stands in no market's catchment, so nothing can stock its shelf")
+        end
+        verify.stock_market(mkt, "steel", 120.0)                -- 35 at up to ~3x site time
+        verify.stock_market(mkt, "construction_capacity", 200.0)
     end
 
     -- 2. Wait for it. Construction is durative and pay-as-you-build, so the tick
@@ -289,15 +318,13 @@ function raise_player_force(corp)
     -- figure, the Budget ledger's split — therefore still depicts the true opening
     -- economy rather than a staged fortune, which is the whole reason option C was
     -- chosen over re-enabling the seeder.
-    local opening = verify.player_balance()
-    -- Lent against a FLOOR, not against `opening`: the base is pay-as-you-build,
-    -- so by the time it completes the balance can be near zero or negative, and a
-    -- relative loan then lands short of hire_base_cost + hire_cost_per_power x
-    -- power. Measured 2026-08-28: +500 still gave rejected_funds on all six
-    -- available rows. The repayment below subtracts the same LOAN, so the corp
-    -- still ends `opening - actual_spend` however large the float is.
-    local LOAN = 5000.0
-    verify.set_balance(opening + LOAN)
+    -- The loan itself was taken at step 0. Lent against a FLOOR, not against
+    -- `opening`: the base is pay-as-you-build, so by the time it completes the
+    -- balance can be near zero or negative, and a relative loan then lands short
+    -- of hire_base_cost + hire_cost_per_power x power. Measured 2026-08-28: +500
+    -- still gave rejected_funds on all six available rows. The repayment below
+    -- subtracts the same LOAN, so the corp still ends `opening - actual_spend`
+    -- however large the float is.
 
     -- AND THE GOODS, which is the gate that actually bit. hire_unit has TWO
     -- funds checks and they return the same string: `payer.balance < hire_cost`
@@ -331,7 +358,7 @@ function raise_player_force(corp)
     for i, r in ipairs(order) do
         why = why .. (i > 1 and ", " or "") .. r .. " x" .. seen[r]
     end
-    verify.set_balance(opening) -- no hire happened; leave the economy untouched
+    verify.set_balance(verify.player_balance() - LOAN) -- no hire happened; repay the loan
     error("fixture placed a muster base at tile " .. tostring(base.tile)
           .. " but no roster row could be hired onto it: " .. why)
 end

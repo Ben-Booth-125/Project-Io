@@ -208,7 +208,9 @@ void app::prime_wizard_setup()
     if (!m_seed_rolled)
     {
         m_seed_rolled = true;
-        if (m_golden_dir.empty())
+        if (m_bench.on)
+            wp.seed = m_bench.seed; // BL-1247: a benchmark compares like with like
+        else if (m_golden_dir.empty())
         {
             std::random_device rd_seed;
             wp.seed = static_cast<uint32_t>(rd_seed());
@@ -2837,8 +2839,21 @@ void app::draw_generation_screen()
         // The line holds the button's row height, so Back and Next sit where they
         // sit on every other pass round (the footer geometry scripts press).
         const bool culture_round = lapse_round && lapse_index == 0;
-        // The footer's press points, for verify.wizard_buttons (the footer now
-        // follows the round's content, so its height varies by round).
+        // THE FOOTER IS ANCHORED AT THE BOTTOM OF THE WINDOW (Ben, 2026-10-16;
+        // STARTUP.md § Rounds). The leans above still follow the round's folds
+        // (the 2026-10-15 "controls sit high" rule keeps the column free of a
+        // scroll bar); only Reroll / Back / Next drop to the column's floor, so
+        // a press lands in the same place on every round. Both footer rows are
+        // 34 px plus one ItemSpacing each; when the content already reaches the
+        // floor the slack is zero and the footer follows it as before.
+        {
+            const float footer_rows_h = (34.0f + style.ItemSpacing.y) * 2.0f;
+            const float slack = ImGui::GetContentRegionAvail().y - footer_rows_h;
+            if (slack > 0.0f)
+                ImGui::SetCursorPosY(ImGui::GetCursorPosY() + slack);
+        }
+        // The footer's press points, for verify.wizard_buttons (read after the
+        // anchor, so they are where the buttons are actually drawn).
         {
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             const bool has_reroll = !culture_round && !setup_round;
@@ -3195,10 +3210,12 @@ void app::draw_generation_screen()
             // IO_AUTOSTART_DWELL_MS (BL-1246, a measurement switch): a player
             // watches each lapse round before pressing Next; the walk dwells
             // that long from its arrival on every lapse round.
-            static const long long dwell_ms = [] {
+            static const long long env_dwell_ms = [] {
                 const char* v = SDL_getenv("IO_AUTOSTART_DWELL_MS");
                 return v ? std::atoll(v) : 0LL;
             }();
+            // BL-1247: the ground bench walks as a reader (--dwell).
+            const long long dwell_ms = m_bench.on ? m_bench.dwell_ms : env_dwell_ms;
             if (m_autostart_round_t0 == std::chrono::steady_clock::time_point{})
                 m_autostart_round_t0 = std::chrono::steady_clock::now();
             bool dwelling =
@@ -3208,10 +3225,11 @@ void app::draw_generation_screen()
             // IO_AUTOSTART_BEGIN_DWELL_MS: Begin is held this long after round
             // 6's world has landed -- the player reading the close, and the
             // seat canvas a player is shown and the walk skips.
-            static const long long begin_dwell_ms = [] {
+            static const long long env_begin_dwell_ms = [] {
                 const char* v = SDL_getenv("IO_AUTOSTART_BEGIN_DWELL_MS");
                 return v ? std::atoll(v) : 0LL;
             }();
+            const long long begin_dwell_ms = m_bench.on ? m_bench.dwell_ms : env_begin_dwell_ms;
             if (begin_dwell_ms > 0 && !round_building && m_wiz_round == wizard_round_count - 1)
             {
                 if (m_autostart_landed_t0 == std::chrono::steady_clock::time_point{})

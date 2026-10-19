@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*28 entries — 26 open, 2 resolved.*
+*32 entries — 27 open, 5 resolved.*
 
 ---
 
@@ -126,41 +126,6 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 
 The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
 
-### NR-1001 — Sprint 51 write-up: five calls taken on Ben's behalf beyond the design form
-*decision taken on your behalf · raised 2026-10-08 · from the sprint 51 design write-up, 2026-10-08 (RENDERING.md, SELECTION.md, LENSES.md, PLANETARY.md; BL-1239..BL-1244)*
-
-The form settled the shape; writing it into the docs needed five smaller calls, each now in its owning doc and reversible there. (a) COMPANY LENS DEFAULT - no firm picked, so every firm's ground opens owned-grey: the player owns no company, so "the player only" has no counterpart (LENSES.md § Company lens). Alternative: every firm picked (the old look). (b) RIVAL ROWS IN THE PRODUCTION SECTION show type, count and owner; output and running state read "private", matching the rival building card (SELECTION.md). Alternative: running state public, since a working plant is observable. (c) SCAFFOLDING - "the art is static" has one exception, a construction site bakes as scaffolding, because start and completion are events rather than ticks and so cost no per-tick re-bake (RENDERING.md § Installations). (d) A FOURTH STACK adds nothing to the ground (the cluster caps at three), and a small settlement may vanish at the far page where the density dot stood; a scale >= 3 centre must still read as a city at every rung. (e) NEVER-MAGNIFY shifts every rung up one tier (13 px rung -> 24 px tier, top rung -> 192), and supersampling bakes the 192 tier at 384 px per hex - four times the bake pixels on the worker. BL-1244 measures bake time and memory before and after; if the 192 x 2 bake is too slow, the lever is to supersample only the tiers below it.
-
-### NR-1002 — After a refund, the header NET and the Balance card net disagree: should the header exclude the refund?
-*question · raised 2026-10-08 · from lane L6, BL-1215 (refunds flow shown), sprint 51*
-
-On a seat that received a refund the header reads NET +332/qtr (the quarterly return net, which includes the 190.3 refund) while the Balance card reads +142.1 (operating net) with a new line "Refunds: +190.3 (not earnings)". The line makes the gap readable but the two headline numbers still differ. Options: (A) leave both, the card explains the gap; (B) the header shows the operating net, excluding refunds, so the two agree; (C) the header keeps the return net and gains a refund marker on hover.
-
-### NR-1003 — Structures, settlements, landforms and rivers vanish wherever the bake is not drawn: under every lens, and on unsurveyed ground in spectator god view
-*question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
-
-RENDERING.md § Installations says a structure is ground and takes the lens wash. As built, every lens draws through the old vector fill path, which never shows the bake, so with the canvas glyphs retired a lens shows no buildings at all. That is the gap the cancelled BL-734 (ground/chrome layer contract) was to settle. Options: (A) new sprint 51 work - lenses composite their tint over the baked ground (one item, touches the lens fill path BL-1240 just changed); (B) accept for now - a lens is an analytic read and the Selection element names what stands there; file the bake-under-lens work for a later sprint; (C) under a lens, draw a minimal structure footprint mark in the vector path (a glyph by another name, against the design). WIDER THAN FIRST RECORDED (the integrated cold review, 2026-10-08): the same cause hides them (1) under the Corporation and Company lenses, where BL-1240 asks the player to pick owners by colour and none of their buildings show; (2) in spectator god view on unsurveyed ground, where the retired glyph paths used to lift rival works, rivers and landforms into view and the bake masks those tiles; (3) briefly on a body switch before the far page is ready. Rivers and landforms are lost the same way as structures, since their canvas strokes and glyphs are also retired. RULED (Ben, 2026-10-09): build lens over the bake now - LENSES.md § A lens washes the rendered ground. STILL OPEN from this entry: the spectator god-view case (unsurveyed ground hides rival works, rivers and landforms in god view, because the master masks those tiles).
-
-### NR-1004 — The player-identity wash tints the player's own baked structures blue
-*question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
-
-The always-on player-identity wash (about 30% on the player's tiles on the plain canvas) is applied over the bake, so the player's structures come out tinted, against RENDERING.md "a structure carries no owner colour". Ben kept the always-on player OUTLINE (the sprint 51 form) but did not rule on the wash. Options: (A) drop the wash, keep the outline only; (B) keep the wash but mask it off structure pixels; (C) keep as is and amend the doc.
-
-### NR-1005 — Sprint 51 lane calls taken: the market-state band, non-producing buildings read Running, and verify staging that writes world state
-*decision taken on your behalf · raised 2026-10-08 · from lanes L1 (BL-1239) and L4 (BL-1241), sprint 51*
-
-(a) The Production section's short / balanced / surplus reads supply against demand with a +-10% band, borrowed from the Scarcity lens; no doc fixed a threshold. (b) Ports, hubs, launchpads, military bases and other non-producing types now read "Running" in the hover card and the Production section: they staff at zero by design, so "labour short" described a shortage that cannot exist. (c) "No producer in reach" is not derived as an input-shortage cause (it needs the input_reach logistics walk, too heavy per frame); the line falls back to "input short: <good>". (d) NOVEL: L4 added verify-only functions (stage_gallery, stage_building, stage_centre) that insert buildings and restep centres directly, bypassing placement rules, and stage_gallery returns the tile positions it staged to. C++ picks the ground, but positions reach Lua - compare the scoped NR-698 grant (verify.find_deposit_tile). Options for (d): accept as a verify-only staging grant recorded beside NR-698; or require scripts to stage through the real placement seam. (e) RIVER WIDTH IS MASK-BLIND (cold review): a revealed river's width reads accumulated flow including unsurveyed upstream tiles, so width hints at the size of an unsurveyed catchment; courses and forms never draw from masked ground. Taken as acceptable; confirm or require flow to stop at the mask.
-
-### NR-1007 — BL-1246 ground one master: four calls from the build
-*decision taken on your behalf · raised 2026-10-09 · from the BL-1246 (ground one master) lane, sprint 51*
-
-(a) NOVEL, taken: unsurveyed ground is a FILL, not a bake - a master chunk whose every tile in reach is unsurveyed is filled with the lock colour directly, byte-identical to the full bake (ground_bake_check P23). It is what lets a first visit to an unsurveyed body be sharp in 0.77 s. (b) A Debug --verify run that frames a whole body now pays minutes of synchronous master bake (Debug bakes ~10x slower). Option: compile the bake TUs optimised in Debug (a CMake change), or accept. (c) --autostart-windowed smoke runs now wait 35-55 s on the painting step (until the Life-round pre-bake lands). Option: skip the wait under autostart (the ground fills in live), or accept. (d) The Selection band's neighbourhood page is still its own flat 48 px bake, not a crop of the master - so it does not match the 22.5 deg canvas. Work for a later item unless you want it now.
-
-### NR-1008 — Lens wash and partial re-bake: four calls and two novel pieces
-*decision taken on your behalf · raised 2026-10-09 · from the BL-1250 (lens washes ground) and BL-1246 partial re-bake lanes, sprint 51*
-
-(a) Wash strengths taken: categorical lenses 0.46, sequential 0.54 (LENSES.md). (b) Resource lens: ground with no deposit keeps the WHITE wash Ben ruled 2026-10-04 (0.50) rather than "no wash" - LENSES.md says an unanswered tile takes no wash, so one of the two needs your word. (c) CALL: at the close rungs the Company lens draws the unpicked owners' dark rim on nearly every tile (firms hold most ground), which reads as a heavy hex grid. Options: thin/fade the rim at close zoom; drop the rim where the close-zoom seam already marks edges; accept. (d) NOVEL, fixed: a lit structure's hover wash drew at the inset radius and left a 1 px grid of unlit gaps over the bake; now drawn at full radius. (e) NOVEL, scope grew: the partial re-bake needed a bounds mode in the structure pass (rasterise a tile's parts writing nothing) and a shared build_tile, because a conservative reach only saved ~50%; plus a 1/256 px rounding fix in four structure forms caught by the new window-invariance row. (f) Rung 0 frame time read ~20 ms in the lens lane under heavy machine load (11.5 ms clean in the 60 fps lane); a clean re-measure is owed.
-
 ### NR-982 — Decisions taken on your behalf building "an order is a floor, not a hold" (BL-1229)
 *decision · raised 2026-10-07 · from the BL-1229 (steel stays home) build lane, 2026-10-07*
 
@@ -206,6 +171,41 @@ To verify the air gate and the sea-route lane headlessly, the verify API gained 
 
 Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT.
 
+### NR-1001 — Sprint 51 write-up: five calls taken on Ben's behalf beyond the design form
+*decision taken on your behalf · raised 2026-10-08 · from the sprint 51 design write-up, 2026-10-08 (RENDERING.md, SELECTION.md, LENSES.md, PLANETARY.md; BL-1239..BL-1244)*
+
+The form settled the shape; writing it into the docs needed five smaller calls, each now in its owning doc and reversible there. (a) COMPANY LENS DEFAULT - no firm picked, so every firm's ground opens owned-grey: the player owns no company, so "the player only" has no counterpart (LENSES.md § Company lens). Alternative: every firm picked (the old look). (b) RIVAL ROWS IN THE PRODUCTION SECTION show type, count and owner; output and running state read "private", matching the rival building card (SELECTION.md). Alternative: running state public, since a working plant is observable. (c) SCAFFOLDING - "the art is static" has one exception, a construction site bakes as scaffolding, because start and completion are events rather than ticks and so cost no per-tick re-bake (RENDERING.md § Installations). (d) A FOURTH STACK adds nothing to the ground (the cluster caps at three), and a small settlement may vanish at the far page where the density dot stood; a scale >= 3 centre must still read as a city at every rung. (e) NEVER-MAGNIFY shifts every rung up one tier (13 px rung -> 24 px tier, top rung -> 192), and supersampling bakes the 192 tier at 384 px per hex - four times the bake pixels on the worker. BL-1244 measures bake time and memory before and after; if the 192 x 2 bake is too slow, the lever is to supersample only the tiers below it.
+
+### NR-1002 — After a refund, the header NET and the Balance card net disagree: should the header exclude the refund?
+*question · raised 2026-10-08 · from lane L6, BL-1215 (refunds flow shown), sprint 51*
+
+On a seat that received a refund the header reads NET +332/qtr (the quarterly return net, which includes the 190.3 refund) while the Balance card reads +142.1 (operating net) with a new line "Refunds: +190.3 (not earnings)". The line makes the gap readable but the two headline numbers still differ. Options: (A) leave both, the card explains the gap; (B) the header shows the operating net, excluding refunds, so the two agree; (C) the header keeps the return net and gains a refund marker on hover.
+
+### NR-1003 — Structures, settlements, landforms and rivers vanish wherever the bake is not drawn: under every lens, and on unsurveyed ground in spectator god view
+*question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
+
+RENDERING.md § Installations says a structure is ground and takes the lens wash. As built, every lens draws through the old vector fill path, which never shows the bake, so with the canvas glyphs retired a lens shows no buildings at all. That is the gap the cancelled BL-734 (ground/chrome layer contract) was to settle. Options: (A) new sprint 51 work - lenses composite their tint over the baked ground (one item, touches the lens fill path BL-1240 just changed); (B) accept for now - a lens is an analytic read and the Selection element names what stands there; file the bake-under-lens work for a later sprint; (C) under a lens, draw a minimal structure footprint mark in the vector path (a glyph by another name, against the design). WIDER THAN FIRST RECORDED (the integrated cold review, 2026-10-08): the same cause hides them (1) under the Corporation and Company lenses, where BL-1240 asks the player to pick owners by colour and none of their buildings show; (2) in spectator god view on unsurveyed ground, where the retired glyph paths used to lift rival works, rivers and landforms into view and the bake masks those tiles; (3) briefly on a body switch before the far page is ready. Rivers and landforms are lost the same way as structures, since their canvas strokes and glyphs are also retired. RULED (Ben, 2026-10-09): build lens over the bake now - LENSES.md § A lens washes the rendered ground. STILL OPEN from this entry: the spectator god-view case (unsurveyed ground hides rival works, rivers and landforms in god view, because the master masks those tiles).
+
+### NR-1004 — The player-identity wash tints the player's own baked structures blue
+*question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
+
+The always-on player-identity wash (about 30% on the player's tiles on the plain canvas) is applied over the bake, so the player's structures come out tinted, against RENDERING.md "a structure carries no owner colour". Ben kept the always-on player OUTLINE (the sprint 51 form) but did not rule on the wash. Options: (A) drop the wash, keep the outline only; (B) keep the wash but mask it off structure pixels; (C) keep as is and amend the doc.
+
+### NR-1005 — Sprint 51 lane calls taken: the market-state band, non-producing buildings read Running, and verify staging that writes world state
+*decision taken on your behalf · raised 2026-10-08 · from lanes L1 (BL-1239) and L4 (BL-1241), sprint 51*
+
+(a) The Production section's short / balanced / surplus reads supply against demand with a +-10% band, borrowed from the Scarcity lens; no doc fixed a threshold. (b) Ports, hubs, launchpads, military bases and other non-producing types now read "Running" in the hover card and the Production section: they staff at zero by design, so "labour short" described a shortage that cannot exist. (c) "No producer in reach" is not derived as an input-shortage cause (it needs the input_reach logistics walk, too heavy per frame); the line falls back to "input short: <good>". (d) NOVEL: L4 added verify-only functions (stage_gallery, stage_building, stage_centre) that insert buildings and restep centres directly, bypassing placement rules, and stage_gallery returns the tile positions it staged to. C++ picks the ground, but positions reach Lua - compare the scoped NR-698 grant (verify.find_deposit_tile). Options for (d): accept as a verify-only staging grant recorded beside NR-698; or require scripts to stage through the real placement seam. (e) RIVER WIDTH IS MASK-BLIND (cold review): a revealed river's width reads accumulated flow including unsurveyed upstream tiles, so width hints at the size of an unsurveyed catchment; courses and forms never draw from masked ground. Taken as acceptable; confirm or require flow to stop at the mask.
+
+### NR-1007 — BL-1246 ground one master: four calls from the build
+*decision taken on your behalf · raised 2026-10-09 · from the BL-1246 (ground one master) lane, sprint 51*
+
+(a) NOVEL, taken: unsurveyed ground is a FILL, not a bake - a master chunk whose every tile in reach is unsurveyed is filled with the lock colour directly, byte-identical to the full bake (ground_bake_check P23). It is what lets a first visit to an unsurveyed body be sharp in 0.77 s. (b) A Debug --verify run that frames a whole body now pays minutes of synchronous master bake (Debug bakes ~10x slower). Option: compile the bake TUs optimised in Debug (a CMake change), or accept. (c) --autostart-windowed smoke runs now wait 35-55 s on the painting step (until the Life-round pre-bake lands). Option: skip the wait under autostart (the ground fills in live), or accept. (d) The Selection band's neighbourhood page is still its own flat 48 px bake, not a crop of the master - so it does not match the 22.5 deg canvas. Work for a later item unless you want it now.
+
+### NR-1008 — Lens wash and partial re-bake: four calls and two novel pieces
+*decision taken on your behalf · raised 2026-10-09 · from the BL-1250 (lens washes ground) and BL-1246 partial re-bake lanes, sprint 51*
+
+(a) Wash strengths taken: categorical lenses 0.46, sequential 0.54 (LENSES.md). (b) Resource lens: ground with no deposit keeps the WHITE wash Ben ruled 2026-10-04 (0.50) rather than "no wash" - LENSES.md says an unanswered tile takes no wash, so one of the two needs your word. (c) CALL: at the close rungs the Company lens draws the unpicked owners' dark rim on nearly every tile (firms hold most ground), which reads as a heavy hex grid. Options: thin/fade the rim at close zoom; drop the rim where the close-zoom seam already marks edges; accept. (d) NOVEL, fixed: a lit structure's hover wash drew at the inset radius and left a 1 px grid of unlit gaps over the bake; now drawn at full radius. (e) NOVEL, scope grew: the partial re-bake needed a bounds mode in the structure pass (rasterise a tile's parts writing nothing) and a shared build_tile, because a conservative reach only saved ~50%; plus a 1/256 px rounding fix in four structure forms caught by the new window-invariance row. (f) Rung 0 frame time read ~20 ms in the lens lane under heavy machine load (11.5 ms clean in the 60 fps lane); a clean re-measure is owed.
+
 ### NR-1035 — Sprint 50 onto main: G3 (firms alive at tick 400) moved 99.8% -> 95.8%; every other gate digit identical
 *question · raised 2026-10-10 · from Main-session gates on the sprint 50 merge (a560c5d7 + d8d2a04c), 2026-10-10*
 
@@ -234,6 +234,13 @@ MARKETS.md rules that catchment is logistics cost over pull, and LOGISTICS.md se
 
 **Why it matters.** The leg decides how far a market's edge bulges past the end of its roads, and the terrain term decides whether islands and far coasts belong to the market across the water from them. Measured on seed 0 after the change: market_viability pooled G1 92.0 -> 90.1, G1t50 88.1 -> 86.3, G2 182.1 -> 185.0, all five gates still passing, and the same-nation fifth moves 279 of 31581 tiles.
 
+### NR-1052 — BL-1382 band scaling: f(s) = 1 + (s-1)/2 by anchor scale
+*decision · raised 2026-10-18 · from PROVINCES.md § The normalising pass*
+
+Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).
+
+**Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
+
 ---
 
 ## Resolved
@@ -258,4 +265,31 @@ score_national_budgets walks every landed nation and run_nation_step writes the 
 **Why it matters.** Either the AI is setting the player's national budget every cadence (an act on the player the grant forbids), or the player has no budget control yet and the scored weights stand in as a default. The two readings need different fixes.
 
 > **RESOLVED.** Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11.
+
+### NR-1051 — BL-1311 (ground paint perf) builds the ground bake at /O2 in Debug: a new object library and CMake policy CMP0184
+*novel-work · raised 2026-10-17 · from BL-1311 lane report (commit 3af45cdb); CMakeLists.txt*
+
+The four bake files (ground_bake, structure_stamps, route_paint, terrain_palette) now build as their own library at /O2 even in Debug, with runtime checks off; CMake policy CMP0184 is switched on so Debug runtime checks become a per-target property, and /RTC1 is stripped from the cached Debug flags for top-level targets (they keep the checks through the property). IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=OFF restores single-stepping. Existing build trees rebuild once. This cut the Debug seat wait from 750 s to 12.7 s with byte-identical captures.
+
+**Why it matters.** It changes what the Debug build means for one subsystem (no runtime checks, not steppable by default) and touches every build tree; a build-system change is project-wide scope.
+
+> **RESOLVED.** Ben: keep the /O2 ground-bake library in Debug, on by default (IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=ON).
+
+### NR-1053 — No doc owns who holds a Logistic Points hub placed during generation; a broke major idles its hubs and starves its consumers
+*novel-work · raised 2026-10-18 · from BL-1382 economy trace (seed 28), src/world/logistic_points.cpp seed_logistics_sources / place_hub, src/world/state_industry.cpp plan_state_funding*
+
+seed_logistics_sources gives every hub on a major's ground to the nation as state industry (NATIONS.md § State industry: transport is state industry; a losing building idles, never debt). A major leaving generation with treasury 0.0 idles all its hubs at tick 0, so its consumers get 0 Logistic Points and the loss reflex decommissions them. BL-1382's merges moved 181 consumers onto such a major on seed 28 (G1 96.8 -> 44.7). Present before BL-1382 at smaller scale (seeds 9, 32, 40). The seeding report also claims 100% coverage before the funding gate runs.
+
+**Why it matters.** Hub ownership at generation is a design rule no economy doc states; LOGISTICS.md says anyone may build one, NATIONS.md makes transport state industry.
+
+> **RESOLVED.** Ben: B — no major leaves generation on a zero treasury (Pass 7). Foundings keep a year (four ticks) of the state bill; the poorest realms earn more in the history until none closes empty. The LP coverage report reads the funding gate.
+
+### NR-1054 — Seed 40: background firms herd-build oil power plants in one market; the build check does not see same-window input claims
+*novel-work · raised 2026-10-19 · from BL-1382 economy trace, seed 40 (G1 t50 74.2 with the province pass, 83.7 without)*
+
+Ticks 23-36: 25 background firms each build an oil power plant in market 47446 (grid 15253), oversubscribing petroleum; 24 of 32 are decommissioned by tick 50. The province pass only reshaped the grids (51 vs 31). The fix reaches the corp-AI build scorer (AI_OPPONENT.md § 11 grants).
+
+**Why it matters.** A herd is a scorer behaviour; changing what the scorer sees is AI work under the grant register, outside the economy brief.
+
+> **RESOLVED.** Ben: accept as world variance (seed 40 G1 t50 74.2). Same form: seed 9's hydroponics charter web accepted as world variance (G1 t50 ~83). No AI grant widened.
 

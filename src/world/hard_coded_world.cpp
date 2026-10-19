@@ -417,6 +417,17 @@ uint32_t choose_home_tile_seed(const planetology_state& pl,
 // or ended realm can still be named on a card): `polity::name`, coined once
 // at founding and carried by id, so whichever span closed last hands nation
 // generation the same table the wizard's board printed.
+// BL-1310 -- THE SEATS AT A SPAN'S CLOSE, on the names' footing: indexed by
+// POLITY id, `polity::capital` for a living realm, -1 for a dead one. The
+// realm's seat is the nation's capital (NATION_GENERATION.md sec Pass 2d).
+std::vector<int> polity_seats_at_close(const std::vector<polity>& polities)
+{
+    std::vector<int> seats;
+    seats.reserve(polities.size());
+    for (const polity& q : polities) seats.push_back(q.alive ? q.capital : -1);
+    return seats;
+}
+
 std::vector<std::string> polity_names_at_close(const std::vector<polity>& polities)
 {
     std::vector<std::string> names;
@@ -1666,6 +1677,8 @@ void run_empires(generation_cursor& c)
         kepler_grudges    = kepler_pass_one.grudges;
         kepler_grudge_cap = static_cast<int32_t>(hp.grudge_cap);
         kepler_polity_names = polity_names_at_close(kepler_pass_one.polities); // BL-1089
+        c.kepler_polity_seats = polity_seats_at_close(kepler_pass_one.polities); // BL-1310
+        c.kepler_last_span   = 1;
         c.kepler_polity_industrial_years =
             polity_industrial_years_at_close(kepler_pass_one.polities); // BL-1159
 
@@ -1892,6 +1905,8 @@ void run_exploration(generation_cursor& c)
         // `polity_treasuries_at_close`.
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_exploration.regions);
         kepler_polity_names      = polity_names_at_close(kepler_exploration.polities); // BL-1089
+        c.kepler_polity_seats = polity_seats_at_close(kepler_exploration.polities); // BL-1310
+        c.kepler_last_span   = 2;
         c.kepler_polity_industrial_years =
             polity_industrial_years_at_close(kepler_exploration.polities); // BL-1159
 
@@ -2069,7 +2084,7 @@ void run_industrialisation(generation_cursor& c)
                 kepler_settlement.regions, kepler_exploration.polities,
                 closing_carve_cells(*closing, kepler_settlement.regions), closing->ground.gw,
                 closing->ground.gh, closing->min_nation_tiles, closing->keep_city_states,
-                /*total_target=*/0);
+                /*total_target=*/0, &closing->ground.sub);
             const int n_open = std::max(1, open_plan.nations_after_floor);
             const int gap_q  = std::clamp((n_open - params.nation_total_target) * 1000 / n_open, -1000, 1000);
             dp.campaign_appetite_q = gap_q / 2;
@@ -2149,6 +2164,34 @@ void run_industrialisation(generation_cursor& c)
         // tail holds the fold to the count the closing rounds planned.
         c.closing_predicted = kepler_industrialisation_hs.closing_predicted;
         if (c.closing_predicted >= 0) c.kepler_np.floor_in_history = true;
+        // BL-1310 (NATION_GENERATION.md sec Pass 2e): the cessions relabelled
+        // the carve where a region move could not carry them; the tail draws
+        // the same relabels, by the receiving region's anchor tile.
+        c.kepler_np.cell_overrides.clear();
+        for (const auto& [tile, reg] : kepler_industrialisation_hs.closing_cell_overrides)
+            if (reg >= 0 && static_cast<std::size_t>(reg) < kepler_settlement.regions.size()
+                && kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor >= 0)
+                c.kepler_np.cell_overrides.emplace_back(
+                    tile, kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor);
+        c.kepler_np.polity_core_tiles.assign(kepler_industrialisation_hs.closing_polity_core_tiles.begin(),
+                                             kepler_industrialisation_hs.closing_polity_core_tiles.end());
+        // The provinces a cession moved as regions: their seeds stand on
+        // ceded ground (Pass 5 seats and names nobody by them).
+        c.kepler_np.ceded_seed_tiles.clear();
+        for (const int32_t reg : kepler_industrialisation_hs.closing_ceded_regions)
+            if (reg >= 0 && static_cast<std::size_t>(reg) < kepler_settlement.regions.size()
+                && kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor >= 0)
+                c.kepler_np.ceded_seed_tiles.push_back(kepler_settlement.regions[static_cast<std::size_t>(reg)].anchor);
+        if (kepler_industrialisation_hs.closing_parts_detached > 0 || kepler_industrialisation_hs.closing_provinces_split > 0)
+            record_pattern_miss(c, "closing_rounds",
+                                std::to_string(kepler_industrialisation_hs.closing_parts_detached)
+                                    + " ceded part(s) did not join their receiver, "
+                                    + std::to_string(kepler_industrialisation_hs.closing_provinces_split)
+                                    + " province(s) split (sec Pass 2e)");
+        if (kepler_industrialisation_hs.closing_core_tiles_lost > 0)
+            record_pattern_miss(c, "closing_rounds",
+                                "the opening cessions moved " + std::to_string(kepler_industrialisation_hs.closing_core_tiles_lost)
+                                    + " tile(s) of a realm's core (sec Pass 2e: a cession moves only ground outside a territory)");
         // A TARGET MISSED IS A DEFECT, never a reported outcome (sec The
         // nation count is a target: "both targets are always hit"). The
         // closing rounds stop short only when no legal step is left -- no
@@ -2218,6 +2261,8 @@ void run_industrialisation(generation_cursor& c)
         kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
         kepler_polity_names      = polity_names_at_close(kepler_industrialisation.polities); // BL-1089
+        c.kepler_polity_seats = polity_seats_at_close(kepler_industrialisation.polities); // BL-1310
+        c.kepler_last_span   = 3;
         c.kepler_polity_industrial_years =
             polity_industrial_years_at_close(kepler_industrialisation.polities); // BL-1159
 
@@ -2443,6 +2488,20 @@ void close_history(generation_cursor& c)
     // coining a second one (NATION_GENERATION.md § Pass 5).
     kepler_np.polity_names = kepler_polity_names;
 
+    // BL-1310 -- THE SEATS CROSS WITH THE NAMES (NATION_GENERATION.md sec
+    // Pass 2d, Ben 2026-10-17: the realm's seat at the close is always the
+    // nation's capital tile). Per polity id, the raster tile of its seat
+    // region's anchor -- which may stand on coastal water; the tail then
+    // seats the nation on its nearest own land -- or -1 for a dead realm.
+    kepler_np.polity_seat_tiles.assign(c.kepler_polity_seats.size(), -1);
+    for (std::size_t p = 0; p < c.kepler_polity_seats.size(); ++p)
+    {
+        const int sr = c.kepler_polity_seats[p];
+        if (sr < 0 || static_cast<std::size_t>(sr) >= kepler_settlement.regions.size()) continue;
+        const region& rg = kepler_settlement.regions[static_cast<std::size_t>(sr)];
+        kepler_np.polity_seat_tiles[p] = rg.anchor >= 0 ? rg.anchor : rg.row * home_grid_width + rg.col;
+    }
+
     // BL-898 — THE SAME READ, KEPT FOR THE SAME WINDOW. `seed_polities`
     // above is filtered to anchored regions because `generate_nations`
     // reads it as a parallel array; the grudge seeding needs the polity of
@@ -2527,6 +2586,82 @@ void run_tail(generation_cursor& c)
                                  "the fold made " + std::to_string(kepler_nations.size())
                                      + " nations; the closing rounds planned "
                                      + std::to_string(c.closing_predicted));
+    // BL-1310 -- THE SAME GUARD FOR THE STRAIT RULE: after closing rounds the
+    // history ceded every exclave, so the tail's tile-level pass has nothing
+    // left to cede. A cession there is the plan and the carve parting.
+    if (c.closing_predicted >= 0 && kepler_fold.cessions > 0)
+        record_pattern_miss(c, "closing_rounds",
+                                 "the tail ceded " + std::to_string(kepler_fold.cessions)
+                                     + " exclave(s) the closing rounds left (sec Pass 2e)");
+    // BL-1310 round 4 review -- the tail's split, checked: every ceded part
+    // joined its receiver, and no province was split on a settled world. Both
+    // hold by construction; a breach is a handoff violation.
+    if (fixture != nullptr)
+    {
+        fixture->tail_cessions        = kepler_fold.cessions;
+        fixture->tail_cessions_split  = kepler_fold.cessions_split;
+        fixture->tail_parts_detached  = kepler_fold.parts_detached;
+        fixture->tail_provinces_split = kepler_fold.provinces_split;
+        fixture->tail_cores_floor_moved = kepler_fold.cores_floor_moved;
+    }
+    if (kepler_fold.parts_detached > 0 || kepler_fold.provinces_split > 0)
+        record_pattern_miss(c, "strait_rule",
+                            std::to_string(kepler_fold.parts_detached) + " ceded part(s) did not join their receiver, "
+                                + std::to_string(kepler_fold.provinces_split) + " province(s) split (sec Pass 2e)");
+    // BL-1310 -- EVERY LAUNCH OBEYS THE RULE (NATION_GENERATION.md sec Pass
+    // 2e, Ben 2026-10-17). A launch that closed before Industrialisation ran
+    // no closing round, so the tail's post-pass took its cessions: each is an
+    // event of the LAST SPAN THAT RAN (`exclave_ceded`, kind 42), dated at
+    // that span's close, with the same cause line the closing rounds write.
+    if (c.closing_predicted < 0 && c.kepler_last_span > 0 && !kepler_fold.cession_log.empty())
+    {
+        const auto region_at = [&](int32_t tile) -> int {
+            if (tile < 0) return -1;
+            for (std::size_t r = 0; r < kepler_settlement.regions.size(); ++r)
+                if (kepler_settlement.regions[r].anchor == tile) return static_cast<int>(r);
+            return -1;
+        };
+        const auto realm_label = [&](int32_t p) -> std::string {
+            if (p >= 0 && static_cast<std::size_t>(p) < c.kepler_polity_names.size()
+                && !c.kepler_polity_names[static_cast<std::size_t>(p)].empty())
+                return c.kepler_polity_names[static_cast<std::size_t>(p)];
+            return p >= 0 ? std::string("a realm") : std::string("the unheld ground around it");
+        };
+        era_timelapse* lapse = nullptr;
+        if (report != nullptr)
+            for (generation_report::body_entry& be : report->bodies)
+                if (be.id == kepler)
+                    lapse = c.kepler_last_span == 1 ? &be.prehistory_timelapse
+                          : c.kepler_last_span == 2 ? &be.exploration_timelapse
+                                                    : &be.industrialisation_timelapse;
+        int32_t close_year = 0;
+        if (lapse != nullptr) close_year = lapse->start_year + lapse->years;
+        for (const nation_fold_record::cession_record& cr : kepler_fold.cession_log)
+        {
+            const int reg = region_at(cr.seed_tile);
+            const auto slot = [](int v) {
+                return (v < 0 || v >= static_cast<int>(lapse_event_none)) ? lapse_event_none : static_cast<uint16_t>(v);
+            };
+            if (lapse != nullptr)
+            {
+                lapse_event e;
+                e.year   = close_year;
+                e.kind   = static_cast<uint8_t>(lapse_event_kind::exclave_ceded);
+                e.region = slot(reg);
+                e.polity = slot(cr.from_polity);
+                e.other  = slot(cr.to_polity);
+                lapse->events.push_back(e);
+            }
+            const std::string ground =
+                reg >= 0 ? kepler_settlement.regions[static_cast<std::size_t>(reg)].name : std::string("Ground");
+            kepler_settlement.history.push_back(history_event{
+                years_from_calendar_year(close_year), chain_stage::legacy,
+                ground + ", cut off from " + (cr.from_polity >= 0 ? realm_label(cr.from_polity)
+                                                                   : std::string("the ground around it"))
+                    + ", is ceded to " + realm_label(cr.to_polity) + " as the old order closes",
+                std::string{}});
+        }
+    }
     if (report != nullptr)
         for (generation_report::body_entry& be : report->bodies)
             if (be.id == kepler)
@@ -2719,11 +2854,19 @@ void run_tail(generation_cursor& c)
     // set) changes after this point, and the anchors founded between the two
     // calls are skipped as seeds by their `province_anchor` flag
     // (province_partition_harness P6 is the identity's guard).
+    //
+    // BL-1382 (the normalising pass, Ben 2026-10-18): this call is also where
+    // settled land provinces are evened out — the partition's pass 4 splits
+    // the too-large and merges the too-small — so it lands exactly where the
+    // ruling puts it: nations final (generate_nations above ran the strait
+    // rule; the closing rounds ran inside the history), roads and firms not
+    // yet placed. The split pieces' villages are founded just below.
     build_province_partition(w, params.seed ^ 0x50524F56u);
 
     // BL-611 (province centre anchor): every land province on the settled body
     // holds a centre — the leftover pockets the centre-seeded fill could not
-    // reach get a scale-1 anchor founded on their best ground. RNG-free. The
+    // reach, and the pieces the normalising pass split off (BL-1382), get a
+    // scale-1 anchor founded on their best ground. RNG-free. The
     // re-name is the byte-stable re-run name_population_centres documents (new
     // ids sort last, the existing prefix of draws reproduces exactly); the
     // re-stamp is idempotent and paves only the new anchors' footprints.

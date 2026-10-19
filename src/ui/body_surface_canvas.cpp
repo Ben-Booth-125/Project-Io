@@ -4239,7 +4239,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // the step actually crosses something laid. A road reads its edge mask there (a run
         // draws across the boundary it crosses, RENDERING.md § Roads draw across the edge
         // they cross); a sea lane, still a tile field, reads the neighbour's own level.
-        // BL-1386: @p weight_of / @p thick_of turn ONE DIRECTION's link value into the
+        // BL-1390: @p weight_of / @p thick_of turn ONE DIRECTION's link value into the
         // colour and width drawn across it, with the passed col/thick as the fallback for
         // a network whose value carries no tier (a sea lane, which is a tile field).
         const auto draw_network = [&](auto level_of, auto link_of, ImU32 col, float thick,
@@ -4253,7 +4253,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             };
             ImVec2 mids[4];
             float  vis[4];
-            ImU32  ecol[4];   // BL-1386: this DIRECTION's colour...
+            ImU32  ecol[4];   // BL-1390: this DIRECTION's colour...
             float  ethick[4]; // ...and its width, from the edge's own tier
             int    deg = 0;
             for (int n = 0; n < 4; ++n)
@@ -4292,7 +4292,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                 mids[deg] = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
                 vis[deg]  = std::max(vision, vision_rc(ncol, nrow));
-                // BL-1386: A ROAD IS AN EDGE, SO THE WEIGHT IS THE EDGE'S. This used to
+                // BL-1390: A ROAD IS AN EDGE, SO THE WEIGHT IS THE EDGE'S. This used to
                 // style every half of the tile by `max_road_tier(tile)` - one weight for
                 // the whole cell - so a tile carrying a Track one way and a Highway the
                 // other drew both halves as Highway. Measured on the shipped 1960 start:
@@ -4341,7 +4341,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             out->PathBezierQuadraticCurveTo(ctl, to, segs);
                     };
                     // One stroke only when the two halves agree in BOTH colour and width
-                    // (BL-1386 added the width half of that test).
+                    // (BL-1390 added the width half of that test).
                     if (ea == eb && ta == tb)
                     {
                         out->PathLineTo(mids[a]);
@@ -4368,7 +4368,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 // A round joint at the apex hides the seam between the two halves. It takes
                 // the HEAVIER half, so a Track meeting a Highway is capped by the highway
-                // and the taper reads at the midpoint rather than as a notch (BL-1386).
+                // and the taper reads at the midpoint rather than as a notch (BL-1390).
                 const int heavy = (ethick[a] >= ethick[b]) ? a : b;
                 out->AddCircleFilled(apex, ethick[heavy] * 0.5f,
                                      fog_dim(ecol[heavy], std::max(vis[a], vis[b])));
@@ -4418,7 +4418,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     out->AddLine(hub, mids[i], fog_dim(ecol[i], vis[i]), ethick[i]);
                 if (ethick[i] > cap_thick) { cap_thick = ethick[i]; cap_col = ecol[i]; }
             }
-            // The cap is the heaviest edge meeting here (BL-1386), and falls back to the
+            // The cap is the heaviest edge meeting here (BL-1390), and falls back to the
             // passed weight for a lone tile with no edge at all.
             if (cap_thick <= 0.0f) { cap_thick = thick; cap_col = col; }
             out->AddCircleFilled(hub, std::max(1.0f, cap_thick * 0.75f),
@@ -4495,7 +4495,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                  self, hex_side_for_offset(dc, dr, (t_row & 1) != 0));
                          },
                          col, thick, false,
-                         // BL-1386: the EDGE's tier decides its half's weight, not the
+                         // BL-1390: the EDGE's tier decides its half's weight, not the
                          // tile's best. The ladder is the same one the legend and the bake
                          // use - Track thin/dim, Road medium, Highway thick/bright.
                          [](int tier, ImU32 fallback) -> ImU32 {

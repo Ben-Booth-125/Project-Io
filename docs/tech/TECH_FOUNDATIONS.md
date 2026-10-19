@@ -198,8 +198,17 @@ hope:
 - The Planetary canvas holds **60 fps at every zoom**.
 - A **building placed** has its ground re-baked **within 1 s**.
 
+The check is `ProjectIo --bench-ground` (`src/core/ground_bench.cpp`): the live app, not
+`--verify`, walking the wizard as a reader (`--dwell <ms>` per round, default 10 s; `--dwell 0`
+is the click-through case) on one world (`--bench-seed <n>`, default 0, the reference world; a
+rolled seed would make two runs two different paints) and then driving the Planetary canvas at
+the reference 1720×1080 window. It prints PASS/FAIL per budget with the number, the ground's total paint wall time and
+the process's peak memory (working set and private bytes), then exits. A stand-in is a frame
+whose drawn level is not wholly final under the view; frame time is the frame's own work (the
+vsync wait excluded), judged on the 1%-low of a sustained pan at each rung.
+
 What these budgets cost, and why they fit: the ground is painted on the CPU by a worker pool
-and held in system RAM (about 6.7 GB per Earth-sized body at 128 px per hex, with the whole ground held to 45% of installed RAM, home pinned and other bodies streaming from a disk cache); the
+and held in system RAM (an Earth-sized body at 128 px per hex, opaque chunks held losslessly as RGB, home pinned and other bodies streaming from a disk cache, the whole process under 6 GB — Ben, 2026-10-17); the
 GPU holds only the textures on screen and draws them as quads, so GPU time is not the
 constraint (RENDERING.md § Level of detail). A check that misses a budget on the reference PC
 is a defect; one that only the minimum PC would miss is measured on it before release.

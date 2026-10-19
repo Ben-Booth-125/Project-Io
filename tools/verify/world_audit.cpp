@@ -19,11 +19,20 @@
 #include "world/population_generation.hpp"
 #include "world/terrain_combat.hpp"
 #include "world/world.hpp"
+#include "world/era_minus_one.hpp"
+#include "world/finish_campaign_world.hpp"
+#include "world/recipe_registry.hpp"
+#include "world/era_timelapse.hpp"
+#include "world/history_sim.hpp"
+#include "world/works_roster.hpp"
+#include "world/world_gen_config.hpp"
+#include "scripting/lua_state.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <set>
 #include <string>
@@ -213,8 +222,509 @@ static frag_stats measure_fragmentation(const world& w, const generation_report&
     return fs;
 }
 
-int main()
+// ---------------------------------------------------------------------------
+// BL-1310 — ONE TERRITORY: THE STRAIT RULE, AUDITED (NATION_GENERATION.md
+// § Pass 2e). Independent of the generator's own cession code on purpose: it
+// re-derives every nation's land groups, its core (the group holding its
+// capital tile), the groups joined to the core by straits of at most
+// `strait_tiles` water tiles (chained, water-only legs, column-wrapped), and
+// classifies every other group as the REMOTE ISLAND (no land neighbour of
+// another nation and no other nation's ground within strait reach — the one
+// exemption) or an ILLEGAL exclave. The rule's promise is zero illegal.
+// ---------------------------------------------------------------------------
+struct strait_stats
 {
+    int nations          = 0;
+    int groups           = 0; ///< land groups over all nations
+    int strait_joined    = 0; ///< non-core groups joined to their core by straits
+    int remote           = 0; ///< exempt remote-island groups
+    int remote_tiles     = 0;
+    int illegal          = 0; ///< exclaves outside the rule
+    int illegal_tiles    = 0;
+    int illegal_anchored = 0; ///< of those, holding a region anchor (a seeded province)
+    int illegal_bordered = 0; ///< of those, with a land neighbour of another nation
+    int capital_off      = 0; ///< nations whose capital tile is not on their own land
+};
+
+static strait_stats audit_strait_rule(const world& w, const generation_report& rep, int strait_tiles = 3)
+{
+    strait_stats ss;
+    const entity_id body = w.home_body;
+    const auto      bit  = w.bodies.find(body);
+    if (bit == w.bodies.end()) return ss;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height, total = gw * gh;
+    if (total <= 0) return ss;
+
+    std::vector<char>      land(static_cast<std::size_t>(total), 0), water(static_cast<std::size_t>(total), 0);
+    std::vector<entity_id> owner(static_cast<std::size_t>(total), null_entity);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body) continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx < 0 || idx >= total) continue;
+        if (is_water(tc.substrate)) { water[static_cast<std::size_t>(idx)] = 1; continue; }
+        land[static_cast<std::size_t>(idx)] = 1;
+        const auto nit = w.tile_to_nation.find(tid);
+        if (nit != w.tile_to_nation.end()) owner[static_cast<std::size_t>(idx)] = nit->second;
+    }
+    auto nb4 = [gw, gh](int idx, int out[4]) {
+        const int col = idx % gw, row = idx / gw;
+        int n = 0;
+        out[n++] = row * gw + ((col + 1) % gw);
+        out[n++] = row * gw + ((col - 1 + gw) % gw);
+        if (row > 0) out[n++] = (row - 1) * gw + col;
+        if (row < gh - 1) out[n++] = (row + 1) * gw + col;
+        return n;
+    };
+
+    // Land groups per nation.
+    std::vector<int> comp(static_cast<std::size_t>(total), -1);
+    std::vector<entity_id> comp_owner;
+    std::vector<std::vector<int>> comp_tiles;
+    for (int s = 0; s < total; ++s)
+    {
+        const entity_id o = owner[static_cast<std::size_t>(s)];
+        if (o == null_entity || comp[static_cast<std::size_t>(s)] >= 0) continue;
+        const int id = static_cast<int>(comp_tiles.size());
+        comp_owner.push_back(o);
+        comp_tiles.emplace_back();
+        std::vector<int> st{ s };
+        comp[static_cast<std::size_t>(s)] = id;
+        while (!st.empty())
+        {
+            const int t = st.back();
+            st.pop_back();
+            comp_tiles[static_cast<std::size_t>(id)].push_back(t);
+            int nb[4];
+            const int n = nb4(t, nb);
+            for (int i = 0; i < n; ++i)
+                if (owner[static_cast<std::size_t>(nb[i])] == o && comp[static_cast<std::size_t>(nb[i])] < 0)
+                {
+                    comp[static_cast<std::size_t>(nb[i])] = id;
+                    st.push_back(nb[i]);
+                }
+        }
+    }
+    ss.groups = static_cast<int>(comp_tiles.size());
+
+    std::vector<char> anchored(comp_tiles.size(), 0);
+    for (const auto& be : rep.bodies)
+        if (be.id == body)
+            for (const region& p : be.settlement.regions)
+                if (p.anchor >= 0 && p.anchor < total && comp[static_cast<std::size_t>(p.anchor)] >= 0)
+                    anchored[static_cast<std::size_t>(comp[static_cast<std::size_t>(p.anchor)])] = 1;
+
+    std::map<entity_id, std::vector<int>> by_nation;
+    for (int c = 0; c < static_cast<int>(comp_tiles.size()); ++c) by_nation[comp_owner[static_cast<std::size_t>(c)]].push_back(c);
+    ss.nations = static_cast<int>(by_nation.size());
+
+    std::vector<char> in_terr(comp_tiles.size(), 0);
+    std::vector<int>  wdist(static_cast<std::size_t>(total), 1 << 20);
+    for (const auto& [nid, cs] : by_nation)
+    {
+        // The core: the group holding the capital tile, else the largest.
+        int core = -1;
+        const auto nit = w.nations.find(nid);
+        if (nit != w.nations.end() && nit->second.capital_tile != null_entity)
+        {
+            const auto tit = w.tiles.find(nit->second.capital_tile);
+            if (tit != w.tiles.end() && tit->second.body == body)
+            {
+                const int ci = tit->second.grid_y * gw + tit->second.grid_x;
+                if (ci >= 0 && ci < total && owner[static_cast<std::size_t>(ci)] == nid)
+                    core = comp[static_cast<std::size_t>(ci)];
+            }
+        }
+        if (core < 0)
+        {
+            ++ss.capital_off;
+            for (const int c : cs)
+                if (core < 0 || comp_tiles[static_cast<std::size_t>(c)].size() > comp_tiles[static_cast<std::size_t>(core)].size())
+                    core = c;
+        }
+        // Chained straits: water legs of at most `strait_tiles` from any
+        // joined group's land; a leg re-starts at every group it reaches.
+        std::vector<int> touched, q;
+        auto join = [&](int c) {
+            in_terr[static_cast<std::size_t>(c)] = 1;
+            for (const int t : comp_tiles[static_cast<std::size_t>(c)]) q.push_back(t);
+        };
+        join(core);
+        std::size_t head = 0;
+        while (head < q.size())
+        {
+            const int t = q[head++];
+            const int d = land[static_cast<std::size_t>(t)] ? 0 : wdist[static_cast<std::size_t>(t)];
+            int nb[4];
+            const int n = nb4(t, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (d + 1 > strait_tiles || wdist[static_cast<std::size_t>(u)] <= d + 1) continue;
+                    if (wdist[static_cast<std::size_t>(u)] == (1 << 20)) touched.push_back(u);
+                    wdist[static_cast<std::size_t>(u)] = d + 1;
+                    q.push_back(u);
+                }
+                else if (owner[static_cast<std::size_t>(u)] == nid && !in_terr[static_cast<std::size_t>(comp[static_cast<std::size_t>(u)])])
+                    join(comp[static_cast<std::size_t>(u)]);
+            }
+        }
+        for (const int t : touched) wdist[static_cast<std::size_t>(t)] = 1 << 20;
+        for (const int c : cs)
+            if (c != core && in_terr[static_cast<std::size_t>(c)]) ++ss.strait_joined;
+    }
+
+    // Everything outside a territory: the remote island, or illegal.
+    for (int c = 0; c < static_cast<int>(comp_tiles.size()); ++c)
+    {
+        if (in_terr[static_cast<std::size_t>(c)]) continue;
+        const entity_id o = comp_owner[static_cast<std::size_t>(c)];
+        bool bordered = false, reach_other = false;
+        std::vector<int> touched, q;
+        for (const int t : comp_tiles[static_cast<std::size_t>(c)]) q.push_back(t);
+        std::size_t head = 0;
+        while (head < q.size() && !reach_other)
+        {
+            const int t = q[head++];
+            const int d = land[static_cast<std::size_t>(t)] ? 0 : wdist[static_cast<std::size_t>(t)];
+            int nb[4];
+            const int n = nb4(t, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                const int u = nb[i];
+                if (water[static_cast<std::size_t>(u)])
+                {
+                    if (d + 1 > strait_tiles || wdist[static_cast<std::size_t>(u)] <= d + 1) continue;
+                    if (wdist[static_cast<std::size_t>(u)] == (1 << 20)) touched.push_back(u);
+                    wdist[static_cast<std::size_t>(u)] = d + 1;
+                    q.push_back(u);
+                }
+                else if (owner[static_cast<std::size_t>(u)] != null_entity && owner[static_cast<std::size_t>(u)] != o)
+                {
+                    reach_other = true;
+                    if (d == 0) bordered = true;
+                }
+            }
+        }
+        for (const int t : touched) wdist[static_cast<std::size_t>(t)] = 1 << 20;
+        const int sz = static_cast<int>(comp_tiles[static_cast<std::size_t>(c)].size());
+        if (!reach_other) { ++ss.remote; ss.remote_tiles += sz; continue; }
+        ++ss.illegal;
+        ss.illegal_tiles += sz;
+        ss.illegal_anchored += anchored[static_cast<std::size_t>(c)] ? 1 : 0;
+        if (!bordered)
+        {
+            // The early exit above may stop before a land edge is seen: look directly.
+            for (const int t : comp_tiles[static_cast<std::size_t>(c)])
+            {
+                int nb[4];
+                const int n = nb4(t, nb);
+                for (int i = 0; i < n; ++i)
+                    if (owner[static_cast<std::size_t>(nb[i])] != null_entity && owner[static_cast<std::size_t>(nb[i])] != o)
+                        bordered = true;
+            }
+        }
+        ss.illegal_bordered += bordered ? 1 : 0;
+    }
+    return ss;
+}
+
+static void print_strait(const char* tag, uint32_t seed, const strait_stats& s, int cessions)
+{
+    std::printf("  %s seed %u: %d nations, %d groups | strait-joined %d | remote %d (%d tiles) | "
+                "ILLEGAL %d (%d tiles; %d anchored, %d land-bordered) | capital off-ground %d | cessions %d\n",
+                tag, seed, s.nations, s.groups, s.strait_joined, s.remote, s.remote_tiles, s.illegal,
+                s.illegal_tiles, s.illegal_anchored, s.illegal_bordered, s.capital_off, cessions);
+}
+
+static int count_cessions(const generation_report& rep)
+{
+    int n = 0;
+    for (const auto& be : rep.bodies)
+        if (be.is_homeworld)
+            for (const era_timelapse* t : { &be.prehistory_timelapse, &be.exploration_timelapse,
+                                            &be.industrialisation_timelapse })
+                for (const lapse_event& e : t->events)
+                    if (e.kind == static_cast<uint8_t>(lapse_event_kind::exclave_ceded)) ++n;
+    return n;
+}
+
+// THE RANDOM-PLACEMENT PATH (BL-1310 review). A `no_prehistory` world holds
+// no realm and runs no closing rounds (measured: every nation's polity -1),
+// so it is a no-history world on the SETTLEMENT anchors. This carves the same
+// ground again through `generate_nations` with default params -- no seed
+// tiles, no polities: Pass 1's random placement, Pass 2e as the post-pass
+// after the fold, the size floor at its real minimum, and the repair after it
+// -- and audits the strait rule on that too.
+static strait_stats audit_no_history(world sw, uint32_t seed, int& nations_out)
+{
+    nations_out = 0;
+    const entity_id body = sw.home_body;
+    const auto      bit  = sw.bodies.find(body);
+    if (bit == sw.bodies.end()) return {};
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height, total = gw * gh;
+    if (total <= 0) return {};
+    std::vector<entity_id> tile_ids(static_cast<std::size_t>(total), null_entity);
+    for (const auto& [tid, tc] : sw.tiles)
+    {
+        if (tc.body != body) continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx >= 0 && idx < total) tile_ids[static_cast<std::size_t>(idx)] = tid;
+    }
+    sw.nations.clear();
+    sw.tile_to_nation.clear();
+    const nation_params np{}; // no seed tiles, no polities: the no-history path
+    nations_out = static_cast<int>(generate_nations(sw, body, tile_ids, gw, gh, np, seed ^ 0x5EED1310u).size());
+    const generation_report none{};
+    return audit_strait_rule(sw, none);
+}
+
+static bool g_dump_capitals = false; ///< `--dump-capitals`: print CAP lines (library mode)
+
+static std::vector<uint32_t> parse_seed_list(const char* s)
+{
+    std::vector<uint32_t> out;
+    const char* p = s;
+    while (*p)
+    {
+        char* end = nullptr;
+        const unsigned long v = std::strtoul(p, &end, 10);
+        if (end == p) break;
+        out.push_back(static_cast<uint32_t>(v));
+        p = (*end == ',') ? end + 1 : end;
+    }
+    return out;
+}
+
+// LIBRARY MODE (BL-1310): `world_audit --seeds a,b,c [--pairs t:m,...]` builds
+// each SHIPPED world (history on, the app's data layer) and audits the strait
+// rule on it — natural counts, then each target pair. par_seeds.sh shards it.
+static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vector<std::pair<int, int>>& pairs)
+{
+    lua_state        lua;
+    world_gen_config cfg{};
+    works_registry   works;
+    lua.load("scripts/world_gen.lua");
+    cfg.load_from_lua(lua);
+    lua.load("scripts/works.lua");
+    works.load_from_lua(lua);
+    recipe_registry reg; // the finish's settle runs on it (the size reading's majors)
+    lua.load("scripts/recipes.lua");
+    lua.load("scripts/economy.lua");
+    reg.load_from_lua(lua);
+
+    int checks = 0, fails = 0, cessions_total = 0, splits_seen = 0;
+    std::printf("world_audit strait rule (BL-1310), %zu seed(s), %zu target pair(s) beside natural\n",
+                seeds.size(), pairs.size());
+    for (const uint32_t seed : seeds)
+    {
+        // (target total, target majors, launch): 0 the shipped close at 1960;
+        // 1 an EMPIRES-ROUND launch (Exploration and Industrialisation off);
+        // 2 an EXPLORATION-ROUND launch (Industrialisation off). Every launch
+        // obeys the strait rule (Ben, 2026-10-17); the early ones by the
+        // tail's post-pass, its cessions recorded in the last span's record.
+        struct run_spec { int tt, mt, launch; };
+        std::vector<run_spec> runs{ { 0, 0, 0 } };
+        for (const auto& [t, m] : pairs) runs.push_back({ t, m, 0 });
+        // 20:4, the wizard default, always: the nation size reading runs there.
+        bool have_default = false;
+        for (const run_spec& r : runs) have_default = have_default || (r.tt == 20 && r.mt == 4 && r.launch == 0);
+        if (!have_default) runs.push_back({ 20, 4, 0 });
+        runs.push_back({ 0, 0, 1 });
+        runs.push_back({ 0, 0, 2 });
+        for (const auto& [tt, mt, launch] : runs)
+        {
+            world_params p = arc_params(world_arc::shipped);
+            p.seed                = seed;
+            p.nation_total_target = tt;
+            p.major_target        = mt;
+            if (launch == 1) p.exploration_sim_enabled = false;
+            if (launch >= 1) p.industrialisation_span_enabled = false;
+            generation_report     rep{};
+            era_minus_one_fixture fx{};
+            world             sw = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
+            const strait_stats s  = audit_strait_rule(sw, rep);
+            const int          ce = count_cessions(rep);
+            const history_sim_state& hs = fx.industrialisation_state;
+            cessions_total += ce;
+            // CAPITALS, by realm, for comparing two builds (`CAP` lines):
+            // the polity each nation folds from and its capital's raster tile.
+            if (g_dump_capitals)
+                for (const auto& be : rep.bodies)
+                    if (be.is_homeworld)
+                        for (std::size_t i = 0; i < be.nation_ids.size() && i < be.nation_polity.size(); ++i)
+                        {
+                            if (be.nation_polity[i] < 0) continue;
+                            const auto nit = sw.nations.find(be.nation_ids[i]);
+                            if (nit == sw.nations.end()) continue;
+                            const auto tit = sw.tiles.find(nit->second.capital_tile);
+                            const int  ct  = tit == sw.tiles.end() ? -1
+                                           : tit->second.grid_y * sw.bodies.at(be.id).grid_width + tit->second.grid_x;
+                            std::printf("CAP %d %d %u %d %d\n", launch, tt, seed, be.nation_polity[i], ct);
+                        }
+            char tag[32];
+            if (launch == 1)      std::snprintf(tag, sizeof(tag), "empires");
+            else if (launch == 2) std::snprintf(tag, sizeof(tag), "explorat");
+            else std::snprintf(tag, sizeof(tag), tt > 0 ? "t%d/%d" : "natural", tt, mt);
+            // The rule holds, AND the cessions are the history's own events
+            // (one per closing-round step), AND the tail found nothing left.
+            // § Territorial fragmentation, measured: "the cessions counted as
+            // recorded events, so the sim still visibly produces the
+            // fragmentation the rule resolves" -- at least one on every world.
+            // An early launch ran no closing round: its cessions are the
+            // tail's, recorded as events of the last span (at least one).
+            const bool events_ok = launch == 0 ? (ce == hs.closing_cessions && ce > 0) : ce > 0;
+            // No capital off its own land (Pass 5 seats inside the
+            // territory), and the frozen cores intact: no opening cession moved
+            // a tile of a realm's core group (the review's row -- a core that
+            // drifted onto received ground ceded the mainland under it).
+            // THE SPLIT, CHECKED (BL-1310 round 4 review): every ceded part
+            // joined its receiver, and no province spanned two parts -- in the
+            // closing rounds (the plan's counts) and in the tail (an early
+            // launch's cessions, through the fixture). Both are 0 by
+            // construction; these rows make that a check, not a claim.
+            const int parts_detached  = hs.closing_parts_detached + fx.tail_parts_detached;
+            const int provinces_split = hs.closing_provinces_split + fx.tail_provinces_split;
+            splits_seen += hs.closing_cessions_split + fx.tail_cessions_split;
+            const bool ok = s.illegal == 0 && events_ok && rep.handoff_violation.empty()
+                         && s.capital_off == 0 && hs.closing_core_tiles_lost == 0
+                         && parts_detached == 0 && provinces_split == 0;
+            std::printf("        split: parts not joined %d, provinces split %d, split cessions %d (rounds) + %d (tail)\n",
+                        parts_detached, provinces_split, hs.closing_cessions_split, fx.tail_cessions_split);
+            std::printf("        under the floor, a larger piece kept as the core: %d (rounds) + %d (tail)\n",
+                        hs.closing_cores_floor_moved, fx.tail_cores_floor_moved);
+            std::printf("        core tiles lost %d\n", hs.closing_core_tiles_lost);
+            ++checks;
+            fails += ok ? 0 : 1;
+            std::printf("%s", ok ? "PASS" : "FAIL");
+            print_strait(tag, seed, s, ce);
+            std::printf("        plan: cessions %d (islet %d, to unheld %d, late %d), split secessions %d, "
+                        "reps off core %d, overrides %zu, nations %d%s%s\n",
+                        hs.closing_cessions, hs.closing_cessions_islet, hs.closing_cessions_to_unheld,
+                        hs.closing_cessions_late, hs.closing_secessions_split, hs.closing_reps_off_core,
+                        hs.closing_cell_overrides.size(), hs.closing_predicted,
+                        rep.handoff_violation.empty() ? "" : " | VIOLATION: ", rep.handoff_violation.c_str());
+            std::printf("        split cessions %d, city states %d (judged at the close)\n", hs.closing_cessions_split,
+                        hs.closing_city_states);
+            // THE RULE MUST NOT STARVE THE MINORS (Ben, 2026-10-18; sec
+            // Territorial fragmentation, measured). At the wizard default
+            // (20:4), after the finish (majors are nations home to a
+            // non-background corporation, nation_sizes.cpp's reading): the
+            // minors' median tile count must reach 80% of the SAME seed's
+            // pre-BL-1310 median (the table below), and the majors may hold at
+            // most 80% of the land. A READING, never a clamp: nothing is tuned
+            // to it.
+            if (launch == 0 && tt == 20 && mt == 4)
+            {
+                recipe_registry seed_reg = reg;
+                (void)finish_campaign_world(sw, rep, seed_reg, p, cfg, nullptr);
+                entity_id home = null_entity;
+                for (const auto& be : rep.bodies)
+                    if (be.is_homeworld) { home = be.id; break; }
+                std::set<entity_id> majors;
+                for (const auto& kv : sw.corporations)
+                    if (!kv.second.is_background && kv.second.home_nation != null_entity) majors.insert(kv.second.home_nation);
+                std::vector<int> minor_sizes;
+                long total_tiles = 0, major_tiles = 0;
+                int  under_floor = 0;
+                for (const auto& kv : sw.nations)
+                {
+                    const nation_component& n = kv.second;
+                    if (n.tiles.empty()) continue;
+                    const auto t = sw.tiles.find(n.tiles.front());
+                    if (t == sw.tiles.end() || t->second.body != home) continue;
+                    const int sz = static_cast<int>(n.tiles.size());
+                    total_tiles += sz;
+                    if (majors.count(kv.first)) major_tiles += sz;
+                    else minor_sizes.push_back(sz);
+                    if (sz < 80) ++under_floor;
+                }
+                std::sort(minor_sizes.begin(), minor_sizes.end(), [](int a, int b) { return a > b; });
+                const int    median = minor_sizes.empty() ? 0 : minor_sizes[minor_sizes.size() / 2];
+                const double share  = total_tiles ? 100.0 * static_cast<double>(major_tiles) / static_cast<double>(total_tiles) : 0.0;
+                // THE BAR IS EACH SEED'S OWN (Ben, 2026-10-18): 80% of that
+                // seed's PRE-BL-1310 minors' median. The baseline is
+                // tools/verify/nation_sizes at 20:4 on aa3c6304 (the tree
+                // before BL-1310), one row per library seed. A seed with no row
+                // has no baseline and FAILS loudly -- it never passes.
+                static const std::map<uint32_t, int> k_pre_bl1310_median = {
+                    { 0, 390 },  { 9, 524 },  { 10, 547 }, { 11, 605 }, { 12, 455 }, { 13, 644 },
+                    { 25, 608 }, { 28, 227 }, { 31, 566 }, { 32, 460 }, { 37, 456 }, { 38, 455 },
+                    { 40, 471 }, { 41, 631 }, { 43, 236 }, { 46, 558 },
+                };
+                // ACCEPTED EXCEPTIONS (Ben, 2026-10-18): a seed Ben accepted
+                // below its 80% bar, pinned at the reading he accepted, so a
+                // further drop still fails. Seed 43: 145 against a bar of
+                // 188.8 (pre-BL-1310 236) -- its many small realms seat on
+                // their smaller piece, and the floor absorbs them (trace in
+                // HANDOFF_SPRINT_56.md). The majors' 80% ceiling still applies.
+                // Seeds 28 (181 against 181.6) and 13 (496 against 515.2),
+                // accepted 2026-10-19: BL-1386's treasury rules move the
+                // history's armies and conquests, and with them these two
+                // worlds' minors.
+                static const std::map<uint32_t, int> k_accepted_median = { { 13, 496 }, { 28, 181 }, { 43, 145 } };
+                const auto   acc_it   = k_accepted_median.find(seed);
+                const bool   accepted = acc_it != k_accepted_median.end();
+                const auto   base_it  = k_pre_bl1310_median.find(seed);
+                const bool   has_base = base_it != k_pre_bl1310_median.end();
+                const double bar      = accepted ? static_cast<double>(acc_it->second)
+                                      : has_base ? 0.8 * static_cast<double>(base_it->second) : 0.0;
+                const bool   size_ok  = has_base && static_cast<double>(median) >= bar && share <= 80.0;
+                ++checks;
+                fails += size_ok ? 0 : 1;
+                if (!has_base)
+                    std::printf("FAIL  SIZE seed %u 20:4: NO PRE-BL-1310 BASELINE for this seed (median %d, majors hold %.1f%%)\n",
+                                seed, median, share);
+                else
+                    std::printf("%s  SIZE seed %u 20:4: minors %zu median %d (bar %.1f = %s, pre-BL-1310 %d) | majors hold %.1f%% (<= 80) | under floor(80) %d\n",
+                                size_ok ? (accepted ? "ACCEPTED" : "PASS") : "FAIL", seed, minor_sizes.size(), median, bar,
+                                accepted ? "the reading Ben accepted" : "80% of", base_it->second, share, under_floor);
+            }
+            std::fflush(stdout);
+        }
+    }
+    // The split happens at all: at least one exclave split among two or more
+    // neighbours over the worlds this run built (each shard: one library seed).
+    ++checks;
+    fails += splits_seen > 0 ? 0 : 1;
+    std::printf("%s  splits seen: %d exclave(s) split among 2+ neighbours\n", splits_seen > 0 ? "PASS" : "FAIL", splits_seen);
+    std::printf("\nSUMMARY strait rule: %d check(s), %d failure(s), %d cession event(s) -- %s\n", checks, fails,
+                cessions_total, fails == 0 ? "PASS" : "FAIL");
+    return fails == 0 ? 0 : 1;
+}
+
+int main(int argc, char** argv)
+{
+    {
+        std::vector<uint32_t>            seeds;
+        std::vector<std::pair<int, int>> pairs;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc) seeds = parse_seed_list(argv[++i]);
+            else if (std::strcmp(argv[i], "--dump-capitals") == 0) g_dump_capitals = true;
+            else if (std::strcmp(argv[i], "--pairs") == 0 && i + 1 < argc)
+            {
+                const std::vector<uint32_t> v = parse_seed_list(argv[++i]); // "t:m" read below
+                (void)v;
+                const char* s = argv[i];
+                while (*s)
+                {
+                    char* e1 = nullptr;
+                    const long t = std::strtol(s, &e1, 10);
+                    if (e1 == s || *e1 != ':') break;
+                    char* e2 = nullptr;
+                    const long m = std::strtol(e1 + 1, &e2, 10);
+                    pairs.emplace_back(static_cast<int>(t), static_cast<int>(m));
+                    s = (*e2 == ',') ? e2 + 1 : e2;
+                    if (e2 == e1 + 1) break;
+                }
+            }
+        }
+        if (!seeds.empty()) return run_library_mode(seeds, pairs);
+    }
+
     generation_report report;
     world w = make_hard_coded_world(no_prehistory(), &report);
 
@@ -1096,23 +1606,53 @@ int main()
     // orphan-island cleanup (authored). The emergent share is the headline — it is
     // the number BL-218's argument for the expensive path predicted. ---
     frag_stats frag_total;
+    int        strait_illegal = 0;
     {
         std::printf("Territorial fragmentation (BL-284) — exclaves by producer:\n");
         constexpr uint32_t sweep_seeds[] = { 0u, 1u, 2u, 3u, 4u, 5u };
         for (uint32_t s : sweep_seeds)
         {
-            frag_stats fs;
-            if (s == 0)
+            frag_stats   fs;
+            strait_stats st, nh;
+            int          ce = 0, nh_nations = 0;
+            bool         closing_ran = false;
+            std::string  violation;
             {
-                fs = measure_fragmentation(w, report);
-            }
-            else
-            {
-                world_params      wp; wp.seed = s;
-                generation_report rp;
-                const world       sw = make_hard_coded_world(no_prehistory(wp), &rp);
+                // Built with a fixture so the closing rounds' own cession
+                // count is readable: these worlds record no playback, so the
+                // events `count_cessions` reads are not kept here.
+                world_params          wp; wp.seed = s;
+                generation_report     rp;
+                era_minus_one_fixture fx{};
+                const world sw = make_hard_coded_world(no_prehistory(wp), &rp, world_gen_config{}, nullptr, nullptr, &fx);
                 fs = measure_fragmentation(sw, rp);
+                st = audit_strait_rule(sw, rp);
+                ce = fx.industrialisation_state.closing_cessions;
+                violation = rp.handoff_violation;
+                int realms = 0;
+                for (const auto& be : rp.bodies)
+                    if (be.is_homeworld)
+                        for (const int32_t p : be.nation_polity) realms += p >= 0 ? 1 : 0;
+                closing_ran = fx.industrialisation_state.closing_predicted >= 0;
+                std::printf("    no-prehistory seed %u: %d nation(s) from a realm, closing rounds %s\n", s, realms,
+                            closing_ran ? "ran" : "did not run");
+                nh = audit_no_history(sw, s, nh_nations);
             }
+            // THE STRAIT RULE WHERE NO HISTORY RAN (settlement anchors, no
+            // realm, no closing rounds): no illegal exclave, no capital off
+            // its own nation's land (Pass 5 seats a nation on a seed inside its
+            // territory, so the count is a check: 0), no handoff violation;
+            // and IF closing rounds ever run here, they must have ceded.
+            strait_illegal += st.illegal + st.capital_off + (violation.empty() ? 0 : 1)
+                            + ((closing_ran && ce == 0) ? 1 : 0);
+            print_strait("no-prehistory", s, st, ce);
+            if (!violation.empty()) std::printf("    VIOLATION: %s\n", violation.c_str());
+            // AND THE RANDOM-PLACEMENT PATH over the same ground: Pass 2e as
+            // the post-pass, then the floor at its real minimum, then the
+            // repair after it.
+            strait_illegal += nh.illegal + nh.capital_off;
+            print_strait("no-history", s, nh, 0);
+            std::printf("    no-history: %d nations from random seeds\n", nh_nations);
             std::printf("  seed %u: %d nations, %d with an exclave | emergent %d (%d tiles), "
                         "Pass 2b %d (%d tiles) | %d landmasses, %d seedless\n",
                         s, fs.nations, fs.nations_with_exclave,
@@ -1137,13 +1677,40 @@ int main()
                     emergent_share, frag_total.tiles_emergent,
                     frag_total.tiles_emergent + frag_total.tiles_pass2b);
     }
-    // Wide bars, deliberately (BL-284): the assertion is that the settlement sim
-    // produces fragmentation AT ALL, on at least half the swept seeds. Tighten once
-    // the real distribution has been watched for a while.
-    const bool frag_ok = frag_total.exclaves_emergent >= 6;
-    std::printf("  BL-284 R1 the settlement sim produces emergent exclaves "
-                "(>= 6 across the 6-seed sweep, saw %d): %s\n",
-                frag_total.exclaves_emergent, frag_ok ? "PASS" : "FAIL");
+    // BL-1310 REPLACES BL-284's R1 (NATION_GENERATION.md § Territorial
+    // fragmentation, measured; § Pass 2e). The old bar asserted the sim
+    // produces exclaves at all; the strait rule now cedes every one, so the
+    // finished world is asserted to hold NO exclave outside the rule save the
+    // remote island: on six no-history worlds twice over (settlement anchors,
+    // random placement), and on one world with its history, where the
+    // closing rounds must also have ceded (the sim still produces the
+    // fragmentation the rule resolves) with the frozen cores intact. Library
+    // mode (`--seeds`) asserts the same on the app's data layer, natural and
+    // targeted, plus events == steps.
+    // ONE WORLD WITH ITS HISTORY (the review's gap): `no_prehistory` worlds
+    // hold no realm and run no closing rounds, so the fragmentation the
+    // history produces is read here, on the shipped arc's seed 0: the closing
+    // rounds ran, they ceded (recorded as steps), and the rule holds.
+    {
+        world_params          wp; wp.seed = 0;
+        generation_report     rp;
+        era_minus_one_fixture fx{};
+        const world sw = make_hard_coded_world(wp, &rp, world_gen_config{}, nullptr, nullptr, &fx);
+        const strait_stats st = audit_strait_rule(sw, rp);
+        const history_sim_state& hs = fx.industrialisation_state;
+        const bool ok = hs.closing_predicted >= 0 && hs.closing_cessions > 0 && st.illegal == 0
+                     && st.capital_off == 0 && rp.handoff_violation.empty() && hs.closing_core_tiles_lost == 0;
+        print_strait("history", 0, st, hs.closing_cessions);
+        std::printf("    history seed 0: closing rounds %s, cessions %d, core tiles lost %d%s%s : %s\n",
+                    hs.closing_predicted >= 0 ? "ran" : "did NOT run", hs.closing_cessions,
+                    hs.closing_core_tiles_lost, rp.handoff_violation.empty() ? "" : " | VIOLATION: ",
+                    rp.handoff_violation.c_str(), ok ? "PASS" : "FAIL");
+        strait_illegal += ok ? 0 : 1;
+    }
+    const bool frag_ok = strait_illegal == 0;
+    std::printf("  BL-1310 R1 strait rule across the 6-seed sweep, history and no-history worlds "
+                "(saw %d): %s\n",
+                strait_illegal, frag_ok ? "PASS" : "FAIL");
 
     // --- BL-612 (urban ground stamped): every centre carries an urban
     // footprint; urban ground exists only where centres are. The stamp is the

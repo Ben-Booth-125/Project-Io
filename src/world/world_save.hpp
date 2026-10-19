@@ -453,8 +453,26 @@ inline constexpr uint32_t world_save_magic =
 /// pair of 4-cardinal neighbours that both carried a road, an edge at the LOWER of their
 /// two tiers (`migrate_legacy_roads`). On load the mirror invariant is checked over the
 /// whole field and the stream is refused whole if two halves of a crossing disagree.
-/// Every version outside v47-v53 is refused whole.
-inline constexpr uint32_t world_save_version = 53;
+///
+/// Bumped to 54 by BL-1337 (return net crosses zero; FINANCE.md § The quarterly return):
+/// `quarterly_return::net` is a double, the exact balance delta. The record keeps its f32
+/// slot (the double rounded to float), and a TRAILING SECTION after the returns' taxes
+/// carries the exact figure for every corporation whose history holds any net the f32
+/// slot does not carry exactly, ascending id, as (id, u32 n = its return count, n x f64 in
+/// filed order).
+///
+/// THE TWO WERE WRITTEN ON SEPARATE BRANCHES and are stacked here in the order their own
+/// notes asked for (sprint 56's integrator line: "v53 is claimed by BL-1340 on another
+/// branch: the integrator stacks this section after that one and moves
+/// `k_world_save_version_pre_net` to 53"). So v53 is the tile record's shape and v54 adds
+/// the exact-net section on top of it: v53 is a STRICT PREFIX of v54 and is read as a
+/// world whose nets are their f32 slots. Every version outside v47-v54 is refused whole.
+inline constexpr uint32_t world_save_version = 54;
+
+/// BL-1337: v53, a strict prefix of v54 (the exact-net section is v54's only addition).
+/// Moved from 52 to 53 on integration, because v53 carries BL-1340's tile record and this
+/// section stacks after it.
+inline constexpr uint32_t k_world_save_version_pre_net = 53;
 
 /// BL-1340: v52 — the last stream with one road tier a TILE. Not a prefix of v53 (the
 /// tile record itself changed shape); read through the tile record's version branch and
@@ -500,6 +518,11 @@ void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out);
 /// writes for @p w (the nation rows and the returns' taxes) — what a harness
 /// cuts off a v52 stream to make the v51 prefix.
 std::size_t world_save_tax_section_bytes(const world& w);
+
+/// BL-1337: the byte length of the v54 exact-net section `write_world_snapshot`
+/// writes for @p w — what a harness cuts off a v54 stream to make the v52
+/// prefix. Every older prefix is cut through it too, since it is the last.
+std::size_t world_save_net_section_bytes(const world& w);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

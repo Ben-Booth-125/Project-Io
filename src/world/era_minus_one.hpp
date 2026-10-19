@@ -428,6 +428,17 @@ struct era_minus_one_fixture
     /// is never handed a fixture with it set) leaves the floor as derived.
     int harness_floor_tiles = 0;
 
+    /// BL-1310 round 4 review — what the tail's strait-rule pass did, for the
+    /// audit (written by run_tail from `nation_fold_record`): cessions, those
+    /// split among 2+ receivers, parts that did not join their receiver, and
+    /// provinces split across parts on a settled world (the last two 0 by
+    /// construction).
+    int tail_cessions        = 0;
+    int tail_cessions_split  = 0;
+    int tail_parts_detached  = 0;
+    int tail_provinces_split = 0;
+    int tail_cores_floor_moved = 0; ///< BL-1310: tail nations under the floor that kept a larger piece
+
     /// The 1960 close exactly as generation folded it
     /// (`make_industrialisation_output`), default-constructed when the span did
     /// not run.

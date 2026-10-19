@@ -1176,6 +1176,24 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         r["ms"]      = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         return r;
     });
+    // BL-1311: the paint in miniature (ground_layer::bench_paint) — the active
+    // body's whole master against a snapshot with every `drop_every`-th
+    // installation stripped, then the true one: a first bake and a partial
+    // re-bake, timed, with GROUND_PAINT lines per pass. A reading, no
+    // assertion. Returns { ok, first_ms, rebake_ms, chunks, moved, dropped }.
+    v.set_function("ground_paint_bench", [this](sol::optional<int> drop_every, sol::optional<double> timeout_s) {
+        const ground_layer::paint_bench r =
+            m_ground.bench_paint(m_world, m_ui.active_body, drop_every.value_or(3),
+                                 timeout_s.value_or(1800.0) * 1000.0);
+        sol::table t = m_lua.state().create_table();
+        t["ok"]        = r.ok;
+        t["first_ms"]  = r.first_ms;
+        t["rebake_ms"] = r.rebake_ms;
+        t["chunks"]    = r.chunks;
+        t["moved"]     = r.moved;
+        t["dropped"]   = r.dropped;
+        return t;
+    });
     // A part-baked frame: at most n master chunk bakes per tick (-1 =
     // unlimited, the --verify default) — a first visit caught mid-bake.
     v.set_function("ground_fill_limit", [this](int n) { m_ground.verify_fill_limit = n; });
@@ -1974,8 +1992,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // one that reads it, which is what turns a walk into an assertion.
     // BL-1279: the third value is whether the wizard is on Quick Start's
     // setup round alone (STARTUP.md § Rounds, Ben 2026-10-13).
-    // THE WIZARD FOOTER'S PRESS POINTS (Ben, 2026-10-15: the footer follows
-    // each round's content, so no fixed coordinate is right on every round).
+    // THE WIZARD FOOTER'S PRESS POINTS (the footer is anchored at the window's
+    // floor, Ben 2026-10-16, but content past the floor pushes it, so a script
+    // still reads the press point rather than fixing a coordinate).
     // Returns rx, ry, bx, by, nx, ny -- Reroll's centre (-1, -1 where the
     // round has none), Back's, Next's (or Begin's) -- as last drawn.
     v.set_function("wizard_buttons", [this]() {
@@ -3407,6 +3426,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1319: the market whose catchment holds grid tile (col, row) on the active
+    // body, or 0 — so the UI fixture can stock the shelf its own muster base draws
+    // (`stock_market`), not every shelf on the body. The catchment is what the
+    // Market lens already paints; no tile data beyond it is returned.
+    v.set_function("market_at", [this](int col, int row) -> unsigned {
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+                return static_cast<unsigned>(market_for_tile(m_world, tid));
+        return 0u;
+    });
+
     // BL-1315: a market's display name, as every surface shows it
     // (`ui::market_city_name`) — so a script can count distinct names per body.
     v.set_function("market_name", [this](entity_id mid) -> std::string {
@@ -4592,7 +4622,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 }
             }
         }
-        // BL-1386 - ONE WEIGHT FOR A TILE THAT CARRIES TWO TIERS. A road is an EDGE and
+        // BL-1390 - ONE WEIGHT FOR A TILE THAT CARRIES TWO TIERS. A road is an EDGE and
         // each edge has its own tier, but both renderers weight the whole TILE by
         // `max_road_tier`, so a tile with a Track one way and a Highway the other draws
         // both halves as Highway. This counts the tiles where that is visible: two or
@@ -4620,7 +4650,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             {
                 ++mixed_tier_tiles;
                 mixed_tier_edges += sides_with_road;
-                // ONE EXAMPLE, TO THE LOG, NEVER TO THE SCRIPT (BL-1386). A capture of the
+                // ONE EXAMPLE, TO THE LOG, NEVER TO THE SCRIPT (BL-1390). A capture of the
                 // taper has to be aimed at a tile that actually carries two tiers, and no
                 // verify call answers "which tile is that" - nor should one, without a
                 // grant. The LOG is the author's to read; the Lua table above still carries
@@ -4632,7 +4662,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                             sides_with_road);
             }
         }
-        // BL-1386: and what the BAKE did about it - curve pieces actually carrying two
+        // BL-1390: and what the BAKE did about it - curve pieces actually carrying two
         // tiers, one a half. Before the fix this was 0 by construction, because a piece
         // took one tier for the whole tile.
         int two_tier_pieces = 0, road_pieces = 0;
@@ -4644,9 +4674,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (pc.tier_b != pc.tier)
                 ++two_tier_pieces;
         }
-        out["two_tier_pieces"] = two_tier_pieces; ///< BL-1386: baked runs that taper at the apex
+        out["two_tier_pieces"] = two_tier_pieces; ///< BL-1390: baked runs that taper at the apex
         out["road_pieces"]     = road_pieces;
-        out["mixed_tier_tiles"] = mixed_tier_tiles; ///< BL-1386: tiles carrying two different tiers
+        out["mixed_tier_tiles"] = mixed_tier_tiles; ///< BL-1390: tiles carrying two different tiers
         out["mixed_tier_edges"] = mixed_tier_edges; ///< ...and the crossings on them
         out["drawn_without_edge"] = drawn_without_edge; ///< BL-1382: a run drawn across a roadless boundary
         out["drawn_rail_join"]    = drawn_rail_join;    ///< ...excused because one end is rail (a tile field)

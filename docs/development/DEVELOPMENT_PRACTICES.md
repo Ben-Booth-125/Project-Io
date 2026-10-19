@@ -350,7 +350,8 @@ third toolchain so it cannot silently inherit another's numbers. Both sets pass 
   both. 300 ticks of a feedback-coupled economy amplifies last-bit float differences; bit-identical
   FP across MSVC and GCC is explicitly **not** a goal this prototype adopts.
 - **Optimisation level is not the variable.** MSVC `/O2` reproduces MSVC Debug value for value.
-  The toolchain is.
+  The toolchain is. (The ground bake leans on this: it builds at `/O2` in a Debug tree too —
+  `io_ground_bake`, BL-1311 — and its captures are byte-identical either way.)
 - **Re-blessing rule.** Run the harness on the platform whose set you are changing and change
   **only that set**. Never copy one platform's observed values into the other's block.
 

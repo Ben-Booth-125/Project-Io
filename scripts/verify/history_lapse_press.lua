@@ -30,8 +30,8 @@
 -- straight to round 4 with verify.generation_stage(3) bypasses the very thing it
 -- is meant to check -- it would pass while asserting nothing, which is the
 -- failure mode this repo keeps paying for. So round 3's footer geometry was
--- READ OFF A CAPTURE rather than guessed (the footer follows each round's
--- preference block, and round 3 has one where round 4 has none), and the walk is
+-- READ OFF A CAPTURE rather than guessed (the footer is anchored at the window's
+-- floor since Ben, 2026-10-16, and read off verify.wizard_buttons), and the walk is
 -- a single real press from a known position.
 --
 -- Determinism: measured in frames, never in sleeps.

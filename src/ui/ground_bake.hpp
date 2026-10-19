@@ -413,6 +413,54 @@ int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_param
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out);
 
+/// BL-1311 (the process under 6 GB; RENDERING.md § Resident set): a chunk of
+/// ground held in RAM. A fully opaque chunk (every alpha 255) is held
+/// losslessly as RGB, three bytes a pixel, its alpha implied; a chunk with any
+/// transparency keeps RGBA. Unpacked, either gives back the very words packed.
+struct packed_px
+{
+    std::vector<std::uint8_t> b;   ///< RGB (3 a pixel) or RGBA (4 a pixel); empty = nothing held.
+    std::int32_t n   = 0;          ///< Pixels.
+    bool         rgb = false;
+    bool        empty() const { return b.empty(); }
+    std::size_t bytes() const { return b.size(); }
+};
+/// Hold @p n pixels: RGB when every one is opaque, else RGBA.
+void pack_px(const std::uint32_t* px, int n, packed_px& out);
+/// An RGBA chunk of @p n transparent pixels (a mip chunk its pieces fill).
+void alloc_transparent(packed_px& p, int n);
+/// Every pixel back as RGBA words.
+void unpack_px(const packed_px& p, std::uint32_t* out);
+/// Rect [x0, x0+rw) x [y0, y0+rh) of a chunk @p w pixels wide, as RGBA words.
+void read_rect(const packed_px& p, int w, int x0, int y0, int rw, int rh, std::uint32_t* out);
+/// Write @p src (rw x rh RGBA words) at (x0, y0) of a chunk @p w wide. An RGB
+/// chunk widens to RGBA first when any written pixel is not opaque.
+void write_rect(packed_px& p, int w, int x0, int y0, int rw, int rh, const std::uint32_t* src);
+/// An RGBA chunk whose every pixel is opaque becomes RGB. True when it did.
+bool narrow_if_opaque(packed_px& p);
+
+/// BL-1311 (ground paint perf): where a bake's time goes, per pass — the
+/// calling thread's running totals in ms (a reading only: it never touches a
+/// pixel, and each thread has its own, so the bake stays pure). The pool's
+/// workers fold theirs into ground_layer::stats after every job.
+enum bake_pass : int
+{
+    bp_window = 0, ///< bake_window: base ground, borders, relief, water — the per-pixel field.
+    bp_ink,        ///< edge_ink (cover and shore lines).
+    bp_trees,      ///< stamp_trees.
+    bp_features,   ///< landforms and rivers.
+    bp_install,    ///< installations, with the roads and lanes inside them.
+    bp_shadows,    ///< cast shadows.
+    bp_grade,      ///< the near-future grade.
+    bp_unsharp,    ///< the unsharp mask.
+    bp_count
+};
+struct pass_clock
+{
+    double ms[bp_count] = {};
+};
+pass_clock& thread_pass_clock();
+
 /// THE ONE CAMERA ANGLE (RENDERING.md § One angle, Ben 2026-10-09): the
 /// planetary ground is viewed at 22.5 degrees at every rung and under every
 /// lens — the canvas squashes y by this, and every bake is oblique by it.

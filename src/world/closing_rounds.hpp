@@ -34,6 +34,7 @@
 #include "world/settlement.hpp"
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 /// What the closing rounds need from outside the sim. Held by the caller for
@@ -63,6 +64,11 @@ enum class closing_step_kind : uint8_t
     floor_absorb  = 0, ///< Below the minimum territory: absorbed by a neighbour.
     target_absorb = 1, ///< Too many nations for the total: absorbed by a neighbour.
     target_secede = 2, ///< Too few nations for the total: a province secedes.
+    /// BL-1310 (NATION_GENERATION.md § Pass 2e): ground cut off from its realm's
+    /// core -- no land path and no strait of at most `strait_tiles` water tiles
+    /// -- ceded to the nation around it. Runs FIRST, before the floor. Moves
+    /// ground only: never a nation, never the count.
+    exclave_cede  = 3,
 };
 
 /// One closing-round correction, in the order it is applied.
@@ -84,6 +90,9 @@ struct closing_step
     /// it (ground no realm held cannot absorb): `from_polity` -1 (the ground),
     /// `into_polity` the realm that was too small. The cause is the realm's size.
     bool annex = false;
+    /// BL-1310: a cession taken after the floor and the total (the repair a
+    /// secession with no one-territory split leaves), dated with the total.
+    bool late = false;
 };
 
 struct closing_plan
@@ -97,6 +106,45 @@ struct closing_plan
     int target_secessions   = 0;
     int subfloor_secessions = 0; ///< Of those, splits taken below the floor (no floor-safe split existed): the total outranks the floor.
     bool short_of_target    = false; ///< A target was set and no step of any kind could reach it -- no absorber, or no realm holding two cells (a defect: recorded as a handoff violation).
+    /// BL-1310 (§ Pass 2e) -- the cessions. `cessions` counts every
+    /// `exclave_cede` step; of those, `cessions_islet` moved ground no region
+    /// move could carry (an islet of another cell, a relabel only),
+    /// `cessions_to_unheld` went to ground no realm held, `cessions_late` are
+    /// the repair after a secession that found no one-territory split.
+    int cessions           = 0;
+    int cessions_islet     = 0;
+    int cessions_to_unheld = 0;
+    int cessions_late      = 0;
+    int cessions_split     = 0; ///< BL-1310 round 4: exclaves split among two or more bordering keys (each part is one step)
+    int city_states        = 0; ///< BL-1310 round 4: realms exempt as city states, judged before any cession
+    int parts_detached     = 0; ///< BL-1310 round 4 review: ceded parts not touching their receiver (0 by construction)
+    int provinces_split    = 0; ///< BL-1310 round 4 review: moved provinces spanning two parts (0 by construction)
+    int cores_floor_moved  = 0; ///< BL-1310 (Ben 2026-10-18): realms under the floor whose core is a larger piece than the seat's group
+    int secessions_split   = 0; ///< secessions where no candidate kept both sides one territory
+    /// Realms whose representative (the lowest region they hold, which the
+    /// tail reads as the nation's capital tile) is NOT in the territory of
+    /// their capital's group after the rounds -- the two readings of "capital"
+    /// part. Diagnostic: 0 is the expected value.
+    int reps_off_core      = 0;
+    /// THE CARVE AS THE CESSIONS LEFT IT: per pair a LAND tile and the region
+    /// whose cell now holds it, for every land tile whose cell differs from
+    /// the oracle's. The tail relabels its carve with these before the fold
+    /// (`nation_params::cell_overrides`, by the region's anchor tile).
+    std::vector<std::pair<int, int>> cell_overrides;
+    /// Per polity id, the anchor tile of the realm's core as the rounds read
+    /// it after every step (its capital's, where that region has a cell; else
+    /// its lowest region's); -1 for a polity holding no cell. The tail anchors
+    /// the nation's territory on it (`nation_params::polity_core_tiles`).
+    std::vector<int> polity_core_tiles;
+    /// BL-1310 review: tiles of the realms' frozen core groups (as the
+    /// cessions open) that changed hands in the opening cessions. A cession
+    /// moves only ground outside a territory, so anything above 0 is a core
+    /// moving under a realm -- a defect the audit asserts against.
+    int core_tiles_lost = 0;
+    /// BL-1310 review: every region a cession moved to another realm (or out
+    /// of every realm), ascending. Its seed stands on ceded ground, so Pass 5
+    /// neither seats nor names a nation by it.
+    std::vector<int> ceded_regions;
 };
 
 /// Per region, the number of carve tiles its anchor's cell holds (0 for a
@@ -111,8 +159,15 @@ int predict_fold_count(const std::vector<region>& regions, const std::vector<int
 /// Plan the closing rounds: the floor first (always, when `min_tiles > 0`),
 /// then the total (only when `total_target > 0`). `polities` gives each
 /// realm's capital and liveness.
+///
+/// BL-1310: with @p sub (the carve ground's substrate, `closing_rounds_spec::
+/// ground.sub`), the rounds OPEN with the cessions of § Pass 2e on the oracle
+/// carve, the floor's island case goes to the nearest realm across the water,
+/// and a secession prefers a split that leaves both sides one territory. Null
+/// keeps the pre-BL-1310 plan exactly.
 closing_plan plan_closing_rounds(const std::vector<region>& regions,
                                  const std::vector<polity>& polities,
                                  const std::vector<int>&    cell_region,
                                  int gw, int gh,
-                                 int min_tiles, bool keep_city_states, int total_target);
+                                 int min_tiles, bool keep_city_states, int total_target,
+                                 const std::vector<terrain_substrate>* sub = nullptr);

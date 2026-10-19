@@ -616,7 +616,7 @@ void draw_profit_table(const world& w, const recipe_registry& reg, ui_state& s)
 
         if (!cc.returns.empty())
         {
-            r.profit     = cc.returns.back().net;
+            r.profit     = static_cast<float>(cc.returns.back().net); // BL-1337: net is double
             r.has_profit = true;
         }
         // A price exists only where the VERB would price it: public, filed, and

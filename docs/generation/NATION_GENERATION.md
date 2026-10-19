@@ -245,7 +245,7 @@ geography leaves standing. The result amplifies the size spread (rich-get-richer
 **irregular, non-convex borders** — a nation may be the union of a core and an absorbed
 neighbour. Tie-breaks are fully deterministic (smallest by tile count then lowest index;
 absorbing neighbour by tile count then lowest index; an island with no land neighbour is absorbed
-into the globally largest nation). This pass is *not* itself a source of fragmentation — it only
+into the nearest nation across the water, § Pass 2e). This pass is *not* itself a source of fragmentation — it only
 ever merges a nation into a neighbour it already touches, so it cannot cut one in two.
 
 **The floor runs after the fold, so it judges realms, not seeds** (§ Pass 2d — The polity fold).
@@ -273,14 +273,17 @@ polity is its founding core — the lowest-indexed region it held, because regio
 founding order — and the nation the fold makes carries the realm's identity through that
 representative: its **name**, coined once at the realm's founding and never re-coined (§ Pass 5);
 its **colour slot**, the one the wizard's rounds painted it in (§ Pass 5); its **treasury** at
-the close (§ Pass 7); and its capital tile. Nothing about a realm is recalculated at the handoff:
+the close (§ Pass 7); and its capital. **The realm's seat at the close is the nation's
+capital tile (Ben, 2026-10-17)**, save a realm under the size floor, whose capital follows the
+larger piece it keeps (§ Pass 2e, Ben 2026-10-18). Nothing about a realm is recalculated at the handoff:
 the nation the player meets at Begin is the realm they watched rise, under the same name and the
-same colour. A realm's territory can be **non-contiguous**, and that is a fact of the history
-rather than a defect — a polity that conquered across a neighbour holds ground on both sides of
-it.
+same colour. A realm's territory is **one territory** (§ Pass 2e): a polity that conquered across
+a neighbour does not keep the far side, which the closing rounds cede to the nation around it.
 
 **A city state crosses as itself.** A polity that reached the close holding one region with a
-population centre on it is a nation on its own account — exempt from the size floor, and never an
+population centre on it is a nation on its own account. It is judged **as the realm stood at the
+close, before any cession** (Ben, 2026-10-18): a realm the strait rule cut down to its seat is not
+thereby a city state, and stays open to the floor and the total like any small nation — exempt from the size floor, and never an
 absorber. A world with no city state is a legitimate outcome; the exemption is a permission, never
 a quota.
 
@@ -289,8 +292,9 @@ rule A, Ben, 2026-09-24). When Pass 2c folds a small realm into a neighbour, the
 results is the **absorber**: it keeps its own name and its own colour slot, its chest grows by the
 absorbed realm's (§ Pass 7), and the seat card (`../ui/STARTUP.md` § The seat) lists under the
 nation's name the realms it absorbed. The absorbed realm contributes ground, people and a chest —
-never a name, whatever index its seed carried. No other pass merges nations, and nothing splits
-one.
+never a name, whatever index its seed carried. No other pass merges nations. The one transfer of
+ground between surviving nations is the cession of an exclave (§ Pass 2e), which moves ground and
+never a nation.
 
 **Ownerless ground crosses as a nation with no realm.** A Voronoi cell around an anchor no polity
 held at the close folds to itself, so it becomes a nation of its own, subject to the size floor
@@ -299,6 +303,53 @@ name for — in the tongue of the culture that settled the region its seed grew 
 case the colour table assigns a fresh slot to; the seat card says the ground had no realm at the
 close. A body with no settlement pass is all ownerless ground, and there the fold is the identity:
 every seed is its own nation, exactly as the random-placement path carves.
+
+### Pass 2e — One territory: the strait rule
+
+**Every nation holds one territory (Ben, 2026-10-16).** A nation's ground is one land-contiguous
+group, or several groups joined by **short straits**, never ground that jumps across another
+nation. Borders that leap a neighbour read as a defect at the first look at the map, whatever
+history produced them.
+
+**What joins two groups.** Two of a nation's land groups (cardinal adjacency, column-wrapped) are
+**joined** when a path between them crosses **at most `strait_tiles` ocean tiles and no land
+another nation holds**. Joins chain: a nation's groups form one territory when every group reaches
+the **core** — the group holding its capital, which is the realm's seat at the close (§ Pass 2d); a
+nation with no realm is seated on its lowest seed inside its territory — through joins. **A realm
+under the size floor keeps the larger piece (Ben, 2026-10-18):** where a realm's land at the close,
+before any cession, is under the floor, its core is the larger of its seat's group and its largest
+group — land tiles only, and only a group holding one of its provinces (Ben, 2026-10-18) — and its capital follows the core; a realm at or over the floor keeps its seat's group. The
+core is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
+`body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
+
+**An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
+**split among the nations that border it** (Ben, 2026-10-18): each part goes to the bordering
+nation nearest to it — province by province on a settled world, where a province never splits,
+and tile by tile where no history ran — so no one neighbour takes a large exclave whole. An island
+with no land neighbour goes whole to the nation whose ground is fewest ocean tiles away. Ties go
+to the lower nation index, then the lower tile index. The cession moves ground only. The nation
+keeps its core, its name and its chest, so a cession never changes the nation count, and the
+receiver's own contiguity is re-checked after each one until no exclave is left.
+
+**A cession is a history event.** On a settled world it is a **closing-round step of
+Industrialisation** (§ The nation count is a target), recorded with its cause — the exclave was
+cut off from its realm — and it runs **first**, before the size floor and before reconciliation.
+The floor then judges territories as the player will see them. Reconciliation keeps the rule: an
+absorption joins a nation to a neighbour it already touches, and a secession is chosen so both
+sides remain one territory. Where an absorption reaches its neighbour only through owned water —
+a lake or a coast that joins beyond a strait — the closing rounds run the rule again after it and
+cede what is left over (Ben, 2026-10-17).
+
+**Every launch obeys the rule (Ben, 2026-10-17).** A launch that closes before Industrialisation —
+an Empires-round launch, where no closing round runs — holds one territory too: the same rule runs
+as a post-pass after Pass 2d, and each cession is recorded as an event of the last span that ran.
+Where no history ran at all, it runs as the same post-pass, and again after the size floor.
+
+**The remote island.** A landmass farther than `strait_tiles` from every nation's ground cannot
+be held contiguously by anyone. Pass 2b still gives it to the nearest nation, and it is the one
+group exempt from the rule, **at any size** (Ben, 2026-10-17): a whole continent beyond every
+strait is held by one nation as a remote island would be. The floor's island case follows the same reading: an island with no
+land neighbour is absorbed by the nearest nation across the water, never the globally largest.
 
 ### Territorial fragmentation, measured
 
@@ -325,8 +376,16 @@ Pass 2b — 31 % of exclaves by count, but **49 % of exclave tiles** (940 of 193
 produced emergent exclaves (6–17 each), and roughly half of all nations hold at least one. The
 promise pays: fragmentation is real and sim-produced, but Pass 2b's long tail of tiny orphan
 islands dominates the raw *count*, so the honest headline is the tile share, not the component
-share. The audit asserts only a wide bar — at least 6 emergent exclaves across the sweep — to be
-tightened once the distribution has been watched.
+share. Those figures describe the carve **before** § Pass 2e. The cession turns emergent
+fragmentation into history — a cut-off province changing hands — rather than into a map defect.
+So the audit asserts two things on the finished world: **no exclave outside the strait rule**, save
+the remote island; and the cessions counted as recorded events, so the sim still visibly
+produces the fragmentation the rule resolves. **The rule must not starve the minors (Ben,
+2026-10-18).** The audit also reads the nations' sizes on every library seed at the default
+targets, and fails a seed whose minors' median falls below **80% of that seed's own median
+measured before the strait rule** (Ben, 2026-10-18), or whose majors hold more than 80% of the land. It is a reading of the
+world, never a clamp on it. A seed Ben accepts below its bar is recorded in the audit at the
+reading he accepted, so a further drop still fails.
 
 ### Pass 3 — Resource profile derivation
 
@@ -517,7 +576,29 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 nation and sees its starting credits, so a median nation opening on a fraction of a credit is a
 defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
 across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
-granted at the handoff. No nation, the player's or a rival's, takes on debt before the game starts —
+granted at the handoff. **No major leaves generation on a zero treasury (Ben, 2026-10-19):** a major
+holds state industry — its share of the hubs that make Logistic Points among it — and a state that
+cannot fund any of it idles every hub at the first tick and starves the firms on its ground. Two
+rules hold it there. **A state founding leaves a year of the state bill in the chest, counted from the game's
+opening** (Ben, 2026-10-19): the twelve settle ticks before the opening plus four, sixteen ticks of
+what the funding gate would charge its state industry, hubs included: it pays only from what lies
+above that, and a shortfall is the founding's, never a mint. **No realm closes the history empty**
+(Ben, 2026-10-19): the poorest realms earn more across the spans — the same earning lever as below,
+lifting the floor and keeping the order — until none folds an empty chest. Three rules carry it:
+**a small realm's endowment has a floor** (a fraction of the average realm's world-share income);
+the standing army carries only a share of the earn, and tribute is a share of the earn rather than
+the chest (`EXPLORATION.md` § Force persists, and the tribute clause). The army share and the
+endowment floor are **calibrated together by sweep** against two targets: no major opens short of a
+year of its state bill, and the median nation still opens inside 1,000–2,000 credits.
+**Calibrated (Ben, 2026-10-19):** the army carries **600 per mille** of the earn and the endowment
+floor is **500 per mille** of the average realm's. The sweep met neither target fully — it cut the
+majors short of a year from 20 of 78 to 7 on natural worlds — and Ben accepted it, tracing what
+still drains the rest as its own work. The 1,000–2,000 band is judged on every pair: a world built to
+few nations opens its median above it, and that is accepted rather than cut. **The floor may
+reorder a few realms (Ben, 2026-10-19):** it lifts the endowment alone, so a small realm that also
+trades can pass a larger one that does not; that small reordering is accepted, the one exception to
+"keep the order". No
+nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
 (Ben, 2026-10-11):

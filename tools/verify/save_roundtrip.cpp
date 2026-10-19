@@ -722,6 +722,9 @@ int main()
             // it (share rules, space assets): 28 bytes in all. The reader ignores
             // trailing bytes, so a stale count here still "passed" -- it is exact now.
             // BL-1335 (v52): plus the tax section (count + 9 bytes a moved nation).
+            // INTEGRATION (sprints 55 + 56): sliced off the PRE-EDGE stream, and with no
+            // exact-net tail subtracted - that writer writes at v52 and the net section is
+            // written only at `world_save_version`, so this stream ends before it.
             std::string v47 = pre_edge_once.substr(0, pre_edge_once.size() - 7 * sizeof(uint32_t)
                                                           - (world_save_tax_section_bytes(w)));
             const uint32_t pre = k_world_save_version_pre_state;
@@ -740,6 +743,9 @@ int main()
             // section (a world with no rail writes three empty counts, 12 bytes),
             // stamped 48. It reads, as a world with no rail. (+2 empty counts:
             // the v50 share rules and the v51 space assets.)
+            // INTEGRATION (sprints 55 + 56): sliced off the PRE-EDGE stream, and with no
+            // exact-net tail subtracted - that writer writes at v52 and the net section is
+            // written only at `world_save_version`, so this stream ends before it.
             std::string v48 = pre_edge_once.substr(0, pre_edge_once.size() - 5 * sizeof(uint32_t)
                                                           - (world_save_tax_section_bytes(w))); // + BL-1335's v52 tax section
             const uint32_t pre = k_world_save_version_pre_rail;

@@ -23,6 +23,12 @@
 //       organic borders are meant to be irregular, so D describes what the cost
 //       model produced against the superseded 3x3 partition's numbers rather
 //       than asserting a spread. Its one size assertion is the hard CAP of 20.
+//   N — THE NORMALISING PASS (Ben, 2026-10-18; BL-1382), inside D's sweep:
+//       settled land's size distribution BEFORE (the fill, rebuilt with the
+//       pass off) and AFTER (shipped); every settled province inside its band
+//       24·f(s)-100·f(s) save the counted exceptions, a left-under province
+//       re-derived to have no merge target, every piece anchored, and the
+//       shipped partition reproduced by a recompute.
 //   W — the WATER bands (BL-516). Coastal water takes land's band, hard cap
 //       included; the open ocean is "much larger, but not larger than say 80
 //       tiles" (Ben, 2026-08-21). The 80 is the clamp GROWTH obeys and is
@@ -139,6 +145,222 @@ static void legacy_write_history_log(const world& w, std::ostream& out)
         str(e.event);
         str(e.consequence);
     }
+}
+
+// ---------------------------------------------------------------------------
+// N — THE NORMALISING PASS (Ben, 2026-10-18; BL-1382). The band is RE-DERIVED
+// here from the ruling's words — too small below 24·f(s), too large above
+// 100·f(s), f(s) = 1 + (s - 1)/2 — not read out of province.hpp.
+// ---------------------------------------------------------------------------
+
+static std::size_t ruled_floor(int s)   { return static_cast<std::size_t>(24.0 * (1.0 + (s - 1) / 2.0) + 0.5); }
+static std::size_t ruled_ceiling(int s) { return static_cast<std::size_t>(100.0 * (1.0 + (s - 1) / 2.0) + 0.5); }
+
+struct norm_sweep
+{
+    std::vector<std::size_t> before, after; ///< settled land province sizes, pooled
+    int splits = 0, pieces = 0, unseeded = 0, merges = 0, indivisible = 0, no_target = 0;
+    std::size_t after_over = 0, after_under = 0, under_with_target = 0, unanchored = 0,
+                cross_nation = 0;
+    std::size_t before_over = 0, before_under = 0;
+};
+
+static void print_dist(const char* label, std::vector<std::size_t> v)
+{
+    std::sort(v.begin(), v.end());
+    const std::size_t n = v.size();
+    const auto at = [&](double q) {
+        return n ? v[std::min(n - 1, static_cast<std::size_t>(q * double(n)))] : std::size_t{ 0 };
+    };
+    std::printf("%s %zu provinces, min %zu p10 %zu median %zu p90 %zu max %zu\n", label, n,
+                n ? v.front() : 0, at(0.10), at(0.50), at(0.90), n ? v.back() : 0);
+}
+
+/// One seed's before/after: @p sw is the shipped world, @p st the tally the
+/// recompute of its partition returned.
+static void measure_normalising_pass(world& sw,const province_absorption_stats& st, norm_sweep& out)
+{
+    std::map<entity_id, int> seed_scale, any_centre;
+    for (const auto& [cid, tid] : sw.population_centre_tile)
+    {
+        const auto pit = sw.population_centres.find(cid);
+        if (pit == sw.population_centres.end())
+            continue;
+        any_centre[tid] += pit->second.scale;
+        if (!pit->second.province_anchor)
+            seed_scale[tid] += pit->second.scale;
+    }
+    std::set<entity_id> covered;
+    for (const auto& [tid, s] : seed_scale)
+    {
+        (void)s;
+        const auto tit = sw.tiles.find(tid);
+        if (tit != sw.tiles.end() && domain_matches(tit->second.substrate, province_kind::land))
+            covered.insert(tit->second.body);
+    }
+    std::map<entity_id, std::vector<entity_id>> grids;
+    std::map<entity_id, std::pair<int, int>>    dims;
+    for (const auto& [bid, bc] : sw.bodies)
+    {
+        grids[bid] = body_tile_grid(sw, bid);
+        dims[bid]  = { bc.grid_width, bc.grid_height };
+    }
+    const auto nation_of = [&](entity_id t) {
+        const auto it = sw.tile_to_nation.find(t);
+        return it == sw.tile_to_nation.end() ? null_entity : it->second;
+    };
+    const auto anchor_scale = [&](const province& p) {
+        int best = 0;
+        for (const entity_id t : p.tiles)
+        {
+            const auto it = seed_scale.find(t);
+            if (it != seed_scale.end() && it->second > best)
+                best = it->second;
+        }
+        return std::clamp(best, 1, 5);
+    };
+    const auto has_seed = [&](const province& p) {
+        for (const entity_id t : p.tiles)
+            if (seed_scale.count(t))
+                return true;
+        return false;
+    };
+    // Each land neighbour province of @p p (on its body's grid), with the hex
+    // edges shared.
+    const auto neighbours = [&](const province_partition& part, const province& p) {
+        std::map<uint32_t, int> out_n;
+        const auto& grid = grids.at(p.body);
+        const int   gw   = dims.at(p.body).first;
+        const int   gh   = dims.at(p.body).second;
+        for (const entity_id t : p.tiles)
+        {
+            const tile_component& tc = sw.tiles.at(t);
+            for (int s = 0; s < 6; ++s)
+            {
+                const auto c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
+                if (c.gy < 0 || c.gy >= gh)
+                    continue;
+                int nx = c.gx % gw;
+                if (nx < 0)
+                    nx += gw;
+                const entity_id n = grid[static_cast<std::size_t>(c.gy) * gw + nx];
+                if (n == null_entity)
+                    continue;
+                const auto nit = sw.tiles.find(n);
+                if (nit == sw.tiles.end() || !domain_matches(nit->second.substrate, province_kind::land))
+                    continue;
+                const uint32_t q = part.province_of(n);
+                if (q != p.id)
+                    ++out_n[q];
+            }
+        }
+        return out_n;
+    };
+    // Settled = covered land, less the uncentred islands: a province with no
+    // seed centre that touches no land of its own nation outside itself.
+    const auto settled = [&](const province_partition& part, const province& p) {
+        if (province_kind_of(sw, p) != province_kind::land || !covered.count(p.body))
+            return false;
+        if (has_seed(p))
+            return true;
+        const entity_id own = nation_of(p.tiles.front());
+        for (const auto& [q, e] : neighbours(part, p))
+        {
+            (void)e;
+            const province* qp = part.find(q);
+            if (qp != nullptr && nation_of(qp->tiles.front()) == own)
+                return true; // a split piece
+        }
+        return false;
+    };
+
+    // BEFORE: the fill's own partition, the pass switched off.
+    world wb = sw;
+    build_province_partition(wb, sw.provinces.seed, nullptr, /*normalise=*/false);
+    std::size_t before_n = 0, bo = 0, bu = 0;
+    for (const province& p : wb.provinces.provinces)
+    {
+        if (province_kind_of(wb, p) != province_kind::land || !covered.count(p.body) || !has_seed(p))
+            continue;
+        ++before_n;
+        out.before.push_back(p.tiles.size());
+        const int s = anchor_scale(p);
+        if (p.tiles.size() > ruled_ceiling(s)) ++bo;
+        if (p.tiles.size() < ruled_floor(s))   ++bu;
+    }
+
+    // AFTER: the shipped partition.
+    const province_partition& part = sw.provinces;
+    std::size_t after_n = 0, over = 0, under = 0, with_target = 0, unanchored = 0, cross = 0;
+    std::map<uint32_t, bool> is_settled;
+    for (const province& p : part.provinces)
+        is_settled[p.id] = settled(part, p);
+    for (const province& p : part.provinces)
+    {
+        if (!is_settled[p.id])
+            continue;
+        ++after_n;
+        out.after.push_back(p.tiles.size());
+        const int s = anchor_scale(p);
+        bool anchored = false;
+        for (const entity_id t : p.tiles)
+            if (any_centre.count(t)) anchored = true;
+        if (!anchored) ++unanchored;
+        const entity_id own = nation_of(p.tiles.front());
+        for (const entity_id t : p.tiles)
+            if (nation_of(t) != own) { ++cross; break; }
+        if (p.tiles.size() > ruled_ceiling(s)) ++over;
+        if (p.tiles.size() < ruled_floor(s))
+        {
+            ++under;
+            for (const auto& [q, e] : neighbours(part, p))
+            {
+                (void)e;
+                const province* qp = part.find(q);
+                if (qp == nullptr || !is_settled[q] || nation_of(qp->tiles.front()) != own)
+                    continue;
+                const int qs = anchor_scale(*qp);
+                if (p.tiles.size() + qp->tiles.size() <= ruled_ceiling(std::max(s, qs)))
+                {
+                    ++with_target;
+                    break;
+                }
+            }
+        }
+    }
+    std::printf("       normalising pass: settled %zu -> %zu; %d split (+%d pieces, %d unseeded ->"
+                " new villages), %d merged; over ceiling %zu -> %zu (indivisible %d), under floor"
+                " %zu -> %zu (no target %d)\n",
+                before_n, after_n, st.norm_split, st.norm_pieces_added, st.norm_unseeded_pieces,
+                st.norm_merged, bo, over, st.norm_indivisible, bu, under,
+                st.norm_no_merge_target);
+    out.before_over  += bo;
+    out.before_under += bu;
+    out.splits      += st.norm_split;
+    out.pieces      += st.norm_pieces_added;
+    out.unseeded    += st.norm_unseeded_pieces;
+    out.merges      += st.norm_merged;
+    out.indivisible += st.norm_indivisible;
+    out.no_target   += st.norm_no_merge_target;
+    out.after_over  += over;
+    out.after_under += under;
+    out.under_with_target += with_target;
+    out.unanchored  += unanchored;
+    out.cross_nation += cross;
+}
+
+static void print_normalising_summary(const norm_sweep& n)
+{
+    std::printf("\nN — the normalising pass across the sweep (settled land; band 24·f(s)-100·f(s))\n");
+    print_dist("  BEFORE (fill only):", n.before);
+    print_dist("  AFTER  (shipped):  ", n.after);
+    std::printf("  %d splits (+%d pieces, %d new villages), %d merges; counted exceptions:"
+                " %d indivisible (over), %d no merge target (under)\n",
+                n.splits, n.pieces, n.unseeded, n.merges, n.indivisible, n.no_target);
+    std::printf("  before: %zu over ceiling, %zu under floor\n", n.before_over, n.before_under);
+    std::printf("  after: %zu over ceiling, %zu under floor (%zu of them WITH a target), %zu unanchored,"
+                " %zu spanning nations\n",
+                n.after_over, n.after_under, n.under_with_target, n.unanchored, n.cross_nation);
 }
 
 int main()
@@ -364,13 +586,22 @@ int main()
             }
         }
 
+        // RE-SCOPED by BL-1382 (the normalising pass, Ben 2026-10-18): P2d is a
+        // claim about the FILL, so it reads the fill's own partition — rebuilt
+        // with the pass off. On the shipped one a piece the pass split off
+        // holds no seed centre until its village is founded, and would read
+        // as stranded ground; the pass's own claims are section N's.
+        world wfill = w;
+        build_province_partition(wfill, part.seed, nullptr, /*normalise=*/false);
+        const province_partition& fill = wfill.provinces;
+
         std::set<uint32_t> seeded_provinces;
         for (const entity_id t : seed_tiles)
-            seeded_provinces.insert(part.province_of(t));
+            seeded_provinces.insert(fill.province_of(t));
 
         std::size_t stranded = 0, crossed_tiles = 0, crossed_provinces = 0;
         std::size_t settled_tiles = 0, unsettled_tiles = 0;
-        for (const province& p : part.provinces)
+        for (const province& p : fill.provinces)
         {
             if (province_kind_of(w, p) != province_kind::land || !covered_bodies.count(p.body))
                 continue;
@@ -1062,16 +1293,29 @@ int main()
                         " islands, %zu anchor foundings)\n",
                         seed_tiles, seeded_provinces, sg.covered_centre_singletons_absorbed,
                         anchor_only, sg.uncentred_regions, anchor_foundings);
-            check(!covered_bodies.empty() && not_island == 0,
+            // RE-SCOPED by BL-1382 (the normalising pass, Ben 2026-10-18): a
+            // piece the pass split off with no seed centre in it also rests on
+            // an anchor founding alone, and it DOES touch its nation's land (it
+            // was cut from a province). So G1 counts the non-islands and holds
+            // them to the pass's own count of such pieces, and G2's ledger
+            // gains the pass's two terms: unseeded pieces among the anchor
+            // foundings, and the seeded-province delta its merges and splits
+            // make.
+            std::printf("        normalising pass: %d anchor-only provinces touch their nation's land"
+                        " (split pieces: %d unseeded)\n",
+                        static_cast<int>(not_island), sg.norm_unseeded_pieces);
+            check(!covered_bodies.empty() && not_island == static_cast<std::size_t>(sg.norm_unseeded_pieces),
                   "G1  every covered-land province on an anchor founding alone is an UNCENTRED"
                   " ISLAND (touches no land of its own nation outside itself, across the settled"
-                  " line or not; BL-1150)");
+                  " line or not; BL-1150) or a piece the normalising pass split off (BL-1382)");
             check(anchor_only == anchor_foundings
-                      && anchor_only == static_cast<std::size_t>(sg.uncentred_regions)
-                      && seeded_provinces + static_cast<std::size_t>(
-                             sg.covered_centre_singletons_absorbed) == seed_tiles,
-                  "G2  the fill's ledger: anchor foundings == uncentred islands, and seeded"
-                  " provinces == seed-centre tiles - hemmed singletons absorbed");
+                      && anchor_only == static_cast<std::size_t>(sg.uncentred_regions + sg.norm_unseeded_pieces)
+                      && static_cast<long long>(seeded_provinces)
+                                 + sg.covered_centre_singletons_absorbed - sg.norm_seeded_delta
+                             == static_cast<long long>(seed_tiles),
+                  "G2  the fill's ledger: anchor foundings == uncentred islands + unseeded split"
+                  " pieces, and seeded provinces == seed-centre tiles - hemmed singletons absorbed"
+                  " + the normalising pass's seeded delta");
         }
 
         std::printf("        %zu anchor foundings excluded (not seeds, BL-611)\n",
@@ -1354,6 +1598,8 @@ int main()
         // uncentred islands and the hemmed singletons absorbed): nothing bounds
         // it, so no size of it is a claim.
         std::vector<std::size_t> all_covered;
+        norm_sweep               norm;
+        bool                     norm_recompute_ok = true;
         std::printf("  seed | provinces |  min  max   mean | <7  <3  >12 | %% in 7-12 |"
                     " 1-tile absorbed islands breach   (band columns HINTERLAND land only; the"
                     " three singleton columns are ALL-DOMAIN, breach is land's)\n");
@@ -1363,8 +1609,20 @@ int main()
             wp.seed = static_cast<uint32_t>(sd);
             world sw = make_hard_coded_world(no_prehistory(wp));
 
+            // N0 (BL-1382): the shipped partition, kept to hold the recompute to.
+            const province_partition shipped = sw.provinces;
+
             province_absorption_stats st;
             build_province_partition(sw, sw.provinces.seed, &st);
+
+            {
+                bool same = shipped.provinces.size() == sw.provinces.provinces.size();
+                for (std::size_t i = 0; same && i < shipped.provinces.size(); ++i)
+                    same = shipped.provinces[i].id == sw.provinces.provinces[i].id
+                           && shipped.provinces[i].tiles == sw.provinces.provinces[i].tiles;
+                if (!same)
+                    norm_recompute_ok = false;
+            }
 
             std::set<entity_id> sw_covered; // re-derived as for the primary world
             for (const auto& [cid, tid] : sw.population_centre_tile)
@@ -1421,6 +1679,7 @@ int main()
                             st.covered_centre_singletons_absorbed);
                 all_covered.insert(all_covered.end(), covered.begin(), covered.end());
             }
+            measure_normalising_pass(sw, st, norm);
             std::fflush(stdout);
 
             all_singles  += static_cast<std::size_t>(st.singletons_before);
@@ -1522,6 +1781,56 @@ int main()
         // D2 — the partition covers every seed's land, so the mean is a real
         // statistic and not an artefact of a body that failed to partition.
         check(all_total > 0 && all_tiles > 0, "D2  every seed produced a non-empty partition");
+
+        // N — THE NORMALISING PASS (Ben, 2026-10-18; BL-1382; PROVINCES.md
+        // § The normalising pass), across the same six seeds. The BEFORE is the
+        // fill's own partition, rebuilt with the pass switched off (an
+        // instrument only); the AFTER is the shipped one. SETTLED land only:
+        // covered land, less the uncentred islands.
+        print_normalising_summary(norm);
+        check(norm_recompute_ok,
+              "N0  on every seed, a recompute from the stored seed reproduces the shipped"
+              " (normalised) partition exactly — the pass is a pure function, and the villages"
+              " it causes are seed-skipped");
+        check(norm.unanchored == 0,
+              "N1  every settled land province holds a population centre once the split pieces'"
+              " villages are founded (ensure_province_anchor_centres)");
+        check(norm.after_over == norm.indivisible && norm.after_under == norm.no_target,
+              "N2  every settled land province sits inside its band 24·f(s)-100·f(s) save the"
+              " counted exceptions (INDIVISIBLE above, NO TARGET below)");
+        check(norm.under_with_target == 0,
+              "N3  no province left under its floor had a merge target (re-derived: a same-nation"
+              " settled neighbour the merge would not push over its ceiling)");
+        check(norm.cross_nation == 0,
+              "N4  no settled land province spans two nations after the pass");
+        check(norm.splits > 0 && norm.merges > 0,
+              "N5  the pass ran: it split and it merged (the ruling had an effect)");
+
+        // N6 — the same claims on ONE WORLD WITH ITS HISTORY ON (the sweep above
+        // is no-prehistory, as the rest of this harness is). Between the
+        // homeworld's pre-road partition and the canonical rebuild at the end
+        // of generation run roads, firms and the finish's construction; the
+        // pass must still be reproduced there, and every piece's village must
+        // still stand in its piece.
+        {
+            world pw = make_hard_coded_world(world_params{});
+            const province_partition  shipped_p = pw.provinces;
+            province_absorption_stats pst;
+            build_province_partition(pw, pw.provinces.seed, &pst);
+            bool same = shipped_p.provinces.size() == pw.provinces.provinces.size();
+            for (std::size_t i = 0; same && i < shipped_p.provinces.size(); ++i)
+                same = shipped_p.provinces[i].id == pw.provinces.provinces[i].id
+                       && shipped_p.provinces[i].tiles == pw.provinces.provinces[i].tiles;
+            norm_sweep pn;
+            std::printf("  N6  history-on world (default params):\n");
+            measure_normalising_pass(pw, pst, pn);
+            print_dist("       BEFORE:", pn.before);
+            print_dist("       AFTER: ", pn.after);
+            check(same && pn.unanchored == 0 && pn.after_over == pn.indivisible
+                      && pn.after_under == pn.no_target && pn.under_with_target == 0 && pn.cross_nation == 0,
+                  "N6  on a history-on world the shipped partition is the recompute, every settled"
+                  " province is anchored and inside its band save the counted exceptions");
+        }
     }
 
     // -----------------------------------------------------------------------

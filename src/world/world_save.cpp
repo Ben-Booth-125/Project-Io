@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
 #include <istream>
+#include <limits>
 #include <ostream>
 #include <map>
 #include <tuple>
@@ -450,7 +451,9 @@ void w_return(std::ostream& o, const quarterly_return& q)
     w_f32(o, q.interest);
     w_f32(o, q.levies);
     w_f32(o, q.upkeep);
-    w_f32(o, q.net);
+    // BL-1337: `net` is a double; its f32 slot keeps v52 a strict prefix, and
+    // the exact figure follows in the v54 trailing exact-net section.
+    w_f32(o, static_cast<float>(q.net));
     w_f32(o, q.balance);
     w_u32(o, q.holdings);
     w_f32(o, q.book_value);
@@ -459,11 +462,13 @@ void w_return(std::ostream& o, const quarterly_return& q)
 
 bool r_return(std::istream& i, quarterly_return& q)
 {
+    float net32 = 0.0f; // BL-1337: the f32 slot; a v54 stream refines it below
     if (!(r_f32(i, q.income) && r_f32(i, q.expenditure) && r_f32(i, q.maintenance)
           && r_f32(i, q.wages) && r_f32(i, q.interest) && r_f32(i, q.levies)
-          && r_f32(i, q.upkeep) && r_f32(i, q.net) && r_f32(i, q.balance)
+          && r_f32(i, q.upkeep) && r_f32(i, net32) && r_f32(i, q.balance)
           && r_u32(i, q.holdings) && r_f32(i, q.book_value) && r_f32(i, q.refunds)))
         return false;
+    q.net = static_cast<double>(net32);
     // BL-1206: a refund is a credit, never negative; the writer cannot produce
     // one, so a negative or non-finite figure is a corrupt stream.
     if (!(std::isfinite(q.refunds) && q.refunds >= 0.0f))
@@ -475,7 +480,7 @@ bool r_return(std::istream& i, quarterly_return& q)
     return std::isfinite(q.income) && std::isfinite(q.expenditure)
         && std::isfinite(q.maintenance) && std::isfinite(q.wages)
         && std::isfinite(q.interest) && std::isfinite(q.levies)
-        && std::isfinite(q.upkeep) && std::isfinite(q.net) && std::isfinite(q.balance)
+        && std::isfinite(q.upkeep) && std::isfinite(net32) && std::isfinite(q.balance)
         && std::isfinite(q.book_value);
 }
 
@@ -1322,6 +1327,53 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_f32(out, q.taxes);
         }
     }
+
+    // BL-1337 (world_save_version 54): the EXACT NETS. `quarterly_return::net`
+    // is a double; the record's f32 slot carries it rounded, which is exact on
+    // almost every row and short by up to an ULP of the larger balance where a
+    // balance crossed zero. Every corporation with any such row, ascending id,
+    // as (id, u32 n = its return count, n x f64 in filed order). None: one
+    // empty count. A v52 (and older) stream ends before it.
+    //
+    // GATED ON THE VERSION BEING WRITTEN (integration of sprints 55 and 56): the
+    // reader consumes this section only at `world_save_version`, so a stream written
+    // AT AN OLDER VERSION - which `write_world_snapshot_pre_road_edges` does, to give
+    // BL-1340's migration a real v52 stream to read - must end before it, exactly as
+    // the comment above says. Unconditional, it appended bytes no reader would eat.
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> inexact;
+        for (const auto& [cid, cc] : w.corporations)
+            for (const quarterly_return& q : cc.returns)
+                if (static_cast<double>(static_cast<float>(q.net)) != q.net)
+                {
+                    inexact.push_back(cid);
+                    break;
+                }
+        std::sort(inexact.begin(), inexact.end());
+        w_u32(out, static_cast<uint32_t>(inexact.size()));
+        for (const entity_id cid : inexact)
+        {
+            const std::vector<quarterly_return>& rs = w.corporations.at(cid).returns;
+            w_id(out, cid);
+            w_u32(out, static_cast<uint32_t>(rs.size()));
+            for (const quarterly_return& q : rs)
+                w_f64(out, q.net);
+        }
+    }
+}
+
+std::size_t world_save_net_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const quarterly_return& q : cc.returns)
+            if (static_cast<double>(static_cast<float>(q.net)) != q.net)
+            {
+                n += 4 + 4 + 8 * cc.returns.size();
+                break;
+            }
+    return n;
 }
 
 std::size_t world_save_tax_section_bytes(const world& w)
@@ -1371,7 +1423,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_state
             && version != k_world_save_version_pre_space
             && version != k_world_save_version_pre_tax
-            && version != k_world_save_version_pre_road_edges)) // BL-1340: v52, migrated
+            && version != k_world_save_version_pre_road_edges // BL-1340: v52, migrated
+            && version != k_world_save_version_pre_net))      // BL-1337: v53, nets as f32
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1784,7 +1837,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // the stream, strictly ascending, with a tier in 1..5 and a Discontent
     // finite in [0, 1]. Refused whole otherwise. A v51 (and older) stream ends
     // before it: every nation at tier III with no Discontent (the defaults).
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_net) // v52 and v54 carry it
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -1829,6 +1882,42 @@ bool read_world_snapshot(world& w, std::istream& in)
                 if (!r_f32(in, t) || !std::isfinite(t) || t < 0.0f)
                     return false;
                 q.taxes = t;
+            }
+        }
+    }
+
+    // BL-1337 (v54): the exact nets. Untrusted: each names a corporation in the
+    // stream, strictly ascending, with exactly its return count of finite
+    // figures, each of which rounds to the f32 slot its record already carried
+    // (the writer wrote that slot from this very double). Refused whole
+    // otherwise. A v52 (and older) stream ends before it: every net is its slot.
+    if (version == world_save_version)
+    {
+        uint32_t ccount = 0;
+        if (!r_u32(in, ccount) || ccount > s.corporations.size())
+            return false;
+        entity_id cprev = null_entity;
+        for (uint32_t k = 0; k < ccount; ++k)
+        {
+            entity_id cid = null_entity;
+            uint32_t  n   = 0;
+            if (!r_id(in, cid) || !r_u32(in, n))
+                return false;
+            const auto cit = s.corporations.find(cid);
+            if (cid == null_entity || (k > 0 && cid <= cprev) || cit == s.corporations.end()
+                || n != cit->second.returns.size())
+                return false;
+            cprev = cid;
+            for (quarterly_return& q : cit->second.returns)
+            {
+                double v = 0.0;
+                // Range-checked before the narrowing cast: a finite double can
+                // be an infinite float (io-standing-rules, the seam rule).
+                if (!r_f64(in, v) || !std::isfinite(v)
+                    || std::fabs(v) > static_cast<double>(std::numeric_limits<float>::max())
+                    || static_cast<double>(static_cast<float>(v)) != q.net)
+                    return false;
+                q.net = v;
             }
         }
     }

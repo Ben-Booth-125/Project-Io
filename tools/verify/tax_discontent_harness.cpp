@@ -508,6 +508,11 @@ void t6_save(const app_start_world& out)
     // v51: the PRE-EDGE stream less the tax section (nation rows, then the returns'
     // taxes). BL-1340: taken off `to_bytes_pre_road_edges`, since a v51 reader reads the
     // old tile record and the current writer no longer writes it.
+    //
+    // INTEGRATION (sprints 55 + 56): no exact-net tail is subtracted here, because the
+    // pre-edge writer writes AT v52 and the net section is written only at
+    // `world_save_version` - so that stream already ends before it. Subtracting it as
+    // well would cut into the taxes this row is about.
     const std::size_t tail = world_save_tax_section_bytes(c);
     const std::string b52_pre_edge = to_bytes_pre_road_edges(c);
     std::string b51 = b52_pre_edge.substr(0, b52_pre_edge.size() - tail);
@@ -526,7 +531,7 @@ void t6_save(const app_start_world& out)
 
     // Bad values refuse whole and leave the target untouched. The FIRST row of
     // the section is ids.front(): id (4) then tier (1) then discontent (4).
-    const std::size_t row0 = b52.size() - tail + 4;
+    const std::size_t row0 = b52.size() - tail - net_tail + 4;
     const auto refuse = [&](const char* what, auto patch) {
         std::string bad = b52;
         patch(bad);
@@ -542,8 +547,8 @@ void t6_save(const app_start_world& out)
     refuse("a negative Discontent", [&](std::string& s) { const float f = -0.25f; std::memcpy(&s[row0 + 5], &f, 4); });
     refuse("an unknown nation id", [&](std::string& s) { const std::uint32_t id = 0x7FFFFFF0u; std::memcpy(&s[row0], &id, 4); });
     // The returns' taxes: count (4), then the corp's id (4), n (4), floats.
-    const std::size_t ret0 = b52.size() - tail + 4 + 9 * moved_nations(c) + 4;
-    refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - 4], &f, 4); });
+    const std::size_t ret0 = b52.size() - tail - net_tail + 4 + 9 * moved_nations(c) + 4;
+    refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - net_tail - 4], &f, 4); }); // BL-1337 review: the v54 net section follows the tax floats
     refuse("a return-tax count that is not the firm's return count", [&](std::string& s) {
         std::uint32_t n = 0; std::memcpy(&n, &s[ret0 + 4], 4); n += 1; std::memcpy(&s[ret0 + 4], &n, 4); });
 }
