@@ -940,6 +940,11 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     std::sort(route_centres.begin(), route_centres.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
     rec.folded_records = static_cast<int>(w.folded_markets.size());
+    // BL-1346: the independent check is ONE FRESH FIELD, not a scan per tile. A tile's
+    // market now depends on the body's roads, so `market_for_tile_scan` costs a whole
+    // field per call and this loop would have rebuilt it 31581 times.
+    int fgw = 0, fgh = 0;
+    const std::vector<entity_id> fresh_field = market_catchment_field(w, w.home_body, fgw, fgh);
     for (std::size_t idx = 0; idx < grid.size(); ++idx)
     {
         const entity_id tid = grid[idx];
@@ -947,7 +952,10 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
         const tile_component& tc = w.tiles.at(tid);
         ++rec.home_tiles;
         const entity_id m = market_for_tile(w, tid);
-        if (market_for_tile_scan(w, tid) != m) ++rec.raster_mismatch; // R1
+        if (tc.grid_x >= 0 && tc.grid_x < fgw && tc.grid_y >= 0 && tc.grid_y < fgh
+            && fresh_field[static_cast<std::size_t>(tc.grid_y) * static_cast<std::size_t>(fgw)
+                           + static_cast<std::size_t>(tc.grid_x)] != m)
+            ++rec.raster_mismatch; // R1
         const auto rit = row_of.find(m);
         if (rit == row_of.end()) continue;
         market_row& r = rec.rows[rit->second];

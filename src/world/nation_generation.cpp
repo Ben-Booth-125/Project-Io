@@ -1381,7 +1381,11 @@ std::vector<entity_id> generate_nations(
         const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
         if (tid == null_entity)
             continue;
-        w.tile_to_nation[tid] = nation_ids[static_cast<std::size_t>(ni)];
+        // BL-1346: through the setter, which bumps the catchment stamp - a tile's owner
+        // decides which centre pulls a fifth harder on it, and the home body's markets
+        // are created BEFORE this pass runs (hard_coded_world.cpp), so a catchment
+        // cached in that window would otherwise survive as a no-nation field.
+        w.set_tile_nation(tid, nation_ids[static_cast<std::size_t>(ni)]);
     }
 
     // --- Pass 6: substrate density (BL-050) ---

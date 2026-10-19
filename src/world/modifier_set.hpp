@@ -97,6 +97,14 @@ enum class modifier_subject : uint8_t
                          ///  research" share, summed into `research_multiplier`;
                          ///  scope "building:university" with op multiply scales
                          ///  the University term of `advance_research`.
+    market_pull,         ///< A market centre's PULL: how far its attraction reaches
+                         ///  (MARKETS.md section "The pull"). WIRED (BL-1346): read in
+                         ///  `centre_pull` (market_clearing.cpp), where a tile's
+                         ///  attraction is its logistics cost to a centre DIVIDED by
+                         ///  that centre's pull, so a pull of 2 reaches twice as far in
+                         ///  cost terms. Nothing raises it yet: BL-1350 is the
+                         ///  provisional pull technologies and BL-1349 the building
+                         ///  standing on the centre. Appended, never inserted.
 };
 
 /// How a modifier combines with the value it moves. The three ops the BL-479

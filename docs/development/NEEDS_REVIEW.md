@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*27 entries — 25 open, 2 resolved.*
+*28 entries — 26 open, 2 resolved.*
 
 ---
 
@@ -226,6 +226,13 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 The march now draws Logistic Points and claims ahead of production. Four readings the doc does not settle, each cheap to change. (1) WHOSE POOL - THE MOVER'S. A corporation's march draws its HOME NATION's points, a nation's garrison its own; never the pool of the ground it stands on. The first cut read the ground's nation and a cold review caught both consequences: a unit whose points ran out on unowned wilderness could never be granted again (a refusal moves nothing, so it re-fired for ever and the unit was stranded for good), and a unit invading another nation drew ITS VICTIM's pool, starving the defender's industry to fund the attack. LOGISTICS.md's 'Movement a player or rival DIRECTS' is the reading taken. The alternative - the ground's nation, with a stranding escape and a foreign-ground rule - is a real design and is Ben's if he wants it. (2) NO REACH TEST ON A MARCH - a unit draws its own nation's pool at full strength wherever it stands, because the off-network military reach is still 'military detail later' (LOGISTICS.md). (3) THE CLAIM IS GATHERED BEFORE THE BATTLE PHASE - the resolve runs at tick phase 4 and the march at phase 11, with battles at 10, so a unit killed in battle has already consumed its nation's points for that tick; the alternative is resolving the pool twice a tick. (4) THE EXCHANGE RATE IS UNCHANGED - one point admits one march-point of movement (infantry 1.0, cavalry 1.5 a tick) against a production need of 10 per unit of run, so a 50-unit army asks for ~60 points of a pool measured in the hundreds. Nothing measured says a soldier-tick and a unit of grain burden a nation equally; the old per-anchor rate (20/tick at every city) carried the same assumption.
 
 **Why it matters.** Reading 4 decides whether 'guns, butter and freight compete in one currency' is felt at all: at these numbers a march is a rounding error against production, which is the opposite of the campaign-starves-its-industry cost the doc describes. Reading 1 is the one that changes what a war looks like - who pays for an invasion's logistics. The 2040 spectator run is the measurement that should settle 4.
+
+### NR-1050 — BL-1346 (market attraction): the off-road leg's price, and what it costs to cross water
+*decision · raised 2026-10-19 · from BL-1346 build + cold review, main session*
+
+MARKETS.md rules that catchment is logistics cost over pull, and LOGISTICS.md section 3b rules an off-road tile is priced by 'the off-road cost per tile times the number of 4-cardinal steps'. Two things the docs do not settle were decided in band. (1) THE PRICE: k_offroad_leg_per_tile = 3.0, taken from the Logistic Point model's own off-network step (lp_offnet_step) so the two off-road prices agree rather than drifting apart; it is dear against a plains road step of 1.0 before the tier discount, which is what keeps a market's edge following the road. (2) TERRAIN: the leg is multiplied by the tile's own traversal weight, so crossing a mountain or open water costs proportionally more than crossing a field. The doc says 'per tile' and is silent on terrain; a flat leg would price an unroaded island tile three steps across the sea exactly as a field three steps across a meadow, which a cold review flagged as the one place the walk ignores a domain every other cost walk in the tree respects.
+
+**Why it matters.** The leg decides how far a market's edge bulges past the end of its roads, and the terrain term decides whether islands and far coasts belong to the market across the water from them. Measured on seed 0 after the change: market_viability pooled G1 92.0 -> 90.1, G1t50 88.1 -> 86.3, G2 182.1 -> 185.0, all five gates still passing, and the same-nation fifth moves 279 of 31581 tiles.
 
 ---
 

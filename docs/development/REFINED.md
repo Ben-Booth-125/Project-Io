@@ -10,6 +10,38 @@ blocking calls were taken 2026-10-18 and are written in their owning docs.
 `market_viability` (FULL, par_seeds) and `haulage_measure` measured on the COMMIT before and after,
 never a probe-off. A cold `code-reviewer` pass with a fix round budgeted. UI items: Ben's live click.
 
+### BL-1346 (market attraction) — Delivery Full
+
+Requirement group `market-attraction` (requirements.json, R1-R6). Catchment stops being the
+nearest centre by grid distance and becomes the cheapest by LOGISTICS cost over the centre's
+pull, so a road moves a market's edge and a technology or a building can widen it.
+
+- [x] **T1** `market_pull` appended to `modifier_subject` (append only - the enum's rule), read
+  through `nation_scalar` off the centre's nation; 1 where nothing raises it. BL-1349 and BL-1350
+  are the items that raise it. Files: `modifier_set.hpp`. (R1)
+- [x] **T2** The attraction field: per body, a Dijkstra per market over the ROADED network on
+  `edge_traversal_cost` (read_river false, as the reach field does), markets walked in ascending
+  id, folded centres included and mapped to their absorber. Files: `market_clearing.cpp`. (R1)
+- [x] **T3** The off-road leg: one multi-source BFS from every roaded tile giving each tile its
+  anchor and its 4-cardinal step count (column wrapped); an unroaded tile's cost is its anchor's
+  plus `k_offroad_leg_per_tile` x steps. Files: `logistics.{hpp,cpp}`, `market_clearing.cpp`. (R2)
+- [x] **T4** The same-nation 1.2 on the (tile, centre) PAIR, and the census of how many tiles it
+  actually flips. consumes: T2, T3. (R3)
+- [x] **T5** The raster's signature folds what the field reads - the market set, the road
+  generation and the pull values - so it rebuilds on a change and never on a clock, and nothing
+  is saved. Files: `market_clearing.cpp`, `world.hpp` if the digest moves. (R4)
+- [x] **T6** `tools/verify/market_attraction_harness.cpp` for R1-R4 (16/0), registered in
+  CMakeLists, plus the before/after world-mover measurement (baseline on the commit before any
+  edit). (R1-R4, R6)
+- [x] **T7 (fix round, cold review)** The off-road walk became ONE Dijkstra per centre instead of
+  a centre-independent anchor that could discard a reachable network; the cadence became its own
+  `catchment_generation` instead of the logistics counter that fires per idling port; ownership
+  writes go through `world::set_tile_nation` so the stamp cannot be forgotten; A3 and A5 assert
+  what their banners claim and the banner stops claiming a pull fixture that does not exist;
+  MARKETS.md says asking per tile now costs a field. NR-1050 carries the in-band readings.
+- [ ] **T8** `haulage_measure --far-trade` after the change, against the baseline on 7f4f9461
+  (window E 771 / 3543.5, window Y 841 / 4188.6).
+
 ### BL-1352 (one Logistic Point system) — Delivery Full
 
 Requirement group `lp-one-system` (requirements.json, R1-R5). Two LP systems are live at once: the

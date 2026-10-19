@@ -247,6 +247,11 @@ entity_id road_edge_neighbour(world& w, entity_id tile, int side)
 
 bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier)
 {
+    // BL-1346: the catchment reads the roads, so laying one moves the field. Bumped
+    // here rather than in `invalidate_logistics_caches`, which fires for reasons the
+    // catchment does not read (see world::catchment_generation).
+    ++w.catchment_generation;
+
     if (side < 0 || side > 5 || tier == 0 || tier > 3)
         return false;
     const auto tit = w.tiles.find(tile);

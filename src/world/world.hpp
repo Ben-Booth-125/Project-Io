@@ -816,6 +816,37 @@ struct world
     /// the one it replaced — never share a value.
     std::uint64_t logistics_cache_generation = 0;
 
+    /// BL-1346: THE CATCHMENT GENERATION - a stamp that changes when something the
+    /// market ATTRACTION FIELD reads moves: a road laid, cut or migrated, a tile
+    /// changing nation (the same-nation fifth is a property of the pair), and later a
+    /// centre's pull (BL-1349, BL-1350). `market_for_tile` folds it into the catchment
+    /// raster's signature, which is how MARKETS.md's "recompute on change, never on a
+    /// clock" is kept.
+    ///
+    /// IT IS NOT `logistics_cache_generation`, and the distinction cost a cold review to
+    /// find: that counter is bumped by every `invalidate_logistics_caches` call site,
+    /// several of which sit inside per-building loops that themselves read
+    /// `market_for_tile` - a port idling, a state station flipping - so folding it in
+    /// made a tick rebuild the field once per such building. A rebuild is a Dijkstra per
+    /// centre over the body; the catchment must rebuild when the CATCHMENT's inputs move
+    /// and not when a cache was dropped for an unrelated reason.
+    ///
+    /// Derived, never serialised, never hashed. Drawn from the same process-wide counter
+    /// idea as above, so a freshly loaded save never shares a value with the world it
+    /// replaced.
+    std::uint64_t catchment_generation = 0;
+
+    /// BL-1346: THE ONE WAY TO SET A TILE'S OWNER. `tile_to_nation` is read by the market
+    /// attraction field (the same-nation fifth is a property of the tile-centre PAIR), so
+    /// a write that forgets `catchment_generation` leaves a stale catchment behind it.
+    /// Writing through here makes that impossible to forget; a direct write to the map is
+    /// a bug waiting for the next reader of ownership.
+    void set_tile_nation(entity_id tile, entity_id nation)
+    {
+        tile_to_nation[tile] = nation;
+        ++catchment_generation;
+    }
+
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
     /// derived cache on the same footing as the three above: built lazily by
     /// `nearest_lp_anchor`, cleared by invalidate_logistics_caches and by

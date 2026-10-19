@@ -155,6 +155,13 @@ both of them visible in the world — a **technology** the centre's nation holds
 standing on the centre** (which also carries trade points, `TRADE.md`). It is a `modifier_set`
 quantity (`../META_LAYER.md`), so it composes and is read, never special-cased.
 
+**Asking per tile now costs a field.** A tile's market depends on the body's roads, so
+there is no per-tile sum to evaluate: the answer comes from a field built for the whole
+body, and a reader that wants many tiles takes the field once
+(`market_catchment_field`) rather than asking tile by tile. The straight-line rule could
+be asked one tile at a time and this one cannot, which is the price of a catchment that
+can see a road.
+
 **Mildly dynamic, and still not saved.** The catchment raster is recomputed when something it reads
 changes — a road laid or cut, a pull gained or lost, a market carved or folded — and never on a
 clock. It stays a pure function of the body's standing state, so a loaded game computes the

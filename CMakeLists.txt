@@ -833,6 +833,27 @@ target_link_libraries(market_census PRIVATE io_world_obj lua54)
 target_compile_features(market_census PRIVATE cxx_std_20)
 target_compile_options(market_census PRIVATE ${IO_WARNING_FLAGS})
 
+# market_attraction_harness (BL-1346; sprint 55) — live-Lua for market_census's
+# reason: its G1 rows build the shipped 1960 world in app order through
+# harness_params.hpp. Its A rows are hand-built bodies and need no Lua at all, so a
+# run with no world still checks the rule itself (the road beating the grid, the
+# off-road leg, the same-nation fifth).
+add_executable(market_attraction_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/market_attraction_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(market_attraction_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(market_attraction_harness PRIVATE io_world_obj lua54)
+target_compile_features(market_attraction_harness PRIVATE cxx_std_20)
+target_compile_options(market_attraction_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # nation_tech_harness (BL-1273; sprint 52) — live-Lua for market_census's
 # reason: its R0 campaign run builds the shipped world in app order through
 # harness_params.hpp. Under ctest it runs its fixture rows only

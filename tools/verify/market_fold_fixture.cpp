@@ -147,10 +147,23 @@ int main()
         check(rest_unchanged, "F3", "every tile B did not hold routes exactly where it did before");
     }
     {
+        // BL-1346: one fresh FIELD against the cached raster - the scan costs a field
+        // per call now, because a tile's market depends on the body's roads.
         bool same = true;
+        int fgw = 0, fgh = 0;
+        const std::vector<entity_id> fresh = market_catchment_field(s.w, s.body, fgw, fgh);
         for (const entity_id t : s.tile)
-            if (market_for_tile(s.w, t) != market_for_tile_scan(s.w, t)) same = false;
-        check(same, "F4", "the catchment raster and the full scan route every tile alike");
+        {
+            const auto tit = s.w.tiles.find(t);
+            if (tit == s.w.tiles.end()) continue;
+            const int x = tit->second.grid_x, y = tit->second.grid_y;
+            if (x < 0 || x >= fgw || y < 0 || y >= fgh) continue;
+            if (market_for_tile(s.w, t)
+                != fresh[static_cast<std::size_t>(y) * static_cast<std::size_t>(fgw)
+                         + static_cast<std::size_t>(x)])
+                same = false;
+        }
+        check(same, "F4", "the catchment raster and a freshly built field route every tile alike");
     }
     check(s.w.markets.count(s.b) == 0 && s.w.folded_markets.count(s.b) == 1
               && s.w.folded_markets.at(s.b).into == s.a,

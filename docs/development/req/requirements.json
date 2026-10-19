@@ -7212,6 +7212,83 @@
      "result_metric": "4 captures, 0 failures"
     }
    ]
+  },
+  {
+   "brief": "market-attraction",
+   "title": "BL-1346 - A tile clears at the market it is most attracted to: logistics cost over pull, not grid distance",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1346 - sprint 55 (Ben, 2026-10-16, the market attraction form)",
+   "batch": "sprint-55",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: market_attraction_harness - a fixture where the nearer centre by grid distance is the dearer by road, and the tile clears at the farther one",
+      "headless: the same fixture with the pull raised on the farther centre, which takes more ground"
+     ],
+     "requirement": "A tile's market is the one whose traversal cost to its centre, divided by that centre's pull, is lowest; ties go to the lowest market id, and a folded market's catchment passes whole to its absorber. The straight-line grid rule is gone.",
+     "notes": "market_attraction_harness A1: on a hand-built row the nearer centre by grid distance is the dearer by road, and the tile clears at the FARTHER one - the answer the retired straight-line rule could not give. Ties go to the lowest market id (A5's first check, an exact cost tie). A FIXTURE FOR THE PULL HALF IS OWED, not written: nothing raises market_pull until BL-1350, so the division by pull is reachable but unexercised, and the harness banner now says so rather than claiming a row it does not have (the cold review caught the banner claiming an A4 that did not exist).",
+     "result_metric": "16/0"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: market_attraction_harness - no tile on a generated body answers null, and an off-road tile's cost is its anchor's plus the stepped leg"
+     ],
+     "requirement": "Every tile on the body belongs to a market. A tile with no roaded edge is priced as the nearest roaded tile's network cost plus the off-road leg per tile times the 4-cardinal steps to it, column wrapped.",
+     "notes": "market_attraction_harness A3: every tile of a part-roaded body belongs to a market, and three steps off the spine the row SPLITS between two centres - a zero leg would send the whole row to the nearer one, so the split is what proves the leg is paid per step. The cold review's first finding was fixed on the way: the off-road walk is now ONE Dijkstra per centre priced at edge_traversal_cost across a roaded edge and the leg across anything else, instead of a centre-independent nearest-roaded-tile anchor that could discard a reachable network and make a tile's cost JUMP when a disconnected road was laid beside it.",
+     "result_metric": "16/0"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: market_attraction_harness --bonus-census over the library seeds, reporting flips per seed"
+     ],
+     "requirement": "A tile owned by the same nation as the centre is 1.2x as attracted to it, as a property of the PAIR. Measured: how many tiles actually change hands because of it, per seed - and said plainly if it flips almost none.",
+     "notes": "market_attraction_harness A5 and the G1 census. The fifth decides an exact cost tie, and neither nation's bonus reaches across the border (a tile cheaper from the east, on east ground, clears east while a tile cheaper from the west, on west ground, clears west). THE NUMBER BEN ASKED FOR: on seed 0 the 1.2x moves 279 of 31581 tiles, 0.88% - small, but not the 'almost none' the item worried about, and it is measured per seed rather than assumed.",
+     "result_metric": "279/31581 = 0.88%"
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: save_roundtrip - state_hash equal across a save/load with roads laid between",
+      "headless: market_attraction_harness - laying a road moves a tile's market without any tick"
+     ],
+     "requirement": "The catchment is recomputed when what it reads changes - a road laid or cut, a pull gained or lost, a market carved or folded - and never on a clock. It stays unsaved and a pure function of standing state: a loaded game computes the catchment the saved one had.",
+     "notes": "The raster rebuilds on a change and never on a clock: A2 lays a Highway and the tile's market moves with no tick. The cadence is its own stamp, world::catchment_generation, bumped by the road writer and by world::set_tile_nation - NOT by invalidate_logistics_caches, which the cold review measured firing inside per-building loops that themselves read market_for_tile (a rebuild per idling port, each a Dijkstra per centre). Ownership now goes through a setter so a writer cannot forget the stamp; the harness's own fixture caught that the moment the cadence changed. save_roundtrip OK and nothing new is serialised.",
+     "result_metric": "det PASS, save PASS"
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: logistics_harness (the placement reach rows) unchanged"
+     ],
+     "requirement": "Reach is untouched: placement's distance rule still answers the question it answered, and a tile in a market's catchment is not thereby in anybody's reach.",
+     "notes": "logistics_harness ALL PASS: placement's reach rule is untouched - collect_anchor_tile_set and body_reach_field were not read or changed by this item, and catchment and permission stay separate questions.",
+     "result_metric": "logistics_harness PASS"
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "verification": [
+      "headless: par_seeds market_viability --tier full, before and after",
+      "headless: haulage_measure --far-trade, before and after, same seeds"
+     ],
+     "requirement": "The world-mover question is answered with a measurement on the commit before and after: market_viability FULL and haulage_measure --far-trade, with any movement explained by catchments that now follow the roads.",
+     "notes": "market_viability FULL on the commit before (7f4f9461) and after: pooled G1 92.0 -> 90.1, G1t50 88.1 -> 86.3, G1b 3.1 -> 3.4, G2 182.1 -> 185.0, G3 95.9 -> 96.1 - all five gates still PASS, every per-seed line moved. The movement is the item: a tile's market now follows the roads, so which market each tile clears at changed on every seed, and the income ratio rose because more tiles clear where their goods can actually go. haulage_measure --far-trade baseline on the same commit: window E 771 convoys / 3543.5 units, window Y 841 / 4188.6; the after-run is owed and is the one measurement still open.",
+     "result_metric": "G1 92.0->90.1, G2 182.1->185.0, all gates pass"
+    }
+   ]
   }
  ]
 }

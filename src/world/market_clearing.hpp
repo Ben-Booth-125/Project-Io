@@ -399,3 +399,10 @@ entity_id market_for_tile(const world& w, entity_id tile);
 /// over the body's original centres every call (no catchment raster). For
 /// verification only -- the raster must route identically on every tile.
 entity_id market_for_tile_scan(const world& w, entity_id tile);
+
+/// BL-1346: the body's whole catchment field, rebuilt fresh - cell (y * gw + x) holds
+/// the market that cell's tile clears at, already mapped through any fold. The honest
+/// way to check the cached raster, and the only affordable one: a tile's market now
+/// depends on the body's roads, so `market_for_tile_scan` costs a field per call and a
+/// caller comparing many tiles should take this once instead.
+std::vector<entity_id> market_catchment_field(const world& w, entity_id body, int& gw, int& gh);

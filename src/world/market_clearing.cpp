@@ -1,6 +1,10 @@
 #include "market_clearing.hpp"
 
 #include "logistics.hpp" // BL-708: body_reach_field / tile_reach_cost — the grid good's listing gate
+#include "river_generation.hpp" // BL-1346: hex_side_for_offset — a step becomes a side
+#include "nation_tech.hpp"      // BL-1346: nation_scalar — the centre's pull, as a modifier
+
+#include <queue>
 
 #include <algorithm>
 #include <array>
@@ -160,63 +164,261 @@ const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(con
     return w.body_market_index;
 }
 
-/// Pick, from a body's markets, the one whose catchment holds `tile`.
-/// One market and nothing folded → that market (anchored or not). Otherwise the
-/// nearest ORIGINAL centre by squared grid distance, column wrapped — standing
-/// markets and the body's folded ones alike (BL-1125), ties → lowest id — and a
-/// folded winner hands the tile to the market that absorbed it, so a folded
-/// market's catchment passes to its absorber whole (MARKETS.md § Market centres
-/// and seeding). An unanchored market is a candidate only if every market on the
-/// body is unanchored, in which case the lowest id wins.
-entity_id nearest_market(const world& w, const std::vector<entity_id>& body_markets,
-                         const tile_component& tile)
+// ---------------------------------------------------------------------------
+// BL-1346 - CATCHMENT IS AN ATTRACTION, NOT A DISTANCE
+// ---------------------------------------------------------------------------
+// MARKETS.md section "Catchment is an attraction, not a distance" (Ben, 2026-10-16):
+// a tile clears against the market whose LOGISTICS COST to its centre, divided by that
+// centre's PULL, is lowest; ties to the lowest market id. The straight-line rule this
+// replaces could not see a road, a technology or a building, so no market's reach ever
+// changed and a road laid beside a border moved nothing.
+//
+// THE COST IS THE NETWORK'S. The flood walks ROADED EDGES only, on the one hop price
+// every other consumer uses (edge_traversal_cost), with the river term OFF for the
+// reason body_reach_field has it off: this is a SCALAR per tile, and a directed
+// discount in an undirected field would make the answer depend on which way it was
+// asked.
+//
+// AND OFF THE ROAD, A LEG (LOGISTICS.md section 3b). A tile with no roaded edge takes
+// the nearest roaded tile's cost plus a per-step price times the 4-cardinal steps to
+// it, column wrapped - so EVERY tile belongs to a market, far land is dear rather than
+// unreachable, and it drifts between markets as roads approach. Reach (section 3) is
+// untouched: catchment says what a tile sells into, reach says where a firm may build,
+// and only the second is a permission.
+//
+// WHERE THERE IS NO NETWORK AT ALL the leg is walked from the centre itself: a body
+// generation has not roaded, or a tile whose own roads reach no centre, still has to
+// belong somewhere, and "the walk to the network" is then the walk to the market. It
+// is the degenerate case of the same rule, not a second rule.
+
+/// The off-road leg's price per 4-cardinal step. IN BAND (Ben delegates calibration
+/// inside a ruled design, 2026-10-13): 3.0 is the Logistic Point model's own
+/// off-network step (lp_offnet_step), taken so the two off-road prices agree in spirit
+/// rather than drifting apart by accident. It is deliberately dear against a plains
+/// road step (1.0 before the tier discount), which is what keeps a market's edge
+/// following the road rather than bulging across open country.
+constexpr float k_offroad_leg_per_tile = 3.0f;
+
+/// MARKETS.md section "Its own nation pulls harder": a tile owned by the same nation as
+/// the centre is 1.2x as attracted to it. A property of the PAIR - the same centre pulls
+/// no harder on anyone else's ground - which is what makes a border sticky and a large
+/// nation's market large.
+constexpr float k_home_nation_pull = 1.2f;
+
+/// A cell's 4-cardinal neighbour in direction @p d, column wrapped and row clamped -
+/// the walk every other grid rule here uses. Returns -1 off the grid.
+inline int cell_step(int gw, int gh, int cell, int d, int& out_dc, int& out_dr)
 {
-    if (body_markets.empty())
-        return null_entity;
+    static const int k_card[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+    const int r = cell / gw, cx = cell % gw;
+    const int nr = r + k_card[d][1];
+    if (nr < 0 || nr >= gh)
+        return -1;
+    const int nc = ((cx + k_card[d][0]) % gw + gw) % gw;
+    out_dc = k_card[d][0];
+    out_dr = k_card[d][1];
+    return nr * gw + nc;
+}
+
+// RETIRED (BL-1346 fix round): `offroad_anchors`, a centre-INDEPENDENT BFS that gave
+// every cell its nearest roaded cell once, for all centres. A cold review broke it: the
+// anchor was chosen without knowing which centre was being priced, so a tile whose
+// nearest roaded cell sat on a road component THIS centre cannot reach threw away the
+// whole network and fell back to a bare grid walk. Laying one isolated crossing beside
+// a tile could therefore make its cost to a centre jump - the field was not monotone in
+// roads, which is the opposite of what the item exists for, and generation leaves
+// disconnected fragments on purpose (road_generation.cpp: an isolated village keeps
+// only its local street). The walk below prices both halves in ONE Dijkstra per centre
+// instead, so a tile always takes the cheapest real route it has.
+
+/// The cost from @p centre_tile to EVERY cell of the body: one Dijkstra in which a step
+/// across a ROADED edge costs `edge_traversal_cost` and any other 4-cardinal step costs
+/// the off-road leg, scaled by the ground it crosses. So the network carries what it
+/// reaches, the leg prices the walk to it (LOGISTICS.md 3b), and a tile always takes the
+/// cheapest route it actually has rather than one anchor chosen for it in advance.
+/// Deterministic: the queue orders on (cost, tile id).
+void road_cost_field(const world& w, const std::vector<entity_id>& raster, int gw, int gh,
+                     entity_id centre_tile, std::vector<float>& cost)
+{
+    const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    cost.assign(n, std::numeric_limits<float>::infinity());
+    const auto cit = w.tiles.find(centre_tile);
+    if (cit == w.tiles.end())
+        return;
+    const int cx = cit->second.grid_x, cy = cit->second.grid_y;
+    if (cx < 0 || cx >= gw || cy < 0 || cy >= gh)
+        return;
+    const std::size_t start = static_cast<std::size_t>(cy) * static_cast<std::size_t>(gw)
+                            + static_cast<std::size_t>(cx);
+    if (start >= n)
+        return;
+    cost[start] = 0.0f;
+    using entry = std::tuple<float, entity_id, int>; // cost, tile id (the tie), cell
+    std::priority_queue<entry, std::vector<entry>, std::greater<entry>> pq;
+    pq.emplace(0.0f, centre_tile, static_cast<int>(start));
+    while (!pq.empty())
+    {
+        const entry top = pq.top();
+        pq.pop();
+        const float d    = std::get<0>(top);
+        const int   cell = std::get<2>(top);
+        if (d > cost[static_cast<std::size_t>(cell)])
+            continue;
+        const entity_id from_id = raster[static_cast<std::size_t>(cell)];
+        const auto fit = w.tiles.find(from_id);
+        if (fit == w.tiles.end())
+            continue;
+        const tile_component& from = fit->second;
+        for (int k = 0; k < 4; ++k)
+        {
+            int dc = 0, dr = 0;
+            const int nb = cell_step(gw, gh, cell, k, dc, dr);
+            if (nb < 0 || static_cast<std::size_t>(nb) >= n)
+                continue;
+            const std::size_t ni = static_cast<std::size_t>(nb);
+            if (ni >= raster.size())
+                continue;
+            const entity_id to_id = raster[ni];
+            if (to_id == null_entity)
+                continue;
+            const auto tit = w.tiles.find(to_id);
+            if (tit == w.tiles.end())
+                continue;
+            const int side = hex_side_for_offset(dc, dr, (from.grid_y & 1) != 0);
+            float step;
+            if (side >= 0 && road_tier_on_side(from, side) != 0)
+            {
+                step = edge_traversal_cost(from, tit->second, side, /*read_river=*/false);
+            }
+            else
+            {
+                // OFF THE ROAD: the leg, times the ground it crosses. The flat per-step
+                // price LOGISTICS.md 3b names is read here as the price of crossing a
+                // PLAINS tile, so rougher ground and open water cost proportionally more
+                // - an unroaded island tile is then dear rather than as cheap as a field.
+                // The doc rules the leg per step and is silent on terrain, so this is the
+                // in-band reading, logged for Ben rather than assumed (NR).
+                step = k_offroad_leg_per_tile * tile_traversal_cost(tit->second);
+            }
+            if (!(step > 0.0f))
+                continue;
+            const float nd = d + step;
+            if (nd < cost[ni])
+            {
+                cost[ni] = nd;
+                pq.emplace(nd, to_id, nb);
+            }
+        }
+    }
+}
+
+/// A centre's PULL: 1 unless something raises it (MARKETS.md section "The pull"). Read
+/// off the nation holding the centre as a modifier_set quantity, so it composes and is
+/// never special-cased. Nothing raises it yet - BL-1349 (a building standing on the
+/// centre) and BL-1350 (the provisional pull technologies) are the items that will.
+float centre_pull(const world& w, entity_id centre_tile)
+{
+    const auto nit = w.tile_to_nation.find(centre_tile);
+    if (nit == w.tile_to_nation.end())
+        return 1.0f;
+    const float p = nation_scalar(w, nit->second, modifier_subject::market_pull,
+                                  effect_target{}, 1.0f);
+    return (std::isfinite(p) && p > 0.0f) ? p : 1.0f;
+}
+
+/// THE FIELD. For every cell of @p body, the market it is most attracted to - already
+/// mapped through a fold, so a folded market's catchment passes to its absorber whole.
+/// Pure in the body's standing state and never saved: the raster below caches it, and
+/// market_for_tile_scan rebuilds it to check that cache.
+std::vector<entity_id> attraction_field(const world& w, entity_id body,
+                                        const std::vector<entity_id>& ms, int& gw, int& gh)
+{
+    gw = gh = 0;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return {};
+    gw = bit->second.grid_width;
+    gh = bit->second.grid_height;
+    const std::size_t n = static_cast<std::size_t>(std::max(0, gw)) * static_cast<std::size_t>(std::max(0, gh));
+    std::vector<entity_id> out(n, null_entity);
+    if (n == 0)
+        return out;
+
+    // The raster: cell -> tile. body_tile_grid is the one raster index, and it wants a
+    // mutable world only because it may build that index.
+    const std::vector<entity_id>& raster = body_tile_grid(const_cast<world&>(w), body);
+    if (raster.size() < n)
+        return out;
+
+    std::vector<float> best(n, std::numeric_limits<float>::infinity());
+    std::vector<float> cost;
+
+    // Every centre on the body: the standing markets ascending, then the folded ones
+    // ascending, exactly as the distance rule walked them.
+    const auto fit = w.body_folded_index.find(body);
     static const std::vector<entity_id> k_none;
-    const auto fit = w.body_folded_index.find(tile.body);
     const std::vector<entity_id>& folded = (fit != w.body_folded_index.end()) ? fit->second : k_none;
-    if (body_markets.size() == 1 && folded.empty())
-        return body_markets.front();
 
-    // BL-1127: the surface is a cylinder, so the column distance wraps — the
-    // same rule every other grid walk uses. Without it a tile by the seam
-    // routed to a centre on the far side of the map.
-    const auto bit = w.bodies.find(tile.body);
-    const long long gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
-
-    entity_id best        = null_entity;
-    bool      best_folded = false;
-    long long best_dist   = 0;
-    const auto consider = [&](entity_id id, entity_id centre, bool is_folded) {
+    const auto consider = [&](entity_id market_id, entity_id centre, entity_id wins_for) {
         const auto cit = w.tiles.find(centre);
         if (cit == w.tiles.end())
-            return; // unanchored — skip while an anchored market exists
-        long long dx = cit->second.grid_x - tile.grid_x;
-        if (dx < 0) dx = -dx;
-        if (gw > 0 && dx > gw - dx) dx = gw - dx;
-        const long long dy = cit->second.grid_y - tile.grid_y;
-        const long long d  = dx * dx + dy * dy;
-        // Strictly nearer, or equally near with a lower id: the two lists are
-        // walked separately, so the id tie-break is explicit.
-        if (best == null_entity || d < best_dist || (d == best_dist && id < best))
+            return; // unanchored: no centre to be attracted to
+        road_cost_field(w, raster, gw, gh, centre, cost);
+        const float pull = centre_pull(w, centre);
+        const auto cnit = w.tile_to_nation.find(centre);
+        const entity_id centre_nation = (cnit != w.tile_to_nation.end()) ? cnit->second : null_entity;
+        for (std::size_t i = 0; i < n; ++i)
         {
-            best        = id;
-            best_folded = is_folded;
-            best_dist   = d;
+            const entity_id tid = raster[i];
+            if (tid == null_entity)
+                continue;
+            // The walk already priced both halves, so a cell is unreachable only where
+            // the grid itself is torn (a null cell between them); such a tile falls to
+            // the sweep below rather than to a guessed cost.
+            const float c = cost[i];
+            if (!std::isfinite(c))
+                continue;
+            float pull_here = pull;
+            if (centre_nation != null_entity)
+            {
+                const auto tnit = w.tile_to_nation.find(tid);
+                if (tnit != w.tile_to_nation.end() && tnit->second == centre_nation)
+                    pull_here *= k_home_nation_pull;
+            }
+            const float attraction = c / pull_here;
+            // Lowest attraction wins; an exact tie goes to the lowest MARKET id, so the
+            // answer does not depend on the order the centres were walked.
+            if (attraction < best[i] || (attraction == best[i] && wins_for < out[i]))
+            {
+                best[i] = attraction;
+                out[i]  = wins_for;
+            }
         }
     };
-    for (const entity_id mid : body_markets)
-        consider(mid, w.markets.at(mid).centre_tile, false);
+
+    for (const entity_id mid : ms)
+        consider(mid, w.markets.at(mid).centre_tile, mid);
     for (const entity_id fid : folded)
     {
         const folded_market& fm = w.folded_markets.at(fid);
-        consider(fid, fm.centre_tile, true);
+        consider(fid, fm.centre_tile, fm.into); // a fold's catchment passes to its absorber
     }
-    if (best == null_entity)
-        return body_markets.front(); // all unanchored
-    return best_folded ? w.folded_markets.at(best).into : best;
+
+    // A tile no centre's network reaches at all still belongs somewhere: the lowest
+    // market id takes it, which is the same answer the all-unanchored case gives.
+    if (!ms.empty())
+        for (std::size_t i = 0; i < n; ++i)
+            if (out[i] == null_entity && raster[i] != null_entity)
+                out[i] = ms.front();
+    return out;
 }
+
+// RETIRED (BL-1346): `nearest_market`, the straight-line rule. A tile went to the
+// nearest ORIGINAL centre by squared grid distance on the cylinder, which is a rule
+// that cannot see a road, a technology or a building - so no market's reach ever
+// changed and a road laid beside a border moved nothing. `attraction_field` above is
+// what replaced it, and it keeps the two parts of the old rule that were right: the
+// folded centres are candidates, and a fold's catchment passes to its absorber whole.
 
 } // namespace
 
@@ -229,7 +431,34 @@ entity_id market_for_tile_scan(const world& w, entity_id tile)
     const auto it = by_body.find(tit->second.body);
     if (it == by_body.end())
         return null_entity;
-    return nearest_market(w, it->second, tit->second);
+    // BL-1346: THE WHOLE FIELD, REBUILT, and this tile read off it. The rule is no
+    // longer a per-tile sum - a tile's market depends on the body's roads - so the
+    // independent check is a fresh field against the cached one, and this call costs a
+    // field. Verification only, and a caller comparing many tiles should build the
+    // field ONCE (market_census, market_fold_fixture) rather than call this per tile.
+    int gw = 0, gh = 0;
+    const std::vector<entity_id> field = attraction_field(w, tit->second.body, it->second, gw, gh);
+    const int x = tit->second.grid_x, y = tit->second.grid_y;
+    if (x >= 0 && x < gw && y >= 0 && y < gh)
+    {
+        const entity_id r = field[static_cast<std::size_t>(y) * static_cast<std::size_t>(gw)
+                                  + static_cast<std::size_t>(x)];
+        if (r != null_entity)
+            return r;
+    }
+    return it->second.empty() ? null_entity : it->second.front();
+}
+
+std::vector<entity_id> market_catchment_field(const world& w, entity_id body, int& gw, int& gh)
+{
+    const auto& by_body = markets_by_body(w);
+    const auto it = by_body.find(body);
+    if (it == by_body.end())
+    {
+        gw = gh = 0;
+        return {};
+    }
+    return attraction_field(w, body, it->second, gw, gh);
 }
 
 entity_id market_for_tile(const world& w, entity_id tile)
@@ -248,30 +477,28 @@ entity_id market_for_tile(const world& w, entity_id tile)
     if (ms.size() == 1 && !any_folded)
         return ms.front(); // one market, nothing folded: no raster needed
 
-    // BL-1125: THE CATCHMENT RASTER, O(1) per call. Built by the very scan it
-    // replaces (`nearest_market`, every tile of the body once) and rebuilt only
-    // when the body's routing digest moves -- a market created or folded, a
-    // centre or an absorber changed. The NR-915 hot path (pool_key_for_tile per
-    // asset per priced leg) reads here.
+    // BL-1125: THE CATCHMENT RASTER, O(1) per call, and the NR-915 hot path
+    // (pool_key_for_tile per asset per priced leg) reads here. BL-1346: what fills it
+    // is the ATTRACTION FIELD - a flood per centre over the road network - so the
+    // rebuild is dearer than the scan it replaced and the signature below decides how
+    // often it happens: a market created or folded, a centre or absorber changed, or
+    // the roads moved.
     const auto sit = w.body_market_sig.find(tc.body);
-    const std::uint64_t sig = (sit != w.body_market_sig.end()) ? sit->second : 0;
+    std::uint64_t sig = (sit != w.body_market_sig.end()) ? sit->second : 0;
+    // BL-1346: THE FIELD READS MORE THAN THE MARKETS - the roads, and who owns each
+    // tile - so the raster rebuilds when THOSE move: "recompute on change, never on a
+    // clock" (MARKETS.md). `catchment_generation` is bumped by exactly those writers
+    // (world.hpp says which), and deliberately NOT by `invalidate_logistics_caches`,
+    // which fires for things the field does not read; a cold review measured that
+    // mistake as a rebuild per idling port in one tick, each a Dijkstra per centre.
+    sig ^= (w.catchment_generation + 0x9E3779B97F4A7C15ull) * 1099511628211ull;
     body_route_cache& rc = w.body_route_index[tc.body];
     if (rc.route.empty() || rc.sig != sig)
     {
-        const auto bit = w.bodies.find(tc.body);
-        rc.gw = (bit != w.bodies.end()) ? bit->second.grid_width  : 0;
-        rc.gh = (bit != w.bodies.end()) ? bit->second.grid_height : 0;
-        rc.route.assign(static_cast<std::size_t>(std::max(0, rc.gw))
-                            * static_cast<std::size_t>(std::max(0, rc.gh)), null_entity);
-        // Each cell's answer depends only on its own tile, so the hash-map
-        // walk order cannot reach the result.
-        for (const auto& [tid, t] : w.tiles)
-        {
-            if (t.body != tc.body) continue;
-            if (t.grid_x < 0 || t.grid_x >= rc.gw || t.grid_y < 0 || t.grid_y >= rc.gh) continue;
-            rc.route[static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(rc.gw)
-                     + static_cast<std::size_t>(t.grid_x)] = nearest_market(w, ms, t);
-        }
+        int gw = 0, gh = 0;
+        rc.route = attraction_field(w, tc.body, ms, gw, gh);
+        rc.gw = gw;
+        rc.gh = gh;
         rc.sig = sig;
     }
     if (tc.grid_x >= 0 && tc.grid_x < rc.gw && tc.grid_y >= 0 && tc.grid_y < rc.gh)
@@ -281,7 +508,10 @@ entity_id market_for_tile(const world& w, entity_id tile)
         if (r != null_entity)
             return r;
     }
-    return nearest_market(w, ms, tc); // off-raster tile: the scan itself
+    // An off-raster tile (a grid position outside the body's own bounds - defensive)
+    // has no cell in the field; the lowest market id takes it, as the all-unanchored
+    // case does.
+    return ms.front();
 }
 
 // --- Shelf helpers (BL-1265, MARKETS.md § The shelf economy) -----------------
