@@ -69,6 +69,8 @@ int   g_endow = -1;
 long long g_ipu = -1;   // --ipu N: industry points per treasury unit (-1 = shipped)
 bool  g_no_size = false; // --no-size: the army is NOT sized to the earn (the pre-ruling arm)
 int   g_tt = 0, g_mt = 0; // --pair t:m: the nation targets (0:0 = natural)
+int   g_army_share = -1;  // --army-share N: per mille of the earn the army carries (BL-1386; -1 = shipped)
+int   g_endow_floor = -1; // --endow-floor N: per mille of the average realm's endowment (BL-1386; -1 = shipped)
 FILE* g_dump  = nullptr;
 
 std::vector<uint32_t> library_seeds(const char* path)
@@ -330,6 +332,8 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
     if (g_levy  >= 0) p.treasury_levy_per_mille_q   = g_levy;
     if (g_endow >= 0) p.treasury_endowment_income_q = g_endow;
     if (g_no_size)    p.standing_army_sized_to_earn = false;
+    if (g_army_share >= 0)  p.standing_army_earn_share_q = g_army_share;
+    if (g_endow_floor >= 0) p.treasury_endowment_floor_q = g_endow_floor;
     if (g_ipu >= 1)   p.industry_points_per_1000_treasury_units = g_ipu;
     generation_report     rep{};
     era_minus_one_fixture fx{};
@@ -576,6 +580,8 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[i], "--levy") == 0 && i + 1 < argc) { g_levy = std::atoi(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--ipu") == 0 && i + 1 < argc) { g_ipu = std::atoll(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--no-size") == 0) { g_no_size = true; continue; }
+        if (std::strcmp(argv[i], "--army-share") == 0 && i + 1 < argc) { g_army_share = std::atoi(argv[++i]); continue; }
+        if (std::strcmp(argv[i], "--endow-floor") == 0 && i + 1 < argc) { g_endow_floor = std::atoi(argv[++i]); continue; }
         if (std::strcmp(argv[i], "--pair") == 0 && i + 1 < argc)
         {
             const char* v = argv[++i];

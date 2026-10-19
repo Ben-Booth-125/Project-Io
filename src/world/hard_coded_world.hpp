@@ -296,6 +296,17 @@ struct world_params
     /// Force persists now, Ben 2026-10-11). On in every shipped world; a field
     /// only so the census can read the pre-ruling arm.
     bool standing_army_sized_to_earn = true;
+    /// BL-1386 -- NO REALM CLOSES THE HISTORY EMPTY (NATION_GENERATION.md sec
+    /// Pass 7; EXPLORATION.md sec Force persists now; Ben 2026-10-19). The
+    /// army carries at most this per mille of the round's earn, and a small
+    /// realm's world-share endowment is floored at this per mille of the
+    /// average realm's. Calibrated TOGETHER by sweep (treasury_census, 16
+    /// library seeds, natural and 20:4) against two targets: no major opens
+    /// short of a year of its state bill, and every seed's median nation opens
+    /// inside 1,000-2,000 credits. Not written by the envelope, on the same
+    /// footing as the BL-1298 fields above (these defaults ARE the shipped values).
+    int standing_army_earn_share_q = 1000;
+    int treasury_endowment_floor_q = 0;
     /// ...and the treasury's exchange rate into industry points in the
     /// Industrialisation span, points per THOUSAND treasury units
     /// (`history_sim_params::industry_points_per_1000_treasury_units`).

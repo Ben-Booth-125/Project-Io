@@ -656,6 +656,8 @@ bool app::same_world_params(const world_params& a, const world_params& b)
         && a.treasury_levy_per_mille_q == b.treasury_levy_per_mille_q
         && a.treasury_endowment_income_q == b.treasury_endowment_income_q
         && a.standing_army_sized_to_earn == b.standing_army_sized_to_earn
+        && a.standing_army_earn_share_q == b.standing_army_earn_share_q // BL-1386
+        && a.treasury_endowment_floor_q == b.treasury_endowment_floor_q // BL-1386
         && a.industry_points_per_1000_treasury_units == b.industry_points_per_1000_treasury_units
         && a.body_count == b.body_count
         // BL-1279: the setup round's nation targets steer the history's lean
