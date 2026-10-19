@@ -4592,6 +4592,38 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 }
             }
         }
+        // BL-1386 - ONE WEIGHT FOR A TILE THAT CARRIES TWO TIERS. A road is an EDGE and
+        // each edge has its own tier, but both renderers weight the whole TILE by
+        // `max_road_tier`, so a tile with a Track one way and a Highway the other draws
+        // both halves as Highway. This counts the tiles where that is visible: two or
+        // more DIFFERENT non-zero tiers on the crossable sides of one tile.
+        int mixed_tier_tiles = 0, mixed_tier_edges = 0;
+        for (const auto& [tid2, tc2] : m_world.tiles)
+        {
+            (void)tid2;
+            if (tc2.body != m_ui.active_body)
+                continue;
+            std::uint8_t lo = 4, hi = 0;
+            int sides_with_road = 0;
+            for (int side = 0; side < 6; ++side)
+            {
+                if (!road_side_is_crossable(side, tc2.grid_y))
+                    continue;
+                const std::uint8_t t = road_tier_on_side(tc2, side);
+                if (t == 0)
+                    continue;
+                ++sides_with_road;
+                lo = std::min(lo, t);
+                hi = std::max(hi, t);
+            }
+            if (hi > 0 && lo < hi)
+            {
+                ++mixed_tier_tiles;
+                mixed_tier_edges += sides_with_road;
+            }
+        }
+        out["mixed_tier_tiles"] = mixed_tier_tiles; ///< BL-1386: tiles carrying two different tiers
+        out["mixed_tier_edges"] = mixed_tier_edges; ///< ...and the crossings on them
         out["drawn_without_edge"] = drawn_without_edge; ///< BL-1382: a run drawn across a roadless boundary
         out["drawn_rail_join"]    = drawn_rail_join;    ///< ...excused because one end is rail (a tile field)
         out["edges"]         = edges;        ///< every road crossing on the body, each once
