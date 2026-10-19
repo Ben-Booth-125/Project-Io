@@ -53,6 +53,7 @@
 #include "world/road_generation.hpp" // BL-1347: lay_site_roads, after this path's own stamper
 #include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
 #include "ui/ground_bake.hpp"        // BL-1375: prepare_source, the bake the audit reads
+#include "ui/route_paint.hpp"       // BL-1382: k_route_rail, the one tile-field rung
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
 #include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
@@ -4550,6 +4551,49 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 }
             }
         }
+        // BL-1382 - A LINK DRAWN WHERE THE WORLD LAID NOTHING. Every count above walks
+        // the WORLD's edges and asks whether the bake drew them, so it is blind in the
+        // one direction Ben's report points: a run drawn ACROSS A BOUNDARY THAT CARRIES
+        // NO ROAD ("I see it connect in all possible directions, not just the direction
+        // it was built in"). This walks the BAKE's links instead and asks the world. It
+        // is the same two quantities this call already holds, combined the other way
+        // round - no new data reaches the script.
+        int drawn_without_edge = 0, drawn_rail_join = 0;
+        if (n > 0 && src.route_links.size() == n && src.road.size() == n
+            && src.road_sides.size() == n)
+        {
+            constexpr int card2[4][2] = { { +1, 0 }, { -1, 0 }, { 0, +1 }, { 0, -1 } };
+            const auto wrap2 = [&](int c) { return ((c % src.gw) + src.gw) % src.gw; };
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (src.road[i] == 0)
+                    continue;
+                const int r = static_cast<int>(i) / src.gw, c = static_cast<int>(i) % src.gw;
+                for (int d = 0; d < 4; ++d)
+                {
+                    if (((src.route_links[i] >> d) & 1u) == 0)
+                        continue; // nothing drawn this way
+                    const int side = hex_side_for_offset(card2[d][0], card2[d][1], (r & 1) != 0);
+                    const std::uint16_t mask = src.road_sides[i];
+                    const int tier = (side >= 0)
+                        ? static_cast<int>((mask >> (2 * side)) & 0x3u) : 0;
+                    if (tier != 0)
+                        continue; // drawn across an edge the world laid: correct
+                    // The one legitimate exception: rail is a TILE field, so a link to
+                    // or from a rail tile needs no edge. Counted apart rather than
+                    // excused silently.
+                    const int nr = r + card2[d][1];
+                    const std::size_t ni = (nr >= 0 && nr < src.gh)
+                        ? static_cast<std::size_t>(nr) * src.gw + wrap2(c + card2[d][0]) : n;
+                    const bool rail = src.road[i] == ui::ground::k_route_rail
+                                   || (ni < n && src.road[ni] == ui::ground::k_route_rail);
+                    if (rail) ++drawn_rail_join;
+                    else      ++drawn_without_edge;
+                }
+            }
+        }
+        out["drawn_without_edge"] = drawn_without_edge; ///< BL-1382: a run drawn across a roadless boundary
+        out["drawn_rail_join"]    = drawn_rail_join;    ///< ...excused because one end is rail (a tile field)
         out["edges"]         = edges;        ///< every road crossing on the body, each once
         out["linked_both"]   = linked_both;  ///< ...publishing its bit on BOTH tiles
         out["linked_one"]    = linked_one;
