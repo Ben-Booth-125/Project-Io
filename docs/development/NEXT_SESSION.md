@@ -122,6 +122,12 @@ read them before measuring anything.
 - **Ben's running game holds `build_rel/ProjectIo.exe`.** The link then fails with `LNK1104` and
   your checks silently run the **old** exe. Confirm `BUILD_REL_EXIT 0` before believing any result.
   This cost this session a false alarm on two assertions.
+- **A HARNESS EXE IS NOT REBUILT BY BUILDING THE APP.** `bash tools/build_rel.sh` builds the game;
+  `build_gen/verify/<name>.exe` stays whatever it was. An after-measurement run against a harness
+  built before the change reads EXACTLY like the baseline - BL-1346's first haulage reading came
+  back digit-identical to its baseline and the honest conclusion "nothing moved" was wrong by 44%.
+  Rebuild the harness, or compare its exe timestamp against the source you changed.
+
 - **Worktree lanes arrive stale.** Six of nine lanes started behind main, one by 33 commits.
   `git log -1` and `git merge main` before writing a line, and say so in the report.
 - **A worktree agent cannot reach `cmd.exe`**, so `build_app.bat` is unusable there. Use

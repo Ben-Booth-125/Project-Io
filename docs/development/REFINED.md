@@ -39,8 +39,9 @@ pull, so a road moves a market's edge and a technology or a building can widen i
   writes go through `world::set_tile_nation` so the stamp cannot be forgotten; A3 and A5 assert
   what their banners claim and the banner stops claiming a pull fixture that does not exist;
   MARKETS.md says asking per tile now costs a field. NR-1050 carries the in-band readings.
-- [ ] **T8** `haulage_measure --far-trade` after the change, against the baseline on 7f4f9461
-  (window E 771 / 3543.5, window Y 841 / 4188.6).
+- [x] **T8** `haulage_measure --far-trade` after the change: window E 771 / 3543.5 -> 1112 / 6282.9,
+  window Y 841 / 4188.6 -> 1159 / 6733.7. Trade rose sharply, which is the item working - a tile
+  clears where its goods can reach - and is flagged for Ben as the move no golden can see.
 
 ### BL-1352 (one Logistic Point system) — Delivery Full
 
