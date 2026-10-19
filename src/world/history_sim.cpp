@@ -1551,6 +1551,10 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // per mille of the average realm's world-share income (the rate, a
         // year), for a realm holding any ground. It lifts the poorest to the
         // floor and never cuts a realm above it, so the order holds.
+        // The earn BEFORE the floor's lift: what tribute reads (Ben,
+        // 2026-10-19: "tribute reads the earn before the floor") -- the lift
+        // stays with the subject.
+        const int64_t endowment_income_prefloor = endowment_income;
         if (params.treasury_endowment_world_share && params.treasury_endowment_floor_q > 0 && held_count > 0)
         {
             const int64_t floor_income =
@@ -1576,8 +1580,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         seat.treasury = clampi64(
             seat.treasury + endowment_income + corridor_income + trade_income + tribute_income,
             0, 1LL << 48);
-        // BL-1386: the round's earn, kept for tribute (a share of the earn).
-        q.round_earn = std::max<int64_t>(levy_income + endowment_income + corridor_income + trade_income, 0);
+        // BL-1386: the round's earn, kept for tribute (a share of the earn) --
+        // read BEFORE the endowment floor's lift, which stays with the realm.
+        q.round_earn = std::max<int64_t>(levy_income + endowment_income_prefloor + corridor_income + trade_income, 0);
         if (spend) // BL-1298 census, write-only
         {
             spend->earn_endowment += endowment_income;
@@ -1674,6 +1679,15 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (heads > 0 && rate > 0)
             {
                 const int64_t due = (heads * rate) / 1000;
+                // BL-1386 review -- THE ARMY SHARE, CHECKED: with the army
+                // sized to the earn, the bill is within the share of it.
+                if (spend && params.standing_army_sized_to_earn)
+                {
+                    const int64_t carry = army_carry(std::max<int64_t>(
+                        levy_income + endowment_income + corridor_income + trade_income + tribute_income, 0));
+                    ++spend->army_share_rounds;
+                    if (due > carry) ++spend->army_over_share;
+                }
                 int64_t heads_paid = heads;
                 int64_t paid_sum   = due;
                 if (seat.treasury < due)
@@ -6394,6 +6408,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_earned_levy          += upkeep_spend.earn_levy;
             out.army_disbanded_by_earn        += upkeep_spend.army_disbanded_by_earn;
             out.army_sized_rounds             += upkeep_spend.army_sized_rounds;
+            out.army_share_rounds             += upkeep_spend.army_share_rounds; // BL-1386 review
+            out.army_over_share               += upkeep_spend.army_over_share;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
             out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
@@ -7274,6 +7290,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         : (sseat.treasury * params.treaty_tribute_rate_q) / 1000;
                     if (amount > 0)
                     {
+                        // BL-1386 review -- TRIBUTE, CHECKED: on the earn, never
+                        // above its share of the subject's pre-floor earn.
+                        if (params.tribute_on_earn)
+                        {
+                            ++out.tribute_payments_on_earn;
+                            if (amount > (std::max<int64_t>(subj.round_earn, 0) * params.treaty_tribute_rate_q) / 1000)
+                                ++out.tribute_over_earn;
+                        }
                         sseat.treasury -= amount;
                         lseat.treasury = clampi64(lseat.treasury + amount, 0, 1LL << 48);
                         out.tribute_remitted += amount;

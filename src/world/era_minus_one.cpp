@@ -434,7 +434,7 @@ history_sim_params exploration_sim_params(const world_params& params)
     // (both calibrated), and tribute is a share of the subject's earn.
     hp.standing_army_earn_share_q = params.standing_army_earn_share_q;
     hp.treasury_endowment_floor_q = params.treasury_endowment_floor_q;
-    hp.tribute_on_earn            = true;
+    hp.tribute_on_earn            = params.tribute_on_earn;
 
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration

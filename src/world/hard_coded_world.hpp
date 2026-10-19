@@ -315,6 +315,10 @@ struct world_params
     /// and the 7 short majors are traced as a follow-up.
     int standing_army_earn_share_q = 600; // Ben, 2026-10-19: the 600/500 cell
     int treasury_endowment_floor_q = 500; // Ben, 2026-10-19: the 600/500 cell
+    /// ...and tribute is a share of the subject's earn (before the floor's
+    /// lift), not of its chest (EXPLORATION.md, Ben 2026-10-19). On in every
+    /// shipped world; a field so the census can measure the chest arm.
+    bool tribute_on_earn = true;
     /// ...and the treasury's exchange rate into industry points in the
     /// Industrialisation span, points per THOUSAND treasury units
     /// (`history_sim_params::industry_points_per_1000_treasury_units`).
