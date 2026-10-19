@@ -4731,10 +4731,40 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                 why = "A road is laid from a road: this tile carries none, so there is "
                       "nowhere to cross from. Bring one to a neighbour first.";
             else if (targets.empty())
-                // BL-1379: the press is dead, not armed-and-silent, so the sentence
-                // says what the ground refuses rather than what a press would show.
-                why = "Nowhere left to cross to from this tile at this tier: every side is "
-                      "either already roaded to this standard or one no crossing may take.";
+            {
+                // BL-1379: the press is dead, not armed-and-silent, so the sentence says
+                // what the ground refuses rather than what a press would show.
+                //
+                // BL-1385 (Ben, in play 2026-10-18): and it says WHICH ground rule
+                // refused, asked of the rules rather than assumed. This sentence used to
+                // be one sentence for every case - "every side is either already roaded
+                // to this standard or one no crossing may take" - and it was simply not
+                // true of the commonest case: a tile ANOTHER NATION holds, which a road
+                // may cross into but never be built out of (BL-1357). A player reading it
+                // would upgrade the tier, or look for an unroaded side, and neither can
+                // ever work there.
+                switch (ui::road_crossing_refusal(w, tile_id, rt.level, w.player_entity))
+                {
+                    case placement_rules::placement_reason::foreign_ground:
+                        why = "Another nation holds this tile. A road may cross INTO their "
+                              "ground, but never be built out of it - so build from your "
+                              "own side of the border.";
+                        break;
+                    case placement_rules::placement_reason::no_road_to_extend:
+                        why = "A road is laid from a road: this tile carries none, so there "
+                              "is nowhere to cross from. Bring one to a neighbour first.";
+                        break;
+                    case placement_rules::placement_reason::ocean:
+                        why = "No side of this tile is a crossing: each one either has no "
+                              "neighbour or is a side no cost walk can take.";
+                        break;
+                    default:
+                        why = "Nowhere left to cross to from this tile at this tier: every "
+                              "crossable side already stands at this standard or better. A "
+                              "higher tier would raise them.";
+                        break;
+                }
+            }
             else if (!affordable)
                 why = "Can't afford it: the crossing charges "
                     + std::to_string(static_cast<int>(road_capex)) + " cr.";

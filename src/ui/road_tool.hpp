@@ -19,6 +19,7 @@
 // the legality of a crossing is stated in exactly one place
 // (`src/world/placement_rules.cpp`). Nothing here invents a condition of its own.
 
+#include "world/placement_rules.hpp" // BL-1385: the refusal the press explains
 #include "world/world.hpp"
 
 #include <cstdint>
@@ -48,5 +49,21 @@ struct road_target
 std::vector<road_target> road_crossing_targets(const world& w, entity_id tile,
                                                std::uint8_t tier,
                                                entity_id actor = null_entity);
+
+/// WHY an empty set is empty (BL-1385; Ben, in play 2026-10-18: "every tile with a road
+/// I try to press has the build button greyed out"). The muted press carries the whole
+/// of the reason, and until this it carried ONE reason for every case - "every side is
+/// either already roaded to this standard or one no crossing may take" - which is a
+/// sentence about the ground that was never checked against the ground. A crossing
+/// refused because the tile belongs to ANOTHER NATION (BL-1357) was told it had nowhere
+/// left to go, which is a different thing the player would act on differently.
+///
+/// Returns the refusal that best explains the set: `foreign_ground` where any side was
+/// refused for it (the one the player cannot fix on this tile), then
+/// `no_road_to_extend`, then `already_road`, then `ocean` for a tile whose every side is
+/// uncrossable or has no neighbour. `ok` when the set is NOT empty.
+placement_rules::placement_reason road_crossing_refusal(const world& w, entity_id tile,
+                                                        std::uint8_t tier,
+                                                        entity_id actor = null_entity);
 
 } // namespace ui

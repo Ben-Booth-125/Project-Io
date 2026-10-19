@@ -30,4 +30,37 @@ std::vector<road_target> road_crossing_targets(const world& w, entity_id tile,
     return out;
 }
 
+placement_rules::placement_reason road_crossing_refusal(const world& w, entity_id tile,
+                                                        std::uint8_t tier, entity_id actor)
+{
+    using reason = placement_rules::placement_reason;
+    if (w.tiles.find(tile) == w.tiles.end())
+        return reason::no_tile;
+    // ONE WALK, THE SAME GATE. The rules are asked side by side and the answers RANKED,
+    // rather than the first one winning: a tile usually refuses for several reasons at
+    // once, and which of them the player can act on differs. Foreign ground is first
+    // because no amount of money or upgrading opens it; a tile with no road to build out
+    // of is next, because the player fixes it elsewhere; "already at this tier" is last,
+    // because it is the benign one.
+    bool foreign = false, no_road = false, already = false, any_side = false;
+    for (int s = 0; s < 6; ++s)
+    {
+        const placement_rules::placement_result r =
+            placement_rules::can_place_road(w, tile, s, tier, actor);
+        if (r)
+            return reason::ok; // the set is not empty after all
+        switch (r.reason)
+        {
+            case reason::foreign_ground:    foreign  = true; any_side = true; break;
+            case reason::no_road_to_extend: no_road  = true; any_side = true; break;
+            case reason::already_road:      already  = true; any_side = true; break;
+            default: break; // ocean: an uncrossable side or no neighbour that way
+        }
+    }
+    if (foreign)  return reason::foreign_ground;
+    if (no_road)  return reason::no_road_to_extend;
+    if (already)  return reason::already_road;
+    return any_side ? reason::already_road : reason::ocean;
+}
+
 } // namespace ui

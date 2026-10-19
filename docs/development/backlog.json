@@ -1481,6 +1481,30 @@
    ],
    "title": "lp_anchor_field_check's F1 row lost its subject when the march stopped reading the anchor field",
    "design": "SPRINT 55, from BL-1352. F1 asks whether the field THE TICKS BUILT survives invalidate_logistics_caches - a question that needs a live consumer to have built one. The march was that consumer (it looked up its nearest anchor every tick); BL-1352 moved the march onto the nation's pool, so a play year now leaves no cached field and F1 is counted on 0 of 1 anchored bodies. It is reported as a loud SKIP naming this item rather than passed quietly (BL-714: a check that never looked is not a pass) and rather than failed, since there is no failure - there is no subject. THE WORK, once BL-1361 lands (a shipment draws points at the anchor it leaves, which reads this same field): turn the SKIP back into the assertion, and check that the warm field the trade pass builds is the one the read reuses. If BL-1361 ends up reading something else entirely, retire F1 and say so in the harness header."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-18",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (in play, 2026-10-18)",
+   "requires": [],
+   "id": "BL-1385",
+   "short_name": "ROAD_PRESS_BLAMES_WRONG_RULE",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/road_tool.cpp",
+    "src/ui/road_tool.hpp",
+    "tools/verify/road_offer_census.cpp"
+   ],
+   "title": "The muted road press blamed the tier when the real refusal was another nation's ground",
+   "design": "SPRINT 55. BEN, in play 2026-10-18: \"I can't seem to find anywhere that's valid to build a road. Every tile with a road I try to press has the build button greyed out with 'nowhere left to cross from this tile at this tier'.\" MEASURED the same day by the new tools/verify/road_offer_census.cpp, which asks the rules the same question the UI asks, as the player's own corp, over the shipped seed-0 start: of 5017 ROADED tiles on the body only 53 (1.1%) admit a crossing, and 4647 of the refusals are FOREIGN GROUND (BL-1357), not the tier. On the player's OWN nation's ground 53 of 57 roaded tiles admit (93%) - but that nation holds 120 tiles of 31581, so 99.6% of what Ben can press is somebody else's country. THE RULE WORKED; THE SENTENCE LIED, and it lied in the way BL-1381 just made a rule about: it asserted a cause ('every side is either already roaded to this standard or one no crossing may take') that nothing had checked. DELIVERED 2026-10-18: ui::road_crossing_refusal asks can_place_road side by side and RANKS the answers - foreign ground first (no money or tier opens it), then nothing-here-to-build-from, then already-at-tier, then no-crossable-side - and the press's explainer says which one, so foreign ground now reads 'Another nation holds this tile. A road may cross INTO their ground, but never be built out of it - so build from your own side of the border.' WHAT IS STILL BEN'S: whether a corporation building only inside its home nation (plus one crossing over the border) is the intended reach, given that reach is 0.4% of the body. The census is the instrument for that call and prints the number for any seed."
   }
  ]
 }
