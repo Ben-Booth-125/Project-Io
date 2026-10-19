@@ -310,7 +310,8 @@ and both are wanted: a colony can want something its overlord does not care abou
 wants can point at a *rival's* colony across a frontier the metropoles have treatied over.
 
 **Tribute is a share of the subject's earn, not of its chest (Ben, 2026-10-19).** A subject remits
-a share of what it earned that round; what it has saved is its own. A tribute levied on the chest
+a share of what it earned that round, **read before the endowment floor** (the floor's lift stays
+with the subject); what it has saved is its own. A tribute levied on the chest
 decays a subject's savings geometrically, round after round, until a long-held colony closes the
 history with nothing — which is the drain this rule removes.
 

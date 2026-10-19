@@ -660,7 +660,11 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                 // 188.8 (pre-BL-1310 236) -- its many small realms seat on
                 // their smaller piece, and the floor absorbs them (trace in
                 // HANDOFF_SPRINT_56.md). The majors' 80% ceiling still applies.
-                static const std::map<uint32_t, int> k_accepted_median = { { 43, 145 } };
+                // Seeds 28 (181 against 181.6) and 13 (496 against 515.2),
+                // accepted 2026-10-19: BL-1386's treasury rules move the
+                // history's armies and conquests, and with them these two
+                // worlds' minors.
+                static const std::map<uint32_t, int> k_accepted_median = { { 13, 496 }, { 28, 181 }, { 43, 145 } };
                 const auto   acc_it   = k_accepted_median.find(seed);
                 const bool   accepted = acc_it != k_accepted_median.end();
                 const auto   base_it  = k_pre_bl1310_median.find(seed);

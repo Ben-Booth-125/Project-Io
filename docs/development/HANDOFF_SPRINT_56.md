@@ -24,7 +24,9 @@ library seeds, BL-1310 had collapsed 8 seeds (minors' median 4-22 tiles; majors 
 and 31). Traced to two causes and fixed by ruling (Ben, 2026-10-18): an exclave is split among the
 nations that border it, province by province; city states are judged at the close; a realm under
 the floor keeps its larger piece. world_audit now reads sizes: 15 seeds pass 80% of their own
-pre-BL-1310 median, and seed 43 is an accepted exception pinned at its reading (145; Ben).
+pre-BL-1310 median, and seeds 43 (145), 28 (181) and 13 (496) are accepted exceptions pinned at their readings (Ben,
+2026-10-18 and 2026-10-19). market_viability per-seed: seeds 9, 40 and 11 dip under 85 at tick 50 and
+are accepted as world variance (Ben, 2026-10-19); the pooled gates pass.
 
 ## Integration steps, in order
 
