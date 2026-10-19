@@ -576,7 +576,10 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 nation and sees its starting credits, so a median nation opening on a fraction of a credit is a
 defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
 across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
-granted at the handoff. No nation, the player's or a rival's, takes on debt before the game starts —
+granted at the handoff. **No major leaves generation on a zero treasury (Ben, 2026-10-19):** a major
+holds state industry — its share of the hubs that make Logistic Points among it — and a state that
+cannot fund any of it idles every hub at the first tick and starves the firms on its ground. No
+nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
 (Ben, 2026-10-11):
