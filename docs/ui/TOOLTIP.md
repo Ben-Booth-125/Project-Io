@@ -59,9 +59,11 @@ designs, not a consequence of the resolution rule.
 **A lens can suppress the card entirely.** Under an active lens the pointer resolves to the lens's
 own structure or to nothing, and where it resolves to nothing **no card appears at all** (Ben,
 2026-08-28; [SELECTION.md](SELECTION.md) § A lens collapses selection to ONE TIER owns the rule).
-Three lenses — Population, Industry, Throughput — draw a value field with no structure grain, so
-the card is absent across the whole body while one of them is active. The card answers the
-question the lens is asking; a lens with no question about this ground gets no answer.
+Two lenses — Population and Industry — draw a value field with no structure grain, so the card is
+absent across the whole body while one of them is active. The card answers the question the lens
+is asking; a lens with no question about this ground gets no answer. **Throughput is the
+exception:** its field resolves to the ground, so it shows a card and still takes no click (Ben,
+2026-10-20; SELECTION.md owns the rule).
 
 ---
 
@@ -114,7 +116,7 @@ lens is asking:
 | Entity | Lens | Content |
 |---|---|---|
 | **Tile** | Resource | composition · landform header, the selected resource's deposit richness, a richness-band why-line |
-| **Tile** | Population | header, habitability, workforce cap, the 0.6-cliff why-line |
+| **Ground** | Throughput | the tile's coverage of the player nation's points, and that nation's sources that reach it — the why behind the drawn number |
 | **Tile** | *(default)* | header, habitability, and the landform's movement-cost multiplier (`landform_logistics_cost`) when not plains |
 | **Building** (player) | any | type, target/recipe line, workforce, an operational why-line (idle / understaffed / active) |
 | **Building** (rival) | any | type + owner emblem only — production/stockpile stay private (the competitor-visibility rule, DISCOVERY.md) |

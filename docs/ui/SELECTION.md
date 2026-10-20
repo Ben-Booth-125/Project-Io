@@ -806,6 +806,17 @@ surface a hover, and clicks will do nothing"). This is a deliberate category, no
 field is something you *read*, and giving it a fake selectable grain would promise a pivot it has
 no destination for.
 
+**Throughput takes a hover read, and still no selection (Ben, 2026-10-20, choosing option A
+for BL-1353, the throughput lens rework).** Its field is the player nation's own per-tile
+coverage, a figure that differs tile to tile and has a cause worth naming — so the pointer
+resolves to **the ground**, `structure_kind::ground`, and the hover card reads it. The card is
+the *why* behind the drawn number: the tile's coverage and the nation's sources that reach it.
+It is also the only read at a rung too far out for the per-tile numbers to draw. **A click
+stays inert** and clears the band to resting, exactly as above: a hover read promises no pivot,
+so the "no destination" objection does not arise. Ground the lens leaves bare — another
+nation's — resolves to nothing and shows no card. Population and Industry are unchanged: still
+pure reads, no hover, no selection (Ben, same ruling: "Throughput only").
+
 ### The lens names the ledger the selection drives
 
 Resolving the entity and choosing its 'go to' ledger are the *same* decision — the lens that
@@ -820,7 +831,8 @@ validates the structure also routes it.
 | **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
 | **Continent** | the **plate** | History ledger, at its tectonic record |
 | **Nations** | the **nation** whose territory is under the pointer | wherever a press on its border band goes — the same `structure_kind::nation` selection |
-| **Population** / **Industry** / **Throughput** | nothing — inert | — |
+| **Population** / **Industry** | nothing — inert | — |
+| **Throughput** | **the ground**, for the hover card only — a click is inert | — |
 | **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
 **A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
