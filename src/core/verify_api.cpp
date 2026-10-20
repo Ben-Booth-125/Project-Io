@@ -5596,6 +5596,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["tile_w"]            = c.tile_w;
         out["actions_w"]         = c.actions_w;
         out["height"]            = c.height;
+        out["lp_drawn"]          = c.lp_drawn;          // BL-1354: the Logistics section
+        out["lp_makes"]          = c.lp_makes;
+        out["lp_uses"]           = c.lp_uses;
+        out["lp_need"]           = c.lp_need;
+        out["lp_rivals_hidden"]  = c.lp_rivals_hidden;
         sol::table rows = st.create_table();
         int n = 0;
         for (const std::string& r : c.province_rows)

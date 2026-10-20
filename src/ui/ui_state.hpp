@@ -1253,6 +1253,15 @@ struct ui_state
         std::vector<std::string> province_rows;             ///< Resource names, table order.
         std::vector<tile_card_button> buttons;
         float       preview_w = 0.0f, province_w = 0.0f, tile_w = 0.0f, actions_w = 0.0f, height = 0.0f;
+        /// BL-1354: the Logistics section's figures as drawn - what a source here makes,
+        /// what this tile's (counted) buildings are granted and need, and how many rival
+        /// buildings were left out of the count for visibility. `lp_drawn` is false when
+        /// the section did not draw (a building expanded, or no resolve yet).
+        bool        lp_drawn         = false;
+        float       lp_makes         = 0.0f;
+        float       lp_uses          = 0.0f;
+        float       lp_need          = 0.0f;
+        int         lp_rivals_hidden = 0;
     };
     tile_card_readout tile_card;
 

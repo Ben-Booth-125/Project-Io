@@ -453,6 +453,17 @@
    "call": "a) the build supply check counts input claims of buildings under construction or chartered in the same window (raise as an AI grant question); b) accept as world variance.",
    "resolved": "2026-10-19",
    "resolution": "Ben: accept as world variance (seed 40 G1 t50 74.2). Same form: seed 9's hydroponics charter web accepted as world variance (G1 t50 ~83). No AI grant widened."
+  },
+  {
+   "id": "NR-1055",
+   "title": "Tile Logistics section: Uses counts only the player's own buildings",
+   "raised": "2026-10-20",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1354 (tile logistics section), built 2026-10-20",
+   "what": "Ben asked for the points consumed by a tile. A rival building's point need is workforce x target, i.e. its run rate, which DISCOVERY.md keeps private. Taken on Ben's behalf: Uses counts the player's own buildings (god view: all), and the hover names how many rival buildings were left out. SELECTION.md records it.",
+   "why_it_matters": "A figure that reads a rival's private state is a visibility call, which is Ben's, not an in-band calibration.",
+   "call": "a) keep: own buildings only, rivals counted as a number (built); b) count every building on the tile, rivals included, as the request read literally; c) show rivals' consumption only as an aggregate."
   }
  ]
 }

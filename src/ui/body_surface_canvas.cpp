@@ -2022,6 +2022,30 @@ entity_id resolve_structure_hit(const std::vector<structure_hit_zone>& zones,
 
 } // namespace
 
+// BEFORE THE FIRST ECONOMY STEP the report holds no resolve, and a world that has
+// not ticked still has its generated hubs: a capture of the lens on the 1960 start
+// read "No source makes Logistic Points here", which is a worse lie than the one
+// BL-1352 came to fix. So an empty report falls back to ONE resolve - guarded by
+// the frame stamp `update_body_vision` uses, which carries `current_day_tick`, the
+// building count and the logistics generation, so a paused game resolves once
+// rather than once a frame. Shared with the tile card's Logistics section (BL-1354),
+// which read the bare report and said "Makes none" on a port while the lens key,
+// one panel over, said that port made 120.
+const lp_tick& logistic_points_or_fallback(world& w, entity_id body, const lp_tick& resolved)
+{
+    if (!resolved.sources.empty() || !resolved.nations.empty())
+        return resolved;
+    static body_frame_stamp s_fallback_stamp;
+    static lp_tick          s_fallback;
+    const body_frame_stamp stamp = make_body_frame_stamp(w, body);
+    if (stamp != s_fallback_stamp)
+    {
+        s_fallback_stamp = stamp;
+        s_fallback       = resolve_logistic_points(w);
+    }
+    return s_fallback;
+}
+
 void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg,
                             const lp_tick& resolved)
 {
@@ -2072,27 +2096,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     // every frame from the report — never banked, never fed back to the sim.
     (void)reg;
 
-    // BEFORE THE FIRST ECONOMY STEP the report holds no resolve, and a world that
-    // has not ticked still has its generated hubs: a capture of the lens on the
-    // 1960 start read "No source makes Logistic Points here", which is a worse lie
-    // than the one this item came to fix. So an empty report falls back to ONE
-    // resolve — guarded by the frame stamp `update_body_vision` uses, which carries
-    // `current_day_tick`, the building count and the logistics generation, so a
-    // paused game resolves once rather than once a frame.
-    static body_frame_stamp s_fallback_stamp;
-    static lp_tick          s_fallback;
-    const lp_tick* chosen = &resolved;
-    if (resolved.sources.empty() && resolved.nations.empty())
-    {
-        const body_frame_stamp stamp = make_body_frame_stamp(w, state.active_body);
-        if (stamp != s_fallback_stamp)
-        {
-            s_fallback_stamp = stamp;
-            s_fallback       = resolve_logistic_points(w);
-        }
-        chosen = &s_fallback;
-    }
-    const lp_tick& lp = *chosen;
+    const lp_tick& lp = logistic_points_or_fallback(w, state.active_body, resolved);
     state.lp_anchors.reserve(lp.sources.size());
     for (const lp_source_row& src : lp.sources)
     {

@@ -106,9 +106,15 @@ void update_body_vision(world& w, ui_state& state, double now_days);
 /// @param reg    Recipe registry. Unused since BL-1352 (the retired per-anchor rate
 ///               was the only thing read from it); kept so the call site is stable.
 /// @param resolved This tick's resolved Logistic Points (the economy report's). Before
-///               the first economy step it is empty, and the lens then shows no source,
-///               which is the truth about a world that has not ticked.
+///               the first economy step it is empty, and the lens reads
+///               `logistic_points_or_fallback` instead.
 void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg,
                             const lp_tick& resolved);
+
+/// @p resolved when it holds a resolve; before the first economy step (an empty
+/// report) one resolve of the world, cached on the body's frame stamp so a paused
+/// game resolves once. Every surface that reads Logistic Points off the report goes
+/// through this, so the lens and the tile card cannot disagree (BL-1354).
+const lp_tick& logistic_points_or_fallback(world& w, entity_id body, const lp_tick& resolved);
 
 } // namespace ui

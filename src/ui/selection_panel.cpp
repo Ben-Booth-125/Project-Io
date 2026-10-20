@@ -23,6 +23,7 @@
 #include "world/condition_set.hpp"   // condition_text — the contract card's predicate (BL-577)
 #include "world/corp_ai.hpp"         // corp_reserve_floor / corp_should_have_buffer — god-view corp readout (BL-408)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
+#include "body_surface_canvas.hpp"    // logistic_points_or_fallback (BL-1354)
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
 #include "world/logistics.hpp"       // invalidate_logistics_caches (idle/resume flips the anchor set)
@@ -3124,6 +3125,123 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
     ImGui::EndChild();
 }
 
+// BL-1354: the tile card's LOGISTICS section (SELECTION.md § The tile element's
+// layout, item 3; Ben, 2026-10-16: "show the number of logistics points provided,
+// and the number consumed by that tile"). Two figures under one label - what a
+// source here MAKES and what this tile's buildings USE out of what they need - read
+// off the tick's own resolve (`report.logistic_points`), never re-derived, and a
+// hover with the detail: whose pool the ground draws on, the coverage a building
+// here would get, and a line per source and per counted building.
+//
+// USES COUNTS THE PLAYER'S OWN BUILDINGS (god view: all). A rival building's need is
+// its run rate, which the competitor-visibility rule keeps private (DISCOVERY.md),
+// so the hover says how many were left out rather than folding them in.
+static void draw_tile_logistics(world& w, const economy_report& report, ui_state& ui,
+                                entity_id tile_id, bool god)
+{
+    const auto host = w.tiles.find(tile_id);
+    const lp_tick& lp = logistic_points_or_fallback(
+        w, host != w.tiles.end() ? host->second.body : null_entity, report.logistic_points);
+
+    float makes = 0.0f;
+    std::vector<const lp_source_row*> sources;
+    for (const lp_source_row& s : lp.sources)
+        if (s.tile == tile_id)
+        {
+            makes += s.made;
+            sources.push_back(&s);
+        }
+
+    float uses = 0.0f, need = 0.0f;
+    int   rivals_hidden = 0;
+    std::vector<const lp_building_row*> consumers;
+    for (const lp_building_row& r : lp.buildings)
+    {
+        const auto bit = w.buildings.find(r.building);
+        if (bit == w.buildings.end() || bit->second.tile != tile_id)
+            continue;
+        if (!god && !is_player_owned(w, r.building))
+        {
+            ++rivals_hidden;
+            continue;
+        }
+        uses += r.granted;
+        need += r.need;
+        consumers.push_back(&r);
+    }
+
+    ui.tile_card.lp_drawn         = true;
+    ui.tile_card.lp_makes         = makes;
+    ui.tile_card.lp_uses          = uses;
+    ui.tile_card.lp_need          = need;
+    ui.tile_card.lp_rivals_hidden = rivals_hidden;
+
+    // The label carries the hover; the two figures sit under it, one a line, because
+    // the tile card is a quarter of the band and narrow at the reference width.
+    ImGui::TextDisabled("Logistic Points");
+    const bool hovered_label = ImGui::IsItemHovered();
+    if (sources.empty())
+        ImGui::TextDisabled("Makes none");
+    else
+        ImGui::Text("Makes %.0f", static_cast<double>(makes));
+    if (need <= 0.0f)
+        ImGui::TextDisabled("Uses none");
+    else
+    {
+        // A shortfall reads as one: granted short of need by more than rounding.
+        const bool short_of = uses + 0.05f < need;
+        const ImVec4 col = ImGui::ColorConvertU32ToFloat4(short_of ? palette::negative
+                                                                   : palette::text_secondary);
+        ImGui::TextColored(col, "Uses %.1f of %.1f", static_cast<double>(uses),
+                           static_cast<double>(need));
+    }
+    if (!hovered_label)
+        return;
+
+    ImGui::BeginTooltip();
+    const auto nit = w.tile_to_nation.find(tile_id);
+    const entity_id nation = (nit != w.tile_to_nation.end()) ? nit->second : null_entity;
+    const auto nat = w.nations.find(nation);
+    if (nation == null_entity || nat == w.nations.end())
+        ImGui::TextUnformatted("Nobody's ground: it feeds and draws no pool.");
+    else
+    {
+        ImGui::Text("Draws on %s's pool", nat->second.name.c_str());
+        for (const lp_nation_row& n : lp.nations)
+            if (n.nation == nation)
+            {
+                float claim = 0.0f;
+                for (const float c : n.claim)
+                    claim += c;
+                ImGui::TextDisabled("Pool %.0f a tick, claimed %.0f", static_cast<double>(n.pool),
+                                    static_cast<double>(claim));
+            }
+        // The one genuinely per-tile figure: what a building HERE would get, which
+        // means something on an empty tile too.
+        lp_reach_memo memo;
+        ImGui::Text("Coverage here: %.0f%%",
+                    static_cast<double>(lp_coverage_at(w, memo, tile_id)) * 100.0);
+    }
+    for (const lp_source_row* s : sources)
+    {
+        const auto bit = w.buildings.find(s->building);
+        ImGui::Text("%s makes %.0f",
+                    bit != w.buildings.end() ? building_type_name(bit->second.type) : "Source",
+                    static_cast<double>(s->made));
+    }
+    for (const lp_building_row* r : consumers)
+    {
+        const auto bit = w.buildings.find(r->building);
+        ImGui::Text("%s uses %.1f of %.1f",
+                    bit != w.buildings.end() ? building_type_name(bit->second.type) : "Building",
+                    static_cast<double>(r->granted), static_cast<double>(r->need));
+    }
+    if (rivals_hidden > 0)
+        ImGui::TextDisabled("%d rival building%s not counted: private", rivals_hidden,
+                            rivals_hidden == 1 ? "" : "s");
+    ImGui::EndTooltip();
+}
+
 // The tile element (BL-1312; SELECTION.md § The tile element's layout): four
 // columns, left to right — Preview, Province, Tile, Actions — and NO header row:
 // the shared `[icon] Tile [x, y] [>]` row spent a line of the band on a name the
@@ -3221,6 +3339,8 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
                     ImGui::SetTooltip("Road tier: Track (thin) - Road - Highway (thick, bright).\n"
                                       "A better road moves goods across this tile faster.");
             }
+            ImGui::Separator();
+            draw_tile_logistics(w, report, ui, tile_id, god);
             ImGui::Separator();
             draw_tile_building_grid(w, reg, report, ui, stacks);
         }

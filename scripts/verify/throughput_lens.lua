@@ -91,3 +91,17 @@ end
 -- key ever moves back to the background draw list.
 verify.select_tile(sx, sy)
 shot("throughput_lens_key_over_selection")
+
+-- T4 — BL-1354: the tile card's Logistics section on that same source tile. The
+-- source stands here, so "Makes" must carry its points.
+local card = verify.tile_card()
+verify.expect(card.drawn and card.lp_drawn,
+              "BL-1354: the tile card draws its Logistics section")
+verify.expect(card.lp_makes > 0,
+              "BL-1354: a source tile's Logistics section says what it makes ("
+              .. tostring(card.lp_makes) .. ")")
+verify.expect(card.lp_uses <= card.lp_need + 0.001,
+              "BL-1354: what the tile uses never exceeds what it needs")
+print("[throughput_lens] tile card logistics: makes " .. tostring(card.lp_makes)
+      .. ", uses " .. tostring(card.lp_uses) .. " of " .. tostring(card.lp_need)
+      .. ", rivals hidden " .. tostring(card.lp_rivals_hidden))

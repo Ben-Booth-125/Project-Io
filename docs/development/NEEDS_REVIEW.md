@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*32 entries — 27 open, 5 resolved.*
+*33 entries — 28 open, 5 resolved.*
 
 ---
 
@@ -240,6 +240,13 @@ MARKETS.md rules that catchment is logistics cost over pull, and LOGISTICS.md se
 Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).
 
 **Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
+
+### NR-1055 — Tile Logistics section: Uses counts only the player's own buildings
+*decision · raised 2026-10-20 · from BL-1354 (tile logistics section), built 2026-10-20*
+
+Ben asked for the points consumed by a tile. A rival building's point need is workforce x target, i.e. its run rate, which DISCOVERY.md keeps private. Taken on Ben's behalf: Uses counts the player's own buildings (god view: all), and the hover names how many rival buildings were left out. SELECTION.md records it.
+
+**Why it matters.** A figure that reads a rival's private state is a visibility call, which is Ben's, not an in-band calibration.
 
 ---
 

@@ -188,6 +188,24 @@ a tile keep the shared header (§ Layout & chrome).
 3. **Tile — one titled card: the buildings on this tile.** Tile grain, because a building
    stands on a tile. **Buildings only** — no market or price rows; what the tile's goods fetch
    is the Market ledger's question.
+   - **A Logistics section, between the title and the grid** (Ben, 2026-10-16: "we should
+     improve visibility by giving tile selection a surface for logistics. We should show the
+     number of logistics points provided, and the number consumed by that tile"). Owned by
+     BL-1354 (tile logistics section). Two figures under a *Logistic Points* label, read off the
+     tick's own resolve (`LOGISTICS.md` § Logistic Points), never re-derived:
+     - **Makes** — what a source standing on this tile (hub, station or port) makes this tick,
+       upkeep folded in; *none* where no source stands.
+     - **Uses** — the points granted to this tile's producing buildings, **out of** what they
+       need, so a shortfall reads as one (drawn in the warning colour when granted falls short).
+     Hovering the label opens the detail: **whose pool** this ground draws on — every building
+     on a nation's ground draws *that nation's* pool, whoever owns it — with the pool and its
+     claim; the **coverage** a building here would get (`lp_coverage_at`, the one genuinely
+     per-tile figure, meaningful on an empty tile too); and one line per source and per
+     consuming building. Ground no nation holds feeds no pool, and the detail says so.
+     **Uses counts the player's own buildings only**: a rival building's need is its run rate,
+     which the competitor-visibility rule keeps private (DISCOVERY.md), so the detail names how
+     many rival buildings were left out rather than folding them into the figure. Spectator god
+     view counts every building, as it opens every rival card.
    - **A grid of building buttons, three across**, one button per **stack** (grouped by type,
      what it makes, and owner — `placement_rules::stack_members`; a rival's stacks group by
      type and owner only, since splitting them by recipe would itself reveal the recipes). Each
