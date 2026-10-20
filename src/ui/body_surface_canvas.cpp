@@ -4473,13 +4473,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // sand tones stay for the plain canvas, where a road is part of the land.
             ImU32 col; float thick;
             const bool lens_white = route_lens;
-            // NOTE (BL-1353): the recolour below is in the pass the item named, and the
-            // stroke cache now keys on the lens so a toggle rebuilds it - but the roads
-            // still read SAND in every captured rung under this lens, so something
-            // upstream of these colours is what reaches the screen (the painted bake, or
-            // a path that skips this block). Left as the item's owed half rather than
-            // papered over with a width multiplier, which changed nothing visible and so
-            // proved the strokes are not what is drawn.
             switch (max_road_tier(tile))
             {
                 case 1:  col = lens_white ? IM_COL32(225, 232, 240, 225) : IM_COL32(175, 158, 120, 205);
@@ -4498,12 +4491,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          // BL-1390: the EDGE's tier decides its half's weight, not the
                          // tile's best. The ladder is the same one the legend and the bake
                          // use - Track thin/dim, Road medium, Highway thick/bright.
-                         [](int tier, ImU32 fallback) -> ImU32 {
+                         // This per-edge colour is what reaches the screen for every
+                         // tiered half, so the lens's white has to live HERE too, or the
+                         // sand wins under the lens (BL-1353).
+                         [lens_white](int tier, ImU32 fallback) -> ImU32 {
                              switch (tier)
                              {
-                                 case 1:  return IM_COL32(175, 158, 120, 205);
-                                 case 2:  return IM_COL32(205, 188, 140, 225);
-                                 case 3:  return IM_COL32(225, 205, 150, 238);
+                                 case 1:  return lens_white ? IM_COL32(225, 232, 240, 225) : IM_COL32(175, 158, 120, 205);
+                                 case 2:  return lens_white ? IM_COL32(238, 243, 249, 240) : IM_COL32(205, 188, 140, 225);
+                                 case 3:  return lens_white ? IM_COL32(250, 252, 255, 255) : IM_COL32(225, 205, 150, 238);
                                  default: return fallback;
                              }
                          },
