@@ -52,7 +52,7 @@ float lp_reach(lp_network n, float d)
     const std::size_t i = static_cast<std::size_t>(n);
     if (!std::isfinite(d) || d < 0.0f)
         return 0.0f;
-    if (d <= lp_full_reach[i])
+    if (lp_full_strength(n, d)) // BL-1360: with the float tolerance (lp_full_eps)
         return 1.0f;
     const float over = d - lp_full_reach[i];
     if (over >= lp_fade_length[i])
@@ -80,6 +80,8 @@ float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_net
             return (lvl >= 1 && lvl <= 3) ? lp_road_step[lvl] : lp_offnet_step;
         }
         case lp_network::rail:
+            // BL-1360: never reached from lp_distance_field, which reads rail point to
+            // point off the rail network; kept total so the switch stays exhaustive.
             if (water)
                 return -1.0f;
             return w.rail_track.count(tile) != 0 ? 1.0f : lp_offnet_step;
@@ -98,6 +100,47 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
     const auto bit = w.bodies.find(body);
     if (bit == w.bodies.end() || seeds.empty())
         return dist;
+
+    // BL-1360: RAIL IS POINT TO POINT (Ben, 2026-10-16: "Railways can reach 20 tiles,
+    // but they only supply the exact tile they connect to"; LOGISTICS.md § One pool).
+    // A station's points land on its own tile and on every OTHER STATION's tile the
+    // line joins it to within reach - never on the country the track passes through,
+    // which is the rule goods already obey (they board and leave only at stations,
+    // § 4c). The distance is the line's own track steps, read off the one rail
+    // network the router uses, so cut and idle track and unfunded stations carry
+    // nothing here exactly as they carry no cargo.
+    if (n == lp_network::rail)
+    {
+        const float rail_bound = lp_full_reach[static_cast<std::size_t>(n)]
+                               + lp_fade_length[static_cast<std::size_t>(n)];
+        const world::rail_network& net = body_rail_network(w, body);
+        std::vector<entity_id> sorted = seeds;
+        std::sort(sorted.begin(), sorted.end());
+        for (const entity_id s : sorted)
+        {
+            const auto tit = w.tiles.find(s);
+            if (tit == w.tiles.end() || tit->second.body != body)
+                continue;
+            dist[s] = 0.0f;
+            // `stations` is sorted ascending (body_rail_network), so a binary search.
+            const auto sit = std::lower_bound(net.stations.begin(), net.stations.end(), s);
+            if (sit == net.stations.end() || *sit != s)
+                continue; // a station joined to no line delivers to its own tile only
+            const std::size_t i = static_cast<std::size_t>(sit - net.stations.begin());
+            for (std::size_t j = 0; j < net.stations.size(); ++j)
+            {
+                const int steps = (i < net.steps.size() && j < net.steps[i].size())
+                                  ? net.steps[i][j] : -1;
+                if (j == i || steps < 0 || static_cast<float>(steps) > rail_bound)
+                    continue;
+                const auto [it, fresh] = dist.emplace(net.stations[j], static_cast<float>(steps));
+                if (!fresh && static_cast<float>(steps) < it->second)
+                    it->second = static_cast<float>(steps);
+            }
+        }
+        return dist;
+    }
+
     const int gw = bit->second.grid_width, gh = bit->second.grid_height;
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
     const float bound = lp_full_reach[static_cast<std::size_t>(n)]
@@ -655,9 +698,18 @@ void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& 
             flipped.push_back(bid);
         }
     }
+    // BL-1360: rail coverage now reads the rail network (lp_distance_field), which
+    // caches its stations and is rebuilt only on a cut change - so a flip made for
+    // this read must clear it, as the real gate does (state_industry.cpp), both ways:
+    // or the read sees idled stations still on the line, and the next reader after
+    // the restore sees them still off it.
+    if (!flipped.empty())
+        w.rail_networks.clear();
     lp_seed_read(w, rep);
     for (const entity_id bid : flipped)
         w.buildings.at(bid).state_idle = false;
+    if (!flipped.empty())
+        w.rail_networks.clear();
 }
 
 void print_lp_seed_report(const lp_seed_report& r)

@@ -99,20 +99,32 @@ enum class lp_network : std::uint8_t
 };
 inline constexpr std::size_t lp_network_count = 3;
 
-// --- Calibration (BL-1309, measured on the shipped 1960 start; see the
-// --- logistic_points_harness M rows). Distances are in network-cost units: one
-// --- step along the source's own network costs 1 (a road step costs
-// --- `lp_road_step[tier]`), one step off it costs `lp_offnet_step`.
+// --- Calibration (BL-1309, measured on the shipped 1960 start; BL-1360 retuned the
+// --- road tiers and rail). Distances are in network-cost units: a road step costs
+// --- `lp_road_step[tier]` (one step off the road costs `lp_offnet_step`), a sea step
+// --- costs 1 (a land step `lp_offnet_step`), and rail counts TRACK STEPS between
+// --- stations - it is point to point and takes no off-network step at all.
 
 /// Points a source makes per tick, by network.
 inline constexpr std::array<float, lp_network_count> lp_source_points = {120.0f, 150.0f, 120.0f};
 /// Full-strength distance, by network.
-inline constexpr std::array<float, lp_network_count> lp_full_reach = {6.0f, 10.0f, 12.0f};
-/// Fade length beyond the full-strength distance (reach 0 at full + fade).
+///
+/// BL-1360 (Ben, 2026-10-16; LOGISTICS.md § One pool): a better road carries points
+/// further - Track 6 tiles, Road 8, Highway 10 at full strength, fading to ZERO AT
+/// DOUBLE (12 / 16 / 20). The road entry stays one cost threshold, 6, and the TIER
+/// is carried by the step cost below: 6 / 1.0 = 6, 6 / 0.75 = 8, 6 / 0.6 = 10 tiles.
+/// Rail carries 20 track steps, delivered point to point (lp_distance_field). Sea is
+/// untouched by the ruling and keeps 12 full / 8 fade - the double-distance fade is
+/// the ROAD's rule, not generalised.
+inline constexpr std::array<float, lp_network_count> lp_full_reach = {6.0f, 20.0f, 12.0f};
+/// Fade length beyond the full-strength distance (reach 0 at full + fade). The road's
+/// equals its full reach, which is what "zero at double" means on every tier.
 inline constexpr std::array<float, lp_network_count> lp_fade_length = {6.0f, 8.0f, 8.0f};
 /// A road step's cost by tier (index 1..3). Index 0 is "no road": off the network.
-inline constexpr std::array<float, 4> lp_road_step = {3.0f, 1.0f, 0.7f, 0.5f};
-/// One step off a source's network (land for rail and road; land for sea).
+/// BL-1360: 1.0 / 0.75 / 0.6, so the tiers reach 6 / 8 / 10 tiles at full strength.
+inline constexpr std::array<float, 4> lp_road_step = {3.0f, 1.0f, 0.75f, 0.6f};
+/// One step off a source's network (land, for road; land, for sea). Rail takes no
+/// off-network step: it delivers point to point (BL-1360).
 inline constexpr float lp_offnet_step = 3.0f;
 /// Points a producing building needs per tick per unit of run
 /// (workforce_assigned x workforce_target/100).
@@ -203,11 +215,29 @@ bool lp_consumer(const building_component& b);
 /// Points @p b needs at its run (0 for a non-consumer).
 float lp_need(const building_component& b);
 
+/// BL-1360: the tolerance on "full strength". 0.6 is not exact in float, so a sum of
+/// steps that is 6.0 in arithmetic can land a hair either side of it. Ten straight
+/// highway steps measure 5.9999995 (under, logistic_points_harness L7), but a path
+/// mixing tiers is not guaranteed to, and the ruling's "Road 8, Highway 10" must not
+/// hinge on rounding. Hygiene, not a measured failure. Every
+/// reader that asks "is this full strength?" goes through `lp_full_strength`, so the
+/// figure and the words beside it cannot disagree.
+inline constexpr float lp_full_eps = 1e-4f;
+
+/// True when network distance @p d is inside @p n's full-strength reach.
+inline bool lp_full_strength(lp_network n, float d)
+{
+    return d <= lp_full_reach[static_cast<std::size_t>(n)] + lp_full_eps;
+}
+
 /// Reach in [0,1] of a source on network @p n at network distance @p d.
 float lp_reach(lp_network n, float d);
 
 /// Network distance field from @p seeds on @p body for network @p n, bounded at
 /// that network's full + fade: tile -> distance, only tiles within the bound.
+/// Road and sea: every tile the walk reaches. RAIL (BL-1360): point to point - the
+/// seed station tiles themselves (0) and the OTHER station tiles the rail network
+/// joins them to (track steps), and no other tile at all.
 std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body, lp_network n,
                                                        const std::vector<entity_id>& seeds);
 

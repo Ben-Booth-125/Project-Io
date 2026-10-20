@@ -42,6 +42,7 @@
 #include "world/logistic_points.hpp"
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/river_generation.hpp" // hex_side_for_offset - L7 lays its roads by side
 #include "world/stance.hpp"
 #include "world/world.hpp"
 
@@ -549,6 +550,126 @@ void l6_march_claims_first()
           "the identical scenario run again gives the identical grant: a rate, not a stock");
 }
 
+// L7 - BL-1360 (Ben, 2026-10-16; LOGISTICS.md § One pool): a better road carries
+// points further, and rail is point to point.
+//
+// ROADS: one hub at column 0 of a long row, a road of one tier laid east along it.
+// Track reaches 6 tiles at full strength, Road 8, Highway 10, and each fades to zero
+// at DOUBLE its distance. The row is 60 wide so the wrap-around (columns wrap on the
+// grid) is far off-road and cannot short-cut back to the far tiles.
+//
+// RAIL: track along the row, stations at columns 0, 15, 24 and 31. From the station
+// at 0 the line delivers to the station tiles at 15 (full) and 24 (fading), not to
+// the one at 31 (beyond 20 + 8), and NEVER to a track tile it merely passes. This
+// asks the field directly with ONE seed: on a fixture every station is itself a
+// source, so a coverage read would only ever see each station's own tile.
+void l7_reach_by_tier_and_rail()
+{
+    std::printf("\n-- L7: road tier extends reach; rail delivers only where it connects (BL-1360)\n");
+    const int east = hex_side_for_offset(1, 0, /*odd_row=*/false);
+
+    struct tier_case { std::uint8_t tier; const char* name; int full; };
+    const tier_case cases[] = { {1, "Track", 6}, {2, "Road", 8}, {3, "Highway", 10} };
+    for (const tier_case& tc : cases)
+    {
+        world w;
+        const entity_id body = make_row_body(w, 60);
+        for (int c = 0; c < 2 * tc.full + 2; ++c)
+            lay_road_edge(w, tile_at(w, body, c), east, tc.tier);
+        const auto f = lp_distance_field(w, body, lp_network::road, {tile_at(w, body, 0)});
+        const auto reach_at = [&](int c) {
+            const auto it = f.find(tile_at(w, body, c));
+            return it == f.end() ? 0.0f : lp_reach(lp_network::road, it->second);
+        };
+        char msg[160];
+        // EXACTLY 1, not approx: the callers that ask "fully covered?" test >= 1.0f
+        // (corp_ai, seed_logistics_sources).
+        std::snprintf(msg, sizeof msg, "%s: full strength (exactly 1) at %d tiles", tc.name, tc.full);
+        check(reach_at(tc.full) >= 1.0f, msg);
+        // And the DISTANCE reads as inside full reach, which is what the ground card's
+        // wording asks (lp_full_strength). The printed distance is the evidence: ten
+        // 0.6 steps measured 5.9999995, under 6, so this row holds with or without
+        // lp_full_eps - it pins the card and the figure to one predicate.
+        {
+            const auto it = f.find(tile_at(w, body, tc.full));
+            std::snprintf(msg, sizeof msg, "%s: tile %d's distance reads as full strength",
+                          tc.name, tc.full);
+            check(it != f.end() && lp_full_strength(lp_network::road, it->second), msg);
+            std::printf("        (%s: distance at %d tiles = %.9f)\n", tc.name, tc.full,
+                        it != f.end() ? static_cast<double>(it->second) : -1.0);
+        }
+        std::snprintf(msg, sizeof msg, "%s: already fading one tile further (%d)", tc.name, tc.full + 1);
+        check(reach_at(tc.full + 1) < 1.0f && reach_at(tc.full + 1) > 0.0f, msg);
+        std::snprintf(msg, sizeof msg, "%s: half strength midway through the fade (%d tiles)",
+                      tc.name, tc.full + tc.full / 2);
+        check(approx(reach_at(tc.full + tc.full / 2), 0.5f, 1e-3f), msg);
+        std::snprintf(msg, sizeof msg, "%s: nothing left at double (%d tiles)", tc.name, 2 * tc.full);
+        check(approx(reach_at(2 * tc.full), 0.0f, 1e-3f), msg);
+    }
+
+    world w;
+    const entity_id body   = make_row_body(w, 60);
+    const entity_id nation = add_nation(w, body, 0, 59);
+    for (int c = 0; c <= 40; ++c)
+        w.rail_track[tile_at(w, body, c)] = nation;
+    for (const int c : {0, 15, 24, 31})
+        add_building(w, tile_at(w, body, c), building_type::railway_station);
+    const auto f = lp_distance_field(w, body, lp_network::rail, {tile_at(w, body, 0)});
+    const auto dist_at = [&](int c) {
+        const auto it = f.find(tile_at(w, body, c));
+        return it == f.end() ? -1.0f : it->second;
+    };
+    check(approx(dist_at(0), 0.0f), "rail: the station's own tile is served");
+    check(approx(dist_at(15), 15.0f) && approx(lp_reach(lp_network::rail, 15.0f), 1.0f),
+          "rail: a station 15 steps down the line is served at full strength");
+    check(approx(dist_at(24), 24.0f) && approx(lp_reach(lp_network::rail, 24.0f), 0.5f, 1e-3f),
+          "rail: a station 24 steps down the line is past the 20 and fading (half)");
+    check(dist_at(31) < 0.0f, "rail: a station 31 steps away is beyond 20 + 8 and not served");
+    check(dist_at(7) < 0.0f && dist_at(20) < 0.0f,
+          "rail: track the line merely PASSES (7, 20) is never served");
+    check(dist_at(45) < 0.0f, "rail: ground off the line is never served");
+
+    // What the line does NOT carry, read off the same rail network the router uses
+    // (LOGISTICS.md § 4c): an unfunded station, idle track, and a station on no line.
+    {
+        // An unfunded (state_idle) station at 15 drops off the line.
+        world wi;
+        const entity_id bi = make_row_body(wi, 60);
+        const entity_id ni = add_nation(wi, bi, 0, 59);
+        for (int c = 0; c <= 40; ++c)
+            wi.rail_track[tile_at(wi, bi, c)] = ni;
+        add_building(wi, tile_at(wi, bi, 0), building_type::railway_station);
+        const entity_id s15 = add_building(wi, tile_at(wi, bi, 15), building_type::railway_station);
+        wi.buildings.at(s15).state_idle = true;
+        const auto fi = lp_distance_field(wi, bi, lp_network::rail, {tile_at(wi, bi, 0)});
+        check(fi.count(tile_at(wi, bi, 15)) == 0, "rail: an unfunded station is not served");
+    }
+    {
+        // Idle track (its owner unfunded) carries nothing: the station at 15 is stranded.
+        world wt;
+        const entity_id bt = make_row_body(wt, 60);
+        const entity_id nt = add_nation(wt, bt, 0, 59);
+        for (int c = 0; c <= 40; ++c)
+            wt.rail_track[tile_at(wt, bt, c)] = nt;
+        wt.rail_idle.insert(nt);
+        add_building(wt, tile_at(wt, bt, 0), building_type::railway_station);
+        add_building(wt, tile_at(wt, bt, 15), building_type::railway_station);
+        const auto ft = lp_distance_field(wt, bt, lp_network::rail, {tile_at(wt, bt, 0)});
+        check(ft.count(tile_at(wt, bt, 15)) == 0, "rail: idle track carries nothing");
+        check(ft.count(tile_at(wt, bt, 0)) == 1, "rail: the station still serves its own tile");
+    }
+    {
+        // A station touching no track is on no line: its own tile only.
+        world wn;
+        const entity_id bn = make_row_body(wn, 60);
+        add_nation(wn, bn, 0, 59);
+        add_building(wn, tile_at(wn, bn, 0), building_type::railway_station);
+        const auto fn = lp_distance_field(wn, bn, lp_network::rail, {tile_at(wn, bn, 0)});
+        check(fn.size() == 1 && fn.count(tile_at(wn, bn, 0)) == 1,
+              "rail: a station on no line serves its own tile and nothing else");
+    }
+}
+
 int main()
 {
     std::printf("=== logistic_points_harness (BL-1352, LP_ONE_SYSTEM) ===\n");
@@ -559,6 +680,7 @@ int main()
     l4_whose_pool();
     l5_contention_order();
     l6_march_claims_first();
+    l7_reach_by_tier_and_rail();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

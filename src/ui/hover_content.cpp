@@ -132,7 +132,7 @@ void hover_structure_ground(const ui_state& ui)
     // numbers, so the player sees how far a source would have to come.
     const float full = lp_full_reach[i], gone = full + lp_fade_length[i];
     ImGui::Spacing();
-    if (ui.lp_hover_distance <= full)
+    if (lp_full_strength(static_cast<lp_network>(n), ui.lp_hover_distance))
         ImGui::TextDisabled("Full reach within %.0f", static_cast<double>(full));
     else
         ImGui::TextDisabled("Fading, gone at cost %.0f", static_cast<double>(gone));

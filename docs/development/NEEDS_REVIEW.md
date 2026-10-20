@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 28 open, 5 resolved.*
+*34 entries — 29 open, 5 resolved.*
 
 ---
 
@@ -247,6 +247,13 @@ Ben ruled the band (merge under 24, split over 100) and that it scales with the 
 Ben asked for the points consumed by a tile. A rival building's point need is workforce x target, i.e. its run rate, which DISCOVERY.md keeps private. Taken on Ben's behalf: Uses counts the player's own buildings (god view: all), and the hover names how many rival buildings were left out. SELECTION.md records it.
 
 **Why it matters.** A figure that reads a rival's private state is a visibility call, which is Ben's, not an in-band calibration.
+
+### NR-1056 — Rail's fade past 20: kept at 8 (zero at 28), not the road's double-distance rule
+*decision · raised 2026-10-20 · from BL-1360 (road tier extends reach), cold review finding 5*
+
+Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Track 6/12, Road 8/16, Highway 10/20). Rail's fade was left at its existing 8, so a station 24 track steps down the line gets half strength and one at 28+ gets nothing. LOGISTICS.md says only '20 tiles' for rail.
+
+**Why it matters.** It decides whether a station 21-27 steps away is served at all. Today that is a fading partial, and the census moved little on it (rail sources unchanged: 69 / 0 / 185 on seeds 0 / 28 / 46).
 
 ---
 

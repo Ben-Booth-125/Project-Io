@@ -464,6 +464,17 @@
    "what": "Ben asked for the points consumed by a tile. A rival building's point need is workforce x target, i.e. its run rate, which DISCOVERY.md keeps private. Taken on Ben's behalf: Uses counts the player's own buildings (god view: all), and the hover names how many rival buildings were left out. SELECTION.md records it.",
    "why_it_matters": "A figure that reads a rival's private state is a visibility call, which is Ben's, not an in-band calibration.",
    "call": "a) keep: own buildings only, rivals counted as a number (built); b) count every building on the tile, rivals included, as the request read literally; c) show rivals' consumption only as an aggregate."
+  },
+  {
+   "id": "NR-1056",
+   "title": "Rail's fade past 20: kept at 8 (zero at 28), not the road's double-distance rule",
+   "raised": "2026-10-20",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1360 (road tier extends reach), cold review finding 5",
+   "what": "Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Track 6/12, Road 8/16, Highway 10/20). Rail's fade was left at its existing 8, so a station 24 track steps down the line gets half strength and one at 28+ gets nothing. LOGISTICS.md says only '20 tiles' for rail.",
+   "why_it_matters": "It decides whether a station 21-27 steps away is served at all. Today that is a fading partial, and the census moved little on it (rail sources unchanged: 69 / 0 / 185 on seeds 0 / 28 / 46).",
+   "call": "a) keep fade 8: full to 20, zero at 28 (built); b) a hard edge: full to 20, nothing past it (fade 0); c) the road rule generalised: zero at 40 (fade 20)."
   }
  ]
 }
