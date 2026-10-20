@@ -6,7 +6,7 @@
 #include "presentation.hpp"
 #include "world/components.hpp"
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
-#include "world/workforce.hpp"
+#include "world/logistic_points.hpp" // BL-1353: lp_full_reach / lp_fade_length for the ground card
 
 #include <imgui.h>
 #include <vector>
@@ -99,6 +99,45 @@ void hover_structure_plate(entity_id key)
     ImGui::TextDisabled("Click: History ledger");
 }
 
+// Throughput: THE GROUND, a hover read with no click (BL-1353; Ben, 2026-10-20,
+// option A). The tile already carries its figure on the map; the card is the WHY -
+// which of the player nation's networks reaches here best, how far along it the
+// nearest source is, and where that sits on the network's full-then-fade curve.
+// The canvas computed all of it for this tile (ui_state::lp_hover_*), so nothing
+// here resolves anything. No "Click:" line: the press is inert and the card does
+// not promise one.
+//
+// SHORT BY MEASUREMENT: the card is a fixed 200 px (hover_card.cpp kMaxWidth), about
+// 25 characters a line. The first cut's "Logistic Points: 100% served" and "Sea -
+// traversal cost 0.0 to the nearest port" were both clipped mid-word in the capture.
+void hover_structure_ground(const ui_state& ui)
+{
+    static constexpr const char* k_net[lp_network_count] = { "Road", "Rail", "Sea" };
+
+    ImGui::Text("Logistic Points: %.0f%%",
+                static_cast<double>(ui.lp_hover_coverage) * 100.0);
+    const int n = ui.lp_hover_network;
+    if (!ui.lp_hover_reached || n < 0 || n >= static_cast<int>(lp_network_count))
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("No source reaches here");
+        return;
+    }
+    const auto i = static_cast<std::size_t>(n);
+    // The cost is the network distance to that network's NEAREST source.
+    ImGui::Text("%s network, cost %.1f", k_net[i],
+                static_cast<double>(ui.lp_hover_distance));
+
+    // Why-line: the curve the figure was read off (lp_reach), in the network's own
+    // numbers, so the player sees how far a source would have to come.
+    const float full = lp_full_reach[i], gone = full + lp_fade_length[i];
+    ImGui::Spacing();
+    if (ui.lp_hover_distance <= full)
+        ImGui::TextDisabled("Full reach within %.0f", static_cast<double>(full));
+    else
+        ImGui::TextDisabled("Fading, gone at cost %.0f", static_cast<double>(gone));
+}
+
 // --- Exemplar 1: tile × resource lens -------------------------------------------
 
 void hover_tile_resource(const tile_component& tile, const std::vector<resource_type>& toggled)
@@ -154,29 +193,6 @@ void hover_tile_default(const tile_component& tile)
         ImGui::TextDisabled("Convoys pay \xc3\x97%.2f to cross",
                             static_cast<double>(landform_logistics_cost(tile.landform)));
     }
-}
-
-// --- BL-069: tile × population lens — quick workforce tell ----------------------
-// Under the Population lens the hover gives a glance read of the siting signal:
-// habitability and the workforce cap it implies. The cap reads the same shared
-// curve the simulation applies (workforce.hpp), so the glance cannot drift from
-// the lens tint or the sim.
-void hover_tile_population(const world& w, const tile_component& tile)
-{
-    hover_terrain_header(tile);
-    ImGui::Text("Habitability: %.0f%%",
-                static_cast<double>(tile.habitability) * 100.0);
-
-    const float eff = workforce_efficiency(tile.habitability);
-    const float cap = w.workforce_supply(w.player_entity, tile.body) * eff;
-    ImGui::Text("Workforce cap: %.1f", static_cast<double>(cap));
-
-    // Why-line: the 0.6 efficiency cliff is the whole point of the lens.
-    ImGui::Spacing();
-    if (tile.habitability >= 0.6f)
-        ImGui::TextDisabled("Full labour \xe2\x80\x94 habitability \xe2\x89\xa5 0.6");
-    else
-        ImGui::TextDisabled("Reduced labour \xe2\x80\x94 below the 0.6 cliff");
 }
 
 // --- Exemplar 2: building × supply lens (or any lens) ---------------------------
@@ -311,6 +327,9 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
     case structure_kind::plate:
         hover_structure_plate(ui.hovered_structure);
         return;
+    case structure_kind::ground:
+        hover_structure_ground(ui);
+        return;
     default:
         break; // deposit, nation, none — fall through to the kind dispatch
     }
@@ -319,10 +338,10 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
     if (const auto tile_it = w.tiles.find(eid); tile_it != w.tiles.end())
     {
         const tile_component& tile = tile_it->second;
+        // No Population variant: that lens is a pure read with no hover at all
+        // (SELECTION.md rule 3), so the canvas never routes a tile here under it.
         if (ui.overlay == overlay_mode::resource)
             hover_tile_resource(tile, ui.lens_resources);
-        else if (ui.overlay == overlay_mode::population)
-            hover_tile_population(w, tile);
         else
             hover_tile_default(tile);
         return;

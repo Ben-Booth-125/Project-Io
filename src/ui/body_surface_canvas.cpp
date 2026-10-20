@@ -1904,6 +1904,25 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
             *out_id = static_cast<entity_id>(on_tile[k]) + 1u; // synthetic; +1 keeps 0 = none
         return structure_kind::deposit;
     }
+    case overlay_mode::throughput:
+    {
+        // BL-1353: THE GROUND, for the hover card only (Ben, 2026-10-20, option A).
+        // The ground as DRAWN: a cell the field filled is the player nation's own,
+        // -1 is somebody else's and stays bare, so it resolves to nothing. Reading
+        // the field the fill reads means the card can never light ground the lens
+        // left blank. The click path treats this kind as no answer.
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end() || state.lp_coverage_gw <= 0)
+            return structure_kind::none;
+        const std::size_t idx =
+            static_cast<std::size_t>(tit->second.grid_y) * static_cast<std::size_t>(state.lp_coverage_gw)
+            + static_cast<std::size_t>(tit->second.grid_x);
+        if (idx >= state.lp_coverage.size() || state.lp_coverage[idx] < 0.0f)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = tile;
+        return structure_kind::ground;
+    }
     case overlay_mode::continent:
     {
         // The plate as drawn: the Voronoi region of `plate_id`. A stagnant-lid
@@ -2025,6 +2044,8 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_player_claim   = 0.0f;
     state.lp_player_sources = 0;
     state.lp_player_known   = false;
+    state.lp_hover_tile     = null_entity;
+    state.lp_hover_reached  = false;
 
     // Off by default in every sense: no lens, no work. The lens is the only reader,
     // and the pools must not be built when nobody is looking at them — LP is a rate,
@@ -2149,6 +2170,20 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 if (nit == w.tile_to_nation.end() || nit->second != pn)
                     continue; // somebody else's ground: not this lens's subject
                 state.lp_coverage[i] = lp_coverage_at(w, memo, tid);
+            }
+            // BL-1353: the ground card's WHY for the tile under the pointer. The card
+            // holds a const world, so it is read here, off the memo the loop above
+            // just filled - a lookup, not a flood. The hovered kind is last frame's,
+            // the same one-frame lag every hover mark on this canvas already carries.
+            if (state.hovered_structure_kind == structure_kind::ground
+                && state.hovered_structure != null_entity)
+            {
+                lp_coverage_why why;
+                state.lp_hover_coverage = lp_coverage_at(w, memo, state.hovered_structure, &why);
+                state.lp_hover_reached  = why.reached;
+                state.lp_hover_network  = static_cast<int>(why.network);
+                state.lp_hover_distance = why.distance;
+                state.lp_hover_tile     = state.hovered_structure;
             }
             // And the player nation's own figures for the key - read off `lp`, the
             // resolve this function actually settled on, NOT `resolved`: before the
@@ -6426,10 +6461,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             //    asking about ("markers do not outrank lenses", Ben 2026-08-28).
             //  - where the lens has NO STRUCTURE for this ground there is NO CARD
             //    AT ALL ("for lenses which return none, just don't surface a
-            //    hover"). Three lenses — Population, Industry, Throughput — draw a
-            //    value field with no structure grain, so the card is absent across
-            //    the whole body while one of them is active. That is deliberate: a
-            //    value field is something you read.
+            //    hover"). Two lenses — Population, Industry — draw a value field
+            //    with no structure grain, so the card is absent across the whole
+            //    body while one of them is active. Throughput resolves its own
+            //    nation's ground to `structure_kind::ground` and so shows a card,
+            //    but takes no click (BL-1353; Ben, 2026-10-20).
             //
             // `hovered_structure_kind` was resolved by the tile loop earlier in
             // THIS frame (it is written well above this read), so this costs a
@@ -6817,7 +6853,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         state.history_view = history_view_tectonics;
                     }
                 }
-                else if (area_kind != structure_kind::none && area_id != null_entity)
+                // The GROUND is a hover read only (BL-1353; Ben, 2026-10-20): a
+                // press on it is no answer, so it clears the band like any other.
+                else if (area_kind != structure_kind::none && area_kind != structure_kind::ground
+                         && area_id != null_entity)
                 {
                     structure_hit = area_id;
                     struct_kind   = area_kind;

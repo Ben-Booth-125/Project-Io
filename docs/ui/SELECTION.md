@@ -810,7 +810,10 @@ no destination for.
 for BL-1353, the throughput lens rework).** Its field is the player nation's own per-tile
 coverage, a figure that differs tile to tile and has a cause worth naming — so the pointer
 resolves to **the ground**, `structure_kind::ground`, and the hover card reads it. The card is
-the *why* behind the drawn number: the tile's coverage and the nation's sources that reach it.
+the *why* behind the drawn number: the tile's coverage, the network whose reach is best there, its
+traversal cost to that network's nearest source, and whether that is inside full reach or on the
+fade. It names a network, not a building: coverage is read off one distance field per network
+seeded by all of them, so no single source is "the" one.
 It is also the only read at a rung too far out for the per-tile numbers to draw. **A click
 stays inert** and clears the band to resting, exactly as above: a hover read promises no pivot,
 so the "no destination" objection does not arise. Ground the lens leaves bare — another

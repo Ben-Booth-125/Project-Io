@@ -116,7 +116,7 @@ lens is asking:
 | Entity | Lens | Content |
 |---|---|---|
 | **Tile** | Resource | composition · landform header, the selected resource's deposit richness, a richness-band why-line |
-| **Ground** | Throughput | the tile's coverage of the player nation's points, and that nation's sources that reach it — the why behind the drawn number |
+| **Ground** | Throughput | the tile's coverage of the player nation's points, the network that reaches it best with its traversal cost to the nearest source, and a full-reach / fade why-line — the why behind the drawn number |
 | **Tile** | *(default)* | header, habitability, and the landform's movement-cost multiplier (`landform_logistics_cost`) when not plains |
 | **Building** (player) | any | type, target/recipe line, workforce, an operational why-line (idle / understaffed / active) |
 | **Building** (rival) | any | type + owner emblem only — production/stockpile stay private (the competitor-visibility rule, DISCOVERY.md) |

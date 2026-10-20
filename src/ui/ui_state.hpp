@@ -122,6 +122,12 @@ enum class structure_kind : uint8_t
     // because every comparison also tests the kind.
     deposit,     ///< A resource deposit — every tile carrying the lens's resource (Resource lens).
     plate,       ///< A tectonic plate (Continent lens).
+    // THE GROUND, for a HOVER READ ONLY (Ben, 2026-10-20, BL-1353 option A). The
+    // Throughput lens's field is the player nation's per-tile coverage, so the
+    // pointer resolves to the tile itself and the card reads why the figure is what
+    // it is. The id is the tile. A click on it is INERT, exactly as on ground the
+    // lens has no answer for - the click path treats this kind as no answer.
+    ground,      ///< The player nation's ground under the Throughput lens (hover only).
 };
 
 /// One segment of a structure's boundary, registered by the draw pass so the
@@ -1535,6 +1541,18 @@ struct ui_state
     float lp_player_claim  = 0.0f;
     int   lp_player_sources = 0;
     bool  lp_player_known   = false; ///< false when the player has no nation to show
+
+    /// BL-1353: the WHY behind the hovered tile's figure, for the Throughput ground
+    /// card (SELECTION.md: Throughput takes a hover read, and still no selection).
+    /// Computed each frame by update_body_throughput off its own coverage memo - the
+    /// card cannot, since it holds a const world - and cleared off the lens.
+    /// `lp_hover_network` is an lp_network as an int (0 road, 1 rail, 2 sea), kept
+    /// plain so this header does not pull in the resolver.
+    entity_id lp_hover_tile     = null_entity;
+    float     lp_hover_coverage = 0.0f;
+    bool      lp_hover_reached  = false;
+    int       lp_hover_network  = 0;
+    float     lp_hover_distance = 0.0f;
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 

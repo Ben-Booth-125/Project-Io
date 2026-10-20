@@ -392,8 +392,10 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
     return out;
 }
 
-float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile)
+float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile, lp_coverage_why* why)
 {
+    if (why != nullptr)
+        *why = {};
     const auto tit = w.tiles.find(tile);
     const auto nit = w.tile_to_nation.find(tile);
     if (tit == w.tiles.end() || nit == w.tile_to_nation.end())
@@ -423,7 +425,14 @@ float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile)
         }
         const auto dit = fit->second.find(tile);
         if (dit != fit->second.end())
-            cov = std::max(cov, lp_reach(static_cast<lp_network>(n), dit->second));
+        {
+            const float r = lp_reach(static_cast<lp_network>(n), dit->second);
+            // The first network to reach the best figure names it: a strict >, in
+            // network order, so a tie reads the same way on every run.
+            if (why != nullptr && (!why->reached || r > cov))
+                *why = { true, static_cast<lp_network>(n), dit->second };
+            cov = std::max(cov, r);
+        }
     }
     return cov;
 }

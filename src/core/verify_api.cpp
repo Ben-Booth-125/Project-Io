@@ -1606,6 +1606,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case structure_kind::company:     k = "company";     break;
             case structure_kind::deposit:     k = "deposit";     break;
             case structure_kind::plate:       k = "plate";       break;
+            case structure_kind::ground:      k = "ground";      break;
             default:                              k = "none";        break;
             }
             out["hovered_structure_kind"] = std::string(k);

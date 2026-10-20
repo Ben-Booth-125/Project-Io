@@ -228,9 +228,21 @@ struct lp_reach_memo
     void clear() { fields.clear(); }
 };
 
+/// Where a tile's coverage came from: the network whose reach is best there and
+/// the network distance to that network's nearest source. `reached` is false when
+/// no field of the host nation reaches the tile at all (BL-1353's hover card).
+struct lp_coverage_why
+{
+    bool       reached  = false;
+    lp_network network  = lp_network::road;
+    float      distance = 0.0f;
+};
+
 /// The coverage a building standing on @p tile would get from the running
 /// sources of the nation whose ground it is ([0,1]; 0 on nobody's ground).
-float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile);
+/// @param why Optional; receives the network and distance the figure came from.
+float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile,
+                     lp_coverage_why* why = nullptr);
 
 /// Validate a share rule as the value that lands (each finite, in [0,1], summing
 /// to 1 within 1e-4). The seam rejects anything else whole.
