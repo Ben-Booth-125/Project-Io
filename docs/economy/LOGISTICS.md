@@ -697,6 +697,11 @@ into passive and active. What follows replaces the bifold model, the city genera
   the **road tier's**, which is what makes an upgrade worth paying for: **Track 6 tiles, Road 8,
   Highway 10** at full strength, nothing left by 12, 16 and 20. Off the networks, points reach a few
   tiles to supply armies (military detail later).
+- **A port stretches fifty tiles over water (Ben, 2026-10-21).** A port's points reach **full
+  strength across 50 water tiles** and fade to zero at double, 100 — the road's rule, at sea's
+  scale. Water is where points travel furthest: a port carries the chain to a coast a road could
+  never reach, which is what lets an island nation's network be one network. Owned by BL-1396
+  (port reach over water).
 - **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
   points carry **20 tiles** along the line, and they are delivered at **the tile the line connects
   to** — never to the country the line passes through. So rail is a link between places rather than

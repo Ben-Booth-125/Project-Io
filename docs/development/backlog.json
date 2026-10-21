@@ -1732,6 +1732,31 @@
    ],
    "title": "Rival siting prices and lays the whole hub chain a build needs to reach its capital",
    "design": "GRANTED (Ben, 2026-10-21, NR-1059), recorded in AI_OPPONENT.md section 11 'AI lays a hub chain to reach the capital'. Since BL-1356 a hub delivers only when it chains back to its nation's capital (LOGISTICS.md section How a tile's points get to it), so corp_ai's source_capex (corp_ai.cpp ~1247) prices an out-of-reach build at ONE hub and the build path (~3311) places that hub on or beside the site - on far ground it costs upkeep and covers nothing, and under NR-1057 it adds nothing to the pool either. THE WORK: price the build at the whole chain lp_route_to would need (the same outward rule generation's seed_logistics_sources step 1 lays: a hub that carries the site at full strength and touches the chain, else a hub on the chain's edge nearest the site, repeated), and lay it in the SAME decision. TERMS (the grant): one decision, priced and laid in the tick the build is chosen, nothing carried to a later tick, a chain the scorer cannot afford that tick is not started; never for the player's nation or champion; only on ground the builder may build on. Pure, seeded, deterministic, replayable, legal verbs only, never a planner. Reuse generation's chain-laying rather than a second copy of it. MEASURE: market_viability FULL (G1, G3 - rivals stop wasting hubs) and rival hub counts against the BL-1356 landing."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-21",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-21); filed by Claude",
+   "id": "BL-1396",
+   "short_name": "PORT_REACH_FIFTY",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "requires": [
+    "BL-1356",
+    "BL-1395"
+   ],
+   "files": [
+    "src/world/logistic_points.hpp",
+    "src/world/logistic_points.cpp"
+   ],
+   "title": "A port's points reach full strength across 50 water tiles, fading to zero at 100",
+   "design": "Ben, 2026-10-21, during BL-1395: 'we can extend logistics points over water, let's say a port stretches 50 tiles'; RULED the same message: full strength to 50, gone at 100 (the road's double-distance fade), and built after BL-1395. DESIGNED: LOGISTICS.md section One pool, 'A port stretches fifty tiles over water'. THE CHANGE: lp_full_reach[sea] 12 -> 50 and lp_fade_length[sea] 8 -> 50. Distances are network cost: a water step costs 1, a land step lp_offnet_step (3), so 50 water tiles is 50 cost - check whether 'tiles' should also be read across the landing step. CONSEQUENCES TO MEASURE: generation's sea bridge (BL-1356) reaches far wider seas, so fewer ports and far fewer stranded consumers; a port's field now spans a large area, so watch per-source flood cost in the resolver and the census seed_ms; the Throughput lens and hover card read lp_full_reach directly. Measure lp_coverage_census, market_viability FULL and haulage_measure --far-trade before and after; budget a cold review."
   }
  ]
 }
