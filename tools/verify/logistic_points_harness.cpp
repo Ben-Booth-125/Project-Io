@@ -670,6 +670,329 @@ void l7_reach_by_tier_and_rail()
     }
 }
 
+// L8 - BL-1356 (LOGISTICS.md § How a tile's points get to it, the four mechanism
+// rules, Ben 2026-10-20; the capital as anchor, 2026-10-21). Every fixture is a
+// 60-wide unroaded row, so one step costs lp_offnet_step (3) and a hub's road field
+// is full to 2 tiles and gone by 4. The nation's CAPITAL is where "connected back" is
+// measured; a market is placed elsewhere on purpose, to prove it is not the anchor.
+void set_capital(world& w, entity_id nation, entity_id tile)
+{
+    w.nations.at(nation).capital_tile = tile;
+}
+
+entity_id add_market(world& w, entity_id body, entity_id centre)
+{
+    const entity_id m = w.create_entity();
+    market_component mc{};
+    mc.body        = body;
+    mc.centre_tile = centre;
+    w.markets[m]   = mc;
+    return m;
+}
+
+const lp_building_row* row_of(const lp_tick& t, entity_id building)
+{
+    for (const lp_building_row& r : t.buildings)
+        if (r.building == building)
+            return &r;
+    return nullptr;
+}
+
+void l8_routed_requests()
+{
+    std::printf("\n-- L8: requests are routed (BL-1356)\n");
+
+    // NO CAPITAL ON THIS BODY: nothing to be connected back to, so every source passes
+    // the test there - the same isolated hub that supplies nothing below supplies here.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59); // capital_tile left null
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 20));
+        const entity_id c = add_consumer(w, tile_at(w, body, 21), corp, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, 1.0f),
+              "no capital on the body: every source passes, so a lone hub supplies in full");
+    }
+
+    // ONLY CONNECTED SOURCES FEED THE POOL (Ben, 2026-10-21, NR-1057): a hub at the
+    // capital and a second, isolated, far down the row - the pool is the first's alone.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        add_hub(w, tile_at(w, body, 0));
+        add_hub(w, tile_at(w, body, 30)); // touches neither the capital nor the chain
+        const lp_tick t = resolve_logistic_points(w);
+        float pool = -1.0f;
+        for (const lp_nation_row& n : t.nations)
+            if (n.nation == nation)
+                pool = n.pool;
+        int linked = 0;
+        for (const lp_source_row& s : t.sources)
+            if (s.connected)
+                ++linked;
+        check(approx(pool, lp_source_points[0]) && linked == 1,
+              "an isolated hub adds nothing to the pool: it is the connected hub's points alone");
+    }
+
+    // A LINK COUNTS EITHER WAY (Ben, 2026-10-21, NR-1058): a station's own field holds
+    // only stations, so it can join the chain only because a CONNECTED road hub's reach
+    // covers its tile - and then the line carries the chain to the station down it.
+    for (const bool hub : {false, true})
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        for (int col = 5; col <= 25; ++col)
+            w.rail_track[tile_at(w, body, col)] = nation;
+        add_building(w, tile_at(w, body, 5), building_type::railway_station);
+        add_building(w, tile_at(w, body, 20), building_type::railway_station);
+        if (hub)
+            add_hub(w, tile_at(w, body, 3)); // touches the capital (9) and the station at 5 (6)
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        const entity_id c = add_consumer(w, tile_at(w, body, 20), corp, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, hub ? 1.0f : 0.0f),
+              hub ? "a connected road hub covering a station puts the line on the chain, and its far station supplies"
+                  : "the same line with no connected source covering it supplies nothing");
+    }
+
+    // GENERATION LAYS THE CHAIN: a consumer 25 tiles from the capital, no hub anywhere.
+    // One hub reaches 4 unroaded tiles, so covering it takes a chain laid outward.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        const entity_id c = add_consumer(w, tile_at(w, body, 25), corp, 10.0f, 100.0f);
+        const lp_seed_report rep = seed_logistics_sources(w);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, 1.0f) && rep.unconnectable == 0,
+              "generation lays a chain out from the capital to a far consumer and covers it");
+        check(rep.hubs_placed >= 2,
+              "and it took more than one hub (a chain, not a single isolated one)");
+    }
+
+    // THE SEA BRIDGE: the consumer's own nation holds an island across a five-tile strait
+    // (columns 20-24 water, and 45-59 so the row's wrap is a wider sea). The road chain
+    // reaches the home shore and can go no further; generation lands a home port on the
+    // shore NEAREST the island by sea (column 19, 8 away - not the capital tile, 18 away
+    // round the wrap) and an island port, then lays the road chain on to the consumer.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        for (int col = 20; col <= 24; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        for (int col = 45; col <= 59; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        const entity_id c = add_consumer(w, tile_at(w, body, 35), corp, 10.0f, 100.0f);
+        const lp_seed_report rep = seed_logistics_sources(w);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        std::printf("        (bridge fixture: hubs %d, ports %d, bridged %d, unconnectable %d, cut off %d, coverage %.2f)\n",
+                    rep.hubs_placed, rep.ports_placed, rep.islands_bridged, rep.unconnectable,
+                    rep.unconnectable_cut_off, r ? static_cast<double>(r->coverage) : -1.0);
+        check(r != nullptr && approx(r->coverage, 1.0f) && rep.unconnectable == 0,
+              "generation bridges a strait by sea and covers a consumer cut off from the capital");
+        check(rep.islands_bridged == 1 && rep.ports_placed == 2,
+              "with one bridge: a home port and an island port");
+        bool home_at_19 = false;
+        for (const auto& [bid, bb] : w.buildings)
+            if (bb.type == building_type::port && bb.tile == tile_at(w, body, 19))
+                home_at_19 = true;
+        check(home_at_19, "the home port stands on the shore nearest the island by sea (column 19)");
+    }
+
+    // ISLAND-HOPPING, IN EITHER ID ORDER (cold review): the far island I2 is beyond any
+    // port's reach of the capital's coast but within reach of the near island I1. Its
+    // consumer is made FIRST (the lower id), so the first pass tries I2 before I1 exists
+    // on the chain and fails; the second pass, after I1 is bridged, bridges I2 from it.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 100);
+        for (int col = 20; col <= 24; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        for (int col = 40; col <= 54; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        for (int col = 70; col <= 99; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        const entity_id nation = add_nation(w, body, 0, 99);
+        set_capital(w, nation, tile_at(w, body, 0));
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        const entity_id far  = add_consumer(w, tile_at(w, body, 60), corp, 10.0f, 100.0f); // I2, first
+        const entity_id near = add_consumer(w, tile_at(w, body, 30), corp, 10.0f, 100.0f); // I1
+        const lp_seed_report rep = seed_logistics_sources(w);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* rf = row_of(t, far);
+        const lp_building_row* rn = row_of(t, near);
+        check(rf != nullptr && rn != nullptr && approx(rf->coverage, 1.0f) && approx(rn->coverage, 1.0f)
+                  && rep.islands_bridged == 2 && rep.unconnectable == 0,
+              "island-hopping: the far island is bridged from the near one, whatever order the ids put them in");
+    }
+
+    // A SEA TOO WIDE: the island lies 30 tiles of water out - beyond any port's reach -
+    // so no bridge is placed and the consumer is counted as cut off, with no dead ports.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 100);
+        for (int col = 20; col <= 49; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        for (int col = 70; col <= 99; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        const entity_id nation = add_nation(w, body, 0, 99);
+        set_capital(w, nation, tile_at(w, body, 0));
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        add_consumer(w, tile_at(w, body, 60), corp, 10.0f, 100.0f);
+        const lp_seed_report rep = seed_logistics_sources(w);
+        check(rep.unconnectable == 1 && rep.unconnectable_cut_off == 1 && rep.ports_placed == 0,
+              "a sea wider than a port's reach: counted as cut off, and no port placed that would deliver nothing");
+    }
+
+    // THE CHAIN STOPS AT A FRONTIER: the consumer's own nation holds both ends of the row
+    // but another nation holds the ground between (both ways round the wrap), so no hub
+    // of its nation can carry the chain to it. Left uncovered and counted, not faked.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 60);
+        const entity_id a = add_nation(w, body, 0, 29, "Home");
+        const entity_id b = add_nation(w, body, 30, 39, "Between");
+        for (int col = 40; col <= 49; ++col)
+        {
+            const entity_id t2 = tile_at(w, body, col);
+            w.tile_to_nation[t2] = a;
+            w.nations.at(a).tiles.push_back(t2);
+        }
+        for (int col = 50; col <= 59; ++col)
+        {
+            const entity_id t2 = tile_at(w, body, col);
+            w.tile_to_nation[t2] = b;
+            w.nations.at(b).tiles.push_back(t2);
+        }
+        set_capital(w, a, tile_at(w, body, 0));
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, a);
+        const entity_id c = add_consumer(w, tile_at(w, body, 45), corp, 10.0f, 100.0f);
+        const lp_seed_report rep = seed_logistics_sources(w);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, 0.0f) && rep.unconnectable == 1
+                  && rep.unconnectable_cut_off == 1 && rep.ports_placed == 0,
+              "a consumer the chain cannot reach across another nation's ground is left uncovered and counted");
+    }
+
+    // CONNECTED BACK (the chain to the capital, Ben 2026-10-20/21): a hub touching
+    // neither the capital nor a connected source supplies nothing, though it reaches the
+    // building; one that touches the capital does; and one touching a CONNECTED hub too.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        add_market(w, body, tile_at(w, body, 50)); // NOT the anchor
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 20));
+        const entity_id far = add_consumer(w, tile_at(w, body, 21), corp, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, far);
+        check(r != nullptr && approx(r->coverage, 0.0f) && approx(r->granted, 0.0f),
+              "an isolated hub (no chain back to the capital) supplies nothing");
+    }
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        add_market(w, body, tile_at(w, body, 50)); // NOT the anchor
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 3)); // 9 from the capital: fading, but touching it
+        const entity_id near = add_consumer(w, tile_at(w, body, 5), corp, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, near);
+        check(r != nullptr && approx(r->coverage, 1.0f) && approx(r->fraction, 1.0f),
+              "a hub whose reach touches the capital supplies the building it reaches, in full");
+    }
+    for (const bool link : {false, true})
+    {
+        // The hub at 6 is 18 from the capital (beyond its 12) but 9 from the hub at 3,
+        // which touches the capital: with that link it is connected, without it isolated.
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        add_market(w, body, tile_at(w, body, 50)); // NOT the anchor
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        if (link)
+            add_hub(w, tile_at(w, body, 3));
+        add_hub(w, tile_at(w, body, 6));
+        const entity_id c = add_consumer(w, tile_at(w, body, 8), corp, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, link ? 1.0f : 0.0f),
+              link ? "a hub touching a CONNECTED hub joins the chain and supplies in full"
+                   : "the same hub with no link back to the capital supplies nothing");
+    }
+
+    // TOP-UP (rule A on the fade): each source carries reach x the request, and the
+    // next tops up. Two hubs each at half strength cover the whole request; one does not.
+    for (const bool both : {false, true})
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 10));
+        add_market(w, body, tile_at(w, body, 50)); // NOT the anchor
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 7)); // 9 away: half strength
+        if (both)
+            add_hub(w, tile_at(w, body, 13)); // 9 away the other side: half strength
+        const entity_id c = add_consumer(w, tile_at(w, body, 10), corp, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, both ? 1.0f : 0.5f, 1e-3f),
+              both ? "two half-strength sources top each other up to the whole request"
+                   : "one half-strength source carries half the request");
+    }
+
+    // THE QUEUE: when the pool is short, the request inside the falloff is met whole
+    // and the one beyond it gets what is left - not both the same thin share. The
+    // far request's claim is its routed share (half its need), never more: distance
+    // orders the queue and never raises the bill.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 10));
+        add_market(w, body, tile_at(w, body, 50)); // NOT the anchor
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 10)); // pool lp_source_points[0] = 120
+        const entity_id near = add_consumer(w, tile_at(w, body, 10), corp, 10.0f, 100.0f); // need 100, full
+        const entity_id far  = add_consumer(w, tile_at(w, body, 13), corp, 10.0f, 100.0f); // need 100, half
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* rn = row_of(t, near);
+        const lp_building_row* rf = row_of(t, far);
+        const float pool = lp_source_points[0];
+        check(rn != nullptr && approx(rn->granted, 100.0f, 1e-2f),
+              "a short pool meets the request inside the falloff whole (100 of 100)");
+        check(rf != nullptr && approx(rf->granted, pool - 100.0f, 1e-2f),
+              "and the request beyond it gets what is left (20), not a pro-rata share");
+        float total = 0.0f;
+        for (const lp_nation_row& n : t.nations)
+            if (n.nation == nation)
+                total = n.granted[0] + n.granted[1] + n.granted[2];
+        check(approx(total, pool, 1e-2f), "the nation's ledger reports exactly what the queue handed out");
+    }
+}
+
 int main()
 {
     std::printf("=== logistic_points_harness (BL-1352, LP_ONE_SYSTEM) ===\n");
@@ -681,6 +1004,7 @@ int main()
     l5_contention_order();
     l6_march_claims_first();
     l7_reach_by_tier_and_rail();
+    l8_routed_requests();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

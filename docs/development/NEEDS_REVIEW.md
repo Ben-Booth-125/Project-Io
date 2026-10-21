@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*34 entries — 29 open, 5 resolved.*
+*37 entries — 29 open, 8 resolved.*
 
 ---
 
@@ -306,4 +306,31 @@ Ticks 23-36: 25 background firms each build an oil power plant in market 47446 (
 **Why it matters.** A herd is a scorer behaviour; changing what the scorer sees is AI work under the grant register, outside the economy brief.
 
 > **RESOLVED.** Ben: accept as world variance (seed 40 G1 t50 74.2). Same form: seed 9's hydroponics charter web accepted as world variance (G1 t50 ~83). No AI grant widened.
+
+### NR-1057 — Routing: does an isolated hub still add to the nation pool?
+*decision · raised 2026-10-21 · from BL-1356 (routed requests), second cold review finding 3*
+
+As built, every running source adds its points to the one nation pool (your 'one nation pool' ruling), connected or not; routing only decides which requests may draw and in what order. So a hub with no chain to the capital delivers to nobody but still raises the pool every connected request draws from. LOGISTICS.md says such a hub 'supplies nothing', which reads as stricter.
+
+**Why it matters.** Decides whether an outlying hub is worthless until connected, or a pool top-up anywhere. Generation step 2 (pool sufficiency) places hubs for pool alone, so it leans on the as-built reading.
+
+> **RESOLVED.** Ben, 2026-10-21 (routing form): b) only connected sources add to the pool. Built in BL-1356: lp_source_row::connected; generation's pool hubs stand only where they join the chain.
+
+### NR-1058 — Routing: does a road hub connect a station it covers, or only the reverse?
+*decision · raised 2026-10-21 · from BL-1356 (routed requests), second cold review finding 2*
+
+The chain admits a source when ITS OWN reach touches the capital or a connected source's tile (your wording, built literally). A rail station's field holds only station tiles, so a station joins only through another connected station, or by standing on the capital or a connected source's tile. A connected road hub whose reach covers the station does NOT connect it. So a line between two provincial cities, neither linked by rail to a station at the capital, delivers nothing.
+
+**Why it matters.** Rail is the inter-market carrier; under the literal rule most generated lines may sit outside every chain. Not yet measured per line.
+
+> **RESOLVED.** Ben, 2026-10-21 (routing form): b) a link counts in either direction. Built in BL-1356 (memo_chain); a connected road hub covering a station puts the line on the chain.
+
+### NR-1059 — Routing: rival siting still buys one hub where a chain is needed (an AI grant question)
+*question · raised 2026-10-21 · from BL-1356 (routed requests), second cold review finding 1; AI_OPPONENT.md § 11*
+
+corp_ai prices an out-of-reach build at one hub and builds that hub on or beside the site. Under routing, a hub there counts only if it chains back to the capital, so on far ground the rival pays upkeep for a hub that never covers its site. The scorer's INPUT (lp_coverage_at) follows the new rule; its RESPONSE does not.
+
+**Why it matters.** Rivals will over-build isolated hubs on far ground. Teaching the scorer to lay a chain is new AI behaviour, so it is a grant for you to give or refuse, not an in-place fix.
+
+> **RESOLVED.** Ben, 2026-10-21 (routing form): b) granted - the scorer prices and builds the chain. Recorded in AI_OPPONENT.md section 11 'AI lays a hub chain to reach the capital'; the work is BL-1395 (AI_LAYS_HUB_CHAIN).
 

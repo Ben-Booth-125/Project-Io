@@ -3143,12 +3143,15 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     const lp_tick& lp = logistic_points_or_fallback(
         w, host != w.tiles.end() ? host->second.body : null_entity, report.logistic_points);
 
+    // BL-1356 (NR-1057): "Makes" counts what a source here adds to the pool, which a
+    // source off the chain to its capital does not; the hover names it as such.
     float makes = 0.0f;
     std::vector<const lp_source_row*> sources;
     for (const lp_source_row& s : lp.sources)
         if (s.tile == tile_id)
         {
-            makes += s.made;
+            if (s.connected)
+                makes += s.made;
             sources.push_back(&s);
         }
 
@@ -3180,7 +3183,7 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     // the tile card is a quarter of the band and narrow at the reference width.
     ImGui::TextDisabled("Logistic Points");
     const bool hovered_label = ImGui::IsItemHovered();
-    if (sources.empty())
+    if (sources.empty() || !(makes > 0.0f))
         ImGui::TextDisabled("Makes none");
     else
         ImGui::Text("Makes %.0f", static_cast<double>(makes));
@@ -3225,9 +3228,11 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     for (const lp_source_row* s : sources)
     {
         const auto bit = w.buildings.find(s->building);
-        ImGui::Text("%s makes %.0f",
-                    bit != w.buildings.end() ? building_type_name(bit->second.type) : "Source",
-                    static_cast<double>(s->made));
+        const char* name = bit != w.buildings.end() ? building_type_name(bit->second.type) : "Source";
+        if (s->connected)
+            ImGui::Text("%s makes %.0f", name, static_cast<double>(s->made));
+        else
+            ImGui::TextDisabled("%s: not tied to the capital, adds nothing", name);
     }
     for (const lp_building_row* r : consumers)
     {

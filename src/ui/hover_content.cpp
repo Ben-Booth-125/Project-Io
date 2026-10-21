@@ -120,7 +120,9 @@ void hover_structure_ground(const ui_state& ui)
     if (!ui.lp_hover_reached || n < 0 || n >= static_cast<int>(lp_network_count))
     {
         ImGui::Spacing();
-        ImGui::TextDisabled("No source reaches here");
+        // BL-1356: a hub can stand beside this tile and still give nothing, because
+        // it has no chain back to the capital. Say that, not "nothing reaches".
+        ImGui::TextDisabled(ui.lp_hover_blocked ? "Not tied to the capital" : "No source reaches here");
         return;
     }
     const auto i = static_cast<std::size_t>(n);
@@ -132,7 +134,11 @@ void hover_structure_ground(const ui_state& ui)
     // numbers, so the player sees how far a source would have to come.
     const float full = lp_full_reach[i], gone = full + lp_fade_length[i];
     ImGui::Spacing();
-    if (lp_full_strength(static_cast<lp_network>(n), ui.lp_hover_distance))
+    // BL-1356: when the figure was topped up from more than one source, the nearest
+    // one's curve no longer explains it - say how many carried it instead.
+    if (ui.lp_hover_used > 1)
+        ImGui::TextDisabled("Topped up from %d sources", ui.lp_hover_used);
+    else if (lp_full_strength(static_cast<lp_network>(n), ui.lp_hover_distance))
         ImGui::TextDisabled("Full reach within %.0f", static_cast<double>(full));
     else
         ImGui::TextDisabled("Fading, gone at cost %.0f", static_cast<double>(gone));

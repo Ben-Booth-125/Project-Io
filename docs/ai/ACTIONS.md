@@ -362,7 +362,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - Both shares finite, each in [0,1], summing to at most 1 (rejected_invalid); `order` is 0 or 1 (rejected_invalid); a clear carries no share (rejected_invalid) and needs a rule set (rejected_state).
 - A rejection mutates nothing.
 
-**Expected output.** From the next tick the nation's Logistic Point pool (made by the hubs, stations and ports on its ground) is granted by class: each of state, champion and other gets its share, pro rata to its buildings' reachable need; a class's unused share spills to the classes still short. Buildings short of points produce in proportion. Cleared, every claim gets the same fraction.
+**Expected output.** From the next tick the nation's Logistic Point pool (made by the hubs, stations and ports on its ground) is granted by class: each of state, champion and other gets its share, served to its buildings in the routed queue (inside a source's full reach first, then nearest; BL-1356); a class's unused share spills to the classes still short. Buildings short of points produce in proportion. Cleared, the classes are one queue: every claim is met while points suffice, and the nearest requests are met first when they do not.
 
 **Reason to select.** Protect the state's or the champion's production when the nation's points are short, at the expense of other (often foreign) firms on its ground.
 

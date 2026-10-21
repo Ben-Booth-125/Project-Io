@@ -479,11 +479,11 @@ int main(int argc, char** argv)
                     centres_on_land);
         std::printf("W seed=%u nations=%d hubs_placed=%d of_max=%.1f%% gen_hubs=%zu "
                     "src_road=%d src_rail=%d src_sea=%d consumers=%d full=%d part=%d none=%d "
-                    "nobody=%d need=%.0f pool=%.0f granted=%.0f seed_ms=%.0f\n",
+                    "nobody=%d unconnectable=%d cut_off=%d ports=%d bridged=%d need=%.0f pool=%.0f granted=%.0f seed_ms=%.0f\n",
                     seed, rep.nations, rep.hubs_placed, 100.0 * rep.hubs_placed / 4000.0,
                     pre_hubs.size(), rep.sources_by_net[0], rep.sources_by_net[1],
                     rep.sources_by_net[2], rep.consumers, rep.fully_covered,
-                    rep.partly_covered, rep.uncovered, rep.nobodys_ground,
+                    rep.partly_covered, rep.uncovered, rep.nobodys_ground, rep.unconnectable, rep.unconnectable_cut_off, rep.ports_placed, rep.islands_bridged,
                     static_cast<double>(rep.need_total), static_cast<double>(rep.pool_total),
                     static_cast<double>(rep.granted_total), seed_ms);
 

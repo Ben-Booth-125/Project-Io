@@ -253,8 +253,7 @@ nowhere to build from, and a nation's first road of a campaign extends the latti
 **A road may always cross a national border, and never go further (Ben, 2026-10-16).** From a tile
 you hold, one crossing into a neighbour's tile is always permitted; that foreign tile is not then a
 tile you may build *from*, so the road stops where it lands. The reason is a real case: a market
-centre held by another nation could otherwise be impossible to connect at all, and a tile that
-cannot reach its centre cannot be supplied (§ How a tile's points get to it). One crossing is
+centre held by another nation could otherwise be impossible to connect at all. One crossing is
 enough to touch the border and no more than that — it buys a connection, never a corridor through
 somebody's country.
 
@@ -707,8 +706,10 @@ into passive and active. What follows replaces the bifold model, the city genera
   up each tick; short of its need it produces **in proportion** (half the points, half the output).
 - **The host nation's pool.** Every building on a nation's ground — its state's, its champion's,
   other firms', foreign firms' — draws on **that nation's** pool, and a source on its ground adds to
-  it whoever built it. **The nation sets how its points are shared** among state, champion and other
-  firms; where no rule is set the share is mechanical (in proportion to need), never a scored choice.
+  it whoever built it, once it is connected to the capital (§ How a tile's points get to it). **The nation sets how its points are shared** among state, champion and other
+  firms; where no rule is set the share is mechanical, never a scored choice: every claim is met
+  while points suffice, and when they fall short the classes are **one queue**, served in the
+  routed order of § How a tile's points get to it (Ben, 2026-10-20).
 - **A source's points dim with its upkeep (Ben, 2026-10-14).** A hub, station or port makes points in
   proportion to the upkeep goods it actually receives — half its stone, half its points — never
   zeroed by a shortfall.
@@ -737,6 +738,24 @@ Three things follow, and each is a check rather than a preference:
   room the logistics game is played in, so a sweep reporting most ground uncovered is reporting the
   intended world.
 
+**The chain is laid outward from the capital (BL-1356).** A hub covers a consumer only where it is
+connected to its nation's capital (§ How a tile's points get to it), so generation reaches an
+outlying consumer by laying hubs outward: where one tile both carries the consumer at full
+strength and touches the chain, one hub there; otherwise a hub on the chain's edge nearest the
+consumer, joining the chain and carrying it closer, until the consumer is covered. The chain is
+steered by the walk over the nation's own dry ground, not by straight-line distance, so it never
+heads for ground it could not reach.
+
+**Ground cut off by water is bridged by sea (Ben, 2026-10-21).** Where a consumer's ground is
+cut off from the capital by water, generation lands a **port** on that ground's coast where the
+chain's sea reach covers it — from a connected port already in reach, or else from a new port on
+the capital's shore nearest the island by sea, with the road chain laid out to it first — and lays
+the road chain on from the island port. A bridge is measured over water only — a route that would
+cross land between its ends is not a strait — and an island already bridged is a home shore for
+the next one out. One bridge per island serves every consumer on it. Where no water route within
+a port's reach joins the ground to the chain, the consumer is left uncovered and the seeding counts
+it rather than placing a source that would deliver nothing.
+
 How many sources, at what tier, and how the lesser centres are ranked are **in-band calibration**:
 chosen against these three rules, logged, and re-measured by the coverage census rather than fixed
 here.
@@ -747,15 +766,54 @@ here.
 buildings' needs. It is filled over **one path** — the best path from a source, never two paths at
 once — and a path is a connection along a network, land or sea.
 
-**A tile must be connected to the market centre, not merely near a source.** A source that reaches
-the tile fills part of its request only if that source is itself connected **back toward the centre**
-— so points arrive along a chain the centre anchors, and a hub dropped in isolation supplies
-nothing. This is what makes an outlying hub an *extension* of a network rather than an island.
+**A tile must be connected to its nation's capital, not merely near a source.** A source that
+reaches the tile fills part of its request only if that source is itself connected **back to the
+capital** — so points arrive along a chain the capital anchors, and a hub dropped in isolation
+supplies nothing. This is what makes an outlying hub an *extension* of a network rather than an
+island. (Ben, 2026-10-21: "Logistics should centre on the capital for all." It replaces the
+market centre as the anchor; see the first of the four rules below.)
 
 **A request may be split across sources, in distance order.** Where the nearest source cannot fill
 it, the remainder comes from the next nearest that both reaches the tile and extends the chain, and
 so on. It supersedes the older "a draw lands on an anchor" rule in the superseded half below, which
 allowed exactly one.
+
+**The four mechanism rules (Ben, 2026-10-20, the routing form).** Owned by BL-1356 (routed
+requests) and BL-1361 (a shipment draws points).
+
+- **Connected back means a chain to the capital (Ben, 2026-10-20 the chain; 2026-10-21 the
+  capital).** A source fills part of a tile's request only if it is **connected** to the capital
+  of the nation whose ground the tile is (`nation_component::capital_tile`): its own reach, on its
+  own network, touches the capital, or touches the tile of a source that is itself connected —
+  and so on outward. **A link counts in either direction (Ben, 2026-10-21, NR-1058):** a source
+  also joins when a connected source's reach touches *its* tile, so a station a connected road hub
+  covers is on the chain, though a station's own field holds only other stations.
+  Every nation's network centres on its capital, whatever market a tile
+  clears in. A hub dropped in isolation, touching neither the capital nor the chain, supplies
+  nothing; a hub that extends the chain extends the network. Ground whose nation has no capital
+  on this body has nothing to be connected back to here, so every source passes the test there.
+  *Two same-day readings were measured and replaced.* A **direct** rule (a source's own reach had
+  to touch the anchor) left about a quarter of generated consumers unreachable by any hub, and G1
+  fell from 96.0 to 71.2. A chain anchored at **the tile's market centre** still stranded about a
+  sixth, almost all of them (171 of 173) in markets centred on another nation's ground, where a
+  nation's own hubs cannot stand. Generation lays hubs outward along the chain to every consumer
+  it can reach (§ Where generation puts the sources).
+- **One nation pool, of CONNECTED sources; routing decides who qualifies and in what order.**
+  Points stay one stock per nation, and **only a source on the chain adds to it (Ben, 2026-10-21,
+  NR-1057)**: a hub with no chain back to the capital makes nothing anyone can draw, so it is
+  worthless until connected — what "supplies nothing" means, read strictly. Ground whose nation has
+  no capital on that body passes every source, as above. Routing does not give a source its own
+  budget; it decides **how much** of a request may
+  be granted and **when** the request is served. Where the nation has set a share rule, each
+  class's portion is served in the same queue order within that class; with no rule the classes
+  are one queue.
+- **The fade caps a source's share, and the next source tops it up.** The qualifying sources
+  that reach a tile are taken nearest first; each can carry its reach × the request (full reach,
+  all of it; halfway down the fade, half), and the next one tops up the remainder, until the
+  request is covered or the sources run out. A tile's cap is therefore its qualifying reaches
+  summed, at most its whole request.
+- **After the march, production claims before trade.** The march claims first (NR-917, above);
+  production is served next, in queue order; a shipment draws what production left.
 
 **Distance orders the queue; it never raises the bill.** When a nation's points fall short of what
 its ground asks for, requests **inside the falloff range are served first**, then the ones beyond

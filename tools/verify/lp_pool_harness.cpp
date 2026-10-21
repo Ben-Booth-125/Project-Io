@@ -15,8 +15,10 @@
 //       ground, exactly (no city, no other building adds any); a road or rail
 //       field never enters water.
 //   L2  FADE: lp_reach is 1 to the threshold, linear across the fade, 0 beyond;
-//       every consumer's coverage is the best reach of its host's sources'
-//       fields (recomputed independently).
+//       every consumer's coverage is its ROUTED cover (BL-1356) - its host's
+//       sources each on its own field, qualifying when it is connected to the
+//       nation's capital (the chain), nearest first and topped up (recomputed
+//       independently).
 //   L3  PRODUCTION PROPORTIONAL TO POINTS: one economy step on two copies (every
 //       second hub idled on one); every extraction site working in both produces
 //       in the ratio of its granted fractions.
@@ -24,8 +26,9 @@
 //       a foreign firm's building counts under `other`; a source owned by a
 //       foreigner adds to the ground's nation.
 //   L5  SHARES: with a rule set and the pool short, each class gets its share (or
-//       its whole claim) and the surplus spills; nothing granted beyond the pool;
-//       with no rule every class gets the same fraction.
+//       its whole claim) and the surplus spills, served in queue order within the
+//       class; nothing granted beyond the pool; with no rule the classes are ONE
+//       queue (BL-1356, Ben 2026-10-20: distance orders the queue).
 //   L6  THE SEAM: set_logistics_shares through agent_protocol::service_line as
 //       the seat — every malformed or unauthorised command rejected with
 //       state_hash unchanged; a valid one applies; clear applies; a rival
@@ -57,8 +60,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -120,6 +125,135 @@ entity_id ground(const world& w, entity_id tile)
     return it != w.tile_to_nation.end() ? it->second : null_entity;
 }
 
+/// BL-1356, recomputed INDEPENDENTLY of lp_route_to (LOGISTICS.md § How a tile's
+/// points get to it, the four mechanism rules): each of the nation's sources on the
+/// body is read on its OWN field; it qualifies when it reaches the tile and is
+/// CONNECTED to its nation's capital - the chain, grown here as a breadth-first
+/// search from the capital over "this source's reach touches that anchor" - and the
+/// qualifying reaches are taken nearest first (distance / full reach, then building
+/// id) and summed to at most 1. `full` and `norm` are the nearest's, the queue key.
+struct routed { float cover = 0.0f; bool full = false; float norm = 0.0f; };
+struct src_rec { entity_id building; entity_id tile; lp_network net; entity_id nation; };
+/// The nation's capital on @p body, or null (Ben, 2026-10-21: the chain's anchor).
+entity_id anchor_of(world& w, entity_id nation, entity_id body)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || nit->second.capital_tile == null_entity)
+        return null_entity;
+    const auto ct = w.tiles.find(nit->second.capital_tile);
+    return (ct != w.tiles.end() && ct->second.body == body) ? nit->second.capital_tile : null_entity;
+}
+
+/// The sources CONNECTED to @p anchor, grown INDEPENDENTLY of the resolver: a source
+/// joins when its own reach touches the anchor or a joined source's tile, or a joined
+/// source's reach touches ITS tile (either direction, NR-1058), repeated until no
+/// source joins. Each source's field is its own single-seed lp_distance_field.
+std::set<entity_id> chain_independently(world& w, const std::vector<src_rec>& srcs, entity_id nation,
+                                        entity_id body, entity_id anchor,
+                                        std::map<entity_id, std::unordered_map<entity_id, float>>& cache)
+{
+    std::set<entity_id> linked;
+    std::vector<const src_rec*> mine, joined;
+    for (const src_rec& s : srcs)
+        if (s.nation == nation && w.tiles.at(s.tile).body == body)
+        {
+            mine.push_back(&s);
+            if (!cache.count(s.building))
+                cache[s.building] = lp_distance_field(w, body, s.net, {s.tile});
+        }
+    std::vector<entity_id> anchors{anchor};
+    const auto reach_at = [&](const src_rec* s, entity_id t) {
+        const auto& f = cache[s->building];
+        const auto it = f.find(t);
+        return it != f.end() && lp_reach(s->net, it->second) > 0.0f;
+    };
+    for (bool grew = true; grew;)
+    {
+        grew = false;
+        for (const src_rec* s : mine)
+        {
+            if (linked.count(s->building)) continue;
+            bool joins = false;
+            for (const entity_id a : anchors) if (reach_at(s, a)) { joins = true; break; }
+            if (!joins)
+                for (const src_rec* j : joined) if (reach_at(j, s->tile)) { joins = true; break; }
+            if (!joins) continue;
+            linked.insert(s->building);
+            anchors.push_back(s->tile);
+            joined.push_back(s);
+            grew = true;
+        }
+    }
+    return linked;
+}
+
+routed route_independently(world& w, const std::vector<src_rec>& srcs, entity_id nation, entity_id tile,
+                           std::map<entity_id, std::unordered_map<entity_id, float>>& cache)
+{
+    routed out;
+    const entity_id body = w.tiles.at(tile).body;
+    // The anchor is the nation's CAPITAL (Ben, 2026-10-21), when it stands on this body.
+    const entity_id centre = anchor_of(w, nation, body);
+    std::vector<const src_rec*> mine;
+    for (const src_rec& s : srcs)
+        if (s.nation == nation && w.tiles.at(s.tile).body == body)
+        {
+            mine.push_back(&s);
+            if (!cache.count(s.building))
+                cache[s.building] = lp_distance_field(w, body, s.net, {s.tile});
+        }
+    const std::set<entity_id> linked = (centre != null_entity)
+        ? chain_independently(w, srcs, nation, body, centre, cache) : std::set<entity_id>{};
+    struct c { float norm; entity_id b; float r; };
+    std::vector<c> cs;
+    for (const src_rec* sp : mine)
+    {
+        const src_rec& s = *sp;
+        const auto& f = cache[s.building];
+        const auto it = f.find(tile);
+        if (it == f.end() || !(lp_reach(s.net, it->second) > 0.0f))
+            continue;
+        if (centre != null_entity && !linked.count(s.building))
+            continue;
+        cs.push_back({it->second / lp_full_reach[static_cast<std::size_t>(s.net)], s.building,
+                      lp_reach(s.net, it->second)});
+    }
+    if (cs.empty())
+        return out;
+    std::sort(cs.begin(), cs.end(), [](const c& a, const c& b) { return a.norm != b.norm ? a.norm < b.norm : a.b < b.b; });
+    float sum = 0.0f;
+    for (const c& k : cs) { sum += k.r; if (sum >= 1.0f) break; }
+    out.cover = std::min(1.0f, sum);
+    out.full  = cs.front().r >= 1.0f;
+    out.norm  = cs.front().norm;
+    return out;
+}
+
+std::vector<src_rec> sources_of(const lp_tick& t)
+{
+    std::vector<src_rec> v;
+    for (const lp_source_row& s : t.sources)
+        if (s.nation != null_entity)
+            v.push_back({s.building, s.tile, s.network, s.nation});
+    return v;
+}
+
+/// The queue property, checked over @p rows already in queue order: once a request
+/// is granted short of its claim, no request after it is granted anything.
+bool queue_holds(const std::vector<const lp_building_row*>& rows)
+{
+    bool short_seen = false;
+    for (const lp_building_row* r : rows)
+    {
+        const float claim = r->need * r->coverage;
+        if (short_seen && r->granted > 1e-3f)
+            return false;
+        if (r->granted + 1e-3f < claim)
+            short_seen = true;
+    }
+    return true;
+}
+
 const lp_nation_row* nation_row(const lp_tick& t, entity_id n)
 {
     for (const lp_nation_row& r : t.nations)
@@ -163,13 +297,29 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             lp_network n;
             types_ok = types_ok && lp_source_network(ty, n) && n == s.network;
         }
+        // BL-1356 (Ben, 2026-10-21, NR-1057): only a source CONNECTED to its nation's
+        // capital adds to the pool - the chain grown independently here.
+        const std::vector<src_rec> l1_srcs = sources_of(t);
+        std::map<entity_id, std::unordered_map<entity_id, float>> l1_cache;
+        std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> l1_chain;
         std::map<entity_id, float> expect;
+        int l1_off_chain = 0;
         for (const auto& [bid, b] : w.buildings)
         {
             lp_network n;
             if (!lp_source_network(b.type, n) || !lp_source_running(b)) continue;
             const entity_id g = ground(w, b.tile);
-            if (g != null_entity) expect[g] += lp_source_points[static_cast<std::size_t>(n)] * building_supply_scalar(b);
+            if (g == null_entity) continue;
+            const entity_id body = w.tiles.at(b.tile).body;
+            const entity_id anc = anchor_of(w, g, body);
+            if (anc != null_entity)
+            {
+                const auto key = std::make_pair(g, body);
+                if (!l1_chain.count(key))
+                    l1_chain[key] = chain_independently(w, l1_srcs, g, body, anc, l1_cache);
+                if (!l1_chain[key].count(bid)) { ++l1_off_chain; continue; }
+            }
+            expect[g] += lp_source_points[static_cast<std::size_t>(n)] * building_supply_scalar(b);
         }
         bool pools_ok = true;
         for (const lp_nation_row& r : t.nations)
@@ -180,7 +330,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         for (const auto& [n, e] : expect)
             if (nation_row(t, n) == nullptr) pools_ok = false;
         check(types_ok && !t.sources.empty(), "L1", fmt("%zu sources, every one a hub, station or port on its own network", t.sources.size()));
-        check(pools_ok, "L1", fmt("every nation's pool (%zu) is exactly its ground's running sources' points; cities add none", t.nations.size()));
+        check(pools_ok, "L1", fmt("every nation's pool (%zu) is exactly its ground's CONNECTED running sources' points (%d off the chain add nothing); cities add none", t.nations.size(), l1_off_chain));
         bool dry = true;
         for (const lp_source_row& s : t.sources)
         {
@@ -217,33 +367,26 @@ void mechanics(app_start_world& out, std::uint32_t seed)
                  && lp_reach(ln, F + L) == 0.0f && lp_reach(ln, F + L + 5.0f) == 0.0f;
         }
         check(curve, "L2", "reach is 1 to the threshold, linear across the fade, 0 beyond (all three networks)");
-        // Independent coverage: per host nation, per network, the field of its sources.
-        std::map<std::pair<entity_id, int>, std::vector<entity_id>> seeds; // (nation, net) on the home body
-        for (const lp_source_row& s : t.sources)
-            if (s.nation != null_entity) seeds[{s.nation, static_cast<int>(s.network)}].push_back(s.tile);
-        std::map<std::pair<entity_id, int>, std::unordered_map<entity_id, float>> fields;
-        int bad = 0, partial = 0, checked = 0;
+        // Independent coverage, ROUTED (BL-1356): per consumer, its host's sources each
+        // on its own field, qualifying only when it is connected to the nation's capital
+        // (the chain), nearest first and topped up (route_independently, not lp_route_to).
+        const std::vector<src_rec> srcs = sources_of(t);
+        std::map<entity_id, std::unordered_map<entity_id, float>> cache;
+        int bad = 0, partial = 0, checked = 0, topped = 0, covered = 0;
         for (const lp_building_row& r : t.buildings)
         {
             if (r.nation == null_entity) continue;
             const entity_id tile = w.buildings.at(r.building).tile;
-            float cov = 0.0f;
-            for (int n = 0; n < 3; ++n)
-            {
-                const auto k = std::make_pair(r.nation, n);
-                if (!seeds.count(k)) continue;
-                std::vector<entity_id> on_body;
-                for (const entity_id s : seeds[k])
-                    if (w.tiles.at(s).body == w.tiles.at(tile).body) on_body.push_back(s);
-                if (!fields.count(k)) fields[k] = lp_distance_field(w, w.tiles.at(tile).body, static_cast<lp_network>(n), on_body);
-                const auto it = fields[k].find(tile);
-                if (it != fields[k].end()) cov = std::max(cov, lp_reach(static_cast<lp_network>(n), it->second));
-            }
+            const routed rt = route_independently(w, srcs, r.nation, tile, cache);
             ++checked;
             if (r.coverage > 0.0f && r.coverage < 1.0f) ++partial;
-            if (!approx(cov, r.coverage)) ++bad;
+            if (rt.cover >= 1.0f && !rt.full) ++topped;
+            if (rt.cover > 0.0f) ++covered;
+            if (!approx(rt.cover, r.coverage)) ++bad;
         }
-        check(bad == 0 && checked > 0, "L2", fmt("%d consumers' coverage equals the best reach of their host's sources (%d in the fade)", checked, partial));
+        // Non-vacuity (cold review): agreement alone would pass if routing blocked every
+        // consumer, so at least one must actually be covered.
+        check(bad == 0 && checked > 0 && covered > 0, "L2", fmt("%d consumers' coverage equals their routed cover - qualifying sources nearest first, topped up (%d covered, %d in the fade, %d topped up to full)", checked, covered, partial, topped));
     }
 
     // ---- L3 -----------------------------------------------------------------
@@ -346,17 +489,33 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         const entity_id lp_n = ln;
         const lp_tick mech = resolve_logistic_points(c);
         const lp_nation_row* mr = nation_row(mech, lp_n);
-        bool same = mr != nullptr;
-        float g0 = -1.0f;
-        if (mr)
-            for (std::size_t k = 0; k < lp_class_count; ++k)
-                if (mr->claim[k] > 0.0f)
-                {
-                    const float g = mr->granted[k] / mr->claim[k];
-                    if (g0 < 0.0f) g0 = g; else same = same && approx(g, g0);
-                }
-        check(same, "L5", fmt("no rule: every class of nation %u gets the same fraction (%.3f; pool %.1f, claims %.1f/%.1f/%.1f)",
-                              lp_n, g0, mr ? mr->pool : 0.f, mr ? mr->claim[0] : 0.f, mr ? mr->claim[1] : 0.f, mr ? mr->claim[2] : 0.f));
+        // BL-1356 (Ben, 2026-10-20): with no rule the classes are ONE queue - inside the
+        // falloff first, then nearest - not a shared fraction. The queue is rebuilt here
+        // from the independent routing, so the check does not read the resolver's order.
+        const std::vector<src_rec> srcs = sources_of(mech);
+        std::map<entity_id, std::unordered_map<entity_id, float>> cache;
+        struct qrow { bool full; float norm; entity_id b; const lp_building_row* row; };
+        std::vector<qrow> q;
+        for (const lp_building_row& b : mech.buildings)
+        {
+            if (b.nation != lp_n || !(b.need > 0.0f)) continue;
+            const routed rt = route_independently(c, srcs, lp_n, c.buildings.at(b.building).tile, cache);
+            q.push_back({rt.full, rt.norm, b.building, &b});
+        }
+        std::sort(q.begin(), q.end(), [](const qrow& a, const qrow& b) {
+            if (a.full != b.full) return a.full;
+            if (a.norm != b.norm) return a.norm < b.norm;
+            return a.b < b.b;
+        });
+        std::vector<const lp_building_row*> in_order;
+        float handed = 0.0f, claims_all = 0.0f;
+        for (const qrow& x : q) { in_order.push_back(x.row); handed += x.row->granted; claims_all += x.row->need * x.row->coverage; }
+        const float avail = mr ? std::max(0.0f, mr->pool - mr->march_granted) : 0.0f;
+        const bool totals = mr != nullptr && approx(handed, std::min(avail, claims_all), 1e-2f)
+                         && approx(handed, mr->granted[0] + mr->granted[1] + mr->granted[2], 1e-2f);
+        check(totals && queue_holds(in_order), "L5",
+              fmt("no rule: nation %u is ONE queue - %zu requests, %.1f handed of pool %.1f against claims %.1f; nobody later is served while an earlier request is short",
+                  lp_n, in_order.size(), handed, mr ? mr->pool : 0.f, claims_all));
         // The rule is set directly here (the verb is L6's subject).
         c.nations.at(lp_n).lp_shares.set = true;
         c.nations.at(lp_n).lp_shares.share = {0.6f, 0.3f, 0.1f};
@@ -389,17 +548,33 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             std::printf("    rule 0.6/0.3/0.1: pool %.1f, claims %.1f/%.1f/%.1f, granted %.1f/%.1f/%.1f\n", r->pool,
                         r->claim[0], r->claim[1], r->claim[2], r->granted[0], r->granted[1], r->granted[2]);
         }
-        // Per building: within a class, every claim granted the same fraction.
-        bool pro_rata = ok;
-        std::array<float, 3> gk = {-1.f, -1.f, -1.f};
-        for (const lp_building_row& b : ruled.buildings)
+        // Per building: within a class, the QUEUE (BL-1356) - each class's portion is
+        // served nearest first, recomputed from the independent routing.
+        bool queued = ok;
         {
-            if (b.nation != lp_n || !(b.need > 0.0f) || !(b.coverage > 0.0f)) continue;
-            const float g = b.fraction / b.coverage;
-            float& ref = gk[static_cast<std::size_t>(b.cls)];
-            if (ref < 0.0f) ref = g; else pro_rata = pro_rata && approx(g, ref, 1e-3f);
+            const std::vector<src_rec> srcs = sources_of(ruled);
+            std::map<entity_id, std::unordered_map<entity_id, float>> cache;
+            struct qrow { bool full; float norm; entity_id b; const lp_building_row* row; };
+            std::array<std::vector<qrow>, 3> per;
+            for (const lp_building_row& b : ruled.buildings)
+            {
+                if (b.nation != lp_n || !(b.need > 0.0f)) continue;
+                const routed rt = route_independently(c, srcs, lp_n, c.buildings.at(b.building).tile, cache);
+                per[static_cast<std::size_t>(b.cls)].push_back({rt.full, rt.norm, b.building, &b});
+            }
+            for (auto& v : per)
+            {
+                std::sort(v.begin(), v.end(), [](const qrow& a, const qrow& b) {
+                    if (a.full != b.full) return a.full;
+                    if (a.norm != b.norm) return a.norm < b.norm;
+                    return a.b < b.b;
+                });
+                std::vector<const lp_building_row*> in_order;
+                for (const qrow& x : v) in_order.push_back(x.row);
+                queued = queued && queue_holds(in_order);
+            }
         }
-        check(ok && pro_rata, "L5", "with a rule set and the pool short: each class its share or its whole claim, the surplus spilled, pro rata within a class, never beyond the pool");
+        check(ok && queued, "L5", "with a rule set and the pool short: each class its share or its whole claim, the surplus spilled, served in queue order within a class, never beyond the pool");
     }
 
     // ---- L6 -----------------------------------------------------------------

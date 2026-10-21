@@ -2131,6 +2131,18 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   admitted:** any build for the player's nation or champion; any source built for reach the scorer
   does not itself need. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
+  **AI lays a hub chain to reach the capital — granted (Ben, 2026-10-21, NR-1059;
+  `../economy/LOGISTICS.md` § How a tile's points get to it).** A widening of the grant above, and
+  its own subject: since BL-1356 a hub delivers only when it chains back to its nation's capital, so
+  one hub beside a far site can cost upkeep and cover nothing. A rival corporation or AI nation may
+  therefore price a build at the WHOLE chain of hubs it needs to be covered, and lay that chain, as
+  the same scored choice over the same legal verbs. **The chain is one decision:** priced and laid
+  in the tick the build is chosen, from the world as it stands; nothing is carried to a later tick,
+  and a chain the scorer cannot afford in that tick is not started. **Not admitted:** any chain for
+  the player's nation or champion; a chain laid for ground the scorer is not building on; any hub
+  on ground the builder may not build on. Pure, seeded, deterministic, replayable, legal verbs
+  only, never a planner.
+
   **A rival major's state industry runs under its champion's layer — granted (Ben, 2026-10-11;
   `../politics/NATIONS.md` § State industry).** State buildings are a new actor grain: buildings a
   nation owns with no corporation between. A rival major's state buildings may take the same

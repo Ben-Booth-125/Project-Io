@@ -74,7 +74,9 @@
 
 #include <array>
 #include <map>
+#include <set>
 #include <tuple>
+#include <utility>
 #include <cstddef>
 #include <unordered_map>
 #include <vector>
@@ -170,6 +172,10 @@ struct lp_source_row
     /// left to each reader to recompute: a surface that re-derived it is how the lens
     /// and the economy came to disagree in the first place (BL-1352).
     float      made     = 0.0f;
+    /// BL-1356 (Ben, 2026-10-21, NR-1057): on the chain back to its nation's capital.
+    /// Only a connected source adds `made` to the pool; an isolated one makes points
+    /// nobody can draw. True where the nation has no capital on this body.
+    bool       connected = true;
 };
 
 /// One marching unit's claim, handed IN by the march pass (BL-1352). The pass owns
@@ -250,22 +256,73 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
 ///        as it was before the march joined this pool.
 lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& marches = {});
 
-/// Per-evaluation memo for `lp_coverage_at`: the host nation's source fields,
-/// keyed (nation, network, body). Clear it after any source is built.
-struct lp_reach_memo
+/// One running source as routing reads it (BL-1356).
+struct lp_source_ref
 {
-    std::map<std::tuple<entity_id, int, entity_id>, std::unordered_map<entity_id, float>> fields;
-    void clear() { fields.clear(); }
+    entity_id  building = null_entity;
+    entity_id  tile     = null_entity;
+    lp_network network  = lp_network::road;
 };
 
-/// Where a tile's coverage came from: the network whose reach is best there and
-/// the network distance to that network's nearest source. `reached` is false when
-/// no field of the host nation reaches the tile at all (BL-1353's hover card).
+/// Per-evaluation memo for routing (`lp_route_to`, `lp_coverage_at`). BL-1356: a
+/// tile's points come from INDIVIDUAL sources, each tested on its own reach, so the
+/// memo holds each source's own field rather than one field per network. Clear it
+/// after any source is built, idled or demolished, or any road changes.
+struct lp_reach_memo
+{
+    /// (nation, body) -> that nation's running sources on that body, ascending building id.
+    std::map<std::pair<entity_id, entity_id>, std::vector<lp_source_ref>> sources;
+    /// source building -> its own distance field (`lp_distance_field` from its tile alone).
+    std::map<entity_id, std::unordered_map<entity_id, float>> fields;
+    /// (nation, body, anchor tile) -> the sources CONNECTED to that anchor - the nation's
+    /// capital (Ben, 2026-10-21): the chain (Ben, 2026-10-20), a source whose reach
+    /// touches the anchor or the tile of a source already in the set, closed outward
+    /// until nothing more joins.
+    std::map<std::tuple<entity_id, entity_id, entity_id>, std::set<entity_id>> connected;
+    void clear() { sources.clear(); fields.clear(); connected.clear(); }
+};
+
+/// How a tile's request is routed (BL-1356; LOGISTICS.md § How a tile's points get
+/// to it, the four mechanism rules, Ben 2026-10-20). A source QUALIFIES for a tile
+/// when its own reach touches the tile and it is CONNECTED to its nation's capital
+/// (its reach touches the capital or a connected source's tile - the chain);
+/// the qualifying sources are taken nearest first, each carrying its reach x the
+/// request, until the request is covered.
+struct lp_route
+{
+    /// Qualifying reaches summed, at most 1: the share of a request that may be granted.
+    float      cover    = 0.0f;
+    /// True when at least one source qualifies.
+    bool       reached  = false;
+    /// The NEAREST qualifying source carries full strength here: the request is
+    /// "inside the falloff range" and is queued ahead of every request that is not.
+    bool       full     = false;
+    /// The nearest qualifying source's distance as a fraction of its network's full
+    /// reach, so road, rail and sea order on one scale. Orders requests within a band.
+    float      norm     = 0.0f;
+    lp_network network  = lp_network::road; ///< the nearest qualifying source's network
+    float      distance = 0.0f;             ///< and its network distance to the tile
+    /// How many qualifying sources the cover was summed from (1 = no top-up).
+    int        used     = 0;
+    /// A source reached the tile but is not connected to the capital (no chain back),
+    /// so it was not counted - the reason a tile beside a hub can read 0.
+    bool       blocked  = false;
+};
+
+/// Route @p tile's request against @p nation's running sources on @p body.
+lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
+                     entity_id tile);
+
+/// Where a tile's coverage came from: the NEAREST QUALIFYING source's network and
+/// its network distance (BL-1356). `reached` is false when no source of the host
+/// nation both reaches the tile and is connected to its capital (BL-1353's card).
 struct lp_coverage_why
 {
     bool       reached  = false;
     lp_network network  = lp_network::road;
     float      distance = 0.0f;
+    int        used     = 0;     ///< sources the cover was topped up from (lp_route::used)
+    bool       blocked  = false; ///< a source reached here but has no chain to the capital (lp_route::blocked)
 };
 
 /// The coverage a building standing on @p tile would get from the running
@@ -298,14 +355,27 @@ struct lp_seed_report
     /// (a state hub, station or port its treasury cannot fund): not counted in
     /// `sources_by_net`, and reaching nobody. Filled by `lp_seed_read_at_gate`.
     int   gate_idled_sources = 0;
+    /// BL-1356: consumers no hub could be placed for - the centre does not reach
+    /// them at full strength, and a hub on their own tile would not reach the centre
+    /// (Ben's rule B), so it would deliver nothing. Left uncovered, counted here.
+    int   unconnectable = 0;
+    /// Of those, the ones on ground CUT OFF from their capital: no path of the nation's
+    /// own dry tiles joins them (an island, or a holding beyond water or a neighbour).
+    /// A road hub's chain cannot cross that, whatever its reach.
+    int   unconnectable_cut_off = 0;
+    /// BL-1356: ports laid to bridge ground cut off from its capital by water, and the
+    /// islands so bridged (a home port, where none was connected, plus an island port).
+    int   ports_placed    = 0;
+    int   islands_bridged = 0;
 };
 
-/// Place logistics hubs at the fold so every producing building on a nation's
-/// ground is covered and every pool meets its need with margin. A hub stands on
-/// the market-centre tile serving the first uncovered building (ascending id) —
-/// or the building's own tile when that centre is off the nation's ground — owned
-/// by the nation (state industry) for a major, else by the uncovered building's
-/// owner. Complete and zero-staffed, as every generated holding is. Deterministic.
+/// Place logistics sources at the fold so every producing building on a nation's ground is
+/// covered and every pool meets its need with margin (LOGISTICS.md § Where generation puts the
+/// sources). BL-1356: a source delivers only on the chain back to its nation's capital, so hubs
+/// are laid OUTWARD along that chain to each consumer, steered over the nation's own dry ground;
+/// ground cut off from the capital by water is bridged by a pair of ports; pool hubs stand only
+/// where they join the chain. Owned by the nation (state industry) for a major, else by the
+/// consumer's owner. Complete and zero-staffed, as every generated holding is. Deterministic.
 lp_seed_report seed_logistics_sources(world& w);
 
 /// The seeding's READING (consumers, coverage, pool, grant), refilled on @p w

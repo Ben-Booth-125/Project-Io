@@ -2106,6 +2106,10 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
         // not this lens's subject either - the lens is the player's own network.
         if (src.nation == null_entity)
             continue;
+        // BL-1356 (NR-1057): a source off the chain adds nothing to the pool, so it
+        // draws no ring either - the key's sum and the rings stay one answer.
+        if (!src.connected)
+            continue;
         if (state.lp_player_known)
         {
             entity_id pn2 = null_entity;
@@ -2159,10 +2163,11 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             state.lp_coverage_gh = gh;
             state.lp_coverage.assign(static_cast<std::size_t>(std::max(0, gw))
                                          * static_cast<std::size_t>(std::max(0, gh)), -1.0f);
-            // One memo for the whole field: `lp_coverage_at` builds its host nation's
-            // source fields once per (nation, network, body) and answers every later
-            // tile from them, so filtering to ONE nation is what makes a per-tile read
-            // affordable here at all - three bounded floods, not one per tile.
+            // One memo for the whole field: `lp_coverage_at` builds each of the host
+            // nation's sources' own field once (BL-1356 routes per source) and answers
+            // every later tile from them, so filtering to ONE nation is what makes a
+            // per-tile read affordable here at all - a bounded flood per source, not
+            // one per tile.
             lp_reach_memo memo;
             const std::vector<entity_id>& raster = body_tile_grid(w, state.active_body);
             for (std::size_t i = 0; i < raster.size() && i < state.lp_coverage.size(); ++i)
@@ -2187,6 +2192,8 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 state.lp_hover_reached  = why.reached;
                 state.lp_hover_network  = static_cast<int>(why.network);
                 state.lp_hover_distance = why.distance;
+                state.lp_hover_used     = why.used;
+                state.lp_hover_blocked  = why.blocked;
                 state.lp_hover_tile     = state.hovered_structure;
             }
             // And the player nation's own figures for the key - read off `lp`, the
@@ -2201,7 +2208,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                     state.lp_player_claim = r.claim[0] + r.claim[1] + r.claim[2];
                 }
             for (const lp_source_row& src : lp.sources)
-                if (src.nation == pn)
+                if (src.nation == pn && src.connected) // BL-1356: only those feeding the pool
                     ++state.lp_player_sources;
         }
     }

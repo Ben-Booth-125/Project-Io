@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <limits>
 #include <cstdio>
 #include <functional>
 #include <map>
@@ -255,14 +257,25 @@ using field_key = std::tuple<entity_id, int, entity_id>; // nation, network, bod
 
 } // namespace
 
+// The routing helpers (defined with lp_route_to below), declared here because step 1
+// of the resolver needs the chain to know which sources add to the pool.
+namespace {
+entity_id chain_anchor(const world& w, entity_id nation, entity_id body);
+const std::set<entity_id>& memo_chain(world& w, lp_reach_memo& memo, entity_id nation,
+                                      entity_id body, entity_id centre);
+} // namespace
+
 lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& marches)
 {
     lp_tick out;
     resolver_input in;
     read_input(w, in);
 
-    // 1. Sources, ascending building id; seeds per (nation, network, body).
-    std::map<field_key, std::vector<entity_id>> seeds;
+    // 1. Sources, ascending building id. Routing (step 2) reads each one on its own
+    //    reach through the memo, so no per-network seed set is built here (BL-1356).
+    //    ONLY A CONNECTED SOURCE ADDS TO THE POOL (Ben, 2026-10-21, NR-1057): a hub with
+    //    no chain back to the capital makes points nobody can draw.
+    lp_reach_memo memo;
     std::map<entity_id, lp_nation_row> rows;
     for (const entity_id bid : in.ids)
     {
@@ -279,14 +292,22 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         // goods it receives (half its stone, half its points), never zeroed
         // outright — the building's upkeep supply factor (BL-641), linear.
         const float made = lp_source_points[ni] * building_supply_scalar(b);
-        out.sources.push_back({bid, b.tile, nation, net, made});
+        bool linked = true;
+        if (nation != null_entity)
+        {
+            const entity_id anchor = chain_anchor(w, nation, tit->second.body);
+            linked = anchor == null_entity
+                  || memo_chain(w, memo, nation, tit->second.body, anchor).count(bid) != 0;
+        }
+        out.sources.push_back({bid, b.tile, nation, net, made, linked});
         if (nation == null_entity)
             continue; // nobody's ground: adds to no pool
+        if (!linked)
+            continue; // off the chain: adds to no pool either
         lp_nation_row& r = rows[nation];
         r.nation = nation;
         r.made[ni] += made;
         ++r.sources[ni];
-        seeds[{nation, static_cast<int>(net), tit->second.body}].push_back(b.tile);
     }
     for (auto& [nid, r] : rows)
         r.pool = r.made[0] + r.made[1] + r.made[2];
@@ -325,8 +346,12 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         out.march_granted[mr.unit] = mr.granted;
     }
 
-    // 2. Consumers: need, coverage, class.
-    std::map<field_key, std::unordered_map<entity_id, float>> fields;
+    // 2. Consumers: need, coverage (ROUTED, BL-1356), class. The memo is step 1's.
+    // Each row's place in the queue: inside the falloff first, then by its nearest
+    // qualifying source's distance, then by building id (LOGISTICS.md: "distance
+    // orders the queue; it never raises the bill").
+    struct queue_key { bool full; float norm; };
+    std::vector<queue_key> qkeys;
     for (const entity_id bid : in.ids)
     {
         const building_component& b = w.buildings.at(bid);
@@ -351,35 +376,25 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
                 row.cls = lp_class::champion;
             else
                 row.cls = lp_class::other;
-            const entity_id body = tit->second.body;
-            float cov = 0.0f;
-            for (int n = 0; n < static_cast<int>(lp_network_count); ++n)
-            {
-                const field_key k{row.nation, n, body};
-                const auto sit = seeds.find(k);
-                if (sit == seeds.end())
-                    continue;
-                auto fit = fields.find(k);
-                if (fit == fields.end())
-                    fit = fields.emplace(k, lp_distance_field(w, body, static_cast<lp_network>(n),
-                                                              sit->second)).first;
-                const auto dit = fit->second.find(b.tile);
-                if (dit != fit->second.end())
-                    cov = std::max(cov, lp_reach(static_cast<lp_network>(n), dit->second));
-            }
-            row.coverage = cov;
+            const lp_route route = lp_route_to(w, memo, row.nation, tit->second.body, b.tile);
+            row.coverage = route.cover;
+            qkeys.push_back({route.full, route.norm});
             lp_nation_row& r = rows[row.nation];
             r.nation = row.nation;
             r.claim[static_cast<std::size_t>(row.cls)] += row.need * row.coverage;
         }
+        else
+            qkeys.push_back({false, 0.0f});
         out.buildings.push_back(row);
     }
 
-    // 3. Grants per nation, per class.
-    std::map<entity_id, std::array<float, lp_class_count>> grant_frac;
+    // 3. Grants per nation, per class. `plenty` marks a pot that covers every claim
+    //    on it, so step 4 hands those requests their claim EXACTLY rather than what
+    //    is left of a float sum drained in another order (cold review).
+    std::map<entity_id, std::array<bool, lp_class_count>> plenty;
     for (auto& [nid, r] : rows)
     {
-        std::array<float, lp_class_count> g{};
+        std::array<bool, lp_class_count> g{};
         const auto nit = w.nations.find(nid);
         const bool rule = nit != w.nations.end() && nit->second.lp_shares.set;
         r.rule_set = rule;
@@ -391,7 +406,7 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
             // it exactly as `pool` was before the march joined.
             const float avail = std::max(0.0f, r.pool - r.march_granted);
             const float f = total > 0.0f ? std::min(1.0f, avail / total) : 0.0f;
-            g.fill(f);
+            g.fill(avail >= total);
             for (std::size_t k = 0; k < lp_class_count; ++k)
                 r.granted[k] = r.claim[k] * f;
         }
@@ -414,24 +429,245 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
                 if (surplus > 0.0f && short_total > 0.0f)
                     got += std::min(shortfall[k], surplus * (shortfall[k] / short_total));
                 r.granted[k] = got;
-                g[k] = r.claim[k] > 0.0f ? std::min(1.0f, got / r.claim[k]) : 0.0f;
+                g[k] = got >= r.claim[k];
             }
         }
-        grant_frac[nid] = g;
+        plenty[nid] = g;
     }
-    for (lp_building_row& row : out.buildings)
+    // 4. SERVE IN QUEUE ORDER (BL-1356). Each nation's grant per class is what step 3
+    // settled; it is handed out request by request in queue order, each request
+    // taking its routed claim (need x coverage) whole while the class has points left.
+    // Where points are plenty this is exactly the pro-rata answer (every claim met);
+    // where they are short, the near requests are met and the far ones wait, rather
+    // than every building getting the same thin share. A far building's claim is never
+    // larger than a near one's: distance orders the queue and never raises the bill.
+    std::vector<std::size_t> order(out.buildings.size());
+    for (std::size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+    std::sort(order.begin(), order.end(), [&](std::size_t x, std::size_t y) {
+        const lp_building_row& a = out.buildings[x];
+        const lp_building_row& b = out.buildings[y];
+        if (a.nation != b.nation) return a.nation < b.nation;
+        if (qkeys[x].full != qkeys[y].full) return qkeys[x].full; // inside the falloff first
+        if (qkeys[x].norm != qkeys[y].norm) return qkeys[x].norm < qkeys[y].norm;
+        return a.building < b.building;
+    });
+    // With a share rule each class has its own pot, served in queue order within the
+    // class; with none, the classes are ONE queue - the mechanical share is "in
+    // proportion to need" only while points suffice, and a queue when they do not.
+    std::map<entity_id, std::array<float, lp_class_count>> left;
+    for (const auto& [nid, r] : rows)
     {
+        std::array<float, lp_class_count> pots = r.granted;
+        if (!r.rule_set)
+        {
+            pots.fill(0.0f);
+            pots[0] = r.granted[0] + r.granted[1] + r.granted[2];
+        }
+        left[nid] = pots;
+    }
+    for (const std::size_t i : order)
+    {
+        lp_building_row& row = out.buildings[i];
         if (row.nation != null_entity && row.need > 0.0f)
         {
-            const float g = grant_frac[row.nation][static_cast<std::size_t>(row.cls)];
-            row.fraction = std::clamp(row.coverage * g, 0.0f, 1.0f);
-            row.granted  = row.need * row.fraction;
+            const bool ruled = rows[row.nation].rule_set;
+            const std::size_t k = ruled ? static_cast<std::size_t>(row.cls) : 0u;
+            float& pot  = left[row.nation][k];
+            const float claim = row.need * row.coverage;
+            const float give  = plenty[row.nation][k] ? claim : std::max(0.0f, std::min(claim, pot));
+            pot -= give;
+            row.granted  = give;
+            row.fraction = std::clamp(give / row.need, 0.0f, 1.0f);
         }
+    }
+    // The nation rows report what the queue actually handed each class - with no rule
+    // that is no longer the pro-rata split step 3 computed, and a ledger that showed
+    // the split while the buildings got the queue would be two answers to one question.
+    for (auto& [nid, r] : rows)
+        r.granted.fill(0.0f);
+    for (const lp_building_row& row : out.buildings)
+    {
         out.fraction[row.building] = row.fraction;
+        if (row.nation != null_entity)
+            rows[row.nation].granted[static_cast<std::size_t>(row.cls)] += row.granted;
     }
     out.nations.reserve(rows.size());
     for (auto& [nid, r] : rows)
         out.nations.push_back(r);
+    return out;
+}
+
+// BL-1356 (LOGISTICS.md § How a tile's points get to it; the four mechanism rules,
+// Ben 2026-10-20; the capital as anchor, 2026-10-21). Routing reads INDIVIDUAL
+// sources: each is tested on its own reach, so a hub with no chain back to its
+// nation's capital supplies nothing, and the coverage a tile gets is the qualifying reaches taken nearest first
+// and summed - the fade caps each source's share and the next one tops it up.
+namespace {
+
+/// What a nation's chain is anchored to on @p body (Ben, 2026-10-21: "Logistics
+/// should centre on the capital for all"): its capital tile, when it stands on this
+/// body. Null when the nation has none here - nothing to be connected back to, so
+/// every source passes the test on that ground.
+entity_id chain_anchor(const world& w, entity_id nation, entity_id body)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || nit->second.capital_tile == null_entity)
+        return null_entity;
+    const auto tit = w.tiles.find(nit->second.capital_tile);
+    if (tit == w.tiles.end() || tit->second.body != body)
+        return null_entity;
+    return nit->second.capital_tile;
+}
+
+const std::vector<lp_source_ref>& memo_sources(world& w, lp_reach_memo& memo, entity_id nation,
+                                               entity_id body)
+{
+    const auto key = std::make_pair(nation, body);
+    auto it = memo.sources.find(key);
+    if (it != memo.sources.end())
+        return it->second;
+    std::vector<lp_source_ref> list;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        lp_network net;
+        if (!lp_source_network(b.type, net) || !lp_source_running(b))
+            continue;
+        const auto st = w.tiles.find(b.tile);
+        const auto sn = w.tile_to_nation.find(b.tile);
+        if (st != w.tiles.end() && st->second.body == body && sn != w.tile_to_nation.end()
+            && sn->second == nation)
+            list.push_back({bid, b.tile, net});
+    }
+    // Ascending building id, so nothing downstream depends on the map's walk order.
+    std::sort(list.begin(), list.end(),
+              [](const lp_source_ref& x, const lp_source_ref& y) { return x.building < y.building; });
+    return memo.sources.emplace(key, std::move(list)).first->second;
+}
+
+const std::unordered_map<entity_id, float>& memo_field(world& w, lp_reach_memo& memo,
+                                                       const lp_source_ref& s, entity_id body)
+{
+    auto it = memo.fields.find(s.building);
+    if (it == memo.fields.end())
+        it = memo.fields.emplace(s.building, lp_distance_field(w, body, s.network, {s.tile})).first;
+    return it->second;
+}
+
+/// THE CHAIN (Ben, 2026-10-20, after the direct rule measured G1 96.0 -> 71.2): the
+/// sources connected to @p centre are those whose own reach touches the centre, and
+/// then, repeatedly, those whose reach touches the tile of one already connected,
+/// until nothing more joins. A monotone closure, so its result is the same whatever
+/// order the sources are visited in.
+const std::set<entity_id>& memo_chain(world& w, lp_reach_memo& memo, entity_id nation,
+                                      entity_id body, entity_id centre)
+{
+    const auto key = std::make_tuple(nation, body, centre);
+    auto it = memo.connected.find(key);
+    if (it != memo.connected.end())
+        return it->second;
+    const std::vector<lp_source_ref>& list = memo_sources(w, memo, nation, body);
+    std::set<entity_id> in;
+    std::vector<entity_id> anchors{centre};
+    std::vector<const lp_source_ref*> joined; // the connected sources, for the reverse test
+    // A LINK COUNTS EITHER WAY (Ben, 2026-10-21, NR-1058): @p s joins when its own reach
+    // touches an anchor (the capital or a connected source's tile), OR a connected
+    // source's reach touches s's tile - so a station a connected road hub covers is on
+    // the chain, though a station's own field holds only other stations.
+    const auto touches = [&](const lp_source_ref& s) {
+        const auto& f = memo_field(w, memo, s, body);
+        for (const entity_id a : anchors)
+        {
+            const auto dit = f.find(a);
+            if (dit != f.end() && lp_reach(s.network, dit->second) > 0.0f)
+                return true;
+        }
+        for (const lp_source_ref* j : joined)
+        {
+            const auto& fj = memo_field(w, memo, *j, body);
+            const auto dit = fj.find(s.tile);
+            if (dit != fj.end() && lp_reach(j->network, dit->second) > 0.0f)
+                return true;
+        }
+        return false;
+    };
+    for (bool grew = true; grew;)
+    {
+        grew = false;
+        for (const lp_source_ref& s : list)
+        {
+            if (in.count(s.building) != 0 || !touches(s))
+                continue;
+            in.insert(s.building);
+            anchors.push_back(s.tile);
+            joined.push_back(&s);
+            grew = true;
+        }
+    }
+    return memo.connected.emplace(key, std::move(in)).first->second;
+}
+
+/// Whether @p s is connected to @p centre. A market with no centre tile (the
+/// single-market body's unanchored case) has nothing to be connected back to, so
+/// every source passes there.
+bool memo_connected(world& w, lp_reach_memo& memo, entity_id nation, const lp_source_ref& s,
+                    entity_id body, entity_id centre)
+{
+    if (centre == null_entity)
+        return true;
+    return memo_chain(w, memo, nation, body, centre).count(s.building) != 0;
+}
+
+} // namespace
+
+lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
+                     entity_id tile)
+{
+    lp_route out;
+    if (nation == null_entity || tile == null_entity)
+        return out;
+    // The chain's anchor is the nation's CAPITAL, whatever market the tile clears in.
+    const entity_id centre = chain_anchor(w, nation, body);
+
+    struct cand { float norm; entity_id building; float reach; lp_network net; float dist; };
+    std::vector<cand> cands;
+    for (const lp_source_ref& s : memo_sources(w, memo, nation, body))
+    {
+        const auto& f = memo_field(w, memo, s, body);
+        const auto dit = f.find(tile);
+        if (dit == f.end())
+            continue;
+        const float r = lp_reach(s.network, dit->second);
+        if (!(r > 0.0f))
+            continue;
+        if (!memo_connected(w, memo, nation, s, body, centre))
+        {
+            out.blocked = true;
+            continue;
+        }
+        cands.push_back({dit->second / lp_full_reach[static_cast<std::size_t>(s.network)],
+                         s.building, r, s.network, dit->second});
+    }
+    if (cands.empty())
+        return out; // `blocked` survives: the card names why a near hub gives nothing
+    // Nearest first; a tie in distance goes to the lower building id, never to order.
+    std::sort(cands.begin(), cands.end(), [](const cand& x, const cand& y) {
+        return x.norm != y.norm ? x.norm < y.norm : x.building < y.building;
+    });
+    float sum = 0.0f;
+    for (const cand& k : cands)
+    {
+        sum += k.reach;
+        ++out.used;
+        if (sum >= 1.0f)
+            break; // covered: the further sources are not drawn on
+    }
+    out.cover    = std::min(1.0f, sum);
+    out.reached  = true;
+    out.full     = cands.front().reach >= 1.0f;
+    out.norm     = cands.front().norm;
+    out.network  = cands.front().net;
+    out.distance = cands.front().dist;
     return out;
 }
 
@@ -443,41 +679,10 @@ float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile, lp_coverage_
     const auto nit = w.tile_to_nation.find(tile);
     if (tit == w.tiles.end() || nit == w.tile_to_nation.end())
         return 0.0f;
-    const entity_id nation = nit->second, body = tit->second.body;
-    float cov = 0.0f;
-    for (int n = 0; n < static_cast<int>(lp_network_count); ++n)
-    {
-        const auto k = std::make_tuple(nation, n, body);
-        auto fit = memo.fields.find(k);
-        if (fit == memo.fields.end())
-        {
-            std::vector<entity_id> seeds;
-            for (const auto& [bid, b] : w.buildings)
-            {
-                lp_network net;
-                if (!lp_source_network(b.type, net) || static_cast<int>(net) != n || !lp_source_running(b))
-                    continue;
-                const auto st = w.tiles.find(b.tile);
-                const auto sn = w.tile_to_nation.find(b.tile);
-                if (st != w.tiles.end() && st->second.body == body && sn != w.tile_to_nation.end()
-                    && sn->second == nation)
-                    seeds.push_back(b.tile);
-            }
-            // lp_distance_field sorts its seeds, so the unordered walk cannot matter.
-            fit = memo.fields.emplace(k, lp_distance_field(w, body, static_cast<lp_network>(n), seeds)).first;
-        }
-        const auto dit = fit->second.find(tile);
-        if (dit != fit->second.end())
-        {
-            const float r = lp_reach(static_cast<lp_network>(n), dit->second);
-            // The first network to reach the best figure names it: a strict >, in
-            // network order, so a tie reads the same way on every run.
-            if (why != nullptr && (!why->reached || r > cov))
-                *why = { true, static_cast<lp_network>(n), dit->second };
-            cov = std::max(cov, r);
-        }
-    }
-    return cov;
+    const lp_route r = lp_route_to(w, memo, nit->second, tit->second.body, tile);
+    if (why != nullptr)
+        *why = { r.reached, r.network, r.distance, r.used, r.blocked };
+    return r.cover;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,8 +698,7 @@ lp_seed_report seed_logistics_sources(world& w)
     resolver_input in;
     read_input(w, in);
 
-    // Running sources of every network, per (nation, network, body).
-    std::map<field_key, std::vector<entity_id>> seeds;
+    // The tiles that already hold a running hub, so none is stacked on one.
     std::set<entity_id> hub_tiles;
     for (const entity_id bid : in.ids)
     {
@@ -506,36 +710,17 @@ lp_seed_report seed_logistics_sources(world& w)
         const entity_id nation = host_nation(w, b.tile);
         if (tit == w.tiles.end() || nation == null_entity)
             continue;
-        seeds[{nation, static_cast<int>(net), tit->second.body}].push_back(b.tile);
         if (net == lp_network::road)
             hub_tiles.insert(b.tile);
     }
-    std::map<field_key, std::unordered_map<entity_id, float>> fields;
-    const auto field_of = [&](const field_key& k) -> const std::unordered_map<entity_id, float>& {
-        auto fit = fields.find(k);
-        if (fit == fields.end())
-        {
-            const auto sit = seeds.find(k);
-            fit = fields.emplace(k, sit != seeds.end()
-                                        ? lp_distance_field(w, std::get<2>(k),
-                                                            static_cast<lp_network>(std::get<1>(k)),
-                                                            sit->second)
-                                        : std::unordered_map<entity_id, float>{}).first;
-        }
-        return fit->second;
-    };
+    // BL-1356: coverage is ROUTED - the same rule the resolver serves by, so a hub
+    // generation places counts only where the economy will let it deliver.
+    lp_reach_memo memo;
     const auto coverage_of = [&](entity_id nation, entity_id body, entity_id tile) {
-        float cov = 0.0f;
-        for (int n = 0; n < static_cast<int>(lp_network_count); ++n)
-        {
-            const auto& f = field_of({nation, n, body});
-            const auto it = f.find(tile);
-            if (it != f.end())
-                cov = std::max(cov, lp_reach(static_cast<lp_network>(n), it->second));
-        }
-        return cov;
+        return lp_route_to(w, memo, nation, body, tile).cover;
     };
-    const auto place_hub = [&](entity_id nation, entity_id tile, entity_id consumer_owner) {
+    const auto place_source = [&](entity_id nation, entity_id tile, entity_id consumer_owner,
+                                  building_type type) {
         entity_id owner = null_entity;
         if (champion_memo(w, in, nation) != null_entity)
             owner = nation; // a major: state industry
@@ -546,7 +731,7 @@ lp_seed_report seed_logistics_sources(world& w)
         const entity_id bid = w.create_entity();
         building_component bc;
         bc.tile               = tile;
-        bc.type               = building_type::inland_logistics_hub;
+        bc.type               = type;
         bc.workforce_assigned = 0.0f; // zero staff, as every network node
         bc.ticks_remaining    = 0;    // stands complete, as every generated holding
         w.buildings[bid]  = bc;
@@ -558,15 +743,390 @@ lp_seed_report seed_logistics_sources(world& w)
         else
             return false;
         const entity_id body = w.tiles.at(tile).body;
-        const field_key k{nation, static_cast<int>(lp_network::road), body};
-        seeds[k].push_back(tile);
-        fields.erase(k);
-        hub_tiles.insert(tile);
-        ++rep.hubs_placed;
+        memo.sources.erase({nation, body}); // the new source joins the list; old fields stand
+        memo.connected.clear();             // and may extend a chain
+        hub_tiles.insert(tile);             // no second network node on this tile
+        if (type == building_type::port)
+            ++rep.ports_placed;
+        else
+            ++rep.hubs_placed;
+        return true;
+    };
+    const auto place_hub = [&](entity_id nation, entity_id tile, entity_id consumer_owner) {
+        return place_source(nation, tile, consumer_owner, building_type::inland_logistics_hub);
+    };
+
+    // 1. COVERAGE: every consumer on a nation's ground reached at full strength,
+    //    BY A HUB CONNECTED TO ITS NATION'S CAPITAL (BL-1356; the chain, Ben 2026-10-20;
+    //    the capital as its anchor, 2026-10-21).
+    //    Hubs are laid OUTWARD along the chain: where a tile exists that both carries
+    //    the consumer at full strength and touches the chain (the capital, or a
+    //    connected source's tile), one hub there covers it; otherwise a hub stands on
+    //    the chain's edge nearest the consumer, joining the chain and carrying it
+    //    closer, and the search repeats. A road step costs the edge it crosses, the same
+    //    both ways, so a field FROM the chain reads whether a hub at X would touch it.
+    //    Every choice takes the least key with a tile-id tie-break: order-independent.
+    const auto placeable = [&](entity_id t, entity_id nation) {
+        return host_nation(w, t) == nation && hub_tiles.count(t) == 0
+            && !is_water(w.tiles.at(t).substrate);
+    };
+    // Steps from @p target over the nation's own dry ground (4-neighbour, columns wrap):
+    // what the chain is steered by. A grid distance steered it across water or round the
+    // wrap toward ground it could never reach (the bridge fixture caught it); a walk over
+    // the ground a hub may stand on cannot. A tile it does not reach is not a step closer.
+    const auto own_steps = [&](entity_id nation, entity_id body, entity_id target) {
+        std::unordered_map<entity_id, int> dist;
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end())
+            return dist;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(w, body);
+        std::vector<entity_id> q{target};
+        dist[target] = 0;
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const entity_id cur = q[head];
+            const tile_component& tc = w.tiles.at(cur);
+            const int x = tc.grid_x, y = tc.grid_y;
+            const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                 y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+            for (const int cc : cand)
+            {
+                if (cc < 0 || static_cast<std::size_t>(cc) >= grid.size())
+                    continue;
+                const entity_id nt = grid[static_cast<std::size_t>(cc)];
+                if (nt == null_entity || dist.count(nt) != 0 || host_nation(w, nt) != nation
+                    || is_water(w.tiles.at(nt).substrate))
+                    continue;
+                dist[nt] = dist[cur] + 1;
+                q.push_back(nt);
+            }
+        }
+        return dist;
+    };
+    constexpr int k_chain_steps = 64; // a bound on hubs laid for one consumer
+    // The capital's own-ground region per (nation, body): every dry tile of the nation
+    // a 4-neighbour walk reaches from the capital without leaving its ground. Read only
+    // to say WHY a consumer is left uncovered (`unconnectable_cut_off`).
+    std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> home_region;
+    const auto region_of = [&](entity_id nation, entity_id body, entity_id capital)
+        -> const std::set<entity_id>& {
+        const auto key = std::make_pair(nation, body);
+        auto it = home_region.find(key);
+        if (it != home_region.end())
+            return it->second;
+        std::set<entity_id> seen;
+        const auto bit = w.bodies.find(body);
+        if (bit != w.bodies.end())
+        {
+            const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+            const std::vector<entity_id>& grid = body_tile_grid(w, body);
+            std::vector<entity_id> q{capital};
+            seen.insert(capital);
+            for (std::size_t head = 0; head < q.size(); ++head)
+            {
+                const tile_component& tc = w.tiles.at(q[head]);
+                const int x = tc.grid_x, y = tc.grid_y;
+                const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                     y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+                for (const int cc : cand)
+                {
+                    if (cc < 0 || static_cast<std::size_t>(cc) >= grid.size())
+                        continue;
+                    const entity_id nt = grid[static_cast<std::size_t>(cc)];
+                    if (nt == null_entity || seen.count(nt) != 0 || host_nation(w, nt) != nation
+                        || is_water(w.tiles.at(nt).substrate))
+                        continue;
+                    seen.insert(nt);
+                    q.push_back(nt);
+                }
+            }
+        }
+        return home_region.emplace(key, std::move(seen)).first->second;
+    };
+    // The road chain laid outward to one consumer (step 1 below; re-run after a bridge).
+    // @p avoid: a tile the chain must not take - the shore tile a bridge's port needs.
+    const auto lay_chain = [&](entity_id nation, entity_id body, entity_id ct, entity_id tile,
+                               entity_id owner, entity_id avoid = null_entity) -> bool {
+        const auto fc = lp_distance_field(w, body, lp_network::road, {tile});
+        const auto steps = own_steps(nation, body, tile);
+        int last_gap = std::numeric_limits<int>::max();
+        bool covered = false;
+        for (int step = 0; step < k_chain_steps && rep.hubs_placed < k_max_hubs; ++step)
+        {
+            if (coverage_of(nation, body, tile) >= 1.0f)
+            {
+                covered = true;
+                break;
+            }
+            std::vector<entity_id> anchors{ct};
+            const std::set<entity_id>& chain = memo_chain(w, memo, nation, body, ct);
+            for (const lp_source_ref& sr : memo_sources(w, memo, nation, body))
+                if (chain.count(sr.building) != 0)
+                    anchors.push_back(sr.tile);
+            const auto fz = lp_distance_field(w, body, lp_network::road, anchors);
+
+            // (a) One hub that carries the consumer at full strength AND touches the chain.
+            entity_id best = null_entity;
+            float best_z = 0.0f;
+            for (const auto& [t2, dc] : fc)
+            {
+                if (!lp_full_strength(lp_network::road, dc))
+                    continue;
+                const auto zt = fz.find(t2);
+                if (zt == fz.end() || !(lp_reach(lp_network::road, zt->second) > 0.0f)
+                    || !placeable(t2, nation) || t2 == avoid)
+                    continue;
+                if (best == null_entity || zt->second < best_z || (zt->second == best_z && t2 < best))
+                {
+                    best   = t2;
+                    best_z = zt->second;
+                }
+            }
+            if (best != null_entity)
+            {
+                place_hub(nation, best, owner);
+                continue; // re-checks coverage at the top
+            }
+
+            // (b) Extend the chain: the tile the chain touches nearest the consumer on the
+            //     grid (further out first on a tie, then the lower tile id).
+            entity_id ext = null_entity;
+            int ext_gap = 0;
+            float ext_z = 0.0f;
+            for (const auto& [t2, dz] : fz)
+            {
+                if (!(lp_reach(lp_network::road, dz) > 0.0f) || !placeable(t2, nation) || t2 == avoid)
+                    continue;
+                const auto st = steps.find(t2);
+                if (st == steps.end())
+                    continue; // not on ground that walks to the target: no step closer
+                const int gap = st->second;
+                if (ext == null_entity || gap < ext_gap || (gap == ext_gap && dz > ext_z)
+                    || (gap == ext_gap && dz == ext_z && t2 < ext))
+                {
+                    ext     = t2;
+                    ext_gap = gap;
+                    ext_z   = dz;
+                }
+            }
+            if (ext == null_entity || ext_gap >= last_gap)
+                break; // the chain cannot get closer (sea, a frontier): stop here
+            last_gap = ext_gap;
+            place_hub(nation, ext, owner);
+        }
+        return covered || coverage_of(nation, body, tile) >= 1.0f;
+    };
+
+    // The nation's dry ground a 4-neighbour walk reaches from @p start (an island).
+    const auto flood_own = [&](entity_id nation, entity_id body, entity_id start) {
+        std::set<entity_id> seen;
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end())
+            return seen;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(w, body);
+        std::vector<entity_id> q{start};
+        seen.insert(start);
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const tile_component& tc = w.tiles.at(q[head]);
+            const int x = tc.grid_x, y = tc.grid_y;
+            const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                 y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+            for (const int cc : cand)
+            {
+                if (cc < 0 || static_cast<std::size_t>(cc) >= grid.size())
+                    continue;
+                const entity_id nt = grid[static_cast<std::size_t>(cc)];
+                if (nt == null_entity || seen.count(nt) != 0 || host_nation(w, nt) != nation
+                    || is_water(w.tiles.at(nt).substrate))
+                    continue;
+                seen.insert(nt);
+                q.push_back(nt);
+            }
+        }
+        return seen;
+    };
+
+    // A land tile with water on one of its four sides: where a port can stand.
+    const auto coastal = [&](entity_id t) {
+        const tile_component& tc = w.tiles.at(t);
+        const auto bit = w.bodies.find(tc.body);
+        if (bit == w.bodies.end() || is_water(tc.substrate))
+            return false;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const int x = tc.grid_x, y = tc.grid_y;
+        const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                             y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+        const std::vector<entity_id>& grid = body_tile_grid(w, tc.body);
+        for (const int cc : cand)
+            if (cc >= 0 && static_cast<std::size_t>(cc) < grid.size()
+                && grid[static_cast<std::size_t>(cc)] != null_entity
+                && is_water(w.tiles.at(grid[static_cast<std::size_t>(cc)]).substrate))
+                return true;
+        return false;
+    };
+
+    // A SEA FIELD OVER WATER ONLY, for the bridge: from the land tiles @p seeds, a step
+    // into water costs 1, water to water 1, and water onto land lp_offnet_step - where
+    // the walk stops, so the route never crosses land between its two ends. The real
+    // port field (lp_distance_field, sea) may also cross land at lp_offnet_step a tile,
+    // so it is never dearer than this: a bridge this field admits is a bridge the ports
+    // will actually connect. Without it a strip of a neighbour's land with a little
+    // water either side read as a strait (cold review). Bounded at the sea's reach.
+    const auto water_field = [&](entity_id body, const std::vector<entity_id>& seeds) {
+        std::unordered_map<entity_id, float> dist;
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end())
+            return dist;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(w, body);
+        const std::size_t si = static_cast<std::size_t>(lp_network::sea);
+        const float bound = lp_full_reach[si] + lp_fade_length[si];
+        using item = std::pair<float, entity_id>;
+        std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+        std::vector<entity_id> sorted = seeds;
+        std::sort(sorted.begin(), sorted.end());
+        for (const entity_id t : sorted)
+            if (dist.emplace(t, 0.0f).second)
+                pq.push({0.0f, t});
+        while (!pq.empty())
+        {
+            const auto [d, t] = pq.top();
+            pq.pop();
+            if (dist[t] < d)
+                continue;
+            const bool here_water = is_water(w.tiles.at(t).substrate);
+            if (!here_water && d > 0.0f)
+                continue; // a landing: the route ends here
+            const tile_component& tc = w.tiles.at(t);
+            const int x = tc.grid_x, y = tc.grid_y;
+            const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                 y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+            for (const int cc : cand)
+            {
+                if (cc < 0 || static_cast<std::size_t>(cc) >= grid.size())
+                    continue;
+                const entity_id nt = grid[static_cast<std::size_t>(cc)];
+                if (nt == null_entity)
+                    continue;
+                const bool nw = is_water(w.tiles.at(nt).substrate);
+                if (!here_water && !nw)
+                    continue; // land to land is not a sea route
+                const float nd = d + (nw ? 1.0f : lp_offnet_step);
+                if (nd > bound)
+                    continue;
+                const auto it = dist.find(nt);
+                if (it == dist.end() || nd < it->second)
+                {
+                    dist[nt] = nd;
+                    pq.push({nd, nt});
+                }
+            }
+        }
+        return dist;
+    };
+
+    // Bridge an island to the chain by sea: a HOME port (an existing connected one, or a
+    // new one on the capital's coast where the road chain touches it) whose sea reach
+    // covers the island's coast, then an island port there. A sea step costs the same
+    // both ways (1 a water step, lp_offnet_step onto land at either end), so one field
+    // FROM the island's coast reads every home candidate's distance. Least distance,
+    // then the lower tile id: order-independent. False when the sea is too wide.
+    std::set<std::tuple<entity_id, entity_id, entity_id>> bridged;
+    // The ground of every island bridged so far, per (nation, body): its shore is as good
+    // a home shore as the capital's for the next island out (island-hopping).
+    std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> bridged_ground;
+    const auto bridge = [&](entity_id nation, entity_id body, entity_id ct,
+                            const std::set<entity_id>& island, entity_id owner) -> bool {
+        std::vector<entity_id> shore;
+        for (const entity_id t : island)
+            if (coastal(t) && placeable(t, nation))
+                shore.push_back(t);
+        if (shore.empty())
+            return false;
+        const auto fi = water_field(body, shore);
+        const auto in_reach = [&](entity_id t) {
+            const auto it = fi.find(t);
+            return it != fi.end() && lp_reach(lp_network::sea, it->second) > 0.0f ? it->second : -1.0f;
+        };
+        // (i) a connected port already in reach of the island's shore
+        entity_id home = null_entity;
+        float home_d = 0.0f;
+        const std::set<entity_id>& chain = memo_chain(w, memo, nation, body, ct);
+        for (const lp_source_ref& sr : memo_sources(w, memo, nation, body))
+        {
+            if (sr.network != lp_network::sea || chain.count(sr.building) == 0)
+                continue;
+            const float d = in_reach(sr.tile);
+            if (d >= 0.0f && (home == null_entity || d < home_d || (d == home_d && sr.tile < home)))
+            {
+                home   = sr.tile;
+                home_d = d;
+            }
+        }
+        // (ii) else a new port on a shore already joined to the capital - the capital's
+        //      own ground, or an island bridged before - the shore tile nearest the island
+        //      by sea. The road chain is laid out to it first (a hub carrying it at full
+        //      strength), so the port joins the chain - a connected hub's reach covers its
+        //      tile, and a link counts either way (NR-1058).
+        if (home == null_entity)
+        {
+            std::set<entity_id> homeland = region_of(nation, body, ct);
+            if (const auto bg = bridged_ground.find({nation, body}); bg != bridged_ground.end())
+                homeland.insert(bg->second.begin(), bg->second.end());
+            for (const entity_id t : homeland)
+            {
+                if (!coastal(t) || !placeable(t, nation))
+                    continue;
+                const float d = in_reach(t);
+                if (d >= 0.0f && (home == null_entity || d < home_d || (d == home_d && t < home)))
+                {
+                    home   = t;
+                    home_d = d;
+                }
+            }
+            if (home == null_entity)
+                return false; // the sea is wider than a port's reach
+            if (coverage_of(nation, body, home) < 1.0f)
+                lay_chain(nation, body, ct, home, owner, /*avoid=*/home);
+            // The port joins the chain only through a connected source whose reach covers
+            // its tile (NR-1058). If the road chain did not get there, a port here would
+            // deliver nothing, and so would the island port beyond it: place neither.
+            if (!(coverage_of(nation, body, home) > 0.0f))
+                return false;
+            if (hub_tiles.count(home) != 0 || !place_source(nation, home, owner, building_type::port))
+                return false;
+        }
+        // the island port: the shore tile nearest the home port by sea
+        const auto fh = water_field(body, {home});
+        entity_id land = null_entity;
+        float land_d = 0.0f;
+        for (const entity_id t : shore)
+        {
+            const auto it = fh.find(t);
+            if (it == fh.end() || !(lp_reach(lp_network::sea, it->second) > 0.0f) || !placeable(t, nation))
+                continue;
+            if (land == null_entity || it->second < land_d || (it->second == land_d && t < land))
+            {
+                land   = t;
+                land_d = it->second;
+            }
+        }
+        if (land == null_entity)
+            return false;
+        if (!place_source(nation, land, owner, building_type::port))
+            return false;
+        ++rep.islands_bridged;
         return true;
     };
 
-    // 1. COVERAGE: every consumer on a nation's ground reached at full strength.
+    // TWO PASSES (cold review): an island the first pass could not bridge - the sea
+    // too wide from the capital's coast - may be in reach of an island bridged LATER in
+    // the same pass, whatever order the consumers' ids put them in. The second pass
+    // retries every consumer still uncovered; only it counts what is left.
+    for (int pass = 0; pass < 2; ++pass)
     for (const entity_id bid : in.ids)
     {
         if (rep.hubs_placed >= k_max_hubs)
@@ -585,32 +1145,67 @@ lp_seed_report seed_logistics_sources(world& w)
         if (coverage_of(nation, body, b.tile) >= 1.0f)
             continue;
         const entity_id owner = oit->second;
-        // The market centre serving it, when on the nation's land and close enough
-        // to reach it at full strength; else its own tile.
-        entity_id at = b.tile;
-        if (const entity_id mid = market_for_tile(w, b.tile); mid != null_entity)
+        // The chain is anchored at the nation's capital (Ben, 2026-10-21).
+        const entity_id ct = chain_anchor(w, nation, body);
+
+        // No capital on this body: every source passes the test, so a hub on the
+        // consumer's own tile covers it, exactly as before routing.
+        if (ct == null_entity)
         {
-            const entity_id ct = w.markets.at(mid).centre_tile;
-            const auto cit = w.tiles.find(ct);
-            if (cit != w.tiles.end() && cit->second.body == body && !is_water(cit->second.substrate)
-                && host_nation(w, ct) == nation)
-            {
-                const auto f = lp_distance_field(w, body, lp_network::road, {ct});
-                const auto it = f.find(b.tile);
-                if (it != f.end() && lp_reach(lp_network::road, it->second) >= 1.0f)
-                    at = ct;
-            }
-        }
-        if (hub_tiles.count(at) != 0)
-            at = b.tile;
-        if (hub_tiles.count(at) != 0 || is_water(w.tiles.at(at).substrate))
+            if (placeable(b.tile, nation))
+                place_hub(nation, b.tile, owner);
             continue;
-        place_hub(nation, at, owner);
+        }
+
+        bool covered = lay_chain(nation, body, ct, b.tile, owner);
+
+        // THE SEA BRIDGE (BL-1356; Ben, 2026-10-21). A consumer the road chain cannot
+        // reach because its ground is cut off from the capital by WATER: land a port on
+        // its coast that the chain's sea reach covers, then lay the road chain on from
+        // there. An island is marked bridged only when a bridge stands, so a failed try
+        // is retried (pass 2); once bridged, it serves every consumer on that ground.
+        if (!covered && region_of(nation, body, ct).count(b.tile) == 0)
+        {
+            const std::set<entity_id> island = flood_own(nation, body, b.tile); // holds b.tile
+            const auto key = std::make_tuple(nation, body, *island.begin());
+            if (bridged.count(key) == 0 && bridge(nation, body, ct, island, owner))
+            {
+                bridged.insert(key);
+                bridged_ground[{nation, body}].insert(island.begin(), island.end());
+            }
+            covered = lay_chain(nation, body, ct, b.tile, owner);
+        }
+        if (pass == 0)
+            continue; // counted after the retry
+        if (!covered && coverage_of(nation, body, b.tile) < 1.0f)
+        {
+            ++rep.unconnectable;
+            if (region_of(nation, body, ct).count(b.tile) == 0)
+                ++rep.unconnectable_cut_off;
+        }
     }
 
     // 2. SUFFICIENCY: each pool meets its need with margin; a further hub stands
     //    at the market centre of the first consumer (ascending id) whose centre
-    //    holds none.
+    //    holds none. BL-1356 (Ben, 2026-10-21, NR-1057): only a CONNECTED hub adds to
+    //    the pool, so the hub must stand where it joins the chain - the centre or the
+    //    consumer's tile when either would, else the free tile touching the chain
+    //    nearest the capital. A hub that would not connect is never placed for pool:
+    //    it would add nothing and this loop would place another, and another.
+    const auto would_connect = [&](entity_id nation, entity_id body, entity_id t2,
+                                   const std::unordered_map<entity_id, float>& fz) {
+        (void)nation; (void)body;
+        const auto it = fz.find(t2);
+        return it != fz.end() && lp_reach(lp_network::road, it->second) > 0.0f;
+    };
+    const auto chain_field = [&](entity_id nation, entity_id body, entity_id anchor) {
+        std::vector<entity_id> anchors{anchor};
+        const std::set<entity_id>& chain = memo_chain(w, memo, nation, body, anchor);
+        for (const lp_source_ref& sr : memo_sources(w, memo, nation, body))
+            if (chain.count(sr.building) != 0)
+                anchors.push_back(sr.tile);
+        return lp_distance_field(w, body, lp_network::road, anchors);
+    };
     for (int round = 0; round < 64 && rep.hubs_placed < k_max_hubs; ++round)
     {
         const lp_tick t = resolve_logistic_points(w);
@@ -625,13 +1220,42 @@ lp_seed_report seed_logistics_sources(world& w)
                 if (row.nation != r.nation)
                     continue;
                 const building_component& b = w.buildings.at(row.building);
+                const entity_id body = w.tiles.at(b.tile).body;
+                const entity_id anchor = chain_anchor(w, r.nation, body);
                 const entity_id mid = market_for_tile(w, b.tile);
                 entity_id at = mid != null_entity ? w.markets.at(mid).centre_tile : null_entity;
-                if (at == null_entity || host_nation(w, at) != r.nation
-                    || is_water(w.tiles.at(at).substrate) || hub_tiles.count(at) != 0)
-                    at = b.tile;
-                if (hub_tiles.count(at) != 0 || is_water(w.tiles.at(at).substrate))
-                    continue;
+                if (anchor == null_entity)
+                {
+                    // No capital on this body: every source passes, the placement stands.
+                    if (at == null_entity || host_nation(w, at) != r.nation
+                        || is_water(w.tiles.at(at).substrate) || hub_tiles.count(at) != 0)
+                        at = b.tile;
+                    if (hub_tiles.count(at) != 0 || is_water(w.tiles.at(at).substrate))
+                        continue;
+                }
+                else
+                {
+                    const auto fz = chain_field(r.nation, body, anchor);
+                    const auto ok = [&](entity_id t2) {
+                        return t2 != null_entity && w.tiles.find(t2) != w.tiles.end()
+                            && w.tiles.at(t2).body == body && placeable(t2, r.nation)
+                            && would_connect(r.nation, body, t2, fz);
+                    };
+                    if (!ok(at))
+                        at = ok(b.tile) ? b.tile : null_entity;
+                    if (at == null_entity)
+                    {
+                        float best_z = 0.0f;
+                        for (const auto& [t2, dz] : fz)
+                            if (ok(t2) && (at == null_entity || dz < best_z || (dz == best_z && t2 < at)))
+                            {
+                                at     = t2;
+                                best_z = dz;
+                            }
+                    }
+                    if (at == null_entity)
+                        continue;
+                }
                 if (place_hub(r.nation, at, row.owner))
                 {
                     placed_any = true;
@@ -642,7 +1266,7 @@ lp_seed_report seed_logistics_sources(world& w)
         if (!placed_any)
             break;
     }
-    if (rep.hubs_placed > 0)
+    if (rep.hubs_placed > 0 || rep.ports_placed > 0) // a port moves the sea-leg caches too
         invalidate_logistics_caches(w);
 
     // 3. The reading.
@@ -716,10 +1340,13 @@ void print_lp_seed_report(const lp_seed_report& r)
 {
     std::printf("[lp] seeding: %d hubs placed; sources road %d rail %d sea %d (%d more the funding "
                 "gate idles); %d consumers "
-                "(%d full, %d partial, %d uncovered, %d on nobody's ground); need %.1f, pool %.1f, "
+                "(%d full, %d partial, %d uncovered, %d on nobody's ground; %d no hub could connect, %d of them cut off; "
+                "%d ports bridging %d islands); "
+                "need %.1f, pool %.1f, "
                 "granted %.1f (%.1f%%) over %d nations\n",
                 r.hubs_placed, r.sources_by_net[0], r.sources_by_net[1], r.sources_by_net[2],
                 r.gate_idled_sources, r.consumers, r.fully_covered, r.partly_covered, r.uncovered, r.nobodys_ground,
+                r.unconnectable, r.unconnectable_cut_off, r.ports_placed, r.islands_bridged,
                 static_cast<double>(r.need_total), static_cast<double>(r.pool_total),
                 static_cast<double>(r.granted_total),
                 r.need_total > 0.0f ? 100.0 * r.granted_total / r.need_total : 0.0, r.nations);

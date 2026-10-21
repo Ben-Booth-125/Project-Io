@@ -1562,6 +1562,8 @@ struct ui_state
     bool      lp_hover_reached  = false;
     int       lp_hover_network  = 0;
     float     lp_hover_distance = 0.0f;
+    int       lp_hover_used     = 0;     ///< BL-1356: sources the cover was topped up from
+    bool      lp_hover_blocked  = false; ///< BL-1356: a source reaches here but has no chain to the capital
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 

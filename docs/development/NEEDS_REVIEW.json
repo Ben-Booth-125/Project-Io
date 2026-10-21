@@ -475,6 +475,45 @@
    "what": "Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Track 6/12, Road 8/16, Highway 10/20). Rail's fade was left at its existing 8, so a station 24 track steps down the line gets half strength and one at 28+ gets nothing. LOGISTICS.md says only '20 tiles' for rail.",
    "why_it_matters": "It decides whether a station 21-27 steps away is served at all. Today that is a fading partial, and the census moved little on it (rail sources unchanged: 69 / 0 / 185 on seeds 0 / 28 / 46).",
    "call": "a) keep fade 8: full to 20, zero at 28 (built); b) a hard edge: full to 20, nothing past it (fade 0); c) the road rule generalised: zero at 40 (fade 20)."
+  },
+  {
+   "id": "NR-1057",
+   "title": "Routing: does an isolated hub still add to the nation pool?",
+   "raised": "2026-10-21",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1356 (routed requests), second cold review finding 3",
+   "what": "As built, every running source adds its points to the one nation pool (your 'one nation pool' ruling), connected or not; routing only decides which requests may draw and in what order. So a hub with no chain to the capital delivers to nobody but still raises the pool every connected request draws from. LOGISTICS.md says such a hub 'supplies nothing', which reads as stricter.",
+   "why_it_matters": "Decides whether an outlying hub is worthless until connected, or a pool top-up anywhere. Generation step 2 (pool sufficiency) places hubs for pool alone, so it leans on the as-built reading.",
+   "call": "a) keep: every running source adds to the pool (built); b) only connected sources add to the pool.",
+   "resolved": "2026-10-21",
+   "resolution": "Ben, 2026-10-21 (routing form): b) only connected sources add to the pool. Built in BL-1356: lp_source_row::connected; generation's pool hubs stand only where they join the chain."
+  },
+  {
+   "id": "NR-1058",
+   "title": "Routing: does a road hub connect a station it covers, or only the reverse?",
+   "raised": "2026-10-21",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1356 (routed requests), second cold review finding 2",
+   "what": "The chain admits a source when ITS OWN reach touches the capital or a connected source's tile (your wording, built literally). A rail station's field holds only station tiles, so a station joins only through another connected station, or by standing on the capital or a connected source's tile. A connected road hub whose reach covers the station does NOT connect it. So a line between two provincial cities, neither linked by rail to a station at the capital, delivers nothing.",
+   "why_it_matters": "Rail is the inter-market carrier; under the literal rule most generated lines may sit outside every chain. Not yet measured per line.",
+   "call": "a) keep the literal one-way rule (built); b) either direction: a source joins if its reach touches the chain OR a connected source's reach touches it.",
+   "resolved": "2026-10-21",
+   "resolution": "Ben, 2026-10-21 (routing form): b) a link counts in either direction. Built in BL-1356 (memo_chain); a connected road hub covering a station puts the line on the chain."
+  },
+  {
+   "id": "NR-1059",
+   "title": "Routing: rival siting still buys one hub where a chain is needed (an AI grant question)",
+   "raised": "2026-10-21",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1356 (routed requests), second cold review finding 1; AI_OPPONENT.md § 11",
+   "what": "corp_ai prices an out-of-reach build at one hub and builds that hub on or beside the site. Under routing, a hub there counts only if it chains back to the capital, so on far ground the rival pays upkeep for a hub that never covers its site. The scorer's INPUT (lp_coverage_at) follows the new rule; its RESPONSE does not.",
+   "why_it_matters": "Rivals will over-build isolated hubs on far ground. Teaching the scorer to lay a chain is new AI behaviour, so it is a grant for you to give or refuse, not an in-place fix.",
+   "call": "a) leave the scorer as is and accept the waste; b) grant: the scorer prices and builds a chain to the capital; c) the scorer declines builds it cannot connect with one hub.",
+   "resolved": "2026-10-21",
+   "resolution": "Ben, 2026-10-21 (routing form): b) granted - the scorer prices and builds the chain. Recorded in AI_OPPONENT.md section 11 'AI lays a hub chain to reach the capital'; the work is BL-1395 (AI_LAYS_HUB_CHAIN)."
   }
  ]
 }
