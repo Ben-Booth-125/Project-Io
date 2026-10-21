@@ -1,128 +1,97 @@
-# Next session — sprint 55 continues, with sprint 56 merged in
+# Next session — sprint 55 continues: finish the logistics arc, then cut v0.2.0
 
-Handoff written **2026-10-19** by the session that continued sprint 55 and integrated sprint
-56. Main carries both sprints and is **not pushed** — pushing is Ben's.
+Handoff written **2026-10-22** by the session that built sprint 55's logistics spine
+(BL-1353 → BL-1396). Main is **10 commits ahead of origin and not pushed** — pushing is Ben's.
 
 Read `docs/development/sprints.json` (sprint 55) for the goal and
-`node tools/session/backlog_query.js --grep <id>` for any item named here. Do not re-read the
-corpus: each item names its own authority doc.
+`node tools/session/backlog_query.js --grep <id> --full` for any item named here. Each item names its
+own authority doc; do not re-read the corpus.
 
 ---
 
-## 1. The merge, and the two things it taught
+## 1. Where it stands
 
-**Sprint 56 is merged** (`claude/sprint-56-456d2b`, 71 commits), built and verified on the
-merge rather than on either side: `save_roundtrip` OK, `world_determinism` ALL PASS,
-`logistic_points_harness` 34/0, `market_attraction_harness` 17/0, and sprint 56's own
-`no_empty_chest_harness` ALL PASS.
+**v0.2.0 is "the economy functions", logistics included** (Ben, 2026-10-22, ROADMAP.md § The
+industrial arc's milestones). Ben judged it reached, but **do not cut yet**: finish the two logistics
+items below first (his call, 2026-10-22). v0.3.0 is a working military system; its done-definition
+is owed.
 
-- **The save format is v54 on top of v53.** v53 is BL-1340's tile record (a road is an edge),
-  v54 adds BL-1337's exact-net trailing section, and v53 is a strict prefix of v54 — stacked
-  in the order sprint 56's own integrator note asked for. **One integration bug was fixed
-  with it:** the net section was written *unconditionally*, so a stream written at an older
-  version — which `write_world_snapshot_pre_road_edges` does, to give the road migration a
-  real v52 stream — carried bytes no reader consumes. It is gated on the version written now,
-  and the two harnesses that slice trailing sections slice off the pre-edge stream with no net
-  tail.
-- **FIVE ids collided.** Both sprints minted BL-1372, BL-1374, BL-1377, BL-1382 and BL-1386
-  for different work, because `next_id.js` cannot see an unmerged branch's store. Sprint 56's
-  rows keep those ids (more citations); sprint 55's moved to **BL-1390** (road halves draw
-  their own tier), **BL-1391** (rail is a crossing), **BL-1392** (ledger tabs fixture),
-  **BL-1393** (the verify world is not roaded) and **BL-1394** (a road reads as connected
-  every way), with their code citations moved too. Commits that landed them still say the old
-  ids; that is history and stays. **Before minting beside a worktree, check the other
-  branch's store.**
-
-**Still owed from sprint 56's own handoff** (`HANDOFF_SPRINT_56.md`): **BL-1338's digest
-re-pin at integration, which is Ben's** — this session did not re-pin anything.
-
-## 2. Delivered since the previous handoff
+**Delivered this session** (all on local main, each with a measured before/after on its row):
 
 | Item | What landed |
 |---|---|
-| BL-1381 | The verify summary names golden diffs and assertion failures apart. |
-| BL-1352 | **One Logistic Point system.** A march draws its own nation's pool and claims before production; the legacy per-anchor pool, its plumbing and its authored rate are gone. |
-| BL-1385 | The muted road press names the rule that actually refused: of 5017 roaded tiles only 53 admit a crossing, and **4647 of the refusals were another nation's ground**, not the tier the message blamed. `road_offer_census.cpp` prints it per seed. |
-| BL-1390 | Each half of a tile's road draws at its own tier — 845 mixed-tier tiles on the shipped start, 603 baked runs now tapering at the apex. |
-| BL-1387 | `roads_painted.lua` no longer kills the app: SDL 3.2.0's software blitter mis-samples a quad measured at **50,025 × 20,254 px against a 1,941 × 1,281 view**, so the ground quad is clipped to the view with its UVs moved by the same fraction. No pixel changes. The crash report now names module, function, file and line. |
-| BL-1346 | **Market attraction.** Catchment is logistics cost over the centre's pull, not grid distance; the off-road leg gives every tile a market; same-nation tiles pull 1.2× harder, moving **279 of 31581 tiles (0.88%)**. |
-| BL-1353 | **Partly — see § 3.** |
+| BL-1353 | Throughput lens: roads draw white (the per-edge colour overrode the lens); a hover-only GROUND card (`structure_kind::ground`, Ben's option A) naming coverage, network, cost and full/fade. |
+| BL-1354 | Tile card Logistics section: Makes / Uses of need; the hover names the pool, coverage here, and each source and building. Uses counts the player's own buildings (NR-1055). |
+| BL-1360 | Road tiers reach 6 / 8 / 10 tiles, fading to zero at double; rail 20 steps, point to point. |
+| BL-1356 | **Routed requests.** One nation pool fed only by sources CONNECTED to the nation's CAPITAL by a chain (either direction); the fade caps a source's share and the next tops it up; a short pool serves requests inside the falloff first, nearest first. Generation lays hubs outward along the chain and bridges water with port pairs, island-hopping. |
+| BL-1395 | Rivals price and lay the whole hub chain a build needs (AI grant, AI_OPPONENT.md § 11, 2026-10-21), through the build door's own check; generation untouched. |
+| BL-1396 | A port reaches 50 water tiles at full strength, gone at 100, over water only (lakes too) — it lands on the shore and goes no further inland. Six-sided sea walk, cached per port. |
 
-**The world moved and Ben accepted it:** `market_viability` FULL pooled G1 92.0 → 90.1, G2
-182.1 → 185.0, all five gates passing both sides; `haulage_measure --far-trade` convoys
-771 → 1112, volume 3543.5 → 6282.9 (+44% / +77%). Ben: *"That jump looks right."*
+**Latest gates** (BL-1396 landed): market_viability FULL pooled G1 95.1 · G1t50 90.3 · G1b 2.5 ·
+G2 176.9 · G3 95.5 — all pass; per seed G1t50 under 85 on seeds 12 (83.8) and 9 (81.0).
+`lp_coverage_census` seeds 0/28/46: every consumer covered. world_determinism ALL PASS,
+save_roundtrip OK, logistic_points_harness 93/0.
 
-## 3. Start here
+## 2. Start here, in order
 
-1. **BL-1353's two owed halves.**
-   - **The brighter-white roads do not show.** The three tier colours in the vector pass the
-     item named are changed, and a real bug was found and fixed on the way — the static stroke
-     bucket's hash did not include the overlay, so strokes built under one lens were reused
-     under another. Even so the roads read **sand** in every captured rung under the lens, and
-     a 2.4× width multiplier changed nothing visible, which is the evidence that these strokes
-     are not what reaches the screen there. **Find the pass that actually paints the road under
-     this lens before touching another colour.**
-   - **The hover card** needs a `structure_kind` meaning "the ground"; adding one changes
-     SELECTION.md's click model, so it is a design call with a live click attached.
-   - A capture showing real numbers needs a world where **the player's own nation has a running
-     source**: the `--verify` world has two sources, neither the player's, so every number
-     there is an honest zero (measured, not assumed).
-2. **BL-1354** — the tile surface's logistics section, honest now that BL-1352 has landed.
-3. **BL-1360** (road tier extends reach), then **BL-1356 / BL-1361** (routed requests, a
-   shipment draws points). **Budget a cold review for each.** Three items this sprint passed
-   their own harnesses and then failed an independent read on substance: BL-1346's review
-   caught a catchment field that was *not monotone in roads* and a cache that rebuilt once per
-   idling port.
-4. **BL-1367** is buildable: LOGISTICS.md now owns the capital-peak rule, its three rules are
-   checks, and the BL-1351 census is its gate.
-5. **Ben's owed live click: BL-1335, the Taxes control.**
+1. **Lake size cap 150 → 75** (Ben, 2026-10-22: "we can retune later again if needed"). Not yet
+   built. It is authored twice and must move together: `scripts/world_gen.lua` (`lake_size_cap`)
+   and `lake_size_cap_default` (`src/world/world_gen_config.hpp`). TILES.md § Water kinds states the
+   cap with its measured reason (the 89–143 band, "150 keeps 301 lakes and makes 59 seas") — rewrite
+   it as Ben's ruling, with the new counts from `tools/verify/lake_census.cpp` (`node
+   tools/verify/build_harness.js lake_census`). A world mover: more enclosed water becomes sea (ports
+   allowed, wells lose fresh water). File a backlog row (mint the id from the stores — see § 5), and
+   measure market_viability FULL and the census before and after.
+2. **BL-1361 — a shipment draws points**, by cargo quantity, at the anchor it leaves, AFTER
+   production (Ben's order: march, production, trade; LOGISTICS.md § How a tile's points get to it).
+   Revive the zeroed code (`market_lp_left`, `commit_trade_shipment`, `trade_lp_spare`, v46 save
+   field) rather than rewrite. Never refused whole — send what the anchor admits. Under routing,
+   decide (and log) what "the anchor it leaves" draws against now that the pool is the nation's and
+   only connected sources feed it. Measure `haulage_measure --far-trade` (the convoy counts are the
+   check that matters) and market_viability G1/G1b. Budget a cold review.
+3. **BL-1367 — where generation puts sources.** LOGISTICS.md § Where generation puts the sources
+   owns the capital-peak rule and its three checks; BL-1356 added the outward chain and the sea
+   bridge to that section. Re-read the item against what generation now does before building — the
+   premise may have moved.
+4. Then **cut v0.2.0** (Ben's go first): sprint close, ruling-check skill, re-bless decision, tag.
 
-## 4. Red rows found, none of them caused by this work
+## 3. Open calls for Ben (NEEDS_REVIEW.md)
 
-- **BL-1388** — a press on a single-building tile selects the TILE, not the building. Nine rows
-  of `ground_bake.lua`, proven on a binary built before the change. Check it against
-  SELECTION.md's click model, not against what the old binary did.
-- **BL-1383** — `lp_pool_harness`'s L7 "v49 stream" row has been red since roads became edges:
-  it fabricates an old stream by relabelling current bytes, and the tile record is
-  version-dependent now. Fix by writing a real old stream, never by relaxing the row.
-- **BL-1384** — `lp_anchor_field_check`'s F1 lost its subject (nothing builds the field now the
-  march does not); it reports a loud SKIP naming the item, and BL-1361 restores it.
-- **The CMake `all` target does not link**: `battle_engagement_harness` references
-  `active_mercenary_contract_for`, defined nowhere. Unfiled.
+- **NR-1060** — rival hub chains on the PLAYER's nation's ground: builder or ground reading?
+  (Built conservatively: the old one-hub rule there.)
+- **NR-1056** — rail's fade past 20 (built: 8, gone at 28).
+- **NR-1055** — tile card Uses counts own buildings only (visibility).
+- **NR-1049 / NR-1050** — from the previous session (march weight; the off-road leg's price).
+
+## 4. Owed
+
+- **Live clicks:** BL-1335 (the Taxes control); the BL-1356 card wording ("Not tied to the
+  capital", "not tied to the capital, adds nothing", "Topped up from N sources") has not been seen live.
+- **Red rows, none caused here:** lp_pool_harness L7 (BL-1383); lens_one_tier's no-lens
+  building-press row, which predates the 2026-10-13 tile-press ruling (on BL-1388); BL-1384; the
+  CMake `all` target does not link (`battle_engagement_harness`, unfiled).
+- **Stale backlog rows:** BL-1352 (one LP system) landed in the session before last and still reads
+  `designed`. Sweep sprint 55's rows for others before the cut.
 
 ## 5. Traps this session paid for
 
-- **A harness exe is not rebuilt by building the app.** `bash tools/build_rel.sh` builds the
-  game; `build_gen/verify/<name>.exe` stays as it was, and an after-measurement against a stale
-  harness reads **exactly** like the baseline. BL-1346's first haulage reading came back
-  digit-identical and "nothing moved" was wrong by 44%.
-- **Get the stack before the fix.** BL-1387 cost two wrong fixes guessed from a bare address;
-  one build with symbols plus a backtrace in the crash handler named the faulting function in a
-  single run.
-- **Measure the number you are about to write down.** That crash's first write said "hundreds of
-  thousands of pixels"; logged, it was 50,025.
-- **A union of two stores silently displaces rows.** Merging sprint 56's backlog took five of
-  sprint 55's rows out of the file entirely before they were noticed and restored. After any
-  store union, diff the id set against **both** parents, not just the result.
-- **`next_id.js` hangs in this checkout** (it scans `.claude/worktrees`, which holds whole
-  repos). Mint from
-  `grep -ohE '"BL-[0-9]+"' backlog.json archive/*.json | sort -n | tail -1`.
-- **`cmd //c build_app.bat` fails**; `cmd //c "cd /d <repo> && call .\build_app.bat"` works.
-- **A verify run through a pipe prints nothing until it exits**, and a Debug `--verify` of a
-  capture script takes 20–30 minutes.
-- **The heavy-run lock is shared with other sessions' worktrees.** Judge it by age and by
-  whether shard output is growing, never by whether its pid resolves — Git Bash records an MSYS
-  pid that Windows will not find.
-
-## 6. State
-
-- Main carries sprints 55 and 56; **nothing is pushed**, no tag cut.
-- World save at **v54** (v53 tile record + v54 exact nets).
-- Backlog: 77 open items, `backlog_lint` 0 fails (17 hot rows that duplicated cold archive
-  copies were re-evicted as part of the merge).
-- Gates green on the merge: build, `save_roundtrip`, `world_determinism`,
-  `logistic_points_harness` 34/0, `market_attraction_harness` 17/0, `no_empty_chest_harness`,
-  `roads` 0, `roads_painted` 0 (it used to crash the app), `throughput_lens` 0.
-- Open review calls: **NR-1049** (the march's weight — a 50-unit army asks ~60 points of a pool
-  measured in the hundreds, so guns and butter barely compete yet) and **NR-1050** (the off-road
-  leg's price, and what crossing water should cost).
+- **Never `taskkill` `cl.exe`.** Killing a compiler mid-build corrupts `build/` (blank `.obj.d`, a bad
+  PCH, an obsolete `vc140.pdb`). The recipe that works is in memory (`io-interrupted-build-corrupts-
+  build-dir`): clean the target's objs, `.obj.d`, `.pch`, `.pdb`, `compiler_depend.internal` all at
+  once and restore the two-line `compiler_depend.make` stub. Deleting ONE pdb breaks the PCH.
+- **Shell heredocs eat `\n` escapes.** A C++ `"\n"` written through `python - <<'EOF'` arrives as a
+  real newline and breaks the build. Write edit scripts to a FILE (scratchpad) and run them; use
+  `chr(92)` for a backslash; or use the Edit tool.
+- **Mixed line endings.** These sources are CRLF in the working tree. Text inserted with bare `\n`
+  makes a file `w/mixed`, and `\r\r\n` makes git call it binary (`w/-text`). Check with
+  `git ls-files --eol` after any scripted edit.
+- **A true before-baseline** for a world mover: reverse-apply just the world files from a saved
+  patch, build the harness, copy the exe to `build_gen/verify/<name>_before.exe` (never `%TEMP%`),
+  re-apply, and `cmp` the diff against the saved patch. `par_seeds.sh <name>_before` runs the copy;
+  its merger keys gates on the harness name, so merge by copying the shards under the real name.
+- **Hold keep-awake** for full-tier sweeps (`mcp__ccd_host__request_keep_awake`); one sweep slept
+  12 hours mid-run.
+- **Appending a backlog row:** items sit at two-space indent, keys at three. The linter counts raw
+  `"id"` keys by indentation and reports a wrongly indented row as FUSED records.
+- **NR ids:** mint across the hot file and `archive/needs-review-*.json`; the hot maximum lies after
+  an archive pass.
