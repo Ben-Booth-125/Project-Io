@@ -309,6 +309,8 @@ struct candidate
     /// stands beyond its host nation's Logistic Point reach, so it is scored and
     /// paid WITH a logistics hub beside it, built right after it applies.
     bool                  needs_source = false;
+    /// BL-1395: the hubs the build was priced with (its chain); never more are laid.
+    int                   chain_hubs   = 0;
 };
 
 /// The BUDGET CLASS a candidate competes in — and, by construction, the only
@@ -1244,17 +1246,82 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // beyond its host nation's Logistic Point reach is scored with the capex of
         // the hub that would bring it into reach, and that hub is built with it.
         // Never for the player's corporation or its nation's champion.
+        //
+        // BL-1395 grant (§ 11, Ben 2026-10-21, NR-1059): since BL-1356 a hub covers a
+        // site only on the chain back to its nation's capital, so the build is priced
+        // at the WHOLE chain lp_plan_chain lays - the rule generation uses - and that
+        // chain is laid with it, in the same decision. A site no chain can reach is not
+        // a candidate at all (it would cost upkeep and produce nothing). On the PLAYER's
+        // nation's ground the earlier grant stands unwidened: at most the one hub it
+        // always allowed, never a chain ("not admitted: any chain for the player's nation").
         lp_reach_memo lp_memo;
         const entity_id lp_player_nation = player_nation(w);
         const bool lp_may_source = corp != w.player_entity && !cc.is_player
             && (lp_player_nation == null_entity || champion_of(w, lp_player_nation) != corp);
-        const auto source_capex = [&](entity_id tile) -> float {
-            if (!lp_may_source || w.tile_to_nation.find(tile) == w.tile_to_nation.end())
-                return 0.0f;
-            if (lp_coverage_at(w, lp_memo, tile) >= 1.0f)
-                return 0.0f;
-            return construction_capex(w, reg, tile, building_type::inland_logistics_hub,
-                                      resource_type::iron_ore);
+        // The hubs a rival build on @p tile needs, or unreachable. A hub tile must pass
+        // the build verb's OWN door (construct_for: logistics reach from COMPLETED
+        // anchors, the era and placement gates) - a hub laid this tick is not yet an
+        // anchor, so a chain longer than the door admits today plans as unreachable and
+        // the site is skipped, never half-laid (cold review). Never the build's own tile.
+        // Memoised per tile for this evaluation; cleared with lp_memo when a hub is laid.
+        std::map<entity_id, lp_chain_plan> lp_plans;
+        const auto chain_for = [&](entity_id tile) -> lp_chain_plan {
+            if (const auto it = lp_plans.find(tile); it != lp_plans.end())
+                return it->second;
+            lp_chain_plan none;
+            const auto tn = w.tile_to_nation.find(tile);
+            const auto tt = w.tiles.find(tile);
+            if (tn == w.tile_to_nation.end() || tt == w.tiles.end())
+                return none;
+            const entity_id nation = tn->second;
+            const entity_id body   = tt->second.body;
+            body_reach_field(w, body); // the door builds it before its check; so do we
+            const auto gate = reg.placement_gate_for(building_type::inland_logistics_hub,
+                                                     corp_command{}.recipe);
+            const float max_reach = reg.construction().max_logistics_reach;
+            const auto may_place = [&](entity_id t) {
+                const auto nn = w.tile_to_nation.find(t);
+                return t != tile && nn != w.tile_to_nation.end() && nn->second == nation
+                    && placement_rules::can_place_in_world(w, t, building_type::inland_logistics_hub,
+                                                           resource_type::iron_ore, max_reach, corp,
+                                                           gate).ok();
+            };
+            const lp_chain_plan plan = lp_plan_chain(w, lp_memo, nation, body, tile, may_place);
+            lp_plans.emplace(tile, plan);
+            return plan;
+        };
+        // What sourcing a build on @p tile costs: `hubs` hub(s) at `capex`, or
+        // unreachable (the caller skips the site). On the PLAYER's nation's ground the
+        // 2026-10-15 grant stands exactly as it was - one hub if the site is short of
+        // full coverage, laid on the tile or a neighbour - and no chain is planned
+        // there, pending Ben's reading of "any chain for the player's nation" (NR-1060).
+        struct sourcing { bool reachable = true; int hubs = 0; float capex = 0.0f; bool legacy = false; };
+        const auto source_capex = [&](entity_id tile) -> sourcing {
+            sourcing out;
+            const auto tn = w.tile_to_nation.find(tile);
+            if (!lp_may_source || tn == w.tile_to_nation.end())
+                return out;
+            if (tn->second == lp_player_nation)
+            {
+                out.legacy = true;
+                if (lp_coverage_at(w, lp_memo, tile) >= 1.0f)
+                    return out;
+                out.hubs  = 1;
+                out.capex = construction_capex(w, reg, tile, building_type::inland_logistics_hub,
+                                               resource_type::iron_ore);
+                return out;
+            }
+            const lp_chain_plan plan = chain_for(tile);
+            if (!plan.reachable)
+            {
+                out.reachable = false;
+                return out;
+            }
+            out.hubs = static_cast<int>(plan.tiles.size());
+            for (const entity_id t : plan.tiles)
+                out.capex += construction_capex(w, reg, t, building_type::inland_logistics_hub,
+                                                resource_type::iron_ore);
+            return out;
         };
 
         // BL-1187: the producer index describes the buildings when it was
@@ -1513,10 +1580,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // industrial warm start, 15,549 build candidates — quadratic
                 // median 13.54 / max 1884.33, linear median 0.106 / max 2.81.
                 {
-                    // BL-1309: the hub that brings an out-of-reach site into reach.
-                    const float src = source_capex(s.tile);
-                    c.needs_source  = src > 0.0f;
-                    const float all = capex + src;
+                    // BL-1309 / BL-1395: the hub chain that brings an out-of-reach site
+                    // into reach; a site no chain can reach is not a candidate.
+                    const auto src = source_capex(s.tile);
+                    if (!src.reachable)
+                    {
+                        trace(extraction_trace_outcome::no_chain, net, 0.0f);
+                        continue;
+                    }
+                    c.needs_source  = src.hubs > 0;
+                    c.chain_hubs    = src.hubs;
+                    const float all = capex + src.capex;
                     c.score  = (net / all) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                     c.spend  = all;
                 }
@@ -1840,10 +1914,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // step 2 was taken ONCE for both rather than forked here. See
                     // that candidate for the full reasoning.
                     {
-                        // BL-1309: the hub that brings an out-of-reach plant into reach.
-                        const float src = source_capex(tile);
-                        c.needs_source  = src > 0.0f;
-                        const float all = capex + src;
+                        // BL-1309 / BL-1395: the hub chain that brings an out-of-reach
+                        // plant into reach; a plant no chain can reach is not a candidate.
+                        const auto src = source_capex(tile);
+                        if (!src.reachable)
+                            continue;
+                        c.needs_source  = src.hubs > 0;
+                        c.chain_hubs    = src.hubs;
+                        const float all = capex + src.capex;
                         c.score  = (net / all) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                         c.spend  = all;
                     }
@@ -3304,49 +3382,73 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             else
                 committed += c.spend;
             if (is_build)  ++builds;
-            // BL-1309 grant: the hub the build was scored with, beside it — on its
-            // tile, else the first land neighbour (N, E, S, W) on the same nation's
-            // ground that takes it — through the same legal verb, paid by the same
-            // book. Only where the build is still out of reach once it stands.
-            if (is_build && c.needs_source && built != null_entity && lp_may_source
-                && lp_coverage_at(w, lp_memo, c.cmd.tile) < 1.0f)
+            // BL-1309 / BL-1395 grants: the hubs the build was scored with, laid in the
+            // same decision through the same legal verb, paid by the same book. The chain
+            // is RE-PLANNED from the world as it stands after each hub (the build itself
+            // now stands), stops the moment the site is covered, and never lays more hubs
+            // than it was priced with. A hub the verb refuses ends it: nothing is carried
+            // to a later tick. On the player's nation's ground: the 2026-10-15 rule as it
+            // was - one hub, on the tile or the first land neighbour that takes it.
+            if (is_build && c.needs_source && built != null_entity && lp_may_source)
             {
-                std::vector<entity_id> spots = {c.cmd.tile};
-                const auto tt = w.tiles.find(c.cmd.tile);
-                const auto tn = w.tile_to_nation.find(c.cmd.tile);
-                if (tt != w.tiles.end() && tn != w.tile_to_nation.end())
-                {
-                    const auto bit = w.bodies.find(tt->second.body);
-                    if (bit != w.bodies.end())
-                    {
-                        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
-                        const int x = tt->second.grid_x, y = tt->second.grid_y;
-                        const std::vector<entity_id>& grid = body_tile_grid(w, tt->second.body);
-                        const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
-                                             y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
-                        for (const int ci : cand)
-                        {
-                            if (ci < 0 || static_cast<std::size_t>(ci) >= grid.size()) continue;
-                            const entity_id nt = grid[static_cast<std::size_t>(ci)];
-                            const auto nn = w.tile_to_nation.find(nt);
-                            if (nt != null_entity && nn != w.tile_to_nation.end() && nn->second == tn->second)
-                                spots.push_back(nt);
-                        }
-                    }
-                }
-                for (const entity_id spot : spots)
-                {
+                lp_memo.clear();
+                lp_plans.clear();
+                const auto lay_hub = [&](entity_id spot) {
                     corp_command hc;
                     hc.tick = c.cmd.tick; hc.corp = c.cmd.corp; hc.as_nation = c.cmd.as_nation;
                     hc.verb = corp_verb::build; hc.type = building_type::inland_logistics_hub; hc.tile = spot;
                     entity_id hub = null_entity;
-                    if (apply_corp_command(w, reg, hc, &hub) == corp_command_result::applied)
+                    if (apply_corp_command(w, reg, hc, &hub) != corp_command_result::applied)
+                        return false;
+                    lp_memo.clear();
+                    lp_plans.clear();
+                    agency_event hev{};
+                    hev.corp = corp; hev.building = hub; hev.what = agency_event::kind::built; hev.tile = spot;
+                    report.agency_events.push_back(hev);
+                    return true;
+                };
+                const auto tn = w.tile_to_nation.find(c.cmd.tile);
+                const bool legacy = tn != w.tile_to_nation.end() && tn->second == lp_player_nation;
+                if (legacy)
+                {
+                    if (lp_coverage_at(w, lp_memo, c.cmd.tile) < 1.0f)
                     {
-                        lp_memo.clear();
-                        agency_event hev{};
-                        hev.corp = corp; hev.building = hub; hev.what = agency_event::kind::built; hev.tile = spot;
-                        report.agency_events.push_back(hev);
-                        break;
+                        std::vector<entity_id> spots = {c.cmd.tile};
+                        const auto tt = w.tiles.find(c.cmd.tile);
+                        if (tt != w.tiles.end())
+                        {
+                            const auto bit = w.bodies.find(tt->second.body);
+                            if (bit != w.bodies.end())
+                            {
+                                const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+                                const int x = tt->second.grid_x, y = tt->second.grid_y;
+                                const std::vector<entity_id>& grid = body_tile_grid(w, tt->second.body);
+                                const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                                     y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+                                for (const int ci : cand)
+                                {
+                                    if (ci < 0 || static_cast<std::size_t>(ci) >= grid.size()) continue;
+                                    const entity_id nt = grid[static_cast<std::size_t>(ci)];
+                                    const auto nn = w.tile_to_nation.find(nt);
+                                    if (nt != null_entity && nn != w.tile_to_nation.end() && nn->second == tn->second)
+                                        spots.push_back(nt);
+                                }
+                            }
+                        }
+                        for (const entity_id spot : spots)
+                            if (lay_hub(spot))
+                                break;
+                    }
+                }
+                else
+                {
+                    for (int laid = 0; laid < c.chain_hubs; ++laid)
+                    {
+                        if (lp_coverage_at(w, lp_memo, c.cmd.tile) >= 1.0f)
+                            break;
+                        const lp_chain_plan plan = chain_for(c.cmd.tile);
+                        if (!plan.reachable || plan.tiles.empty() || !lay_hub(plan.tiles.front()))
+                            break;
                     }
                 }
             }

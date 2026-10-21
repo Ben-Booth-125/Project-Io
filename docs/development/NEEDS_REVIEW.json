@@ -514,6 +514,17 @@
    "call": "a) leave the scorer as is and accept the waste; b) grant: the scorer prices and builds a chain to the capital; c) the scorer declines builds it cannot connect with one hub.",
    "resolved": "2026-10-21",
    "resolution": "Ben, 2026-10-21 (routing form): b) granted - the scorer prices and builds the chain. Recorded in AI_OPPONENT.md section 11 'AI lays a hub chain to reach the capital'; the work is BL-1395 (AI_LAYS_HUB_CHAIN)."
+  },
+  {
+   "id": "NR-1060",
+   "title": "Rival hub chains on the player's nation's ground: builder or ground?",
+   "raised": "2026-10-21",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1395 (rival lays a hub chain), cold review finding 4",
+   "what": "Your grant excludes 'any chain for the player's nation or champion'. The 2026-10-15 grant's like wording is implemented as a BUILDER test (the player's corp and champion never source). Built conservatively: a rival building on the PLAYER's nation's ground keeps the old rule exactly - one hub on or beside the site, priced as one - and never lays a chain there. Elsewhere it lays the full chain.",
+   "why_it_matters": "On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.",
+   "call": "a) keep (built): no rival chain on the player's ground, the old one-hub rule there; b) builder reading: a rival may lay a chain on any ground, the player's included; c) no rival sourcing on the player's ground at all."
   }
  ]
 }

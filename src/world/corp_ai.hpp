@@ -432,6 +432,7 @@ enum class extraction_trace_outcome : uint8_t
     veto_dead,     ///< glut veto: a cleared market with no bid, nothing listed (BL-1227)
     veto_ratio,    ///< glut veto: (supply + added) / demand >= glut_veto_ratio
     emitted,       ///< a candidate went to the greedy selection
+    no_chain,      ///< BL-1395: no legal hub chain this tick can bring it to its capital
     count
 };
 struct extraction_trace_row

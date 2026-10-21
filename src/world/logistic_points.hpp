@@ -73,6 +73,7 @@
 #include "world.hpp"
 
 #include <array>
+#include <functional>
 #include <map>
 #include <set>
 #include <tuple>
@@ -312,6 +313,23 @@ struct lp_route
 /// Route @p tile's request against @p nation's running sources on @p body.
 lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
                      entity_id tile);
+
+/// The hub chain @p target needs (BL-1395; LOGISTICS.md § Where generation puts the
+/// sources, "The chain is laid outward from the capital"): the road hubs, in the order
+/// they would be built, that bring @p target to full coverage on @p nation's chain -
+/// a hub carrying it at full strength where one can stand touching the chain, else an
+/// extension on the chain's edge, steered by the walk over the nation's own dry ground,
+/// repeated. Nothing is placed; @p may_place says which tiles a hub may take. The
+/// first tile is exactly the tile generation would place next, so generation and the
+/// rival scorer (AI_OPPONENT.md § 11, 2026-10-21) lay one chain by one rule.
+struct lp_chain_plan
+{
+    bool                   reachable = false; ///< the target can be covered this way
+    std::vector<entity_id> tiles;             ///< hubs to build, in order (empty: covered now)
+};
+lp_chain_plan lp_plan_chain(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
+                            entity_id target, const std::function<bool(entity_id)>& may_place,
+                            int max_hubs = 64);
 
 /// Where a tile's coverage came from: the NEAREST QUALIFYING source's network and
 /// its network distance (BL-1356). `reached` is false when no source of the host

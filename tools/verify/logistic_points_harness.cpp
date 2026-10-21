@@ -859,6 +859,48 @@ void l8_routed_requests()
               "a sea wider than a port's reach: counted as cut off, and no port placed that would deliver nothing");
     }
 
+    // THE PLANNER (BL-1395): the chain lp_plan_chain proposes for a far consumer, built
+    // hub by hub, covers it - and it is the same chain generation lays (generation now
+    // calls it). An unreachable target is planned as nothing, and a covered one as empty.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 0));
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        const entity_id c = add_consumer(w, tile_at(w, body, 25), corp, 10.0f, 100.0f);
+        const auto anywhere = [&](entity_id t) {
+            return !is_water(w.tiles.at(t).substrate) && w.tile_to_nation.count(t) != 0;
+        };
+        lp_reach_memo memo;
+        const lp_chain_plan plan = lp_plan_chain(w, memo, nation, body, tile_at(w, body, 25), anywhere);
+        check(plan.reachable && plan.tiles.size() >= 2, "the planner proposes a chain of hubs to a far consumer");
+        for (const entity_id t : plan.tiles)
+            add_hub(w, t);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, 1.0f), "and building exactly that chain covers it");
+        lp_reach_memo memo2;
+        const lp_chain_plan again = lp_plan_chain(w, memo2, nation, body, tile_at(w, body, 25), anywhere);
+        check(again.reachable && again.tiles.empty(), "a covered target plans no hub at all");
+    }
+    {
+        world w;
+        const entity_id body = make_row_body(w, 60);
+        for (int col = 20; col <= 59; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        const entity_id nation = add_nation(w, body, 0, 19);
+        set_capital(w, nation, tile_at(w, body, 0));
+        // A hub may not stand within four tiles of the capital: the chain cannot start.
+        const auto far_only = [&](entity_id t) {
+            return !is_water(w.tiles.at(t).substrate) && w.tiles.at(t).grid_x > 4;
+        };
+        lp_reach_memo memo;
+        const lp_chain_plan plan = lp_plan_chain(w, memo, nation, body, tile_at(w, body, 15), far_only);
+        check(!plan.reachable && plan.tiles.empty(),
+              "a target no legal chain can reach is planned as nothing - no hub that would deliver nothing");
+    }
+
     // THE CHAIN STOPS AT A FRONTIER: the consumer's own nation holds both ends of the row
     // but another nation holds the ground between (both ways round the wrap), so no hub
     // of its nation can carry the chain to it. Left uncovered and counted, not faked.

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*37 entries — 29 open, 8 resolved.*
+*38 entries — 30 open, 8 resolved.*
 
 ---
 
@@ -254,6 +254,13 @@ Ben asked for the points consumed by a tile. A rival building's point need is wo
 Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Track 6/12, Road 8/16, Highway 10/20). Rail's fade was left at its existing 8, so a station 24 track steps down the line gets half strength and one at 28+ gets nothing. LOGISTICS.md says only '20 tiles' for rail.
 
 **Why it matters.** It decides whether a station 21-27 steps away is served at all. Today that is a fading partial, and the census moved little on it (rail sources unchanged: 69 / 0 / 185 on seeds 0 / 28 / 46).
+
+### NR-1060 — Rival hub chains on the player's nation's ground: builder or ground?
+*decision · raised 2026-10-21 · from BL-1395 (rival lays a hub chain), cold review finding 4*
+
+Your grant excludes 'any chain for the player's nation or champion'. The 2026-10-15 grant's like wording is implemented as a BUILDER test (the player's corp and champion never source). Built conservatively: a rival building on the PLAYER's nation's ground keeps the old rule exactly - one hub on or beside the site, priced as one - and never lays a chain there. Elsewhere it lays the full chain.
+
+**Why it matters.** On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.
 
 ---
 

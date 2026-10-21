@@ -36,6 +36,7 @@
 #include "world/corp_ai.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
+#include "world/logistic_points.hpp" // BL-1395: the chain row reads routing
 #include "world/market_clearing.hpp"
 #include "world/nation_budget.hpp" // budget_claim (R6, Sprint N3 T5)
 #include "world/recipe_registry.hpp"
@@ -279,6 +280,114 @@ std::string serialise_bb(const corp_blackboard& bb)
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// BL-1395 (AI_OPPONENT.md § 11, "AI lays a hub chain to reach the capital", Ben
+// 2026-10-21): a rival prices a far build at the WHOLE hub chain it needs and lays it
+// in the same decision. A 60-tile roaded row (track: a step costs 1, so a hub reaches
+// 6 tiles in full and touches the chain within 12), one nation, its capital (and a
+// city, the logistics anchor) at column 0, a rich iron deposit at column @p rich_col. The rival
+// is the only candidate builder; the player corp exists only to be the player.
+// ---------------------------------------------------------------------------
+struct chain_result { bool built = false; int hubs = 0; bool covered = false; int extra = 0; };
+chain_result run_chain_scene(int rich_col, float max_reach)
+{
+    world w;
+    const entity_id body = w.create_entity();
+    {
+        body_component b{};
+        b.name = "Row"; b.type = body_type::planet; b.grid_width = 60; b.grid_height = 1;
+        b.orbital_radius_au = 1.0f; b.survey.phase = survey_phase::surveyed;
+        w.bodies[body] = b;
+    }
+    std::vector<entity_id> tiles;
+    // 60 wide, columns 50-59 sea, so the row's wrap is no short cut back to the capital.
+    for (int c = 0; c < 60; ++c)
+        tiles.push_back(make_tile(w, body, c, 0, c >= 50 ? terrain_substrate::ocean : terrain_substrate::rocky,
+                                  c == rich_col ? 1.0f : 0.0f));
+    const entity_id nation = w.create_entity();
+    {
+        nation_component nc{};
+        nc.name = "Rowland";
+        for (const entity_id t : tiles)
+            if (!is_water(w.tiles.at(t).substrate)) { nc.tiles.push_back(t); w.tile_to_nation[t] = nation; }
+        nc.capital_tile = tiles[0];
+        w.nations[nation] = nc;
+    }
+    w.population_centre_tile[w.create_entity()] = tiles[0];
+    const entity_id m = w.create_entity();
+    {
+        market_component mc{};
+        mc.body = body; mc.centre_tile = tiles[0];
+        mc.base_price[ri(resource_type::iron_ore)] = 4.0f;
+        mc.price = mc.base_price;
+        w.markets[m] = mc;
+    }
+    const entity_id ai = w.create_entity();
+    {
+        corporation_component cc; cc.name = "Far Reach Mining"; cc.focus = industrial_focus::extraction;
+        cc.starting_capital = cc.balance = 1.0e6f; cc.home_nation = nation;
+        w.corporations[ai] = cc;
+    }
+    const entity_id pl = w.create_entity();
+    {
+        corporation_component cc; cc.name = "Player Co"; cc.is_player = true;
+        cc.starting_capital = cc.balance = 10.0f;
+        w.corporations[pl] = cc;
+    }
+    w.player_entity = pl;
+
+    recipe_registry reg = make_registry();
+    building_economics hub;
+    hub.build_cost = 50.0f; hub.build_duration_ticks = 2.0f; hub.maintenance = 1.0f;
+    reg.set_economics(building_type::inland_logistics_hub, hub);
+    construction_params cp = reg.construction();
+    cp.max_logistics_reach = max_reach;
+    reg.set_construction(cp);
+
+    corp_ai_params prm{};
+    // Several evaluations: a rival builds one thing per evaluation, and the far mine
+    // need not be the first thing it builds.
+    for (int tick = 0; tick < 6 * prm.cadence_k; ++tick)
+    {
+        w.current_day_tick = w.current_econ_tick = tick;
+        economy_report rep;
+        run_corp_strategic_step(w, reg, rep, tick, prm);
+    }
+
+    chain_result out;
+    entity_id site = null_entity;
+    std::vector<entity_id> hubs;
+    for (const entity_id bid : w.corporations.at(ai).assets)
+    {
+        const building_component& b = w.buildings.at(bid);
+        if (b.type == building_type::extraction_site && b.tile == tiles[static_cast<std::size_t>(rich_col)])
+            site = bid;
+        if (b.type == building_type::inland_logistics_hub)
+            hubs.push_back(bid);
+    }
+    out.built = site != null_entity;
+    out.hubs  = static_cast<int>(hubs.size());
+    if (out.built)
+    {
+        // Finish the hubs (they stand under construction) and route: the chain must cover it.
+        world done = w;
+        for (const entity_id h : hubs)
+            done.buildings.at(h).ticks_remaining = 0;
+        lp_reach_memo memo;
+        out.covered = lp_coverage_at(done, memo, tiles[static_cast<std::size_t>(rich_col)]) >= 1.0f;
+        // And no hub beyond need: each hub, removed, uncovers the site.
+        for (const entity_id h : hubs)
+        {
+            world less = done;
+            less.buildings.at(h).decommissioned = true;
+            lp_reach_memo m2;
+            if (lp_coverage_at(less, m2, tiles[static_cast<std::size_t>(rich_col)]) >= 1.0f)
+                ++out.extra;
+        }
+    }
+    return out;
+}
 
 int main()
 {
@@ -1253,6 +1362,25 @@ int main()
                   "when the input is only stock in the corp's own pool (a switch is judged "
                   "on supply, Ben 2026-10-09)");
         }
+    }
+
+    // ---- BL-1395: the rival lays the whole hub chain, in one decision ----------
+    {
+        // A site 20 tiles out: no single hub both carries it (within 6) and touches the
+        // capital (within 12), so it takes a chain. Reach 24 (the shipped door) admits it.
+        const chain_result r = run_chain_scene(20, 24.0f);
+        std::printf("    chain scene (site 20, reach 24): built %d, hubs %d, covered %d, extra %d\n",
+                    r.built ? 1 : 0, r.hubs, r.covered ? 1 : 0, r.extra);
+        check(r.built && r.hubs >= 2, "BL-1395: a rival builds a far mine and lays a chain of hubs with it, in one decision");
+        check(r.covered, "BL-1395: the chain it laid covers the mine once its hubs stand");
+        check(r.extra == 0, "BL-1395: no hub beyond the chain's need (each one, removed, uncovers the site)");
+    }
+    {
+        // A door that admits no hub beyond 4 tiles of an anchor: the chain cannot be laid
+        // this tick, so the far mine is not a candidate - no mine, no stranded hub.
+        const chain_result r = run_chain_scene(30, 4.0f);
+        std::printf("    chain scene (site 30, reach 4): built %d, hubs %d\n", r.built ? 1 : 0, r.hubs);
+        check(!r.built && r.hubs == 0, "BL-1395: a site no legal chain reaches this tick is not built, and no hub is laid");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

@@ -671,6 +671,150 @@ lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id 
     return out;
 }
 
+namespace {
+
+/// Steps from @p target over @p nation's own dry ground (4-neighbour, columns wrap) -
+/// what a chain is steered by. A grid distance steered it across water or round the
+/// wrap toward ground it could never reach; a walk over the ground a hub may stand on
+/// cannot. A tile it does not reach is not a step closer.
+std::unordered_map<entity_id, int> own_ground_steps(world& w, entity_id nation, entity_id body,
+                                                    entity_id target)
+{
+    std::unordered_map<entity_id, int> dist;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return dist;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    std::vector<entity_id> q{target};
+    dist[target] = 0;
+    for (std::size_t head = 0; head < q.size(); ++head)
+    {
+        const entity_id cur = q[head];
+        const tile_component& tc = w.tiles.at(cur);
+        const int x = tc.grid_x, y = tc.grid_y;
+        const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                             y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+        for (const int cc : cand)
+        {
+            if (cc < 0 || static_cast<std::size_t>(cc) >= grid.size())
+                continue;
+            const entity_id nt = grid[static_cast<std::size_t>(cc)];
+            const auto nn = w.tile_to_nation.find(nt);
+            if (nt == null_entity || dist.count(nt) != 0 || nn == w.tile_to_nation.end()
+                || nn->second != nation || is_water(w.tiles.at(nt).substrate))
+                continue;
+            dist[nt] = dist[cur] + 1;
+            q.push_back(nt);
+        }
+    }
+    return dist;
+}
+
+} // namespace
+
+lp_chain_plan lp_plan_chain(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
+                            entity_id target, const std::function<bool(entity_id)>& may_place,
+                            int max_hubs)
+{
+    lp_chain_plan out;
+    if (nation == null_entity || target == null_entity)
+        return out;
+    const lp_route now = lp_route_to(w, memo, nation, body, target);
+    if (now.cover >= 1.0f)
+    {
+        out.reachable = true; // covered as it stands
+        return out;
+    }
+    const entity_id anchor = chain_anchor(w, nation, body);
+    if (anchor == null_entity)
+    {
+        // Nothing to be connected back to: any hub passes, so one on the target covers it.
+        if (may_place(target))
+        {
+            out.reachable = true;
+            out.tiles.push_back(target);
+        }
+        return out;
+    }
+
+    std::vector<entity_id> anchors{anchor};
+    const std::set<entity_id>& chain = memo_chain(w, memo, nation, body, anchor);
+    for (const lp_source_ref& sr : memo_sources(w, memo, nation, body))
+        if (chain.count(sr.building) != 0)
+            anchors.push_back(sr.tile);
+    const auto fc    = lp_distance_field(w, body, lp_network::road, {target});
+    const auto steps = own_ground_steps(w, nation, body, target);
+    std::set<entity_id> planned;
+    float extra = 0.0f; // the planned hubs' reach at the target, on top of what routes now
+    int last_gap = std::numeric_limits<int>::max();
+    for (int n = 0; n < max_hubs; ++n)
+    {
+        if (now.cover + extra >= 1.0f)
+        {
+            out.reachable = true;
+            return out;
+        }
+        const auto fz = lp_distance_field(w, body, lp_network::road, anchors);
+        const auto free_tile = [&](entity_id t) { return planned.count(t) == 0 && may_place(t); };
+
+        // (a) one hub that carries the target at full strength AND touches the chain
+        entity_id best = null_entity;
+        float best_z = 0.0f;
+        for (const auto& [t2, dc] : fc)
+        {
+            if (!lp_full_strength(lp_network::road, dc))
+                continue;
+            const auto zt = fz.find(t2);
+            if (zt == fz.end() || !(lp_reach(lp_network::road, zt->second) > 0.0f) || !free_tile(t2))
+                continue;
+            if (best == null_entity || zt->second < best_z || (zt->second == best_z && t2 < best))
+            {
+                best   = t2;
+                best_z = zt->second;
+            }
+        }
+        if (best != null_entity)
+        {
+            out.tiles.push_back(best);
+            out.reachable = true;
+            return out;
+        }
+
+        // (b) extend the chain: the tile it touches nearest the target by the walk
+        //     (further out first on a tie, then the lower tile id)
+        entity_id ext = null_entity;
+        int ext_gap = 0;
+        float ext_z = 0.0f;
+        for (const auto& [t2, dz] : fz)
+        {
+            if (!(lp_reach(lp_network::road, dz) > 0.0f) || !free_tile(t2))
+                continue;
+            const auto st = steps.find(t2);
+            if (st == steps.end())
+                continue;
+            const int gap = st->second;
+            if (ext == null_entity || gap < ext_gap || (gap == ext_gap && dz > ext_z)
+                || (gap == ext_gap && dz == ext_z && t2 < ext))
+            {
+                ext     = t2;
+                ext_gap = gap;
+                ext_z   = dz;
+            }
+        }
+        if (ext == null_entity || ext_gap >= last_gap)
+            return out; // the chain cannot get closer: unreachable, and nothing is kept
+        last_gap = ext_gap;
+        out.tiles.push_back(ext);
+        planned.insert(ext);
+        anchors.push_back(ext);
+        if (const auto it = fc.find(ext); it != fc.end())
+            extra += lp_reach(lp_network::road, it->second);
+    }
+    out.tiles.clear(); // ran out of hubs before covering it: not reachable within the bound
+    return out;
+}
+
 float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile, lp_coverage_why* why)
 {
     if (why != nullptr)
