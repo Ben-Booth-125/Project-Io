@@ -15,11 +15,9 @@ number attached. The old text — including the done-definition written at every
 per-minor findings — is kept verbatim at
 [`archive/ROADMAP-2026-08-24.md`](archive/ROADMAP-2026-08-24.md).*
 
-> **Open question, raised by Ben 2026-08-24 (NR-589): do we still want versioned releases?**
-> Item-level versioning is already gone — the 2026-08-23 backlog purge left the hot file holding
-> one sprint's items and no `version` field at all. The tags are real and the themes below are
-> live; it is the *numbering* that is in doubt. Until it is ruled on, read the band as a set of
-> named themes and let SPRINTS.md say what is being cut.
+> **Version numbers stay (Ben, 2026-10-22, settling NR-589).** Releases are versioned. The minor
+> numbers name the industrial arc's milestones (§ The industrial arc's milestones); the patch
+> numbers are the sprint cuts between them.
 
 ---
 
@@ -44,15 +42,31 @@ space programmes in the industrial arc: satellites, rovers, crewed lunar mission
 stations, with their launch and ground infrastructure (`../economy/SPACE_ASSETS.md`). What stays
 parked below is the space game proper — corporations operating across the solar system.
 
-**Space — parked for DLC.** **v0.2.0** (the AI opponent), **v0.3.0** (the national private
-militia), **v0.4.0** (politics + the Era → Filter rename) and **v1.0.0** (the playable space game)
-are parked whole, their designs intact, so the DLC resume is a re-triage rather than an archaeology
+**Space — parked for DLC.** The AI opponent, the national private militia, politics + the Era →
+Filter rename, and the playable space game are parked whole. They were numbered v0.2.0, v0.3.0,
+v0.4.0 and v1.0.0 until 2026-10-22, when those numbers passed to the industrial arc (§ The
+industrial arc's milestones); the DLC is renumbered when it resumes. They are parked their designs intact, so the DLC resume is a re-triage rather than an archaeology
 dig. Do not build against them; do not delete them. Their combined bar, in one line: a player
 contesting **both Trade and Conflict** against AI rivals doing the same, where **procurement of
 force from private suppliers** is the mechanism coupling the two pillars. The full parked design is
 in the archived roadmap and in `archive/backlog-purged-2026-08-23.json`.
 
 The generation layer is shared by both arcs and is never parked.
+
+---
+
+## The industrial arc's milestones (Ben, 2026-10-22)
+
+The minor versions name what the industrial product can do, in order. Each is a capability a
+player can feel, not a list of items.
+
+- **v0.2.0 — the economy functions.** Production, markets, trade and finance run as one
+  economy, and **logistics is part of it**: Logistic Points made by hubs, stations and ports,
+  carried along roads, rail and water, routed to the buildings that need them along a chain
+  to their nation's capital (`../economy/LOGISTICS.md`). Ben judged it reached on 2026-10-22,
+  with the routing work of sprint 55; it is cut when that sprint closes.
+- **v0.3.0 — a working military system.** The campaign's force (`../military/MILITARY.md`)
+  working as a system a player uses. Its done-definition is owed and is Ben's to set.
 
 ---
 
@@ -124,8 +138,10 @@ by [`../tech/TECH_FOUNDATIONS.md`](../tech/TECH_FOUNDATIONS.md), not by this doc
 
 ## Owed
 
-- **The ancient product's own done-definition** — the commercial cut's bar, distinct from
-  v1.0.0's, which is the *space* game's and stays parked with it (NR-177).
+- **The ancient product's own done-definition** — the commercial cut's bar, distinct from the
+  *space* game's, which stays parked with it (NR-177).
+- **v0.3.0's done-definition** — what "a working military system" must show (Ben, 2026-10-22:
+  "we can work on the specifics later").
 - **The product's name.** Io is a moon of Jupiter.
 
 ---

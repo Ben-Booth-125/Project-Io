@@ -1531,8 +1531,8 @@ both stand; the ruling is explicit about the Stage.
   This ruling changes which Stage the model occupies, not the transport or the
   no-cloud-dependency invariant.
 
-**What this does not settle.** Whether Stage C ships before or after the v0.2.0 corp-AI arc
-closes, and the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference
+**What this does not settle.** Whether Stage C ships before or after the corp-AI arc
+closes (the parked DLC milestone numbered v0.2.0 until 2026-10-22, ROADMAP.md), and the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference
 point, not a spec) — both inside BL-334's remainder. The note's ~300-token-per-decision assumption
 was measured separately (BL-335, measure decision token cost): a minimal decision round is
 ~19–20K input tokens, a naive one ~26K, with output under 300 tokens; the compact encoding that
