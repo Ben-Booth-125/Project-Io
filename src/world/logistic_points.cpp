@@ -3,6 +3,7 @@
 #include "logistics.hpp"       // body_tile_grid, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
 #include "river_generation.hpp" // BL-1340: hex_side_for_offset — a step prices the edge it crosses
+#include "hex_neighbors.hpp"    // BL-1396: the sea walk crosses all six hex sides
 #include "state_industry.hpp"  // state_gate_would_idle (the reading at the gate)
 
 #include <algorithm>
@@ -88,12 +89,87 @@ float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_net
                 return -1.0f;
             return w.rail_track.count(tile) != 0 ? 1.0f : lp_offnet_step;
         case lp_network::sea:
+            // BL-1396: never reached from lp_distance_field, which walks sea over water
+            // only (a step 1, a landing 1, no step inland); kept total for the switch.
             return water ? 1.0f : lp_offnet_step;
     }
     return -1.0f;
 }
 
 } // namespace
+
+std::unordered_map<entity_id, float> lp_sea_walk(world& w, entity_id body,
+                                                 const std::vector<entity_id>& seeds)
+{
+    // BL-1396 (Ben, 2026-10-21): A PORT'S POINTS CROSS WATER AND LAND ON THE SHORE. From
+    // the seed tiles (a port's own tile, or a whole shore), the walk steps onto water,
+    // crosses water a tile at a time and LANDS on the tiles beside it, every step costing
+    // 1; a landing ends the walk, so the points reach the shores the water joins and no
+    // further inland (a hub's ground), and land to land is never a sea step. ALL SIX HEX
+    // SIDES (cold review): a port is placed against sea on any of its six sides
+    // (placement_rules::is_coastal), so a four-way walk left a legal port with sea only
+    // on a diagonal side reaching nothing. LAKES TOO (Ben, 2026-10-21, NR-1061: "Ports
+    // should be able to cover lakes too"): the walk crosses any water (is_water), though
+    // a port still STANDS only on a sea coast, as placement rules. Bounded at the sea's
+    // full reach plus its fade.
+    std::unordered_map<entity_id, float> dist;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end() || seeds.empty())
+        return dist;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const std::size_t si = static_cast<std::size_t>(lp_network::sea);
+    const float bound = lp_full_reach[si] + lp_fade_length[si];
+    using item = std::pair<float, entity_id>;
+    std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+    std::vector<entity_id> sorted = seeds;
+    std::sort(sorted.begin(), sorted.end());
+    for (const entity_id s : sorted)
+    {
+        const auto tit = w.tiles.find(s);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        if (dist.emplace(s, 0.0f).second)
+            pq.push({0.0f, s});
+    }
+    while (!pq.empty())
+    {
+        const auto [d, t] = pq.top();
+        pq.pop();
+        if (dist[t] < d)
+            continue;
+        const tile_component& tc = w.tiles.at(t);
+        const bool here_sea = is_water(tc.substrate); // sea or lake (NR-1061)
+        if (!here_sea && d > 0.0f)
+            continue; // a landing: the walk ends on the coast
+        for (int side = 0; side < 6; ++side)
+        {
+            const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+            if (nb.gy < 0 || nb.gy >= gh)
+                continue;
+            const int nx = ((nb.gx % gw) + gw) % gw; // columns wrap
+            const std::size_t ci = static_cast<std::size_t>(nb.gy) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(nx);
+            if (ci >= grid.size())
+                continue;
+            const entity_id nt = grid[ci];
+            if (nt == null_entity)
+                continue;
+            if (!here_sea && !is_water(w.tiles.at(nt).substrate))
+                continue; // land to land is no sea route (only a seed is land)
+            const float nd = d + 1.0f;
+            if (nd > bound)
+                continue;
+            const auto it = dist.find(nt);
+            if (it == dist.end() || nd < it->second)
+            {
+                dist[nt] = nd;
+                pq.push({nd, nt});
+            }
+        }
+    }
+    return dist;
+}
 
 std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body, lp_network n,
                                                        const std::vector<entity_id>& seeds)
@@ -147,6 +223,9 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
     const float bound = lp_full_reach[static_cast<std::size_t>(n)]
                       + lp_fade_length[static_cast<std::size_t>(n)];
+    // BL-1396: sea has its own walk (lp_sea_walk), taken before this loop.
+    if (n == lp_network::sea)
+        return lp_sea_walk(w, body, seeds);
 
     using item = std::pair<float, entity_id>;
     std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
@@ -548,6 +627,15 @@ const std::vector<lp_source_ref>& memo_sources(world& w, lp_reach_memo& memo, en
 const std::unordered_map<entity_id, float>& memo_field(world& w, lp_reach_memo& memo,
                                                        const lp_source_ref& s, entity_id body)
 {
+    // BL-1396: a port's field is the world's cached sea walk from its tile - returned by
+    // reference, read at once by every caller and held across no world mutation.
+    if (s.network == lp_network::sea)
+    {
+        auto ct = w.lp_sea_fields.find(s.tile);
+        if (ct == w.lp_sea_fields.end())
+            ct = w.lp_sea_fields.emplace(s.tile, lp_sea_walk(w, body, {s.tile})).first;
+        return ct->second;
+    }
     auto it = memo.fields.find(s.building);
     if (it == memo.fields.end())
         it = memo.fields.emplace(s.building, lp_distance_field(w, body, s.network, {s.tile})).first;
@@ -1093,89 +1181,38 @@ lp_seed_report seed_logistics_sources(world& w)
         return seen;
     };
 
-    // A land tile with water on one of its four sides: where a port can stand.
+    // A land tile with SEA on one of its six hex sides: where a port can stand - the
+    // test placement makes (is_coastal), and the sides the sea walk lands across.
     const auto coastal = [&](entity_id t) {
         const tile_component& tc = w.tiles.at(t);
         const auto bit = w.bodies.find(tc.body);
         if (bit == w.bodies.end() || is_water(tc.substrate))
             return false;
         const int gw = bit->second.grid_width, gh = bit->second.grid_height;
-        const int x = tc.grid_x, y = tc.grid_y;
-        const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
-                             y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
         const std::vector<entity_id>& grid = body_tile_grid(w, tc.body);
-        for (const int cc : cand)
-            if (cc >= 0 && static_cast<std::size_t>(cc) < grid.size()
-                && grid[static_cast<std::size_t>(cc)] != null_entity
-                && is_water(w.tiles.at(grid[static_cast<std::size_t>(cc)]).substrate))
+        for (int side = 0; side < 6; ++side)
+        {
+            const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+            if (nb.gy < 0 || nb.gy >= gh)
+                continue;
+            const std::size_t ci = static_cast<std::size_t>(nb.gy) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(((nb.gx % gw) + gw) % gw);
+            if (ci < grid.size() && grid[ci] != null_entity && is_sea(w.tiles.at(grid[ci]).substrate))
                 return true;
+        }
         return false;
     };
 
-    // A SEA FIELD OVER WATER ONLY, for the bridge: from the land tiles @p seeds, a step
-    // into water costs 1, water to water 1, and water onto land lp_offnet_step - where
-    // the walk stops, so the route never crosses land between its two ends. The real
-    // port field (lp_distance_field, sea) may also cross land at lp_offnet_step a tile,
-    // so it is never dearer than this: a bridge this field admits is a bridge the ports
-    // will actually connect. Without it a strip of a neighbour's land with a little
-    // water either side read as a strait (cold review). Bounded at the sea's reach.
+    // The bridge reads the sea field itself (lp_sea_walk, BL-1396): one walk, so a bridge
+    // it admits is a bridge the ports connect, and no route crosses land between its ends.
     const auto water_field = [&](entity_id body, const std::vector<entity_id>& seeds) {
-        std::unordered_map<entity_id, float> dist;
-        const auto bit = w.bodies.find(body);
-        if (bit == w.bodies.end())
-            return dist;
-        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
-        const std::vector<entity_id>& grid = body_tile_grid(w, body);
-        const std::size_t si = static_cast<std::size_t>(lp_network::sea);
-        const float bound = lp_full_reach[si] + lp_fade_length[si];
-        using item = std::pair<float, entity_id>;
-        std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
-        std::vector<entity_id> sorted = seeds;
-        std::sort(sorted.begin(), sorted.end());
-        for (const entity_id t : sorted)
-            if (dist.emplace(t, 0.0f).second)
-                pq.push({0.0f, t});
-        while (!pq.empty())
-        {
-            const auto [d, t] = pq.top();
-            pq.pop();
-            if (dist[t] < d)
-                continue;
-            const bool here_water = is_water(w.tiles.at(t).substrate);
-            if (!here_water && d > 0.0f)
-                continue; // a landing: the route ends here
-            const tile_component& tc = w.tiles.at(t);
-            const int x = tc.grid_x, y = tc.grid_y;
-            const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
-                                 y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
-            for (const int cc : cand)
-            {
-                if (cc < 0 || static_cast<std::size_t>(cc) >= grid.size())
-                    continue;
-                const entity_id nt = grid[static_cast<std::size_t>(cc)];
-                if (nt == null_entity)
-                    continue;
-                const bool nw = is_water(w.tiles.at(nt).substrate);
-                if (!here_water && !nw)
-                    continue; // land to land is not a sea route
-                const float nd = d + (nw ? 1.0f : lp_offnet_step);
-                if (nd > bound)
-                    continue;
-                const auto it = dist.find(nt);
-                if (it == dist.end() || nd < it->second)
-                {
-                    dist[nt] = nd;
-                    pq.push({nd, nt});
-                }
-            }
-        }
-        return dist;
+        return lp_sea_walk(w, body, seeds);
     };
 
     // Bridge an island to the chain by sea: a HOME port (an existing connected one, or a
     // new one on the capital's coast where the road chain touches it) whose sea reach
     // covers the island's coast, then an island port there. A sea step costs the same
-    // both ways (1 a water step, lp_offnet_step onto land at either end), so one field
+    // both ways (1 a sea step, 1 a landing), so one field
     // FROM the island's coast reads every home candidate's distance. Least distance,
     // then the lower tile id: order-independent. False when the sea is too wide.
     std::set<std::tuple<entity_id, entity_id, entity_id>> bridged;

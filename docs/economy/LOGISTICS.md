@@ -700,8 +700,13 @@ into passive and active. What follows replaces the bifold model, the city genera
 - **A port stretches fifty tiles over water (Ben, 2026-10-21).** A port's points reach **full
   strength across 50 water tiles** and fade to zero at double, 100 — the road's rule, at sea's
   scale. Water is where points travel furthest: a port carries the chain to a coast a road could
-  never reach, which is what lets an island nation's network be one network. Owned by BL-1396
-  (port reach over water).
+  never reach, which is what lets an island nation's network be one network. **Over water only
+  (Ben, 2026-10-21):** a port's points cross water and land on the coastal tiles they reach — no
+  further inland; inland ground is a hub's. So a port joins the chain through the coast (its sea
+  reach landing on the capital or a connected source) or through a connected hub whose reach
+  covers it. **Lakes too (Ben, 2026-10-21):** a port's points cross a lake as they cross the sea
+  and land on its shore — though a port still stands only on a sea coast. Owned by BL-1396 (port
+  reach over water).
 - **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
   points carry **20 tiles** along the line, and they are delivered at **the tile the line connects
   to** — never to the country the line passes through. So rail is a link between places rather than

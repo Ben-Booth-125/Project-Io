@@ -629,6 +629,74 @@ void l7_reach_by_tier_and_rail()
           "rail: track the line merely PASSES (7, 20) is never served");
     check(dist_at(45) < 0.0f, "rail: ground off the line is never served");
 
+    // SEA (BL-1396, Ben 2026-10-21): a port stretches 50 water tiles at full strength,
+    // gone at 100, and over water only - its points land on the coast they reach and go
+    // no further inland. A port at column 0, sea 1-120, land 121-130, sea after.
+    {
+        world ws;
+        const entity_id bs = make_row_body(ws, 300);
+        for (int col = 1; col <= 120; ++col)
+            ws.tiles.at(tile_at(ws, bs, col)).substrate = terrain_substrate::coast;
+        for (int col = 131; col <= 299; ++col)
+            ws.tiles.at(tile_at(ws, bs, col)).substrate = terrain_substrate::coast;
+        const auto f = lp_distance_field(ws, bs, lp_network::sea, {tile_at(ws, bs, 0)});
+        const auto reach_at = [&](int col) {
+            const auto it = f.find(tile_at(ws, bs, col));
+            return it == f.end() ? 0.0f : lp_reach(lp_network::sea, it->second);
+        };
+        check(reach_at(50) >= 1.0f, "sea: full strength 50 water tiles out");
+        check(approx(reach_at(75), 0.5f, 1e-3f), "sea: half strength 75 out, midway through the fade");
+        check(f.count(tile_at(ws, bs, 100)) == 1 && approx(f.at(tile_at(ws, bs, 100)), 100.0f)
+                  && approx(reach_at(100), 0.0f, 1e-3f),
+              "sea: the walk reaches 100 and nothing is left there, double the full reach");
+        // A short strait: water 1-9, land 10-20 (coast at 10, inland behind it).
+        world wc;
+        const entity_id bc = make_row_body(wc, 300);
+        for (int col = 1; col <= 9; ++col)
+            wc.tiles.at(tile_at(wc, bc, col)).substrate = terrain_substrate::coast;
+        for (int col = 21; col <= 299; ++col)
+            wc.tiles.at(tile_at(wc, bc, col)).substrate = terrain_substrate::coast;
+        const auto fc2 = lp_distance_field(wc, bc, lp_network::sea, {tile_at(wc, bc, 0)});
+        check(fc2.count(tile_at(wc, bc, 10)) == 1, "sea: a port's points land on the coast across the water");
+
+        // Two dimensions, 5 x 5, all land but ONE sea tile. Odd-r hexes: on an even row,
+        // (x-1, y-1) is a diagonal (NW) side a four-way walk never crosses.
+        world wd;
+        const entity_id bd = wd.create_entity();
+        { body_component b{}; b.grid_width = 5; b.grid_height = 5; wd.bodies[bd] = b; }
+        std::vector<entity_id> g2(25);
+        for (int y = 0; y < 5; ++y)
+            for (int x = 0; x < 5; ++x)
+            {
+                const entity_id t2 = wd.create_entity();
+                tile_component tc{}; tc.body = bd; tc.grid_x = x; tc.grid_y = y;
+                tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass;
+                wd.tiles[t2] = tc;
+                g2[static_cast<std::size_t>(y * 5 + x)] = t2;
+            }
+        const auto at2 = [&](int x, int y) { return g2[static_cast<std::size_t>(y * 5 + x)]; };
+        wd.tiles.at(at2(1, 1)).substrate = terrain_substrate::coast; // NW of (2,2), an even row
+        const auto fd = lp_distance_field(wd, bd, lp_network::sea, {at2(2, 2)});
+        check(fd.count(at2(1, 1)) == 1,
+              "sea: a port with sea only on a diagonal hex side still reaches it (all six sides)");
+        // (1,2) sits beside that sea tile on the odd row, so it is a coast the points land
+        // on; (3,2) and (2,3) are the port's own land neighbours, touching no sea.
+        check(fd.count(at2(1, 2)) == 1, "sea: a coast beside the sea tile is landed on");
+        check(fd.count(at2(3, 2)) == 0 && fd.count(at2(2, 3)) == 0,
+              "sea: a port's own land neighbours that touch no sea are never reached - land to land is no sea step");
+        check(fc2.count(tile_at(wc, bc, 11)) == 0 && fc2.count(tile_at(wc, bc, 15)) == 0,
+              "sea: and go no further inland - that ground is a hub's");
+        // LAKES TOO (Ben, 2026-10-21, NR-1061): the same strait as a lake is crossed.
+        world wl;
+        const entity_id bl = make_row_body(wl, 300);
+        for (int col = 1; col <= 9; ++col)
+            wl.tiles.at(tile_at(wl, bl, col)).substrate = terrain_substrate::lake;
+        for (int col = 21; col <= 299; ++col)
+            wl.tiles.at(tile_at(wl, bl, col)).substrate = terrain_substrate::coast;
+        const auto fl = lp_distance_field(wl, bl, lp_network::sea, {tile_at(wl, bl, 0)});
+        check(fl.count(tile_at(wl, bl, 10)) == 1, "sea: a port's points cross a lake and land on its far shore");
+    }
+
     // What the line does NOT carry, read off the same rail network the router uses
     // (LOGISTICS.md § 4c): an unfunded station, idle track, and a station on no line.
     {
@@ -814,24 +882,27 @@ void l8_routed_requests()
         check(home_at_19, "the home port stands on the shore nearest the island by sea (column 19)");
     }
 
-    // ISLAND-HOPPING, IN EITHER ID ORDER (cold review): the far island I2 is beyond any
-    // port's reach of the capital's coast but within reach of the near island I1. Its
+    // ISLAND-HOPPING, IN EITHER ID ORDER (cold review): the far island I2 (155-169) is
+    // beyond any port's reach of the capital's coast but within reach of I1 (80-94). Its
     // consumer is made FIRST (the lower id), so the first pass tries I2 before I1 exists
     // on the chain and fails; the second pass, after I1 is bridged, bridges I2 from it.
     {
         world w;
-        const entity_id body = make_row_body(w, 100);
-        for (int col = 20; col <= 24; ++col)
+        // A port reaches 100 (BL-1396), so the gaps are wide: I1 sits 60 sea tiles off the
+        // capital's coast (in reach), I2 another 60 beyond I1 (in reach of I1, 120+ from
+        // the capital's shore), and 110 tiles of sea round the wrap back to column 0.
+        const entity_id body = make_row_body(w, 300);
+        for (int col = 20; col <= 79; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        for (int col = 40; col <= 54; ++col)
+        for (int col = 95; col <= 154; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        for (int col = 70; col <= 99; ++col)
+        for (int col = 170; col <= 299; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        const entity_id nation = add_nation(w, body, 0, 99);
+        const entity_id nation = add_nation(w, body, 0, 299);
         set_capital(w, nation, tile_at(w, body, 0));
         const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
-        const entity_id far  = add_consumer(w, tile_at(w, body, 60), corp, 10.0f, 100.0f); // I2, first
-        const entity_id near = add_consumer(w, tile_at(w, body, 30), corp, 10.0f, 100.0f); // I1
+        const entity_id far  = add_consumer(w, tile_at(w, body, 162), corp, 10.0f, 100.0f); // I2, first
+        const entity_id near = add_consumer(w, tile_at(w, body, 87), corp, 10.0f, 100.0f);  // I1
         const lp_seed_report rep = seed_logistics_sources(w);
         const lp_tick t = resolve_logistic_points(w);
         const lp_building_row* rf = row_of(t, far);
@@ -841,19 +912,20 @@ void l8_routed_requests()
               "island-hopping: the far island is bridged from the near one, whatever order the ids put them in");
     }
 
-    // A SEA TOO WIDE: the island lies 30 tiles of water out - beyond any port's reach -
-    // so no bridge is placed and the consumer is counted as cut off, with no dead ports.
+    // A SEA TOO WIDE: the island lies 120 tiles of water out (and 100 round the wrap) -
+    // beyond a port's reach, which fades to nothing at 100 (BL-1396) - so no bridge is
+    // placed and the consumer is counted as cut off, with no dead ports.
     {
         world w;
-        const entity_id body = make_row_body(w, 100);
-        for (int col = 20; col <= 49; ++col)
+        const entity_id body = make_row_body(w, 260);
+        for (int col = 20; col <= 139; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        for (int col = 70; col <= 99; ++col)
+        for (int col = 160; col <= 259; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        const entity_id nation = add_nation(w, body, 0, 99);
+        const entity_id nation = add_nation(w, body, 0, 259);
         set_capital(w, nation, tile_at(w, body, 0));
         const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
-        add_consumer(w, tile_at(w, body, 60), corp, 10.0f, 100.0f);
+        add_consumer(w, tile_at(w, body, 150), corp, 10.0f, 100.0f);
         const lp_seed_report rep = seed_logistics_sources(w);
         check(rep.unconnectable == 1 && rep.unconnectable_cut_off == 1 && rep.ports_placed == 0,
               "a sea wider than a port's reach: counted as cut off, and no port placed that would deliver nothing");

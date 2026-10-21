@@ -998,6 +998,7 @@ void clear_derived_state(world& w)
     w.rail_networks.clear(); // BL-1255: the rail network, same footing
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
+    w.lp_sea_fields.clear();    // BL-1396: a port's sea field, same footing
     w.power_grid_of_province.clear(); // BL-1230: the power grid, same footing
     w.power_grid_built = false;
     bump_logistics_cache_generation(w); // BL-1195: view-only stamp, never serialised

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*38 entries — 30 open, 8 resolved.*
+*39 entries — 30 open, 9 resolved.*
 
 ---
 
@@ -340,4 +340,13 @@ corp_ai prices an out-of-reach build at one hub and builds that hub on or beside
 **Why it matters.** Rivals will over-build isolated hubs on far ground. Teaching the scorer to lay a chain is new AI behaviour, so it is a grant for you to give or refuse, not an in-place fix.
 
 > **RESOLVED.** Ben, 2026-10-21 (routing form): b) granted - the scorer prices and builds the chain. Recorded in AI_OPPONENT.md section 11 'AI lays a hub chain to reach the capital'; the work is BL-1395 (AI_LAYS_HUB_CHAIN).
+
+### NR-1061 — Ports cross sea, not lakes
+*decision · raised 2026-10-21 · from BL-1396 (port reach over water), cold review finding 7*
+
+Your rule says a port's points cross 'water'. Built as SEA only (ocean and coast), matching how placement already reads a coast: a lakeshore is not a coast, so a port cannot stand on one, and a sea port's points do not cross a lake to land on its shore.
+
+**Why it matters.** Decides whether a lake joined to the coast by a port reach counts as water the points travel over. Rare on generated worlds; no measured case.
+
+> **RESOLVED.** Ben, 2026-10-21: 'Ports should be able to cover lakes too.' b) any water: the sea walk crosses lakes and lands on their shores; a port still stands only on a sea coast. Built in BL-1396.
 

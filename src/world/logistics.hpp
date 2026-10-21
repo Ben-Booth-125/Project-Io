@@ -318,6 +318,7 @@ inline void invalidate_logistics_caches(world& w)
     w.body_port_tiles.clear();        // it: building_affects_logistics), on the same contract
     w.rail_networks.clear();          // BL-1255: stations and track move it, same contract
     w.body_reach_cost.clear();
+    w.lp_sea_fields.clear();          // BL-1396: a port's sea field, same contract
     w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
                                       // on exactly the events the three above do
     w.power_grid_of_province.clear(); // BL-1230: the power grid is a function of road_level

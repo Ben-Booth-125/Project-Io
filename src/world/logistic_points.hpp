@@ -105,8 +105,8 @@ inline constexpr std::size_t lp_network_count = 3;
 // --- Calibration (BL-1309, measured on the shipped 1960 start; BL-1360 retuned the
 // --- road tiers and rail). Distances are in network-cost units: a road step costs
 // --- `lp_road_step[tier]` (one step off the road costs `lp_offnet_step`), a sea step
-// --- costs 1 (a land step `lp_offnet_step`), and rail counts TRACK STEPS between
-// --- stations - it is point to point and takes no off-network step at all.
+// --- costs 1 and a landing on the coast 1, with no step inland (BL-1396), and rail
+// --- counts TRACK STEPS between stations - point to point, no off-network step at all.
 
 /// Points a source makes per tick, by network.
 inline constexpr std::array<float, lp_network_count> lp_source_points = {120.0f, 150.0f, 120.0f};
@@ -116,18 +116,20 @@ inline constexpr std::array<float, lp_network_count> lp_source_points = {120.0f,
 /// further - Track 6 tiles, Road 8, Highway 10 at full strength, fading to ZERO AT
 /// DOUBLE (12 / 16 / 20). The road entry stays one cost threshold, 6, and the TIER
 /// is carried by the step cost below: 6 / 1.0 = 6, 6 / 0.75 = 8, 6 / 0.6 = 10 tiles.
-/// Rail carries 20 track steps, delivered point to point (lp_distance_field). Sea is
-/// untouched by the ruling and keeps 12 full / 8 fade - the double-distance fade is
-/// the ROAD's rule, not generalised.
-inline constexpr std::array<float, lp_network_count> lp_full_reach = {6.0f, 20.0f, 12.0f};
+/// Rail carries 20 track steps, delivered point to point (lp_distance_field).
+/// BL-1396 (Ben, 2026-10-21): a port stretches FIFTY water tiles at full strength,
+/// fading to zero at double (100) - the road's rule at sea's scale - and over water
+/// only: its points land on the coastal tiles they reach and go no further inland.
+inline constexpr std::array<float, lp_network_count> lp_full_reach = {6.0f, 20.0f, 50.0f};
 /// Fade length beyond the full-strength distance (reach 0 at full + fade). The road's
-/// equals its full reach, which is what "zero at double" means on every tier.
-inline constexpr std::array<float, lp_network_count> lp_fade_length = {6.0f, 8.0f, 8.0f};
+/// and the sea's equal their full reach, which is what "zero at double" means.
+inline constexpr std::array<float, lp_network_count> lp_fade_length = {6.0f, 8.0f, 50.0f};
 /// A road step's cost by tier (index 1..3). Index 0 is "no road": off the network.
 /// BL-1360: 1.0 / 0.75 / 0.6, so the tiers reach 6 / 8 / 10 tiles at full strength.
 inline constexpr std::array<float, 4> lp_road_step = {3.0f, 1.0f, 0.75f, 0.6f};
-/// One step off a source's network (land, for road; land, for sea). Rail takes no
-/// off-network step: it delivers point to point (BL-1360).
+/// One step off a road source's network (onto land with no road). Rail takes no
+/// off-network step (point to point, BL-1360), and neither does sea: a port's points
+/// land on the coast and stop (BL-1396).
 inline constexpr float lp_offnet_step = 3.0f;
 /// Points a producing building needs per tick per unit of run
 /// (workforce_assigned x workforce_target/100).
@@ -239,6 +241,13 @@ inline bool lp_full_strength(lp_network n, float d)
 
 /// Reach in [0,1] of a source on network @p n at network distance @p d.
 float lp_reach(lp_network n, float d);
+
+/// BL-1396: the sea field from @p seeds - water (sea or lake, NR-1061) crossed on all
+/// six hex sides, a landing on the shore ending the walk, every step 1, bounded at the
+/// sea's reach. What
+/// lp_distance_field returns for lp_network::sea, and what generation's bridge reads.
+std::unordered_map<entity_id, float> lp_sea_walk(world& w, entity_id body,
+                                                 const std::vector<entity_id>& seeds);
 
 /// Network distance field from @p seeds on @p body for network @p n, bounded at
 /// that network's full + fade: tile -> distance, only tiles within the bound.

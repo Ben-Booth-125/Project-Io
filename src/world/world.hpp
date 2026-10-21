@@ -855,6 +855,15 @@ struct world
     /// so no answer ever depends on what was cached. std::map: ordered, so a copy
     /// or a load cannot reorder it (and it is never iterated by the sim).
     std::map<entity_id, lp_anchor_field> lp_anchor_fields;
+    /// BL-1396: a port's sea field (lp_sea_walk from its tile), by port TILE. It reads
+    /// only which tiles are sea, so it outlives a tick: without it every port's flood -
+    /// up to ~15,000 tiles at a reach of 100 - was rebuilt every economy tick and every
+    /// Throughput-lens frame (cold review). A derived cache like the fields above:
+    /// cleared with them by invalidate_logistics_caches and on load, never serialised.
+    /// The inner maps are LOOKUP-ONLY (find/count by tile, never iterated on a path
+    /// that decides anything), which is why they need not be faithful_unordered_map:
+    /// a copy's iteration order cannot reach a result (BL-1034's concern).
+    std::map<entity_id, std::unordered_map<entity_id, float>> lp_sea_fields;
 
     /// Each nation's tech state (BL-1273; RESEARCH.md § Who holds technology):
     /// the held set over the Digitisation tree, the RP pool and the queue —

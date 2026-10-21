@@ -525,6 +525,19 @@
    "what": "Your grant excludes 'any chain for the player's nation or champion'. The 2026-10-15 grant's like wording is implemented as a BUILDER test (the player's corp and champion never source). Built conservatively: a rival building on the PLAYER's nation's ground keeps the old rule exactly - one hub on or beside the site, priced as one - and never lays a chain there. Elsewhere it lays the full chain.",
    "why_it_matters": "On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.",
    "call": "a) keep (built): no rival chain on the player's ground, the old one-hub rule there; b) builder reading: a rival may lay a chain on any ground, the player's included; c) no rival sourcing on the player's ground at all."
+  },
+  {
+   "id": "NR-1061",
+   "title": "Ports cross sea, not lakes",
+   "raised": "2026-10-21",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1396 (port reach over water), cold review finding 7",
+   "what": "Your rule says a port's points cross 'water'. Built as SEA only (ocean and coast), matching how placement already reads a coast: a lakeshore is not a coast, so a port cannot stand on one, and a sea port's points do not cross a lake to land on its shore.",
+   "why_it_matters": "Decides whether a lake joined to the coast by a port reach counts as water the points travel over. Rare on generated worlds; no measured case.",
+   "call": "a) sea only (built); b) any water, lakes included.",
+   "resolved": "2026-10-21",
+   "resolution": "Ben, 2026-10-21: 'Ports should be able to cover lakes too.' b) any water: the sea walk crosses lakes and lands on their shores; a port still stands only on a sea coast. Built in BL-1396."
   }
  ]
 }
