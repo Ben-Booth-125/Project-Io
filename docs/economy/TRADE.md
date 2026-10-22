@@ -46,8 +46,8 @@ whose upkeep goes unmet makes no trade points that tick.
 
 **Trade points are separate from Logistic Points (Ben, 2026-10-10).** Trade points are how much
 an *owner* can move; Logistic Points are how much can move *through a place*. A shipment spends
-its owner's trade points and still passes the network's Logistic Point cap at the nodes it
-crosses. Neither replaces the other.
+its owner's trade points and still draws the Logistic Points of the place it leaves
+(`LOGISTICS.md` § How a tile's points get to it). Neither replaces the other.
 
 ## Trade capacity
 

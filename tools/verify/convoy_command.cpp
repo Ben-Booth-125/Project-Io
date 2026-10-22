@@ -52,6 +52,7 @@
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
 #include "world/world.hpp"
+#include "lp_fixture.hpp" // BL-1361: the anchor's nation and source, so a shipment draws points
 
 #include <algorithm>
 #include <cmath>
@@ -252,6 +253,11 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
     dm.base_price[r_iron] = 5.0f;
     dm.price         = dm.base_price;
     s.w.markets[s.dst_market] = dm;
+    // BL-1361: a shipment draws points at its source market's centre from a nation's
+    // pool, and a city makes none - so the anchor's source is road hubs on the same
+    // off-route tile as the city above, on a capital-less nation's ground. This
+    // harness's subject is the command, not the cap, so the cap must never bind.
+    lp_fixture::stage(s.w, s.body, {tile_at(s.w, s.body, 1, 0)}, 10);
     return s;
 }
 

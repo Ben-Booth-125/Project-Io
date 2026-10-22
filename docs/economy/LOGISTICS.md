@@ -847,6 +847,16 @@ now has to be paid for in the capacity that carries it, and what makes a market'
 constraint on its trading rather than a number beside it. A trade is a standing route with nobody to
 tell, so it is never refused whole: its shipment sends what the anchor admits, exactly as
 `SUPPLY.md` § A shipment already rules.
+
+**Under routing, the anchor is a request like any other (decided 2026-10-22, NR-1062).** The
+anchor is the source market's **centre tile**. A shipment leaving it draws on the pool of the
+nation whose ground that tile is, from what the march and production left there, and the centre's
+routed cover caps its share as it caps any tile's request: where the qualifying sources reach the
+centre at half strength, a cargo carries half. A centre on nobody's ground, or one no connected
+source reaches, admits nothing — the trade waits until a source is built there, which is what makes
+a market's logistics a constraint on its trading. Where the nation has set a share rule, a
+shipment draws on its trader's class: the state, the champion, or the other firms, each keeping
+what its class did not spend. Space legs have no tile path and draw nothing.
 - Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
   **new** stations; generated rail still passes as § 4c says.
 

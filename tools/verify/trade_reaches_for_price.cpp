@@ -61,6 +61,7 @@
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
 #include "world/world.hpp"
+#include "lp_fixture.hpp" // BL-1361: the anchors' nation and sources, so a shipment draws points
 
 #include <algorithm>
 #include <cmath>
@@ -206,6 +207,12 @@ scenario make_scenario(float price_n, float price_f)
     s.market_a = add_market(s, 0, 10.0f);
     s.market_n = add_market(s, 6, price_n);
     s.market_f = add_market(s, 30, price_f);
+    // BL-1361: a shipment draws points at its source market's centre, from a nation's
+    // pool, and a city makes none - so each market gets a road hub one row off the
+    // haul's row (row 0), on one capital-less nation's ground. This harness's subject
+    // is the room below the target price, so the cap must never bind: 50 hubs a market.
+    lp_fixture::stage(s.w, s.body, {tile_at(s.w, s.body, 0, 1), tile_at(s.w, s.body, 6, 1),
+                                    tile_at(s.w, s.body, 30, 1)}, 50);
     return s;
 }
 

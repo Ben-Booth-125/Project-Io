@@ -1259,12 +1259,15 @@ struct market_component
     /// rewrites it on every market before the draw reads it, inside the same
     /// clear, so a load that leaves it zero changes nothing the sim computes.
     std::array<float, resource_count> processor_want = {};
-    /// The Logistic Points left at the anchor nearest this market's centre at
-    /// the end of the last trade pass (`run_trades`) — units of cargo a further
-    /// overland shipment leaving here could still have passed that tick; 0 when
-    /// no anchor reaches the centre. Read by the rival Marketplace build's
-    /// estimate (corp_ai.cpp; AI_OPPONENT.md § 11), which must not count on
-    /// shipments the Logistic Point cap would refuse. SERIALISED
+    /// The Logistic Points left at this market's anchor (its centre tile) at the
+    /// end of the last trade pass (`run_trades`) — its nation's pots once the
+    /// march, production and that pass's shipments had drawn (BL-1361): units of
+    /// cargo a further shipment leaving here could still have passed that tick;
+    /// 0 when no connected source covers the centre. Every class's pot together:
+    /// under a nation's share rule a given trader may draw only its class's part,
+    /// and each shipment carries at most the anchor's cover x its cargo. Read by
+    /// the rival Marketplace build's estimate (corp_ai.cpp; AI_OPPONENT.md § 11),
+    /// which must not count on shipments the cap would refuse. SERIALISED
     /// (world_save_version 46).
     float trade_lp_spare = 0.0f;
 

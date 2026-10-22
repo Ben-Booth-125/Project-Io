@@ -54,6 +54,7 @@
 #include "world/stance.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
+#include "lp_fixture.hpp" // BL-1361: the anchor's nation, so a shipment draws points
 
 #include <algorithm>
 #include <cmath>
@@ -194,6 +195,31 @@ scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col
     // BL-1265: the stock is on the SOURCE MARKET's shelf (corporations hold no
     // pools); a trade buys it there.
     s.w.markets.at(s.src_market).inventory[r_iron] = stock;
+    // BL-1361: a shipment draws points at its source market's centre, from a
+    // nation's pool. A port's points stop at the shore, so the source gets a road
+    // hub of its own on a land tile beside it, one row off the haul's row (a hub on
+    // the path would discount the haul these scenarios price exactly).
+    {
+        const tile_component& tc = s.w.tiles.at(s.src_tile);
+        const int gh = s.w.bodies.at(s.body).grid_height;
+        entity_id hub_tile = null_entity;
+        for (const int dr : {1, -1})
+        {
+            const int r = tc.grid_y + dr;
+            if (r < 0 || r >= gh)
+                continue;
+            const entity_id t = tile_at(s.w, s.body, tc.grid_x, r);
+            if (!is_water(s.w.tiles.at(t).substrate))
+            {
+                hub_tile = t;
+                break;
+            }
+        }
+        if (hub_tile != null_entity)
+            lp_fixture::stage(s.w, s.body, {hub_tile});
+        else
+            lp_fixture::stage(s.w, s.body, {});
+    }
     return s;
 }
 

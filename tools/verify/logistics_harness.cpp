@@ -14,6 +14,7 @@
 #include "world/river_generation.hpp" // river_edge_discount (BL-1126 T4b-T4d)
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
+#include "lp_fixture.hpp" // BL-1361: the anchor's nation, so a shipment draws points
 
 #include <cmath>
 #include <cstdio>
@@ -259,6 +260,9 @@ int main()
         md.demand[0] = 10.0f; md.base_price[0] = 5.0f; md.price = md.base_price;
         f.w.markets[f.dst] = md;
         f.mid_tile = tile_at(f.w, body, 0, 1);
+        // BL-1361: the hub at (1,0) is the anchor's source; the ground must be a
+        // nation's for its pool to exist.
+        lp_fixture::stage(f.w, body, {});
         return f.w.corporations[f.corp].balance;
     };
     // Price the leg and commit one 10-unit shipment; the haul is debited now

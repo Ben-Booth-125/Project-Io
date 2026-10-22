@@ -388,13 +388,11 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     }
 
     // What each market's anchor still admits once the pass is done — the
-    // Logistic Points a further shipment leaving there could have used. Each
-    // market writes only its own field, so the (unordered) walk's order is
-    // immaterial; building a body's pool on first touch is deterministic.
-    // BL-1309: RETIRED with passive LP — no anchor caps a shipment, so nothing is
-    // left over; the field stays in the save record (v46) and reads 0.
+    // Logistic Points a further shipment leaving there could have used (BL-1361:
+    // its nation's pots after the march, production and this pass). Each market
+    // writes only its own field, so the (unordered) walk's order is immaterial.
     for (auto& [mid, mc] : w.markets)
-        mc.trade_lp_spare = market_lp_left(w, reg, mid);
+        mc.trade_lp_spare = market_lp_left(report.logistic_points, mid);
 
     // BL-1222: roll the player's record into the lens's trailing window.
     w.player_trade_flow.push_back(std::move(tf));

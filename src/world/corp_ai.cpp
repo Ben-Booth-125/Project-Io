@@ -2702,7 +2702,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // The estimate reads what the LAST tick actually left over, never the
         // standing shelf: a good's SPARE on a market is what landed there less
         // everything its buyers wanted (`supply - demand - hauler_want`), and
-        // (BL-1309: the Logistic Point cap on a route retired with passive LP.) A market whose spare cannot
+        // a route on the body is filled no further than the Logistic Points the
+        // market's anchor still had after the last trade pass
+        // (`market_component::trade_lp_spare`; BL-1361 brought the shipment's draw
+        // back, so the grant's reading stands again). A market whose spare cannot
         // carry the Marketplace's own upkeep is no site: a Marketplace makes no
         // points on a tick its upkeep goes unmet.
         // One at a time: none while another of its trade buildings is still
@@ -2763,6 +2766,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!upkeep_on_shelf)
                         continue;
                     rank_trade_routes(w, reg, mp_nodes, mp_memo, corp, std::vector<entity_id>{mid}, routes);
+                    float lp_left  = um.trade_lp_spare;
+                    // BL-1361 (cold review): each shipment leaving here carries at most
+                    // the anchor's cover x its cargo, so the estimate scales by it too.
+                    // A place's cover, read off this tick's resolve; 1 where none ran.
+                    float lp_cover = 1.0f;
+                    if (report.logistic_points.resolved)
+                    {
+                        const auto ait = report.logistic_points.trade_anchors.find(mid);
+                        lp_cover = ait != report.logistic_points.trade_anchors.end()
+                                       ? std::clamp(ait->second.cover, 0.0f, 1.0f) : 0.0f;
+                    }
                     float pts_left = mp_pts;
                     float earn     = 0.0f;
                     for (const trade_route_offer& o : routes)
@@ -2771,13 +2785,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             break;
                         const float cap  = tp.capacity[o.r];
                         const float room = trade_room(w, reg, o.b, o.r, o.landed);
-                        // BL-1309: no Logistic Point cap on a shipment any more
-                        // (the passive cap retired; LP is the nation's pool).
-                        const float units = std::min({pts_left * cap, spare[o.r], room});
+                        // A leg on the body (land or sea) draws the anchor's Logistic
+                        // Points (BL-1361); a space lane draws none.
+                        const bool on_body = w.markets.at(o.b).body == um.body;
+                        float units = std::min({pts_left * cap, spare[o.r], room});
+                        if (on_body)
+                            units = std::min(units * lp_cover, lp_left);
                         if (!(units > 1e-4f) || !(cap > 0.0f))
                             continue;
                         earn       += o.margin_per_unit * units;
                         spare[o.r] -= units;
+                        if (on_body)
+                            lp_left -= units;
                         pts_left   -= units / cap;
                     }
                     const float net = earn - mex.maintenance - mex.base_wage * mp_wf - upkeep_cost;

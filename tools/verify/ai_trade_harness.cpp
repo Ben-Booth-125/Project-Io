@@ -517,11 +517,10 @@ void run_marketplace_build(world& w, const recipe_registry& reg)
     {
         world x = w;
         rig_spare(x, true, 0.0f);
-        // BL-1309 (LOGISTICS.md § One pool): the passive Logistic Point cap on a
-        // shipment is retired, so the anchor's leftover (`trade_lp_spare`, now
-        // always 0) no longer gates the estimate — the route still carries.
-        check(proposes(x, false),
-              "a Marketplace is still proposed with no anchor Logistic Points left (the passive cap is retired)");
+        // BL-1361: a shipment draws the anchor's Logistic Points again, so the
+        // anchor's leftover (`trade_lp_spare`) gates the estimate as the grant says.
+        check(!proposes(x, false),
+              "no Marketplace when the source market's anchor had no Logistic Points left");
     }
     {
         bool any_upkeep = false;

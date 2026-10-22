@@ -41,6 +41,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
+#include "lp_fixture.hpp" // BL-1361: the anchor's nation and source, so a shipment draws points
 
 #include <array>
 #include <cmath>
@@ -151,6 +152,9 @@ scenario make_scenario()
     mb.base_price[r_steel] = 8.0f;
     mb.price = mb.base_price;
     s.w.markets[s.market_b] = mb;
+    // BL-1361: a city makes no points (LOGISTICS.md § One pool), so the anchor's
+    // source is a hub on the same off-column tile, on a nation's ground.
+    lp_fixture::stage(s.w, s.body, {tile_at(s.w, s.body, 1, 0)});
     return s;
 }
 

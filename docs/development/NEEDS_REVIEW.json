@@ -538,6 +538,18 @@
    "call": "a) sea only (built); b) any water, lakes included.",
    "resolved": "2026-10-21",
    "resolution": "Ben, 2026-10-21: 'Ports should be able to cover lakes too.' b) any water: the sea walk crosses lakes and lands on their shores; a port still stands only on a sea coast. Built in BL-1396."
+  },
+  {
+   "id": "NR-1062",
+   "title": "What a shipment's anchor draws against, now that the pool is the nation's",
+   "raised": "2026-10-22",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1361 (a shipment draws points by cargo), as the handoff asked: decide and log",
+   "what": "Built: the anchor is the SOURCE MARKET'S CENTRE TILE. A shipment draws one point a unit from what the march and production left in the pool of the nation whose ground that tile is; the centre's routed cover caps its share (a half-covered centre ships half of each cargo); a centre on nobody's ground, or one no connected source reaches, ships nothing; under a share rule the trader draws its own class's pot; space legs draw nothing. The rival Marketplace estimate reads the anchor's leftover again (its grant text never stopped saying so) and scales by the cover. Written into LOGISTICS.md section How a tile's points get to it.",
+   "why_it_matters": "Trade now waits on logistics at its source. Measured (16-seed market_viability, haulage --far-trade) before -> after: convoys window E 868 -> 791, Y 909 -> 803; units E 7493 -> 6308, Y 7178 -> 5561; G1t50 89.8 -> 88.2 and G2 176.3 -> 158.8, every gate passing; per seed G1t50 under 85 on seeds 12 (79.4), 46 (81.6), 10 (81.8) and 32 (84.4). A market centre generation leaves uncovered ships nothing until somebody builds a source there - which BL-1367's lesser sources at market centres would answer.",
+   "call": "a) keep (built); b) draw at the nearest connected source rather than the centre tile, so cover never caps; c) let an uncovered centre ship at a floor share.",
+   "known_limit": "market_component::trade_lp_spare, which the rival estimate reads, is every class's pot together: under a share rule (only a seated player sets one) a rival on that ground may estimate on a pot its class cannot draw."
   }
  ]
 }

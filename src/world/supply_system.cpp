@@ -1032,13 +1032,11 @@ namespace {
 
 } // namespace
 
-float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id)
+float market_lp_left(const lp_tick& lp, entity_id market_id)
 {
-    // BL-1309: no passive cap exists any more; nothing is left at an anchor. BL-1352
-    // took the retired per-anchor pool this used to be handed with it; BL-1361 revives
-    // the shipment draw against the NATION's pool, which is what this will read.
-    (void)w; (void)reg; (void)market_id;
-    return 0.0f;
+    // BL-1361: what is left at the market's anchor is its nation's pots once the march,
+    // production and this tick's shipments have drawn.
+    return lp_trade_left(lp, market_id);
 }
 
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
@@ -1081,13 +1079,29 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     if (!(send > 0.0f))
         return false;
 
-    // BL-1309 (LOGISTICS.md § Logistic Points, "One pool", Ben 2026-10-14): the
-    // passive-LP cap this gate drew is RETIRED. Logistic Points are a nation's
-    // pool, made by its sources and consumed by production; a shipment spends its
-    // owner's trade points (TRADE.md) and nothing at the anchor. BL-1361 brings the
-    // points draw back, by cargo quantity, against that nation pool.
-    (void)out_refused_no_lp;
+    // BL-1361 (LOGISTICS.md § How a tile's points get to it, "A shipment draws points
+    // again", Ben 2026-10-16): THE DRAW IS CARGO QUANTITY, NOT DISTANCE - one point a
+    // unit, at the anchor the shipment leaves (the source market's centre), from what
+    // the march and production left in that ground's nation's pool. Trade points are
+    // the OWNER's capacity, Logistic Points the PLACE's; a shipment passes both. A
+    // trade is a standing route with nobody to tell, so the cap TRIMS the cargo to what
+    // the anchor admits rather than refusing it whole. Space legs have no tile path and
+    // stay outside it, as they were under the retired cap. A report nobody resolved
+    // (a fixture calling this directly) is resolved here first - a cache of this
+    // tick's pool, not a change to the world.
     (void)src_body;
+    if (leg.mode != convoy_mode::space)
+    {
+        if (!report.logistic_points.resolved)
+            report.logistic_points = resolve_logistic_points(w);
+        send = lp_trade_admit(w, report.logistic_points, corp_id, src_market, send);
+        if (!(send > 0.0f))
+        {
+            if (out_refused_no_lp)
+                *out_refused_no_lp = true;
+            return false;
+        }
+    }
 
     // Cost is linear in quantity (rate x distance x qty, handling x qty), so a
     // trimmed cargo pays its share of the priced leg and no more.
@@ -1104,6 +1118,10 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     const float already = (io_committed != nullptr) ? *io_committed : 0.0f;
     if (!(*purse - already >= haul + purchase))
         return false;
+
+    // Granted: the anchor's points are drawn (LP is the CAP, not a second PRICE).
+    if (leg.mode != convoy_mode::space)
+        lp_trade_draw(w, report.logistic_points, corp_id, src_market, send);
 
 
     // The purchase: off the shelf now, billed at the posted price by the clear

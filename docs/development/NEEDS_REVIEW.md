@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*39 entries — 30 open, 9 resolved.*
+*40 entries — 31 open, 9 resolved.*
 
 ---
 
@@ -261,6 +261,13 @@ Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Trac
 Your grant excludes 'any chain for the player's nation or champion'. The 2026-10-15 grant's like wording is implemented as a BUILDER test (the player's corp and champion never source). Built conservatively: a rival building on the PLAYER's nation's ground keeps the old rule exactly - one hub on or beside the site, priced as one - and never lays a chain there. Elsewhere it lays the full chain.
 
 **Why it matters.** On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.
+
+### NR-1062 — What a shipment's anchor draws against, now that the pool is the nation's
+*decision · raised 2026-10-22 · from BL-1361 (a shipment draws points by cargo), as the handoff asked: decide and log*
+
+Built: the anchor is the SOURCE MARKET'S CENTRE TILE. A shipment draws one point a unit from what the march and production left in the pool of the nation whose ground that tile is; the centre's routed cover caps its share (a half-covered centre ships half of each cargo); a centre on nobody's ground, or one no connected source reaches, ships nothing; under a share rule the trader draws its own class's pot; space legs draw nothing. The rival Marketplace estimate reads the anchor's leftover again (its grant text never stopped saying so) and scales by the cover. Written into LOGISTICS.md section How a tile's points get to it.
+
+**Why it matters.** Trade now waits on logistics at its source. Measured (16-seed market_viability, haulage --far-trade) before -> after: convoys window E 868 -> 791, Y 909 -> 803; units E 7493 -> 6308, Y 7178 -> 5561; G1t50 89.8 -> 88.2 and G2 176.3 -> 158.8, every gate passing; per seed G1t50 under 85 on seeds 12 (79.4), 46 (81.6), 10 (81.8) and 32 (84.4). A market centre generation leaves uncovered ships nothing until somebody builds a source there - which BL-1367's lesser sources at market centres would answer.
 
 ---
 

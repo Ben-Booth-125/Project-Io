@@ -571,10 +571,134 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         if (row.nation != null_entity)
             rows[row.nation].granted[static_cast<std::size_t>(row.cls)] += row.granted;
     }
+    // BL-1361: what a shipment may draw is the pool less the march's grant and
+    // production's (LOGISTICS.md: march, production, trade). With no share rule that is
+    // one pot. With one, each class keeps what it did not spend of its allocation; a
+    // class whose surplus spilled to a short one gave that much up, so the classes'
+    // unspent allocations are scaled to the true remainder.
+    for (auto& [nid, r] : rows)
+    {
+        const float avail = std::max(0.0f, r.pool - r.march_granted);
+        const float total = std::max(0.0f, avail - (r.granted[0] + r.granted[1] + r.granted[2]));
+        r.left.fill(0.0f);
+        if (!r.rule_set)
+        {
+            r.left[0] = total;
+            continue;
+        }
+        const auto& sh = w.nations.at(nid).lp_shares.share;
+        std::array<float, lp_class_count> raw{};
+        float raw_sum = 0.0f;
+        for (std::size_t k = 0; k < lp_class_count; ++k)
+        {
+            raw[k] = std::max(0.0f, avail * sh[k] - r.granted[k]);
+            raw_sum += raw[k];
+        }
+        if (raw_sum > 0.0f)
+            for (std::size_t k = 0; k < lp_class_count; ++k)
+                r.left[k] = raw[k] * (total / raw_sum);
+    }
+    // BL-1361: every market's anchor - its centre tile, routed as any request is, so a
+    // shipment's share is capped by the cover there. Read here, with this tick's memo,
+    // so the trade pass never re-floods a source field per shipment.
+    for (const auto& [mid, mc] : w.markets)
+    {
+        lp_trade_anchor a;
+        const auto tit = w.tiles.find(mc.centre_tile);
+        if (tit != w.tiles.end())
+        {
+            a.nation = host_nation(w, mc.centre_tile);
+            if (a.nation != null_entity)
+                a.cover = lp_route_to(w, memo, a.nation, tit->second.body, mc.centre_tile).cover;
+        }
+        out.trade_anchors[mid] = a;
+    }
+    out.resolved = true;
     out.nations.reserve(rows.size());
     for (auto& [nid, r] : rows)
         out.nations.push_back(r);
     return out;
+}
+
+// BL-1361: a shipment draws points again (LOGISTICS.md § How a tile's points get to it,
+// Ben 2026-10-16) - by cargo quantity, at the anchor it leaves, from what production left.
+namespace {
+
+/// The index in `t.nations` of the row an anchor draws on, or -1 when the anchor has
+/// no nation or the nation made no pool this tick.
+std::ptrdiff_t anchor_row(const lp_tick& t, const lp_trade_anchor& a)
+{
+    if (a.nation == null_entity)
+        return -1;
+    // `nations` is ascending nation id (the resolver's own std::map order).
+    const auto it = std::lower_bound(t.nations.begin(), t.nations.end(), a.nation,
+                                     [](const lp_nation_row& r, entity_id n) { return r.nation < n; });
+    return (it != t.nations.end() && it->nation == a.nation) ? (it - t.nations.begin()) : -1;
+}
+
+/// The pot @p trader draws from at @p r's nation: its own class's under a share rule,
+/// else the one pot - the same class the production queue serves its buildings in.
+std::size_t trader_pot(const world& w, const lp_nation_row& r, entity_id trader)
+{
+    if (!r.rule_set)
+        return 0;
+    if (trader == r.nation)
+        return static_cast<std::size_t>(lp_class::state);
+    if (trader != null_entity && trader == champion_of(w, r.nation))
+        return static_cast<std::size_t>(lp_class::champion);
+    return static_cast<std::size_t>(lp_class::other);
+}
+
+} // namespace
+
+float lp_trade_admit(const world& w, const lp_tick& t, entity_id trader, entity_id market,
+                     float units)
+{
+    if (!std::isfinite(units) || !(units > 0.0f))
+        return 0.0f;
+    const auto ait = t.trade_anchors.find(market);
+    if (ait == t.trade_anchors.end() || !(ait->second.cover > 0.0f))
+        return 0.0f;
+    const std::ptrdiff_t i = anchor_row(t, ait->second);
+    if (i < 0)
+        return 0.0f;
+    const lp_nation_row& r = t.nations[static_cast<std::size_t>(i)];
+    const float pot   = r.left[trader_pot(w, r, trader)];
+    const float share = units * std::min(1.0f, ait->second.cover);
+    const float admit = std::min(share, pot);
+    // The retired cap's crumb rule (BL-1186 E1): an anchor's last crumbs do not make a
+    // convoy - nothing below one unit unless the cargo's covered share is itself
+    // smaller (cold review: the uncovered cargo refused every sub-unit cargo at a
+    // cover below 1, however full the pot).
+    return (admit + 1e-6f >= std::min(share, 1.0f)) ? std::max(0.0f, admit) : 0.0f;
+}
+
+void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id market, float units)
+{
+    if (!std::isfinite(units) || !(units > 0.0f))
+        return;
+    const auto ait = t.trade_anchors.find(market);
+    if (ait == t.trade_anchors.end())
+        return;
+    const std::ptrdiff_t i = anchor_row(t, ait->second);
+    if (i < 0)
+        return;
+    lp_nation_row& r = t.nations[static_cast<std::size_t>(i)];
+    float& pot = r.left[trader_pot(w, r, trader)];
+    pot = std::max(0.0f, pot - units);
+    r.trade_drawn += units;
+}
+
+float lp_trade_left(const lp_tick& t, entity_id market)
+{
+    const auto ait = t.trade_anchors.find(market);
+    if (ait == t.trade_anchors.end() || !(ait->second.cover > 0.0f))
+        return 0.0f;
+    const std::ptrdiff_t i = anchor_row(t, ait->second);
+    if (i < 0)
+        return 0.0f;
+    const lp_nation_row& r = t.nations[static_cast<std::size_t>(i)];
+    return r.left[0] + r.left[1] + r.left[2];
 }
 
 // BL-1356 (LOGISTICS.md § How a tile's points get to it; the four mechanism rules,

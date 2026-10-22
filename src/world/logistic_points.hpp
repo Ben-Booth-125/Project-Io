@@ -162,6 +162,24 @@ struct lp_nation_row
     std::array<float, lp_class_count>   claim{};
     std::array<float, lp_class_count>   granted{};
     bool      rule_set = false;
+    /// BL-1361: what production LEFT in each pot once its queue was served - the
+    /// points a shipment leaving this nation's ground may draw (LOGISTICS.md § How a
+    /// tile's points get to it: "a shipment draws what production left"). With a share
+    /// rule each class keeps its own pot; with none, pot 0 holds all of it. The trade
+    /// pass draws these down (`lp_trade_draw`).
+    std::array<float, lp_class_count>   left{};
+    /// BL-1361: points shipments drew this tick, every class together.
+    float     trade_drawn = 0.0f;
+};
+
+/// BL-1361: a market's centre tile as a shipment's ANCHOR - the nation whose pool a
+/// shipment leaving that market draws, and the routed cover there (`lp_route.cover`):
+/// the share of a request the anchor's qualifying sources can carry. No nation (the
+/// centre is nobody's ground) draws on no pool and admits nothing.
+struct lp_trade_anchor
+{
+    entity_id nation = null_entity;
+    float     cover  = 0.0f;
 };
 
 /// A source as the resolver read it.
@@ -210,7 +228,31 @@ struct lp_tick
     std::unordered_map<entity_id, float> fraction;
     /// unit id -> points granted, for the march pass's lookup (BL-1352).
     std::unordered_map<entity_id, float> march_granted;
+    /// BL-1361: market id -> its anchor, for every market, read at resolve.
+    std::map<entity_id, lp_trade_anchor> trade_anchors;
+    /// BL-1361: true once `resolve_logistic_points` filled this tick. A shipment
+    /// committed against a report nobody resolved (a fixture) resolves it first.
+    bool resolved = false;
 };
+
+/// BL-1361 (LOGISTICS.md § How a tile's points get to it, "A shipment draws points
+/// again", Ben 2026-10-16): the units of a @p units cargo leaving @p market that its
+/// anchor admits for @p trader this tick - ONE point per unit of cargo, what moves and
+/// not how far. The anchor's cover caps the share (cover x cargo, the fade's rule for
+/// any request); the trader's pot of what production left caps the rest. Never refused
+/// whole: it returns what is admitted, 0 only when nothing is - and, as the retired cap
+/// did, never a crumb below one unit unless the cargo's covered share is smaller. Pure.
+float lp_trade_admit(const world& w, const lp_tick& t, entity_id trader, entity_id market,
+                     float units);
+
+/// BL-1361: draw @p units points for a shipment @p trader sent from @p market, from
+/// the pot `lp_trade_admit` read. Call only with what it admitted.
+void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id market, float units);
+
+/// BL-1361: the points still left at @p market's anchor - its nation's pots together,
+/// 0 where the anchor has no cover or no nation. What `market_component::
+/// trade_lp_spare` records after the trade pass.
+float lp_trade_left(const lp_tick& t, entity_id market);
 
 /// The network a building type makes points along, or false when it makes none.
 bool lp_source_network(building_type t, lp_network& out);

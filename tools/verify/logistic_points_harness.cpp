@@ -44,6 +44,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/river_generation.hpp" // hex_side_for_offset - L7 lays its roads by side
 #include "world/stance.hpp"
+#include "world/supply_system.hpp" // BL-1361: commit_trade_shipment, convoy_leg
 #include "world/world.hpp"
 
 #include <cmath>
@@ -1107,6 +1108,144 @@ void l8_routed_requests()
     }
 }
 
+// L9 - A SHIPMENT DRAWS POINTS AGAIN (BL-1361; LOGISTICS.md § How a tile's points get
+// to it, "A shipment draws points again", Ben 2026-10-16): by cargo quantity, one
+// point a unit, at the anchor it leaves (its source market's centre), from what the
+// march and production LEFT in that ground's nation's pool; the cover there caps the
+// share; never refused whole while any is admitted; nobody's ground admits nothing.
+void l9_shipment_draws()
+{
+    std::printf("\n--- L9 a shipment draws what production left, by cargo ---\n");
+    const float pool = lp_source_points[0]; // one hub: 120
+
+    // The resolver's answer: pool 120, production claims 100, 20 left for trade.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 39); // 40..59 is nobody's
+        set_capital(w, nation, tile_at(w, body, 10));
+        const entity_id m_near = add_market(w, body, tile_at(w, body, 10)); // full cover
+        const entity_id m_fade = add_market(w, body, tile_at(w, body, 13)); // half (L8)
+        const entity_id m_none = add_market(w, body, tile_at(w, body, 50)); // nobody's ground
+        const entity_id corp = add_corp(w, "Trader", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 10));
+        add_consumer(w, tile_at(w, body, 10), corp, 10.0f, 100.0f); // need 100, full
+        lp_tick t = resolve_logistic_points(w);
+        const float left = pool - 100.0f;
+        check(t.resolved, "the resolve marks its tick resolved");
+        check(approx(lp_trade_left(t, m_near), left, 1e-3f),
+              "what production left (120 - 100 = 20) is what the anchor still admits");
+        check(approx(lp_trade_admit(w, t, corp, m_near, 50.0f), left, 1e-3f),
+              "a 50-unit cargo is TRIMMED to the 20 the anchor admits, not refused whole");
+        check(approx(lp_trade_admit(w, t, corp, m_near, 8.0f), 8.0f, 1e-3f),
+              "a cargo inside what is left is admitted whole: one point a unit");
+        check(approx(lp_trade_admit(w, t, corp, m_fade, 10.0f), 5.0f, 1e-2f),
+              "at a half-cover anchor a 10-unit cargo carries half: the fade caps the share");
+        check(lp_trade_admit(w, t, corp, m_none, 10.0f) == 0.0f,
+              "an anchor on nobody's ground draws on no pool and admits nothing");
+        check(approx(lp_trade_admit(w, t, corp, m_fade, 0.8f), 0.4f, 1e-4f),
+              "a sub-unit cargo at a half-cover anchor carries its covered half, not nothing");
+        lp_trade_draw(w, t, corp, m_near, 19.5f);
+        check(approx(lp_trade_left(t, m_near), 0.5f, 1e-3f), "a drawn shipment comes off the pot");
+        check(lp_trade_admit(w, t, corp, m_near, 50.0f) == 0.0f,
+              "an anchor's last crumb (0.5) does not make a convoy of a larger cargo");
+        check(approx(lp_trade_admit(w, t, corp, m_near, 0.4f), 0.4f, 1e-4f),
+              "but a cargo smaller than one unit still goes while the pot holds it");
+        float drawn = -1.0f;
+        for (const lp_nation_row& n : t.nations)
+            if (n.nation == nation)
+                drawn = n.trade_drawn;
+        check(approx(drawn, 19.5f, 1e-3f), "the nation's row records what shipments drew");
+    }
+
+    // Under a SHARE RULE each class keeps what it did not spend: state 1/2, champion
+    // 1/2 of 120 (the nation's one firm is its champion); the champion's consumer needs
+    // 100, takes its 60 and 40 spilled from the state's half, so the 20 left is the
+    // STATE's, and the champion's shipment admits none.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 10));
+        auto& rule = w.nations.at(nation).lp_shares;
+        rule.set   = true;
+        rule.share = {0.5f, 0.5f, 0.0f};
+        const entity_id m    = add_market(w, body, tile_at(w, body, 10));
+        const entity_id firm = add_corp(w, "Firm", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 10));
+        add_consumer(w, tile_at(w, body, 10), firm, 10.0f, 100.0f);
+        const lp_tick t = resolve_logistic_points(w);
+        check(lp_trade_admit(w, t, firm, m, 10.0f) == 0.0f,
+              "a share rule: the champion spent its pot (and the spill), so its shipment admits none");
+        check(approx(lp_trade_admit(w, t, nation, m, 50.0f), pool - 100.0f, 1e-3f),
+              "the state's unspent 20 stays the state's to ship");
+    }
+
+    // MARCH, PRODUCTION, TRADE: a march claim of 50 and a consumer of 50 against 120
+    // leave a shipment 20.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 10));
+        const entity_id m    = add_market(w, body, tile_at(w, body, 10));
+        const entity_id corp = add_corp(w, "Trader", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 10));
+        add_consumer(w, tile_at(w, body, 10), corp, 5.0f, 100.0f); // need 50
+        lp_march_claim mc;
+        mc.unit   = w.create_entity();
+        mc.nation = nation;
+        mc.need   = 50.0f;
+        const lp_tick t = resolve_logistic_points(w, {mc});
+        check(approx(lp_trade_admit(w, t, corp, m, 100.0f), pool - 50.0f - 50.0f, 1e-3f),
+              "the march claims first, production next, and a shipment draws what both left (20)");
+    }
+
+    // Through the one place a shipment is committed: trimmed, drawn, then refused with
+    // the refusal named and nothing mutated.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 60);
+        const entity_id nation = add_nation(w, body, 0, 59);
+        set_capital(w, nation, tile_at(w, body, 10));
+        const entity_id a = add_market(w, body, tile_at(w, body, 10));
+        const entity_id b = add_market(w, body, tile_at(w, body, 30));
+        for (const entity_id m : {a, b})
+        {
+            market_component& mc = w.markets.at(m);
+            mc.base_price[0] = 1.0f;
+            mc.price         = mc.base_price;
+        }
+        w.markets.at(a).inventory[0] = 100.0f;
+        const entity_id corp = add_corp(w, "Trader", 100000.0f, nation);
+        add_hub(w, tile_at(w, body, 10));
+        add_consumer(w, tile_at(w, body, 10), corp, 10.0f, 100.0f); // leaves 20
+        recipe_registry reg;
+        convoy_leg leg;
+        leg.viable = true;
+        leg.mode   = convoy_mode::land;
+        leg.cost   = 5.0f;
+        economy_report rep; // unresolved: the commit resolves it
+        bool  refused = false;
+        float sent    = 0.0f;
+        const bool ok = commit_trade_shipment(w, reg, rep, corp, a, b, 0, 50.0f, leg, &refused, &sent);
+        check(ok && approx(sent, pool - 100.0f, 1e-3f) && !refused,
+              "a 50-unit trade sends the 20 the anchor admits");
+        check(w.convoys.size() == 1 && approx(w.convoys.front().cargo_qty, sent, 1e-4f),
+              "and the convoy carries exactly that");
+        check(approx(w.corporations.at(corp).balance, 100000.0f - 5.0f * (sent / 50.0f), 1e-2f),
+              "a trimmed cargo pays its share of the haul and no more");
+        const float shelf = w.markets.at(a).inventory[0];
+        const float bal   = w.corporations.at(corp).balance;
+        refused = false;
+        const bool again = commit_trade_shipment(w, reg, rep, corp, a, b, 0, 10.0f, leg, &refused, &sent);
+        check(!again && refused, "with the pot spent the next shipment is refused, for want of points");
+        check(w.convoys.size() == 1 && w.markets.at(a).inventory[0] == shelf
+                  && w.corporations.at(corp).balance == bal,
+              "and the refusal mutates nothing");
+    }
+}
+
 int main()
 {
     std::printf("=== logistic_points_harness (BL-1352, LP_ONE_SYSTEM) ===\n");
@@ -1119,6 +1258,7 @@ int main()
     l6_march_claims_first();
     l7_reach_by_tier_and_rail();
     l8_routed_requests();
+    l9_shipment_draws();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

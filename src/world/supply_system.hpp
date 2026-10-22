@@ -242,6 +242,7 @@ bool corp_has_launchpad_on(const world& w, const corporation_component& corp, en
 const std::array<float, resource_count>& launch_draw_per_convoy();
 
 struct economy_report; // economy_system.hpp: the tick's want and fill registers
+struct lp_tick;        // logistic_points.hpp: this tick's resolved pools (BL-1361)
 
 /// Commit a priced trade shipment (TRADE.md § A trade, steps 1-2): BUY up to
 /// @p qty of good @p ri off @p src_market's shelf at its posted price, under the
@@ -256,18 +257,21 @@ struct economy_report; // economy_system.hpp: the tick's want and fill registers
 /// when the cargo is that good). A trimmed cargo pays its share of the leg's cost
 /// (cost is linear in quantity).
 ///
-/// NO LOGISTIC POINT GATE STANDS HERE TODAY. BL-1309 retired the per-anchor passive
-/// cap, and BL-1352 removed the retired pool this was handed with it; BL-1361 brings
-/// the draw back, by cargo quantity, against the NATION's pool. Until then trade
-/// points (the owner's capacity, TRADE.md) are the only capacity a shipment passes.
+/// THE LOGISTIC POINT DRAW (BL-1361; LOGISTICS.md § How a tile's points get to it,
+/// Ben 2026-10-16): an overland or sea shipment draws ONE point per unit of cargo at
+/// its anchor (the source market's centre) from what the march and production left in
+/// that ground's nation's pool (`report.logistic_points`; resolved first if nobody
+/// has). The cargo is TRIMMED to what the anchor admits (`lp_trade_admit`), never
+/// refused whole while any is admitted. Space legs draw nothing. Trade points (the
+/// owner's capacity, TRADE.md) are the other capacity a shipment passes.
 ///
 /// All-or-nothing on refusal: returns false, having mutated nothing, when the
-/// leg is not viable, the ceiling refuses the shelf, the shelf admits nothing, or
-/// the trader cannot cover the haul plus the purchase.
+/// leg is not viable, the ceiling refuses the shelf, the shelf admits nothing, the
+/// anchor admits no points, or the trader cannot cover the haul plus the purchase
+/// (the one exception: an unresolved report is resolved, a cache of this tick).
 ///
 /// @param out_refused_no_lp Optional; set true (never false) when this call
-///                         refused SPECIFICALLY for want of points. Nothing sets it
-///                         while no points gate stands here (BL-1361).
+///                         refused SPECIFICALLY for want of points (BL-1361).
 /// @param out_sent         Optional; the units actually sent on success.
 /// @param io_committed     Optional; the purchases this trader has already
 ///                         committed this tick (billed at the clear, not yet
@@ -276,11 +280,11 @@ struct economy_report; // economy_system.hpp: the tick's want and fill registers
 ///                         shipment's purchase to it — so a trader shipping
 ///                         many routes in one pass cannot overdraw (cold
 ///                         review). Null: the balance alone.
-/// The Logistic Points still left this tick for market @p market_id's trading.
-/// ALWAYS 0 since BL-1309 retired the passive cap: kept, rather than deleted, as the
-/// seam BL-1361 revives (a shipment drawing by cargo quantity against the nation's
-/// pool). `market_component::trade_lp_spare` is what reads it.
-float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id);
+/// The Logistic Points still left this tick at market @p market_id's anchor, once the
+/// march, production and the shipments drawn so far have taken theirs (BL-1361):
+/// its nation's pots together, 0 where the anchor has no cover. What
+/// `market_component::trade_lp_spare` records after the trade pass.
+float market_lp_left(const lp_tick& lp, entity_id market_id);
 
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
