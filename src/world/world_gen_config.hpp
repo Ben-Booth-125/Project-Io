@@ -13,18 +13,17 @@ class lua_state;
 
 /// THE LAKE SIZE CAP's default and domain (BL-1200, TILES.md § Water kinds).
 ///
-/// MEASURED, NOT CHOSEN (tools/verify/lake_census.cpp, the 16 curated seeds,
-/// home body, 2026-10-05). The 360 enclosed water bodies (every component but
-/// the largest) run from 1 tile to 5802 with no empty gap; the thinnest band is
-/// 89-143 tiles, which holds 3 bodies (96, 119, 138) against 15 in 144-232, a
-/// dense cluster opening at 154. 150 sits just under that cluster: pooled, 301
-/// bodies stay lakes (3079 tiles) and 59 become seas (61668 tiles) -- among
-/// them the 21 enclosed bodies of 1000+ tiles that rival a world's main ocean.
-/// The value was taken by the main session on Ben's delegation (NR-975).
+/// RULED, NOT MEASURED (Ben, 2026-10-22, BL-1397: "we can retune later again if
+/// needed"). The first value, 150, was read off the thinnest band of enclosed-body
+/// sizes (NR-975). 75 halves it: on the 16 curated seeds' home bodies
+/// (tools/verify/lake_census.cpp) the 360 enclosed water bodies split 293 lakes
+/// (2325 tiles) and 67 seas (62422 tiles), against 301 / 59 at 150 -- eight
+/// bodies of 75 to 149 tiles become seas, so their shores take ports and lose the
+/// Well's fresh water.
 ///
 /// The domain: at least 1 (1 = every enclosed body is a sea, no lakes) and at
 /// most 1,000,000 (above any grid, i.e. no cap -- every enclosed body a lake).
-inline constexpr int lake_size_cap_default = 150;
+inline constexpr int lake_size_cap_default = 75;
 inline constexpr int lake_size_cap_min     = 1;
 inline constexpr int lake_size_cap_max     = 1000000;
 

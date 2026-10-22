@@ -216,7 +216,7 @@ void hex_neighbours(int col, int row, int gw, int gh,
 //      2026-10-05, NR-974): a lake is an enclosed body BELOW the cap, because
 //      a lakeshore now gives a Well fresh water and a second salt basin must
 //      not. Only the smaller enclosed components are LAKES. The cap's value
-//      and its measured reason: `lake_size_cap_default`, world_gen_config.hpp.
+//      and its reason (Ben's ruling): `lake_size_cap_default`, world_gen_config.hpp.
 //   3. Within any sea component: a tile with at least one LAND neighbour is
 //      COAST (the shoreline ring); a tile with none is OPEN OCEAN.
 //

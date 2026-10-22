@@ -291,7 +291,7 @@ int main(int argc, char** argv)
     }
 
     // Candidate caps.
-    const int caps[] = { 8, 13, 21, 34, 50, 55, 89, 100, 144, 200, 233, 300, 377, 500, 610, 1000 };
+    const int caps[] = { 8, 13, 21, 34, 50, 55, 75, 89, 100, 144, 200, 233, 300, 377, 500, 610, 1000 };
     std::printf("\nCandidate caps (size >= cap becomes sea): cap lakes_kept lake_tiles lake_shore_hab | seas seas_tiles seas_shore_hab\n");
     for (int cap : caps)
     {
