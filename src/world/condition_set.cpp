@@ -52,10 +52,15 @@ bool condition_subject_is_integral(condition_subject s)
 
 float measure_condition(const condition& c, const world& w, entity_id subject_corp)
 {
+    // BL-1402 (NATIONS.md § What a nation owns): the subject is any economic
+    // owner — a corporation or a nation — read through assets_of / purse_of.
+    const std::vector<entity_id>* assets = assets_of(w, subject_corp);
+    const float*                  purse  = purse_of(w, subject_corp);
+    if (assets == nullptr || purse == nullptr)
+        return 0.0f; // An unknown owner measures zero on every subject, never throws.
     const auto corp_it = w.corporations.find(subject_corp);
-    if (corp_it == w.corporations.end())
-        return 0.0f; // An unknown corp measures zero on every subject, never throws.
-    const corporation_component& cc = corp_it->second;
+    const corporation_component* cc =
+        corp_it != w.corporations.end() ? &corp_it->second : nullptr;
 
     switch (c.subject)
     {
@@ -67,7 +72,7 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
         case condition_subject::structure:
         {
             int n = 0;
-            for (const entity_id bid : cc.assets) // vector: authored order, deterministic
+            for (const entity_id bid : *assets) // vector: authored order, deterministic
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit != w.buildings.end() && bit->second.type == c.structure)
@@ -101,7 +106,7 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
         }
 
         case condition_subject::surplus:
-            return cc.balance;
+            return *purse; // BL-1402: a corporation's balance or a nation's treasury
 
         case condition_subject::era:
         {
@@ -111,7 +116,7 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
             // measures: a corp that owns a launchpad reads Era 1, otherwise Era 0.
             // When the Era system lands this becomes a lookup, and every authored
             // `era` condition keeps its meaning.
-            for (const entity_id bid : cc.assets)
+            for (const entity_id bid : *assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit != w.buildings.end() && bit->second.type == building_type::launchpad)
@@ -162,7 +167,8 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
         case condition_subject::produced:
         {
             const std::size_t ri = static_cast<std::size_t>(c.resource);
-            return (ri < resource_count && cc.produced_ever[ri]) ? 1.0f : 0.0f;
+            // A nation keeps no produced_ever record (corporation-only): it reads 0.
+            return (cc != nullptr && ri < resource_count && cc->produced_ever[ri]) ? 1.0f : 0.0f;
         }
     }
     return 0.0f;

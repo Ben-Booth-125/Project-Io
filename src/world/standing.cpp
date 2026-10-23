@@ -15,13 +15,12 @@ std::vector<corp_standing> compute_corp_standings(
     const world& w,
     const std::unordered_map<entity_id, corp_cash_flow>& cash_flow)
 {
-    // Sorted corp id walk for deterministic output (same pattern corporation_panel.cpp uses —
-    // w.corporations is an unordered_map).
-    std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& [id, _] : w.corporations)
-        corp_ids.push_back(id);
-    std::sort(corp_ids.begin(), corp_ids.end());
+    // Sorted owner id walk for deterministic output (same pattern corporation_panel.cpp uses —
+    // w.corporations is an unordered_map). BL-1402 (NATIONS.md § What a nation owns): every
+    // economic owner is ranked — each corporation and each nation holding buildings —
+    // ascending id (economic_owner_ids).
+    const std::vector<entity_id> corp_ids = economic_owner_ids(w);
+    const entity_id              my_nation = player_nation(w);
 
     // Tick-total income denominator for market share (0 if no trade this tick — avoids /0).
     // ASCENDING CORP ID (BL-1050): a float sum, and `cash_flow` is an unordered_map
@@ -48,7 +47,12 @@ std::vector<corp_standing> compute_corp_standings(
 
     for (const entity_id id : corp_ids)
     {
-        const corporation_component& cc = w.corporations.at(id);
+        const auto                   cit = w.corporations.find(id);
+        const corporation_component* cc  = cit != w.corporations.end() ? &cit->second : nullptr;
+        const std::vector<entity_id>* assets = assets_of(w, id);
+        const float*                  purse  = purse_of(w, id);
+        if (assets == nullptr || purse == nullptr)
+            continue;
 
         corp_standing cs;
         cs.corp      = id;
@@ -58,7 +62,7 @@ std::vector<corp_standing> compute_corp_standings(
         // visible on-canvas (DISCOVERY.md § Competitor visibility), so walking the corp's own
         // asset list is honest for any corp and the figure is public for every one of them.
         std::unordered_set<entity_id> bodies;
-        for (const entity_id bld_id : cc.assets)
+        for (const entity_id bld_id : *assets)
         {
             const auto bit = w.buildings.find(bld_id);
             if (bit == w.buildings.end())
@@ -78,8 +82,12 @@ std::vector<corp_standing> compute_corp_standings(
         // `closed` -- leaves the player unable to read their own balance, and a firm that
         // cannot read its own balance sheet cannot be run. A closed firm reading its own books
         // while publishing none is exactly what `closed` means.
-        cs.capital_balance   = cc.balance;
-        cs.capital_disclosed = cs.is_player || corp_files_return(cc.ownership_class);
+        // BL-1402: capital is the owner's purse. A nation files no return, so its treasury is
+        // disclosed only to its own player (the same own-books exemption).
+        cs.capital_balance   = *purse;
+        cs.capital_disclosed = cs.is_player
+                            || (cc != nullptr ? corp_files_return(cc->ownership_class)
+                                              : (my_nation != null_entity && id == my_nation));
 
         // Market share: derived from the market aggregates, which are the deliberate public
         // signal — public for every corp for the same reason reach is.
