@@ -583,6 +583,7 @@ struct world
         float expenditure    = 0.0f; ///< inputs, upkeep goods and materials bought off the shelf
         float maintenance    = 0.0f; ///< operating maintenance
         float wages          = 0.0f; ///< wages
+        float taxes          = 0.0f; ///< BL-1403: the tier's share of those wages, back to the treasury
         float treasury_settle_from = 0.0f; ///< treasury as apply_budget's state pass found it
         float treasury_close = 0.0f; ///< treasury after apply_budget settled it
 
@@ -1334,6 +1335,23 @@ std::vector<entity_id> economic_owner_ids(const world& w);
 /// tree's modifiers, the qualified pool): a corporation's home nation, or the
 /// nation itself for state industry. Null for anything else.
 entity_id owner_home_nation(const world& w, entity_id owner);
+
+/// BL-1402 (sprint 57; NATIONS.md § What a nation owns): the money an owner pays
+/// from — a corporation's `balance` or a nation's `treasury` — the money twin of
+/// `assets_of`, so a path written once serves either owner while the corporations
+/// are folded away. Null when @p owner is neither. A caller that charges a nation
+/// must still respect "the nation never runs into debt": read `purse_room_of`.
+float*       purse_of(world& w, entity_id owner);
+const float* purse_of(const world& w, entity_id owner);
+
+/// What @p owner may commit now: a corporation's balance (which may go negative,
+/// as it always could), or a nation's UNCOMMITTED treasury (state_industry.hpp),
+/// never below zero. 0 for neither.
+float purse_room_of(const world& w, entity_id owner);
+
+/// True when @p owner holds @p building (corporation `assets` or nation
+/// `state_assets`). The owner-generic `owns`.
+bool owner_holds(const world& w, entity_id owner, entity_id building);
 
 /// A nation's CHAMPION: the player's corporation when it is a specialist of
 /// this nation (the seat is the champion), else the lowest-id specialist

@@ -562,6 +562,46 @@ entity_id owner_home_nation(const world& w, entity_id owner)
     return null_entity;
 }
 
+float* purse_of(world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return &cit->second.balance;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return &nit->second.treasury;
+    return nullptr;
+}
+
+const float* purse_of(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return &cit->second.balance;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return &nit->second.treasury;
+    return nullptr;
+}
+
+float purse_room_of(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return cit->second.balance;
+    // A nation's uncommitted treasury - state_uncommitted_treasury's rule
+    // (state_industry.cpp), restated so this file needs no economy header.
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+    {
+        float committed = 0.0f;
+        if (const auto lit = w.state_ledger.find(owner); lit != w.state_ledger.end())
+            committed = lit->second.committed;
+        return std::max(0.0f, nit->second.treasury - committed);
+    }
+    return 0.0f;
+}
+
+bool owner_holds(const world& w, entity_id owner, entity_id building)
+{
+    const std::vector<entity_id>* a = assets_of(w, owner);
+    return a != nullptr && std::find(a->begin(), a->end(), building) != a->end();
+}
+
 entity_id champion_of(const world& w, entity_id nation)
 {
     if (nation == null_entity)

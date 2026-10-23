@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*44 entries — 27 open, 17 resolved.*
+*45 entries — 28 open, 17 resolved.*
 
 ---
 
@@ -248,6 +248,15 @@ The 2026-10-11 reconciliation folded the poorest major's SPECIALISTS into the ri
 > **Recommendation:** (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) retire; (5) keep focus as the nation's economic_focus; (6) keep.
 
 *Files: `docs/ui/PROFILE.md`, `docs/politics/RELATIONS.md`, `docs/economy/FINANCE.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ai/AI_OPPONENT.md`, `docs/ui/LENSES.md`*
+
+### NR-1067 — BL-1403 (nation money flows): the tax rates now bite on wages, and a nation's import duty is capped at its treasury
+*decision · raised 2026-10-24 · from BL-1403 build, main session*
+
+(1) WAGE TAX RATES: the tier rates I..V (0 / 5 / 10 / 15 / 20 %) were calibrated as shares of a firm's operating PROFIT; under your ruling they are now shares of the WAGES a nation pays, which is a much larger base, so tier V returns a fifth of the whole wage bill. Kept unchanged in band; the post-fold measurement will say whether the tiers still read as a trade-off against Discontent. (2) DUTY CAP: a nation never runs into debt, so when a nation (not a corporation) owes import duty on goods entering a foreign market, the duty is capped at what its treasury holds; the cargo still lands. The alternative is refusing the shipment at dispatch when the importer cannot pay, which is a larger change to the trade pass.
+
+**Why it matters.** (1) decides whether a high tax tier is a strong lever or a free one; (2) decides whether a broke nation can keep importing.
+
+*Files: `src/world/budget_system.cpp`, `src/world/supply_system.cpp`, `src/world/nation_tax.hpp`*
 
 ---
 

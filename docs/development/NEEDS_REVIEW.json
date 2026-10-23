@@ -631,6 +631,24 @@
     "docs/ui/LENSES.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1067",
+   "title": "BL-1403 (nation money flows): the tax rates now bite on wages, and a nation's import duty is capped at its treasury",
+   "raised": "2026-10-24",
+   "kind": "decision",
+   "status": "open",
+   "source": "BL-1403 build, main session",
+   "what": "(1) WAGE TAX RATES: the tier rates I..V (0 / 5 / 10 / 15 / 20 %) were calibrated as shares of a firm's operating PROFIT; under your ruling they are now shares of the WAGES a nation pays, which is a much larger base, so tier V returns a fifth of the whole wage bill. Kept unchanged in band; the post-fold measurement will say whether the tiers still read as a trade-off against Discontent. (2) DUTY CAP: a nation never runs into debt, so when a nation (not a corporation) owes import duty on goods entering a foreign market, the duty is capped at what its treasury holds; the cargo still lands. The alternative is refusing the shipment at dispatch when the importer cannot pay, which is a larger change to the trade pass.",
+   "why_it_matters": "(1) decides whether a high tax tier is a strong lever or a free one; (2) decides whether a broke nation can keep importing.",
+   "options": null,
+   "recommendation": null,
+   "files": [
+    "src/world/budget_system.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/nation_tax.hpp"
+   ],
+   "resolution": null
   }
  ]
 }
