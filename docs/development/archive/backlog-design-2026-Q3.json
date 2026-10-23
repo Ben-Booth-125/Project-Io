@@ -24439,6 +24439,49 @@
         "design",
         "line"
       ]
+    },
+    "BL-1119": {
+      "status": "cancelled",
+      "glyph": "✓",
+      "written": "2026-09-25",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
+      "id": "BL-1119",
+      "short_name": "ROADS_TREE_AND_DETOUR",
+      "sprint": 50,
+      "category": "Generation",
+      "priority": "S",
+      "difficulty": 3,
+      "title": "Roads are a tree plus a detour test, and only villages above a size spur: no lattice, and round 6's tail inside 35 s",
+      "authority_doc": "docs/economy/LOGISTICS.md",
+      "files": [
+        "src/world/road_generation.cpp",
+        "tools/verify/road_generation_harness.cpp",
+        "tools/verify/gen_step_costs.cpp",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "design": "MOVED (2026-10-07, the sprint 49 close-out; Ben: place by subject): sprint 49 -> 50. SETTLED (Ben, 2026-09-25, the density form): the village spur floor is 40,000 heads (the ladder's ~p90; median road pass 18 s loaded, 1 of 16 seeds under 10 s), size read as the population step's headcount; a border link ends ONLY on a town or a spurring village (LOGISTICS.md § 4). The street carpet is not this item's: BL-1130 (centres consolidate) thins the centres upstream, and this item's \"no lattice on the densest seed\" is read after it.\n\nROUND 2 (the lane's own findings and the settle review): fix the floor at 40,000 as the constant; border endpoints restricted to towns and spurring villages; road_generation.cpp's two hand-written cache clears (~616-619, ~689-691) replaced by invalidate_logistics_caches so the new nearest-anchor field is never missed; the loading bar's roads weight (hard_coded_world.cpp ~495, 38,000 ms) and kBorderUnitsPerNation re-measured; road_generation_harness's \"R2 highway tier reachable when qualified\" FAILS on 0 of 8 seeds, identically on b03fd52e -- find why (the percentile gate, the two-major-endpoints rule, or the harness's qualified regen) and fix the cause or split it to its own item with the reading; never weaken the row.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): BL-1077 (village roads cost) is FOLDED IN. Its target joins this done-when: generate_roads under ~10 s Release on the library seeds, read after the spur floor; if the floor alone does not reach it, BL-1077's bound (one multi-source search per centre, or a shared reach field, digest-neutral by itself) is this item's second step. THE 35 s IS JUDGED ON THE WHOLE TAIL, jointly with BL-1117 (settle tick one), which joins the sprint with its fix: on seed 0 the settle is ~56 s Release, tick 1 alone 38.5 s, so roads alone cannot meet it.\n\nFILED 2026-09-25 (Ben, walking round 6: \"we also need many fewer roads... it should be heavily discouraged to build a lattice of roads\"; he chose the tree plus a detour test over \"no second path\", and spurs only for villages above a size). LOGISTICS.md § 4 carries the rule; STARTUP.md § Round 6 carries the 35 s target.\n\nTHE WORK. (1) Replace the relative-neighbour redundancy edges with the DETOUR TEST: after the Kruskal MST, a candidate link between two centres is laid only when the network's route between them costs more than 2x the direct A* route (one constant, named). The percentile rationing of loops applies to the loops the test admits (a delegated reading that keeps BL-618/BL-621 intact; Ben may overturn). (2) A village lays a spur only above a size floor, MEASURED on the 16 curated seeds first (Rule 0b: road tiles, spur count and pass time per floor candidate). (3) The border link rule is unchanged.\n\nA WORLD-MOVER: every road digest and the sweep pins move -- read road tile counts, pass time (gen_step_costs --finish) and the haulage baseline (memory: goldens cannot see trade) on the 16 seeds before and after, then ONE re-bless.\n\nDONE WHEN. No lattice on a capture of the densest seed; road pass time and tile count recorded old -> new per seed; round 6's tail lands within 35 s of arrival on seeds 0 and 28 in Release (gen_step_costs); one re-bless; road_generation_harness green (connectivity held). CARRIED to sprint 49 at the sprint 48 close (2026-10-04): owed R4 a quiet Release gen_step_costs run on 16 seeds (road tiles and pass time per seed, old -> new, against ~10 s); R6 an isolated haulage reading of this change (or fold into BL-1165); R7 a cold review of round 4 (8b921ee6, directed paths). CANCELLED at the v0.2.0 cut (2026-10-23), unbuilt. Ben, 2026-10-23, at the v0.2.0 cut: cancel everything not related to sprint 55 and archive it, so the backlog is free for the next sprint. PARTIAL when cancelled: Kruskal, the detour test and the spur floor landed (95bfb22a and rounds 2-4); requirement R7 (the cold review of the merged change) was never recorded.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "written",
+        "requires",
+        "blocked_on",
+        "parked",
+        "author",
+        "id",
+        "short_name",
+        "sprint",
+        "category",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }
