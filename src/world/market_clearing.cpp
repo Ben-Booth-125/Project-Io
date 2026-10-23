@@ -583,11 +583,13 @@ entity_id corp_hq_market(const world& w, entity_id corp)
 
 std::vector<entity_id> corp_markets(const world& w, entity_id corp)
 {
+    // BL-1402: any economic owner — a corporation's `assets` or a nation's
+    // `state_assets` (assets_of).
     std::vector<entity_id> out;
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    const std::vector<entity_id>* assets = assets_of(w, corp);
+    if (assets == nullptr)
         return out;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : *assets)
         if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
             if (const entity_id mid = market_for_tile(w, bit->second.tile); mid != null_entity)
                 out.push_back(mid);
@@ -612,9 +614,13 @@ float corp_shelf_stock(const world& w, entity_id corp, std::size_t r)
 float buy_from_corp_shelves(world& w, entity_id corp, std::size_t r, float qty,
                             float reservation_mult)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end() || r >= resource_count || !(qty > 0.0f))
+    // BL-1402: any owner, paid from its purse (purse_of). A corporation's
+    // balance may go negative, as it always could; a nation buys only what its
+    // uncommitted treasury covers (purse_room_of), so it never runs into debt.
+    float* purse = purse_of(w, corp);
+    if (purse == nullptr || r >= resource_count || !(qty > 0.0f))
         return 0.0f;
+    const bool capped = w.corporations.find(corp) == w.corporations.end();
     float bought = 0.0f;
     for (const entity_id mid : corp_markets(w, corp))
     {
@@ -625,11 +631,13 @@ float buy_from_corp_shelves(world& w, entity_id corp, std::size_t r, float qty,
             continue;
         if (!shelf_admits(mc, r, reservation_mult, /*off_buys=*/true))
             continue;
-        const float take = std::min(qty - bought, std::max(0.0f, mc.inventory[r]));
+        float take = std::min(qty - bought, std::max(0.0f, mc.inventory[r]));
+        const float px = posted_price(mc, r);
+        if (capped && px > 0.0f)
+            take = std::min(take, purse_room_of(w, corp) / px);
         if (!(take > 0.0f))
             continue;
-        const float px = posted_price(mc, r);
-        cit->second.balance -= take * px;
+        *purse -= take * px;
         mc.inventory[r]     -= take;
         bought              += take;
         // The exchange record (BL-685): the market sells, the corporation buys.
@@ -1557,13 +1565,17 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // both sites have run, so the ring's order is the map's — deterministic.
     struct exchange_acc { float qty = 0.0f; float value = 0.0f; entity_id corp = null_entity; std::uint16_t parties = 0; };
     std::map<std::tuple<entity_id, std::size_t, std::uint8_t, bool>, exchange_acc> exchange_rows;
-    auto record_exchange = [&w, &exchange_rows](entity_id market, std::size_t r, float qty, float price,
+    // BL-1402: the player's NATION's own exchanges (its buildings' sales and
+    // purchases, NATIONS.md § What a nation owns) are the player's too.
+    const entity_id my_nation = player_nation(w);
+    auto record_exchange = [&w, &exchange_rows, my_nation](entity_id market, std::size_t r, float qty, float price,
                                                 entity_id seller, entity_id buyer) {
         if (qty <= 0.0f)
             return;
         const std::uint8_t side = (buyer == null_entity) ? 0 : 1; // 0: sold TO the market
         const entity_id    corp = (side == 0) ? seller : buyer;
-        const bool         mine = corp != null_entity && corp == w.player_entity;
+        const bool         mine = corp != null_entity
+                               && (corp == w.player_entity || corp == my_nation);
         exchange_acc& a = exchange_rows[std::make_tuple(market, r, side, mine)];
         a.qty   += qty;
         a.value += qty * price;

@@ -281,6 +281,26 @@ std::int64_t economy_milli_of(const corporation_component& c)
         return 0;
     return to_milli(inc); // credits -> milli-credits, the same 1000 and the same cap
 }
+
+// BL-1402 (NATIONS.md § What a nation owns): any economic owner's contribution.
+// A corporation's is its previous filed return (above). A nation holding
+// buildings files no return; its term is the sales its own buildings made
+// this tick (`state_ledger` income, which clear_markets books before the
+// nation step reads it), never negative. One economy tick is one quarter.
+std::int64_t owner_economy_milli(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return economy_milli_of(cit->second);
+    if (w.nations.find(owner) == w.nations.end())
+        return 0;
+    const auto lit = w.state_ledger.find(owner);
+    if (lit == w.state_ledger.end())
+        return 0;
+    const double inc = static_cast<double>(lit->second.income);
+    if (!std::isfinite(inc) || inc <= 0.0)
+        return 0;
+    return to_milli(inc);
+}
 } // namespace
 
 std::int64_t nation_economy_milli(const world& w, entity_id nation)
@@ -288,9 +308,9 @@ std::int64_t nation_economy_milli(const world& w, entity_id nation)
     if (nation == null_entity)
         return 0;
     std::int64_t sum = 0;
-    for (const auto& [cid, c] : w.corporations)
-        if (c.home_nation == nation)
-            sum = sat_add(sum, economy_milli_of(c));
+    for (const entity_id owner : economic_owner_ids(w))
+        if (owner_home_nation(w, owner) == nation)
+            sum = sat_add(sum, owner_economy_milli(w, owner));
     return sum;
 }
 
@@ -837,14 +857,20 @@ struct research_buildings
 research_buildings count_research_buildings(const world& w)
 {
     research_buildings rb;
-    for (const auto& [corp, cc] : w.corporations)
+    // BL-1402: every economic owner — corporations and nations holding
+    // buildings alike — so a state University or institute counts too.
+    for (const entity_id owner : economic_owner_ids(w))
     {
-        if (cc.home_nation != null_entity)
+        const entity_id home = owner_home_nation(w, owner);
+        if (home != null_entity)
         {
-            std::int64_t& e = rb.economy_milli[cc.home_nation];
-            e = sat_add(e, economy_milli_of(cc));
+            std::int64_t& e = rb.economy_milli[home];
+            e = sat_add(e, owner_economy_milli(w, owner));
         }
-        for (const entity_id bid : cc.assets)
+        const std::vector<entity_id>* assets = assets_of(w, owner);
+        if (assets == nullptr)
+            continue;
+        for (const entity_id bid : *assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -865,8 +891,8 @@ research_buildings count_research_buildings(const world& w)
             }
             else if (b.type == building_type::research_institute)
             {
-                if (cc.home_nation != null_entity)
-                    ++rb.institutes[cc.home_nation];
+                if (home != null_entity)
+                    ++rb.institutes[home];
             }
         }
     }

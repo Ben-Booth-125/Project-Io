@@ -522,8 +522,9 @@ bool market_wired(world& w, entity_id market)
 float processing_output(const world& w, entity_id corp, const recipe& rcp, std::size_t r, float outq,
                         float ground = 1.0f)
 {
-    const auto      cit    = w.corporations.find(corp);
-    const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+    // BL-1402: any owner — a state building answers to its own nation, as the
+    // extraction draw already does (owner_home_nation).
+    const entity_id nation = owner_home_nation(w, corp);
     effect_target   at;
     at.group    = rcp.group;
     at.recipe   = rcp.name;
@@ -1837,10 +1838,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 || b.type == building_type::university;
         };
 
+        // BL-1402: every economic owner's buildings (corporations and nations
+        // holding buildings), ascending id; the count is an integer per nation.
         std::map<entity_id, int> education_by_nation;
-        for (const auto& [corp, cc] : w.corporations)
+        for (const entity_id owner : economic_owner_ids(w))
         {
-            for (const entity_id bid : cc.assets)
+            const std::vector<entity_id>* assets = assets_of(w, owner);
+            if (assets == nullptr)
+                continue;
+            for (const entity_id bid : *assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end())
@@ -4311,15 +4317,20 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
         // actual money... moving units"). Outside the gate deliberately: with no
         // resolve handed in the march is UNGATED, not FREE, and the first cut made it
         // free by pricing inside the branch (cold review). A nation-owned garrison
-        // (BL-571) has no `w.corporations` entry: it draws against the cap, as the
-        // physical constraint applies to everyone, but pays no credits, matching
-        // MILITARY.md's "a garrison does not draw the credits+goods vector
-        // run_unit_upkeep charges corp units".
-        if (const auto corp_it = w.corporations.find(u.owner); corp_it != w.corporations.end())
+        // (BL-571) draws against the cap, as the physical constraint applies to
+        // everyone. Its UPKEEP stays outside run_unit_upkeep's credits+goods vector
+        // (MILITARY.md); this march price is separate from upkeep.
+        // BL-1402: charged to the march's owner through its purse — a
+        // corporation's balance (which may go negative, as before) or a nation's
+        // treasury, capped at its uncommitted room so the nation never runs into
+        // debt. An owner that is neither pays nothing.
+        if (float* purse = purse_of(w, u.owner); purse != nullptr)
         {
-            const float credit_cost = mil.active_lp_credit_per_unit_distance
-                                     * would_be_points * static_cast<float>(u.count);
-            corp_it->second.balance -= credit_cost;
+            float credit_cost = mil.active_lp_credit_per_unit_distance
+                               * would_be_points * static_cast<float>(u.count);
+            if (w.corporations.find(u.owner) == w.corporations.end())
+                credit_cost = std::min(credit_cost, purse_room_of(w, u.owner));
+            *purse -= credit_cost;
         }
 
 
