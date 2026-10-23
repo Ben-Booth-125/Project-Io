@@ -103,5 +103,39 @@
     "anchor": "v0\\.2\\.0 — the economy functions",
     "stale": [],
     "owner": "ROADMAP (milestone)"
+  },
+  {
+    "ruling": "Rail fades to zero at double its 20 tiles, 40 - the road's rule (NR-1056)",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "fade to zero at double, \\*\\*40\\*\\*",
+    "stale": [
+      "zero at 28"
+    ],
+    "owner": "BL-1360 (road tier extends reach) - constant changed at the close"
+  },
+  {
+    "ruling": "The off-road leg is 3 x terrain and prices market attraction only, no Logistic Points (NR-1050)",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "The leg is three a step, times the ground it crosses",
+    "stale": [],
+    "owner": "BL-1346 (market attraction) - as built"
+  },
+  {
+    "ruling": "No rival builds anything on the player's nation's ground (NR-1060)",
+    "doc": "docs/ai/AI_OPPONENT.md",
+    "anchor": "No rival builds on the player's nation's ground",
+    "stale": [],
+    "owner": "BL-1399 (no rival on player ground)"
+  },
+  {
+    "ruling": "A shipment pays the Logistic Points of its whole route, market centre to trading market (NR-1060)",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "It pays for its whole route",
+    "stale": [
+      "what moves, not how far",
+      "draws at the anchor it leaves",
+      "passive cap at\\s+the anchor nearest"
+    ],
+    "owner": "BL-1400 (shipment pays whole route)"
   }
 ]

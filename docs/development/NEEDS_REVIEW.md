@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*41 entries — 30 open, 11 resolved.*
+*41 entries — 24 open, 17 resolved.*
 
 ---
 
@@ -220,48 +220,6 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
 
-### NR-1049 — BL-1352 (one LP system): three readings taken so a march could draw the nation's pool
-*decision · raised 2026-10-18 · from BL-1352 build, main session*
-
-The march now draws Logistic Points and claims ahead of production. Four readings the doc does not settle, each cheap to change. (1) WHOSE POOL - THE MOVER'S. A corporation's march draws its HOME NATION's points, a nation's garrison its own; never the pool of the ground it stands on. The first cut read the ground's nation and a cold review caught both consequences: a unit whose points ran out on unowned wilderness could never be granted again (a refusal moves nothing, so it re-fired for ever and the unit was stranded for good), and a unit invading another nation drew ITS VICTIM's pool, starving the defender's industry to fund the attack. LOGISTICS.md's 'Movement a player or rival DIRECTS' is the reading taken. The alternative - the ground's nation, with a stranding escape and a foreign-ground rule - is a real design and is Ben's if he wants it. (2) NO REACH TEST ON A MARCH - a unit draws its own nation's pool at full strength wherever it stands, because the off-network military reach is still 'military detail later' (LOGISTICS.md). (3) THE CLAIM IS GATHERED BEFORE THE BATTLE PHASE - the resolve runs at tick phase 4 and the march at phase 11, with battles at 10, so a unit killed in battle has already consumed its nation's points for that tick; the alternative is resolving the pool twice a tick. (4) THE EXCHANGE RATE IS UNCHANGED - one point admits one march-point of movement (infantry 1.0, cavalry 1.5 a tick) against a production need of 10 per unit of run, so a 50-unit army asks for ~60 points of a pool measured in the hundreds. Nothing measured says a soldier-tick and a unit of grain burden a nation equally; the old per-anchor rate (20/tick at every city) carried the same assumption.
-
-**Why it matters.** Reading 4 decides whether 'guns, butter and freight compete in one currency' is felt at all: at these numbers a march is a rounding error against production, which is the opposite of the campaign-starves-its-industry cost the doc describes. Reading 1 is the one that changes what a war looks like - who pays for an invasion's logistics. The 2040 spectator run is the measurement that should settle 4.
-
-### NR-1050 — BL-1346 (market attraction): the off-road leg's price, and what it costs to cross water
-*decision · raised 2026-10-19 · from BL-1346 build + cold review, main session*
-
-MARKETS.md rules that catchment is logistics cost over pull, and LOGISTICS.md section 3b rules an off-road tile is priced by 'the off-road cost per tile times the number of 4-cardinal steps'. Two things the docs do not settle were decided in band. (1) THE PRICE: k_offroad_leg_per_tile = 3.0, taken from the Logistic Point model's own off-network step (lp_offnet_step) so the two off-road prices agree rather than drifting apart; it is dear against a plains road step of 1.0 before the tier discount, which is what keeps a market's edge following the road. (2) TERRAIN: the leg is multiplied by the tile's own traversal weight, so crossing a mountain or open water costs proportionally more than crossing a field. The doc says 'per tile' and is silent on terrain; a flat leg would price an unroaded island tile three steps across the sea exactly as a field three steps across a meadow, which a cold review flagged as the one place the walk ignores a domain every other cost walk in the tree respects.
-
-**Why it matters.** The leg decides how far a market's edge bulges past the end of its roads, and the terrain term decides whether islands and far coasts belong to the market across the water from them. Measured on seed 0 after the change: market_viability pooled G1 92.0 -> 90.1, G1t50 88.1 -> 86.3, G2 182.1 -> 185.0, all five gates still passing, and the same-nation fifth moves 279 of 31581 tiles.
-
-### NR-1052 — BL-1382 band scaling: f(s) = 1 + (s-1)/2 by anchor scale
-*decision · raised 2026-10-18 · from PROVINCES.md § The normalising pass*
-
-Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).
-
-**Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
-
-### NR-1055 — Tile Logistics section: Uses counts only the player's own buildings
-*decision · raised 2026-10-20 · from BL-1354 (tile logistics section), built 2026-10-20*
-
-Ben asked for the points consumed by a tile. A rival building's point need is workforce x target, i.e. its run rate, which DISCOVERY.md keeps private. Taken on Ben's behalf: Uses counts the player's own buildings (god view: all), and the hover names how many rival buildings were left out. SELECTION.md records it.
-
-**Why it matters.** A figure that reads a rival's private state is a visibility call, which is Ben's, not an in-band calibration.
-
-### NR-1056 — Rail's fade past 20: kept at 8 (zero at 28), not the road's double-distance rule
-*decision · raised 2026-10-20 · from BL-1360 (road tier extends reach), cold review finding 5*
-
-Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Track 6/12, Road 8/16, Highway 10/20). Rail's fade was left at its existing 8, so a station 24 track steps down the line gets half strength and one at 28+ gets nothing. LOGISTICS.md says only '20 tiles' for rail.
-
-**Why it matters.** It decides whether a station 21-27 steps away is served at all. Today that is a fading partial, and the census moved little on it (rail sources unchanged: 69 / 0 / 185 on seeds 0 / 28 / 46).
-
-### NR-1060 — Rival hub chains on the player's nation's ground: builder or ground?
-*decision · raised 2026-10-21 · from BL-1395 (rival lays a hub chain), cold review finding 4*
-
-Your grant excludes 'any chain for the player's nation or champion'. The 2026-10-15 grant's like wording is implemented as a BUILDER test (the player's corp and champion never source). Built conservatively: a rival building on the PLAYER's nation's ground keeps the old rule exactly - one hub on or beside the site, priced as one - and never lays a chain there. Elsewhere it lays the full chain.
-
-**Why it matters.** On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.
-
 ---
 
 ## Resolved
@@ -287,6 +245,24 @@ score_national_budgets walks every landed nation and run_nation_step writes the 
 
 > **RESOLVED.** Ben: B, keep scoring the player's nation as a dated stand-in until the budget verbs exist. Written into NATIONS.md and AI_OPPONENT.md § 11.
 
+### NR-1049 — BL-1352 (one LP system): three readings taken so a march could draw the nation's pool
+*decision · raised 2026-10-18 · from BL-1352 build, main session*
+
+The march now draws Logistic Points and claims ahead of production. Four readings the doc does not settle, each cheap to change. (1) WHOSE POOL - THE MOVER'S. A corporation's march draws its HOME NATION's points, a nation's garrison its own; never the pool of the ground it stands on. The first cut read the ground's nation and a cold review caught both consequences: a unit whose points ran out on unowned wilderness could never be granted again (a refusal moves nothing, so it re-fired for ever and the unit was stranded for good), and a unit invading another nation drew ITS VICTIM's pool, starving the defender's industry to fund the attack. LOGISTICS.md's 'Movement a player or rival DIRECTS' is the reading taken. The alternative - the ground's nation, with a stranding escape and a foreign-ground rule - is a real design and is Ben's if he wants it. (2) NO REACH TEST ON A MARCH - a unit draws its own nation's pool at full strength wherever it stands, because the off-network military reach is still 'military detail later' (LOGISTICS.md). (3) THE CLAIM IS GATHERED BEFORE THE BATTLE PHASE - the resolve runs at tick phase 4 and the march at phase 11, with battles at 10, so a unit killed in battle has already consumed its nation's points for that tick; the alternative is resolving the pool twice a tick. (4) THE EXCHANGE RATE IS UNCHANGED - one point admits one march-point of movement (infantry 1.0, cavalry 1.5 a tick) against a production need of 10 per unit of run, so a 50-unit army asks for ~60 points of a pool measured in the hundreds. Nothing measured says a soldier-tick and a unit of grain burden a nation equally; the old per-anchor rate (20/tick at every city) carried the same assumption.
+
+**Why it matters.** Reading 4 decides whether 'guns, butter and freight compete in one currency' is felt at all: at these numbers a march is a rounding error against production, which is the opposite of the campaign-starves-its-industry cost the doc describes. Reading 1 is the one that changes what a war looks like - who pays for an invasion's logistics. The 2040 spectator run is the measurement that should settle 4.
+
+> **RESOLVED.** Ben, 2026-10-23 (the sprint 55 close form): (1) the mover's own nation pays, as built. (4) the 1:1 exchange rate is kept as settled, not as a reading awaiting the 2040 measurement. Readings (2) and (3) stand as built.
+
+### NR-1050 — BL-1346 (market attraction): the off-road leg's price, and what it costs to cross water
+*decision · raised 2026-10-19 · from BL-1346 build + cold review, main session*
+
+MARKETS.md rules that catchment is logistics cost over pull, and LOGISTICS.md section 3b rules an off-road tile is priced by 'the off-road cost per tile times the number of 4-cardinal steps'. Two things the docs do not settle were decided in band. (1) THE PRICE: k_offroad_leg_per_tile = 3.0, taken from the Logistic Point model's own off-network step (lp_offnet_step) so the two off-road prices agree rather than drifting apart; it is dear against a plains road step of 1.0 before the tier discount, which is what keeps a market's edge following the road. (2) TERRAIN: the leg is multiplied by the tile's own traversal weight, so crossing a mountain or open water costs proportionally more than crossing a field. The doc says 'per tile' and is silent on terrain; a flat leg would price an unroaded island tile three steps across the sea exactly as a field three steps across a meadow, which a cold review flagged as the one place the walk ignores a domain every other cost walk in the tree respects.
+
+**Why it matters.** The leg decides how far a market's edge bulges past the end of its roads, and the terrain term decides whether islands and far coasts belong to the market across the water from them. Measured on seed 0 after the change: market_viability pooled G1 92.0 -> 90.1, G1t50 88.1 -> 86.3, G2 182.1 -> 185.0, all five gates still passing, and the same-nation fifth moves 279 of 31581 tiles.
+
+> **RESOLVED.** Ben, 2026-10-23 (the sprint 55 close forms): keep 3.0 x terrain for market attraction, as built. The leg prices catchment only and moves no Logistic Points; off the networks, points supply units alone. Written into LOGISTICS.md section 3b.
+
 ### NR-1051 — BL-1311 (ground paint perf) builds the ground bake at /O2 in Debug: a new object library and CMake policy CMP0184
 *novel-work · raised 2026-10-17 · from BL-1311 lane report (commit 3af45cdb); CMakeLists.txt*
 
@@ -295,6 +271,15 @@ The four bake files (ground_bake, structure_stamps, route_paint, terrain_palette
 **Why it matters.** It changes what the Debug build means for one subsystem (no runtime checks, not steppable by default) and touches every build tree; a build-system change is project-wide scope.
 
 > **RESOLVED.** Ben: keep the /O2 ground-bake library in Debug, on by default (IO_OPTIMISE_GROUND_BAKE_IN_DEBUG=ON).
+
+### NR-1052 — BL-1382 band scaling: f(s) = 1 + (s-1)/2 by anchor scale
+*decision · raised 2026-10-18 · from PROVINCES.md § The normalising pass*
+
+Ben ruled the band (merge under 24, split over 100) and that it scales with the centre scale 1-5. The scaling form is mine: f(s) = 1 + (s-1)/2, so 1, 1.5, 2, 2.5, 3 for scales 1-5 (village 24-100, scale-5 city 72-300). Chosen because the measured covered-land province mean by anchor scale runs s1 75, s2 88, s3 145 (a scale-3 about twice a scale-1).
+
+**Why it matters.** It sets how much larger a city province may be than a village one, and so how many splits a world takes.
+
+> **RESOLVED.** Ben, 2026-10-23 (the sprint 55 close form): f(s) = 1 + (s-1)/2, x1 to x3, as built.
 
 ### NR-1053 — No doc owns who holds a Logistic Points hub placed during generation; a broke major idles its hubs and starves its consumers
 *novel-work · raised 2026-10-18 · from BL-1382 economy trace (seed 28), src/world/logistic_points.cpp seed_logistics_sources / place_hub, src/world/state_industry.cpp plan_state_funding*
@@ -313,6 +298,24 @@ Ticks 23-36: 25 background firms each build an oil power plant in market 47446 (
 **Why it matters.** A herd is a scorer behaviour; changing what the scorer sees is AI work under the grant register, outside the economy brief.
 
 > **RESOLVED.** Ben: accept as world variance (seed 40 G1 t50 74.2). Same form: seed 9's hydroponics charter web accepted as world variance (G1 t50 ~83). No AI grant widened.
+
+### NR-1055 — Tile Logistics section: Uses counts only the player's own buildings
+*decision · raised 2026-10-20 · from BL-1354 (tile logistics section), built 2026-10-20*
+
+Ben asked for the points consumed by a tile. A rival building's point need is workforce x target, i.e. its run rate, which DISCOVERY.md keeps private. Taken on Ben's behalf: Uses counts the player's own buildings (god view: all), and the hover names how many rival buildings were left out. SELECTION.md records it.
+
+**Why it matters.** A figure that reads a rival's private state is a visibility call, which is Ben's, not an in-band calibration.
+
+> **RESOLVED.** Ben, 2026-10-23 (the sprint 55 close form): Uses counts the player's own buildings and the hover counts the rivals left out, as built.
+
+### NR-1056 — Rail's fade past 20: kept at 8 (zero at 28), not the road's double-distance rule
+*decision · raised 2026-10-20 · from BL-1360 (road tier extends reach), cold review finding 5*
+
+Your ruling gives rail 20 tiles and gives the zero-at-double fade to ROADS (Track 6/12, Road 8/16, Highway 10/20). Rail's fade was left at its existing 8, so a station 24 track steps down the line gets half strength and one at 28+ gets nothing. LOGISTICS.md says only '20 tiles' for rail.
+
+**Why it matters.** It decides whether a station 21-27 steps away is served at all. Today that is a fading partial, and the census moved little on it (rail sources unchanged: 69 / 0 / 185 on seeds 0 / 28 / 46).
+
+> **RESOLVED.** Ben, 2026-10-23 (the sprint 55 close form): rail takes the road's rule - full to 20, zero at double, 40. Written into LOGISTICS.md; the constant change is work (lp_fade_length rail 8 -> 20).
 
 ### NR-1057 — Routing: does an isolated hub still add to the nation pool?
 *decision · raised 2026-10-21 · from BL-1356 (routed requests), second cold review finding 3*
@@ -340,6 +343,15 @@ corp_ai prices an out-of-reach build at one hub and builds that hub on or beside
 **Why it matters.** Rivals will over-build isolated hubs on far ground. Teaching the scorer to lay a chain is new AI behaviour, so it is a grant for you to give or refuse, not an in-place fix.
 
 > **RESOLVED.** Ben, 2026-10-21 (routing form): b) granted - the scorer prices and builds the chain. Recorded in AI_OPPONENT.md section 11 'AI lays a hub chain to reach the capital'; the work is BL-1395 (AI_LAYS_HUB_CHAIN).
+
+### NR-1060 — Rival hub chains on the player's nation's ground: builder or ground?
+*decision · raised 2026-10-21 · from BL-1395 (rival lays a hub chain), cold review finding 4*
+
+Your grant excludes 'any chain for the player's nation or champion'. The 2026-10-15 grant's like wording is implemented as a BUILDER test (the player's corp and champion never source). Built conservatively: a rival building on the PLAYER's nation's ground keeps the old rule exactly - one hub on or beside the site, priced as one - and never lays a chain there. Elsewhere it lays the full chain.
+
+**Why it matters.** On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.
+
+> **RESOLVED.** Ben, 2026-10-23 (the sprint 55 close forms): stricter than either reading - a rival may build NOTHING on the player's nation's ground (AI_OPPONENT.md section 11, a narrowing). And a shipment needs the Logistic Points of its WHOLE route, from its market's centre to the market it trades with, international trades included (LOGISTICS.md, SUPPLY.md). Both are work, filed in the backlog.
 
 ### NR-1061 — Ports cross sea, not lakes
 *decision · raised 2026-10-21 · from BL-1396 (port reach over water), cold review finding 7*

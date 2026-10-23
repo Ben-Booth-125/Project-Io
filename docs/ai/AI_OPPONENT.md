@@ -2220,6 +2220,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   on ground the builder may not build on. Pure, seeded, deterministic, replayable, legal verbs
   only, never a planner.
 
+  **No rival builds on the player's nation's ground (Ben, 2026-10-23, NR-1060).** A narrowing,
+  not a grant: it takes behaviour away. No rival corporation's scorer places anything on ground
+  the player's nation owns — no production building, and no hub, station or port. So the
+  exclusions above read as both **builder** and **ground**: a rival lays a chain only where it
+  may build, and it may not build there.
+
   **A rival major's state industry runs under its champion's layer — granted (Ben, 2026-10-11;
   `../politics/NATIONS.md` § State industry).** State buildings are a new actor grain: buildings a
   nation owns with no corporation between. A rival major's state buildings may take the same

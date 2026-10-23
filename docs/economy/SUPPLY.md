@@ -162,7 +162,9 @@ without reaching a shelf.
    left in the pool of the nation whose ground that is ([LOGISTICS.md](LOGISTICS.md) § How a
    tile's points get to it): a cargo sized above what the anchor still admits this tick leaves at
    what it admits and pays that share of the leg's cost, rather than not leaving at all (Ben,
-   2026-10-05, NR-969). Trade points are the owner's capacity; Logistic Points are the place's; a
+   2026-10-05, NR-969). The draw covers **the whole route** to the market it trades with, not the
+   anchor alone (Ben, 2026-10-23, NR-1060; [LOGISTICS.md](LOGISTICS.md) § A shipment draws points
+   again). Trade points are the owner's capacity; Logistic Points are the place's; a
    shipment passes both (`TRADE.md` § The Planetary Marketplace).
 4. **It pays the haul now.** The trader's balance is charged the leg's cost when the shipment
    leaves (§ Logistical cost). A trader that cannot cover the haul and the purchase ships nothing.

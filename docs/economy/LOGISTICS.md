@@ -188,6 +188,11 @@ anybody's reach: the two answer different questions — *what does this tile sel
 a firm build* — and only the second is a permission. Keeping them apart is what lets a market render
 whole while placement stays honest about the road.
 
+**The leg is three a step, times the ground it crosses (Ben, 2026-10-23, NR-1050).** Each step costs
+**3.0 × the tile's own traversal weight**, so open water and mountain push a market's edge back as
+they lengthen every other walk. The leg prices **market attraction only**: it moves no Logistic
+Points. Off the networks, points supply **units** alone (§ Logistic Points).
+
 ### 4. Roads — an edge between two tiles, generated then extended by hand
 
 **A road runs from one tile centre to another, and may span water (Ben, 2026-10-17).** The link is
@@ -708,7 +713,8 @@ into passive and active. What follows replaces the bifold model, the city genera
   and land on its shore — though a port still stands only on a sea coast. Owned by BL-1396 (port
   reach over water).
 - **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
-  points carry **20 tiles** along the line, and they are delivered at **the tile the line connects
+  points carry **20 tiles** along the line at full strength and fade to zero at double, **40** — the
+  road's rule (Ben, 2026-10-23, NR-1056) — and they are delivered at **the tile the line connects
   to** — never to the country the line passes through. So rail is a link between places rather than
   a blanket over ground, which is what makes it the **inter-market** carrier, and it is the same rule
   goods already obey: they board and leave only at stations (§ 4c).
@@ -861,8 +867,10 @@ trade and the factories behind it wait. A campaign visibly starving its own indu
 intended, legible cost of marching.
 
 **A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
-reinstated: a shipment draws at the anchor it leaves, **by cargo quantity** — the settled formula,
-*what moves, not how far*. It is what makes rail's twenty tiles matter, because an inter-market haul
+reinstated: a shipment draws **by cargo quantity**.
+**It pays for its whole route (Ben, 2026-10-23, NR-1060):** a shipment needs the Logistic Points its route costs **from its market's
+centre all the way to the market it trades with** — an international trade included — not only at
+the anchor it leaves. So distance now counts as well as cargo. It is what makes rail's twenty tiles matter, because an inter-market haul
 now has to be paid for in the capacity that carries it, and what makes a market's logistics a real
 constraint on its trading rather than a number beside it. A trade is a standing route with nobody to
 tell, so it is never refused whole: its shipment sends what the anchor admits, exactly as
@@ -914,8 +922,8 @@ cannot generate, since the half that serves trade is not owned by anybody.
 
 **Trade points are not Logistic Points (Ben, 2026-10-10).** Trade points are how much an *owner*
 can move, made by its Planetary Marketplaces and Ports (`TRADE.md`); passive LP is how much can move
-*through a place*. A shipment spends its owner's trade points and still passes the passive cap at
-the anchor nearest its source market's centre, on a leg within a body (`SUPPLY.md` § A shipment).
+*through a place*. A shipment spends its owner's trade points and still pays Logistic Points for its
+whole route from its source market's centre, on a leg within a body (`SUPPLY.md` § A shipment).
 Neither replaces the other.
 
 ### Active use costs credits — and that is not a reversal of "a cap, not a price"
@@ -974,10 +982,12 @@ Each rejected an earlier cut. Two are structural.
    cache happens to hold.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
-   **Settled (Ben, 2026-08-25): the draw is what MOVES, not how far.** A passive convoy draw is
-   its **cargo quantity**; an active march draw is its **march points**. One rate serves both, so
-   a unit of goods and a march-point's worth of movement burden an anchor equally — the implicit
-   exchange rate, and a first cut. Distance stays priced in credits and only in credits.
+   **Settled (Ben, 2026-08-25): a convoy draw is its cargo quantity; a march draw is its march
+   points.** One rate serves both, so a unit of goods and a march-point's worth of movement burden
+   an anchor equally — the implicit exchange rate, kept as settled (Ben, 2026-10-23, NR-1049).
+   **For a shipment, distance now counts too (Ben, 2026-10-23, NR-1060):** it pays for its whole
+   route (§ A shipment draws points again), which overturns the old rule that only cargo, never
+   distance, decides the draw.
 4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
    nodes decide how much you may move" is fictional; city generation is what makes the rate real.
 5. **A rival must be able to build the generator.** `corp_ai.cpp`'s scorer carries `place_road`

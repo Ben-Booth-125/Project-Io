@@ -28,9 +28,11 @@ pushing is Ben's (`git push origin main --follow-tags`). The next sprint is not 
 
 ## 2. Waiting on Ben
 
-- **Open review calls** (NEEDS_REVIEW.md): NR-1060 (rival hub chains on the player's ground),
-  NR-1056 (rail's fade past 20), NR-1055 (tile card Uses counts own buildings), NR-1049, NR-1050,
-  NR-1052 and the older NR-1003..NR-1035.
+- **Sprint 55's six calls are ruled** (Ben, 2026-10-23; register `sprint-55.json`, 18 rulings,
+  0 failing). Rail now fades to zero at 40 (a world mover: its digest movement waits for the next
+  wave's re-bless). NR-1060 left two items: BL-1399 (no rival on player ground) and BL-1400
+  (shipment pays whole route), each with open questions to settle before building.
+- **Older open review calls** (NEEDS_REVIEW.md): NR-966..NR-1035, 24 entries.
 
 ## 3. Owed
 

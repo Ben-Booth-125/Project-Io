@@ -116,14 +116,15 @@ inline constexpr std::array<float, lp_network_count> lp_source_points = {120.0f,
 /// further - Track 6 tiles, Road 8, Highway 10 at full strength, fading to ZERO AT
 /// DOUBLE (12 / 16 / 20). The road entry stays one cost threshold, 6, and the TIER
 /// is carried by the step cost below: 6 / 1.0 = 6, 6 / 0.75 = 8, 6 / 0.6 = 10 tiles.
-/// Rail carries 20 track steps, delivered point to point (lp_distance_field).
+/// Rail carries 20 track steps, delivered point to point (lp_distance_field), and
+/// fades to zero at double (40) - the road's rule (Ben, 2026-10-23, NR-1056).
 /// BL-1396 (Ben, 2026-10-21): a port stretches FIFTY water tiles at full strength,
 /// fading to zero at double (100) - the road's rule at sea's scale - and over water
 /// only: its points land on the coastal tiles they reach and go no further inland.
 inline constexpr std::array<float, lp_network_count> lp_full_reach = {6.0f, 20.0f, 50.0f};
-/// Fade length beyond the full-strength distance (reach 0 at full + fade). The road's
-/// and the sea's equal their full reach, which is what "zero at double" means.
-inline constexpr std::array<float, lp_network_count> lp_fade_length = {6.0f, 8.0f, 50.0f};
+/// Fade length beyond the full-strength distance (reach 0 at full + fade). Every
+/// network's equals its full reach, which is what "zero at double" means.
+inline constexpr std::array<float, lp_network_count> lp_fade_length = {6.0f, 20.0f, 50.0f};
 /// A road step's cost by tier (index 1..3). Index 0 is "no road": off the network.
 /// BL-1360: 1.0 / 0.75 / 0.6, so the tiers reach 6 / 8 / 10 tiles at full strength.
 inline constexpr std::array<float, 4> lp_road_step = {3.0f, 1.0f, 0.75f, 0.6f};

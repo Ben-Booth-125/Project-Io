@@ -444,6 +444,50 @@
    ],
    "title": "A newly built road reads as connected in every direction, though the build is pairwise",
    "design": "SPRINT 55. BEN, in play on 2026-10-18: \"It looks like roads are still rendered as adjoining even if the build is pairwise. When I build a new road tile, I see it connect in all possible directions, not just the direction it was built in.\" WHAT THE CODE SAYS, read the same day: the simulation is right - construction.cpp's lay_road_edge raises ONE crossing (both halves of that one edge), and BOTH draw paths gate on the edge mask, not on the neighbour: body_surface_canvas's draw_network skips a direction where road_tier_on_side is 0 ('nothing is laid across THIS boundary'), and the bake's road_links_of does the same before tile_pieces. So the all-directions read is NOT the two paths disagreeing with the mask, and three candidate causes remain, in order of likelihood: (1) the ARMED HIGHLIGHT persists after the lay, so the legal crossings still drawn around the new tile read as built road (BL-1370's highlight, drawn by the same press); (2) the NEIGHBOUR already carried generated edges on its other sides, so the junction genuinely connects several ways and only the new edge is new; (3) a stale bake chunk re-derived from road rather than road_sides. THE WORK: reproduce live at the zoom Ben was at, name which of the three it is, and fix that one - it is a visual triage item, so the live look comes before any code. It matters beyond itself because BL-1353's lens honesty rests on the road picture being true. ID MOVED on integration, 2026-10-19: filed as BL-1382 in sprint 55's session while sprint 56's worktree filed a different BL-1382 (PROVINCE_NORMALISING_PASS) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1394. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-23",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (sprint 55 close form, NR-1060, 2026-10-23)",
+   "requires": [],
+   "id": "BL-1399",
+   "short_name": "NO_RIVAL_ON_PLAYER_GROUND",
+   "category": "AI",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "A rival builds nothing on the player's nation's ground",
+   "design": "BEN, 2026-10-23, resolving NR-1060 (rival hub chains on the player's ground): \"a rival shouldn't be able to build on your nation's ground\" - and, asked whether that meant logistics sources only or everything, \"nothing at all\". AI_OPPONENT.md section 11 records it as a NARROWING, not a grant. WHAT THE CODE DOES, read the same day: corp_ai.cpp still scores sites on the player's nation's ground, and BL-1395's legacy branch (the 'tn->second == lp_player_nation' tests near lines 1297 and 3409) keeps the one-hub rule there pending NR-1060. THE WORK: drop every tile the player's nation owns from every rival placement candidate - production buildings and hubs, stations and ports alike - and delete the now-dead one-hub legacy branch. It is a world mover: report the digest movement and wait for the wave's re-bless. OPEN, to confirm with Ben before building: (a) GLOSSARY.md makes every non-player corporation a rival, so a rival homed in the player's own nation is excluded too on the literal reading; (b) whether generation and the settle may still place rival assets on that ground, or only the campaign scorer is barred."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-23",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (sprint 55 close form, NR-1060, 2026-10-23)",
+   "requires": [],
+   "id": "BL-1400",
+   "short_name": "SHIPMENT_PAYS_WHOLE_ROUTE",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/logistic_points.cpp",
+    "src/world/trade.cpp"
+   ],
+   "title": "A shipment pays the Logistic Points of its whole route, market centre to trading market",
+   "design": "BEN, 2026-10-23, resolving NR-1060: \"A shipment needs the required LP cost across the whole route from its market centre to the trading market\" - international trades included. LOGISTICS.md section 'A shipment draws points again' and SUPPLY.md section A shipment item 3 now say so; this overturns BL-1361's anchor-only draw ('what moves, not how far'). THE WORK: replace the single anchor draw in supply_system with a route draw, keeping NR-969's rule that a short shipment sends what is admitted rather than nothing. OPEN, to settle with Ben before building (Full mode: economy seam): (1) the formula - cargo x the route's LP traversal cost, or cargo drawn at each tile/anchor the route crosses; (2) whose pool pays a leg on foreign ground - the exporter's nation throughout, or each nation for the leg on its own ground; (3) how a leg through ground no connected source reaches is treated. Multi-tick rows only (a one-tick row cannot see the price its own buyer moves)."
   }
  ]
 }
