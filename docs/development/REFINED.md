@@ -30,10 +30,20 @@ disjoint files; BL-1404 owns `world_save.cpp` until BL-1407. Wave 3 is serial.
 - [ ] **T4** `tools/verify/nation_ai_builds.cpp`. (R1, R2)
 
 ### BL-1402 (fold to ground) — Delivery Full, group `fold-to-ground`
-- [ ] **T1** `fold_to_ground` replaces `hand_over_state_industry`: every building to its ground nation in
-  (firm id, asset order); balances to treasuries; units re-owned; HQ cleared; stock re-keyed. (R1, R2)
-- [ ] **T2** `fund_state_nodes_from_firms` retires; `is_player_owned` / `player_nation` read the nation. (R1)
-- [ ] **T3** `tools/verify/fold_census.cpp`. (R1-R3)
+An audit (2026-10-24) found twelve subsystems that walk corporations only; folding first would freeze
+research and education, stop inter-body and manual trade, refuse hires, surveys, roads and demolition,
+and leak treasury money into empty corporations. So the PORT lands first, the fold last.
+- [x] **T0** `purse_of` / `purse_room_of` / `owner_holds`, the money twin of `assets_of` (ad810329).
+- [ ] **T1 lane E** research count and economy term, education, processing yield, market shelf helpers,
+  conditions, standings, the march credit cost read any owner.
+- [ ] **T2 lane T** inter-body lanes, manual trades, trade reserve and points, interception, survey serve any owner.
+- [ ] **T3 lane M** budget payees and claw-backs, hire / muster / naval gates, roads, demolition, trade and
+  research verbs for a nation acting as itself; procurement refuses a nation.
+- [ ] **T4** `fold_to_ground` replaces `hand_over_state_industry`: every building to its ground nation in
+  (firm id, asset order); balances to treasuries; units and rail re-owned; HQ cleared. (R1, R2)
+- [ ] **T5** unit upkeep for nation-owned units (budget_system); `is_player_owned` / `player_present_on` read the nation. (R1)
+- [ ] **T6** `tools/verify/fold_census.cpp`. (R1-R3)
+- [ ] **T7** re-apply the BL-1403 patch (`docs/development/drafts/bl-1403-money-flows.patch`) once the fold is in, and measure both.
 
 ### BL-1403 (nation money flows) — lane M, group `nation-money-flows`
 - [ ] **T1** Tax from wages (`nation_tax.hpp`, `budget_system.cpp`, `nation_step.cpp`). (R1)

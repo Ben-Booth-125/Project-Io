@@ -1,0 +1,243 @@
+diff --git a/src/world/budget_system.cpp b/src/world/budget_system.cpp
+index eb7a0cda..6d1902ca 100644
+--- a/src/world/budget_system.cpp
++++ b/src/world/budget_system.cpp
+@@ -195,17 +195,15 @@ void apply_budget(world& w,
+     // loop in sorted order. Debits stay per-corp and are untouched.
+     std::vector<std::tuple<entity_id, entity_id, float>> levy_credits;
+ 
+-    // BL-1335 (NATIONS.md § Taxes and Discontent): the quarter's tax, taken HERE
+-    // — after interest, before the return is filed — so the filed `net` carries
+-    // it and the returns telescope. The home nation's tier rate of the money
+-    // loop's operating profit (income less every outflow, floored at 0). The
+-    // debit is per corp in the loop; the credit is deferred and applied in
+-    // ascending (corp, nation) order like the levy's, the same float. Never in
+-    // the campaign settle (`research_age_open`): every nation opens play at
+-    // tier III with Discontent 0 and no firm taxed.
++    // BL-1403 (Ben, 2026-10-23: "Taxes are taken from wages, which are also paid
++    // for by the nation"; NATIONS.md § Taxes and Discontent): the quarter's tax is
++    // the nation's tier share of the WAGES its own buildings paid, credited back to
++    // its treasury in the state pass below. It replaces BL-1335's tax on home
++    // firms' operating profit, which had no firm left to tax; a corporation is not
++    // taxed. Never in the campaign settle (`research_age_open`): every nation opens
++    // play at tier III with Discontent 0 and nothing taxed.
+     const bool      tax_pass = research_age_open(w);
+     const tax_params& taxp   = reg.tax();
+-    std::vector<std::tuple<entity_id, entity_id, float>> tax_credits;
+ 
+     // BL-626: this tick's quarterly returns, keyed by corp. Collected here and
+     // FILED after the loop, in the map's own ascending entity_id order, because
+@@ -430,31 +428,9 @@ void apply_budget(world& w,
+ 
+         cc.balance += delta; // bit-identical to the pre-BL-072 arithmetic; may go negative
+ 
+-        // BL-073: debt interest. Charged once per tick on the balance that is now
+-        // negative (the outstanding debt after this tick's operating flows), so a
+-        // corp underwater compounds its decline. Pure function of balance × the
+-        // fixed rate — deterministic, no wall-clock. Zero while solvent.
+-        if (cc.balance < 0.0f)
+-        {
+-            bud.interest = -cc.balance * k_debt_interest_per_quarter;
+-            cc.balance  -= bud.interest;
+-        }
+-
+-        // BL-1335: the tax (see tax_pass above).
+-        if (tax_pass)
+-        {
+-            const auto nit = w.nations.find(cc.home_nation);
+-            if (nit != w.nations.end())
+-            {
+-                const float tax = nation_tax_due(bud, nit->second.tax_tier, taxp);
+-                if (tax > 0.0f)
+-                {
+-                    bud.taxes   = tax;
+-                    cc.balance -= tax; // the debit half
+-                    tax_credits.emplace_back(corp, cc.home_nation, tax);
+-                }
+-            }
+-        }
++        // BL-073's debt interest RETIRED with BL-1403 (Ben, 2026-10-23): a nation
++        // never runs into debt, and the corporation it compounded on is being
++        // folded into its nation (BL-1402). `bud.interest` stays 0.
+ 
+         if (breakdown)
+             (*breakdown)[corp] = bud;
+@@ -499,16 +475,6 @@ void apply_budget(world& w,
+         }
+     }
+ 
+-    // BL-1335: the tax credits, ascending (corp, nation) — the same floats the
+-    // loop debited, so the transfer conserves by construction.
+-    if (!tax_credits.empty())
+-    {
+-        std::sort(tax_credits.begin(), tax_credits.end());
+-        for (const auto& [payer, nation, amount] : tax_credits)
+-            if (const auto nat = w.nations.find(nation); nat != w.nations.end())
+-                nat->second.treasury += amount;
+-    }
+-
+     // BL-1296 — THE STATE PASS (NATIONS.md § State industry; § 2, the second
+     // exception). A major's state buildings trade on the market with the
+     // treasury in place of a balance: what they landed was sold at the clear
+@@ -568,6 +534,17 @@ void apply_budget(world& w,
+                 led.wages       += opex.wages;
+                 delta           -= opex.wages;
+             }
++            // BL-1403: the wage tax — the tier's share of the wages the nation's
++            // own buildings paid this tick comes back to its treasury (a higher
++            // tier lowers the net wage bill; Discontent is its cost, nation_step).
++            // Taken on what was actually paid, after the wages, so it can never
++            // carry the treasury below where the wages left it.
++            if (tax_pass && led.wages > 0.0f)
++            {
++                const float tax = nation_wage_tax(led.wages, nc.tax_tier, taxp);
++                led.taxes = tax;
++                delta    += tax;
++            }
+             // BL-1255: the nation's track, after its buildings — FUNDED by this
+             // tick's gate (plan_state_funding committed it), or IDLE
+             // (`w.rail_idle`) and charged nothing. The clamp is the never-debt
+diff --git a/src/world/economy_system.hpp b/src/world/economy_system.hpp
+index af48c518..e2cdf46c 100644
+--- a/src/world/economy_system.hpp
++++ b/src/world/economy_system.hpp
+@@ -131,6 +131,18 @@ struct corp_budget
+     }
+ };
+ 
++/// BL-1403 (Ben, 2026-10-23; NATIONS.md § Taxes and Discontent): the tax a nation
++/// takes back from the @p wages its own buildings paid this tick, at tier @p tier —
++/// the tier's rate of the wages, 0 when nothing was paid. The one definition
++/// apply_budget's state pass credits and a harness re-derives.
++inline float nation_wage_tax(float wages, int tier, const tax_params& p)
++{
++    if (!std::isfinite(wages) || !(wages > 0.0f))
++        return 0.0f;
++    const float tax = wages * p.rate[tax_tier_index(tier)];
++    return (std::isfinite(tax) && tax > 0.0f) ? tax : 0.0f;
++}
++
+ /// BL-1335: the tax a firm owes its home nation on this quarter's money loop at
+ /// tier @p tier — the tier's rate of the operating profit (income less
+ /// expenditure, maintenance, wages, interest, levies and upkeep; subsidies and
+diff --git a/src/world/hard_coded_world.cpp b/src/world/hard_coded_world.cpp
+index a7ca09d3..d8142c39 100644
+--- a/src/world/hard_coded_world.cpp
++++ b/src/world/hard_coded_world.cpp
+@@ -3807,13 +3807,12 @@ void run_tail(generation_cursor& c)
+         report->stage_lines.emplace_back(buf);
+     }
+ 
+-    // BL-343/BL-480/BL-741: the prototype levy, seeded ENACTED — since BL-741
+-    // by EVERY nation over its own jurisdiction (one nation's levy left 42
+-    // treasuries empty and every state demand channel unfunded). Enactment is
+-    // a governing-body act, not a player control; each levy is a transfer into
+-    // its own author's treasury, bounded by that jurisdiction. Runs after
+-    // generate_nations/generate_corporations. See law.cpp's seeding comment.
+-    seed_prototype_laws(w);
++    // BL-1403 (Ben, 2026-10-23; NATIONS.md § 4. Law authorship): NO EXTRACTION
++    // LEVY IS SEEDED. BL-343/BL-480/BL-741 seeded one per nation, a transfer from
++    // the firms extracting on its ground into its treasury; with every building
++    // the nation's own (BL-1402), the author would charge itself. The treasury is
++    // funded by its own buildings' sales instead. `seed_prototype_laws` stays for
++    // the fixtures that exercise the levy machinery the save format still reads.
+ 
+     // BL-466/BL-623: the CANONICAL whole-world province partition. The
+     // homeworld was partitioned before its roads (BL-623, provinces before
+diff --git a/src/world/nation_budget.hpp b/src/world/nation_budget.hpp
+index e8fe2635..22c9d961 100644
+--- a/src/world/nation_budget.hpp
++++ b/src/world/nation_budget.hpp
+@@ -113,8 +113,10 @@ enum class budget_priority : uint8_t
+     contracted_force      = 5, ///< Buying force it does not raise (CONTRACTS.md, BL-377).
+     strategic_reserve     = 6, ///< Buying goods to HOLD. Distinct from `reserve_fraction`,
+                                ///< which withholds CREDITS: this line spends them.
+-    public_works          = 7, ///< Works a corporation builds and the nation pays for.
+-    charters              = 8, ///< Paying a corporation to exist somewhere it otherwise would not.
++    public_works          = 7, ///< RESERVED (BL-1403, Ben 2026-10-23): paid a corporation to build
++                               ///< works; the nation builds its own. No consumer claims it, so it
++                               ///< pays nothing; kept because a weight vector is indexed by the enum.
++    charters              = 8, ///< RESERVED (BL-1403): paid a corporation to exist; there are none.
+     space_programme       = 9, ///< Government satellite launches — spacecraft_components and
+                                ///< propellant, bought procurement-style and CONSUMED
+                                ///< (space_programme.hpp is the consumer; BL-644).
+diff --git a/src/world/nation_tax.hpp b/src/world/nation_tax.hpp
+index bd043161..444a7f42 100644
+--- a/src/world/nation_tax.hpp
++++ b/src/world/nation_tax.hpp
+@@ -8,10 +8,12 @@
+ // points production output accrues (economy_system.cpp), the AI tier pick in
+ // nation_ai.cpp, the player's verb in corp_command.cpp.
+ //
+-// A nation taxes the firms HEADQUARTERED on its ground (`home_nation`) at a tier
+-// I..V: each quarter it takes the tier's rate of the operating profit each such
+-// firm's money loop earned that quarter — a TRANSFER, the firm debited and the
+-// treasury credited the same float in the same tick. A tier above the middle
++// A nation taxes the WAGES its own buildings pay (BL-1403, Ben 2026-10-23: "Taxes
++// are taken from wages, which are also paid for by the nation") at a tier I..V:
++// each tick the tier's rate of those wages comes back to its treasury, so a higher
++// tier lowers the net wage bill (`nation_wage_tax`, economy_system.hpp). It
++// replaced the tax on home firms' operating profit, which had no firm left to
++// tax. A tier above the middle
+ // raises the nation's Discontent each quarter, the middle holds it, a tier below
+ // lowers it; above the bite threshold every building on the nation's GROUND (any
+ // owner) loses output in proportion, up to `max_penalty` at full Discontent.
+@@ -35,8 +37,8 @@ inline constexpr int k_tax_tier_count   = 5;
+ /// values, so a registry that never read Lua runs the same mechanic.
+ struct tax_params
+ {
+-    /// The share of a home firm's quarterly operating profit the nation takes,
+-    /// by tier I..V. Each finite in [0, 1].
++    /// The share of the wages it pays that the nation takes back, by tier I..V
++    /// (BL-1403). Each finite in [0, 1].
+     std::array<float, k_tax_tier_count> rate = {0.0f, 0.05f, 0.10f, 0.15f, 0.20f};
+ 
+     /// Discontent added per quarter at each tier I..V (negative = ebbs). Each
+diff --git a/src/world/supply_system.cpp b/src/world/supply_system.cpp
+index fe4aa03e..21196096 100644
+--- a/src/world/supply_system.cpp
++++ b/src/world/supply_system.cpp
+@@ -264,20 +264,35 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
+                 const auto n = w.tile_to_nation.find(m->second.centre_tile);
+                 return n == w.tile_to_nation.end() ? null_entity : n->second;
+             };
+-            const entity_id dest_nation = nation_of(convoy.dest_market);
+-            const entity_id src_nation  = nation_of(convoy.source_market);
+-            const auto      tnit        = w.nations.find(dest_nation);
+-            const auto      cit         = w.corporations.find(convoy.corp);
+-            if (dest_nation != null_entity && dest_nation != src_nation
+-                && tnit != w.nations.end() && cit != w.corporations.end())
++            // BL-1403 (Ben, 2026-10-23; NATIONS.md § The import tariff): the duty
++            // falls on a FOREIGN NATION'S goods entering — the owner's nation, not
++            // the source market's — so a nation's own goods in its own market pay
++            // nothing wherever they were shipped from. The owner is a corporation
++            // (its home nation; its balance pays) or a nation (itself; its treasury
++            // pays). A nation never runs into debt, so its duty is capped at what
++            // its treasury holds (decided on Ben's behalf, NR-1067).
++            const entity_id dest_nation  = nation_of(convoy.dest_market);
++            const entity_id owner_nation = owner_home_nation(w, convoy.corp);
++            const auto      tnit         = w.nations.find(dest_nation);
++            const auto      cit          = w.corporations.find(convoy.corp);
++            const auto      onit         = cit == w.corporations.end() ? w.nations.find(convoy.corp)
++                                                                       : w.nations.end();
++            if (dest_nation != null_entity && owner_nation != dest_nation
++                && tnit != w.nations.end()
++                && (cit != w.corporations.end() || onit != w.nations.end()))
+             {
+                 const float rate = nation_tariff_rate(w, dest_nation, convoy.cargo_resource);
+                 const float px   = dispatch_market_price(mit->second,
+                                                          static_cast<std::size_t>(convoy.cargo_resource));
+-                const float duty = convoy.cargo_qty * px * rate;
++                float duty = convoy.cargo_qty * px * rate;
++                if (onit != w.nations.end())
++                    duty = std::min(duty, std::max(0.0f, onit->second.treasury));
+                 if (rate > 0.0f && std::isfinite(duty) && duty > 0.0f)
+                 {
+-                    cit->second.balance  -= duty;
++                    if (cit != w.corporations.end())
++                        cit->second.balance  -= duty;
++                    else
++                        onit->second.treasury -= duty;
+                     tnit->second.treasury += duty;
+                 }
+             }
