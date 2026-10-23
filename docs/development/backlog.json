@@ -184,27 +184,6 @@
    "design": "SPRINT 55 (Ben, 2026-10-16: leave it for now, revisit after the live run). As built in BL-1335 (taxes and Discontent), the AI tier scorer counts a nation short whenever its research queue owes, so every nation sits at III with one year at IV; Discontent peaks at 0.25 and never bites in 80 years; treasuries end 7x main because the budget does not spend the new revenue. Option offered: raise taxes only when the treasury cannot cover the budget lines, cut them on surplus. Compare against Ben's play log first."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 56,
-   "written": "2026-10-16",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Claude (found verifying BL-1335, 2026-10-16)",
-   "requires": [],
-   "category": "Verification",
-   "priority": "B",
-   "difficulty": 2,
-   "id": "BL-1338",
-   "short_name": "DIGEST_PINS_STALE",
-   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-   "files": [
-    "tools/verify/player_seed_sweep.cpp"
-   ],
-   "title": "player_seed_sweep digest pins fail on every digest for every seed, both arcs",
-   "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben. RULED (Ben, 2026-10-16): attribute the movers on the sprint 56 branch; re-pin at integration after sprint 55 lands, not on the branch. RE-PIN AUTHORISED IN PRINCIPLE (Ben, 2026-10-17): the integrating session may re-pin both arcs on the integrated tree once sprints 55 and 56 are merged and gated; movers in docs/development/drafts/sprint-56-digest-attribution.md."
-  },
-  {
    "status": "designed",
    "glyph": "○",
    "sprint": 55,

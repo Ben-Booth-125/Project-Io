@@ -12,6 +12,67 @@ release.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-23
+
+*The economy functions, logistics included. Sprint 55 opened as a spectator run to 2040 with space
+and became the logistics arc: one Logistic Point system, routed along a chain to each nation's
+capital, carried by roads, rail and ports, drawn by production and now by trade, and seeded by
+generation from the capital outward. Sprint 56 made the ground trustworthy: one territory per
+nation, a ground paint inside a minute, and gates that tell the truth. All five market viability
+targets pass.*
+
+### Added
+
+- **One Logistic Point system** (BL-1352 (LP one system)): a march draws its nation's pool and
+  claims first, then production, then trade.
+- **Routed requests** (BL-1356 (LP routed requests)): a tile's points come along a chain of sources
+  connected to its nation's capital, nearest first, the fade capping each source's share. Rivals
+  price and lay the whole hub chain a build needs (BL-1395 (AI lays hub chain)).
+- **Reach by network** (BL-1360 (road tier extends reach)): Track 6, Road 8, Highway 10 tiles at
+  full strength, gone at double; rail reaches 20 and delivers only where it connects. A port
+  stretches 50 tiles over water, lakes too, and lands on the shore (BL-1396 (port reach fifty)).
+- **A shipment draws points again** (BL-1361 (trade draws points)): by cargo, at its market's
+  centre, from what the march and production left; the cover there caps the share, and a cargo is
+  trimmed, never refused whole.
+- **The capital is the peak** (BL-1367 (LP source layout)): generation seeds a source on every
+  capital, then covers every market centre from it, then the consumers. `lp_coverage_census` is now
+  a gate on the three rules, read through the funding gate.
+- **No capital starts dark** (BL-1398 (no capital starts dark)): a minor may hold its network nodes
+  as the state; the firms on a short nation's ground fund its opening node bill; the funding gate
+  pays network nodes first.
+- **Logistics on screen**: the Throughput lens's ground card (BL-1353 (LP lens rework)) and the tile
+  card's Logistics section (BL-1354 (tile logistics section)).
+- **Market attraction** (BL-1346 (market attraction)): a tile clears at the market it is most
+  attracted to, cost over pull, not the nearest.
+- Sprint 55's first half: the construction UI arc, roads as edges with bridges and the three
+  placement rules, taxes and Discontent, the Life reroll, the space asset model, the headless
+  spectator runner, nation research AI and the LP coverage census.
+- Sprint 56: nations contiguous (BL-1310 (nations contiguous)), a province normalising pass
+  (BL-1382 (province normalising pass)), no realm closes the history empty (BL-1386 (no realm closes
+  empty)), the ground benchmark and paint (BL-1247 (ground benchmark), BL-1311 (ground paint perf): seat wait 750 s ->
+  34 s, peak 12.4 -> 6.66 GB), and the return net held exact (BL-1337 (return net crosses zero)).
+
+### Changed
+
+- **The lake size cap is 75 tiles** (BL-1397 (lake cap 75)): eight more enclosed bodies are sea.
+- Minor nations now hold state buildings (their logistics nodes), pay for them from the treasury,
+  and trade through a state port like a major.
+
+### Known
+
+- **Gates at the tip:** market_viability FULL G1 95.7, G1t50 89.1, G1b 2.6, G2 157.5, G3 96.4, all
+  pass; haulage --far-trade 834 / 971 convoys; lp_coverage_census every rule passes on 16 seeds,
+  21 capitals dark at the fold (nations that cannot fund their nodes); world_determinism and
+  save_roundtrip pass.
+- **Red harnesses:** supply_advance R5, pools_per_market (a), unposted_bid U2/U7a, railway,
+  state_industry, lp_pool (L7, BL-1383), hauler_room, shelf_share and nation_budget_harness R9;
+  tax_discontent_harness does not compile.
+- **The space waves** of sprint 55 (BL-1326..BL-1333) carry to a later sprint.
+- **The digest pins are re-blessed** (BL-1338 (digest pins stale), Ben 2026-10-23): both
+  `player_seed_sweep` arcs re-pinned at bd33e496 against the shape in
+  `docs/development/drafts/v0.2.0-rebless.md`; every mover since 2026-10-10 is named, none
+  unexplained.
+
 ## [0.1.32] — 2026-10-15
 
 *The player is a nation. Sprint 53 moved the player from a corporation holding a seat to a major
@@ -1597,7 +1658,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.32...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.32...v0.2.0
 [0.1.32]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.31...v0.1.32
 [0.1.31]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.30...v0.1.31
 [0.1.30]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.29...v0.1.30

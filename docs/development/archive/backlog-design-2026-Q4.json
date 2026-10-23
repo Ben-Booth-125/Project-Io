@@ -9502,6 +9502,46 @@
         "title",
         "design"
       ]
+    },
+    "BL-1338": {
+      "status": "complete",
+      "glyph": "○",
+      "sprint": 56,
+      "written": "2026-10-16",
+      "parked": false,
+      "blocked_on": null,
+      "author": "Claude (found verifying BL-1335, 2026-10-16)",
+      "requires": [],
+      "category": "Verification",
+      "priority": "B",
+      "difficulty": 2,
+      "id": "BL-1338",
+      "short_name": "DIGEST_PINS_STALE",
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "files": [
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "title": "player_seed_sweep digest pins fail on every digest for every seed, both arcs",
+      "design": "Confirmed on main 2026-10-16: seed 0 shipped arc D_search 5CC46DB210F04D68 vs pinned 11013ABA30FEF609, D_land/D_settle/D_seat all differ. Pins date from 484ccb29 (2026-10-10); --guard does not check them so nothing noticed. Attribute the movers (save bumps v48-v52, sprint 53-55 world movers) before any re-pin; re-pin is a re-bless and needs Ben. RULED (Ben, 2026-10-16): attribute the movers on the sprint 56 branch; re-pin at integration after sprint 55 lands, not on the branch. RE-PIN AUTHORISED IN PRINCIPLE (Ben, 2026-10-17): the integrating session may re-pin both arcs on the integrated tree once sprints 55 and 56 are merged and gated; movers in docs/development/drafts/sprint-56-digest-attribution.md. DELIVERED 2026-10-23 at the v0.2.0 cut (Ben's go, 2026-10-23): both player_seed_sweep arcs re-pinned to the 16-seed table at bd33e496. The shape: docs/development/drafts/v0.2.0-rebless.md - a walk of all 31 world-touching first-parent commits after 42eb9d99 (seeds 0/28/46, both arcs, each tree exported with git archive), 13 movers, every one an intended world change, none unexplained; with sprint 56's attribution to aa3c6304 every mover since the 2026-10-10 pins is named. VERIFIED: --digest-check 16/16 PASS on the shipped arc and 16/16 on the legacy arc, every row seating exactly one player.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "category",
+        "priority",
+        "difficulty",
+        "id",
+        "short_name",
+        "authority_doc",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }
