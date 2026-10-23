@@ -8035,6 +8035,50 @@
         "title",
         "design"
       ]
+    },
+    "BL-1247": {
+      "status": "complete",
+      "glyph": "✓",
+      "sprint": 51,
+      "written": "2026-10-09",
+      "requires": [
+        "BL-1246"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "category": "Tooling",
+      "priority": "A",
+      "difficulty": 2,
+      "id": "BL-1247",
+      "short_name": "GROUND_BENCHMARK",
+      "author": "Ben (2026-10-09, after walking the sprint 51 build: the ground lag is off-putting; build it now)",
+      "title": "A ground benchmark reports the five target-hardware budgets on the machine it runs on",
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "files": [
+        "scripts/verify/ground_benchmark.lua",
+        "src/core/verify_api.cpp",
+        "src/core/ground_layer.cpp"
+      ],
+      "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware. WORK: a check (a non-verify timing mode of the app, since --verify bakes synchronously and would measure the wrong thing) that reports, on the machine it runs on: the home-body pre-bake time added to generation (budget 15 s); whether any zoom or pan step on the home body shows a stand-in (budget none); time until a first visit to another body is sharp under the view (budget 2 s); frame time at every rung (budget 16.7 ms); time from a building placed to its ground re-baked (budget 1 s). Prints PASS/FAIL per budget with the number. Wrapped as a skill only with Ben's permission (CLAUDE.md § Tool creation is skill creation). DELIVERED in sprint 56 (merged into main at 903586b9; the sprint 56 retro records BL-1247 and BL-1311 as landed: seat wait 750 s -> 34 s Debug). Status flipped at the v0.2.0 cut, 2026-10-23.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "requires",
+        "blocked_on",
+        "parked",
+        "category",
+        "priority",
+        "difficulty",
+        "id",
+        "short_name",
+        "author",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }
