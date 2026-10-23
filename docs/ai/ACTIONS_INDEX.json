@@ -3,7 +3,7 @@
  "actions": [
   [
    "gameplay.accept_quote",
-   "No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — BL-350 landed the procurement seam, its world state, its serialisation and its harness, but no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes."
+   "No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — The procurement seam (BL-350 (procurement contract seam)) has its world state, its serialisation and its harness, and no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes."
   ],
   [
    "gameplay.build",
@@ -11,7 +11,7 @@
   ],
   [
    "gameplay.cancel_contract",
-   "No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — BL-350 landed the procurement seam, its world state, its serialisation and its harness, but no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes."
+   "No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — The procurement seam (BL-350 (procurement contract seam)) has its world state, its serialisation and its harness, and no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes."
   ],
   [
    "gameplay.demolish",
@@ -39,7 +39,7 @@
   ],
   [
    "gameplay.request_quote",
-   "No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — BL-350 landed the procurement seam, its world state, its serialisation and its harness, but no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes."
+   "No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — The procurement seam (BL-350 (procurement contract seam)) has its world state, its serialisation and its harness, and no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes."
   ],
   [
    "gameplay.resume",

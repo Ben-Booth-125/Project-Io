@@ -182,6 +182,83 @@ not an absolute wealth band, which says nothing about whether anyone was played 
 > (`DEVELOPMENT_PRACTICES.md` § Cutting a release; NR-167, ruled 2026-08-13). This block is the
 > baseline the next one diffs against — keep it at the top, one entry per sweep, newest first.
 >
+> **2026-10-23 (v0.2.0).** Verdict: **the map below stands as written; no amendment required.** One
+> optional sentence for Area 2 is offered below. The window ran 2026-08-26 → 2026-10-23, fifty-eight
+> days, four times the last one, and it was not empty.
+>
+> Area 1: no material change. Nothing dated in the window on utility, HTN, GOAP or MCTS in a shipped
+> strategy title.
+>
+> Area 2: the solvency failure mode got its clearest new evidence. Paradox ran a dedicated **Victoria 3
+> "AI Update"** as the 1.14 open beta, folded into **1.15** (released 2026-10-22 with *State and
+> Revolution*): DD #185 (2026-08-20, announcement), DD #186 (2026-09-02, beta start), open-beta
+> updates 2026-09-08/16/23, and DD #191 (2026-10-07, "AI and War Support Open Beta Summary"). The
+> developers' beta notes say they fixed cases where the AI **could not reduce its military spending**,
+> naming it one cause of **AI cyclic bankruptcy**. The AI now sets government and military wages from
+> budget, reserves, radicals and civil-war risk. They also say the economic and trade AI was **not
+> finished in time** and moved to 1.15 and later patches. **Stellaris 4.5 "Cygnus"** carried a
+> beta "Join War" AI overhaul to stop snowballing wars (DD #430, 2026-08-27). It also carried a "major
+> AI economy overhaul" of resource management and colony specialisation (DD #432, 2026-09-10).
+> Both Stellaris items are known only from an aggregator; the primary diary text was not read. This is
+> the map's own lesson, re-confirmed by the studio whose design the map holds up as best:
+> *"the hard part is making the AI actually solvent."* Optional Area 2 sentence: *"Victoria 3's 1.14/1.15
+> AI Update (2026) still targeted cyclic AI bankruptcy and an AI unable to cut military spending."*
+>
+> Area 3: four findings, none changing a decision.
+> - **CivBench (Civ VI)**, arXiv 2609.02459, 2026-09-02 (Andrews, Foerster, Ponte Costa et al.). Agents
+>   play Civ VI over MCP: 76 tools, 300+ turns, 23 runs, four model families. The authors call it a
+>   pilot, not a ranking. Agents carried out their **own stated near-term commitments** within ten
+>   turns only 48.2–65.8% of the time (RAG@10). They checked victory state every 30–75 turns, not the
+>   20 their playbook asked. The authors read this as "deviations under instruction", not lack of
+>   capability. That is § 10g's argument: a model that drifts from its own plan should not emit
+>   `corp_command`. It also bears on § 10h, since its MCP harness is the research use the server keeps.
+> - **NVIDIA Nemotron 3.5 Bolt 74B-A9B 24GB**, open weights under OpenMDW-1.1, NVIDIA blog
+>   2026-10-15 (TechCrunch 2026-10-19). It is a 74B mixture-of-experts with 9B active, natively
+>   2-bit to fit in 24 GB, and NVIDIA says it runs on GeForce RTX PCs. The model cards disagree: the
+>   GGUF card asks for 32 GB+. NVIDIA reports agentic-benchmark leads that were not checked here. It
+>   widens the **C1/C2 margin** (`LANGUAGE_POLICY_FEASIBILITY.md`) again, as Qwen3.8-27B did last
+>   time. A smaller **Bolt E4B 4GB** was announced for 2026-10-23 and is not yet datable as released.
+> - **The dropped llama.cpp MTP item is now dated, and it is not in either window.** Secondary
+>   sources put the multi-token-prediction merge at **2026-05-16** (PR #22673). It ships as a beta
+>   behind `--mtp`, off by default, and only some model architectures support it. The reported speedups
+>   are community benchmarks: Qwen3.6-27B ≈ 38 → 65 tok/s (~1.7×) on one card, and 2.17× on dual
+>   3090s in Q8_0. The PR itself was not read. This is new to the map, not new: it predates the last
+>   sweep's window too. It cuts measured decode time against § 10g's C2 budget and changes nothing.
+> - **Bitwise-deterministic LLM inference.** *Vosti*, arXiv 2609.38981, 2026-09-30 (Qin, Zhuo et al.).
+>   It specifies and formally verifies **bitwise-identical logits** across batch makeup, prompt
+>   chunking, prefill/decode and KV-cache reuse. The guarantee holds for one fixed model and deployment
+>   setup. Its authors report vLLM's batch-invariant mode and SGLang's deterministic mode still
+>   diverge under some of those variations. It is the first finding to touch **a leg of § 10g's
+>   ruling** rather than capability. It touches only part of the determinism leg. The guarantee holds
+>   on one deployment, not across Ben's GPU and a player's, so it does not meet Io's replayable-seed
+>   bar. The legibility leg and *"distilling `corp_ai.cpp` yields `corp_ai.cpp`"* are untouched. Its
+>   real use is Stage C: reproducible dialogue on one machine would make BL-334 (Stage C dialogue
+>   layer) traces replayable in diagnostics. Nothing found implies llama.cpp has a matching mode.
+>
+> Area 4: no material change. The 2026 work on dynamic difficulty found here is generic: VR,
+> education, and a DDA review. None of it is about strategy-game opponents or seed exploitation.
+>
+> **No finding changes a decision.** § 10g stands for the reason it stood last time. Capability and
+> speed were never load-bearing, and the one determinism result is per-deployment, not
+> cross-hardware. Nothing found required a cloud model.
+>
+> *Limits of the 2026-10-23 sweep, recorded because the next one inherits them.* The agent's own
+> knowledge cutoff (June 2026) also sat before this window. "New" was again judged by published
+> date alone, and anything undatable was excluded. Excluded or unconfirmed:
+> - **Civ VII 1.5.0** (2026-09-15) and its hotfix (2026-09-30): the official notes returned HTTP 403,
+>   so no AI item could be confirmed or ruled out.
+> - **Primary texts not read:** Victoria 3 DD #191 and Stellaris DD #432. Their claims rest on Steam
+>   excerpts and one aggregator.
+> - **Qwen 4 27B:** only announced (Apsara, 2026-09-22). There were no weights to weigh.
+> - **Meta "Muse Glimmer" 30B** (reported 2026-08-10): falls between the two windows and rests on
+>   one blog, so it was not carried.
+> - **EU5's AI work** (1.2–1.3.11, May–July 2026): predates the window.
+>
+> Two blind spots carry over. arXiv new-submission listings again could not be enumerated. Keyword
+> search still under-samples papers only weeks old. Treat the empty Areas 1 and 4 as consistent with
+> a quiet span, not proof of one. Several Area 3 figures are vendor or community numbers, not checked
+> here.
+>
 > **2026-08-26 (v0.1.20).** Verdict: **the map below stands as written; no amendment required.**
 > Window 2026-08-13 → 2026-08-26, thirteen days, and a diff that short should mostly be empty — it
 > was. Areas 1, 2 and 4: no material change. Area 3: one in-window finding, **Qwen3.8-27B** (released

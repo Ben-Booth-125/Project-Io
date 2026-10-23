@@ -1,0 +1,107 @@
+[
+  {
+    "ruling": "A tile clears against the market it is most attracted to - cost over pull - not the nearest",
+    "doc": "docs/economy/MARKETS.md",
+    "anchor": "Catchment is an attraction, not a distance \\(Ben, 2026-10-16\\)",
+    "stale": [],
+    "owner": "BL-1346 (market attraction)"
+  },
+  {
+    "ruling": "A source's points reach full strength to its road tier's threshold and fade to zero at double: Track 6, Road 8, Highway 10",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "Track 6 tiles, Road 8,",
+    "stale": [],
+    "owner": "BL-1360 (road tier extends reach)"
+  },
+  {
+    "ruling": "Rail reaches twenty tiles and delivers only at the tile the line connects to",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "Rail reaches twenty tiles and supplies only what it connects to \\(Ben, 2026-10-16\\)",
+    "stale": [],
+    "owner": "BL-1360 (road tier extends reach)"
+  },
+  {
+    "ruling": "A tile's points come along a chain connected to its nation's capital; only connected sources feed the pool",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "Logistics should centre on the capital for all",
+    "stale": [],
+    "owner": "BL-1356 (LP routed requests)"
+  },
+  {
+    "ruling": "A port reaches 50 water tiles at full strength, gone at 100, over water only - lakes too - landing on the shore",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "A port stretches fifty tiles over water \\(Ben, 2026-10-21\\)",
+    "stale": [],
+    "owner": "BL-1396 (port reach fifty)"
+  },
+  {
+    "ruling": "The lake size cap is 75 tiles",
+    "doc": "docs/economy/TILES.md",
+    "anchor": "The cap is 75 tiles \\(Ben,\\s+2026-10-22",
+    "stale": [
+      "The cap is 150 tiles"
+    ],
+    "owner": "BL-1397 (lake cap 75)"
+  },
+  {
+    "ruling": "A shipment draws Logistic Points again, by cargo, at the anchor it leaves, after the march and production",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "A shipment draws points again \\(Ben, 2026-10-16\\)",
+    "stale": [
+      "passive Logistic\\s+Point\\*\\* cap at the anchor nearest",
+      "Logistic Point cap at the nodes it\\s+crosses"
+    ],
+    "owner": "BL-1361 (trade draws points)"
+  },
+  {
+    "ruling": "The anchor is the source market's centre tile; its routed cover caps the share (NR-1062)",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "Under routing, the anchor is a request like any other",
+    "stale": [],
+    "owner": "BL-1361 (trade draws points)"
+  },
+  {
+    "ruling": "The capital is the peak: generation seeds a source on every capital, then the market centres, then consumers; read as every capital at full cover (NR-1063)",
+    "doc": "docs/economy/LOGISTICS.md",
+    "anchor": "Read under routing, the peak is the capital's full cover",
+    "stale": [],
+    "owner": "BL-1367 (LP source layout)"
+  },
+  {
+    "ruling": "A minor may own its logistics network nodes as the state",
+    "doc": "docs/politics/NATIONS.md",
+    "anchor": "a minor may own its Logistic Point sources",
+    "stale": [
+      "\\*\\*Which nations\\.\\*\\* Majors only\\. A minor's industry stays"
+    ],
+    "owner": "BL-1367 (LP source layout)"
+  },
+  {
+    "ruling": "The funding gate pays network nodes before any other state building",
+    "doc": "docs/politics/NATIONS.md",
+    "anchor": "Network nodes are paid first \\(Ben, 2026-10-22\\)",
+    "stale": [],
+    "owner": "BL-1398 (no capital starts dark)"
+  },
+  {
+    "ruling": "A minor's state port trades from its treasury like a major's",
+    "doc": "docs/politics/NATIONS.md",
+    "anchor": "A minor's state port trades like a major's \\(Ben, 2026-10-22\\)",
+    "stale": [],
+    "owner": "BL-1367 (LP source layout)"
+  },
+  {
+    "ruling": "No capital starts dark: the firms on a nation's ground fund its opening node bill; the endowment floor stays 500",
+    "doc": "docs/generation/NATION_GENERATION.md",
+    "anchor": "No capital starts dark \\(Ben, 2026-10-22\\)",
+    "stale": [],
+    "owner": "BL-1398 (no capital starts dark)"
+  },
+  {
+    "ruling": "v0.2.0 is the economy functioning, logistics included",
+    "doc": "docs/development/ROADMAP.md",
+    "anchor": "v0\\.2\\.0 — the economy functions",
+    "stale": [],
+    "owner": "ROADMAP (milestone)"
+  }
+]
