@@ -28,10 +28,6 @@ pushing is Ben's (`git push origin main --follow-tags`). The next sprint is not 
 
 ## 2. Waiting on Ben
 
-- **His new idea, not filed** (Ben, 2026-10-23): when workforce is short, let the player choose the
-  order buildings are staffed in, with a **"most profitable first"** option — beside the ruled
-  "network nodes are funded first" for the state's money (NATIONS.md § State industry). Rule 0a: offer
-  A) backlog / B) build now. Suggested A — it wants a design pass (PRODUCTION.md § Workforce).
 - **Open review calls** (NEEDS_REVIEW.md): NR-1060 (rival hub chains on the player's ground),
   NR-1056 (rail's fade past 20), NR-1055 (tile card Uses counts own buildings), NR-1049, NR-1050,
   NR-1052 and the older NR-1003..NR-1035.
