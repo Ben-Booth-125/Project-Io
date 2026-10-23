@@ -1663,21 +1663,17 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     if (b.recipe_switch_cooldown > 0)
         return recipe_switch_result::on_cooldown;
 
-    // BL-1296: @p corp may name a NATION switching one of its state buildings
-    // (NATIONS.md § State industry, "The player's controls"). Then the tech
-    // gate asks its champion (same home nation, same tree), the cost comes out
-    // of the treasury's uncommitted part, and the new recipe must keep the
-    // building state industry (`state_runs`) — nothing moves between state and
-    // private in play.
+    // BL-1296: @p corp may name a NATION switching one of its own buildings
+    // (NATIONS.md § What a nation owns). Then the cost comes out of the
+    // treasury's uncommitted part. BL-1399 (Ben, 2026-10-23): the nation is its
+    // own actor - the tech gate reads its own tree, so a minor with no champion
+    // retools too - and any recipe is admitted, the strategic-sector limit having
+    // retired with the state/private split.
     const auto cit = w.corporations.find(corp);
     const auto nit = (cit == w.corporations.end()) ? w.nations.find(corp) : w.nations.end();
     if (cit == w.corporations.end() && nit == w.nations.end())
         return recipe_switch_result::invalid;
-    const entity_id gate_corp = (cit != w.corporations.end()) ? corp : champion_of(w, corp);
-    if (gate_corp == null_entity)
-        return recipe_switch_result::invalid;
-    if (nit != w.nations.end() && !state_runs(reg, b.type, new_recipe_id))
-        return recipe_switch_result::invalid;
+    const entity_id gate_corp = corp;
 
     const recipe_switch_params& sw = reg.recipe_switch();
 
@@ -3128,10 +3124,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
                             if (ratio > best_ratio
                                 && recipe_runs_at_tile(w, cand, b.tile) // the body's air (Ben, 2026-10-09)
-                                // BL-1296: a state building stays state industry.
-                                && (owner == corp
-                                    || state_runs(reg, building_type::processing_facility,
-                                                  reg.recipe_id(cand.name)))
+                                // BL-1399: a nation's building takes any recipe; the
+                                // strategic-sector limit retired (Ben, 2026-10-23).
                                 && recipe_inputs_supplied(w, reg, rescue_reach(), mid, cand,
                                                           sw_batches, bid))
                             {

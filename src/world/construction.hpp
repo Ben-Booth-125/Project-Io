@@ -125,6 +125,20 @@ bool demolish_building(world& w, entity_id corp, entity_id building);
 /// pay-as-you-build from the treasury (run_construction), and a tick the
 /// treasury cannot fund pauses the site. The building joins the nation's
 /// `state_assets`. Mutates only on `placed`.
+/// BL-1399 (Ben, 2026-10-23; NATIONS.md § What a nation owns): THE NATION'S BUILD
+/// DOOR - @p nation builds @p type (with @p target / @p recipe as construct_building
+/// takes them) on @p tile, any sector, for itself: no corporation between. The nation
+/// is the actor every gate asks about - its own tech tree, and its OWN GROUND (a tile
+/// another nation holds, or none does, is refused `foreign_ground`). Paid
+/// pay-as-you-build from the treasury's uncommitted part; @p founding (generation's)
+/// skips the commitment gate. The building joins the nation's `state_assets`.
+/// Mutates only on `placed`. The construct_state_* doors below are this door.
+construction_result construct_nation(world& w, const recipe_registry& reg,
+                                     entity_id nation, entity_id tile,
+                                     building_type type, resource_type target,
+                                     std::uint16_t recipe, entity_id& out_building,
+                                     bool founding = false);
+
 construction_result construct_state_building(world& w, const recipe_registry& reg,
                                              entity_id nation, entity_id tile,
                                              std::uint16_t recipe, entity_id& out_building,

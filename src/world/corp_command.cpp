@@ -747,8 +747,17 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     const entity_id nation = cmd.as_nation;
     if (w.nations.find(nation) == w.nations.end())
         return corp_command_result::rejected_invalid;
-    if (champion_of(w, nation) != cmd.corp)
+    // BL-1399: the nation acts for itself (cmd.corp == the nation), which every
+    // minor must since it has no champion; the champion's seat is still admitted
+    // until the corporations are folded away (BL-1402).
+    if (cmd.corp != nation && champion_of(w, nation) != cmd.corp)
         return corp_command_result::rejected_not_owner;
+    // The SEAT: the player acting for its own nation, whether through its champion
+    // corp or as the nation itself. Every seat-only verb (rail, the share rule, the
+    // tax tier) and every seat refusal (BL-1322, the workforce lock) keys on this,
+    // so naming the nation as the actor can neither unlock nor dodge them.
+    const bool seat = cmd.corp == w.player_entity
+                   || (cmd.corp == nation && nation == player_nation(w));
 
     // BL-1255 (LOGISTICS.md § 4c): the railway verbs — a station, a tile of track —
     // are the PLAYER NATION's (Ben, 2026-10-13: "the player builds stations and lays
@@ -758,7 +767,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     // anything mutates.
     const bool rail_verb = cmd.verb == corp_verb::lay_track
         || (cmd.verb == corp_verb::build && cmd.type == building_type::railway_station);
-    if (rail_verb && cmd.corp != w.player_entity)
+    if (rail_verb && !seat)
         return corp_command_result::rejected_not_owner;
 
     // BL-1309 (LOGISTICS.md § Logistic Points, "One pool"): the nation's share
@@ -766,7 +775,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     // validated as the value that lands before anything mutates.
     if (cmd.verb == corp_verb::set_logistics_shares)
     {
-        if (cmd.corp != w.player_entity)
+        if (!seat)
             return corp_command_result::rejected_not_owner;
         nation_component& nc = w.nations.at(nation);
         if (cmd.order == 1)
@@ -799,7 +808,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     // lands (1..5) before anything mutates; out of range is rejected whole.
     if (cmd.verb == corp_verb::set_tax_tier)
     {
-        if (cmd.corp != w.player_entity)
+        if (!seat)
             return corp_command_result::rejected_not_owner;
         if (cmd.order < static_cast<uint32_t>(k_tax_tier_min)
             || cmd.order > static_cast<uint32_t>(k_tax_tier_max))
@@ -832,17 +841,19 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
                     *out_building = built;
                 return map_construction(r);
             }
-            // A state building is a processing facility on a strategic recipe
-            // the state runs; the recipe must be NAMED (the sector is the recipe).
-            if (cmd.type != building_type::processing_facility || cmd.recipe == no_recipe
-                || reg.get_recipe(cmd.recipe) == nullptr
-                || !state_runs(reg, cmd.type, cmd.recipe))
+            // BL-1399 (Ben, 2026-10-23; NATIONS.md § What a nation owns): the
+            // nation builds ANY type in ANY sector for itself - the strategic-sector
+            // limit retired with the state/private split. A stated recipe must name
+            // a processor and reach it, as on the corporation path (BL-388).
+            if (cmd.recipe != no_recipe
+                && (cmd.type != building_type::processing_facility
+                    || reg.get_recipe(cmd.recipe) == nullptr))
                 return corp_command_result::rejected_invalid;
             if (w.tiles.find(cmd.tile) == w.tiles.end())
                 return corp_command_result::rejected_invalid;
             entity_id built = null_entity;
             const construction_result r =
-                construct_state_building(w, reg, nation, cmd.tile, cmd.recipe, built);
+                construct_nation(w, reg, nation, cmd.tile, cmd.type, cmd.target, cmd.recipe, built);
             if (r == construction_result::placed && out_building)
                 *out_building = built;
             return map_construction(r);
@@ -897,7 +908,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
         {
             // BL-1322: the player's state buildings are stepped by the game like
             // its own (economy_system Pass 3); the player has no workforce verb.
-            if (cmd.corp == w.player_entity)
+            if (seat)
                 return corp_command_result::rejected_invalid;
             if (cmd.workforce < 0 || cmd.workforce > 200)
                 return corp_command_result::rejected_invalid;
@@ -914,7 +925,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
             return corp_command_result::applied;
         }
         case corp_verb::set_workforce_auto:
-            if (cmd.corp == w.player_entity)
+            if (seat)
                 return corp_command_result::rejected_invalid; // BL-1322, as above
             if (b.workforce_auto)
                 return corp_command_result::rejected_state;
@@ -1131,7 +1142,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
     if (out_building)
         *out_building = null_entity;
 
-    if (w.corporations.find(cmd.corp) == w.corporations.end())
+    // BL-1399: a nation acting for itself names itself as both actor and nation.
+    const bool nation_self = cmd.as_nation != null_entity && cmd.corp == cmd.as_nation
+                          && w.nations.find(cmd.corp) != w.nations.end();
+    if (!nation_self && w.corporations.find(cmd.corp) == w.corporations.end())
         return corp_command_result::rejected_no_corp;
 
     // BL-1296: a command for a nation's state industry takes its own door.

@@ -53,6 +53,7 @@ enum class placement_reason : uint8_t
     needs_road,        ///< BL-1347: no building stands on a tile no road reaches (PRODUCTION.md § A building needs a road).
     no_road_to_extend, ///< BL-1348: a road is laid FROM a road -- the named tile carries none.
     foreign_ground,    ///< BL-1357: a road may cross a border and no further -- the named tile is another nation's.
+    not_own_ground,    ///< BL-1399: a nation builds only on its own ground -- the tile is another nation's, or no nation's.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on

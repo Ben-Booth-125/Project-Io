@@ -35,7 +35,8 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::far_from_centre: return "Too far from a population centre to draw a workforce";
         case placement_reason::needs_road: return "No road reaches this tile - lay one to it before building here";
         case placement_reason::no_road_to_extend: return "A road is laid from a road - this tile carries none to build out of";
-        case placement_reason::foreign_ground: return "A road may cross a border, but not run on past it - this ground is another nation's";
+        case placement_reason::foreign_ground: return "A road may cross a border, but not run on past it - this ground is not your nation's";
+        case placement_reason::not_own_ground: return "A nation builds only on its own ground - this tile is not your nation's";
     }
     return "Cannot build here";
 }
@@ -177,16 +178,16 @@ placement_result can_place_road(const world& w, entity_id tile, int side, std::u
     // against and this half does not fire.
     if (actor != null_entity)
     {
-        const auto cit = w.corporations.find(actor);
-        const entity_id home = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+        const entity_id home = owner_home_nation(w, actor);
         if (home != null_entity)
         {
             const auto hn = w.tile_to_nation.find(tile);
             const entity_id holder = hn != w.tile_to_nation.end() ? hn->second : null_entity;
-            // Unowned ground is nobody's border: a chain may be walked out across it, which
-            // is how a remote deposit is reached at all (PRODUCTION.md § A building needs a
-            // road). Only ground ANOTHER nation holds stops the chain.
-            if (holder != null_entity && holder != home)
+            // BL-1399 (Ben, 2026-10-23; GLOSSARY.md § Own ground): a nation builds only on
+            // its own ground, and ground NO nation holds is not its own either. Unowned
+            // ground used to be walkable so a remote deposit could be reached; nothing may
+            // be built there now, so the chain stops at it exactly as at a border.
+            if (holder != home)
                 return placement_reason::foreign_ground;
         }
     }
@@ -514,6 +515,19 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // entirely when the caller named no corp (see the header).
     if (!structure_unlocked(w, corp, type))
         return placement_reason::tech_locked;
+
+    // BL-1399 OWN GROUND (Ben, 2026-10-23; NATIONS.md § Own ground): a nation builds
+    // only on its own tiles - never another nation's, never ground no nation owns. Asked
+    // of the builder's nation, for every building kind. Skipped when no builder is named
+    // (a generation stamp, a bare affordance), like the tech gate above.
+    if (corp != null_entity)
+    {
+        const entity_id home = owner_home_nation(w, corp);
+        const auto hn = w.tile_to_nation.find(tile_id);
+        const entity_id holder = hn != w.tile_to_nation.end() ? hn->second : null_entity;
+        if (home == null_entity || holder != home)
+            return placement_reason::not_own_ground;
+    }
 
     if (type == building_type::port)
     {

@@ -215,6 +215,9 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // that must not arrive as "invalid tile".
         if (pr.reason == placement_rules::placement_reason::needs_road)
             return construction_result::needs_road;
+        // BL-1399: a nation builds only on its own ground, and the refusal says so.
+        if (pr.reason == placement_rules::placement_reason::not_own_ground)
+            return construction_result::foreign_ground;
         if (type == building_type::launchpad)
             return construction_result::slot_occupied;
         return construction_result::invalid_tile; // Port not coastal
@@ -317,83 +320,64 @@ construction_result construct_building(world& w, const recipe_registry& reg,
                          corp_it->second.balance, corp_it->second.assets);
 }
 
+construction_result construct_nation(world& w, const recipe_registry& reg,
+                                     entity_id nation, entity_id tile,
+                                     building_type type, resource_type target,
+                                     std::uint16_t recipe, entity_id& out_building,
+                                     bool founding)
+{
+    // BL-1399 (Ben, 2026-10-23; NATIONS.md § What a nation owns): the nation builds
+    // for itself, any type in any sector, with no corporation between - every major
+    // and every minor. The nation is its own actor at the door, so the tech gate reads
+    // its own tree and the own-ground gate (placement_rules::can_place_in_world) its
+    // own territory. Paid from the treasury's uncommitted part; a founding build
+    // (generation's) is admitted unpriced, as before.
+    out_building = null_entity;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return construction_result::no_corp;
+    return construct_for(w, reg, nation, tile, type, target, out_building, recipe,
+                         founding ? std::numeric_limits<float>::max()
+                                  : state_uncommitted_treasury(w, nation),
+                         nit->second.state_assets);
+}
+
 construction_result construct_state_building(world& w, const recipe_registry& reg,
                                              entity_id nation, entity_id tile,
                                              std::uint16_t recipe, entity_id& out_building,
                                              bool founding)
 {
-    out_building = null_entity;
-    const auto nit = w.nations.find(nation);
-    const entity_id champion = champion_of(w, nation);
-    if (nit == w.nations.end() || champion == null_entity)
-        return construction_result::no_corp; // no major nation to own it
-    // Strategic, and run by the state, or it is not state industry at all.
-    if (!state_runs(reg, building_type::processing_facility, recipe))
-        return construction_result::invalid_tile;
-    // On its own ground: a nation's state industry stands on its own territory.
-    const auto tn = w.tile_to_nation.find(tile);
-    if (tn == w.tile_to_nation.end() || tn->second != nation)
-        return construction_result::invalid_tile;
-    return construct_for(w, reg, champion, tile, building_type::processing_facility,
-                         resource_type::iron_ore, out_building, recipe,
-                         founding ? std::numeric_limits<float>::max()
-                                  : state_uncommitted_treasury(w, nation),
-                         nit->second.state_assets);
+    return construct_nation(w, reg, nation, tile, building_type::processing_facility,
+                            resource_type::iron_ore, recipe, out_building, founding);
 }
 
 construction_result construct_state_port(world& w, const recipe_registry& reg,
                                          entity_id nation, entity_id tile,
                                          entity_id& out_building, bool founding)
 {
-    out_building = null_entity;
-    const auto nit = w.nations.find(nation);
-    const entity_id champion = champion_of(w, nation);
-    if (nit == w.nations.end() || champion == null_entity)
-        return construction_result::no_corp; // no major nation to own it
-    const auto tn = w.tile_to_nation.find(tile);
-    if (tn == w.tile_to_nation.end() || tn->second != nation)
-        return construction_result::invalid_tile; // on its own ground
-    return construct_for(w, reg, champion, tile, building_type::port,
-                         resource_type::iron_ore, out_building, no_recipe,
-                         founding ? std::numeric_limits<float>::max()
-                                  : state_uncommitted_treasury(w, nation),
-                         nit->second.state_assets);
+    return construct_nation(w, reg, nation, tile, building_type::port,
+                            resource_type::iron_ore, no_recipe, out_building, founding);
 }
 
 construction_result construct_state_station(world& w, const recipe_registry& reg,
                                             entity_id nation, entity_id tile,
                                             entity_id& out_building)
 {
-    out_building = null_entity;
-    const auto nit = w.nations.find(nation);
-    const entity_id champion = champion_of(w, nation);
-    if (nit == w.nations.end() || champion == null_entity)
-        return construction_result::no_corp; // no major nation to own it
-    const auto tn = w.tile_to_nation.find(tile);
-    if (tn == w.tile_to_nation.end() || tn->second != nation)
-        return construction_result::invalid_tile; // on its own ground
-    return construct_for(w, reg, champion, tile, building_type::railway_station,
-                         resource_type::iron_ore, out_building, no_recipe,
-                         state_uncommitted_treasury(w, nation), nit->second.state_assets);
+    return construct_nation(w, reg, nation, tile, building_type::railway_station,
+                            resource_type::iron_ore, no_recipe, out_building, false);
 }
 
 construction_result construct_state_logistics(world& w, const recipe_registry& reg,
                                               entity_id nation, entity_id tile,
                                               building_type type, entity_id& out_building)
 {
-    out_building = null_entity;
     if (type != building_type::inland_logistics_hub)
+    {
+        out_building = null_entity;
         return construction_result::invalid_tile; // BL-1309: the nation's hub door
-    const auto nit = w.nations.find(nation);
-    const entity_id champion = champion_of(w, nation);
-    if (nit == w.nations.end() || champion == null_entity)
-        return construction_result::no_corp; // no major nation to own it
-    const auto tn = w.tile_to_nation.find(tile);
-    if (tn == w.tile_to_nation.end() || tn->second != nation)
-        return construction_result::invalid_tile; // on its own ground
-    return construct_for(w, reg, champion, tile, type, resource_type::iron_ore, out_building,
-                         no_recipe, state_uncommitted_treasury(w, nation),
-                         nit->second.state_assets);
+    }
+    return construct_nation(w, reg, nation, tile, type, resource_type::iron_ore, no_recipe,
+                            out_building, false);
 }
 
 float track_tile_cost(const world& w, const recipe_registry& reg, entity_id tile)

@@ -3780,8 +3780,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // enforce. Without this the scan offers a tile the authoritative gate
             // then refuses, which reads as a broken build rather than a rule.
             body_reach_field(m_world, tc.body);
+            // BL-1399: asked AS the player, so the own-ground gate (a nation builds
+            // only on its own ground) filters the scan the build door will enforce.
             if (!placement_rules::can_place_in_world(m_world, tid, bt, tgt,
-                                                     m_registry.construction().max_logistics_reach))
+                                                     m_registry.construction().max_logistics_reach,
+                                                     m_world.player_entity))
                 continue;
             entity_id built = null_entity;
             const construction_result r = construct_building(

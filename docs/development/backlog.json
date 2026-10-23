@@ -446,8 +446,8 @@
    "design": "SPRINT 55. BEN, in play on 2026-10-18: \"It looks like roads are still rendered as adjoining even if the build is pairwise. When I build a new road tile, I see it connect in all possible directions, not just the direction it was built in.\" WHAT THE CODE SAYS, read the same day: the simulation is right - construction.cpp's lay_road_edge raises ONE crossing (both halves of that one edge), and BOTH draw paths gate on the edge mask, not on the neighbour: body_surface_canvas's draw_network skips a direction where road_tier_on_side is 0 ('nothing is laid across THIS boundary'), and the bake's road_links_of does the same before tile_pieces. So the all-directions read is NOT the two paths disagreeing with the mask, and three candidate causes remain, in order of likelihood: (1) the ARMED HIGHLIGHT persists after the lay, so the legal crossings still drawn around the new tile read as built road (BL-1370's highlight, drawn by the same press); (2) the NEIGHBOUR already carried generated edges on its other sides, so the junction genuinely connects several ways and only the new edge is new; (3) a stale bake chunk re-derived from road rather than road_sides. THE WORK: reproduce live at the zoom Ben was at, name which of the three it is, and fix that one - it is a visual triage item, so the live look comes before any code. It matters beyond itself because BL-1353's lens honesty rests on the road picture being true. ID MOVED on integration, 2026-10-19: filed as BL-1382 in sprint 55's session while sprint 56's worktree filed a different BL-1382 (PROVINCE_NORMALISING_PASS) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1394. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 57,
    "written": "2026-10-23",
    "parked": false,

@@ -7374,38 +7374,38 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1399 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-23",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_actor_seam"
      ],
      "requirement": "A nation may build on its own ground and is refused on another nation's tiles and on unowned ground, for every building kind.",
-     "notes": null
+     "notes": "nation_actor_seam N2, seeds 0/28/46: every placeable kind refused on foreign ground with state_hash unchanged; unowned land refused to every nation the tech gate admits, and the door mutates nothing."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_actor_seam"
      ],
      "requirement": "A road may be laid one crossing into foreign ground and never from it.",
-     "notes": null
+     "notes": "nation_actor_seam N3, seeds 0/28/46: an admitted land crossing into ground the nation does not hold (reason ok); from such ground, foreign_ground."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_actor_seam"
      ],
      "requirement": "A minor nation can issue a build with no champion anywhere in the world.",
-     "notes": null
+     "notes": "nation_actor_seam N1, seeds 0/28/46: a minor builds an extraction site, a NON-strategic processor and a hub as itself; each joins its state_assets."
     }
    ]
   },

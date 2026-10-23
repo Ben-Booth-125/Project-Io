@@ -331,10 +331,12 @@ bool nation_holds(const world& w, entity_id nation, int node)
 
 bool corp_nation_holds(const world& w, entity_id corp, int node)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1399: the actor may be a nation itself (NATIONS.md § What a nation owns);
+    // owner_home_nation resolves either kind to the nation whose tree it reads.
+    const entity_id nation = owner_home_nation(w, corp);
+    if (nation == null_entity)
         return false;
-    return nation_holds(w, cit->second.home_nation, node);
+    return nation_holds(w, nation, node);
 }
 
 bool node_requirements_met(const world& w, entity_id nation, int node)

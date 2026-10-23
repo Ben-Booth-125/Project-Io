@@ -16,12 +16,12 @@ Digests are NOT re-pinned per item: BL-1408 (sprint 57 re-bless) is the wave's o
 disjoint files; BL-1404 owns `world_save.cpp` until BL-1407. Wave 3 is serial.
 
 ### BL-1399 (nation builds own ground) — Delivery Full, group `own-ground`
-- [ ] **T1** `construct_state_*` drop the champion gate; tech and placement read the nation's own id
+- [x] **T1** `construct_state_*` drop the champion gate; tech and placement read the nation's own id
   (`construction.cpp`, `placement_rules.cpp`, `nation_tech.cpp`). (R3)
-- [ ] **T2** The own-ground test in placement for every builder; unowned ground refused; `can_place_road`
+- [x] **T2** The own-ground test in placement for every builder; unowned ground refused; `can_place_road`
   keeps the one crossing in (`placement_rules.cpp`). (R1, R2)
-- [ ] **T3** `as_nation` accepts the nation itself (`corp_command.cpp`, `agent_protocol.cpp`). (R3)
-- [ ] **T4** `tools/verify/nation_actor_seam.cpp`, registered. (R1-R3)
+- [x] **T3** `as_nation` accepts the nation itself (`corp_command.cpp`; the wire half moves to BL-1406). Fix round after the cold review: seat verbs and the BL-1322 lock key on the seat, a retool reads the nation's own tree with no sector limit, `verify.build_first_valid` asks as the player. (R3)
+- [x] **T4** `tools/verify/nation_actor_seam.cpp`, registered. (R1-R3)
 
 ### BL-1401 (nation AI actor) — Delivery Full, group `nation-ai-actor`
 - [ ] **T1** `ai_actor` view: treasury, `state_assets`, nation focus, owner-keyed books (`corp_ai.{hpp,cpp}`). (R1)
