@@ -597,7 +597,18 @@ still drains the rest as its own work. The 1,000–2,000 band is judged on every
 few nations opens its median above it, and that is accepted rather than cut. **The floor may
 reorder a few realms (Ben, 2026-10-19):** it lifts the endowment alone, so a small realm that also
 trades can pass a larger one that does not; that small reordering is accepted, the one exception to
-"keep the order". No
+"keep the order". **No capital starts dark (Ben, 2026-10-22).** Every capital holds a
+Logistic Point source, a minor's as a major's (`../economy/LOGISTICS.md` § Where generation puts
+the sources), so every nation holding network nodes carries a bill for them from the first tick. The
+endowment floor stays at 500 per mille: swept from 500 to the cap, it lifted few of the short realms
+and pushed more seeds' medians out of the band, and no floor reaches a nation the history never held.
+Instead, **the firms on a nation's ground fund its opening node bill**: at the fold, a nation still
+short of sixteen ticks of its state bill once the foundings' reserve is taken is topped up by the
+corporations holding buildings on its ground — never by more than those ticks of its network nodes'
+share of the bill, each firm paying by the buildings it holds there and never more than its balance.
+It is a transfer, never a mint. A nation no firm stands on, or whose firms cannot pay, keeps what it
+has; its capital's source stands but the funding gate idles it, and the coverage census reports it as
+dark rather than failing. No
 nation, the player's or a rival's, takes on debt before the game starts —
 a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings

@@ -324,6 +324,8 @@ inline shipped_landscape apply_shipped_landscape(
         // the seeding's reading at the gate, verbatim, right after it.
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
+        // BL-1398: the firms on a short nation's ground fund its opening node bill.
+        print_state_node_fund(fund_state_nodes_from_firms(w, reg));
         lp_seed_read_at_gate(w, reg, out.lp);
         print_lp_seed_report(out.lp);
     }

@@ -39,6 +39,7 @@
 #include "world/era_minus_one.hpp"
 #include "world/finish_campaign_world.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistic_points.hpp" // BL-1367: lp_source_network / lp_source_running (dark capitals)
 #include "world/recipe_registry.hpp"
 #include "world/state_industry.hpp"
 #include "world/world.hpp"
@@ -305,6 +306,14 @@ struct seed_out
     /// (four ticks) of its state bill (`state_first_tick_bill`, the funding
     /// gate's own cost bound) -- the empty-chest bar.
     int    majors_le0 = 0, majors_short_year = 0, majors_n = 0;
+    /// BL-1367 (Ben, 2026-10-22: "no capital starts dark"; every realm folds at least a
+    /// year of its node bill): EVERY homeworld nation holding state buildings - a
+    /// minor's network nodes included - against a year of its state bill after the
+    /// finish; those of them the history never gave a chest (build treasury 0, which
+    /// no endowment floor can reach); and capitals whose own source is not running at
+    /// the handoff.
+    int    bill_nations = 0, bill_short_year = 0, bill_short_never_held = 0;
+    int    capitals = 0, dark_capitals = 0;
     double worst_year_ratio = -1; ///< min over majors of treasury / (4 x bill); -1 = none
     std::string worst_major;
     double drained_cr = 0; ///< what the drained ones took at 1200
@@ -522,6 +531,35 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
             }
         }
     if (do_finish)
+        for (const entity_id id : ids)
+        {
+            const nation_component& nc = w.nations.at(id);
+            const double bill = static_cast<double>(state_first_tick_bill(w, seed_reg, id));
+            if (bill > 0.0)
+            {
+                ++o.bill_nations;
+                if (nc.treasury < static_cast<double>(k_state_founding_year_ticks) * bill)
+                {
+                    ++o.bill_short_year;
+                    if (!(chest0[id] > 0.0))
+                        ++o.bill_short_never_held;
+                }
+            }
+            if (nc.capital_tile == null_entity || w.tile_to_nation.count(nc.capital_tile) == 0
+                || w.tile_to_nation.at(nc.capital_tile) != id)
+                continue;
+            ++o.capitals;
+            bool lit = false;
+            for (const auto& [bid, b] : w.buildings)
+            {
+                lp_network net;
+                if (b.tile == nc.capital_tile && lp_source_network(b.type, net) && lp_source_running(b))
+                    lit = true;
+            }
+            if (!lit)
+                ++o.dark_capitals;
+        }
+    if (do_finish)
         for (std::size_t i = 0; i < ids.size(); ++i)
             if (o.levy_q1[i] > 0)
             {
@@ -638,6 +676,10 @@ int main(int argc, char** argv)
                     seed, g_tt, g_mt, o.t0.empty() ? 0.0 : *std::min_element(o.t0.begin(), o.t0.end()), median(o.t0),
                     o.t1.empty() ? 0.0 : *std::min_element(o.t1.begin(), o.t1.end()), median(o.t1),
                     o.majors_n, o.majors_le0, o.majors_short_year, o.worst_year_ratio, o.worst_major.c_str());
+        std::printf("NODELINE seed %u | nations with a state bill %d, short of a year %d (never held %d) | "
+                    "capitals %d, dark at the handoff %d\n",
+                    seed, o.bill_nations, o.bill_short_year, o.bill_short_never_held, o.capitals,
+                    o.dark_capitals);
         std::printf("  WHERE THE CHEST WENT (sim material shown in credits)\n");
         std::printf("    %-17s no treasury flows (upkeep off); seats' material stock at 1200 = %.0f cr\n",
                     "Empires", o.empires_material_at_1200 * kCr);

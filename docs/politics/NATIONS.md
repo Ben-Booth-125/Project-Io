@@ -60,7 +60,7 @@ and the distinction is load-bearing:
 
 | | Corporation | Nation |
 |---|---|---|
-| Owns | buildings and trades — never goods: what it makes is sold onto a market's shelf | **tiles**, and for a major its **state industry** (§ State industry) |
+| Owns | buildings and trades — never goods: what it makes is sold onto a market's shelf | **tiles**, for a major its **state industry**, and for a minor its logistics network nodes (§ State industry) |
 | Money | `balance`, spent on the market every tick | `treasury`, spent by direct transfer, on the order book for military equipment, and through its state buildings' own sales and purchases |
 | Acts through | `corp_command`'s verbs | the **national budget** — a weight vector over priority lines |
 | Decides | `corp_ai`, every tick | `nation_ai`, on the same staggered cadence |
@@ -76,7 +76,12 @@ steel works and a private one run the same recipe under the same rules.
 
 - **Which sectors.** State industry is the strategic sectors only: **energy, steel, arms, transport
   infrastructure, and space**. Everything else is private.
-- **Which nations.** Majors only. A minor's industry stays with private background firms.
+- **Which nations.** Majors only, with one exception. A minor's industry stays with private background
+  firms. **The exception is its logistics network nodes: a minor may own its Logistic Point sources —
+  hubs, stations and ports — as the state (Ben, 2026-10-22).** Generation stands a source on every
+  capital and covers every market centre (`../economy/LOGISTICS.md` § Where generation puts the
+  sources), and most minors have no firm to hold them. These nodes are paid from the minor's
+  treasury exactly as a major's state buildings are.
 - **Its money is the treasury's.** A state building's sales land in the treasury, and its inputs,
   wages and maintenance are paid from it. This widens the treasury's touch on the market beyond
   military equipment, for these buildings and these goods only.
@@ -106,6 +111,12 @@ buildings.
   the trade machinery a port needs carried by the state.
 - **A losing building idles.** When its costs exceed what the treasury can pay, a state building
   stops producing and paying until the treasury can pay again. The state never runs into debt.
+  **Network nodes are paid first (Ben, 2026-10-22):** when the treasury cannot pay for everything,
+  its hubs, stations and ports are funded before any other state building, so the points its
+  industry produces with come before the industry that draws them.
+- **A minor's state port trades like a major's (Ben, 2026-10-22).** A port generation stands on a
+  minor's coast to bridge its ground is the minor's own, and it trades from the minor's treasury
+  exactly as a major's state port does.
 - **The player's controls** over a state building are a corporation's building verbs — build,
   recipe, sell — paid from the treasury. **Workforce is not one of them**: the game steps a
   state building's workforce as it steps the player's own, one 25 % step a quarter toward the most

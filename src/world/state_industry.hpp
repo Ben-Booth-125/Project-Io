@@ -245,6 +245,31 @@ state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& r
 /// Print the reserve's one `[state_reserve]` log line.
 void print_state_reserve(const state_reserve_report& r);
 
+/// BL-1398 (Ben, 2026-10-22; NATION_GENERATION.md § Pass 7, "No capital starts
+/// dark"): THE FIRMS ON A NATION'S GROUND FUND ITS OPENING NODE BILL. Every nation
+/// holding network nodes (hubs, stations, ports - a minor's too, NATIONS.md § State
+/// industry) whose treasury is short of `k_state_founding_reserve_ticks` of its
+/// NODES' share of the bill - which the funding gate pays first - is topped up to it by
+/// the corporations holding buildings on its ground. Each
+/// firm pays its share by the buildings it holds there, and never more than its
+/// balance; what one cannot pay is asked again of the others. A transfer, never a
+/// mint: what a treasury gains, balances lose. A nation no firm stands on, or whose
+/// firms cannot pay, stays short and is reported. Runs at the fold after the
+/// founding reserve (`reserve_state_first_tick`) and before the reading at the gate.
+struct state_node_fund_report
+{
+    int   nations_short         = 0;    ///< nations short of the opening node bill
+    int   nations_funded        = 0;    ///< of them, paid anything by firms
+    int   nations_still_short   = 0;    ///< of them, still short after the firms paid
+    int   nations_without_firms = 0;    ///< of them, no corporation holds a building on their ground
+    float paid                  = 0.0f; ///< credits moved from firms to treasuries
+    int   minted                = 0;    ///< transfers that left more than they moved (0 by construction)
+};
+state_node_fund_report fund_state_nodes_from_firms(world& w, const recipe_registry& reg);
+
+/// Print the step's one `[node_fund]` log line.
+void print_state_node_fund(const state_node_fund_report& r);
+
 
 /// BL-1255 -- what the rail handover did at the fold.
 struct rail_handover_report

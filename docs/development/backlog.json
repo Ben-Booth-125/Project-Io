@@ -1780,6 +1780,33 @@
    ],
    "title": "The lake size cap is 75 tiles: an enclosed water body of 75 or more is sea",
    "design": "Ben, 2026-10-22: lake size cap 150 -> 75, 'we can retune later again if needed'. RULED, so TILES.md section Water kinds now states 75 as his ruling rather than as a measurement (150 was read off the thinnest band of enclosed-body sizes, NR-975). Authored twice and moved together: world_gen.lake_size_cap (scripts/world_gen.lua) and lake_size_cap_default (world_gen_config.hpp); lake_census gains 75 in its candidate-cap table. A WORLD MOVER: eight enclosed bodies of 75 to 149 tiles become sea, so their shores take ports and lose the Well's fresh water. DELIVERED 2026-10-22. MEASURED before (150, main 5f60d603) -> after (75): lake_census on the 16 curated home bodies, 301 lakes / 59 seas -> 293 / 67 (lake tiles 3079 -> 2325). market_viability FULL pooled G1 95.1 -> 95.2, G1t50 90.3 -> 89.8, G1b 2.5 -> 2.2, G2 176.9 -> 176.3, G3 95.5 -> 95.7, all pass; per seed G1t50 under 85 still only seeds 12 (83.8) and 9 (81.0). lp_coverage_census FULL (16 seeds): consumers 5426 -> 5446, every one covered but 1 (unconnectable, as before); hubs placed 1161 -> 1184, ports 76 -> 72, sea bridges 42 -> 40. world_determinism ALL PASS. Goldens and pinned digests that read generation will move; that is the sprint-close re-bless decision, not taken here."
+  },
+  {
+   "status": "complete",
+   "glyph": "○",
+   "sprint": 55,
+   "written": "2026-10-22",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-22/23); filed by Claude",
+   "id": "BL-1398",
+   "short_name": "NO_CAPITAL_STARTS_DARK",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "requires": [
+    "BL-1367"
+   ],
+   "files": [
+    "src/world/state_industry.cpp",
+    "src/world/state_industry.hpp",
+    "src/world/finish_campaign_world.cpp",
+    "tools/verify/harness_params.hpp",
+    "tools/verify/treasury_census.cpp"
+   ],
+   "title": "No capital starts dark: the firms on a nation's ground fund its opening node bill, and the gate pays network nodes first",
+   "design": "Ben, 2026-10-22/23, during BL-1367 (capital-first seeding). Every capital now holds a Logistic Point source, a minor's as a major's, so every nation holding network nodes carries a bill for them from the first tick, and a nation with an empty chest idles its capital's hub at the funding gate. RULED: 'No capital starts dark' (NATION_GENERATION.md section Pass 7). Option 2 (extend 'no realm closes the history empty' by raising the endowment floor) was SWEPT AND REJECTED: treasury_census over the 16 library seeds, floor 500 / 750 / 1000 (the cap) / 2000 / 5000 (cap lifted for the measure only): nations short of a year of their state bill 55 / 51 / 41 / 31 / 21, capitals dark at the handoff 44 / 33 / 33 / 28 / 18, seeds with the median outside 1,000-2,000 4 / 5 / 7 / 16 / 16; the 18 left at 5000 are exactly the nations the history never held, which no floor reaches. Ben: keep the floor at 500 and fund by option 1. BUILT: fund_state_nodes_from_firms (state_industry.cpp), at the fold after the founding reserve and before the reading at the gate (finish_campaign_world, mirrored in harness_params and lp_coverage_census): a nation whose chest is under k_state_founding_reserve_ticks (16) of its network nodes' share of the state bill is topped up to it by the corporations holding buildings on its ground, each by its building share and never above its balance, the remainder asked again of the others; a transfer, never a mint (counted, 0). Every firm alike, the player's future seat included (Ben, 2026-10-23). AND THE GATE PAYS NETWORK NODES FIRST (Ben, 2026-10-23; NATIONS.md section State industry): gate_walk_buildings walks hubs, stations and ports before every other state building, so a nation short of money idles its plants before its hubs - every tick of play, not only the opening. Cold review (two rounds) fixed: the top-up buying a plant ahead of the hub (the gate order), the trigger keyed to the node bill, a mint counter. MEASURED (16 seeds, floor 500): coverage census at the fold, 78 nations short of the node bill, 36 funded (19,414 credits moved), 2 still short, 42 with no firm on their ground, 0 minted; 21 capitals dark at the fold and their consumers 0, every rule passing; treasury_census at the handoff, 37 capitals dark (20 of them never held by the history), majors short of a year 4, medians outside the band on 3 seeds (4 before). market_viability FULL pooled G1 95.7, G1t50 89.1, G1b 2.6, G2 157.5, G3 96.4, all pass; haulage --far-trade window E 834 convoys (7062.1 u), window Y 971 (7612.3 u). world_determinism ALL PASS, save_roundtrip OK, no_empty_chest_harness, corp_ai, ai_trade, decision_trace pass; lp_pool, state_industry, railway and nation_budget_harness reds unchanged from before."
   }
  ]
 }

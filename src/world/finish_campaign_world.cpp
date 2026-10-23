@@ -409,6 +409,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // printed coverage is what the first tick runs.
     out.reserve = reserve_state_first_tick(w, reg, out.state);
     print_state_reserve(out.reserve);
+    // BL-1398 (NATION_GENERATION.md § Pass 7, Ben 2026-10-22: no capital starts dark):
+    // a nation still short of its opening node bill is funded by the firms on its
+    // ground - a transfer, capped by what they hold - before the reading at the gate.
+    print_state_node_fund(fund_state_nodes_from_firms(w, reg));
     lp_seed_read_at_gate(w, reg, out.lp);
     print_lp_seed_report(out.lp);
     // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS

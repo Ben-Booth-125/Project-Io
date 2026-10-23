@@ -8,6 +8,7 @@
 #include "recipe_registry.hpp"
 #include "world.hpp"
 #include "logistics.hpp"       // BL-1255: tile_touches_track, invalidate_logistics_caches
+#include "logistic_points.hpp" // BL-1398: lp_source_network (a network node)
 #include <set>
 #include <functional>
 
@@ -421,23 +422,30 @@ std::vector<entity_id> gate_nations(const world& w, const std::map<entity_id, in
     return ids;
 }
 
-/// One nation's buildings, in stored order: a bound that fits comes off what
-/// is left, one that does not idles. `on(bid, building, bound, fits)` sees
+/// One nation's buildings: a bound that fits comes off what is left, one that
+/// does not idles. NETWORK NODES FIRST (Ben, 2026-10-22; NATIONS.md § State
+/// industry): the hubs, stations and ports, in stored order, then every other
+/// state building in stored order - the points the rest produce with are paid
+/// for before the plants that draw them. `on(bid, building, bound, fits)` sees
 /// each; returns what is left for the track. `W` is `world` or `const world`.
 template <class W, class On>
 float gate_walk_buildings(W& w, const recipe_registry& reg, const nation_component& nc, float left, On&& on)
 {
-    for (const entity_id bid : nc.state_assets)
-    {
-        const auto bit = w.buildings.find(bid);
-        if (bit == w.buildings.end())
-            continue;
-        const float bound = gate_bound(w, reg, bit->second);
-        const bool  fits  = std::isfinite(bound) && bound <= left;
-        if (fits)
-            left -= bound;
-        on(bid, bit->second, bound, fits);
-    }
+    for (const bool nodes : {true, false})
+        for (const entity_id bid : nc.state_assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            lp_network net;
+            if (lp_source_network(bit->second.type, net) != nodes)
+                continue;
+            const float bound = gate_bound(w, reg, bit->second);
+            const bool  fits  = std::isfinite(bound) && bound <= left;
+            if (fits)
+                left -= bound;
+            on(bid, bit->second, bound, fits);
+        }
     return left;
 }
 
@@ -751,6 +759,109 @@ void print_state_reserve(const state_reserve_report& r)
                 "foundings (%.1f credits of payment left short; %d still under the bill; %d minted)\n",
                 r.nations_reserved, k_state_founding_reserve_ticks, static_cast<double>(r.returned),
                 r.nations_short, r.minted);
+    std::fflush(stdout);
+}
+
+// ---------------------------------------------------------------------------
+// BL-1398 -- the firms on a nation's ground fund its opening node bill
+// (Ben, 2026-10-22; see the header)
+// ---------------------------------------------------------------------------
+state_node_fund_report fund_state_nodes_from_firms(world& w, const recipe_registry& reg)
+{
+    state_node_fund_report rep;
+    // Every building a corporation holds, by the nation whose ground it stands on:
+    // the payers, ascending corp id, each with how many it holds there.
+    std::map<entity_id, std::map<entity_id, int>> held_on; // nation -> corp -> buildings
+    for (const auto& [cid, cc] : w.corporations)
+        for (const entity_id bid : cc.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const auto tn = w.tile_to_nation.find(bit->second.tile);
+            if (tn != w.tile_to_nation.end() && tn->second != null_entity)
+                ++held_on[tn->second][cid];
+        }
+
+    std::vector<entity_id> nids;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nc;
+        nids.push_back(nid);
+    }
+    std::sort(nids.begin(), nids.end());
+    for (const entity_id nid : nids)
+    {
+        nation_component& nc = w.nations.at(nid);
+        // The node share of the bill: the gate's own bound for each network node
+        // the state holds (a hub, a station, a port), as if all fit.
+        float node_bill = 0.0f;
+        (void)gate_walk_buildings(w, reg, nc, std::numeric_limits<float>::infinity(),
+            [&](entity_id, const building_component& b, float bound, bool) {
+                lp_network net;
+                if (std::isfinite(bound) && lp_source_network(b.type, net))
+                    node_bill += bound;
+            });
+        if (!(node_bill > 0.0f))
+            continue;
+        // The gate pays network nodes first, so a nation is short of its node bill
+        // exactly when its chest is under the reserve's ticks of the nodes' share.
+        const float reserve = static_cast<float>(k_state_founding_reserve_ticks);
+        float need = reserve * node_bill - std::max(0.0f, nc.treasury);
+        if (!(need > 0.0f))
+            continue;
+        ++rep.nations_short;
+        const auto hit = held_on.find(nid);
+        if (hit == held_on.end())
+        {
+            ++rep.nations_without_firms;
+            continue;
+        }
+        // Each firm's share by the buildings it holds on this ground; a firm pays
+        // what it holds and no more. What a firm could not pay is asked again of
+        // the others, ascending id, each up to what it still holds.
+        int total = 0;
+        for (const auto& [cid, n] : hit->second)
+            total += n;
+        const float asked = need;
+        float paid = 0.0f;
+        for (int round = 0; round < 2 && need > 1e-4f; ++round)
+        {
+            const float base = need;
+            for (const auto& [cid, n] : hit->second)
+            {
+                float& bal = w.corporations.at(cid).balance;
+                const float share = (round == 0) ? base * static_cast<float>(n) / static_cast<float>(total)
+                                                 : need;
+                const float pay = std::min({share, std::max(0.0f, bal), need});
+                if (!(pay > 0.0f))
+                    continue;
+                const double before = static_cast<double>(bal) + static_cast<double>(nc.treasury);
+                bal         -= pay;
+                nc.treasury += pay;
+                need        -= pay;
+                paid        += pay;
+                // NEVER A MINT: what the treasury gains the balance loses, to float slack.
+                const double after = static_cast<double>(bal) + static_cast<double>(nc.treasury);
+                if (after > before * (1.0 + 1e-6) + 1e-3)
+                    ++rep.minted;
+            }
+        }
+        rep.paid += paid;
+        if (paid > 0.0f)
+            ++rep.nations_funded;
+        if (need > 1e-3f * std::max(1.0f, asked))
+            ++rep.nations_still_short;
+    }
+    return rep;
+}
+
+void print_state_node_fund(const state_node_fund_report& r)
+{
+    std::printf("[node_fund] %d nation(s) short of the opening node bill: %d funded by the firms on "
+                "their ground (%.1f credits), %d still short, %d with no firm there; %d minted\n",
+                r.nations_short, r.nations_funded, static_cast<double>(r.paid), r.nations_still_short,
+                r.nations_without_firms, r.minted);
     std::fflush(stdout);
 }
 
