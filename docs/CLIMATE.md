@@ -1,14 +1,14 @@
 # Project Io — Climate
 
 > **Settles:** what climate state a body carries and what moves it during play · what pressure the
-> commons puts on the people and firms under it · which era owns the catastrophe · how the change
+> commons puts on the people and nations under it · which era owns the catastrophe · how the change
 > is made legible · what causes the Era boundary.
 > **Not here:** how a body's scalars were generated in the first place (generation/PLANETOLOGY) ·
 > the era ladder itself (economy/ERAS).
 > **Confused with:** generation/PLANETOLOGY.md, economy/ERAS.md, EVENTS.md.
 
 Authority doc for **climate**: the state of a body's habitability as it changes during play, what
-changes it, and what that does to the people and corporations living under it.
+changes it, and what that does to the people and nations living under it.
 
 **Scope, stated first.** Climate is **Era 2's catastrophe** — Early Space — not Era 1's. Ben,
 2026-08-31: *"I am not against climate change being a large problem for Era 2, but our prototype
@@ -100,9 +100,9 @@ water access. The slowest channel, and the least reversible.
 
 **4. The point is redistribution, not penalty.** Climate change does not make everything worse for
 everyone by the same amount — **it moves where value is.** Ground that was too cold becomes arable;
-a band that fed a continent stops. A corporation holding the right ground gains; one holding the
-wrong ground must move or trade. That is what makes climate a **Trade** system rather than a tax,
-and it is what satisfies `docs/SYSTEMS.md`'s test: it changes what the company must answer to.
+a band that fed a continent stops. A nation holding the right ground gains; one holding the
+wrong ground must trade for what it lost, since it builds only on its own ground (Ben, 2026-10-23). That is what makes climate a **Trade** system rather than a tax,
+and it is what satisfies `docs/SYSTEMS.md`'s test: it changes what the nation must answer to.
 
 ---
 
@@ -139,7 +139,7 @@ reachable.
 ## 6. Legibility is part of the mechanism
 
 Same rule the Alarm scalar carries. The body's climate state is **visible as a number and a trend**;
-a corporation's **own contribution** is visible to it; the consequence is **attributable**. A player
+a nation's **own contribution** is visible to it; the consequence is **attributable**. A player
 who experiences climate as "my output got worse for no stated reason" has been cheated, however
 correct the arithmetic.
 

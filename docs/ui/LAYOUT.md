@@ -118,12 +118,12 @@ The 380 px floor keeps the one-question-per-view panel splits load-bearing.
 **Spec: `PROFILE.md`**
 
 The **identity tile**: a panel pinned to the top-left corner that caps the shell column,
-taking its full width `W`. Shows the player corporation at a glance:
+taking its full width `W`. Shows the player's nation at a glance:
 
-- **Corporation emblem** — a geometric emblem (deterministic shape + identity colour) on a portrait plate.
-- **Corporation name**, plus `Parent: <home nation>` and `Focus: <industrial focus>`, read live from `corporation_component`.
+- **Emblem** — a geometric emblem (deterministic shape + the nation's identity colour) on a portrait plate.
+- **Nation name**, read live from the nation table.
 
-This is a static identity readout in the prototype — no interaction beyond, eventually, opening a fuller corporation screen. Implemented in `src/ui/profile_panel.cpp`; see `PROFILE.md`.
+This is a static identity readout in the prototype — no interaction beyond, eventually, opening a fuller nation screen. Implemented in `src/ui/profile_panel.cpp`; see `PROFILE.md`.
 
 ---
 
@@ -132,9 +132,9 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 
 A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`). It stands the **full identity-tile height** (`profile_panel_height`, ~92 px) and top-aligns at `y = 0`, so the header and the identity tile read as **one level top band**; its content row is vertically centred within that strip. It is the player's persistent financial dashboard, wired to the live economy:
 
-- **Balance** — the player corporation's running treasury balance (negatives flagged red).
+- **Treasury** — the player nation's treasury (a nation never runs into debt, so it has no negative state).
 - **Cargo valuation** — an estimated value of the goods the player owns: its trades' cargo in transit, at each destination market's current price (`HEADER.md`). A single money figure, not a per-resource inventory.
-- **Net + trend** — the last economy tick's net change as a coloured per-quarter figure, alongside a small sparkline of recent balances.
+- **Net + trend** — the last economy tick's net change as a coloured per-quarter figure, alongside a small sparkline of recent treasury values.
 
 The header answers "can I afford this, and which way is it trending?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
 
@@ -147,7 +147,7 @@ A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, 56
 
 - Holds a vertical strip of **thirteen square icon slots** — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent. An active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
-- **Twelve slots are live** (`nav_pane.cpp`): ten carry their own subject — Corporation overview, Budget, Construction, Acquisitions, Market Ledger, History, Generation Ledger, AI decisions, Strategy readout, Contracts — and two carry a **provisional occupant**, a subject whose slot hosts a surface that would otherwise have no door: Research hosts the tech-tree viewer, Diplomacy the corporations table (NR-012). **One is reserved**, disabled with a dimmed glyph: Corp. Strategy. Full slot semantics in `MENU.md`.
+- **Ten slots are live** (`nav_pane.cpp`): the curated slots carry Nation overview, Budget, Construction, Market Ledger, Convoys and History, and Research hosts the tech-tree viewer as a **provisional occupant**; the tail carries Generation Ledger, AI decisions and Strategy readout. **Acquisitions retired** with the buyout and **Diplomacy's corporations table retired** with the corporation (Ben, 2026-10-23); Diplomacy and Corp. Strategy are reserved, disabled with a dimmed glyph. Full slot semantics in `MENU.md`.
 
 ---
 
@@ -189,12 +189,12 @@ over the kind's content — except a **tile**, which draws no header and gives t
 height to four columns (preview, province card, tile card, action grid; a building is that
 card with one stack expanded in place). A **unit** and a **battle** use the purpose-built
 three-column band layout (left image, centre accordion, right 2×3 action grid — § SELECTION.md); the remaining kinds
-(body, market, nation/corporation) use an action|facts split — a **body** offers *Dispatch
+(body, market, nation) use an action|facts split — a **body** offers *Dispatch
 Survey* or *Go to surface* beside its commercial-activity pulse.
 
 The **go-to** button is equivalent to a double-click on the selection (routes through
 `ui::focus_on_entity` — navigates a canvas for spatial entities, opens a ledger for
-non-spatial ones). With nothing selected the band rests on the player's own corporation.
+non-spatial ones). With nothing selected the band rests on the player's own nation.
 Unlike the fold-out ledgers it has **no nav-rail slot** — being selection-driven,
 **selecting an entity is the only way to point it.** It carries the click-model shared
 across all canvases: **single-click selects** (fills this band, no view change),
@@ -223,7 +223,7 @@ The clock has three layers — sim tick → day → economy tick — paced so th
 **Spec: `CHAT.md`**
 
 The channel-based **comms chat log**: the Public channel plus arbitrary player-created
-corp groups, fed by deterministic sim events (the agency reflexes) and player messages
+nation groups, fed by deterministic sim events (the agency reflexes) and player messages
 (`src/ui/chat_panel.cpp`).
 
 It docks in the **bottom-left tile of the bottom strip** (`comms_dock_rect`,
@@ -238,7 +238,7 @@ a shortened rail would clip two slots.
 appended after Public — *appended*, never inserted, because `m_counsel_channel` caches an
 index into the channel list. It carries battle traffic for **the player's own fights**: one
 dispatch line per battle per tick, plus the aftermath line of any that concluded.
-Rival-vs-rival fights are skipped, on the precedent that corporations stay out of comms so
+Rival-vs-rival fights are skipped, on the precedent that rivals' internals stay out of comms so
 a rival's internals do not leak through it — they are seen as a canvas marker instead, which
 says *where* without saying how it is going (NR-470). It is separate from Public because its
 volume is driven by **simulation intensity** rather than by scripted events — a running war
@@ -282,7 +282,7 @@ The panel, its pin toggle and the pin glyph are BL-216's pinned-items slice.
 
 ## Ledger windows — all fold-out
 
-No ledger floats. Every ledger — Construction, Market, Balance, Corporations, the
+No ledger floats. Every ledger — Construction, Market, Balance, the
 tile construction ledger, **and the Tile Ledger** (History, slot 9 — `tile_inspector.cpp`
 opens through the same path) — draws as a **pinned, borderless panel filling the shell
 column** (`ui::foldout_begin`/`foldout_end`, `src/ui/foldout_column.hpp`) when its nav slot
@@ -302,7 +302,7 @@ Fold-out ledgers with more than one question split their content across a **butt
 the **Construction** panel — **Construction / Buildings** (defaults to Buildings; the build
 front door is the tile Selection element's and trades are the Market Ledger's); the
 **Market Ledger** — **Goods / Trades**; the **History** ledger — Story / Chain /
-Ages. The **Balance** and **Corporation** ledgers are single-question — no split. The principle
+Ages. The **Balance** ledger and the **Nation overview** are single-question — no split. The principle
 is *one question per view, a menu to move between views* — not a mandate to split every panel.
 
 **Toggle rule on the strip.** Consistent with the universal toggle rule
@@ -317,9 +317,7 @@ non-closing selector.
 Every ledger table is tuned for the narrow shell column: in ~244px a `SizingStretchProp`
 multi-column table collapses every column to a leading glyph — a balances column reading
 `9 8 1 1…` — so the **identity column stretches and the numeric columns take tight fixed
-widths**, and low-value columns are dropped rather than clipped. The Corporations dashboard
-(`corporation_panel.cpp`) shows Corporation / Focus / Balance on that rule; Home Nation and
-Status live on the Selection panel / row tint.
+widths**, and low-value columns are dropped rather than clipped.
 
 ### Ledger family conventions
 
@@ -329,10 +327,10 @@ need not rediscover them:
 - **Uniform chrome = the fold-out column.** Every ledger draws through
   `foldout_begin`/`foldout_end`, pinned to `foldout_column_rect` — one rect, one border
   policy, no per-ledger sizing.
-- **Player corporation defaulted.** Every ledger that shows per-corporation data defaults
-  to `w.player_entity` in its corp selector and offers a selector to view any other
-  corporation's figures. Cross-corporation side-by-side comparison is not in scope for
-  the prototype.
+- **Player nation defaulted.** Every ledger that shows per-nation data defaults to the
+  player's nation in its selector and offers a selector to view any other nation's figures
+  (re-subjected from the retired corporation, Ben, 2026-10-23). Cross-nation side-by-side
+  comparison is not in scope for the prototype.
 - **Shared content builders.** Per-entity stat blocks are rendered through the shared
   `entity_summary` helpers (`src/ui/entity_summary.{hpp,cpp}`) — the Tile Ledger and the
   pinned-item cards. The Selection element does not call them (SELECTION.md § Not a stat

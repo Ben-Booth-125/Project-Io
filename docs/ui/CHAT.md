@@ -1,6 +1,6 @@
 # Project Io — Comms Chat Log
 
-> **Settles:** why coordination between corporations is visible rather than hidden
+> **Settles:** why coordination between nations is visible rather than hidden
 > state · where the comms dock sits and what its size costs the surfaces around it ·
 > which channels exist and who may speak on one · what generates a message, and what
 > becomes of the log across a session.
@@ -11,7 +11,7 @@
 
 The **comms log** is the channel-based chat panel docked **bottom-left** of the shell (`src/ui/chat_panel.{hpp,cpp}`; placement below). The panel is BL-205 (comms chat log); its dock placement is BL-227 (comms dock bottom-left). `EXPLORER.md` records the placeholder surface it replaced.
 
-It is the surface of the **diplomacy-as-communication principle** (`docs/ai/AI_OPPONENT.md` § 7, Ben 2026-07-26): since every rival corporation is AI, inter-corp coordination happens in a visible communication medium — corps message publicly or in private groups to form plans — rather than in hidden state. In multiplayer the same channels carry human players; the medium is actor-agnostic.
+It is the surface of the **diplomacy-as-communication principle** (`docs/ai/AI_OPPONENT.md` § 7, Ben 2026-07-26): since every rival nation is AI, coordination between them happens in a visible communication medium — nations message publicly or in private groups to form plans — rather than in hidden state (re-subjected from the retired corporation, Ben, 2026-10-23). In multiplayer the same channels carry human players; the medium is actor-agnostic.
 
 ---
 
@@ -75,9 +75,9 @@ fit).
   a cross-cutting selector, so the standing toggle rule explicitly exempts it; it holds an
   unbounded channel count at no rule cost.
 - **Capped group popup.** The `+` popup is size-constrained (`220–320 × ≤260`) with the
-  per-corp checkbox list in its own scrolling child. Bottom-anchored in the corner, an
-  uncapped list grows *upwards* without bound — one row per corp, off the top of the
-  screen at any real corp count.
+  per-nation checkbox list in its own scrolling child. Bottom-anchored in the corner, an
+  uncapped list grows *upwards* without bound — one row per nation, off the top of the
+  screen at any real nation count.
 - **Floor guard.** The panel draws nothing below 120 px of height: under that the log
   child's height goes negative, ImGui clamps it to a 4 px sliver and the input row is
   pushed out of the window. Defensive only — `selection_band_height` never resolves
@@ -90,8 +90,8 @@ so a standing channel anywhere but the end silently repoints them. The standing 
 named constants (`chat_state::k_public_channel`, `chat_state::k_field_channel`) so posters do not
 spell the index.
 
-- **Public** — channel 0, always present. The only speakers ever posted here are **nations**,
-  never corporations (BL-212, nation-voiced comms). Opens with a deterministic epoch line (a
+- **Public** — channel 0, always present. The only speakers ever posted here are **nations**
+  (BL-212, nation-voiced comms). Opens with a deterministic epoch line (a
   nation count) so the panel is never an empty shell.
 - **Field** — channel 1, always present (BL-468, battle dispatch stream; Ben's call, 2026-08-19).
   Battle traffic: one dispatch line per battle per tick, plus the aftermath line of any that
@@ -101,11 +101,11 @@ spell the index.
   route (NR-470). It is a channel of its own rather than more Public traffic because its volume is
   driven by **simulation intensity** rather than by scripted events. Muting a channel is open
   (NR-471).
-- **Counsel** — one per corp, created lazily, player-only (BL-207, persona packs): a corp's
-  advisor channel. Indices cached in `app::m_counsel_channel`.
-- **Groups** — arbitrary player-created channels over any corp subset (the `+` tab: name + member
+- **Counsel** — one per seat, created lazily, player-only (BL-207, persona packs): the player
+  nation's advisor channel. Indices cached in `app::m_counsel_channel`.
+- **Groups** — arbitrary player-created channels over any nation subset (the `+` tab: name + member
   checkboxes; the creator is an implicit member). Session-local.
-- AI-created groups (plan-forming between AI corps, unreadable by the player unless an
+- AI-created groups (plan-forming between AI nations, unreadable by the player unless an
   intelligence mechanic exposes intercepts — a Discovery-model extension) are a designed
   extension of the same channel model.
 
@@ -114,13 +114,13 @@ spell the index.
 | Source | Determinism |
 |---|---|
 | Epoch system line (d0) | Pure function of generation |
-| **Nation-voiced agency comms** (BL-212) — per-corp/per-building reflex lines would violate `DISCOVERY.md`'s competitor-visibility rule by leaking rival internals, so `step_economy` aggregates **one heaviest event per (nation, tick)** and posts it under the corp's `home_nation`, phrased in first person, with **no building or corp specifics** | Templated from `economy_report::agency_events`, deterministic aggregation |
+| **Nation-voiced agency comms** (BL-212) — per-building reflex lines would violate `DISCOVERY.md`'s competitor-visibility rule by leaking rival internals, so `step_economy` aggregates **one heaviest event per (nation, tick)** and posts it under that nation, phrased in first person, with **no building specifics** | Templated from `economy_report::agency_events`, deterministic aggregation |
 | **Battle dispatches** (BL-468) — one line per the player's own battle per tick to the **Field** channel, phrased from six seeded banks in `src/core/battle_dispatch_text.cpp` | Pure function of `economy_report::battle_dispatches`. **Consumes no draw**: phrase selection folds `stream_seed` with the round index (the BL-290 tongue-bank idiom), so the dispatch layer is structurally unable to move the simulation rather than merely disciplined not to |
 | Player input (message box, active channel) | No mechanical effect — the AI C-route hook |
-| Corp-command stream (strategic AI decisions, BL-202 rival scorer) | Templated from the decision log |
+| Command stream (strategic AI decisions, BL-202 rival scorer) | Templated from the decision log |
 | In-character LLM chat (C-route personality layer) | Out-of-process, coarse-grained, replay-logged (AI_OPPONENT.md § 2C) |
 
-The chat is deliberately the **AI-observability surface first**: what the background corps do mechanically surfaces as messages before any AI "speaks" for real.
+The chat is deliberately the **AI-observability surface first**: what the AI nations do mechanically surfaces as messages before any AI "speaks" for real.
 
 ## State & persistence
 
@@ -128,7 +128,7 @@ UI-side, app-owned (`ui::chat_state`): a capped message ring (`k_message_cap`, 3
 
 ## Presentation
 
-- Speaker lines carry the author's **identity colour** on the name — `speaker_name` / `speaker_colour` (`chat_panel.cpp`) try the **nation** map first (`palette::nation_colour`; Public is nation-authored), falling back to the corp lookup (`palette::corp_identity_colour`; Counsel/group channels are corp-authored). System lines render dimmed (`palette::text_secondary`).
+- Speaker lines carry the author's **identity colour** on the name — `speaker_name` / `speaker_colour` (`chat_panel.cpp`) try the **nation** map first (`palette::nation_colour`; Public is nation-authored), and every speaker is a nation. System lines render dimmed (`palette::text_secondary`).
 - Messages are day-stamped (`d<N>`) and render as one wrapped paragraph per message (§ Layout in the dock); the log pins to the newest line unless the player scrolls back.
 - ASCII-only message text (the UI font has no em-dash/ellipsis glyphs).
 

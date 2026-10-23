@@ -60,7 +60,7 @@ Two gestures, applied uniformly across all three canvases:
   (descend a rung, focus a surface/tile, or — for non-spatial entities — open
   the relevant ledger).
 - **Single-click empty space → clear the selection.** The band stays open and
-  returns to its resting state — the player's own corporation (see § Always
+  returns to its resting state — the player's own nation (see § Always
   open below).
 
 The 'go to' button on the panel is exactly equivalent to a double-click on the
@@ -85,7 +85,7 @@ TIER, which supersedes this section wherever the two differ.
 The panel is **polymorphic by selection kind**, but not as a stat block. The
 entity's kind is resolved by probing the `world` maps (the same discrimination
 `focus_on_entity` does: `w.tiles`, `w.buildings`, `w.units`, `w.markets`,
-`w.bodies`, nations and corporations), and the kinds without a dedicated layout
+`w.bodies` and nations), and the kinds without a dedicated layout
 render through the same two-column split:
 
 - **Action** (left, dominant, ~58% of the content width) — the ONE primary
@@ -127,10 +127,10 @@ Each kind routes its 'go to' to the right place:
 | **Building** (any) | The host tile's card with this stack expanded in place, no header row — § The building element's layout. Player-owned and rival buildings alike. | | None: the tile element draws no go-to. |
 | **Unit** | Dedicated three-column band — § The unit element's layout. | | Canvas: entity's position. |
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
-| **Nation / Corporation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
+| **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
-non-spatial entities (nation, corporation) open the relevant ledger.
+non-spatial entities (a nation) open the relevant ledger.
 
 ### The tile element's layout
 
@@ -198,7 +198,7 @@ a tile keep the shared header (§ Layout & chrome).
      - **Uses** — the points granted to this tile's producing buildings, **out of** what they
        need, so a shortfall reads as one (drawn in the warning colour when granted falls short).
      Hovering the label opens the detail: **whose pool** this ground draws on — every building
-     on a nation's ground draws *that nation's* pool, whoever owns it — with the pool and its
+     on a nation's ground draws *that nation's* pool, and is that nation's — with the pool and its
      claim; the **coverage** a building here would get (`lp_coverage_at`, the one genuinely
      per-tile figure, meaningful on an empty tile too); and one line per source and per
      consuming building. Ground no nation holds feeds no pool, and the detail says so.
@@ -322,7 +322,7 @@ placement-mode canvas click enqueues the same request.
 
 Placeability is gated by `placement_rules::can_place`, and a type's cost is **budget *and*
 materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`).
-Affordability is gated on both: the player corporation's balance *and* its material pool on
+Affordability is gated on both: the player nation's treasury *and* its material pool on
 that body (`corp_body_pools`) — `construct_building` returns `insufficient_materials` when the
 resources are absent, so the requirement is surfaced up front rather than only on a failed
 click.
@@ -332,15 +332,15 @@ class of refusal never becomes a row at all: `construction_result::era_locked` a
 BL-593) `tech_locked` are filtered out of the candidate list before it renders, on one repeated
 argument stated in the filter's own code comment — *"the door not showing what the gate would
 refuse."* The two lock kinds resolve differently (never available in this campaign at all /
-held by the corp's nation through research, PRODUCTION.md § Chain depth) but share the same
+held by the owning nation through research, PRODUCTION.md § Chain depth) but share the same
 door-side treatment: not a reason string, an absent row. The tech clause removes a recipe only
-where a node unlocks it and the corp's nation does not hold that node. Filtered was the ruled choice over
+where a node unlocks it and the owning nation does not hold that node. Filtered was the ruled choice over
 
 shown-and-locked (Ben, 2026-08-24) — extending the existing era precedent rather than adding a
 new lock-reason string and UI affordance.
 
 **Chain depth locks nothing** (Ben, 2026-08-29). The door once carried a third clause erasing a
-recipe deeper than the corp had reached, and the Method Switch row once greyed itself with *"Your
+recipe deeper than the owner had reached, and the Method Switch row once greyed itself with *"Your
 industry cannot make what this needs yet."* Neither exists: tech is the only method lock, so the
 Switch control is disabled by its cooldown alone.
 
@@ -451,7 +451,7 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
      value too, rather than guess a divisor that would disagree with the other surface.
    - **Roster** — `type` resolved through `unit_roster_table()` (`hire_unit` sets
      `unit_component::type` from that table's own index; an out-of-range index falls back to
-     `"Type %u"`) and `owner` resolved via the same corp-name lookup the building card's rival
+  `"Type %u"`) and `owner` resolved via the same owner-name lookup the building card's rival
      summary uses.
 3. **Right quarter — a 2×3 action grid**: **Go to** (`focus_on_entity`) plus five reserved
    slots (`glyph_reserved`), matching the tile/building cards' pattern.
@@ -524,14 +524,14 @@ Like a province, a battle is not an entity, so it travels in its own fields:
 | Field | Meaning |
 |---|---|
 | `ui_state::selected_battle_province` | The province the selected fight stands in, or `0` for none. |
-| `ui_state::selected_battle_attacker` / `_defender` | The two corps, which *name* the fight — a province can hold several. |
+| `ui_state::selected_battle_attacker` / `_defender` | The two sides, which *name* the fight — a province can hold several. |
 | `ui_state::pending_withdraw_province` / `_against` | The withdraw press awaiting its confirm popup. |
 
 `has_battle_selection()` / `clear_battle_selection()` are the accessors; the canvas reconciles a
 stale battle selection on the same arm it reconciles a stale province one, and the battle sits at
 **rung 0** of the repeat-click cycle (see below).
 
-**More than one battle can stand in one province.** A third corp arriving opens its **own** battles
+**More than one battle can stand in one province.** A third side arriving opens its **own** battles
 against each existing participant rather than joining theirs, so "the battle here" is a choice.
 `first_battle_in()` makes it deliberately: **the player's own fight first**, then sorted
 `(province, attacker, defender)` order when none of them is the player's — the fight you are in is
@@ -638,7 +638,7 @@ keyed on the body's survey phase (`draw_survey_section`, called from `draw_selec
 See [DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog this section reads).
 
 - **`hidden`** — a **Dispatch Survey** button with a `cost cr · ETA days` preview (cost and ETA
-  derived from size + distance). Affordability-gated against the player corporation's balance;
+  derived from size + distance). Affordability-gated against the player nation's treasury;
   disabled with an "Insufficient funds." reason when the player cannot pay.
 - **`in_transit`** — `En route — ETA <days> d`.
 - **`scanning`** — `Surveying <k>/<N> — ETA <days> d`.
@@ -716,16 +716,16 @@ the screen, rather than floating with the cursor."* The band is:
 
   Being selection-driven with no rail slot, the element is **not** governed by the universal
   toggle rule: that rule toggles the rail's ledgers, not this element.
-- **Resting state — the player's own corporation.** With nothing selected (fresh session, or
-  after clicking empty space) the band rests on the player corp, through the same
-  `selection_kind::corporation` builder any selection uses. Deselecting means "stop looking at
-  that, back to looking at yourself".
+- **Resting state — the player's own nation.** With nothing selected (fresh session, or
+  after clicking empty space) the band rests on the player's nation (re-subjected from the
+  retired player corporation, Ben, 2026-10-23), through the same builder a nation selection
+  uses. Deselecting means "stop looking at that, back to looking at yourself".
 
   `selected_entity` stays null while resting, so deselect remains representable; the band
-  substitutes the player corp at draw time and never renders `selection_kind::none`. The
-  player corp exists before the first frame, so there is no bootstrap gap.
+  substitutes the player's nation at draw time and never renders `selection_kind::none`. The
+  player's nation exists before the first frame, so there is no bootstrap gap.
 - **Esc ends at the system menu.** Esc's ladder is: exit-confirm → close system menu → pop a
-  drill level → corp roll-up → fold overlay → open the system menu. The "pause screen" IS
+  drill level → nation roll-up → fold overlay → open the system menu. The "pause screen" IS
   `show_system_menu` (settled 2026-08-02).
 
 **Click-through.** The band draws as an ordinary ImGui window over the canvas; ImGui's
@@ -791,7 +791,7 @@ for every lens without exception:
    everything the lens is not about.
 2. **Markers do not outrank lenses.** A building glyph is not a shortcut past the lens's question.
    Under the Market lens a click on a plant gives the catchment; under Resource it gives the
-   deposit; under Corporation it gives the owner. This inverts the no-lens precedence deliberately:
+   deposit; under Nations it gives the nation. This inverts the no-lens precedence deliberately:
    *outside* a lens a marker is the specific thing the player aimed at, but *inside* one the lens
    is the question they are asking and the marker is only ground that happens to be built on.
 3. **A lens with no answer here is inert.** Where the lens resolves to nothing — a tile carrying
@@ -808,7 +808,7 @@ and the province edge are **no-lens marks**. Selection is a different question a
 outlines under every lens.
 
 **A click on inert ground clears the band to resting.** The Selection band returns to the player's
-own corporation (§ Always open), exactly as a click on empty space does. Leaving the previous
+own nation (§ Always open), exactly as a click on empty space does. Leaving the previous
 selection standing is the worse of the two readings: it makes the band assert something the player
 did not just click and has no way to connect to the pointer (the failure NR-697 names).
 
@@ -846,8 +846,6 @@ validates the structure also routes it.
 | Active lens | Resolves to | Routes to |
 |---|---|---|
 | **none** (terrain) | the lowest drawn entity, then the four-rung cycle | Tile Ledger |
-| **Corporation** | the corporation's **tile group** — every tile it holds on this body | that corporation's ledger |
-| **Company** | the background firm's **tile group**, same shape, different subject | that company's ledger |
 | **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, aimed at that resource |
 | **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
 | **Continent** | the **plate** | History ledger, at its tectonic record |
@@ -856,15 +854,10 @@ validates the structure also routes it.
 | **Throughput** | **the ground**, for the hover card only — a click is inert | — |
 | **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
-**A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
-lights **all** of them at once (Ben, 2026-08-28: "hovering one tile displays an outline around all
-company buildings for that corporation/company"), and clicking any of them opens that owner's
-ledger. It is the same claim the market catchment's highlight makes — *all of this is one thing* —
-so it takes the same wash the catchment does rather than a walked boundary (Ben's 2026-08-24 ruling
-on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
-and an area statement is the truer read anyway). It lands one frame behind the pointer,
-exactly as the hovered-province outline already does and for the same reason: the tile loop
-must know the answer before it has drawn the tile that produces it.
+**A tile group was the owner lenses' structure.** Under the retired Corporation and Company lenses,
+hovering one tile of an owner's holdings lit all of them at once and a click opened that owner's
+ledger (Ben, 2026-08-28). Both retired with the firms (Ben, 2026-10-23); the Nations lens's
+territory is the structure that answers ownership now.
 
 **Check:** `scripts/verify/lens_structure_pivot.lua`.
 
@@ -884,16 +877,13 @@ kind resolution exactly as the battle and the contract are — none of the four 
   where the mountains came from, a rift is where the crust thinned.
 
 **Why the band showed the wrong subject before this.** The band substitutes the player's own
-corporation whenever `selected_entity` is null (§ Always open), and both region presses deliberately
+nation whenever `selected_entity` is null (§ Always open), and both region presses deliberately
 null it. So a plate press did not leave the band blank — it confidently showed a *different*
 subject, which is the worse failure and the harder one to notice.
 
-**Corporation and Company route to DIFFERENT ledgers**, because since the 2026-08-28 split
-([GLOSSARY.md](GLOSSARY.md)) they are different words: a corporation is a named operating firm the
-player competes with, a company is a background firm. One is a rival dossier, the other is a
-market participant. BL-666 (owner ledger destinations) owns what each destination is.
-
-Ground held by nobody is inert under both, by rule 3.
+**The Corporation and Company lenses retired (Ben, 2026-10-23)**, and with them their owner
+ledger routes (BL-666, owner ledger destinations). Who owns a building is its ground's nation, read
+under the Nations lens. Ground held by nobody is inert under it, by rule 3.
 
 ## Open questions
 

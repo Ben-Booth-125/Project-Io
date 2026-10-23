@@ -47,9 +47,10 @@ rule has a fuller authority, it is cited — this file does not redefine it.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
-  dated, scoped exceptions** widens this — background corporations and nations run a
-  deterministic scored-utility layer; the player's own corp is never auto-acted on
-  strategically, save one opt-out dial. Every grant is bound by the same constraints, and
+  dated, scoped exceptions** widens this — every non-player nation runs a deterministic
+  scored-utility layer over its own economy (Ben, 2026-10-23: corporations and companies are
+  retired); the player's own nation is never auto-acted on strategically, save one opt-out
+  dial, and nothing builds on its ground for it. Every grant is bound by the same constraints, and
   they are the whole basis on which each was given: **pure, seeded, deterministic and
   replayable, issuing only legal verbs, and never a planner.** No cloud model is ever in the
   loop. **The register lives in `docs/ai/AI_OPPONENT.md` § 11 — read it before touching

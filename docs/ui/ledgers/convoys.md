@@ -73,7 +73,7 @@ the column.
 - ~~Does it earn a rail slot, and where?~~ **Answered** (Ben, 2026-08-29): *"give convoys a slot,
   put it after market."* Slot **7**, directly after Market, taking the rail to fourteen and
   shifting Corp. Strategy down to 8. That placement keeps the commercial run of the rail together
-  — Acquisitions, Market, Convoys — while giving the logistics read its own door and its own
+  — Market, Convoys (Acquisitions, which led it, retired with the buyout, Ben 2026-10-23) — while giving the logistics read its own door and its own
   lens. See `MENU.md` § Scope-widening names.
 - ~~**Is `x0` a defect?**~~ **Answered by measurement** (see above): it is a formatting defect in
   the row, not a supply-layer bug. Dispatch cannot commit an empty convoy — 1669 dispatches, zero

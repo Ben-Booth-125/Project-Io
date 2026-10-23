@@ -51,7 +51,7 @@ The game window is divided into two regions:
 **Default state.** The app opens on the **main menu**, not a canvas: main menu →
 New World wizard → "Begin" hands over to `in_game` (the `app_screen` flow —
 see [STARTUP.md](STARTUP.md)). The **first in-game view** is then the
-**corporation's home planet**: the Planetary screen is primary with the home
+**player nation's home planet**: the Planetary screen is primary with the home
 body selected, and the minimap shows that planet's Circumplanetary view. The
 opening rung is the surface, not the system — the player starts looking at home.
 

@@ -68,7 +68,7 @@ whether the deposit profile justifies building.
 
 ## Competitor visibility
 
-The intentional intelligence channel — what one corporation can learn about another. The single
+The intentional intelligence channel — what one nation can learn about another. The single
 branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind it,
 `src/world/world.{hpp,cpp}`): everything not player-owned is treated uniformly as a rival.
 
@@ -89,11 +89,11 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
   *infers* rival state from market movement: a rising price in a good a rival is known to extract
   means their output is down, or demand is up elsewhere — not a fact read off a panel.
 
-- **Filed financials are public wherever a firm files** (Ben, 2026-08-26). A corporation's
-  **ownership class** decides whether it publishes a quarterly return at all; where it does, the
-  figures are exact and unbanded. This is a **disclosure regime, not a hole in the fog** — what is
-  published is published in full, and what is not published is absent entirely rather than blurred.
-  `docs/economy/FINANCE.md` § Disclosure owns it.
+- **The ownership-class disclosure regime is retired** (Ben, 2026-10-23; `../GLOSSARY.md`
+  § Ownership class). It said whether a firm published a quarterly return; the return is now the
+  nation's (`../GLOSSARY.md` § Quarterly return). Whatever of it is published is published exact,
+  never banded — a **disclosure regime, not a hole in the fog**. `docs/economy/FINANCE.md`
+  § Disclosure owns what a nation publishes.
 
 This rule is what makes decisions interesting rather than trivial: intelligence is *earned by
 reasoning over public signals*, not handed over.
@@ -107,7 +107,7 @@ rival hover card still shows type and owner only; and the principle above still 
 outside a filed return.
 
 The line is worth stating in one sentence, because it is the line every future surface has to find:
-**an open book tells you what a firm earned, never how it operates.** A return is an accounting
+**an open book tells you what an owner earned, never how it operates.** A return is an accounting
 statement — flows, balance, holding count, book value. It is not a production report, and no
 surface may reconstruct one from it.
 
@@ -120,12 +120,12 @@ menu, default off) lifts:
 
 - **This rule's internals redaction**: the rival building hover/Selection cards open their
   Production row (same row, real values) and name the market the building sells into, the rival
-  building card gains the read-only Profitability page, and a selected corp's facts column carries
+  building card gains the read-only Profitability page, and a selected nation's facts column carries
   the full readout (cash, reserve floor, Should-Have buffer, trade points / reserve / manual
   trades, running production).
 - **The geographic fog at draw time**: the Planetary canvas renders unsurveyed regions
   through a heavy lock-colour wash — the *tell* — rather than as ordinary ground, so where
-  the corps' own blindness sits stays legible while the watcher sees through it. The
+  the nations' own blindness sits stays legible while the watcher sees through it. The
   header's `UNSURVEYED / Surveying n/m` suffix stays for the same reason.
 
 The lift is **strictly presentational**: the flag lives in `ui_state`, is read at the draw
@@ -148,20 +148,20 @@ Authority: `trade_route` in `src/world/components.hpp`; `world.trade_routes`; th
 
 Convoys are **transient** (auto-dispatched to fill a shortfall, erased on arrival), so they leave no
 durable lane for a fog to read. A **`trade_route`** is that durable record: a body-pair lane a
-corporation's commerce has actually run.
+nation's commerce has actually run.
 
 ```cpp
 struct trade_route { entity_id body_a, body_b, corp; int last_tick, convoy_count; };
 ```
 
-- Keyed on the **unordered body pair** + corp (a body may host several markets; all collapse to one
+- Keyed on the **unordered body pair** + owner (the `corp` field; a body may host several markets; all collapse to one
   lane for visibility — `body_of_market` does the resolution).
 - **Upserted** when a convoy completes an inter-body lane (`last_tick = ` completion day,
   `++convoy_count`); **one completed convoy establishes** a route. Intra-body lanes record nothing.
 - **Never erased.** Aging to "stale" is a *read-time* concern (below), so there is no deletion logic
   and no flicker. Routes are part of the flat-binary serialisation seam, read and written
   symmetrically.
-- Recording is done for **all** corps (cheap, and what rival-route intelligence would read); the
+- Recording is done for **every** owner (cheap, and what rival-route intelligence would read); the
   fog reads only the **player's** routes.
 
 ---
@@ -267,9 +267,9 @@ brightest edge meeting there. Presentation only — no `world/*` change.
 
 - **Permanent building pockets:** a radius-2 flood around each of the player's own building tiles —
   your installations are always visible.
-- **Permanent corp-centre → market corridors:** a **3-wide** corridor (the A* path flooded one hop
-  to each side) from the **corp centre of operation** (the lowest-id player building tile on the
-  body) to each **market centre** the corp operates in (the catchment markets of its buildings).
+- **Permanent centre → market corridors:** a **3-wide** corridor (the A* path flooded one hop
+  to each side) from the **player's centre of operation** (the lowest-id player building tile on the
+  body) to each **market centre** the player's nation operates in (the catchment markets of its buildings).
   Your trade spine is always lit.
 - **Moving convoy beam:** a live player intra-body convoy lights a **radius-2** beam with a bright
   **head** and a dimming **tail**. `ui_state.convoy_beams` stores each convoy's tile path (from
@@ -300,6 +300,6 @@ brightest edge meeting there. Presentation only — no `world/*` change.
 
 ## Extensions
 
-- **Rival routes** surfaced to the player — the substrate already records every corp's routes;
+- **Rival routes** surfaced to the player — the substrate already records every nation's routes;
   the read is gated on the competitor-visibility rule.
 - Per-resource "where is X cheap" inference tooling; a persistent commercial-sphere minimap.

@@ -5,7 +5,7 @@
 > from and how contention over it resolves · what wages are paid and what development does to a
 > region.
 > **Not here:** what a building does with the labour it is allocated (PRODUCTION) · what the
-> goods a centre consumes cost (MARKETS) · what the wage bill does to the balance (FINANCE) ·
+> goods a centre consumes cost (MARKETS) · what the wage bill does to the treasury (FINANCE) ·
 > the body-level strain and hazard behind habitability (../CLIMATE.md) · the ground the centre
 > stands on (TILES).
 > **Confused with:** PRODUCTION.md, ../CLIMATE.md, TILES.md.
@@ -19,7 +19,7 @@ Population is the human layer of the economy — the source of workforce, the dr
 A **population centre** is a cluster of inhabited tiles on a body, characterised by its population level and the type of development present. In the simulation model, a population centre:
 
 - Is attached to one or more tiles on a body.
-- Provides workforce to the body's `(corp, body)` labour pools (§ Workforce model).
+- Provides workforce to the body's `(nation, body)` labour pools (§ Workforce model).
 - Generates demand for food rations, consumer goods, and habitability goods each Tick.
 - Has a habitability score that reflects its amenity, infrastructure, and input supply (food, clean water, utilities).
 
@@ -259,7 +259,7 @@ capped at 1, read from the market's last clear. **Filled means received:** the h
 their bid off the market's shelf at the end of each clear, and the fill is what they took
 (`MARKETS.md` § The clearing tick, step 9). A shelf that stands full feeds them whether or not
 anything was listed that tick. Steel, ore, fuel and every other industrial want
-are out: they are firms' wants, and a city does not shrink because a mill is short. The grow
+are out: they are industry's wants, and a city does not shrink because a mill is short. The grow
 threshold is unchanged at one half. A good the band does not make is never in the basket, because
 the basket is era-masked as the bid is.
 
@@ -467,7 +467,8 @@ avoids per-centre bookkeeping the prototype does not need.
   share of its regions held by a polity that crossed adds breadth; a polity that never crossed
   reads as never industrialised. The regional furnace flags are never lit on a generated world,
   so reading them would tie every nation at the floor and no Highway would ever qualify.
-  **Corp focus reads a different scalar** (`docs/generation/CORPORATION_GENERATION.md` § Pass 2):
+  **The retired corporation focus read a different scalar** (Ben, 2026-10-23, retiring the
+  corporation; `docs/generation/CORPORATION_GENERATION.md` § Pass 2):
   a region's own furnace year against the world median of those years — on a generated world
   that median is 0, so focus takes its never-industrialised rung while qualification reads the
   polity crossing.
@@ -494,25 +495,25 @@ constraint**, and migration is the only lever that moves one of them.
 
 ## Workforce model
 
-What labour a body's population centres yield, how it is shared between corporations, who wins it
+What labour a body's population centres yield, how it is shared between nations, who wins it
 when it is scarce, and what it is paid.
 
 ### The labour pool
 
-Workforce is a **pool**, not a per-building free parameter. The pool is held **per `(corp,
-body)`** because labour does not cross
-bodies without transport, and a corporation's contention is local to where its buildings
-sit. (A corporation-wide pool was considered and rejected: it would let a labour surplus on
+Workforce is a **pool**, not a per-building free parameter. The pool is held **per `(nation,
+body)`** (Ben, 2026-10-23, re-subjected from the corporation) because labour does not cross
+bodies without transport, and a nation's contention is local to where its buildings
+sit. (An owner-wide pool was considered and rejected: it would let a labour surplus on
 one body silently staff buildings on another, which the spatial economy must not allow.)
 Each pool has:
 
-- a **supply** — the total effective workforce available to that corporation on that body,
+- a **supply** — the total effective workforce available to that nation on that body,
   and
 - a **demand** — the sum of the labour its buildings on that body want this Tick.
 
 **Supply** derives from the body's population centres (BL-042, workforce supply derivation):
 each centre contributes labour by scale — `labour_by_scale` = 1 / 3 / 10 / 30 / 100 units for
-scale 1–5. A corp's share of that body supply is its share of the building count there; a body
+scale 1–5. A nation's share of that body supply is its share of the building count there; a body
 with no centres falls back to the authored `world::workforce_supply` figure (default 3.0).
 
 ### Contention
@@ -529,7 +530,7 @@ is `economy_report.building_labour`. A recipe's **qualified** requirement (§ Qu
 BL-613) clears against its national pool by the same rule, before the ordinary pool; a building's factor is the product of the two grants. Every grant is then multiplied by
 `workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069 workforce efficiency): full
 labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
-`workforce_assigned × grant`. A corporation that over-builds relative to its labour force must
+`workforce_assigned × grant`. A nation that over-builds relative to its labour force must
 outbid itself and its neighbours, so labour scarcity is priced instead of silently averaged. The
 player never hand-assigns headcount; they express intent and the pool resolves it. Building counts
 lean on available land (§ Land use, the province ceiling), not on the pool alone.

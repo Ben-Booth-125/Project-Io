@@ -9,8 +9,8 @@
 > crosses into play · where its boundary with Exploration falls.
 > **Not here:** the phase before it and everything it hands forward (EXPLORATION) · technology,
 > which the history does not run (../economy/RESEARCH, trees/TREES) · how a market clears and how a price resolves
-> (../economy/MARKETS) · how a haul is costed (../economy/SUPPLY) · how a corporation is placed,
-> focused and financed (CORPORATION_GENERATION) · how the culture lens draws (../ui/LENSES) · the
+> (../economy/MARKETS) · how a haul is costed (../economy/SUPPLY) · how a charter's buildings are
+> placed on a nation's ground (CORPORATION_GENERATION) · how the culture lens draws (../ui/LENSES) · the
 > wizard round's surface (../ui/STARTUP § Rounds) · the Era 1 catastrophe test and the recipe band
 > (../economy/ERAS)
 > · how force resolves inside the sim (MILITARY_HISTORY) · the pass map and the calendar
@@ -72,7 +72,7 @@ whatever the epoch: Ben, 2026-09-08 and 2026-09-18, NR-869; `GENERATION_STRATEGY
 **Every nation opens on the industrial recipe band, and at the same tech level (Ben, 2026-10-10,
 overturning NR-929).** The band is fixed, not read off the history: a realm's
 crossing of the Industrial rung (§ Beat 1; `../lore/HISTORY.md` § Stage 4) dates its industrial
-moment and shapes its works, but never closes a roster to its nation's firms
+moment and shapes its works, but never closes a roster to its nation's industry
 (`../economy/ERAS.md` § Where the ladder starts). The history hands the campaign no technology —
 it runs no tree and spends no research (`trees/TREES.md`; `../economy/RESEARCH.md` § Who holds
 technology). Which of the three axes that say "era" in code this is: `../economy/ERAS.md` § Three
@@ -132,19 +132,21 @@ markets that trade named goods in a simplified form."*
 
 | Belongs to Exploration | Belongs to Industrialisation |
 |---|---|
-| Capital as a per-polity treasury | Capital as firm balance sheets, and as industry points at cities |
+| Capital as a per-polity treasury | Capital as industry points at cities, spent as a nation's buildings |
 | Named goods, traded in simplified form | The price field, the order book, the market carve |
-| Trade flows between polities, unpriced, opened by treaty | Trade relationships a firm inherits and prices |
+| Trade flows between polities, unpriced, opened by treaty | Trade relationships a nation inherits and prices |
 | Cultural preference for a good | Demand resolved from population and preference |
 | Ports, navies, standing armies and their upkeep | Industry points, railways, mechanised force |
-| Treaties, subjects, trade provinces | Decolonisation, world war, and **corporations as live-play actors** |
+| Treaties, subjects, trade provinces | Decolonisation, world war, and **the industry the campaign plays with** |
 | War that destroys armies and spares civilians | War that kills people |
 | Migration as the Culture phase's diffusion | Migration into cities and across borders |
 | — | Tariff posture by 1960; national political character hardened |
 
-**The company is the reason the split exists.** A corporation is the object the campaign is played
-with (`../CONCEPT.md`), and generating one needs a chartering institution, a treasury behind it,
-and a market it can price against. Exploration produces all three and charters none of them.
+**Industry is the reason the split exists.** Ben's line named companies; the company is retired
+(Ben, 2026-10-23), and what this round generates is the industry each nation opens with — every
+building owned by the nation whose ground it stands on (`../CONCEPT.md` § Player identity).
+Placing it needs capital at a city and a market it can price against. Exploration produces both and
+places none of it.
 
 **This phase inherits `EXPLORATION.md` § What this phase hands Industrialisation and nothing else.**
 That list is the contract: a struct, not a promise.
@@ -168,7 +170,7 @@ tariff derivation. Whether a posture bites in play is the convoy-arrival duty, w
 `node tools/session/seed_library.js`). Generation is a pure function of the world descriptor, so a
 seed is the save: each entry carries the readings that made that world interesting and a fingerprint
 that says whether the world it still generates is the world described. They span the axes this phase
-forms companies on — the median chest, the polity count, colonial subjects, post roads and trade
+places industry on — the median chest, the polity count, colonial subjects, post roads and trade
 flows — from a floor case that hands this phase almost nothing to a ceiling case that hands it
 everything. **The numbers live in the store, not here,** because a world-moving item is supposed to
 move them.
@@ -183,7 +185,7 @@ has no business here.
 
 | # | Property | Lands in | Produced by |
 |---|---|---|---|
-| 1 | Many companies around population centres; most markets carry goods suited to their cultures | Corporations, companies, market stock, household demand weights | Beat 1's stockpile, spent at the epoch; preference from Exploration |
+| 1 | Many companies around population centres (read since 2026-10-23 as many buildings, each its ground nation's); most markets carry goods suited to their cultures | Buildings on each nation's ground, market stock, household demand weights | Beat 1's stockpile, spent at the epoch; preference from Exploration |
 | 2 | Advanced production (parts, computing) exists; wealth converts into production | Installations on advanced chains; capital | Beat 1, paid into by the treasury |
 | 3 | Some conflicts are ongoing, mostly proxy wars in polities left behind or decolonised | A standing war condition on provinces | Beat 3, and the price gap it builds between great powers |
 | 4 | A culture lens: primary culture per province, a secondary as a checkered fill when close | Culture shares read onto provinces | Beat 2 moves culture into cities |
@@ -191,186 +193,104 @@ has no business here.
 | 6 | Political systems and armies — simple stubs; no nation opens ahead in technology (Ben, 2026-10-10) | A regime field, garrison strength | The works lean, carried force |
 | 7 | Working international markets: shipping far, over sea or land, often beats the nearest market | Price gaps with visible causes, and inherited trade relationships | Specialisation, preference, depletion, tariffs, colonial ties |
 
-### 1. A dense corporate web, and markets that stock what their people want
+### 1. A dense industrial web, and markets that stock what their people want
 
-**Firm density follows the city, not the basket.** `CORPORATION_GENERATION.md` § Pass 6 sizes the
-background field by how many *different* goods are demanded, which is blind to where people are.
-Ben's property is the opposite reading: companies cluster where population does.
+**Density follows the city, not the basket.** Ben's property is that industry clusters where
+population does. A density set by how many *different* goods are demanded is blind to where people
+are, which is why the per-good legacy cap retired (`CORPORATION_GENERATION.md` § Pass 6).
+
+**There are no firms in this web (Ben, 2026-10-23).** What a centre's charter budget bought as firms
+it buys as **buildings owned by the centre's nation**, placed only on that nation's ground
+(`../politics/NATIONS.md` § Own ground). A **charter** is the unit the budget buys: one priced set of
+buildings for one good, placed together around the centre (`CORPORATION_GENERATION.md` § Design
+principles). The budget path is the only path; the legacy roster of eight corporations is retired.
 
 **SETTLED (Ben, 2026-09-15, elicitation): a centre's industry-point stockpile at 1960 is its
-CHARTER BUDGET.** What a city built and did not spend (§ Beat 1) is the capital a firm is chartered
-against, located where the firm will stand. The web is dense where industry accumulated and thin
-where it was spent or never lit — a consequence with a place on the map, never a count picked per
-world. How the budget is spent is § This phase sets budgets; the search spends them.
-
-**SETTLED (Ben, 2026-09-17, elicitation): the budget charters the WHOLE web, specialists
-included.** A city's budget pays for the specialists the seat is chosen from, not only for the
-background firms around them. So the seat shortlist is drawn from firms the budgets chartered, and
-the corporations a player can hold stand where capital accumulated
-(`CORPORATION_GENERATION.md` § The spawn shortlist, and the seat).
+CHARTER BUDGET.** What a city built and did not spend (§ Beat 1) is the capital its charters are
+placed against, located where the buildings will stand. The web is dense where industry accumulated
+and thin where it was spent or never lit — a consequence with a place on the map, never a count
+picked per world. How the budget is spent is § This phase sets budgets; the search spends them.
 
 **The budget has one source: the stockpile (Ben, 2026-09-17).** No stand-in derived from urban
 population fills it before industry points exist. A budget made of headcount would pass *density
 follows cities* by construction, and the reading would prove nothing.
 
-**SETTLED (Ben, 2026-09-17, elicitation): one specialist per centre that can afford one, richest
-first.** Centres spend in order of budget, largest first, ties to the lower centre id. A centre whose
-budget covers a specialist's price — a fixed number of firm charters — charters exactly one
-specialist; what remains buys background firms around it; what cannot be spent stays unspent and is
-counted. So the number of specialists is the number of centres rich enough to afford one, and it
-rises with capital rather than being set by a count. **Pass 1's balancing across nations does not
-apply on this path:** a nation whose cities accumulated capital holds the seats that capital
-bought. The price of a firm charter is a share of the world's own stockpile, and the divisor that
-sets the share is measured against live-play cost before it is fixed; a specialist's price and its
-starting capital follow the rulings below.
+**Centres spend richest first (Ben, 2026-09-17).** Centres spend in order of budget, largest first,
+ties to the lower centre id; what cannot be spent stays unspent and is counted. The price of a
+charter is a share of the stock within the centre's trade reach (below).
 
-**SETTLED (Ben, 2026-09-18, NR-889): on a budget world the per-resource firm cap SCALES WITH THE
-BODY'S CHARTER CAPITAL.** Pass 6 caps a body at 8 firms per demanded good, which froze firm count
-however rich a world became; lifting the cap outright handed density to the 200-per-body runaway
-guard at four to six times the live tick. So a richer body earns a higher per-good cap — capital
-buys density, and breadth still decides which goods. The scaling rule is set against the cost
-table (`charter_cost_sweep.json`), and the specialist's price on real stockpiles, not on the
-synthetic test budget.
+**Which nations are majors follows where capital accumulated** (Ben, 2026-10-23). The seat
+shortlist is the majors, and the count target picks them from the nations whose cities accumulated
+the most capital (`NATION_GENERATION.md` § The nation count is a target). The budget decides which
+nations can lead; the target decides how many do.
+
+**SETTLED (Ben, 2026-09-18, NR-889): the per-resource charter cap SCALES WITH THE BODY'S CHARTER
+CAPITAL.** A fixed cap of 8 per demanded good froze density however rich a world became; lifting the
+cap outright handed density to the 200-per-body runaway guard at four to six times the live tick.
+So a richer body earns a higher per-good cap — capital buys density, and breadth still decides which
+goods. The scaling rule is set against the cost table (`charter_cost_sweep.json`).
 
 **SETTLED (Ben, 2026-09-18, elicitation): the cap scales by a SQUARE ROOT of the body's charter
 capital, under a named DENSITY CEILING.** Capital buys density with diminishing returns. The ceiling
 sits below the 200-per-body runaway guard and counts what it refuses under its own unspent reason,
-so the guard goes back to catching runaways only. The constants are read off the cost table once it
-holds rows between 81 and 150 firms and a tally of firms per good. **The ceiling is 120 firms per
-body (Ben, 2026-09-19, NR-902):** on the cost table's square-root rows it is the ceiling that binds —
-at four times the reference budget it trims every good evenly to 12 firms — while 160 never bound,
-each good's own cap of 15 filling first, and cost a 12-31% dearer economy tick for it. A ceiling that
-never binds is not a brake. **The ceiling scales with the goods the walk serves (Ben, 2026-10-05):**
-once the walk counts derived demand (`CORPORATION_GENERATION.md` § Pass 6), it serves more goods —
-the inputs of the goods households and bodies want — and a fixed 120 trimmed each household good
-from 8-14 firms to 4-5. So the ceiling is a density **per good served**: 7.5 firms for each good in
-G (120 at the 16 goods it was ruled on), still under the 200-per-body runaway guard, which keeps
-catching runaways only. Its tick cost is measured on the cost table before it ships; the rate, not
-the 120, is what the 2026-09-19 measurement anchors. A body's ceiling is fixed once its G is: 7.5 ×
-|G| **rounded down** to a whole firm (172 at 23 goods), so no body carries more than the rate per
-good it serves, and one below the guard where the rate would reach it (27 goods and up).
+so the guard goes back to catching runaways only. **The ceiling is 120 charters per body (Ben,
+2026-09-19, NR-902):** on the cost table's square-root rows it is the ceiling that binds — at four
+times the reference budget it trims every good evenly to 12 — while 160 never bound and cost a
+12-31% dearer economy tick. A ceiling that never binds is not a brake. **The ceiling scales with the
+goods the walk serves (Ben, 2026-10-05):** once the walk counts derived demand
+(`CORPORATION_GENERATION.md` § Pass 6), a fixed 120 trimmed each household good from 8-14 charters
+to 4-5. So the ceiling is a density **per good served**: 7.5 charters for each good in G (120 at the
+16 goods it was ruled on), still under the 200-per-body guard. A body's ceiling is fixed once its G
+is: 7.5 × |G| **rounded down** (172 at 23 goods), and one below the guard where the rate would reach
+it (27 goods and up).
 
 **SETTLED (Ben, 2026-09-18, wave 1 form): the budget and its reference are in the same units, and
-the ceiling fills goods in turn.** A body's charter capital B counts only the points spent on firms,
-net of specialist prices; the reference B_ref is 8 firms for every good with demand on the body, at
-the firm price, so a body at the legacy spend keeps the legacy cap of 8. Under the ceiling, firms go
-to the goods in turn — one per good each pass, up to its cap — so the ceiling trims every good
-evenly. A ceiling that filled the biggest gaps first starved the smallest goods of any firm: breadth
-still decides which goods, and density decides how many of each. **A good that cannot be placed is
-skipped, not fatal (Ben, 2026-09-19, NR-903):** when a centre's window has no free site for a good —
-an extraction good wants an unoccupied deposit tile, which a dense city window often lacks — the turn
-passes that good over for this centre and moves on, and the centre stops only when no good in the
-turn can place. A city with no free quarry still charters the mills and works it has room for.
-**When the ceiling binds, each good keeps an even share of it (Ben, 2026-09-19, NR-905):** the
-ceiling's room, less a place for each construction yard the body will provision, is reserved in
-equal parts to the goods in the turn — with one yard standing, 11 of the remaining 119 to each of
-ten goods and one more to the first nine — so a centre that skips the
-quarries cannot spend their share on mills before a centre that has quarries is reached. A share is a
-reservation, not a cap (NR-906): a good may take a firm beyond its share whenever the room left
-still covers every other short good's unfilled share, so a good that stops being short releases
-what it did not use and the ceiling still fills. A share no centre on the body placed by the end of
-the walk is counted unspent under its own reason, so the gap shows. **A ceiling that cannot be cut into
-shares refuses the spend whole:** where the ceiling binds on a body and the room left after the
-yards would not give every good of the turn one firm, the world charters nothing rather than run
-without the reservation, and the search falls back to the world it would have built with no budget.
-The refusal is read on the world the walk itself will spend, before anything is chartered.
+the ceiling fills goods in turn.** A body's charter capital B counts the points spent on charters;
+the reference B_ref is 8 charters for every good with demand on the body, at the charter price, so a
+body at the reference spend keeps a cap of 8. **The square root's base is 8.** Under the ceiling,
+charters go to the goods in turn — one per good each pass, up to its cap — so the ceiling trims every
+good evenly. **A good that cannot be placed is skipped, not fatal (Ben, 2026-09-19, NR-903):** when a
+centre's window has no free site for a good, the turn passes that good over for this centre and moves
+on, and the centre stops only when no good in the turn can place. **When the ceiling binds, each good
+keeps an even share of it (Ben, 2026-09-19, NR-905):** the ceiling's room, less a place for each
+construction yard the body will provision, is reserved in equal parts to the goods in the turn, so a
+centre that skips the quarries cannot spend their share on mills before a centre that has quarries is
+reached. A share is a reservation, not a cap (NR-906): a good may take a charter beyond its share
+whenever the room left still covers every other short good's unfilled share. A share no centre
+placed by the end of the walk is counted unspent under its own reason. **A ceiling that cannot be cut
+into shares refuses the spend whole:** where the room left after the yards would not give every good
+of the turn one charter, the world places nothing from the budget. The no-budget world it used to
+fall back to retired with the legacy path (Ben, 2026-10-23); what such a world opens on is an open
+question (§ Open questions).
 
-**SETTLED (Ben, 2026-09-18, elicitation): a specialist's price is anchored to the SEAT MENU.** The
-price, in firm charters, is the one at which the median library world offers about as many seats as
-a world with no budget does. The number is read on real stockpiles.
+**SETTLED (Ben, 2026-09-21, NR-907; narrowed 2026-10-03): the price is a SHARE OF THE STOCK WITHIN
+THE CENTRE'S TRADE REACH, not a fixed number of points.** A charter's price is that stock divided
+by a constant, fixed once when the budget is built, so the price is a derived number rather than a
+clamp on the outcome. **The reach is the LANDMASS** the centre's region's anchor stands on — every
+point of the stockpile counted where it stands, the razed and dropped included — and a centre with
+no landmass pays the world's price, which is the dearest (§ Industry spreads beyond its heartland).
+**SETTLED (Ben, 2026-09-21, NR-908; pinned NR-910, NR-914): the divisor answers LIVE-PLAY COST.** It
+alone sets how many charters a stock buys, which is the web's density and so its tick: **650**.
 
-**SETTLED (Ben, 2026-09-21, NR-907): the price is a SHARE OF THE WORLD'S OWN STOCKPILE, not a fixed
-number of points.** *Whose stock is narrowed (Ben, 2026-10-03): the stock is the one within the
-centre's trade reach, not the world's — below.* A charter's price is the stockpile divided by a
-constant, fixed once when the budget is built; a specialist still costs its whole number of firm charters. So
-the size of a world's stockpile no longer decides the size of its menu, and the price is a derived
-number rather than a clamp on the outcome. It does not make the menu the same size everywhere: how
-many near-equal cities a world holds still decides how many cross the price together, and NR-910
-accepts that spread (below). **Why a fixed price could not hold it**
-(BL-1043 stage 1, 16 library seeds): the library's stockpiles run 24.7M to 133.6M points, and the
-seats a fixed price opens track that stockpile almost proportionally, while the no-budget roster
-does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seats, seed 9 holds 27.5M
-and offers 16. At 40000 points a firm the poorest world offered 1 seat and the richest 91, against
-an anchor median of 9; no single number sits inside both tails. The constant itself is read off the
-sweep and pinned at the re-bless. **Whose stock is narrowed (Ben, 2026-10-03):** a centre pays a
-share of the stock within its own trade reach, not the world's (§ Industry spreads beyond its
-heartland); the divisor and the charters are the same knobs. **The reach is the LANDMASS** the
-centre stands on — every point of the stockpile counted where it stands, the razed and dropped
-included — and a centre with no landmass pays the world's price, which is the dearest. A market's
-catchment, the ruling's other reading, is not the reading that prices.
+**The per-province cap scales with the province's centre (Ben, 2026-09-27, NR-960):** two charters
+per rung the centre reaches — a village 2, a town 4, a city 6, a metropolis 8, a megacity 10. A
+province is its centre's whole ground (`PROVINCES.md`), so a flat 2 pushed a city's industry out into
+its villages.
 
-**SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
-price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a
-specialist when its points cover the specialist's firm charters over the divisor, as a share of
-the stock it is priced by (the world's when this was ruled; its trade reach's since 2026-10-03). So
-the seat menu turns on that ratio alone, and the price in firm charters is
-the knob the seat-menu anchor sets; measured on the library (BL-1043 stage 2 and the seat curve),
-the anchor's nine seats sat near a ratio of 290 (divisor over charters) under the world's price.
-The divisor alone sets how many firm charters a stock buys, which is its density and so its tick, and it is set
-against live-play cost. Each knob has one job; a divisor tuned to the seat menu would leave density
-with no knob at all.
+**The specialist's price is retired with the specialist (Ben, 2026-10-23).** These rulings priced a
+seat-eligible firm in charters against a seat menu: anchored to the menu (2026-09-18), 2 then 44
+charters (NR-910; 2026-10-03, option a), the seat spread accepted, the no-specialist fallback
+(NR-910), the report-and-count of an affording centre with no ground (NR-911), and a specialist's
+seeded starting capital (2026-09-18). The seat menu is now the majors, which the count target
+chooses; no charter is priced against it.
 
-**SETTLED (Ben, 2026-10-03, option a; BL-1168 folding BL-1151): under the reach price the charters
-carry the anchor.** Priced by its trade reach, the median library world affords a specialist at about
-158 centres at two charters, against a no-budget world of 8 (the shipped arc's span-on fallback
-world; the span-off legacy roster opens 12). The divisor alone would need about 36 to reach it, and
-there the web starves — 14 to 80 background firms where 650 fills the 120 ceiling. So NR-908's own
-knob takes it: **44 charters**, the first whole number at which the median library world opens the
-no-budget world's 8 seats, with the divisor held at 650 for live-play cost. The spread runs 1 to 29
-seats; a world of one landmass whose capital towers offers one. Seats move off the heartland: at
-44 charters almost no centre on a world's richest landmass affords one, because there the reach is
-dearest. **A centre is priced by its region's anchor (Ben, 2026-10-03):** the reach is the landmass
-the region's anchor tile stands on, even where the centre itself stands on an islet off that
-coast; priced by its own islet, a lone centre is the whole stock of its reach and always affords a
-specialist, a seat made by geometry rather than by capital.
-
-**SETTLED (Ben, 2026-09-21, NR-910): the pins.** *The charter pin is OVERTURNED (Ben, 2026-10-03,
-option a, above): a specialist costs 44 firm charters, not two; the divisor pin of 650 and the
-rest of this ruling stand.* As ruled, a specialist cost two firm charters. The
-charter count moves in whole charters, which is too coarse to land the anchor on its own, so the
-divisor takes the last step, inside the band live-play cost allows: it is **the divisor at which
-the median library world, at the charters then pinned, opens the anchor's nine seats**. The rule is read on the
-world that ships (Ben, 2026-09-22, NR-914): **650**, the first divisor at which the median library
-world opens nine and none opens none. Under the reach price at 44 charters the live tick reads a
-median ×1.12 the legacy world's (`live_tick_cost_probe --quick`, 16 library seeds, per seed ×0.77 to
-×1.61; one seed's legacy tick read 286 and 395 ms on two runs, so the figure is noisy). (Read on a world
-without BL-1037's corridor tier the same rule gave 580; the tier moves every stockpile.) The step
-past it is steep — at 660 the median jumps to thirteen and a half, as a world of near-equal cities
-crosses the price together. **The seat spread is accepted:** the anchor is a median, and a world
-with many cities near the line offers more seats than one whose capital towers over the rest — at
-the pinned price the library runs from four seats to ninety-eight. That is the world talking, not a
-menu to be capped (those figures are the world's price at two charters; at the reach price and 44
-the library runs from one seat to twenty-nine). **A world whose budget opens no specialist falls
-back to the world it would have built with no budget**, exactly as a refused spend does, decided
-from the budget before anything is chartered; above a ratio of about 325 no library world opens
-none. Affording is not placing: a centre that affords a specialist and finds no ground for one
-charters none, so a world whose every affording centre does so opens with no player. **That residual
-is reported and counted, not patched (Ben, 2026-09-22, NR-911)** — the app says so on its seat
-line and the seat sweep fails such a world — and it is fixed only if a library world is ever
-measured there. **The per-province cap scales with the province's centre (Ben, 2026-09-27, NR-960,
-superseding NR-910's flat 2):** two firms per rung the centre reaches — a village 2, a town 4, a
-city 6, a metropolis 8, a megacity 10. A province is its centre's whole ground (`PROVINCES.md`), so
-a flat 2 pushed a city's industry out into its villages. **The square root's base is 8**, the legacy
-per-good cap, so a body at the legacy spend keeps the legacy cap.
-
-**SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
-specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
-(`CORPORATION_GENERATION.md` § Pass 4). Capital drawn from a centre's unspent points was built and
-measured first: centres spend richest first, so a specialist's own centre spends its whole budget
-unless its ground runs out, and on a synthetic budget 10 of 11 specialists opened with nothing.
-Capital that follows the city in that way funds almost no seat. This is the capital call NR-886 tied
-the seat's solvency to; solvency is read on real stockpiles.
-
-**PROPOSED (listed to Ben 2026-09-17, not overturned): a charter stays near its centre.** A firm is
-anchored inside a window around its centre and then its centre's region; a charter that finds no
-ground there is counted unspent rather than scattered across the nation, because a scattered firm
-is capital that left the city that built it. **No budget and an empty budget are the same world as
-today's**: the population-blind placement stands until a budget with something in it arrives.
+**PROPOSED (listed to Ben 2026-09-17, not overturned): a charter stays near its centre.** A charter
+is anchored inside a window around its centre and then its centre's region, always on its nation's
+ground; a charter that finds no ground there is counted unspent rather than scattered across the
+nation, because a scattered charter is capital that left the city that built it.
 
 PROPOSED (listed to Ben 2026-09-18, not overturned; the cap since scaled with the centre, NR-960, above):
-**a budget world reads no
-charter terms from technology** — the history holds none (`trees/TREES.md`) — because a specialist
-stands wherever its centre can afford one.
+**a budget world reads no charter terms from technology** — the history holds none (`trees/TREES.md`).
 
 **SETTLED (Ben, 2026-09-15, elicitation): terminal demand keeps universal PRESENCE and takes a
 cultural WEIGHT.** `../economy/MARKETS.md` § Three properties the set has to hold (property 5)
@@ -475,12 +395,11 @@ The definition was ruled for a verification tool (NR-774); `../politics/NATIONS.
 it. At the epoch there is no trailing window of ticks, so the seeded GDP is output capacity at the
 seeded price field.
 
-**SETTLED (Ben, 2026-09-15, elicitation): a market's cap is its LISTED VALUE** — the summed
-valuation of the firms headquartered in its catchment. It is the stock-exchange reading: how much
-capital sits here. The firm valuation is the one the model already carries for a whole-firm buyout
-(`../economy/FINANCE.md` § Whole-firm acquisition), so nothing new is valued. The corporation
-ledger's *no market cap in the model* is about a firm's own figure and is not overturned; a
-market's cap is a sum over firms, not a share price. `../economy/MARKETS.md` § A market's listed
+**SETTLED (Ben, 2026-09-15, elicitation): a market's cap is its LISTED VALUE** — how much capital
+sits here, the stock-exchange reading. As ruled it summed the valuation of the firms headquartered
+in the catchment; firms, HQs and the buyout valuation it borrowed are retired (Ben, 2026-10-23), so
+what it sums is the book value of the buildings standing in the catchment, whichever nation owns
+them. It is a sum over buildings, not a share price. `../economy/MARKETS.md` § A market's listed
 value owns it.
 
 **SETTLED (Ben, 2026-09-15, elicitation): inequality is BETWEEN NATIONS AND BETWEEN CITIES.** Read
@@ -545,7 +464,7 @@ it feeds, so a beat that drifts from its consumer is visible.
 
 **SETTLED (Ben, 2026-09-15, elicitation): the round is a TIME-LAPSE that ENDS ON THE SEEDED MAP.**
 The three beats play over 1660 → 1960 on the same 2D map as rounds 3–5, and the round closes on the
-epoch's opening map — firms, markets and the price field drawn in place. `../ui/STARTUP.md`
+epoch's opening map — buildings, markets and the price field drawn in place. `../ui/STARTUP.md`
 § Rounds owns the surface.
 
 ### Beat 1 — Industry: cities make industry points
@@ -607,7 +526,8 @@ a survey of its own. SETTLED (Ben, 2026-09-18, wave 1 form): a region founded af
 inherits its parent's surveyed fuel at ×0.7, as the pre-span reading does; and inside the span
 every fuel read takes the survey, so every reader agrees about who has coal.
 
-**SETTLED (Ben, 2026-09-15, elicitation): three sinks, and what is not spent charters firms.**
+**SETTLED (Ben, 2026-09-15, elicitation): three sinks, and what is not spent becomes charters**
+(placed as the nation's buildings, Ben, 2026-10-23).
 
 | Sink | What it buys | Feeds |
 |---|---|---|
@@ -615,25 +535,24 @@ every fuel read takes the survey, so every reader agrees about who has coal.
 | **Mechanised force** | Army and navy stock built from industry rather than treasury | Property 3 and beat 3's wars; property 6's garrisons |
 | **Works** | Raises the city's own yield next round | Concentration, which is what makes properties 5 and 7 uneven |
 
-**Spending and stockpiling are one choice: the state now, or firms later.** At 1960 each city's
+**Spending and stockpiling are one choice: works now, or charters later.** At 1960 each city's
 stockpile becomes its charter budget (property 1).
 
 **Who lays rail (Ben, 2026-10-13):** realms that lean into works spend treasury laying track on their
 busiest corridors from the city, with a station at each city a line serves; the track and stations
-pass to the nation at the fold as state industry (a major's) or to background firms (a minor's). **Lines cross borders (Ben, 2026-10-14):**
-a realm's line may run into a neighbour's ground along the busiest road corridors, and a major's line
-may reach a minor's market city, so rail joins the cities trade actually flows between. Track on
-another nation's ground belongs to that nation's state (or a minor's background firm), as ownership
-always follows ground.
+pass at the fold to the nation whose ground they stand on, like every building (Ben, 2026-10-23).
+**Lines cross borders (Ben, 2026-10-14):** a realm's line may run into a neighbour's ground along the
+busiest road corridors, and a major's line may reach a minor's market city, so rail joins the cities
+trade actually flows between. Track on another nation's ground belongs to that nation, as ownership
+always follows ground (`../politics/NATIONS.md` § Own ground).
 
 **The works lean: some polities spend into rail and force, others stockpile and charter.** That is
 a derived disposition, not a flag, and it is why two equally industrial powers open the campaign
-with different corporate webs. **It is derived from charter reach (Ben, 2026-10-10, NR-1032):** the share of the realm's
-processing plant held by chartered firms at the 1960 fold. A realm whose firms hold most of its plant
-leans *Private Works* — corporations own processing; one whose plant the state holds leans *State
-Arsenal* — heavy plant nation-owned, corporations lease. The threshold is a dial, set by measurement
-across the curated seeds. It is an in-world quantity with a visible cause: the lens shows who owns
-the plant.
+with different industrial webs. **As ruled it was derived from charter reach (Ben, 2026-10-10,
+NR-1032):** the share of the realm's processing plant held by chartered firms at the fold, a realm
+whose firms held most of it leaning *Private Works* and one whose state held it leaning *State
+Arsenal*. Every building is now its nation's (Ben, 2026-10-23), so that share has no subject; what
+the lean is derived from is an open question (§ Open questions).
 
 **An industry point is a second currency beside the treasury, and that cost is accepted.** It
 earns its place because it is located and the treasury is not spread to cities; the alternative —
@@ -649,16 +568,16 @@ ground's lag — is Stage 4's design (`../lore/HISTORY.md` § Stage 4) and the r
 *left behind* reads; the polity rung is what the span computes, and the polity rung is what the
 round shows.
 
-**Firms are chartered IN the span (Ben, 2026-09-25, NR-925, overturning the record-only reading).**
-When a region's stock crosses the running charter price the firm is chartered then and there and
-the points are debited — a real sink, a sim beat with its own re-bless — so the firms the player
-meets at 1960 are the ones the span founded, each with its true year. How the close's charter
+**Charters are made IN the span (Ben, 2026-09-25, NR-925, overturning the record-only reading).**
+When a region's stock crosses the running charter price the charter is made then and there and
+the points are debited — a real sink, a sim beat with its own re-bless — so the industry the player
+meets at 1960 is the one the span founded, each charter with its true year. How the close's charter
 budget and the search reconcile with charters already made is BL-1122's design (in-span
 chartering). The paragraph below keeps its price rule (the running price, NR-907), its cap and
 its dating; its record-only clause ("points are not debited") is overturned.
 
-**Works chartered: the moment a city's stock crosses a charter's price (Ben, 2026-09-24).** A firm
-is chartered at the epoch, from a centre's stockpile (§ 1); the span shows *when* the capital that
+**Works chartered: the moment a city's stock crosses a charter's price (Ben, 2026-09-24).** A charter
+is placed at the epoch, from a centre's stockpile (§ 1); the span shows *when* the capital that
 charters it was built. After each year's accrual, when a region's accumulated industry points cross
 the next multiple of a fraction *f* of the RUNNING charter price — the stock so far within the
 region's own trade reach (its landmass, the reach the close prices by: § Industry spreads beyond its
@@ -670,12 +589,12 @@ switches that let the span record industry points at all — the industry-point 
 span's open year, and a record being written — with no other gate than the price multiple. It
 records the moment: region, polity, focus and year; whether it also debits the points is the
 ruling above (in-span chartering, BL-1122). The fraction *f*
-is read on the seed spread, notes against 1960 firm count per seed, before it is pinned, starting
-at 1. At the close the firms that flash are the REAL charters — the ones each budget bought,
-richest centre first, at their anchor tiles — and each is dated by pairing a region's k-th firm
-with its k-th in-span crossing; a roster no budget chartered is never shown, because the player
-never meets it. **A firm carries its founding year and its origin region into play**, so a seat's
-origin is read from the firm, not from the record. The note reads a crossing of a running price,
+is read on the seed spread, notes against 1960 charter count per seed, before it is pinned, starting
+at 1. At the close the charters that flash are the REAL ones — the ones each budget bought,
+richest centre first, at their anchor tiles — and each is dated by pairing a region's k-th charter
+with its k-th in-span crossing; a roster no budget bought is never shown, because the player
+never meets it. **A charter carries its founding year and its origin region into play**
+(`CORPORATION_GENERATION.md` § Pass 6), read from the charter, not from the record. The note reads a crossing of a running price,
 not a heat reading.
 
 ### Beat 2 — Mass migration, and innovation where people gather
@@ -759,7 +678,7 @@ exploit polities far away."*
 **SETTLED (Ben, 2026-10-03): a charter is priced by the capital in its own trade reach.** A
 centre's charters are priced as a share of the stock within its trade reach — its landmass, or its
 market's catchment — not of the whole world's. Capital is dear where it is scarce and cheap where it
-is all that is around, so a far landmass with little capital still charters its own firms rather
+is all that is around, so a far landmass with little capital still places its own charters rather
 than being priced out by a richer continent's stock. **The reach that prices is the landmass**
 (§ 1); the span's works notes read the same reach's running stock (§ Beat 1), so the span and the
 close price one stock by one divisor.
@@ -809,12 +728,13 @@ being freed, not by being planted.
   - **Exploit.** Subjection reaches far: the sea-legs test and the sphere of claim ease in
     proportion to the push, so a crowded sea power can bind a far people as a tribute colony.
   - **Charter.** In Industrialisation a heartland charters an overseas company that holds trading
-    posts. *Open, to design before it is built:* whether a post is a region, a market or a
-    building; whether the company is a firm the campaign inherits; how it relates to the
-    seat and the charter price by reach (§ 1).
+    posts — a sim object of the history, not a firm the campaign inherits: no firm crosses into
+    play (Ben, 2026-10-23). *Open, to design before it is built:* whether a post is a region, a
+    market or a building, and so which nation's ground it hands to the campaign; how it relates to
+    the charter price by reach (§ 1).
 - **Exploration plants; Industrialisation grows.** Voyages, planting, expeditions and far
   subjection begin in the Exploration age; Industrialisation continues them, adds the chartered
-  company, and grows what was planted.
+  overseas company, and grows what was planted.
 - **Settlers flow from the crowded heartland.** A colony grows by migration from its metropole,
   carrying the metropole's culture (BL-1148, migration carries culture), so a planted colony
   becomes populous enough to industrialise on its own ground, and so to pay for itself and stop
@@ -946,16 +866,16 @@ the reason the campaign's near-miss is nearer on some worlds than on others.
 ## Part III — From region to tile: the downscale
 
 **This is the hardest thing the phase does.** The sim works at region and polity grain with a
-handful of abstract goods. The campaign opens on tiles, named resources, installations, firms and
+handful of abstract goods. The campaign opens on tiles, named resources, installations, buildings and
 prices. Every property in Part I needs a stated rule for crossing that gap.
 
 | Sim quantity | Campaign field | PROPOSED projection |
 |---|---|---|
-| Industry points at a centre | Firms and installations near it | The landscape search spends the stockpile as its budget (below); a region's points reach its campaign centres by the carve's slots, and a carved centre dropped when its body is built out takes its share unspent (PROPOSED, 2026-09-18, not overturned) |
+| Industry points at a centre | Buildings and installations near it, on its nation's ground | The landscape search spends the stockpile as its budget (below); a region's points reach its campaign centres by the carve's slots, and a carved centre dropped when its body is built out takes its share unspent (PROPOSED, 2026-09-18, not overturned) |
 | Scarcity signal per good per market | Starting price per market | Base price scaled by the signal, inside the band |
 | Culture preference × population shares | Household demand weight per market | Population-weighted preference over the catchment |
 | Culture shares on regions and centres | Province culture for the lens | Population-weighted blend (property 4) |
-| Corridor throughput and rail | Road tiers on tiles; rail track and stations as state industry | The existing road stamp; rail as its own network (`../economy/LOGISTICS.md` § 4c) |
+| Corridor throughput and rail | Road tiers on tiles; rail track and stations owned by the nation whose ground they stand on | The existing road stamp; rail as its own network (`../economy/LOGISTICS.md` § 4c) |
 | Held-and-worked duration, class, throughput | `tile_component::resource_remaining` | The depletion formula (§ Spend is estimated at the end) |
 | Standing wars and patron links | A war condition on provinces | Property 3 |
 | Works lean, army stock | Regime, garrisons | Property 6's stubs; no technology crosses (Ben, 2026-10-10) |
@@ -965,14 +885,14 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 
 **SETTLED (Ben, 2026-09-15, elicitation): Industrialisation decides HOW MUCH and WHERE; the landscape
 search decides WHICH.** `GENERATION_STRATEGY.md` § The eight phases gives phase 6 — a static search
-over rosters, placements and road tiers — the corporate landscape; Ben's 2026-09-11 line gives it
+over rosters, placements and road tiers — the industrial landscape; Ben's 2026-09-11 line gives it
 to this phase. Both hold. Industrialisation produces a charter budget per centre, a demand weight per
 market and a price field; the search picks the roster and placement that spends each budget
 viably, on its existing terms.
 
 **So the search is Industrialisation's last act, not a phase after it — and it runs inside the
 round (Ben, 2026-09-24).** The Industrialisation round's own worker, once the span has closed,
-carries on into everything the campaign world still needs — the borders, the roads, the companies,
+carries on into everything the campaign world still needs — the borders, the roads, the industry,
 the landscape search that spends each budget, the winner's apply and its recipe pass, and the
 twelve-tick settle that proves the field — as the phase's last act. One world function does all of
 it, in one order, whether the wizard ran the round or a cold start built the world without one, so
@@ -986,7 +906,7 @@ starts while the same worker builds the tail behind it; landing swaps the world 
 caption names only the step under way. The settle keeps its meaning from `../economy/ERAS.md`
 § Where the ladder starts — twelve quarterly ticks with no calendar meaning, the clock rebased at
 Begin — and the wait's caption is the only thing that names it. Neither the search nor the settle is
-written twice, and the viability check the search exists for survives: a budget spent on firms
+written twice, and the viability check the search exists for survives: a budget spent on buildings
 that cannot pay is exactly what its terms score down.
 
 ---
@@ -1007,8 +927,8 @@ that cannot pay is exactly what its terms score down.
    run, with migration adding per-round work on top of Exploration's.
 6. **A world war is permitted, not forced, so its rate must be measured.** The treaty graph's
    density decides it; too sparse and none ever happens, too dense and every world burns.
-7. **Firm count at the epoch meets live-play cost.** A dense web is many actors each running the
-   corporate scorer every tick. The charter budget must be measured against tick time before it is
+7. **Building count at the epoch meets live-play cost.** A dense web is many buildings each scored
+   by its nation's build layer. The charter budget must be measured against tick time before it is
    tuned for the map.
 
 ---
@@ -1020,7 +940,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 
 | Reading | What it must show |
 |---|---|
-| **Density follows cities** | Firm count per market rises with the catchment's urban population, not with its good count |
+| **Density follows cities** | Charter count per market rises with the catchment's urban population, not with its good count |
 | **Cultural stock** | In most markets, the most-preferred goods have a local or preferred seller |
 | **Advanced chains** | Realised somewhere, unevenly, and correlated with treasury rather than size |
 | **Live conflict** | A war condition standing at the epoch in most worlds, most of them on left-behind or decolonised ground |
@@ -1029,7 +949,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **Far trade** | A material share of seeded trade relationships skip the seller's nearest market |
 | **Industry points** | Industry points unevenly distributed, with fuel within reach visible in who holds them |
 | **Industrial crossing** | Each realm's crossing by 1960 is dated and reported, never reshaped; it moves no nation's recipe band (Ben, 2026-10-10) |
-| **Works notes** | Works-chartered notes per region track the 1960 firm count per seed, which is what pins *f* |
+| **Works notes** | Works-chartered notes per region track the 1960 charter count per seed, which is what pins *f* |
 | **Migration** | Urban share rising across the span; at least one cross-border stream in most worlds |
 | **Decolonisation** | Fewer subjects at 1960 than at 1660, not zero, and at least one lost without a war |
 | **World war** | Present in every world (Ben, 2026-10-10), with population, industry, infrastructure and treasuries lost and rebuilt by 1960 |
@@ -1048,8 +968,9 @@ The epoch's handoff, and nothing else:
 
 - **Nations** from the 1960 polity map, with seeded **GDP**, a **regime** stub and **garrisons**
   from carried force.
-- **The corporate web**: firms and installations the search spent from each city's charter budget,
-  each firm carrying its founding year and origin region (§ Beat 1).
+- **The industrial web**: buildings and installations the search spent from each city's charter
+  budget, each owned by the nation whose ground it stands on, each charter carrying its founding
+  year and origin region (§ Beat 1).
 - **The price field** and **household demand weights** per market.
 - **No recipe band.** Every nation opens on the industrial band, which the history does not derive
   (Ben, 2026-10-10; `../economy/ERAS.md` § Where the ladder starts); the epoch names the calendar
@@ -1108,16 +1029,15 @@ Measured rather than argued:
 - **What binds a far pair, and how fast** (§ Far pairs meet and bind, and this phase makes them).
 - **Whether a colony can hold a colony** (carried from `EXPLORATION.md`).
 - **The depletion formula itself** — writing it down is the work.
-- **How a charter budget converts to firms** — the divisor that prices a firm charter as a share of
-  the stock, and the square root's constants, each set against live-play cost before it is fixed;
-  and the specialist's price in firm charters, set against the seat menu (the split, the rule's
-  form, the price's derivation, both anchors and the density ceiling are settled in § 1).
-- **Whether a seat on a budget world is solvent at today's starting capital** — read on real
-  stockpiles, with the trailing net over a window long enough to judge it.
-- **What a world gets when no centre can afford a specialist** — decided when Beat 1's real
-  stockpiles exist, not on a synthetic budget.
+- **How a charter budget converts to buildings** — the divisor that prices a charter as a share of
+  the stock, and the square root's constants, each set against live-play cost before it is fixed
+  (the rule's form, the price's derivation and the density ceiling are settled in § 1).
+- **What a world whose spend is refused opens on** — the no-budget world it fell back to retired
+  with the legacy path (Ben, 2026-10-23), and nothing has replaced it.
+- **What the works lean is derived from** — its 2026-10-10 reading, the share of plant held by
+  chartered firms, has no subject now every building is its nation's (Ben, 2026-10-23).
 - **The works-note fraction *f*** — the share of the running charter price a region's stock must
-  cross to note a works chartered, read on the seed spread as notes against 1960 firm count,
+  cross to note a works chartered, read on the seed spread as notes against 1960 charter count,
   starting at 1 (§ Beat 1).
 - **How many worlds cross the Industrial rung by 1960** — measured across the library before the
   rung's threshold is fixed; the crossing moves no roster, and the sim is never reshaped to force

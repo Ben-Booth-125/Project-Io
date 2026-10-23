@@ -213,7 +213,7 @@ carries six fields:
 | Field | Type | Notes |
 |---|---|---|
 | `position` | `entity_id` | **The tile the unit occupies.** Tile-canonical — see below. |
-| `owner` | `entity_id` | Corporation or faction entity that controls it. |
+| `owner` | `entity_id` | The nation that controls it (Ben, 2026-10-23: every unit is a nation's). |
 | `count` | `int` | Number of men in the group. |
 | `type` | `uint16_t` | Opaque index into the roster table. |
 | `order` | `movement_order` | `{dest, path, next_index, progress}`; `dest == null_entity` means halted/unordered. See § Marching. |
@@ -240,10 +240,11 @@ by entity id), which is what keeps the container's iteration order off the deter
 
 - `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type 0. No `muster_base`
   (that world has none), so it is deliberately never orphaned.
-- `src/world/corporation_generation.cpp` — `seed_starting_military`: every non-background corp's
-  starting unit beside its starting base (BL-331, starting military presence; BL-476, rivals start
-  armed), count 50, roster row 0, placed on the nearest valid land tile to the HQ. Records that
-  base as its `muster_base`. BL-365 background firms are unarmed on purpose.
+- `src/world/corporation_generation.cpp` — `seed_starting_military`: a starting unit beside a
+  starting base (BL-331, starting military presence; BL-476, rivals start armed), count 50, roster
+  row 0, recorded with that base as its `muster_base`. Its subject was every non-background
+  corporation, placed by the HQ; the corporations and the HQ are retired (Ben, 2026-10-23), so the
+  unit and base are a nation's, on its own ground, and which nations open with one is open.
 - `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records
   the tile's qualifying base, lowest entity id first.
 - `src/world/nation_generation.cpp` — a nation's garrisons, owner set to the nation entity, no
@@ -260,9 +261,9 @@ from *region manpower* — is Era −1's alone.
 `military_strength` (summed derived strengths, an integer sum) — in `src/world/condition_set.cpp`,
 available to laws, techs and quests. The Selection element's unit card (Strength / Roster pages)
 and the hover summary in `src/ui/entity_summary.cpp`, both printing the derived strength with its
-`count × quality × supply` derivation. The corp AI, counting its own units against a soft cap of
+`count × quality × supply` derivation. A rival nation's build scorer, counting its own units against a soft cap of
 three. The battle pass, the march pass, the upkeep pass and the budget's `upkeep` term. The
-blackboard export, for a corp's own units.
+blackboard export, for a nation's own units.
 
 **The unit on the canvas.** A unit has its own marker and command surface — BL-471 (unit marker
 and command surface) owns both. A unit is also reached by clicking its tile: the Planetary canvas
@@ -322,18 +323,15 @@ in what it *does* is `docs/economy/LOGISTICS.md`'s question, not this document's
 ## The muster interface
 
 **The nation musters (Ben, 2026-10-10; `../CONCEPT.md` § Development through ages).** The player is a
-major nation, and a nation **raises its own units and buys their equipment from corporations**; it
-runs no arsenal of its own. So the hirer at a base is the nation, not its champion. The nation buys the
-equipment **as a real buyer on the order book** (Ben, 2026-10-10, NR-1028), so a nation's war
+major nation, and a nation **raises its own units and buys their equipment off the market's shelf**,
+made by its own works or another nation's (Ben, 2026-10-23). So the hirer at a base is the nation. The
+nation buys the equipment **as a real buyer on the order book** (Ben, 2026-10-10, NR-1028), so a nation's war
 demand moves the prices of the goods it arms with (`../politics/NATIONS.md` § 2. Conservation).
 
-**The nation commissions the base; a corporation builds it for pay (Ben, 2026-10-11).** A nation owns
-no construction capacity, so it pays a corporation to build the base on its ground — an
-actor-to-actor transfer, conserved — and the nation owns the finished base. It then hires through
-its **muster** verb at a base it owns. Which corporation takes the commission, and at what price, is
-open design.
-Everything below describes the base and the hire as ruled for a corporation, and holds wherever
-this paragraph does not override it.
+**The nation builds its own base (Ben, 2026-10-23).** A nation builds every building on its own
+ground, paid from its treasury, and the military base is one of them; the 2026-10-11 commission to a
+corporation retired with the corporations. It then hires through its **muster** verb at a base it
+owns.
 
 `building_type::military_base = 6` is the single economy → military interface. It is where units
 come from, and the only place they come from.
@@ -358,15 +356,15 @@ one is ever wanted, is a fresh field with its behaviour filed in the same change
 checks, in order:
 
 1. `unit_type` indexes the roster table, else `rejected_invalid`.
-2. That row is available to this corp under the **live** gate — re-checked at apply time, so a caller's cached list is refused. Else `rejected_invalid`.
+2. That row is available to this nation under the **live** gate — re-checked at apply time, so a caller's cached list is refused. Else `rejected_invalid`.
 3. `tile` names a real tile, else `rejected_invalid`.
-4. **That tile carries the acting corp's own `military_base`, completed (`ticks_remaining <= 0`) and not decommissioned.** A base still building does not qualify. Else `rejected_placement`.
-5. The corp can pay **both** legs, else `rejected_funds`.
+4. **That tile carries the acting nation's own `military_base`, completed (`ticks_remaining <= 0`) and not decommissioned.** A base still building does not qualify. Else `rejected_placement`.
+5. The nation can pay **both** legs, else `rejected_funds`.
 
 The two payment legs. A **credit cost** of
 `hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 40 + 0.5 × power,
 so Levy Spear costs 40 and Rifle Regiment 230). Plus a **flat resource draw** of 5.0 per *gated*
-axis, **bought** off the shelves of the markets the corp sits in, lowest market id first, at each
+axis, **bought** off the shelves of the markets the nation's buildings sit in, lowest market id first, at each
 shelf's posted price — a hire buys its kit like any buyer (`../economy/MARKETS.md` § The shelf
 economy).
 
@@ -376,7 +374,7 @@ resource the gate did not already confirm access to.
 
 The credit base is a **floor**: row 0's gate is all-zero, so the resource leg alone would test and
 spend nothing, and the cheapest rows would be free and unbounded for any seam caller. Both legs are
-checked before either is debited, so a refusal leaves the corp wholly uncharged.
+checked before either is debited, so a refusal leaves the nation wholly uncharged.
 
 On success: a new unit entity at the muster tile with `count = hire_batch_manpower`, returned
 through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
@@ -387,12 +385,13 @@ The player's press then selects the new unit; the rival scorer's path additional
 `agency_event::kind::hired` for the decision feed and session history. The hire price is shown on
 the press (BL-405, hire price on screen).
 
-**Rivals hire through the same verb** (the BL-324 widening of the AI-agency exception, standing
-rules § Determinism & data model). `src/world/corp_ai.cpp` scores hiring alongside build, demolish,
-survey and road; a corp with no completed base has no muster tile and must build one first, priced
-by the ordinary build-candidate machinery. A soft cap of three units per corp keeps hiring from
-becoming an unconditional extra action every evaluation. Availability is decided by the stock on
-the shelves of the markets the corp sits in alone; the credit cost is subject to the solvency gate like every other spend
+**Rival nations hire through the same verb** (the BL-324 widening of the AI-agency exception,
+carried to the nation unchanged, Ben 2026-10-23; `../ai/AI_OPPONENT.md` § 11). The build scorer
+(`src/world/corp_ai.cpp`) scores hiring alongside build, demolish, survey and road; a nation with no
+completed base has no muster tile and must build one first on its own ground, priced by the ordinary
+build-candidate machinery. A soft cap of three units per nation keeps hiring from becoming an
+unconditional extra action every evaluation. Availability is decided by the stock on the shelves of
+the markets the nation's buildings sit in alone; the credit cost is subject to the solvency gate like every other spend
 (Ben, 2026-08-13, NR-218).
 
 ### The roster
@@ -417,9 +416,9 @@ words that it scores whatever stack it is handed and knows no roster; so the ros
 separately and *resolves into* combat's types.
 
 **Two gate paths, one table.** `available_rows(const region&, band)` is the Era −1 path, gated on
-authored region endowment. `available_rows(const world&, corp, band)` is the campaign path, gated
-on the stock standing on the shelves of the markets the corp sits in — the `stockpile` subject's
-reading, since a corporation holds no goods of its own.
+authored region endowment. `available_rows(const world&, actor, band)` is the campaign path, gated
+on the stock standing on the shelves of the markets the nation's buildings sit in — the `stockpile`
+subject's reading, since a nation holds no goods of its own.
 
 The campaign gate is **binary by design** — each axis is 1000 or 0, the table's own max threshold.
 "You may field rifles because you can buy steel" is a yes/no supply-chain question here, not a
@@ -438,7 +437,7 @@ Era −1 settlement model — but from `recipe_registry::era()`, the same coarse
 split every other era gate reads. Every nation opens on the industrial band (`../economy/ERAS.md`
 § Where the ladder starts; Ben, 2026-10-10), so the campaign roster opens at its highest band
 (`industrial`). Because bands are
-cumulative, every earlier row the corp's ground supports is exposed either way.
+cumulative, every earlier row the nation's ground supports is exposed either way.
 
 `roster_stack(manpower, region, band, readiness)` composes an army stack from region manpower.
 Later bands crowd out earlier ones — a row's weight decays ×0.35 per band it sits below the
@@ -450,7 +449,7 @@ works use.
 
 ## Marching
 
-A unit is not pinned to its muster tile. Three `corp_verb` rows extend the **same** corp-command
+A unit is not pinned to its muster tile. Three `corp_verb` rows extend the **same** command
 seam every other action goes through — there is no parallel `unit_command` type (BL-470 ruling 2;
 BL-314's unit verb family resolves to this seam, extended):
 
@@ -491,16 +490,16 @@ cannot be tuned into meaninglessness.
 
 **Visit order — NR-344, "war flips the queue".** At peace, convoys claim the network first:
 `advance_convoys` runs in the sim loop *before* `run_economy_step` is called (`main.cpp`/`app.cpp`),
-a stated rule rather than an accident of phase order. A corp party to **any** declared hostility,
+a stated rule rather than an accident of phase order. A nation party to **any** declared hostility,
 either direction (`is_hostile` checked both ways against `corp_hostile_pairs` — being attacked
 mobilises too), has its own units visited **first** within `run_unit_march`, evaluated once per
 tick from the stance table. The contention this decides is over the Logistic Points pool
 (BL-464, Logistic Points — [`LOGISTICS.md`](../economy/LOGISTICS.md)); absent a shared pool, the
 order is written down and changes nothing observable.
 
-**The blackboard export shows a corp its own force.** `export_corp_blackboard`
+**The blackboard export shows a nation its own force.** `export_corp_blackboard`
 (`src/world/corp_ai.cpp`) emits `unit_tile`, `unit_type`, `unit_count`, `unit_strength` and
-`unit_order_state`/`unit_order_dest` facts for the corp's OWN units — no BL-068 visibility
+`unit_order_state`/`unit_order_dest` facts for the nation's OWN units — no BL-068 visibility
 question, exactly like cash and buildings. Rival units carry no unit-subject facts in the
 export. The rival scorer can legally issue `march_unit`; scoring march *quality* is BL-450's
 (rivals score stance) conflict-AI arc.
@@ -527,24 +526,24 @@ is deliberately no second disband mechanism.
    exposed as a named function so it can be asserted.
 3. **Pacing is several rounds per tick** — `campaign_battle_params::rounds_per_tick`.
 
-**The trigger.** A battle opens when a corp with a **directed** hostility toward another has units
+**The trigger.** A battle opens when a nation with a **directed** hostility toward another has units
 in a province where the target also has units. Directed suffices — the ambush property stance
 pays two tables for: the declarer attacks, the target is drawn in regardless of what it thinks.
-Two neutral corps sharing a province do not fight; the trigger is stance, not proximity. Friendship
-permits what BL-549 (friendship permits two things) names; it gates nothing here. A corp-vs-nation
+Two neutral nations sharing a province do not fight; the trigger is stance, not proximity. Friendship
+permits what BL-549 (friendship permits two things) names; it gates nothing here. A
 retired second trigger, which opened over an active mercenary contract rather than a declared
 hostility, is § Nation
 garrisons, below.
 
-**Identity is (province, attacker, defender).** A corp pair fights at most one battle per province
+**Identity is (province, attacker, defender).** A nation pair fights at most one battle per province
 at a time; mutual hostility opens the pair once, in the direction whose attacker sorts lower — a
-property of the ids, not of who declared first. A third corp arriving opens its **own** battles
+property of the ids, not of who declared first. A third nation arriving opens its **own** battles
 against each existing participant rather than joining theirs. **Membership is snapshotted at
 open** — a unit marching in after the first round reinforces nothing — and the participating unit
 ids are stored ascending per side.
 
 Both sides are screened by `stack_can_fight` (§ `resolve_battle`). Doctrine is `doctrine_row{}`
-on both sides — no per-corp doctrine field exists, so the doctrine machinery contributes nothing
+on both sides — no per-nation doctrine field exists, so the doctrine machinery contributes nothing
 to a campaign battle until a formation carries a row (BL-472, formations). Season is `summer` —
 the world carries no season, so the winter penalty is a history-sim-only effect. Side supply is
 the mean of the participating units' `supply_factor_permille`; per-unit supply and quality have
@@ -564,8 +563,8 @@ removed equal the losses the pass reports, or the pass would quietly mint or des
 land per round batch, so a battle weakens units while it runs, which is what makes a mid-fight
 withdrawal a real decision.
 
-**Withdrawal** is `request_withdraw(w, corp, province, against)`. `against` names the fight, because
-a corp can be in more than one battle in one province; `null_entity` means "the first, in sorted
+**Withdrawal** is `request_withdraw(w, actor, province, against)`. `against` names the fight, because
+a nation can be in more than one battle in one province; `null_entity` means "the first, in sorted
 order". The request is **honoured at the tick boundary**, before the next round batch — that delay
 *is* the withdrawal window. Strength is captured before the withdrawal is applied, so the parting
 cost reaches the men and not only a number. A request naming no live battle, or from a
@@ -614,10 +613,9 @@ battle element.
 
 ## Nation garrisons
 
-> Nations field force of their own. Whatever a corporation eventually fights a nation over, this
-> is the force it fights.
+> Nations field force of their own. A garrison is the standing force a nation's ground is held with.
 
-Nations own units. `unit_component::owner` accepts a nation entity exactly as it accepts a corp's —
+Nations own units — every unit (Ben, 2026-10-23). `unit_component::owner` takes a nation entity;
 the field was never corp-typed. A garrison is seeded at generation, not hired: one in the nation's
 capital province, plus one in each border province it shares with its highest-grudge neighbour
 (`nation_score_terms.mean_grudge`). **Where each stands (Ben, 2026-10-03):** the capital
@@ -638,24 +636,22 @@ costs-twice-annual-salary anchor prices a garrison's count off the nation's own
 token one — no separate garrison-strength dial. Garrisons are **static** in this slice: they hold
 their seeded tile and do not march.
 
-**There is ONE battle trigger: corp-vs-corp directed hostility** (§ Battles, above).
+**There is ONE battle trigger: nation-vs-nation directed hostility** (§ Battles, above).
 
-There were two. The second opened a corp-vs-nation fight automatically over an ACTIVE mercenary
+There were two. The second opened a corporation-vs-nation fight automatically over an ACTIVE mercenary
 contract — no `declare_hostile` row was authored for it, because the contract itself was the
 hostility. It went with the mercenary contract (Ben, 2026-08-30), and it had **never fired**: its
 lookup returned nothing from every production state, because the contracts that would have
 populated it were never created.
 
-**The capability is intact; only the automatic trigger is gone.** `open_battle` is
-entity-id-agnostic and opens a corp-vs-nation fight exactly as it opens a corp-vs-corp one, so a
-garrison remains something that can be fought. What no longer exists is anything that *decides* to
-fight one. How a corporation comes to blows with a nation is an open design question, and
-[`../politics/RELATIONS.md`](../politics/RELATIONS.md)'s declared stance is the nearest existing
-mechanism — hostility is a state a party opts into (Ben, 2026-08-17), which is exactly the shape
-the retired trigger bypassed.
+**A garrison is fought through declared stance.** `open_battle` is entity-id-agnostic, and with
+stance between nations (Ben, 2026-10-23; [`../politics/RELATIONS.md`](../politics/RELATIONS.md))
+a garrison is drawn into battle whenever its nation is the target of a directed hostility in its
+province. Hostility is a state a party opts into (Ben, 2026-08-17), which is exactly the shape the
+retired trigger bypassed.
 
-**Upkeep is a budget claim, not the corp vector.** A garrison does not draw the credits+goods
-vector `run_unit_upkeep` charges corp units (§ Upkeep, below) — its upkeep is a `military_research`
+**Upkeep is a budget claim, not the hired-unit vector.** A garrison does not draw the credits+goods
+vector `run_unit_upkeep` charges hired units (§ Upkeep, below) — its upkeep is a `military_research`
 line claim in the nation's own budget pass ([`../politics/NATIONS.md`](../politics/NATIONS.md) § A
 budget), paid the same way every other priority line is. A garrison whose nation cannot fund the
 line weakens by the ordinary budget-shortfall reading; there is no second mechanism.
@@ -708,7 +704,7 @@ Naming a good here is a one-line `economy.lua` change, never a code change.
 > **The ordnance recipe is industrial.** The Fabricator recipe that makes ordnance is tagged
 > `era = "industrial"` (`scripts/recipes.lua` id 27). Every nation opens on the industrial band
 > (`../economy/ERAS.md` § Where the ladder starts; Ben, 2026-10-10), so the good every unit's upkeep
-> draws is one every nation's firms may make.
+> draws is one every nation may make.
 
 **One decay rule, two triggers.** A unit is unsupplied if it sits beyond the reach field *or* its
 goods draw went unmet. Both fire the **same** subtraction on `supply_factor_permille`, because both
@@ -726,7 +722,7 @@ Dijkstra behind it, so a zero table costs no time as well as no credits. The tes
 `w.units`, because two units drawing on one shelf draw the same stock — the visit order
 decides which one goes short. That is load-bearing, not cosmetic.
 
-**Orphan cleanup.** `demolish_building` erases the building, the corp asset and the stockpile but
+**Orphan cleanup.** `demolish_building` erases the building, its owner's asset record and the stockpile but
 never touches `w.units`. The upkeep pass disbands a unit whose `owner`, tile, or `muster_base` has
 been erased, and a unit a battle reduced to zero. It runs **last** in the economy step, so a base
 torn down this tick orphans its units in the same tick rather than leaving them live for one. It
@@ -805,7 +801,7 @@ tuned-to-pass number.
 
 **`battle_engagement_harness.cpp`** — `run_battles`. B1: the trigger fires from hostility plus a
 shared province alone, men die through the tick rather than a direct resolver call, and two
-neutral corps sharing a province do not fight. B2: twin worlds produce the same battle set in the
+neutral nations sharing a province do not fight. B2: twin worlds produce the same battle set in the
 same order. B3: mutual hostility and four units open exactly one battle, and a second tick opens no
 duplicate. B4: province and role order each change the stream. B5: no count goes negative and
 conservation is exact, per tick and end to end. B6: five ticks twice gives identical strengths and
@@ -835,13 +831,13 @@ rejects not-owner/invalid/ocean-dest/off-body/already-there without mutating the
 `run_unit_march` spends per-class march points against the shared traversal-cost weight, carries
 fractional progress across ticks, and clears the order on arrival. M3: `halt_unit` clears the order
 and rejects a unit with none; `disband_unit` erases the unit and rejects a non-owned/unknown one.
-M4: NR-344 — a mobilised corp's units are visited before a peaceful corp's within one tick's pass.
+M4: NR-344 — a mobilised nation's units are visited before a peaceful nation's within one tick's pass.
 M5: state-hash replay determinism with marching units in flight. M6: a corrupted path (the
 recompute guard's trigger) recomputes identically across two independent runs.
 
-**`rival_military_seeding_harness.cpp`** — `seed_starting_military`. R1: every non-background corp
-ends generation owning exactly one `military_base` and one unit (roster index 0, 50 manpower) on
-the nearest valid land tile to its HQ, and a background firm owns neither. R2: two same-seed runs
+**`rival_military_seeding_harness.cpp`** — `seed_starting_military`. R1: every seeded owner
+ends generation owning exactly one `military_base` and one unit (roster index 0, 50 manpower); its
+corporation-and-HQ reading retired with the corporations (Ben, 2026-10-23). R2: two same-seed runs
 seed identically.
 
 **`stance_determinism.cpp`** — the stance tables that gate all of the above replay identically.

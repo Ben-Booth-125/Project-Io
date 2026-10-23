@@ -15,7 +15,7 @@ The **navigation pane** is a fixed, full-height **icon rail** pinned to the left
 
 ## Structure
 
-- A vertical strip of **thirteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **ten curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the ten, **eight carry their own subject** — Corporation overview, Budget, Construction, Acquisitions, Market Ledger, Convoys, Diplomacy, History. **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **One is reserved** — Corp. Strategy — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
+- A vertical strip of **thirteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **ten curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the ten, **six carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, History; **Acquisitions** retired with the buyout and **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Corp. Strategy and Diplomacy are reserved** — disabled, but each carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (the toggle rule, `.claude/rules/io-standing-rules.md`), or open another slot (accordion, `close_all_panels`).
@@ -34,8 +34,8 @@ Slots 11–13 sit after the curated player slots and never displace them; the ta
 | # | Slot | Surface |
 |---|---|---|
 | 11 | **Generation Ledger** (`icons::continent`) | why a tile generated as it did — the per-pass derivation and the body's histograms (BL-303, generation ledger; `../generation/GENERATION_LEDGER.md`) |
-| 12 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each corporation decided and how close the call was (BL-407, decision feed) |
-| 13 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per corp over the recent run (BL-411, emergent strategy readout) |
+| 12 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each AI nation decided and how close the call was (BL-407, decision feed) |
+| 13 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per nation over the recent run (BL-411, emergent strategy readout) |
 
 Slot 12 borrows the pennant glyph slot 8 draws dim, because its subject is exactly the strategic decision that slot is reserved for; slot 13 has its own glyph because two *lit* slots must not share a silhouette.
 
@@ -46,7 +46,7 @@ The tail is the foot of the rail: **slot 13 is the last slot, and nothing sits b
 Where a new surface goes is nonetheless a real decision, and the rail has both routes.
 **Insertion** puts a surface among the curated slots at the point the curated sequence would
 put it — Acquisitions (§ Menu set and ordering, slot 5) was inserted above Market on Ben's
-call (2026-08-29), because buying a firm reads before the market it is priced from.
+call (2026-08-29), because buying a firm read before the market it was priced from (the ledger has since retired).
 **Appending** puts it below the developer tail, outside both the curated set and the tail.
 
 The rule is the subject, not the convenience: a surface whose subject is one of the curated
@@ -86,14 +86,14 @@ each slot's position in the SYSTEMS.md tier list, so the curation is auditable.
 
 | # | Slot | tier-idx | System / source |
 |---|---|---|---|
-| 1 | **Corporation overview** (dashboard) | 0 | the player corporation at a glance |
+| 1 | **Nation overview** (dashboard) | 0 | the player nation at a glance |
 | 2 | **Budget** | 2 | Budget ([A4]) |
 | 3 | **Construction** | 3 | Infrastructure |
 | 4 | **Research** *(provisionally hosts the tech-tree mock)* | 7 | Research |
-| 5 | **Acquisitions** | 2 | Finance ([A4]) — whole-firm buyout (`../economy/FINANCE.md` § Whole-firm acquisition) |
+| 5 | **Acquisitions** *(retired, Ben 2026-10-23)* | 2 | — the buyout retired; no surface |
 | 6 | **Market Ledger** | 1 | Trade ([A4]) |
 | 7 | **Corp. Strategy** *(reserved)* | 8 | Policy |
-| 8 | **Diplomacy** *(provisionally hosts the all-corporations balance table)* | 9 | Diplomacy |
+| 8 | **Diplomacy** *(reserved)* | 9 | Diplomacy |
 | 9 | **History** | 6 | Environment |
 
 Three slots are **named more broadly than their source ledger** — Budget (not Balance Ledger),
@@ -105,36 +105,17 @@ Notes on the mapping:
 - **Resources, Supply, Conflict and Workforce/Population do not get their own slot.** Resource
   detail lives in the Market ledger and the Selection element; Supply folds into
   Construction/Market; Conflict has no broad ledger; the labour read is a roll-up on the
-  Corporation overview dashboard (slot 1) rather than a rail subject of its own. The rail scales
+  Nation overview dashboard (slot 1) rather than a rail subject of its own. The rail scales
   with *systems that have a broad surface*, per the menus-are-broad-ledgers rule.
 
-- **Slot 5 — Acquisitions (Ben, 2026-08-29).** Which firms may be bought outright and at what
-  price, plus a full-canvas fold-out over every corporation's filed return. It **earns a slot on
-  the menus-are-broad-ledgers test**: an overview across the whole field of firms, not a targeted
-  action on one — the targeted read of a single corporation remains the Selection element's.
-
-  It is **inserted above Market rather than appended**, which shifts every slot from Market down
-  by one. Buying a firm is the largest single thing a player's money does, and it reads before
-  the market it is priced from; appending it instead would have placed a curated player system
-  below the developer/observability tail and taught the rail's order to mean nothing.
-
-  **The surface is small, and that is a generated fact rather than a design gap.** A buyout needs
-  a target that is `publicly_held` *and* has filed (`../economy/FINANCE.md` § Whole-firm
-  acquisition), and ownership class is generated from the home region's industrialisation
-  timing — so most firms are `closed` and publish nothing. The ledger therefore states the size
-  of the field it is drawing ("N of M firms file and can be priced") rather than letting a short
-  list read as a defect. Its two groups — **Purchasable** (priced within the player's balance,
-  carrying the Buy press) and **Possible** (priced, beyond it today, deliberately carrying no
-  press) — exist for that contrast: the second group is how a player sees what the next rung
-  costs.
-
-  **Two doors reach it**: this slot, and the Company lens's click destination (`LENSES.md`
-  § Company lens) — a background firm's holdings resolve through to the firm, and the question a
-  player has about a background firm is whether they can buy it.
-- **Slot 1 — Corporation ledger (BL-248, corporation dashboard; BL-691, corp: how am I doing).**
-  Its question is **"how well am I doing?"**, and it holds **one card, Balance**, folded out into
-  the shell column (`src/ui/corporation_dashboard.{hpp,cpp}`). The card **rests as one verdict
-  line** (`±X/qtr, balance Y`) **over its chart** — a two-column graph, earnings against the
+- **Slot 5 — Acquisitions, retired (Ben, 2026-10-23).** It listed which firms could be bought
+  outright and at what price (Ben, 2026-08-29). The buyout and the firms are retired
+  (`../GLOSSARY.md` § Buyout), so the slot has no surface; see `ledgers/acquisitions.md`.
+- **Slot 1 — Nation overview (formerly the Corporation ledger; BL-248, corporation dashboard;
+  BL-691, corp: how am I doing).** Its question is **"how well am I doing?"**, asked of the
+  player's own nation (re-subjected, Ben, 2026-10-23), and it holds **one card, Balance**, folded
+  out into the shell column (`src/ui/corporation_dashboard.{hpp,cpp}`). The card **rests as one verdict
+  line** (`±X/qtr, treasury Y`) **over its chart** — a two-column graph, earnings against the
   quarter's expenses stacked by flow, with the net beneath it. `›` gives it the canvas
   (BL-214, drill-through; `DRILL_THROUGH.md`); there is no expand-in-place control,
   because the card already shows its content at rest. There is no chart question log on the card
@@ -148,9 +129,9 @@ Notes on the mapping:
   `economy_report`. The chart is `ui::charts::draw_stacked_columns`, shared with the building
   card's Revenue / Expenses graph at the building grain.
 
-  **"Balance" here is a sub-header, not a surface name** (Ben, 2026-08-29): the ledger is called
-  Corporation, and the overlap with slot 2's **Budget** is explicitly accepted rather than
-  tolerated, with Budget to be revisited. See `ledgers/corporation.md` § Slot 1.
+  **"Balance" here is a sub-header, not a surface name** (Ben, 2026-08-29), and the overlap
+  with slot 2's **Budget** is explicitly accepted rather than tolerated, with Budget to be
+  revisited. See `ledgers/corporation.md` § Slot 1.
 
   > **The MVP four, and what became of them (Ben, 2026-07-31).** An earlier cut named **balance +
   > last-tick delta**, a **holdings roll-up**, **workforce contention** and **alerts**; Ben chose
@@ -161,31 +142,31 @@ Notes on the mapping:
   > which is the same signal without a second mechanism to maintain (player alerts as a system
   > are BL-261, player alerts).
 
-  The **rival-field comparison** — corporations grouped by stance, with the stance verbs on each
-  row — lives on **slot 9** (Diplomacy), not here. That slot stopped being provisional when its
-  surface became the diplomatic read its label always promised; the financial half it used to
-  carry moved to the Acquisitions ledger's profitability fold-out.
+  The **rival-field comparison** — corporations grouped by stance — **retired** with the
+  corporation (Ben, 2026-10-23), and the Acquisitions ledger that carried its financial half
+  retired with the buyout.
 
 - **Buildings have no dedicated ledger (settled 2026-06-15, [F4]).** A standalone buildings
   overview is more "good to know" than goal-driving, so it earns no reserved slot. Buildings are
   read in the two places a player cares about them: **own buildings** ("good for me") in the
-  **Corporation overview dashboard** (slot 1); **competitors' buildings** ("competition") in the
+  **Nation overview dashboard** (slot 1); **competitors' buildings** ("competition") in the
   **Market Ledger**. Slot 3 is construction *in progress*, not a buildings inventory.
-- **Corp. Strategy** is the one reserved placeholder. **Diplomacy** is no longer reserved in name
-  only — it hosts a real stance surface. Both follow the *ledgers-start-closed* convention above.
+- **Corp. Strategy** is a reserved placeholder. **Diplomacy** is reserved again: the
+  corporation stance surface it hosted retired with the corporation (Ben, 2026-10-23;
+  `ledgers/corporation.md` § Slot 8). Both follow the *ledgers-start-closed* convention above.
 - **Scope-widening names (settled by Q&A 2026-06-15).**
   — **Convoys** (slot 7): **cargo in transit** — one row per convoy in flight, its route, its ETA
     in qtr and the haulage it has cost. Added 2026-08-29 on Ben's call, lifted out of the Market
     Ledger where it had been a third tab. It was never a market question: `MARKETS.md` owns
     clearing and the order book, and a convoy is `SUPPLY.md`'s subject — *Logistics is the road,
     Supply is the traffic*. Placing it directly after Market keeps the commercial run of the rail
-    together (Acquisitions, Market, Convoys) while giving the logistics read its own door and its
+    together (Market, Convoys) while giving the logistics read its own door and its
     own lens: a tab strip can arm only one lens, and the old third tab always got the price wash
     when it wanted `supply_routes`. It draws `icons::convoy`, the marker the canvas already uses
     for cargo in transit, so slot and canvas share a silhouette. Design: `docs/ui/ledgers/convoys.md`.
   — **Budget** (slot 2): the full **Budget-system** surface — income vs expenditure broken down
     (sales, input purchases, maintenance, wages) **plus budget allocation** across research /
-    military / workforce contracts, not just the running balance. Same money-loop data as the
+    military / workforce contracts, not just the running treasury. Same money-loop data as the
     [A4] "Balance Ledger", wider remit.
   — **Corp. Strategy** (slot 8): a **standing-strategy** surface — the player's "laws" / pre-set
     options, with **wage levels** and **military posture** the archetypal levers, and possibly a

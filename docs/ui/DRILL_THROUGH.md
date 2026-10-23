@@ -168,9 +168,9 @@ On the ladder, with what each one's takeover shows:
 | History ledger — Story | — (already shown in the column) | the whole biography, on the canvas |
 | History ledger — Chain (per stage) | that stage's title, explainer and charts | the **whole round** — every stage open, scrolled |
 | New World wizard — chain stages | that stage's title, explainer and charts | the **whole round**, scrolled (window-wide; no shell yet) |
-| Corporation dashboard — 4 roll-ups | that card's chart or rows | **all four** roll-ups, headed and scrolled |
+| Nation overview (`corporation_dashboard.cpp`) — roll-ups | that card's chart or rows | **every** roll-up, headed and scrolled |
 
-The three accordions — History Chain, wizard stages, corp roll-ups — show everything in a
+The three accordions — History Chain, wizard stages, Nation overview roll-ups — show everything in a
 takeover: a surface that has taken the largest rectangle available has no excuse for showing
 a subset. The History ledger's **Ages** tab takes no disclosure control at all — its map sizes
 itself to whatever column it is given.

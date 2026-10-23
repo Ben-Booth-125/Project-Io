@@ -20,30 +20,31 @@ exchange — a counterparty, a lead time, a refusal — is a contract, not a mar
 
 ## The shelf economy
 
-**Corporations hold no stockpiles; every good is on a market's shelf (Ben, 2026-10-10).** The
-market owns its shelf. This replaces the corporation pool — the per-(corporation, market) store
-production used to land in, list from, and draw on — and with it everything that read a pool.
+**No owner holds a stockpile; every good is on a market's shelf (Ben, 2026-10-10).** The
+market owns its shelf. This replaced the owner's pool — the per-(owner, market) store production
+used to land in, list from, and draw on — and with it everything that read a pool. Every seller
+and buyer at a market is a nation's building (Ben, 2026-10-23: there are no corporations).
 
 - **Production lands on the shelf, and landing is selling.** What a building makes goes onto the
   shelf of its own market the tick it is made, and its owner is paid the quantity at that tick's
   clearing price — the market is the counterparty, whether or not anyone bids (Ben, 2026-10-10).
   A glut drives that price to the floor: that is the signal, and the maker feels it.
 - **The order book retires (Ben, 2026-10-10).** No standing buy or sell orders: everyone buys at
-  the posted price, under the fair-price ceiling. Procurement contracts are not the order book and
-  stay (`CONTRACTS.md`); they deliver from and to shelves.
+  the posted price, under the fair-price ceiling. Procurement is a shelf purchase like any other:
+  the named-supplier contract retired with the corporations (Ben, 2026-10-23; `CONTRACTS.md`).
 - **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
   building upkeep, procurement, the space programme and a launch's propellant are all bought on
-  the shelf at the posted price, under the fair-price ceiling. A corporation buys even its own
-  output back: vertical integration is a location, not a free transfer.
+  the shelf at the posted price, under the fair-price ceiling. A nation buys even its own
+  buildings' output back: vertical integration is a location, not a free transfer.
 - **Goods leave a market only by trade** (`TRADE.md`), which buys on one shelf and lands on
   another.
 - **The opening stock is on the shelves.** Generation's opening stockpile — the same total it
-  seeds — is placed on the shelves of the markets the corporations sit in, each corporation's
-  share on its own markets (`../generation/CORPORATION_GENERATION.md` § Pass 4b).
+  seeds — is placed on the shelves of the markets its owning nations' buildings sit in, each
+  nation's share on its own markets (`../generation/CORPORATION_GENERATION.md` § Pass 4b).
 
 **What retires with the pool.** Auto-surplus and the processor reservation; the order book (standing buy
 and sell orders, and the sell order's floor); the pad's propellant reserve; opening stock held until a bid; the
-corporation convoy and the market export (`TRADE.md` § What trade replaces); the workforce
+owner's convoy and the market export (`TRADE.md` § What trade replaces); the workforce
 dial's stock-fed draws (`../ai/AI_OPPONENT.md` § 11 — with no pool, a plant's whole want is
 posted demand).
 
@@ -80,8 +81,8 @@ larger market's reach folds into it like any other market, and the absorber keep
 
 **A market also emerges where trade CONCENTRATED, not from population alone** (Ben, 2026-09-03,
 the eight-phase reorder point 4: *"markets should begin to emerge towards the end of this
-phase"*). The carve above is a **nation-grain** judgement — this nation's geology, and how many
-corporations already compete in it — and it says nothing about *where inside that territory*
+phase"*). The carve above is a **nation-grain** judgement — this nation's geology, and how much
+industry already competes in it — and it says nothing about *where inside that territory*
 exchange actually happened. The Era −1 history does: it records every corridor it supplied an
 army or a founding party along (`LOGISTICS.md` § The ancient network), and a region several of
 them **meet** at is a junction. A centre standing at a junction is gated as a rich nation's
@@ -126,10 +127,10 @@ to another, idle and unbuilt. Three in-world causes remove them, and none is a c
 A folded market's catchment and inventory pass to the market that absorbs it. The junction
 rule above still only lowers the gate; the folds run after it, on the whole set.
 
-**On a world whose firms come from the charter budget, the competitors the carve counts are the
-budget's planned corporations (Ben, 2026-09-26; BL-1086), its specialists as well as its firms
-(Ben, 2026-09-27, NR-957)** — every corporation each nation's centres can afford, under the same
-ceiling the charter walk honours — so no roster is laid only to be discarded, and the landscape
+**The competitors the carve counts are the charter budget's planned purchases (Ben, 2026-09-26;
+BL-1086; re-subjected Ben, 2026-10-23)** — every purchase each nation's centres can afford, under
+the same ceiling the charter walk honours, which the budget now buys as buildings owned by the
+centre's nation rather than as firms — so no roster is laid only to be discarded, and the landscape
 search, which scores the carve's markets, still runs after the carve.
 
 **Catchment is an attraction, not a distance (Ben, 2026-10-16).** A tile clears against the market
@@ -190,7 +191,7 @@ generation artifact**: it comes into existence the tick a body's first building 
 (`maybe_spawn_market`, called from both `construct_building`'s instant-completion path and
 `run_construction`'s pacing loop, `economy_system.cpp`) — investment, not presence. A survey
 completing is explicitly **not** the trigger, keeping the geographic and commercial fogs
-independent (`docs/ui/DISCOVERY.md`). **Any** corporation can cause one; the player does not learn
+independent (`docs/ui/DISCOVERY.md`). **Any** nation can cause one; the player does not learn
 of a rival-created market for free — it enters at the activity fog's Unknown tier like any other
 undiscovered activity. Exactly **one market per body** off-world (population-anchored carving does
 not apply — an outpost has no population to anchor to); the home body's own carved multi-market
@@ -264,11 +265,10 @@ and sells the landings. In order:
    snapshot of every market's supply is taken *immediately before* the zeroing
    (`snapshot_market_supply`), because the inter-body pull needs a supply that this pass has not
    yet computed — see § Spontaneous market emergence.
-2. **Background firms** — real corporations (`corporation_component.is_background = true`),
-   generated at world-gen and running the same corp_ai scored-utility layer as rivals, land, sell
-   and buy through the ORDINARY steps of this tick exactly like any other corp. There is no
-   separate injection step for background supply: saturation and the live opportunity margin are
-   **emergent** from real generated firms, not asserted by a function. See § Background
+2. **Every nation's buildings** — generated at world-gen or built since, and run by each nation's
+   build scorer (or the player) — land, sell and buy through the ORDINARY steps of this tick.
+   There is no separate injection step for background supply: saturation and the live opportunity
+   margin are **emergent** from real buildings, not asserted by a function. See § Background
    corporations below.
 3. **Demand injection** — the pure demand-side pulls, after the reset so they are not erased the
    tick they land. The endemic pull (§ Demand channels) and the inter-body pull (§ Spontaneous
@@ -283,7 +283,7 @@ and sells the landings. In order:
    - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
      mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys, electronics
      — **not** `spacecraft_components`, which stays procurement-only so the militia's contracts
-     remain its only buyer), because real background firms alone would under-consume these before
+     remain its only buyer), because real buildings alone would under-consume these before
      enough of them exist. **It retires good by good as a real channel claims each one (Ben,
      2026-09-15):** electronics leaves it when the metropolis rung of the household ladder takes it
      (`POPULATION.md` § The stratum ladder), and not before — until then this pull is its only
@@ -329,7 +329,7 @@ and sells the landings. In order:
 7. **Landings sold** — each landing's owner is paid its quantity at the reference price, and the
    goods move onto the shelf in the same statement, so the shelf gains exactly what was paid for.
    The market is the counterparty, **bid or no bid** (Ben, 2026-10-10): the sell side is
-   unconditional, with no floor and no hold. A landing whose owner is not a corporation shelves
+   unconditional, with no floor and no hold. A landing with no owning nation shelves
    unpaid. A landing on a market that no longer stands has no shelf to land on and is dropped. The
    register then empties.
 8. **Shelf draws billed** — every draw taken off a shelf this tick is billed at the **posted
@@ -363,7 +363,7 @@ and sells the landings. In order:
 12. **Price update** — the reference price stands. Every exchange is with the market, at the price
     the supply and demand state set, so there is no second signal for the price to ease toward.
 
-Cash flows accrue per corp and are applied to balances by `apply_budget`
+Cash flows accrue per nation and are applied to treasuries by `apply_budget`
 (`src/world/budget_system.cpp`).
 
 **Production lands at the clear, not when it is made.** A processor cannot draw a sibling's output
@@ -415,15 +415,15 @@ mechanism, banded input — no new concept, and the ancient chain's terminal goo
 ends the moment the basket knows which era it is in.
 
 **3. A channel that CONSUMES without PRICING cannot bootstrap its own supply.** Measured, not
-reasoned: BL-641 turned building upkeep on and operating firms collapsed **227 → 19**. Not a
+reasoned: BL-641 turned building upkeep on and operating firms (as owners then were) collapsed **227 → 19**. Not a
 magnitude problem — the goods it drew (tools, planks) are *produced 0.0* in that band, so every
-draw went unmet, the supply factor decayed, output followed, and the reflex tier idled the firm.
+draw went unmet, the supply factor decayed, output followed, and the reflex tier idled the building.
 Halving the rate only delays it. And the loop cannot close from the other end either, because a
 **draw that does not bid never reaches a market's `demand`**: wanting tools never raises their
 price, so no rival ever scores a Toolmaker and the supply is never induced.
 
 So a channel bids on the market, and its want becomes a price signal. With every good on a shelf
-(§ The shelf economy) there is no second road — no corporation's own store to draw on instead — so
+(§ The shelf economy) there is no second road — no owner's own store to draw on instead — so
 a draw that takes goods without posting its want is the defect this property names, wherever it
 sits. **A sink that cannot call forth its own supply is a slow way to shut the economy down**, and
 the cost of learning that is one harness run rather than a shipped world nobody can play.
@@ -492,7 +492,7 @@ What changes is the volume: household demand for a good is weighted by the popul
 preference of the cultures in the market's catchment. Trade therefore arises from **both**
 asymmetries — supply, because deposits are regional, and demand, because peoples are. The
 preference is derived in the history (`docs/generation/EXPLORATION.md` § A good acquires a cultural
-preference) and seeded at the epoch (`docs/generation/INDUSTRIALISATION.md` § 1. A dense corporate web,
+preference) and seeded at the epoch (`docs/generation/INDUSTRIALISATION.md` § 1. A dense industrial web,
 and markets that stock what their people want).
 
 **6. Two channels are settled by the power and construction design** (Ben, 2026-08-31), and both
@@ -506,7 +506,8 @@ rate owns it.
 
 **Power is a BOUGHT good, and it is the Industry channel's first viable entry** (Ben, 2026-08-31:
 *"it has to be a bought good when it is taken as upkeep. Therefore corporations can buy power from
-each other, and background companies can produce power with a profit"*).
+each other, and background companies can produce power with a profit"*). The buyers and the
+producers are nations' buildings (Ben, 2026-10-23); the ruling that power is bought stands.
 
 Every building that needs power bids for it, so **both links of the fuel chain bid**: the generator
 buys fuel as a processing input, and every building buys power as upkeep. Both bid, so
@@ -531,7 +532,7 @@ draw** — unit upkeep takes the same shape, not a second one.
 
 - **A draw buys on the market**, spending credits. The draw is a real participant, so the want
   lands in `demand`, the price moves, and a rival scoring the building that supplies it finally
-  has a reason to. That is the half BL-641 was missing. With no corporation stock (§ The shelf
+  has a reason to. That is the half BL-641 was missing. With no owner's stock (§ The shelf
   economy), the whole need is bought, never only a shortfall.
 - **Above a reservation ceiling, it does not buy.** The draw goes unmet and the shortfall rule
   applies — the building weakens, exactly as an unsupplied unit does. Going without is an outcome
@@ -560,7 +561,7 @@ BL-643 (infrastructure), BL-644 (state), BL-645 (research), BL-646 (conflict).
 **4. Every channel is a lever on what the player chases.** Demand is not bookkeeping; it is the
 design's statement about what the game is *about*. A good with no buyer is a good the player has no
 reason to build toward, and a good with a *state* buyer plays differently from one with a
-*household* buyer — the first is lumpy, political and worth lobbying for; the second is steady,
+*household* buyer — the first is lumpy, political and set by a national budget; the second is steady,
 broad and worth scaling into. Choosing which channel wants a good is choosing what kind of
 gameplay that good produces.
 
@@ -573,7 +574,7 @@ gameplay that good produces.
   stone — and, in the industrial band, the first genuine buyer for electronics.
 - **Industry** (BL-641, building upkeep in goods). Today a building pays maintenance and wages in
   **credits only**, while a unit pays credits **and a goods vector** (`run_unit_upkeep`). Giving
-  buildings the same shape turns every firm in the world into a consumer, and it is the single
+  buildings the same shape turns every building in the world into a consumer, and it is the single
   largest structural sink available: tools and planks keep an ancient workshop running, machinery
   and electronics an industrial one. The precedent, the shortfall rule and the shelf-draw ordering
   all already exist — this is the unit-upkeep vector applied to the other kind of asset.
@@ -592,7 +593,7 @@ gameplay that good produces.
   channel **already designed and not yet claimed on**. A tenth line, a *space programme*, buys
   `spacecraft_components` and `propellant` for government satellite launches: the first buyer for
   space goods that is not a militia contract, and thematically the gate into space. Lumpy,
-  political, worth lobbying for — see property 3.
+  political, set by a national budget — see property 3.
 - **Research** (BL-645, research consumes goods). `academic_research` and `military_research` are
   budget lines that spend credits; research that also consumes **goods** makes the tech ladder an
   economic decision rather than a free accumulator, and gives the top of the chain a buyer. Folds
@@ -647,27 +648,28 @@ is the signature of a dead chain**, and it is invisible to any check that looks 
 A good with no sink at all is easy to notice; a good with a sink nobody exercises is what this
 economy actually had.
 
-## Background corporations
+## Background corporations — retired word: the background economy is real buildings
 
-**The market saturates because real firms produce and consume, not because a substrate pass
+**The market saturates because real buildings produce and consume, not because a substrate pass
 injects supply and demand.** Nothing in the engine injects fictional supply; the only injected
 quantities are the demand pulls in step 3. The design is BL-365 (real background
-corporations).
+corporations); with no corporations (Ben, 2026-10-23) the background economy is every nation's
+buildings.
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
 on after generation. The settle that hands play its opening position is phase 6's single
 validation run of the winner — twelve quarterly econ ticks, `k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`), a length
 measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
 opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
-loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate corporate landscapes
+loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate landscapes
 — rosters, placements and road tiers — statically against the finished world, and the winning
-candidate's firms *are* the background economy: real buildings, on real tiles, with
-`corporation_component.is_background = true`. Placement mechanics are
+candidate's buildings *are* the background economy: real buildings, on real tiles, each owned by
+the nation whose ground it stands on (Ben, 2026-10-23). Placement mechanics are
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6; what is placed is decided by the search
 (`docs/generation/GENERATION_STRATEGY.md` § The eight phases; BL-770, Era 0 candidate search).
 
 **So the roster is a consequence of the objective, not of a calibrated stopping rule.** The earlier
-design added firms until measured production crossed a ~90% target fraction of measured demand.
+design added producers until measured production crossed a ~90% target fraction of measured demand.
 That is superseded, and for a reason worth stating rather than dropping: a target fraction pushes
 every market toward the same coverage, and an even map is exactly what
 `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable exists to prevent. The
@@ -676,21 +678,18 @@ the *spread* of both across markets, with unevenness scored for rather than tole
 calibrated rule got right is kept: nothing is authored as a fixed count, so the roster stays
 correct as recipes, deposits or population are retuned.
 
-Background firms are not a cheaper stand-in for the player's rivals. They run the **full corp_ai
-scored-utility layer** — build, demolish, survey, road, hire, and trade decisions, identical to
-the handful of named rival corps (Ben, 2026-08-11, overriding a reduced-model recommendation) —
-against the same `corp_command` seam and the same market this section documents. A background
-firm's landings, shelf draws and trades are ordinary rows in steps 4–8 above; there is no separate
-code path for them.
+The background economy is not a cheaper stand-in for the player's rivals. Every non-player
+nation, major and minor, runs its buildings through **one scored-utility build layer** — build,
+demolish, survey, road, hire, and trade decisions (Ben, 2026-10-23; `../ai/AI_OPPONENT.md` § 11,
+carrying over the 2026-08-11 ruling against a reduced model) — against the same command seam and
+the same market this section documents. Its landings, shelf draws and trades are ordinary rows in
+steps 4–8 above; there is no separate code path for them.
 
-**Data-model hook, not a UI change.** `is_background` exists on `corporation_component` so
-generation and `export_corp_blackboard` (BL-206) can distinguish "background noise" from a named
-rival. Every corp, background or not, is listed individually on any surface that enumerates
-corporations; aggregating the ~80 background firms into one entry on the Corporation lens and
-dashboard is separate UI work.
+**The `is_background` hook retires** with the corporation (Ben, 2026-10-23): there is no named
+rival firm to tell background noise from, and the Corporation lens retires with the word.
 
 Real market inventory (below) is a hard prerequisite of this model, not a neighbour: real
-background firms selling into a market that conjured any buy-side shortfall would undercut the
+buildings selling into a market that conjured any buy-side shortfall would undercut the
 entire point of modelling real producers.
 
 ## Want and fill — the demand register records the bid
@@ -700,7 +699,7 @@ below: `supply` is an **offer** and `inventory` is a **delivery**. The design is
 records the want).
 
 Hunger is precisely the state in which no purchase completes. A demand register that accrued from
-what a corp **actually bought** would be silent exactly when it mattered most: a processor that
+what a building **actually bought** would be silent exactly when it mattered most: a processor that
 needed 16 units of an input and could draw only 2 would tell the market it wanted 2, and one that
 could draw nothing would tell it nothing at all. The resource would read to `resolve_price` as one
 almost nobody wants, and scarcity would be **invisible to the price signal**. `resolve_price`'s own
@@ -708,7 +707,7 @@ branch for zero supply against real demand takes the price to the top of the ban
 input.
 
 **Two registers, one of them priced.** `economy_report` carries `wants` alongside `purchases`,
-both `std::map` keyed by `(corp, market)`:
+both `std::map` keyed by `(owner, market)`:
 
 - **`wants`** — the full-run input need, computed **before** any coverage decision, so it is the
   same number whether the draw then succeeds, runs short, or fails outright. Registered by
@@ -716,12 +715,12 @@ both `std::map` keyed by `(corp, market)`:
   `rate <= 0` pause check, so a build stalled for want of steel says so; upkeep and a trade's
   purchase register theirs the same way. This is the sole input to `mc.demand`.
 - **`purchases`** — what was actually delivered off the shelf. Feeds the billing pass (step 8) and
-  the expenditure a corp is charged. **Never pay against `wants`**: that would credit deliveries
+  the expenditure a nation is charged. **Never pay against `wants`**: that would credit deliveries
   nobody made.
 
-**The want is the whole need (Ben, 2026-10-10).** A corporation holds no stock of its own
+**The want is the whole need (Ben, 2026-10-10).** A nation holds no stock of its own
 (§ The shelf economy), so nothing covers any part of a processor's input but the shelf, and its
-full-run need is its bid to the market. A corporation feeding its smelter from its own mine bids
+full-run need is its bid to the market. A nation feeding its smelter from its own mine bids
 for the ore like anyone else, and pushes its price like anyone else: the mine's output was sold to
 the market when it landed. A need the fair-price ceiling silences does not bid; it goes to the
 silenced-want register instead (§ Price resolution, *The shelf's share reads the want the ceiling
@@ -806,7 +805,7 @@ section owns the two things a market reading needs from it.
 **Three reads, and they are not equally cheap. Say which is which rather than presenting them as
 one table.**
 
-1. **My trades.** Every trade the player's corporation holds, manual and auto, with its route.
+1. **My trades.** Every trade the player's nation holds, manual and auto, with its route.
    Trades are world state (`world::trades`), written by the player and by rivals through the same
    verbs, so the population this reads exists.
 2. **The market's trades.** Every trade touching a market the player **operates in**, whoever owns
@@ -834,20 +833,20 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 | `resource` | What moved. |
 | `quantity` | How much. |
 | `unit_price` | The price the exchange was made at. A landing is sold to the market at the **clearing** price of its tick; a draw off the shelf is bought at the **posted** price it was decided and billed at ([FINANCE.md](FINANCE.md) § Standing-force upkeep). |
-| `seller`, `buyer` | The corporation on one side. The other side is **absent**, which means the market itself and not an unknown party (see below). |
+| `seller`, `buyer` | The nation on one side. The other side is **absent**, which means the market itself and not an unknown party (see below). |
 
 **There are two kinds of exchange, and the market is on one side of every one.** A **landing** —
 a building's output, a trade's cargo, a captured cargo, a procurement delivery — is *sold to the
 market*: the owner is the seller and the buyer is empty. A **shelf draw** — a processor's input, a
 site's material, an upkeep draw, a trade's purchase — is *bought from the market*: the seller is
-empty and the buyer is the corporation. Both are real — goods moved, cash moved — so both are
+empty and the buyer is the nation. Both are real — goods moved, cash moved — so both are
 recorded. A surface renders the empty side as the market; treating it as missing data would hide
 the whole history the record exists to keep. The households', the background's and spoilage's
 takes move no money and are not exchanges.
 
-**One row per market, good, side and tick (Ben, 2026-10-10).** Every corporation's landings of a
+**One row per market, good, side and tick (Ben, 2026-10-10).** Every nation's landings of a
 good on a market in one tick fold into one sale row, and every draw into one purchase row, at the
-volume-weighted price; the row counts the corporations folded into it and names the corporation
+volume-weighted price; the row counts the nations folded into it and names the nation
 when there is only one. The player's own exchanges keep a row of their own, so its history reads
 what it bought and sold.
 
@@ -884,23 +883,17 @@ competition and what the price does next — so ordering it does not decide the 
 
 ## A market's listed value
 
-**A market's cap is its LISTED VALUE (Ben, 2026-09-15): the summed valuation of the firms
-headquartered in its catchment.** It answers *how much capital sits here*, which is the reading a
-player means by a market's size. Each firm is valued by the formula a whole-firm buyout already
-prices (`FINANCE.md` § Whole-firm acquisition), so the sum introduces no second valuation.
-
-**It is a sum over firms, not a share price.** The corporation ledger's ruling that a firm has no
-market cap stands; nothing here gives a corporation equity, a share count or a stake. A firm counts
-toward the market whose catchment holds its headquarters, once.
-
-**It is derived, never stored**, and it is seeded at the epoch only in the sense that the firms it
-sums are (`docs/generation/INDUSTRIALISATION.md` § 5. Wealth inequality, market cap and GDP).
+**Retired (Ben, 2026-10-23).** A market's listed value was the summed buyout valuation of the
+firms headquartered in its catchment (Ben, 2026-09-15). With no firms, no headquarters and no
+buyout (`FINANCE.md` § Whole-firm acquisition), it has nothing to sum.
 
 ## Procurement is not the market
 
-A procurement contract is a **named counterparty** with a lead time and a refusal. The market is
-anonymous, instant and price-only, and it has no representation for any of those. The form itself
-— its verbs, its terms, its pricing and its reputation axis — is [`CONTRACTS.md`](CONTRACTS.md).
+**The procurement contract is retired (Ben, 2026-10-23).** Its counterparty was a named supplier
+firm, and no firm remains: procurement goods come off a market's shelf like any good. The rule
+below stands for any contract form a nation might later hold — a contract is a **named
+counterparty** with a lead time and a refusal, which the anonymous, instant, price-only market has
+no representation for. The record of the retired form is [`CONTRACTS.md`](CONTRACTS.md).
 
 **A contract still delivers from and to shelves.** At fulfilment the supplier buys what its home
 market's shelf holds of the good, at the posted price under the ceiling, and makes the rest to
@@ -918,9 +911,11 @@ A market resolves to a jurisdiction: `market_component::centre_tile` through
 `world::tile_to_nation`. Goods that arrive in one jurisdiction from another have crossed a border,
 and that is what a tariff reads.
 
-**The rule, in one line (Ben, 2026-09-15):** a convoy arriving at a market whose nation differs
-from its source market's nation pays the destination nation's enacted import duty on the cargo, at
-the destination's price, charged to the convoy's owner and credited to that nation's treasury.
+**The rule, in one line (Ben, 2026-09-15; re-subjected Ben, 2026-10-23):** a convoy arriving at a
+market whose nation differs from the convoy's owning nation pays the destination nation's enacted
+import duty on the cargo, at the destination's price, charged to the owning nation and credited to
+the destination nation's treasury. A nation's own goods in its own market pay nothing
+(`NATIONS.md` § The import tariff).
 
 **Why the border and not the sale.** An import duty taxes goods coming in, and a trade's shipment
 is the only object that carries goods across a line — so it is the only place the duty has a real
@@ -938,7 +933,7 @@ manual, and it is **the one** point of charge, so no good pays twice.
   A `law` carries an **`author_nation`**: the author is both the jurisdiction the duty applies in
   and the treasury it is paid into, so a tariff with a null author is inert by construction rather
   than by a special case. Rates from several enacted laws stack additively, clamped to `[0, 1]` —
-  a stack of laws cannot charge a buyer more than the goods are worth.
+  a stack of laws cannot charge an importer more than the goods are worth.
 - **The posture a nation holds at world setup is derived by its history, not set by a dial
   (Ben, 2026-09-24).** The Industrialisation span derives each nation's protection
   (`polity::protection_q`) at its close from three readings the span already carries — its
@@ -953,11 +948,11 @@ manual, and it is **the one** point of charge, so no good pays twice.
   (`docs/politics/NATIONS.md`, BL-537).
 - **A same-nation haul is charged nothing.** A tariff that taxed domestic trade would be a sales
   tax wearing the wrong name.
-- **The payer is the shipper, and the shipper is always real.** A landing sold to the market has
-  no importer to tax; a shipment does: every convoy has an owner who paid to move it.
-- **It is a transfer.** The shipper's expenditure rises by exactly what the treasury rises by, in
-  the same statement. `apply_budget` charges expenditure unconditionally (a balance may go
-  negative), so the two sides cannot drift apart on a solvency edge.
+- **The payer is the shipping nation, and it is always real.** A landing sold to the market has
+  no importer to tax; a shipment does: every convoy has an owning nation that paid to move it.
+- **It is a transfer.** The shipping nation's expenditure rises by exactly what the market
+  nation's treasury rises by, in the same statement. `apply_budget` charges expenditure
+  unconditionally, so the two sides cannot drift apart on a solvency edge.
 - **Off by default, and provably so.** The whole pass is gated on `any_import_tariff_enacted`; with
   no tariff enacted, not one line of tariff arithmetic runs — asserted by `money_conservation.cpp`
   as a state hash against a control world carrying no law record at all.
@@ -1063,15 +1058,15 @@ ceiling is a generation-calibration signal (background production absent or unde
 > **Authoring a `market` condition: it measures the WORLD, not a market (NR-114).**
 > `condition_subject::market` resolves to the **mean resolved price across every market in the
 > world**, summed in ascending entity-id order for determinism — not the price in the local
-> market, and not the corp's own markets. There is no market qualifier on `condition`, because
+> market, and not the nation's own markets. There is no market qualifier on `condition`, because
 > a law or tech asking "is this good expensive yet?" is asking a world-level question, and a
-> mean is harder to game than a max. The consequence to author around: **a corp trading in one
+> mean is harder to game than a max. The consequence to author around: **a nation trading in one
 > expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
 > ever wanted, add a qualifier to `condition` rather than changing what this subject means.
-> `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
-> since every consumer — a levy charged to a corp, a gate read for a corp — is per-corporation;
-> pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
-> zero.
+> `evaluate` also takes a **subject** actor (`condition_set::evaluate(set, world, subject_corp)`),
+> since every consumer — a gate read for an actor — is per-actor, and the actor is a nation (Ben,
+> 2026-10-23); pass `null_entity` for a genuinely world-level predicate and the actor-scoped
+> subjects measure zero.
 
 ### Where the band lives
 

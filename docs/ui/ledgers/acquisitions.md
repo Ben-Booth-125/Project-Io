@@ -1,7 +1,15 @@
-# Acquisitions — design Q&A
+# Acquisitions — design Q&A (retired)
+
+> **Retired whole (Ben, 2026-10-23).** The Acquisitions ledger listed the firms the player could
+> buy outright and their prices. The buyout, the ownership class and the firms themselves are
+> retired (`docs/GLOSSARY.md` § Buyout, § Ownership class, § Company); ground and what stands on
+> it change hands only by conquest (`docs/politics/NATIONS.md` § Own ground). Rail slot 5 has no
+> Acquisitions surface, and its second door, the Company lens, retired with it
+> (`../LENSES.md` § Corporation and Company lenses — retired). **Everything below is the record
+> of a retired design, not authority**; do not design against it.
 
 > **Working design doc** for the ledger pass. Strawman answers — Ben revises.
-> Menu slot: `rail slot 5 "Acquisitions"` (inserted above Market, Ben 2026-08-29) · Second door: the **Company lens** click destination (`../LENSES.md` § Company lens) · Source: `src/ui/acquisitions_ledger.{hpp,cpp}` · Mock table(s): `corporations.csv`
+> Menu slot: `rail slot 5 "Acquisitions"` (inserted above Market, Ben 2026-08-29) · Second door: the **Company lens** click destination · Source: `src/ui/acquisitions_ledger.{hpp,cpp}` · Mock table(s): `corporations.csv`
 > Host: shell fold-out column, ~380 px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution), plus a full-canvas fold-out (`ui::canvas_rect`).
 > Authority for the rules it renders: `../../economy/FINANCE.md` § Disclosure and § Whole-firm acquisition.
 

@@ -358,7 +358,8 @@ nation's starting rows.
 
 **Corporate terms.** Works Doctrine × General Incorporation decides on what terms a specialist
 corporation exists in a nation — the input `../CORPORATION_GENERATION.md` reads for nation
-assignment.
+assignment. *(Record only: the corporation, the specialist and nation assignment are retired too —
+Ben, 2026-10-23; every building is its ground nation's.)*
 
 | | General Incorporation held | not held |
 |---|---|---|

@@ -2,8 +2,8 @@
 
 > **Settles:** which quantity answers which question — how A *feels* about B (sentiment, derived) ·
 > what A has *declared* toward B (stance) · how an actor is rated at large (reputation) · who is
-> refused trade outright (embargo) · what a surface reads back as standing · how a nation reads a
-> corporation · which of these may become hostility and which may never do so on its own · what
+> refused trade outright (embargo) · what a surface reads back as standing · which of these may
+> become hostility and which may never do so on its own · what
 > each one gates.
 > **Not here:** what hostility permits militarily — interdiction, engagement, the march queue
 > (MILITARY) · what a nation holds and may enact (NATIONS) · how a rival *scores* a stance
@@ -14,8 +14,9 @@
 layer, and its first job is to say **which quantity answers which question** — because the code
 carries several, and three of them share overlapping names.
 
-Companion to [`NATIONS.md`](NATIONS.md) — nations are actors in this layer too, and their read of a
-corporation is one grain of the substrate below.
+Companion to [`NATIONS.md`](NATIONS.md). **Every actor in this layer is a nation** (Ben, 2026-10-23):
+the corporations are retired, and with them every corporation grain — corp↔corp stance, corp
+sentiment, and a nation's read of a corporation. Nation↔nation stays, and is the whole layer.
 
 ---
 
@@ -26,24 +27,24 @@ This table is the reason the document exists. Read it before touching any of the
 | Quantity | Question it answers | Shape | Origin | Gates |
 |---|---|---|---|---|
 | **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march; passage and immunity |
-| **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer, subject) | **derived** | procurement quotes via the Reputation view; territory via Access |
-| **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | procurement quotes |
-| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per corp | **authored** | procurement quotes |
+| **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer nation, subject nation) | **derived** | informs a declaration; never makes one |
+| **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | nothing — its procurement-quote consumer retired (§ 2) |
+| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per actor | **authored** | its procurement-quote consumer retired (§ 3) |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
 
 **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The model is **two
 layers, not four quantities**, and the first two rows are the layers rather than siblings. See
 § The settled model directly below — read it before extending anything here. Reputation is listed
-as its own row because it is still the question procurement asks — but it is not a place anything
+as its own row because it was the question procurement asked — but it is not a place anything
 is stored, and there is no second table it can disagree with.
 
 **Standing is the odd one and the naming is a known hazard.** It is not a relation at all: it is a
-coarse public read of how powerful a corporation is, with no second party anywhere in it. NR-304
+coarse public read of how powerful a nation is, with no second party anywhere in it. NR-304
 records the collision being noticed when stance was named — *"called it 'stance', not 'standing' —
 the latter is taken by the power read."*
 
-The distinction that keeps them straight, from `stance.hpp`'s own header: **"stance is how a corp
-feels about another; standing is how strong it is."**
+The distinction that keeps them straight, after `stance.hpp`'s own header: **stance is how one
+nation feels about another; standing is how strong it is.**
 
 ---
 
@@ -51,7 +52,7 @@ feels about another; standing is how strong it is."**
 
 Ben's ruling on NR-520, 2026-08-22. Putting every quantity in one table made visible what none of
 them showed individually: **three designs were converging on the same continuous derived quantity
-and none knew about the other two** — CONCEPT.md's sentiment, the nation→corp Access/Trust read,
+and none knew about the other two** — CONCEPT.md's sentiment, the nation→corp Access/Trust read (retired, Ben 2026-10-23),
 and procurement's reputation.
 
 They converge deliberately:
@@ -59,17 +60,17 @@ They converge deliberately:
     stance      DECLARED, discrete    — an act, always attributable to an ACTOR
     sentiment   DERIVED,  continuous  — a reading, attributable to CONDUCT
 
-**Sentiment** is one directed, continuous, derived value from an **observer** to a **subject**,
-where an actor is a corporation or a nation. Directed, because every use needs it — reputation is
-keyed (buyer, supplier), a nation reads a corp and never the reverse, a grudge is asymmetric by
-nature; symmetry, where a consumer wants it, is a read that asks twice. Continuous, and if it is ever
+**Sentiment** is one directed, continuous, derived value from an **observer** nation to a
+**subject** nation (Ben, 2026-10-23; the corporation grain retired). Directed, because every use
+needs it — a grudge is asymmetric by nature; symmetry, where a consumer wants it, is a read that asks twice. Continuous, and if it is ever
 presented in bands that is a *presentation* choice, never the storage.
 
 **Stance sits on top as the declared layer**, unchanged by the substrate beneath it.
 
 ### The invariant: sentiment must never become hostility on its own
 
-Ben ruled on 2026-08-17 that hostility is **a declared state a corp opts into**, and that a rival
+Ben ruled on 2026-08-17 that hostility is **a declared state an actor opts into** — a nation, since
+2026-10-23 — and that a rival
 *"may score and declare it, never acquire it ambiently."* That ruling stands, and the substrate must
 not quietly overturn it.
 
@@ -88,8 +89,8 @@ declarations.
 
 | Separate design | Becomes |
 |---|---|
-| procurement reputation, its own serialised map | a **view** of sentiment at buyer→supplier grain |
-| nation→corp Access / Trust, a per-nation table | **dimensions** of sentiment at nation→corp grain |
+| procurement reputation, its own serialised map | a **view** of sentiment at buyer→supplier grain — retired with the named supplier (Ben, 2026-10-23) |
+| nation→corp Access / Trust, a per-nation table | retired with the corporations (Ben, 2026-10-23) |
 | Era −1 grudges, with nowhere to live | **seeded** nation→nation sentiment |
 | CONCEPT.md's sentiment | **the layer itself** |
 
@@ -100,8 +101,9 @@ above the floor.* A cycle with no entry. A continuous quantity that **decays tow
 permanent floor by construction** — a burned relationship heals, and "wait" becomes a legitimate
 strategic move. The fix is a property of the substrate, not a patch on procurement.
 
-*Owned by BL-545 (sentiment substrate) and BL-546 (reputation migration). BL-540 (nation→corp
-stance), BL-541 (directional tariffs) and BL-391 (reputation floor deadlock) are shaped onto it.*
+*Owned by BL-545 (sentiment substrate) and BL-546 (reputation migration). BL-541 (directional
+tariffs) and BL-391 (reputation floor deadlock) are shaped onto it; BL-540 (nation→corp stance) is
+retired (Ben, 2026-10-23).*
 
 ---
 
@@ -127,19 +129,20 @@ subject), holding two floats per row. Four properties, all load-bearing:
 
 ### The factors
 
-`sentiment_factor_kind`, append-only — it is the array bound the fold indexes with:
+`sentiment_factor_kind`, append-only — it is the array bound the fold indexes with. A factor whose
+conduct retired with the corporations keeps its enumerator and moves nothing (Ben, 2026-10-23):
 
 | Factor | Conduct |
 |---|---|
-| `contract_completed` | a procurement contract delivered as promised |
-| `contract_cancelled` | a procurement contract cancelled by the counterparty |
+| `contract_completed` | a procurement contract delivered as promised — **retired** with the named-supplier contract (Ben, 2026-10-23) |
+| `contract_cancelled` | a procurement contract cancelled by the counterparty — **retired** with it |
 | `trade_conducted` | goods actually moved between the pair — commerce as its own slow warming |
-| `equity_taken` | the observer wanted a firm and the subject took it — a **buyout** (`docs/economy/FINANCE.md` § Whole-firm acquisition); Ben's own worked example, *"buying a background firm that they wanted"*. Sentiment is where an acquisition's *political* cost lands |
+| `equity_taken` | **retired** (Ben, 2026-10-23): it was the political cost of a **buyout** of a firm the observer wanted, and the buyout retired with the firms |
 | `hostility_declared` | the subject declared hostility toward the observer |
 | `friendship_accepted` | a friendship offer from the subject was accepted — both parties observe it, each in their own row |
-| `levy_charged` | the observer was charged under a law the subject authored — the corp→nation grain's bread and butter |
+| `levy_charged` | **retired** (Ben, 2026-10-23): it read the extraction levy at the corp→nation grain, and both retired |
 | `embargo_imposed` | the subject refused to deal with the observer at all |
-| `lobbied_against` | the subject spent to move a nation against the observer — BL-539's political grain |
+| `lobbied_against` | **retired** (Ben, 2026-10-23) with the lobbying channel |
 | `force_used` | force was used against the observer's interest — the sharpest input, and still only an input |
 | `historical_grudge` | an Era −1 grudge, seeded once at world setup — see § Where a grudge lands |
 
@@ -220,21 +223,22 @@ delete.
 ### 1. Stance — declared, and it gates
 
 `src/world/stance.{hpp,cpp}` (BL-448, corp stance). Three tables on `world`, four verbs on the
-corp-command seam.
+command seam. **Stance is between nations** (Ben, 2026-10-23): the tables keep their `corp_` names,
+but every row's parties are nations, and so is every owner of a unit.
 
 **The hybrid reading is the design, settled by Ben on 2026-08-17 (NR-302):**
 
 - **Hostility is DIRECTED.** `corp_hostile_pairs`, keyed `(from, to)`. You can be attacked without
-  agreeing — *a corp can be at war and not know it yet*. That ambush property is not incidental; it
+  agreeing — *an actor can be at war and not know it yet*. That ambush property is not incidental; it
   is what interdiction needs to be a threat rather than a negotiation.
 - **Friendship is SYMMETRIC.** `corp_friend_pairs`, keyed canonical `(min id, max id)`. You cannot
-  be befriended without agreeing, so a friendship row is always evidence **both** corps chose it.
+  be befriended without agreeing, so a friendship row is always evidence **both** nations chose it.
 
 **Three invariants hold the shape together**, and none is optional:
 
 1. **A pending offer is not a stance.** `corp_friend_offers` is its own table, so no consumer that
    checks friendship can accidentally read an unaccepted offer as one.
-2. **Declaring hostility dissolves friendship atomically**, in the same call — a corp is never left
+2. **Declaring hostility dissolves friendship atomically**, in the same call — a nation is never left
    readable as both hostile and friendly toward one target.
 3. **Consumers ask the right table.** `is_hostile` is directional, `are_friends` is not, and the two
    are deliberately **never** collapsed behind one `stance_between()` accessor that would hide
@@ -254,7 +258,7 @@ out-of-range byte is rejected rather than cast): a declared war outlives the ses
 | `economy_system.cpp` | War **flips the march queue** (BL-470, NR-344) |
 
 Note the care taken in the interdiction check: it tests `is_hostile(unit_owner, cargo_owner)`, in
-that direction only. *"A corp that has been declared against but has not answered is a victim, not
+that direction only. *"An actor that has been declared against but has not answered is a victim, not
 a raider."*
 
 **What friendship permits — two things** (Ben, 2026-08-22): **passage through territory** and
@@ -266,15 +270,16 @@ needs a reading: a friend's anchors counting toward your reach field (recommende
 friendship a *logistics* fact, and cannot be confused with Access), or placement permission (which
 overlaps Access at a different grain). *Owned by BL-549 (friendship permits two things).*
 
-**Who declares.** A rival scores stance and may declare hostility toward any corp, the player's
-included — BL-450 (rivals score stance), granted 2026-08-18 on the standing terms: deterministic,
-seeded, scored-utility, legal verbs only. Hostility stays a declared state a corp opts into; a
+**Who declares.** A rival nation scores stance and may declare hostility toward any nation, the
+player's included — BL-450 (rivals score stance), granted 2026-08-18 on the standing terms and
+carried to the nation unchanged (Ben, 2026-10-23; `../ai/AI_OPPONENT.md` § 11): deterministic,
+seeded, scored-utility, legal verbs only. Hostility stays a declared state a nation opts into; a
 rival may score and declare it, never acquire it ambiently.
 
 **A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
 had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
 and the reversal is recorded rather than quietly applied. The cost is real: directed hostility
-exists so *"a corp can be at war and not know it yet"* — the ambush property interdiction was
+exists so *"an actor can be at war and not know it yet"* — the ambush property interdiction was
 designed around — and signalling removes that property *for the player*. Interdiction becomes a
 known risk rather than a surprise. Directedness itself is untouched — hostility still needs no
 reciprocation. Whether rival-vs-rival declarations are equally visible is a BL-068
@@ -283,7 +288,10 @@ a surface).
 
 ### 2. Reputation — a view of sentiment
 
-Reputation is the **Trust dimension of `world::sentiment` at (buyer, supplier) grain.** There is
+**Retired with the named supplier (Ben, 2026-10-23).** Procurement goods come off a market's shelf,
+so no quote is asked of a supplier and no floor is read. What follows records the view as it was.
+
+Reputation was the **Trust dimension of `world::sentiment` at (buyer, supplier) grain.** There is
 one read point, `world::procurement_reputation(buyer, supplier)`, and two writes, both one
 occurrence of authored conduct folded into the substrate — `contract_completed` from
 `economy_system.cpp` on delivery, `contract_cancelled` from `corp_command.cpp` on cancellation.
@@ -301,37 +309,33 @@ read-back).
 
 ### 3. Embargo — an authored refusal
 
-`world::corp_embargo_conditions` — a `condition_set` per corp, checked by `request_quote` in
-`corp_command.cpp`, serialised in the world snapshot. When the predicate fires the supplier refuses
-the buyer outright, and the refusal is conduct: `embargo_imposed` is its sentiment factor.
+`world::corp_embargo_conditions` — a `condition_set` per actor, serialised in the world snapshot.
+When the predicate fires the embargoing party refuses the other outright, and the refusal is
+conduct: `embargo_imposed` is its sentiment factor. Its one consumer was `request_quote`, the
+named-supplier quote, which retired with the corporations (Ben, 2026-10-23); what an embargo
+between nations gates on the shelf is open (§ Open questions).
 
-The read path proves `condition_set` reaches procurement for free. An embargo's **author** is a
-law — it is the relationship family of BL-155's four-family taxonomy, and which embargoes the
-company must route around is BL-399 (company answerability). A per-counterparty allow/deny at the
-corp's own hand is BL-161 (counterparty allow/deny).
+An embargo's **author** is a law — it is the relationship family of BL-155's four-family taxonomy.
 
 ### 4. Standing — a readout, read by one surface
 
 `src/world/standing.{hpp,cpp}`. Three axes: **reach** (distinct bodies with a building),
-**capital** (balance), **market share** (this corp's clearing income over the total).
+**capital** (treasury), **market share** (this nation's clearing income over the total). The actor
+is a nation (Ben, 2026-10-23).
 
 **The five bands are retired** (Ben, 2026-08-26: *"We don't need company information to be
-invisible"*). Every axis now reads as an exact figure, and what varies between corporations is
+invisible"*). Every axis reads as an exact figure, and what varies between actors is
 not how coarse the number is but **whether there is one at all**:
 
 - **Reach and market share are public for everyone.** Both are derived from facts already
   observable — buildings are visible on canvas, market supply/demand aggregates are the deliberate
   public signal (`DISCOVERY.md` § Competitor visibility). Nothing was ever hidden about them
   except by the banding, so nothing is lost by printing them.
-- **Capital is a filed figure and follows the ownership class — for everyone but you.** The
-  observer's **own** corporation always shows exact figures: disclosure is a rule about reading
-  *another* firm, and a corporation that could not read its own balance sheet could not be run.
-  For every other corporation it is exact where the firm is `public` and absent where it is
-  `private` or `closed` — the same binary disclosure the quarterly return takes
-  (`docs/economy/FINANCE.md` § Disclosure). A dash means *this firm does not file*, never *you have
-  not earned this*.
+- **Capital is exact for your own nation.** Its disclosure for every other actor followed the
+  ownership class, which retired with the firms (Ben, 2026-10-23); whether another nation's
+  treasury is shown is open (§ Open questions).
 
-**It is still deliberately NOT unified with `corp_ai`'s scorer.** The AI optimises an internal
+**It is still deliberately NOT unified with the build scorer** (`corp_ai.cpp`). The AI optimises an internal
 ground-truth quantity; this is a published read. Unifying them would make every rival directly
 optimise the published number — **a Goodhart trap**, and the reason the duplication is correct
 rather than lazy. Retiring the bands does not touch that property.
@@ -340,26 +344,10 @@ rather than lazy. Retiring the bands does not touch that property.
 workforce dial, and neither is a filed figure — there is no honest source for it, so the axis is
 left out rather than faked.*
 
-### 5. The nation's read of a corporation
+### 5. The nation's read of a corporation — **retired** (Ben, 2026-10-23)
 
-**BL-540 (nation→corp stance)** is a nation's read of a corporation, settled in the
-[`NATIONS.md`](NATIONS.md) design session. It differs from corp-to-corp stance on every axis Ben
-named, and the differences are the design:
-
-| | Stance (BL-448) | Nation → corp (BL-540) |
-|---|---|---|
-| Shape | discrete tri-state | **graded** |
-| Dimensions | one | **two: Access and Trust** |
-| Origin | **declared** — a corp opts in | **derived** — nobody declares it |
-
-The last row is load-bearing. Hostility is a state a corp opts into and *may never acquire
-ambiently* (Ben, 2026-08-17). A nation's stance is the opposite by construction: a recomputed read
-of what a company has actually done inside the jurisdiction, never stored as a flag.
-
-**Which makes it the same kind of object as Standing, not as Stance** — derived, honest, no hidden
-state — despite sharing the word. It is the nation→corp grain of the substrate: Access gates who
-may operate inside the borders, and `levy_charged`, `embargo_imposed` and `lobbied_against` are
-the factors that move it. Its emitters are the first writers into the Access dimension.
+BL-540 (nation→corp stance) was a nation's graded, derived Access/Trust read of a corporation.
+It retired with the corporations; no actor is left for a nation to read at that grain.
 
 ---
 
@@ -374,6 +362,12 @@ the factors that move it. Its emitters are the first writers into the Access dim
 
 3. **Are rival-vs-rival declarations visible to the player?** A BL-068 (competitor-visibility)
    question the signalling ruling leaves open.
+
+4. **What does an embargo between nations gate?** Its procurement-quote consumer retired with the
+   named supplier (Ben, 2026-10-23).
+
+5. **Is another nation's treasury shown on Standing's capital axis?** The ownership-class
+   disclosure it followed retired with the firms (Ben, 2026-10-23).
 
 ---
 
@@ -393,14 +387,13 @@ the factors that move it. Its emitters are the first writers into the Access dim
 | The Stance column | `src/ui/corporation_panel.cpp` |
 | Checks | `tools/verify/sentiment_harness.cpp`, `stance_determinism.cpp`, `procurement_harness.cpp` |
 
-**Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor, and its read of a
-corp), `docs/military/MILITARY.md` (what hostility permits militarily),
+**Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor), `docs/military/MILITARY.md` (what hostility permits militarily),
 `docs/ui/DISCOVERY.md` (BL-068, the competitor-visibility rule both stance and standing obey),
-`docs/economy/CONTRACTS.md` (§ Procurement — the buy side, where reputation is spent),
+`docs/economy/CONTRACTS.md` (§ Procurement — the buy side, where reputation was spent),
 `docs/ai/AI_OPPONENT.md` (the scorer that declares).
 
 **Owning items.** BL-545 (sentiment substrate) is the spine; BL-546 (reputation migration) is the
-view. BL-540 (nation→corp stance), BL-541 (directional tariffs) and BL-391 (reputation floor
-deadlock) sit on it. BL-450 (rivals score stance) owns the rival's declaration; BL-449 (stance
+view. BL-541 (directional tariffs) and BL-391 (reputation floor deadlock) sit on it; BL-540
+(nation→corp stance) is retired. BL-450 (rivals score stance) owns the rival's declaration; BL-449 (stance
 needs a surface) is the UI half; BL-390 (the seam has no read-back) owns making the value visible;
 BL-549 (friendship permits two things) owns passage and immunity.

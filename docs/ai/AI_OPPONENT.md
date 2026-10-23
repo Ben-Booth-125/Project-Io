@@ -1,13 +1,13 @@
 # Project Io — AI Opponent
 
-> **Settles:** what plays a rival corporation and how it decides · where the boundary sits on what
-> a rival may legally do to a corp a human owns · which seam a rival acts through and what it may
+> **Settles:** what plays a rival nation and how it decides · where the boundary sits on what
+> a rival may legally do to a nation a human plays · which seam a rival acts through and what it may
 > read · why no cloud model sits in the runtime loop · how the word interface is assembled —
 > dictionary, blackboard, command seam, transport · what a rival may say and on what terms.
 > **Not here:** the control dictionary itself (ACTIONS) · whether a language policy compresses and
 > runs locally (LANGUAGE_POLICY_FEASIBILITY, research) · the meta a rival might play (STRATEGIES,
-> research) · how force resolves once a rival commits to it (MILITARY) · what a nation, rather
-> than a rival, may do (NATIONS).
+> research) · how force resolves once a rival commits to it (MILITARY) · what a nation holds and
+> may enact, and its budget scorer (NATIONS).
 > **Confused with:** ai/ACTIONS.md, ai/STRATEGIES.md, politics/NATIONS.md.
 
 Authority doc for the AI-opponent thread (BL-199, AI opponent research). Ben's 2026-07-23 call:
@@ -15,15 +15,22 @@ AI-opponent development proceeds **alongside** the basic mechanics rather than w
 document opens with the **state-of-the-art research** BL-199 mandates as its first activity; the
 architecture, data strategy, and decomposition build on it.
 
+**The rival is a nation (Ben, 2026-10-23).** The corporations and companies are retired: every
+non-player nation, major and minor, builds, runs and trades its own economy on its own ground
+(`../politics/NATIONS.md` § What a nation owns), under the last grant in § 11.
+This document's scorer is that nation's **build scorer**; its budget scorer is `nation_ai`'s
+(NATIONS). The code keeps its corp names — `corp_ai.cpp`, `corp_command`, `corp_verb` — and where
+this document names them it means the nation's faculty.
+
 **The architecture is accepted (Ben, 2026-07-26 — § 5):** the A → B utility core — a
-deterministic scored-utility layer over the corp-command seam, then Victoria-3-style predictive
-spending — is the rival. The standing-rule relaxation is earned **for the scoped path only**: AI-corp
-strategic actions via the corp-command seam (`src/world/corp_ai.cpp`); the player's corp stays
-untouched beyond the workforce dial.
+deterministic scored-utility layer over the command seam, then Victoria-3-style predictive
+spending — is the rival. The standing-rule relaxation is earned **for the scoped path only**: a
+rival nation's strategic actions via the command seam (`src/world/corp_ai.cpp`); the player's
+nation stays untouched beyond the workforce dial, and nothing builds on its ground for it.
 
 **The direction above the core (Ben, 2026-08-03 — § 10):** the interface to any language model is
 **MCP** (an out-of-process protocol wrapper over the three legs Io has: blackboard export, action
-dictionary, corp-command seam); the runtime model is **small and local**; **cloud inference is a
+dictionary, command seam); the runtime model is **small and local**; **cloud inference is a
 corpus generator, not a runtime**, producing the supervised traces a small model is fine-tuned on.
 **The model occupies Stage C — a dialogue layer over the scorer's decisions — and never the
 action-generating seat (Ben, 2026-08-08 — § 10g).** Read § 10 before any work on the language
@@ -37,10 +44,11 @@ hold back.
 **legible**: they read as sensible, not alien and not scripted. Skill is never dialled down. The
 scorer plays as well as it knows how.
 
-**Diplomatic.** It deals rather than merely competes. Stance, contracts and lobbying are positions
-it takes toward named parties, for reasons it can state (§ 7).
+**Diplomatic.** It deals rather than merely competes. Stance, treaties and tariffs are positions
+it takes toward named nations, for reasons it can state (§ 7). Lobbying is retired (Ben,
+2026-10-23).
 
-**Restrained.** No corporation runs away with the game. The intended shape of a campaign is a
+**Restrained.** No nation runs away with the game. The intended shape of a campaign is a
 **close race** — a leader ahead by a slim margin, not by an era.
 
 ### Where restraint comes from — the world, not the agent (Ben, 2026-08-31)
@@ -53,12 +61,15 @@ first written on the same day**. Ben's ruling:
 > against leaders, and we haven't built a critical system which is climate. Therefore, I prefer if
 > an agent's decision to slow down can be framed as usually motivated by systems."*
 
+The seven corporations Ben counted are retired (Ben, 2026-10-23); the field is now the rival
+nations, and the argument stands on them.
+
 **A term in the scorer that says "ease off, I am ahead" is a handicap wearing a costume.** It is
 invisible, the player cannot interact with it, cannot counter it, cannot cause it, and cannot be
 its beneficiary in any way they could name. It also earns its slim margin by making the AI *worse*,
 which is the one thing § "The goal" says it must not do.
 
-**So the agent does not hold back. The world holds it back.** Every corporation plays flat out for
+**So the agent does not hold back. The world holds it back.** Every rival nation plays flat out for
 its own position. The margin stays slim because **leading is expensive** — a fact about the world
 that applies to whoever leads, the player included, and that the player can see, use and suffer.
 
@@ -67,8 +78,8 @@ at**. Nothing in the scorer knows what the margin is.
 
 **The brake in the prototype is coalitions, and it carries this alone.**
 
-**Coalitions form against the leader.** Seven corporations is enough room for this to be real. A
-corp's stance scoring reads *who is winning*, so the leader accumulates enemies and the field
+**Coalitions form against the leader.** The field of nations is enough room for this to be real. A
+nation's stance scoring reads *who is winning*, so the leader accumulates enemies and the field
 accumulates each other — the brake is applied **to** the leader **by others**, never by the leader to
 itself. This is diplomacy doing the load-bearing work rather than decorating it, and it is the reason
 § 7's medium matters: a coalition that forms in a channel the player can read is a coalition the
@@ -83,7 +94,7 @@ a runaway, **nothing else does**, and that is a finding about coalitions rather 
 reaching for the opt-in dial.
 
 The Era's own **Alarm** scalar is a genuine second pressure and a different one — it bears on
-*nations*, not on a leading corporation, and it is a catastrophe to avoid rather than a brake on
+*every nation*, not on the leader, and it is a catastrophe to avoid rather than a brake on
 standing. Do not conflate them.
 
 Coalitions are legible, have a cause, and **feed Trade or Conflict** — which an objective term
@@ -94,12 +105,12 @@ does not, and which every system in Io is required to do.
 > *"'how far restraint goes' should never exclude extension and construction. If a player loses
 > out, they should be able to see that the world doesn't wait for them."*
 
-**A pressured corporation still builds, still expands, still extends.** No brake in either mode may
+**A pressured nation still builds, still expands, still extends.** No brake in either mode may
 veto construction or extension outright. Pressure makes leading *costly*; it never makes the world
 *stop*. A player who falls behind must find a world that carried on without them — that is the
 honest consequence the whole design is protecting, and a frozen leader destroys it.
 
-So a brake scales what a corp does. It never forbids a category of what it does.
+So a brake scales what a nation does. It never forbids a category of what it does.
 
 ### The second mode, kept but not the default
 
@@ -113,17 +124,17 @@ The systemic route is the foundation. This is the dial on top of it.
 
 ### Standing — what the margin is measured in
 
-A corporation's standing is a **composite**, not its bank balance (Ben, 2026-08-31: *"an aggregate
+A nation's standing is a **composite**, not its treasury (Ben, 2026-08-31: *"an aggregate
 of net worth, research, military strength… maybe others too"*):
 
 | Component | Quantity |
 |---|---|
-| Economic | Net worth — cash plus the assessed value of buildings and held stock |
-| Research | Zero: the nation holds technology, not the corp (Ben, 2026-10-10). The slot stays so a corporation research stake (`../economy/RESEARCH.md` § What is open) lands as data |
-| Military | Summed `unit_strength` over the corp's fielded units |
+| Economic | Net worth — treasury plus the assessed value of buildings and held stock |
+| Research | Zero. It was zero because a corporation held no technology (Ben, 2026-10-10); the actor is now the nation that holds it (Ben, 2026-10-23), and whether the slot reads its held nodes is open. The slot stays so that lands as data |
+| Military | Summed `unit_strength` over the nation's fielded units |
 
-Balance alone is the wrong measure and would misread the game constantly — a corp that has just
-spent its treasury on a smelter is not behind, and a corp hoarding cash while its rivals arm is not
+Balance alone is the wrong measure and would misread the game constantly — a nation that has just
+spent its treasury on a smelter is not behind, and a nation hoarding cash while its rivals arm is not
 ahead. The composite is what a coalition scores against, and what the skill harness bands.
 
 **The list is open, so the shape must let it grow.** A component is an entry in
@@ -141,31 +152,30 @@ fielded regiment costs **to keep** — its `unit_upkeep` draw, wages plus the go
 credits, so its weight is 1 by definition.
 
 **Sustained cost, not raise cost, and the difference is the whole component.** Pricing an army at
-`hire_unit`'s one-off ticket says what buying it took, not what holding it commits the corp to —
+`hire_unit`'s one-off ticket says what buying it took, not what holding it commits the nation to —
 and it makes military a rounding error by construction, because raising a regiment costs tens of
 credits where net worth runs to five and six figures. A component that cannot move an ordering is
 not in the index except on paper.
 
 **A component must be able to disagree with cash, or the composite is cash.** This is the
 property the composite exists for, so it is the one to check when a weight is tuned: does an armed
-corp ever outrank a cash-richer unarmed one? Where it does not, the index restates net worth under
-another name, and a coalition scoring against it forms against the richest corp while appearing to
+nation ever outrank a cash-richer unarmed one? Where it does not, the index restates net worth under
+another name, and a coalition scoring against it forms against the richest nation while appearing to
 weigh three things — the failure this section opens by naming, and the one that still looks like
 diplomacy from the outside. **Weight and spread are separate causes of it**: a component that reads
-the *same* on every corp separates nobody however heavily weighted, so a uniform component is a
+the *same* on every nation separates nobody however heavily weighted, so a uniform component is a
 finding about the world rather than about the weight.
 
 **Read at the tick boundary, never inside the scorer's walk.** Standing is read after the budget
 pass has written balances and clearing has resolved the prices that value held stock, and *before*
-any corp's strategic evaluation mutates the world. `run_corp_strategic_step` walks corps in sorted
-id order and applies as it goes, so a standing read from inside that walk answers differently for
-the first corp than for the last — the evaluation cadence would become the tiebreak of every
+any nation's strategic evaluation mutates the world. `run_corp_strategic_step` walks the actors in
+sorted id order and applies as it goes, so a standing read from inside that walk answers differently
+for the first actor than for the last — the evaluation cadence would become the tiebreak of every
 comparison built on it. A consumer that needs the whole field snapshots it once at the boundary
 and scores against the snapshot.
 
-**Not the Corporations panel's `corp_standing`** (`src/world/standing.hpp`), which is a
-disclosure-gated *profile* — reach, capital, market share, each shown or withheld by the observed
-firm's filing status. That answers what a player may READ about a rival. This answers who is
+**Not the panel's `corp_standing`** (`src/world/standing.hpp`), which is a published
+*profile* — reach, capital, market share (`../politics/RELATIONS.md` § 4). That answers what a player may READ about a rival. This answers who is
 ahead, from full world state, and is not player-facing.
 
 **What follows.** A rout is a failure of the design, in the same way a collapse is. Superhuman play
@@ -384,7 +394,8 @@ Extend the background-corp per-building triggers (BL-079, background-corp agency
 **strategic scoring layer**: enumerate candidate actions (build X on tile T, switch recipe, set
 workforce dial, set a trade), score each with tunable weighted heuristics, apply hysteresis,
 execute top-N within a per-tick action budget.
-- **Dev cost:** low–medium (natural extension of what exists). **Determinism:** perfect (pure
+- **Dev cost:** low–medium (natural extension of what exists). *(Written when the per-building
+  triggers were a background corporation's; they are now every rival nation's, Ben 2026-10-23.)* **Determinism:** perfect (pure
   function of world state; seed the tie-break RNG). **Legibility:** excellent. **Skill ceiling:**
   medium — enough for a genuine, beatable rival with good weights + predictive spending.
   **Data needs:** none.
@@ -400,7 +411,7 @@ than needing a cheat.
 ### C. Out-of-process language layer over scored primitives (Vox-Deorum-style) — **the differentiator**
 The external policy reads Io's compact state export; the model works among an explicit
 legal-primitive set (masked to prevent hallucination); the utility layer (A/B) executes
-tactically. Gives varied, legible, human-like *personalities* per corp.
+tactically. Gives varied, legible, human-like *personalities* per nation.
 - **Dev cost:** medium glue, plus latency. **Determinism:** protected by keeping the model
   out-of-process, coarse-grained, replay-logged — never per-tick, never in the sim. **Legibility:**
   high (can self-explain). **Skill ceiling:** competitive end-game. **Data:** none for the
@@ -436,9 +447,9 @@ out-of-process policy over the state export.
   reference AI). Re-run headlessly on every AI change — the direct analogue of `verifier-headless`.
   **The primary metric is the MARGIN, not the level.** § "The goal" makes a close race the
   intended shape of a campaign, and an absolute wealth band cannot score that: a run where every
-  corp grew together and a run where one corp ran away both sit inside a generous net-worth band,
+  nation grew together and a run where one nation ran away both sit inside a generous net-worth band,
   and only the second is a failure. The banded quantity is therefore the **spread in composite
-  standing between the leading corporation and the field** — held narrow is a pass, a widening gap
+  standing between the leading nation and the field** — held narrow is a pass, a widening gap
   is the regression, and an absolute band survives only as a solvency floor underneath it.
   Note what this measures and what it does not: no actor aims at the margin, so the band is scoring
   whether the WORLD'S brakes work, not whether an agent obeyed an instruction.
@@ -456,8 +467,8 @@ out-of-process policy over the state export.
 
 Io is **unusually well-suited to a strong *classical* AI.** Its decision surface (where to build,
 what recipe, workforce dial, supply routing, order-book trading) is exactly the discrete/continuous
-mix that **weighted utility scoring handles best**, and it already has the substrate — background
-corps taking narrow deterministic per-building actions (BL-079). The correct move is to **grow that
+mix that **weighted utility scoring handles best**, and it already has the substrate — narrow
+deterministic per-building actions (BL-079, background-corp agency; now every rival nation's). The correct move is to **grow that
 seam into a scored strategic layer, not to bolt on a planner or a network.**
 
 The single most important design import is **Victoria 3's predictive-spending + priority-bucket
@@ -485,21 +496,22 @@ learning; do **not** ship resource cheats as a substitute for competence.
 
 Ben accepted the **A → B staged path** (scored utility over the BL-079 seam, then Victoria-3-style
 predictive spending). This section is the concrete decomposition, implemented in
-`src/world/corp_ai.{hpp,cpp}` with its tunables in `corp_ai_params`.
+`src/world/corp_ai.{hpp,cpp}` with its tunables in `corp_ai_params`. The evaluating actor is a
+rival nation (Ben, 2026-10-23).
 
 ### Cadence — where the AI thinks
 
 The AI evaluates at the **econ-tick boundary inside `run_economy_step`**, in the slot the BL-079
 agency block occupies; that block is the scorer's **reflex tier** (tier 0: recipe rescue,
-idle-a-loser). Strategic evaluation is **staggered**: corp `c` evaluates every `cadence_k` (4)
-ticks when `tick % k == index(c) % k`, the index taken over the **sorted corp set** (Victoria-3's
-tick-task idea — bounded per-tick cost, fully deterministic). Admitting or removing a corp from
-evaluation never shifts another corp's slot, because the index is over the sorted set.
+idle-a-loser). Strategic evaluation is **staggered**: actor `c` evaluates every `cadence_k` (4)
+ticks when `tick % k == index(c) % k`, the index taken over the **sorted actor set** (Victoria-3's
+tick-task idea — bounded per-tick cost, fully deterministic). Admitting or removing a nation from
+evaluation never shifts another's slot, because the index is over the sorted set.
 
 ### The candidate-action set (legal primitives)
 
 The AI's verbs are exactly the player's, through the same validation — **no bypass, no cheats by
-construction**. Every verb is a `corp_verb` on the corp-command seam (§ 6); the scorer's
+construction**. Every verb is a `corp_verb` on the command seam (§ 6); the scorer's
 candidate set is this subset of it:
 
 | Candidate | Engine seam | Notes |
@@ -509,18 +521,18 @@ candidate set is this subset of it:
 | `set_workforce(building, target)` | `solve_workforce_target` | The solver reports its own modelled gain, so the dial is scoreable in both directions |
 | `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, reversible |
 | `survey(body)` | survey_system | The AI pays for discovery like the player |
-| `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
-| `set_trade(from, to, good, points)` / `clear_trade(id)` / `set_trade_reserve(points)` | the trade pass (`../economy/TRADE.md`) | § 2C; the corporation's own manual trades on its own trade points |
+| `hire_unit(tile, unit_type)` | `hire_unit` at the nation's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
+| `set_trade(from, to, good, points)` / `clear_trade(id)` / `set_trade_reserve(points)` | the trade pass (`../economy/TRADE.md`) | § 2C; the nation's own manual trades on its own trade points |
 
 **A plant the dial idled is not losing (Ben, 2026-10-08; BL-1235, dial hold outlasts reflex).**
 When the workforce dial sets a plant to zero, the maintenance it pays while idle is the cost the
 dial chose to carry, not a loss: the loss reflex counts no streak against it. And the dial's hold on
 a plant it zeroed ends the moment that plant's own forecast recovers — the plant is dialled again
-on the corporation's next evaluation, not after the fixed hold. Measured: the dial zeroed 503
+on the nation's next evaluation, not after the fixed hold. Measured: the dial zeroed 503
 generation-built plants in the settle (178 on a start-up glut that had cleared by the handoff), and
 the 8-tick reflex mothballed most of them before the 16-tick hold let the dial look again.
 **At the handoff the seat's dial-idled plants return to auto (Ben, 2026-10-09; NR-986).** The
-scorer stops acting on the corporation the player takes, so a plant its dial left at zero would
+scorer stops acting on the nation the player takes, so a plant its dial left at zero would
 otherwise stay at zero until the player touched it. Each such plant is handed over with its
 workforce on auto, as every plant the player builds starts.
 
@@ -540,12 +552,12 @@ floored refined-fuel plants switched into unpriced propellant 145 times in the s
 dial then idled them.
 
 The seam carries further verbs the scorer does not enumerate — `demolish`, `place_road`,
-`hold_convoy`, the procurement triple, the stance verbs, the unit verbs and `withdraw_from_battle`
+`hold_convoy`, the procurement triple (its named-supplier quote retired, Ben 2026-10-23), the stance verbs, the unit verbs and `withdraw_from_battle`
 — which an agent on the seam (§ 10) issues directly. Scoring roads and demolition is BL-447
 (scorer never demolishes or roads); scoring stance is BL-450 (rivals score stance).
 
-**Candidate enumeration is bounded**: build sites come from **surveyed tiles the corp can see**
-(its own fog state), pre-filtered to the top-M (`top_m_sites = 8`) by static suitability (terrain
+**Candidate enumeration is bounded**: build sites come from **surveyed tiles of its own ground the nation can see**
+(its own fog state; a nation builds only on its own ground, Ben 2026-10-23), pre-filtered to the top-M (`top_m_sites = 8`) by static suitability (terrain
 affinity × deposit richness × an **input-demand pull**, `input_demand_pull`, that weights a
 tile's extractable deposits by what the economy's recipes want and cannot get — divided by the
 sites already targeting that resource, so the pull decays as the shortage is answered); recipes
@@ -572,9 +584,9 @@ and the same solvency, glut and reserve-floor gates as the extraction candidate,
 where a processor genuinely differs from a mine:
 
 - **Siting.** No deposit ranks a processor, so `ranked_sites` offers it nothing. It is sited on the
-  **corp's own asset tiles** — the same tile, so the same market, and the same shelf its
+  **nation's own asset tiles** — the same tile, so the same market, and the same shelf its
   extraction lands on. Cheap (`O(assets)`, not another `O(tiles)` scan) and legible.
-  One processor per tile, or a corp would stack them on its best tile every evaluation.
+  One processor per tile, or a nation would stack them on its best tile every evaluation.
 - **Recipe choice.** Walks the **browse** space (this era's roster) and crosses to the **absolute**
   id through `recipe_id(name)` — the two id spaces `recipe_registry.hpp` keeps apart. The recipe
   travels **with** the command, because `construct_building` substitutes steel for `no_recipe`.
@@ -598,7 +610,7 @@ where a processor genuinely differs from a mine:
   question is whether to run what exists, not whether to add a draw (a recipe switch adds one:
   below). **A plant under construction
   has already claimed its draw:** spare is net of every processor standing **or under
-  construction** in reach, charged at the draw it will take when it stands, so firms deciding in
+  construction** in reach, charged at the draw it will take when it stands, so nations deciding in
   the same ticks do not all count on the same spare; and a new plant is priced at the landed cost
   of the supply that admitted it, not at a local shelf it will eat through. The shared reading
   reaches every use of spare — a resume, a recipe switch, the reflex rescue — so a rival's plant
@@ -628,7 +640,7 @@ not be able to pay.**
 An input *r* is **obtainable** at market *C* when either holds:
 
 1. **Stock.** *C*'s shelf — only where the fair-price ceiling admits it — covers the run at the
-   idle threshold. This is the production tick's own coverage question; a corporation holds no
+   idle threshold. This is the production tick's own coverage question; a nation holds no
    stock of its own (`../economy/MARKETS.md` § The shelf economy).
 2. **Supply.** The **spare output** of *r* over the producers **within reach** of *C* covers the
    run at the idle threshold. **Within reach** is auto trade's own test, so a lane called in
@@ -664,8 +676,8 @@ carries its own copy of the reach rule until it merges onto this helper.
   idled for good. The spare-supply clause brings it back when its input is genuinely being made
   within reach — not merely when a producer stands there.
 
-Each corp in the scorer's walk sees the buildings as the corps before it left them: the producer
-index is rebuilt for every evaluating corp.
+Each nation in the scorer's walk sees the buildings as the nations before it left them: the
+producer index is rebuilt for every evaluating nation.
 
 This prices existing verbs better and adds none; it sits inside the scored-utility grant (§ 11).
 Reach makes a chain *possible*, not *running*: goods still have to cross markets, which is
@@ -773,15 +785,16 @@ linear median 0.106, max 2.81.
 **A road tracks the build curve by construction** and moves with it: it is priced *under* the curve
 (`0.3 × net / build_cost`) because a road earns no revenue itself, it unlocks a future build's.
 
-The `strategy_weight` biases toward the corp's generated **industrial focus** (specialist premise,
-CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. A **solvency
+The `strategy_weight` biases toward the actor's generated **industrial focus**, giving
+distinct-but-legible personalities for free. The focus was a corporation's specialist premise,
+retired with the corporations (Ben, 2026-10-23); whether a nation carries one is open. A **solvency
 gate** (cash − committed spend > reserve floor, `corp_reserve_floor`) vetoes any spend that breaks
 the floor; stage B layers priority buckets and predictive spending over it (§ 2B).
 
 ### 2B. Stage B — strategy, priority buckets, predictive spending
 
-- **Strategy layer.** `corp_strategy` is a named alias of `industrial_focus` — the corp's
-  generated specialist premise (extraction / processing / trade) IS its strategy, kept as its
+- **Strategy layer.** `corp_strategy` is a named alias of `industrial_focus` — the actor's
+  generated focus (extraction / processing / trade) IS its strategy, kept as its
   own concept so the bias is legible and can diverge from the generation-time focus later
   without a signature break. `focus_weight` biases build/survey scores by this strategy.
 - **Priority buckets** (`corp_priority_bucket`: `must_have` / `should_have` / `nice_to_have`),
@@ -793,7 +806,7 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   action is never starved by a higher-scoring Nice-to-Have one. Only Nice-to-Have candidates carry
   capex (dials are free), so the "never starve a higher bucket" rule is enforced by gating
   build/survey/hire spend against a **stricter** floor: `corp_should_have_buffer` sums
-  `estimate_building_profit(...).input_cost` over the corp's own running processing facilities —
+  `estimate_building_profit(...).input_cost` over the nation's own running processing facilities —
   the cash needed to keep feeding them this tick — and `nice_to_have_floor = reserve_floor +
   should_have_buffer` is the gate a build must clear, on top of (not instead of) the reserve
   floor.
@@ -821,7 +834,7 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   lands (2026-10-08, NR-984):** a nation's want for a good that no shelf yet holds is
   recorded at its **capital's** market — so a nation can start one such chain, at its capital,
   and the want follows the good to wherever it is first held. Each of these is held for
-  the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
+  the scorer's evaluation cadence, so a buyer is seen by every nation that evaluates between
   two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. The taper and veto apply only to
@@ -840,27 +853,28 @@ regression-checked against `corp_ai_harness.cpp`.
 Ben, 2026-08-07, resolving NR-083: *"Order book needs to be a background process, the AI must be
 able to trade as a player does."* A player-only fence over the trade verbs was proposed and
 explicitly rejected, so the scorer reaches trade exactly as it reaches build and survey — through
-the player's own verbs on the corp-command seam. The order book and its sell orders retired with
-corporation pools (`../economy/MARKETS.md` § The shelf economy); what a corporation trades now is
+the player's own verbs on the command seam. The order book and its sell orders retired with
+corporation pools (`../economy/MARKETS.md` § The shelf economy); what a nation trades is
 the **manual trade** (`../economy/TRADE.md` § A trade), under the § 11 grant *a rival may set its
 own trades* (Ben, 2026-10-10).
 
-**Auto trade is not a decision.** A corporation's unreserved trade points are spent by the trade
+**Auto trade is not a decision.** A nation's unreserved trade points are spent by the trade
 pass on the best-margin routes every tick, for every owner alike (`TRADE.md` § Auto and reserved
 trade). The scorer decides only which routes to **pin** as manual trades, which to **clear**, and
 how many points to **reserve** for them.
 
 **One estimate, one code path.** The scorer ranks routes with the trade pass's own ranking
-(`rank_trade_routes`): every route among the markets the corporation's own Marketplaces and Ports
+(`rank_trade_routes`): every route among the markets the nation's own Marketplaces and Ports
 reach whose margin per unit — destination price less source price less the network's haul per
 unit — beats `dispatch_margin` of the source price, ordered by **margin per point** (margin per
 unit × the good's trade capacity), ties by source, destination and good. It reads public prices
-and the network's haul only — never another corporation's trades, points or plans.
+and the network's haul only — never another nation's trades, points or plans.
 
-- **Eligible**: a corporation whose trade buildings made trade points on the last trade pass.
-  Never the player's corporation — not even under spectate, where every other family scores the
-  seat (§ 11 names "nothing for the player's corp", and that is not widened here).
-- **Pin** (`set_trade`): the best-ranked route the corporation does not already hold as a manual
+- **Eligible**: a rival nation whose trade buildings made trade points on the last trade pass.
+  Never the player's nation — not even under spectate, where every other family scores the
+  seat (§ 11 names "nothing for the player's corp", carried to the nation, and that is not
+  widened here).
+- **Pin** (`set_trade`): the best-ranked route the nation does not already hold as a manual
   trade, sized to what the destination can absorb above the landed cost (`trade_room`) and the
   source shelf holds, and capped so its manual trades together hold at most `trade_pin_share`
   (0.5) of the points it makes — the rest stays with auto. **Score**: the expected cash per tick,
@@ -874,7 +888,7 @@ and the network's haul only — never another corporation's trades, points or pl
   an idle is: a losing trade runs until its owner changes it, so it is a standing bleed. The gap
   between the pin's margin floor and the unpin's zero is the hysteresis.
 - **Reserve** (`set_trade_reserve`): after any pin or unpin, the reserve is set to the sum of the
-  corporation's manual trades' points in the same evaluation, so a new pin is supplied on the very
+  nation's manual trades' points in the same evaluation, so a new pin is supplied on the very
   next trade pass. Bookkeeping: no spend, outside the trade budget.
 - **Budget**: at most `max_trades` (1) pin or unpin per evaluation. A trade command's subject is a
   market or a trade, never a building, so it takes no dial slot and records no building cooldown.
@@ -883,7 +897,7 @@ and the network's haul only — never another corporation's trades, points or pl
 of skill: no price trend, no timing, no reading of a rival's shortage. Verified by
 `tools/verify/ai_trade_harness.cpp`: a rival pins the ranking's best route within its share,
 keeps its reserve equal to its manual points, unpins a route turned losing, never acts for the
-player's corporation, and two runs from one start issue the identical commands.
+player's nation, and two runs from one start issue the identical commands.
 There is no directed dispatch: a rival does not name a one-off convoy. Every shipment is a trade's
 (`../economy/SUPPLY.md` § A shipment).
 
@@ -912,18 +926,18 @@ There is no directed dispatch: a rival does not name a one-off convoy. Every shi
   scored for cutting its target and a loss-maker for raising it; a sign taken from the building's
   current variable margin would only ever find one direction.
 - **Budget**: per evaluation, at most `max_builds` (1) construction + `max_dials` (3) dial
-  changes + `max_trades` (1) trade pin or unpin + one hire per corp (the trade reserve's
+  changes + `max_trades` (1) trade pin or unpin + one hire per nation (the trade reserve's
   correction is outside it); total committed spend capped
   by the solvency gate, each accepted candidate reserving its spend against the later ones in the
   same evaluation.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
-  ties break on lowest entity id; the only randomness is `corp_personality_jitter` — a per-corp
+  ties break on lowest entity id; the only randomness is `corp_personality_jitter` — a per-actor
   hash of `personality_seed` in [0.9, 1.1] used as a fixed personality jitter on weights —
   constant per campaign, deterministic by construction.
 
 **The decision record.** Each applied command is a `corp_decision` — `{tick, corp, command,
 winning_score, runner_up, reason}` — in `corp_decision_ring`, a 256-entry ring that is derived
-observability, not save-format state. `runner_up` is **the best candidate the corp did not take**
+observability, not save-format state. `runner_up` is **the best candidate the nation did not take**
 in that evaluation (rejected by a budget, the one-touch rule or the solvency gate) — the foregone
 option belongs to the evaluation, not the command (NR-232).
 
@@ -932,7 +946,7 @@ refusal, so a refused candidate was never available to take, and it belongs in n
 This is not a corner case: the recipe margin-chase is deliberately enumerated without the switch
 cost and without the cooldown the seam applies, so the same high-scoring chases are proposed and
 refused every evaluation — enough, on the shipped world, to make the top refusal the runner-up of
-every decision a corp took.
+every decision a nation took.
 
 **Scored within one budget family, never across.** The candidate families — build, dial, survey,
 hire, trade — are the action budgets above, and each is scored by **one formula in
@@ -948,23 +962,23 @@ as a contest.
 
 ---
 
-## 6. The corp-command seam & state export (shared with multiplayer)
+## 6. The command seam & state export (shared with multiplayer)
 
 The scorer does not mutate the world directly. It emits **`corp_command`** records —
-`{tick, corp, verb, args}` — applied at the tick boundary through the player-grade validation
+`{tick, actor, verb, args}`, the actor a nation (the type keeps its corp name) — applied at the tick boundary through the player-grade validation
 above. This is deliberate triple-duty:
 
 - **AI**: the command stream *is* the decision log. The ring of commands + score rationale
   (winning score vs best foregone) is the AI's legibility surface, its replay artifact, and the
   skill-harness's input.
 - **Multiplayer**: `MULTIPLAYER_PRINCIPLES.md` § Preserve now #2 — lockstep exchanges exactly
-  this: small serialisable intents tagged with their tick. An AI corp is a local command source;
+  this: small serialisable intents tagged with their tick. An AI nation is a local command source;
   a network player is a remote one; the seam is identical. (`canvas_command` stays
   navigation-only; `corp_command` is its sim-mutating sibling.)
 - **Out-of-process policies (C/D)**: an external policy consumes the state export and returns
   commands — the same contract, across a process boundary.
 
-**A command may be legal only before play (Ben, 2026-09-24).** Choosing the corporation to play
+**A command may be legal only before play (Ben, 2026-09-24).** Choosing the nation to play
 (`take_seat`) is a game act, so it is a `corp_command` like any other and an agent can make it;
 but it means nothing once play has begun. The **host** checks the phase — the in-play hosts
 (`--serve`, the live agent seam) refuse a pre-play verb as `rejected_state` — and the seam
@@ -973,10 +987,10 @@ act that belongs to setting up a game rather than playing it: one verb, one dict
 the phase gate at the host, never a second command path.
 
 **State export** (`export_corp_blackboard`, `--export-blackboard <corp|all>`; BL-206, blackboard
-export). A compact, tick-tagged, per-corp view of `corp_fact` records — `(tick, subject,
+export). A compact, tick-tagged, per-nation view of `corp_fact` records — `(tick, subject,
 predicate, value, confidence, provenance)`, schema-versioned, deterministically ordered
 (subject-kind section, then entity id, then predicate), emitted as JSONL — that is
-**visibility-honest**: it contains only what that corp could see under the BL-068 rules and its
+**visibility-honest**: it contains only what that nation could see under the BL-068 rules and its
 own fog state — own buildings, trades and cash in full; public market prices/aggregates; rival
 *buildings* but not their internals; its own routes and survey state. The AI reads through the
 same information asymmetry the player does; anything else is the fog cheat the calibration
@@ -986,7 +1000,7 @@ research warns against.
 written for the trusted in-process caller does not transfer to it. Authority lives at the
 **protocol layer**, not in `apply_corp_command` (the in-process scorer legitimately commands every
 rival and must keep doing so): a serve session has one **actor** (`--as <corp>`, default the
-player corp), `COMMAND` refuses any other corp with `rejected_not_owner`, and `BLACKBOARD` serves
+player's nation), `COMMAND` refuses any other actor with `rejected_not_owner`, and `BLACKBOARD` serves
 only the actor's visibility-honest view. `--as any` is the explicit research opt-in (bot-vs-bot,
 the trace corpus) — permissive mode exists but must be asked for and is visible in the
 invocation. Every wire field is range-checked **as the value that lands in the destination**
@@ -1040,15 +1054,16 @@ hemorrhaging cash. The dictionary supplies meaning; the policy supplies priority
 
 ## 7. Communication & diplomacy — the chat principle (Ben, 2026-07-26)
 
-Ben's steer: **since every rival is AI, inter-corp coordination should happen in a communication
-medium, not hidden state.** Corps message **publicly or in private groups** to form plans;
+Ben's steer: **since every rival is AI, coordination between rivals should happen in a communication
+medium, not hidden state.** Rival nations message **publicly or in private groups** to form plans
+(the rivals were corporations when this was ruled; they are nations since 2026-10-23);
 diplomacy is *legible messaging*, not behind-the-scenes flags. This is a better diplomacy
 principle than invisible opinion modifiers — and in multiplayer the same channels carry human
 players, so the medium is actor-agnostic.
 
 - **Surface**: the **chat panel** (`src/ui/chat_panel.{hpp,cpp}`; BL-205, corp chat log) in the
-  right shell band, middle slot. Channels: **Public** (every corp), plus **arbitrary groups** (any
-  subset of corps, created from the panel). The player reads Public and any group they belong to.
+  right shell band, middle slot. Channels: **Public** (every nation), plus **arbitrary groups** (any
+  subset of nations, created from the panel). The player reads Public and any group they belong to.
 - **Stage A**: messages are **templated, deterministic renderings of the decision log** — the
   reflex-tier agency events ("Meridian idled Ironworks — sustained losses") and the strategic
   tier's command stream. The chat is the AI-observability surface first; personality prose is
@@ -1060,7 +1075,7 @@ players, so the medium is actor-agnostic.
 - **Determinism**: stage-A message text derives purely from deterministic events. Free-text model
   chat arrives only under the C-route rules (out-of-process, coarse-grained, replay-logged).
 - **Player input**: a message box posts to the selected channel. It has **no mechanical effect**
-  — it is the hook Stage C consumes (the player negotiating with AI corps in language).
+  — it is the hook Stage C consumes (the player negotiating with AI nations in language).
 
 ---
 
@@ -1077,7 +1092,7 @@ The build work of BL-199 is carried by:
 
 Economics the scorer prices, settled alongside: **BL-153** (convoy pay by distance) and
 **BL-193** (stack diminishing returns); **BL-160** (auto exchange policy) / **BL-161**
-(counterparty allow/deny) are the AI's trade-policy primitives — the AI authors the same policy
+(counterparty allow/deny) are the AI's trade-policy primitives (their actor is now the nation) — the AI authors the same policy
 objects via commands.
 
 ---
@@ -1086,7 +1101,7 @@ objects via commands.
 
 The project's first flat-binary serialisation seam (`src/world/history_log.{hpp,cpp}`; BL-208,
 world history log): a **single interleaved, append-only, tagged, serialised** world log — not
-per-body/per-corp logs, which fail the moment a corporation acts on a body (every interesting
+per-body/per-actor logs, which fail the moment an actor acts on a body (every interesting
 event) and would need a join with no shared ordering.
 
 **The shape**, in `src/world/world.hpp`:
@@ -1150,7 +1165,7 @@ and `trade_routes` keep their own readers unchanged):
 
   *The cost.* Route establishment doubles in log volume — bounded by **body-pair count**, not
   convoy traffic (a route is logged once, not per delivery), so the absolute growth is small: with
-  *n* bodies the ceiling is `2 × n(n−1)/2` entries per corp instead of `n(n−1)/2`. The real price
+  *n* bodies the ceiling is `2 × n(n−1)/2` entries per actor instead of `n(n−1)/2`. The real price
   is duplicated narration: a reader rendering chronologically sees the same sentence twice with
   different body tags. Mitigation if that reads badly — keep the narration identical (it is) and
   let the renderer de-duplicate on `(tick, event)` when it is *not* filtering by body.
@@ -1166,7 +1181,7 @@ generated world, not hand-fabricated entries) and a determinism check in
 `tools/verify/determinism_harness.cpp` (two identical-seed generations produce an identical
 genesis+checkpoint chapter).
 
-The nation and corporation generation passes write into this same log — the substrate it exists
+The nation and charter-building generation passes write into this same log — the substrate it exists
 to hand them.
 
 ---
@@ -1351,7 +1366,7 @@ tokens of decision trace. A few hundred logged games is a serious supervised cor
 ### 10d. The accepted direction (Ben, 2026-08-03)
 
 **MCP is sanctioned.** Io has an MCP server over the three legs — blackboard export (read),
-action dictionary (meaning), corp-command seam (write). This replaces the computer-use reading
+action dictionary (meaning), command seam (write). This replaces the computer-use reading
 NR-040 recorded as the interim plan.
 
 **The runtime target is a small, local model.** Not a cloud dependency, not a frontier model —
@@ -1391,14 +1406,15 @@ ticks=<n>`, `COMMAND corp=<id> verb=<n> ...`, `CORPS`, `BODIES`, `SHUTDOWN` — 
 `src/core/agent_protocol.{hpp,cpp}`, shared verbatim with the live seam (§ 10j), and reuse
 `export_corp_blackboard`/`to_jsonl` and `apply_corp_command` (no bypass) underneath. `COMMAND`
 parses every argument key every verb reads, and every `corp_command_result` has a name on the
-wire, so a business decline ("the supplier holds no capacity", "you are embargoed") is never
+wire, so a business decline ("the treasury cannot pay", "not your ground") is never
 reported as a syntax error — typed, enumerated failure is the property § 10a leans on for
 self-correction. A `TICK` runs the whole tick sequence, surveys included, so a dispatched survey
 progresses and reveals tiles an agent can then build on.
 
-**Enumeration.** `CORPS` returns one JSON line per corp (`id`, `name`, `is_player`,
-`home_nation`) then `END`, because corp ids in a generated world are non-obvious (NR-061).
-`BODIES` is its sibling: `survey` and `request_quote` take a body id as `subject`, while the
+**Enumeration.** `CORPS` returns one JSON line per actor (`id`, `name`, `is_player`,
+`home_nation`) then `END`, because actor ids in a generated world are non-obvious (NR-061). The
+actor is a nation (Ben, 2026-10-23); the opcode keeps its old name.
+`BODIES` is its sibling: `survey` takes a body id as `subject`, while the
 blackboard keys market facts — its own trades included — by **market** id. A market fact's
 subject is therefore not a body to pass to those verbs: resolve it with the market's `body` (or
 `BODIES`). Without `BODIES` an agent could never name a body it has no activity on, which is every
@@ -1449,7 +1465,7 @@ before extending it.
 asks what happens when someone *plays* (agenda, consequence, surprise). Both are committed.
 
 **What this does NOT change.** The § 10g ruling stands: the deterministic scorer remains the
-action generator for the shipped rival, and an agent playing a corp is the research use of the
+action generator for the shipped rival, and an agent playing a nation is the research use of the
 MCP server that § 10g preserves. What changes is the *value* assigned to that research use — it
 is diagnostics, not spectacle.
 
@@ -1463,26 +1479,26 @@ seconds), rivals act through `corp_command`, and every decision records `winning
 readout, BL-411), and one rule.
 
 **The rule is not excepted; its subject is removed.** The item's draft asked whether the scorer
-could be granted the player's corp under a spectate flag — a fourth narrow exception alongside
+could be granted the player's corp (now its nation) under a spectate flag — a fourth narrow exception alongside
 the reflex tier, the workforce dial and the rival tier. Ben rejected the framing: *"In spectator
 mode, there is no need to mark a corp as played by a human. 'Who plays your corp' collapses as a
 question."*
 
-That is the better model and a smaller change. The standing prohibition protects a corp
-**because a human owns it**. A spectated session has no human owner, so the precondition is
+That is the better model and a smaller change. The standing prohibition protects a nation
+**because a human plays it**. A spectated session has no human owner, so the precondition is
 absent rather than waived. `world::player_entity` survives only as a camera and ledger
 anchor — a **viewpoint**, carrying no ownership meaning. Concretely, `corp_ai_params
 ::spectating` makes the two guards in `corp_ai.cpp` conditional, and nothing else in the
-evaluation loop distinguishes the player's corp, so past those guards it is simply another
-corp on the same staggered cadence.
+evaluation loop distinguishes the player's nation, so past those guards it is simply another
+nation on the same staggered cadence.
 
 **Two properties keep it honest**, both asserted by `tools/verify/spectator_determinism.cpp`:
 
 - The flag **defaults false**, and an unspectated run is byte-identical to a build without the
   guards — the harness carries the dated `state_hash` provenance, and a spectated run hashes
   differently, so "spectating moves the world" has teeth too.
-- Admitting one more corp **shifts no rival's cadence slot**, because the cadence index is
-  over the sorted corp set, which does not change.
+- Admitting one more nation **shifts no rival's cadence slot**, because the cadence index is
+  over the sorted actor set, which does not change.
 
 **The way in is chosen before play, and only before play** (BL-695, live spectate route; Ben,
 2026-10-15). `ProjectIo --spectate` opens the session with nobody seated; it composes with the
@@ -1492,14 +1508,14 @@ in-game control** that
 enters or leaves the mode. The reason follows directly from the paragraph above: because the
 prohibition's *precondition* is what spectate removes, having-no-owner is a property of the
 **whole session**, not a view a watcher steps into and out of. A mid-run flip would change,
-halfway through a campaign, which corporations the scorer may legally act on — a different
+halfway through a campaign, which nations the scorer may legally act on — a different
 argument, and one nobody has made. Off by default, so an ordinary played session never reaches
 any of this.
 
 Two companions complete the seat: player-press affordances (construction placement, order entry,
 workforce dials) are disabled under spectate — BL-413 (spectate disables player presses) — and
-the spectated viewpoint opens on a corp worth watching rather than whichever corp the player would
-have been — BL-418 (spectate viewpoint default).
+the spectated viewpoint opens on a nation worth watching rather than whichever nation the player
+would have been — BL-418 (spectate viewpoint default).
 
 ### 10j. The live agent control seam (BL-412, live agent control seam)
 
@@ -1507,7 +1523,7 @@ have been — BL-418 (spectate viewpoint default).
 *instead of* `app::run`, so an MCP-attached agent plays invisibly and the only way to observe its
 play is to read a transcript afterwards. Spectating the deterministic scorer (§ 10i) and
 spectating a *language model* are therefore different jobs. This seam is the second one: the
-**rendered app hosts an agent**, so a human watches an external model play a corp on the live
+**rendered app hosts an agent**, so a human watches an external model play a nation on the live
 canvas.
 
 **Transport.** `ProjectIo --host-agent [port]` (default 7717, composes with
@@ -1516,7 +1532,7 @@ canvas.
 The engine only **listens**: no outbound connection, no HTTP client, no API key — the § 10
 invariant, untouched. The protocol is `--serve`'s line protocol *verbatim*: both hosts
 (`run_serve` for headless use, and the seam) call the same parser in `agent_protocol.cpp`, the
-same field validation, the same actor gate. The session actor is the player corp — the seat the
+same field validation, the same actor gate. The session actor is the player's nation — the seat the
 agent occupies (this is *not* § 10i's no-seat mode; the seat is occupied, just not by a human).
 Client side, `tools/mcp/server.js --attach <port>` connects to a live session instead of spawning
 a child.
@@ -1541,7 +1557,7 @@ client frames responses exactly as it does against `--serve`.
 
 **Scope.** § 10g stands: the deterministic scorer remains the shipped rival's action
 generator. This seam is the research and diagnostics configuration § 10h argues for —
-frontier-or-local models playing a corp interactively, watchable.
+frontier-or-local models playing a nation interactively, watchable.
 
 ### 10f. Sources for § 10
 
@@ -1602,13 +1618,13 @@ both stand; the ruling is explicit about the Stage.
   own decision ring first (free, no cloud spend, exactly the note's § 9 "bootstrap from the
   scorer" instruction) and trains the **dialogue layer**, not an action-emitting model. Cloud
   play through the MCP server remains valuable for a DIFFERENT reason: an external agent
-  (frontier or otherwise) playing a corp interactively is the research and diagnostics use of the
+  (frontier or otherwise) playing a nation interactively is the research and diagnostics use of the
   server (§ 10h), not the shipped rival AI's architecture.
 - **MCP, the server, and the local-model-as-runtime-target all stand exactly as § 10d states.**
   This ruling changes which Stage the model occupies, not the transport or the
   no-cloud-dependency invariant.
 
-**What this does not settle.** Whether Stage C ships before or after the corp-AI arc
+**What this does not settle.** Whether Stage C ships before or after the AI-opponent arc
 closes (the parked DLC milestone numbered v0.2.0 until 2026-10-22, ROADMAP.md), and the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference
 point, not a spec) — both inside BL-334's remainder. The note's ~300-token-per-decision assumption
 was measured separately (BL-335, measure decision token cost): a minimal decision round is
@@ -2245,3 +2261,23 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   nation layer over the same legal verbs and paid from the treasury. **Not admitted:** any launch
   for the player's nation; any corporation owning a space asset; a mission sequence planned ahead
   of the next launch. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
+  **Every AI nation builds its own economy — granted (Ben, 2026-10-23; `../politics/NATIONS.md`
+  § What a nation owns).** A new actor grain, and the largest widening in this register: the
+  corporations and companies are retired, and **every non-player nation, major and minor alike**,
+  builds, runs and trades the whole of its own industry through one scored-utility build layer, paid
+  from its treasury. Every grant above whose subject was a rival or background corporation's
+  decision — what to build, which recipe, where to sell, hiring, the Marketplace, logistics sources
+  and hub chains — **carries over to the nation unchanged in its terms**, and its corporation reading
+  is retired. The nation is one actor: its budget scorer and its build scorer are two faculties of it,
+  each over its own verbs.
+
+  **What it admits.** The verbs a corporation's scorer issued, now issued by and for a nation, over
+  its own buildings and its own treasury, **only on its own ground** (`../GLOSSARY.md` § Own ground;
+  this subsumes the NR-1060 narrowing above).
+
+  **What it does NOT admit.** No build, recipe, sale or any other decision for the **player's**
+  nation, whose economy grows only by the player's builds; no placement on another nation's ground
+  or on ground no nation owns; no verb that exists only because the actor is now a nation; no read of
+  another nation's private state beyond what any nation may observe. Pure, seeded, deterministic,
+  replayable, legal verbs only, never a planner.

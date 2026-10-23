@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*41 entries — 24 open, 17 resolved.*
+*44 entries — 27 open, 17 resolved.*
 
 ---
 
@@ -219,6 +219,35 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 > **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
 
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
+
+### NR-1064 — Sprint 57 doc sweep: readings taken on your behalf re-subjecting ~60 docs to nations
+*decision · raised 2026-10-23 · from sprint 57 doc sweep (four lanes, main session review)*
+
+Taken in band while re-subjecting the corpus to 'nations own everything'. ECONOMY: FINANCE drops the '<5% of a median firm's income' anchor and the [in debt] flag; glut clearing rests on idling (no building-exit rule); the tariff triggers on the convoy's OWNING nation; MARKETS' listed value retires with no replacement; generated Marketplaces may now land on the player's ground; opening stock falls back to the capital's market where it used the HQ's; POPULATION's labour share stays the share of building count; CONTRACTS keeps no live form between nations. GENERATION: CORPORATION_GENERATION retitled Industry Generation; a charter is a priced set of buildings owned by the centre's nation; per-firm capital no longer sizes opening stock; focus is kept per charter, region-derived; INDUSTRIALISATION's listed value sums building book value. UI: slot 1 renamed 'Nation overview'; the stance ledger (slot 8) retires rather than re-subjecting; the Selection band rests on the player's nation; acquisitions.md keeps its body under a retirement banner. AI/MISC: PEOPLE's company head becomes the nation's Head; RELATIONS keeps only nation-nation stance and retires reputation and the equity_taken / levy_charged / lobbied_against factors; a garrison is drawn into battle by declared nation stance; MILITARY's base is the nation's own build. Main session: 'no capital starts dark' stands, paid from the nation's whole treasury (LOGISTICS).
+
+**Why it matters.** Each is a faithful reading, but together they re-shape a lot of prose at once; any one you would rule differently is cheap to change before the code lanes build against it.
+
+*Files: `docs/economy/FINANCE.md`, `docs/economy/MARKETS.md`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/ledgers/corporation.md`, `docs/politics/RELATIONS.md`, `docs/PEOPLE.md`, `docs/military/MILITARY.md`*
+
+### NR-1065 — Too many majors: the poorest surplus major is DEMOTED to a minor, not folded into another
+*decision · raised 2026-10-23 · from sprint 57 doc sweep, main session correction*
+
+The 2026-10-11 reconciliation folded the poorest major's SPECIALISTS into the richest major's champion; ground never moved. With no corporations there is nothing to move, so the faithful reading is a demotion: the poorest surplus major becomes a minor and keeps its ground and buildings, and the nation total is untouched. A lane had written it as a territorial fold, which would have cut the nation count by one outside the total's reconciliation; corrected in NATION_GENERATION.md and NATIONS.md § Own ground. BL-1404 (generation buys for nations) builds it.
+
+**Why it matters.** It decides whether reconciling the major count can ever change the map.
+
+*Files: `docs/generation/NATION_GENERATION.md`*
+
+### NR-1066 — Six questions the sweep could not settle once corporations retired
+*question · raised 2026-10-23 · from sprint 57 doc sweep*
+
+(1) EMBLEMS: PROFILE.md and ICONS.md now key the player's emblem by nation id, which sits against ICONS' own 'no nation flags' rule - keep a corporate-style emblem for the nation, or no emblem. (2) EMBARGO: what an embargo between nations gates, now there is no procurement between firms (RELATIONS.md open question 4). (3) DISCLOSURE: may the player read a rival nation's quarterly return or treasury (FINANCE.md § Disclosure; RELATIONS open question 5). (4) WORKS LEAN: INDUSTRIALISATION's Private Works vs State Arsenal fork has no subject - derive it some other way, or retire it. (5) INDUSTRIAL FOCUS: whether a nation's build scorer keeps a focus weight (AI_OPPONENT ~789) or it retires with the specialist. (6) INDUSTRY LENS: re-subjected to 'plants of nations other than the player's' - keep, or retire.
+
+**Why it matters.** Each is a design hole the removal opened; none blocks BL-1399..BL-1404, but (3) and (5) shape the AI and UI lanes.
+
+> **Recommendation:** (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) retire; (5) keep focus as the nation's economic_focus; (6) keep.
+
+*Files: `docs/ui/PROFILE.md`, `docs/politics/RELATIONS.md`, `docs/economy/FINANCE.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ai/AI_OPPONENT.md`, `docs/ui/LENSES.md`*
 
 ---
 

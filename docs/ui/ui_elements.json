@@ -1360,7 +1360,7 @@
    "kind": "view",
    "parent": "UI-078",
    "source": [
-    "docs/ui/ledgers/corporation.md § Sub-levels",
+    "docs/ui/ledgers/corporation.md § Slot 1 — the Nation overview",
     "docs/politics/RELATIONS.md § 1 Stance"
    ],
    "summary": "The ledger's single view: rows filed under Friends / Hostile / Neutral by the stance tables, in a sorted entity-id walk within each group. A row expands to its action strip, which carries Declare Hostile (with an inline confirm), Offer / Accept Friendship and Return to Neutral at the strip's full width. A press that changes stance moves the row between groups on the next frame.",

@@ -69,8 +69,26 @@
   "**Sprint-number ceiling advanced to 35 (Ben, 2026-09-08: “We will open sprint 35 looking at the startup budget”).** The 2026-08-24 ceiling stands in spirit — author no sprint past the one Ben opens — with 35 now the horizon. One sprint is open, well inside the three-sprint cap. This is the first sprint authored after the same day's board clear, and it is deliberately four items: the board was emptied because too many items hung off sprint plans that should have been better planned, so the corrective is fewer items with their preconditions stated, not the same list under a new number.",
   "**The startup-budget chain is dropped outright (Ben, 2026-09-08): “drop it — a watched wait needs no budget”.** Sprint 35 was authored that morning around the 72–73 s warm start and re-authored the same day around generation visibility. BL-813/814/815 are deleted under the 2026-08-24 unstarted-plans policy. The ruling is not that startup time stopped mattering — it is that a wait the player is WATCHING is content rather than cost, so the obligation moves from a stopwatch to whether the thing on screen is worth looking at."
  ],
- "sprints": [],
- "next_up": "SPRINT 53 CLOSED 2026-10-15, cut as v0.1.32. SPRINT 55 next: spectator to the end of Era 1 (BL-1324..BL-1333). Handoff: docs/development/NEXT_SESSION.md.",
+ "sprints": [
+  {
+   "id": "57",
+   "theme": "nations own everything",
+   "state": "open",
+   "status_line": "OPEN 2026-10-23. Design written into GLOSSARY, CONCEPT, NATIONS, AI_OPPONENT 11 and the sibling sweep; nine items cut.",
+   "opened_date": "2026-10-23",
+   "author": "Ben (2026-10-23)",
+   "goal": "Corporations and companies are gone: every nation owns and builds every building on its own ground, majors and minors build through the scorer, the player builds its own, and corporation_component is deleted.",
+   "planned": [
+    "WAVE 1 - SEAM. BL-1399 (nation builds own ground), then BL-1401 (nation AI actor), then BL-1402 (fold to ground).",
+    "WAVE 2 - PARALLEL. BL-1403 (nation money flows), BL-1404 (generation buys for nations), BL-1405 (LP one class), BL-1406 (UI and protocol as nation).",
+    "WAVE 3 - DELETE. BL-1407 (delete corporation_component), then BL-1408 (sprint 57 re-bless)."
+   ],
+   "risk": "The largest change in the project: every gate and digest moves, the save format bumps twice, 95 harnesses reference the deleted type. Ben chose the hard delete in one sprint over a staged one (2026-10-23).",
+   "done_when": "No corporation_component in src or tools; every building on its owner's ground; minors and majors build; the player's nation is never built for; a v54 save loads; the load-bearing gates run and report; one re-bless on Ben's go.",
+   "notes": "Rulings 2026-10-23: every nation one owner (then no corporations at all), legacy path retired, territory binds everyone incl. state, unowned ground closed, one road crossing in, ground carries its buildings, buyout retired, hard delete, only the player builds for itself, AI grant majors and minors, tax from wages, tariff on foreign goods entering."
+  }
+ ],
+ "next_up": "SPRINT 57 OPEN 2026-10-23: nations own everything (BL-1399, BL-1401..BL-1408). Worklist: docs/development/REFINED.md.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]

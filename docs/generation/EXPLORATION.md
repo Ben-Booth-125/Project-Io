@@ -111,7 +111,7 @@ it earns nothing, and a market on a busy line earns in proportion to the line
 
 **SETTLED (Ben, 2026-09-11): this phase carries a SCARCITY SIGNAL, not a price.** One integer per
 good per market — how badly this market wants this good — with no clearing, no order book and no
-firm. Industrialisation resolves signals into prices; this phase only says what is wanted and how much.
+building. Industrialisation resolves signals into prices; this phase only says what is wanted and how much.
 
 **This is what keeps `CIVILISATION.md`'s boundary from drifting.** That doc's markets at the close
 are *a place and a visible condition, not an order book*, and a price in this phase would quietly
@@ -482,7 +482,9 @@ hugging the shortest line between two shores.
 function (`../economy/LOGISTICS.md` § 1). A convoy between a colony's market and its metropole's
 is cheaper than one to a stranger's, so a colony's chains close through its metropole *first*
 without anyone naming a preferred seller — the landed price says so. The same discount widens
-**placement reach** across the lane, so a firm on one shore can legally hold a site on the other.
+**placement reach** across the lane, so a site on one shore counts as within reach of a chain on the
+other — a building still stands only on its own nation's ground (Ben, 2026-10-23;
+`../politics/NATIONS.md` § Own ground).
 That is a wider effect than a market preference and it is the intended one: a tie that only moved
 prices would be invisible to the search, and a search that cannot see roads cannot see lanes.
 
@@ -862,10 +864,12 @@ reason the ratio replaced the original one-way reading.
 saturated web of companies and corporations... the main levers we pass are going to be about how
 much of easily accessible resource has been actually spent, and what prices different goods have,
 and what preference different cultures develop for these goods."*
+The companies and corporations are retired (Ben, 2026-10-23); the web is the nations' own buildings
+(`INDUSTRIALISATION.md` § 1), and the levers it reads are unchanged.
 
-- **Treasuries**, one per polity at its capital — the capital a firm will be chartered against.
+- **Treasuries**, one per polity at its capital — the capital a nation's industry will be chartered against.
 - **Scarcity signals**, per good per market — what Industrialisation resolves into prices. Not prices.
-- **Trade flows**, per seller, buyer and good — the trade relationships a firm inherits.
+- **Trade flows**, per seller, buyer and good — the trade relationships a nation inherits.
 - **Corridor throughput** — which lines carry volume, and at which rung of the road ladder.
 - **Cultural good preference** — the demand shape a price field resolves against.
 - **The overlord graph** — who holds whom, and on what tribute terms.

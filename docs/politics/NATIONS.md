@@ -5,8 +5,8 @@
 > which direction it points · what a nation may do, what it does each tick, and in what order it
 > spends · what a nation wants · what separates a major nation from a minor one.
 > **Not here:** how a nation comes to exist — territory placement, resource profile, character,
-> naming (NATION_GENERATION) · which quantity says how a nation reads a corporation (RELATIONS) ·
-> the predicate/effect substrate a law is composed from (META_LAYER) · a corporation's own money loop
+> naming (NATION_GENERATION) · which quantity says how one nation reads another (RELATIONS) ·
+> the predicate/effect substrate a law is composed from (META_LAYER) · the money loop's flows
 > (FINANCE).
 > **Confused with:** generation/NATION_GENERATION.md, politics/RELATIONS.md, META_LAYER.md.
 
@@ -23,8 +23,8 @@ what it does afterwards.** Where they disagree about a field, generation wins on
 this doc wins on what it means.
 
 § Settled records Ben's rulings of 2026-08-22, which closed the six questions this document
-originally posed and added a system — the lobbying/budget channel — that he raised in the same
-session. The mechanism design for that channel lives in its backlog items; the rulings live here.
+originally posed and added a system — the lobbying/budget channel, retired 2026-10-23 — that he
+raised in the same session. The mechanism design for that channel lives in its backlog items; the rulings live here.
 
 ---
 
@@ -34,102 +34,83 @@ A nation is a **territorial polity** in the campaign era. It owns tiles, it has 
 holds money, it states what it cares about, and it is the only actor that can author law.
 
 **The player is a nation (Ben, 2026-10-10; `docs/CONCEPT.md` § Player identity).** The player
-plays one **major** nation and operates its **champion** corporation. For its own nation the player
-is the legislator: it sets the budget weights, the tariffs and the law that `nation_ai` sets for a
-rival. For every other nation it is what a corporation always was here — the thing whose rules its
-champion operates inside, routes around, pays to have changed, or prices in.
+plays one **major** nation. For its own nation the player is the legislator and the builder: it sets
+the budget weights, the tariffs and the law that `nation_ai` sets for a rival, and it builds and runs
+every building on its ground (Ben, 2026-10-23). For every other nation it is a neighbour — one it
+trades with, tariffs, and may fight.
 
 ### Major and minor nations — two depths of one actor
 
-A **major** nation holds a champion when generation ends; a **minor** nation is every other one
+A **major** nation is one generation raises to a full actor; a **minor** nation is every other one
 (`docs/GLOSSARY.md` § Major nation; the counts are generation's,
-`docs/generation/NATION_GENERATION.md` § The nation count is a target). The split is the
-corporation/firm split applied to nations: the majors are the full actors, the minors are the
-cheap backdrop that is traded with and fought over.
+`docs/generation/NATION_GENERATION.md` § The nation count is a target). The majors are the full
+actors, the minors the cheaper backdrop that is traded with and fought over.
 
 - **A major runs the whole of this document.** Treasury, budget, law, tariff, the nation step, the
-  scorer of § 5, and one champion on its ground. The player's major is the same object with the
-  scorer switched off for it (§ What a nation does each tick).
+  scorer of § 5, and the build scorer over its own industry. The player's major is the same object
+  with both scorers switched off for it (§ What a nation does each tick).
 - **A minor runs shallow (Ben, 2026-10-10).** It holds a treasury, sets budget weights and tariffs,
-  and is re-scored on a slower cadence than a major. It hosts **no champion and no specialist**.
-  It enacts no law of its own beyond what generation leaves it. It owns tiles and garrisons, so it
-  can be traded with, conquered and lobbied like any nation.
+  and is re-scored on a slower cadence than a major. It enacts no law of its own beyond what
+  generation leaves it. **It builds its own economy** on its own ground under the same build scorer
+  as a major (Ben, 2026-10-23; `../ai/AI_OPPONENT.md` § 11). It owns tiles and garrisons, so it can
+  be traded with and conquered like any nation.
 
-It is also **not** a corporation. The two are different kinds of object with different faculties,
-and the distinction is load-bearing:
+| | A nation |
+|---|---|
+| Owns | **tiles**, and **every building on them** — never goods: what it makes is sold onto a market's shelf |
+| Money | `treasury`: its buildings' sales land in it, and their inputs, wages and maintenance are paid from it |
+| Acts through | the **national budget** — a weight vector over priority lines — and its **build verbs** |
+| Decides | `nation_ai` for the budget and the build scorer for its industry, on the staggered cadence; the player for its own nation |
+| Objective | **positional** — needed and unthreatened |
+| Can author law | **yes — and only it can** |
 
-| | Corporation | Nation |
-|---|---|---|
-| Owns | buildings and trades — never goods: what it makes is sold onto a market's shelf | **tiles**, for a major its **state industry**, and for a minor its logistics network nodes (§ State industry) |
-| Money | `balance`, spent on the market every tick | `treasury`, spent by direct transfer, on the order book for military equipment, and through its state buildings' own sales and purchases |
-| Acts through | `corp_command`'s verbs | the **national budget** — a weight vector over priority lines |
-| Decides | `corp_ai`, every tick | `nation_ai`, on the same staggered cadence |
-| Objective | profit — accumulative, unbounded | **positional** — needed and unthreatened |
-| Can author law | no | **yes — and only it can** |
+### What a nation owns — every building on its ground (Ben, 2026-10-23)
 
-### State industry — buildings a major owns outright (Ben, 2026-10-11)
+Ben: *"We can remove the corp/company layer entirely. Just have nations building their own
+buildings."* There is no corporation and no company: **a nation owns every building on its ground,
+in every sector**, outright. This overturns the 2026-10-11 split between state industry (a major's
+strategic sectors) and private industry (everything a corporation owned), and with it the rule that
+a nation owns tiles and never buildings.
 
-**Industry is state or private.** **State industry** is a set of buildings a major nation owns
-directly, with no corporation between them and the nation. **Private industry** is every building a
-corporation owns, the champion's included. The two are distinguished by owner, not by recipe: a state
-steel works and a private one run the same recipe under the same rules.
+- **Its money is the treasury's.** A building's sales land in the treasury, and its inputs, wages and
+  maintenance are paid from it.
+- **A losing building idles.** When its costs exceed what the treasury can pay, a building stops
+  producing and paying until the treasury can pay again. The nation never runs into debt. **Network
+  nodes are paid first (Ben, 2026-10-22):** when the treasury cannot pay for everything, its hubs,
+  stations and ports are funded before any other building, so the points its industry produces with
+  come before the industry that draws them.
+- **It builds what it pays for.** Construction is paid from the treasury. A building opens with no
+  stock, so one fed only by trade waits out the haul.
+- **The player's controls** over a building are the building verbs — build, recipe, sell — paid from
+  the treasury. **Workforce is not one of them**: the game steps every building's workforce one 25 %
+  step a quarter toward the most profitable level, a raise taken only when the treasury funds it (Ben,
+  2026-10-14; `../economy/PRODUCTION.md` § Workforce target and the auto-solver).
+- **The player's economy grows only by the player's builds** (Ben, 2026-10-23). Every building it
+  opens with keeps running; nothing builds on its ground for it. A rival nation's builds are its
+  build scorer's (`../ai/AI_OPPONENT.md` § 11).
+- **Rail and stations** are a nation's like everything else (`../economy/LOGISTICS.md` § 4c). Laying
+  track costs the treasury per tile, plus steel per tile, with upkeep per tile.
+- **What generation leaves it.** Every building generation places is the nation's whose ground it
+  stands on (`../generation/CORPORATION_GENERATION.md`).
 
-- **Which sectors.** State industry is the strategic sectors only: **energy, steel, arms, transport
-  infrastructure, and space**. Everything else is private.
-- **Which nations.** Majors only, with one exception. A minor's industry stays with private background
-  firms. **The exception is its logistics network nodes: a minor may own its Logistic Point sources —
-  hubs, stations and ports — as the state (Ben, 2026-10-22).** Generation stands a source on every
-  capital and covers every market centre (`../economy/LOGISTICS.md` § Where generation puts the
-  sources), and most minors have no firm to hold them. These nodes are paid from the minor's
-  treasury exactly as a major's state buildings are.
-- **Its money is the treasury's.** A state building's sales land in the treasury, and its inputs,
-  wages and maintenance are paid from it. This widens the treasury's touch on the market beyond
-  military equipment, for these buildings and these goods only.
-- **Fixed for the prototype.** Nothing moves between state and private in play; nationalising and
-  privatising are later verbs.
-- **Who runs it.** The player runs its nation's state industry and its champion side by side —
-  critical sectors like steel, railway and space alongside the champion's private book. A rival
-  major's state industry runs under the same scored layer as its champion
-  (`../ai/AI_OPPONENT.md` § 11).
+### Own ground — a nation builds only on its own tiles (Ben, 2026-10-23)
 
-This overturns, for a major's state industry only, the rule that a nation owns tiles and never
-buildings.
+**A nation builds only on its own ground**: never on another nation's tiles, and never on ground no
+nation owns. The rule binds every building a nation may place — production, logistics sources
+(hubs, stations, ports) and rail alike.
 
-**How it comes to be, and how it runs (Ben, 2026-10-13):**
-- **Handed over at the fold.** The strategic-sector buildings that background firms placed on a
-  major's ground pass to the nation; the firms keep their other holdings. The champion's buildings
-  stay the champion's, whatever their sector — only background firms' strategic buildings pass.
-- **Every major founds one if it has none to take over (Ben, 2026-10-14).** A major with no
-  strategic plant to inherit founds one at the fold, paid from its treasury and recorded like a state
-  charter, so every major opens with state industry to run. It founds **nearest its feed**, the
-  charter's own order (`../generation/CORPORATION_GENERATION.md`, "the recipe bends before the
-  building goes"): first where its own market makes every input, then where the chain runs by
-  reach, then anywhere on its ground. A founded plant opens with no stock, so one fed only by trade
-  waits out the haul.
-- **A major's coastal seat has a state port (Ben, 2026-10-14).** Transport infrastructure is a
-  strategic sector, so a major whose capital stands on the coast holds a port as state industry, with
-  the trade machinery a port needs carried by the state.
-- **A losing building idles.** When its costs exceed what the treasury can pay, a state building
-  stops producing and paying until the treasury can pay again. The state never runs into debt.
-  **Network nodes are paid first (Ben, 2026-10-22):** when the treasury cannot pay for everything,
-  its hubs, stations and ports are funded before any other state building, so the points its
-  industry produces with come before the industry that draws them.
-- **A minor's state port trades like a major's (Ben, 2026-10-22).** A port generation stands on a
-  minor's coast to bridge its ground is the minor's own, and it trades from the minor's treasury
-  exactly as a major's state port does.
-- **The player's controls** over a state building are a corporation's building verbs — build,
-  recipe, sell — paid from the treasury. **Workforce is not one of them**: the game steps a
-  state building's workforce as it steps the player's own, one 25 % step a quarter toward the most
-  profitable level, a raise taken only when the treasury funds it (Ben, 2026-10-14;
-  `../economy/PRODUCTION.md` § Workforce target and the auto-solver).
-- **Rail and stations** are state industry too (`../economy/LOGISTICS.md` § 4c). Laying track costs
-  the treasury per tile, plus steel per tile, with upkeep per tile.
+- **A road is the one reach across.** It may be laid one crossing *into* foreign ground, so that two
+  nations' networks can join; never laid *from* foreign ground (`../economy/LOGISTICS.md` § 4).
+- **Ground that changes hands carries its buildings.** When a tile passes to another nation — by
+  conquest — every building on it passes to the new
+  nation with it. A building is therefore always on its owner's ground.
+- **Trade still crosses borders.** A nation sells onto any market its shipments reach and buys from
+  any shelf; only placement is bounded. A foreign nation's goods entering a market pay that market
+  nation's import tariff (§ The import tariff).
 
-That table is the whole of this document in miniature. A nation has the two faculties a
-corporation lacks — territory and legislative authority — and it touches the market for two things
-only: the equipment its units carry (§ 2. Conservation), and, for a major, what its state buildings
-buy and sell (§ State industry). Every other credit that leaves it lands on a named corporation's
-balance.
+That is the whole of this document in miniature. A nation has territory, legislative authority and
+all the industry on its ground, and it touches the market through what its buildings sell and buy,
+and through the equipment its units carry (§ 2. Conservation).
 
 ---
 
@@ -162,8 +143,8 @@ trailing window in play and over output capacity at the seeded price field at th
 (`../generation/INDUSTRIALISATION.md` § 5. Wealth inequality, market cap and GDP).
 
 **GDP per head is the axis of inequality between nations**, and output per centre is the axis
-within one. Neither is a household measure, and neither feeds the treasury — a levy does
-(§ 2). GDP says how much a nation makes; the treasury says how much the state holds.
+within one. Neither is a household measure, and neither feeds the treasury — the nation's
+own buildings' sales do (§ 2). GDP says how much a nation makes; the treasury says how much the state holds.
 
 **A regime field sits beside the three character fields** as a stub, derived at the epoch from the
 Works fork, charter reach, subject history and whether the polity fought a world war
@@ -176,23 +157,23 @@ deliberately, since a treasury that started full would be a balance change smugg
 field. **Generation itself is ruled to credit it before the campaign tick ever runs** (Ben,
 2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape:
 the Exploration span's 1660 polity treasury, folded across the handoff through one stated
-per-mille (BL-975, 2026-09-15). The rule above is about the ONGOING campaign tick: nothing but the levy,
-the tariff, the tax and the budget outflow may ever move this field once play starts.
+per-mille (BL-975, 2026-09-15). The rule above is about the ONGOING campaign tick: once play starts,
+only the nation's own buildings' flows, the tariff, the tax and the budget outflow move this field.
 
-Three flows credit it; one pass debits it.
+Its buildings' market flows credit and debit it (§ What a nation owns). Beside them, two flows
+credit it and one pass debits it.
 
 | Flow | Direction | Where |
 |---|---|---|
-| **Extraction levy** | in | `apply_budget`, `budget_system.cpp` |
-| **Import tariff** | in | the clearing tick, `market_clearing.cpp` |
-| **Tax** | in | each quarter, a share of home firms' operating profit (§ Taxes and Discontent) |
+| **Import tariff** | in | the clearing tick, `market_clearing.cpp` — paid by the foreign nation whose goods enter |
+| **Tax** | in | each quarter, the tier's share of the wages the nation pays (§ Taxes and Discontent) |
 | **The national budget** | out | `run_national_budget`, `nation_budget.cpp`, called from `run_nation_step` |
 
-All three are **transfers, not mints**: the payer is debited exactly what the payee is credited, in
-the same float and the same tick. The levy's conservation is asserted by
-`tools/verify/law_author_harness.cpp`; the tariff's by `tools/verify/money_conservation.cpp`; the
-budget's by `tools/verify/nation_budget_harness.cpp`, which proves the distinction between
-bit-exact transfer and the destination's own float rounding rather than assuming it.
+The tariff is a **transfer, not a mint**: the importing nation is debited exactly what the market
+nation is credited, in the same float and the same tick, asserted by
+`tools/verify/money_conservation.cpp`. The budget's spend is asserted by
+`tools/verify/nation_budget_harness.cpp`. The **extraction levy** retires (Ben, 2026-10-23): it
+charged a firm for what it extracted on a nation's ground, and a nation charging itself moves nothing.
 
 The treasury crosses the serialisation seam in `world_save.cpp`'s nation record, and `state_hash`
 folds every treasury — in ascending nation id — whenever any nation's is non-zero, together with
@@ -218,9 +199,9 @@ indexed by them):
 | `academic_research` | the civil tech ladder — treasury the line spends converts to the nation's research points (`../economy/RESEARCH.md` § Research points) |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
 | `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
-| `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
-| `public_works` | works a corporation builds and the nation pays for |
-| `charters` | paying a corporation to exist somewhere it otherwise would not |
+| `strategic_reserve` | buying goods to **hold**, off a market's shelf. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
+| `public_works` | **retired** (Ben, 2026-10-23): it paid a corporation to build works; the nation builds its own |
+| `charters` | **retired** (Ben, 2026-10-23): it paid a corporation to exist; there are none |
 | `space_programme` | government satellite launches — `spacecraft_components` and `propellant`, bought through the procurement seam and **consumed** (a terminal sink: the satellite launched). The first buyer for space goods that is not a militia contract, and the state's own stake in the gate into space (BL-644) |
 
 The first five are Ben's (2026-08-22); the next four were proposed alongside them and accepted;
@@ -229,8 +210,8 @@ The first five are Ben's (2026-08-22); the next four were proposed alongside the
 **Two of these lines are how a NATION becomes a demand channel** ([`MARKETS.md`](../economy/MARKETS.md)
 § Demand channels). `strategic_reserve` already names goods-buying and no consumer claims on it yet;
 `space_programme` is the new one. State demand behaves unlike household demand and that is
-deliberate — it arrives in lumps, it follows a weight a rival can lobby to move, and it is therefore
-worth playing *politics* over rather than merely scaling into.
+deliberate — it arrives in lumps and follows a weight the nation sets, so a rival's demand can be read and
+anticipated rather than merely scaled into.
 The spend mechanics are generic over the enum, and a line no consumer claims on is simply skipped.
 (`logistics_maintenance` also buys goods, but it funds the **Infrastructure** channel, not the
 State one — its demand scales with network size, not with treasury × weight; the weight only
@@ -250,28 +231,27 @@ channel). The same state-purchase shape as the space programme below, with one d
 difference: the claim is **unearmarked**, so rule 3's pro-rata fill applies — upkeep is continuous,
 and half the repair budget meaningfully buys half the materials, where rule 3a's lump exists for
 purchases a fraction of which buys nothing. The materials are bought off a market's shelf at its
-posted price, under the fair-price ceiling, and consumed; the supplier is always a market, never a
-corporation (`../economy/MARKETS.md` § The shelf economy).
+posted price, under the fair-price ceiling, and consumed; the supplier is always a market
+(`../economy/MARKETS.md` § The shelf economy).
 
 `space_programme`'s consumer is `derive_space_programme_claims` / `settle_space_purchases`
 (`src/world/space_programme.{hpp,cpp}`): the state buys its lump **off a market's shelf** — the
 lowest-id market whose shelf holds the most of the good, at least a whole lump, at a posted price
 the fair-price ceiling admits — pays the posted price as a direct, whole-or-nothing treasury debit,
 and the goods leave the shelf **without landing anywhere** — state demand is terminal. The supplier
-is always a market: a corporation holds no stock (`../economy/MARKETS.md` § The shelf economy), and
+is always a market: no actor holds stock (`../economy/MARKETS.md` § The shelf economy), and
 whoever stocked the shelf was paid when the goods landed. The lump sizes are data
 (`economy.space_programme`, scripts/economy.lua).
 
 ### Taxes and Discontent (Ben, 2026-10-16)
 
-**A nation taxes its home firms at a tier, I to V.** Each quarter it takes the tier's share of the
-**operating profit** every corporation headquartered on its ground made that quarter — what it
-earned less what it spent, floored at zero, so a firm making a loss pays nothing (Ben, 2026-10-16).
-The tax is a **transfer**, debited
-from the firm and credited to the treasury in the same float and tick. The tier rates are dials in
-`scripts/economy.lua`. The player sets its nation's tier on the Budget ledger's Taxes control; a
-rival nation's scorer sets its own, under the 2026-08-18 grant ("a nation setting a tariff or tax
-rate").
+**A nation taxes the wages it pays, at a tier, I to V** (Ben, 2026-10-23: *"Taxes are taken from
+wages, which are also paid for by the nation"*, re-subjecting the 2026-10-16 tax on home firms'
+profit, which had no firm left to tax). Each quarter the tier's share of every wage its buildings
+paid that quarter comes back into the treasury, in the same float and tick. A higher tier therefore
+lowers the nation's net wage bill. The tier rates are dials in `scripts/economy.lua`. The player sets
+its nation's tier on the Budget ledger's Taxes control; a rival nation's scorer sets its own, under
+the 2026-08-18 grant ("a nation setting a tariff or tax rate").
 
 **High taxes breed Discontent, and Discontent costs output.** Every nation carries a Discontent
 reading between 0 and 1. A tier above the middle raises it each quarter; the middle tier holds it;
@@ -293,15 +273,9 @@ A `law` is an id, a `condition_set` predicate, an effect kind, a rate, a resourc
 null or dangling is ill-formed and charges *nothing*. That is defensive by design: an authorless
 charge is money destruction wearing a law's clothes.
 
-Generation seeds exactly one law, in `seed_prototype_laws` (`hard_coded_world.cpp`):
-
-- **`LAW-EXTRACTION-LEVY`** — a per-unit charge on raw extraction output, all resources, rate
-  **1.0 credits per unit** by default, enacted at generation.
-- Its author is **the player corporation's home nation** — chosen so the law binds the player and
-  the ledger's levy line reads non-vacuously from turn one (NR-369). Fallback is the largest
-  territory, ties to the lowest entity id; with no nations, there is no law.
-- Its predicate is an **empty `condition_set`** — unconditional once enacted, which is the common
-  case BL-155 (law/policy surface) names and the always-true degenerate branch of BL-342.
+Generation seeds **no extraction levy** (Ben, 2026-10-23): `LAW-EXTRACTION-LEVY` charged a firm for
+what it extracted on its author's ground, and with no firms the author would charge itself. The laws
+a world opens with are its tariffs (§ The import tariff), authored by its history.
 
 Enactment is **the author nation's act, never a player checkbox.** The Budget ledger's Laws
 section is browse-only and shows each law's author and rate.
@@ -315,42 +289,36 @@ section is browse-only and shows each law's author and rate.
 This is the principle established when price clamps were vetoed on 2026-07-11: a clamp *fights*
 price resolution rather than shifting a flow's cost.
 
-So the levy applies where the flow is **accounted** (`apply_budget`), not where the price is
-**resolved** (`clear_markets`). Extraction output is priced by the market exactly as it would be
-without the law, and the levy is a separate accounted cost.
+So a law's charge applies where the flow is **accounted**, not where the price is **resolved**
+(`clear_markets`). The market stays the only thing that sets prices, and the player sees the charge
+as **its own number**, rather than as an unexplained worse price.
 
-Two consequences, both intended. The market stays the only thing that sets prices. And the player
-sees the tax as **its own number**, rather than as an unexplained worse price.
+**Evaluation is once per law, per tick**, before the money loop reads it. Laws by the same author
+stack additively into one schedule. Ordering is fixed, the function is pure, and the determinism
+invariant holds.
 
-**Jurisdiction bounds who pays.** The levy reaches only output on tiles the author nation owns.
-A corporation extracting outside that territory pays that nation nothing.
-
-**Evaluation is once per law, per corp, per tick** (`evaluate_laws`), before the money loop reads
-it. Laws by the same author stack additively into one schedule. Ordering is fixed, the function is
-pure, and the determinism invariant holds.
-
-**The effect family is an enum.** `law_effect_kind` carries the extraction levy and the import
-tariff. BL-155 (law/policy surface) settles a **four-family taxonomy** — margin modifiers,
+**The effect family is an enum.** `law_effect_kind` carries the import tariff and the retired
+extraction levy. BL-155 (law/policy surface) settles a **four-family taxonomy** — margin modifiers,
 production, permission, relationship — and the enum is the extension point: a new family is an
 enumerator plus a branch in `apply_law_effect`, with no change to the record, the predicate, or the
 seam. The predicate is BL-342's, which already carries military subjects, so nothing in the law
 record assumes an economic subject — a law may change what the player can **field** or must
-**answer to** (BL-094's design test), not only what it earns. Which law classes the company is
-*subject to* — an embargo it must route procurement around, basing rights it must be granted — is
-BL-399 (company answerability).
+**answer to** (BL-094's design test), not only what it earns.
 
 ---
 
 ## The import tariff
 
-`law_effect_kind::import_tariff` is an ad-valorem duty on a sale made **in the enacting nation's
-own market** to a buyer **domiciled elsewhere**. A same-nation sale is charged nothing — a tariff
-that taxed domestic trade would be a sales tax wearing the wrong name.
+`law_effect_kind::import_tariff` is an ad-valorem duty on **a foreign nation's goods entering the
+enacting nation's market**, paid by that foreign nation to the market nation (Ben, 2026-10-23, re-
+subjecting the duty from a buyer domiciled elsewhere, which assumed firms). A nation's own goods in
+its own market are charged nothing — a tariff that taxed domestic trade would be a sales tax wearing
+the wrong name.
 
 Rates from several enacted laws stack additively and clamp to `[0, 1]`, so a stack of laws can
-never charge a buyer more than the goods are worth. The duty is a transfer into the market nation's
+never charge an importer more than the goods are worth. The duty is a transfer into the market nation's
 treasury. It is deliberately **not** folded into `evaluate_laws`, because a tariff is a property of
-a *jurisdiction and a good*, resolved when a trade matches — not a property of a corp. The whole
+a *jurisdiction and a good*, resolved when goods arrive — not a property of a building. The whole
 pass is gated on `any_import_tariff_enacted`, so a world with no tariff law pays nothing for the
 mechanism.
 
@@ -361,8 +329,8 @@ setup from the Era −1 sim's pair outcomes.
 **Its author is the history that produced it.** `seed_national_tariffs` enacts one blanket tariff
 per nation whose inherited protection clears the floor, authored by that nation — so the duty falls
 in the author's own market and credits the author's own treasury, through the single
-`enacting_nation` field the levy already uses. No second author, no branch in `market_clearing`, no
-corp verb and no control: the *only* path that writes a tariff is the handoff out of pre-history
+`enacting_nation` field every law carries. No second author, no branch in `market_clearing`, no
+verb and no control: the *only* path that writes a tariff is the handoff out of pre-history
 (§ 4 Tariffs).
 
 That is what closes the ordering this section used to record. `import_tariff` was **vocabulary ahead
@@ -412,26 +380,24 @@ economic premise already assumes nations that act.
 ## What a nation does each tick — the nation step
 
 `run_nation_step` (`src/world/nation_step.{hpp,cpp}`) is where a nation acts. It runs **after
-`apply_budget`** — the treasury holds this quarter's levy and tariff only then; running it inside
+`apply_budget`** — the treasury holds this quarter's sales, tax and tariff only then; running it inside
 `run_economy_step` would spend last quarter's revenue. Four moves, in order, and each is
 somebody else's machinery:
 
 1. **Score.** `score_national_budgets` returns a weight vector for exactly the nations **due** on
    this economy tick under the staggered cadence (§ What a nation wants). Each returned slot
    overwrites one entry of `w.nation_budgets`; the rest keep last quarter's weights.
-2. **Gather.** This tick's claims come off `economy_report::budget_claims`, emitted earlier in the
-   same tick by `corp_ai`'s cash gate — a rival that wanted to survey a body and could not afford
-   it asks its home nation — plus the state's own `space_programme` purchase claims, derived here
-   (§ A budget: the one line whose claimant is the nation itself, its payee the supplier).
+2. **Gather.** This tick's claims are the nation's own: its survey targets, its upkeep bill and its
+   `space_programme` purchase claims, derived here (§ A budget). The claimant is always the nation
+   itself, its payee a market or its own dispatch.
    Every field of a claim is validated at
    gather time, the line index included: a claim carrying an out-of-range line is dropped whole,
    never clamped onto a line nobody asked for, because the moment a claim arrives over `--serve`
    this is an untrusted input boundary.
 3. **Spend.** `run_national_budget` — the pure pass over (weights, claims).
-4. **Dispatch the earmark** (Ben, 2026-08-23, NR-568). A paid `public_exploration` transfer names a
-   body. The corp is credited exactly `survey_cost(body)` and `dispatch_survey` debits exactly
-   that, the same tick — so the credit never sits on the balance for the corp's next evaluation to
-   spend on a build. A dispatch that cannot proceed (the body was surveyed by someone else this
+4. **Dispatch the earmark** (Ben, 2026-08-23, NR-568). A paid `public_exploration` claim names a
+   body, and `dispatch_survey` spends exactly `survey_cost(body)` of the line's share the same tick —
+   so the money never sits loose for the build scorer to spend. A dispatch that cannot proceed (the body was surveyed by someone else this
    very tick) is recorded on the report as a failed earmark and its credit **clawed back** to the
    treasury — a nation does not pay for a survey that did not start.
 
@@ -448,16 +414,14 @@ between the two, not a second rule.
 
 **The player's nation is never scored (Ben, 2026-10-10).** Its weights are the player's: move 1
 skips it, so no scorer ever writes its slot of `w.nation_budgets`, and the player sets the slot
-through the budget verbs. Moves 2 to 4 are mechanical — they gather the claims the firms on its ground
-filed and pay them over the player's own weights — so the spend is the player's decision carried
-out, not a decision made for it. Under `corp_ai_params::spectating` there is no human, and the
-player's nation is scored like any rival. A subsidy landing on the player's champion is a transfer
-*to* the player, not an action *on* it (NR-569d). The champion is never a claimant, because
-`corp_ai` never scores it.
+through the budget verbs. Moves 2 to 4 are mechanical — they pay the nation's own claims over the player's own
+weights — so the spend is the player's decision carried out, not a decision made for it. Under
+spectating there is no human, and the player's nation is scored like any rival. **Nor does the
+build scorer act for it** (Ben, 2026-10-23): the player's economy grows only by the player's builds.
 
 **The player's verbs are everything the scorer sets (Ben, 2026-10-11).** The player's nation gets
 the four faculties a rival major exercises: **budget weights** over the priority lines, **import
-tariffs**, **law** (§ 4. Law authorship), and **muster** (`../military/MILITARY.md` § The muster
+tariffs**, **law** (§ 4. Law authorship), its **build verbs** (§ What a nation owns), and **muster** (`../military/MILITARY.md` § The muster
 interface). No faculty a rival nation has is withheld from the human, and none is added: stance and
 embargo stay derived and declared as `RELATIONS.md` owns them. Each verb arrives over the AI-facing
 seam as untrusted input (the standing rules' seam rule), and each has an entry in `ACTIONS.json`.
@@ -466,10 +430,10 @@ seam as untrusted input (the standing rules' seam rule), and each has an entry i
 
 Three rules keep the budget honest, each a requirement row in `nation_budget_harness`:
 
-1. **Every credit out is a direct transfer to a named corporation.** Ben: *"Payment to corps is
-   direct and not on the market."* A budget line does not bid, does not clear, and never touches
-   `clear_markets` — it debits the treasury and credits a corporation balance in the same float,
-   the same tick. `nation_budget_result::paid`, `national_budget_tick::total_transferred` and the
+1. **Every credit out is paid to a named payee** — a market's shelf for goods, the research pool, or
+   the nation's own survey dispatch (Ben, 2026-10-23: the corporations the 2026-08-22 rule paid
+   directly are retired). A budget line does not bid and does not clear — it debits the treasury and
+   credits its payee in the same float, the same tick. `nation_budget_result::paid`, `national_budget_tick::total_transferred` and the
    treasury's delta are one accumulation, not three that agree approximately.
 2. **Nations save.** `reserve_fraction` is withheld from the tick's spendable total, and an
    underspent line accumulates rather than evaporating — the only credits that leave are the ones
@@ -485,45 +449,34 @@ Three rules keep the budget honest, each a requirement row in `nation_budget_har
 
    **3a. Earmarked claims are whole or nothing** (Ben, 2026-08-23, NR-568). A claim that names a
    `subject` is not a request for credits; it is a request that one named thing be paid for. A
-   pro-rata partial fill would leave a corp holding a fraction of a survey — a credit that
+   pro-rata partial fill would leave a fraction of a survey — a credit that
    dispatches nothing, exactly the fungible top-up Ben ruled out. So an earmarked claim is paid in
    full when the line's remaining share and the nation's remaining headroom both cover it, and
    otherwise skipped: pay 0, the skip counted on the line (`budget_line_result::skipped`), the line
    flagged `rationed`. Unearmarked claims keep rule 3's partial fill.
 
-An unearmarked transfer is folded onto `report.budgets[corp].subsidies` so the corp's `net()`
-explains the credit. An earmark is not: it leaves the balance where it found it, so it lives on
-`report.earmarks` — the line BL-555 (who is paying me) renders.
+Every paid claim lands on the nation's own quarterly return, so its `net()` explains the debit, and
+an earmark also lives on `report.earmarks`.
 
 **Determinism.** Once per economy tick, over nations in ascending id, over lines in the fixed enum
-order, over each line's claims in ascending (corp id, arrival index). `w.nations` and
-`w.corporations` are unordered maps and float addition is not associative, so every accumulation
+order, over each line's claims in ascending (claimant id, arrival index). `w.nations` is an unordered
+map and float addition is not associative, so every accumulation
 order is pinned. No RNG, no wall clock.
 
 ---
 
 ## Settled — Ben's rulings, 2026-08-22
 
-The six questions this document opened with were settled in one session, together with a system
-Ben raised in the same breath: **a two-way channel between corporations and nations.**
+The six questions this document opened with were settled in one session. Of them, the channel
+between corporations and nations (§ The channel, § 6 to § 8) **retired with the corporations** (Ben,
+2026-10-23); the rest stand.
 
-### The channel — lobbying one way, the budget the other
+### The channel — lobbying one way, the budget the other — **retired** (Ben, 2026-10-23)
 
-Ben: *"each corporation affects the national priorities, laws, and budget... lobbying should be an
-option, however it can also go completely in reverse — perhaps it is still fun to have our
-corporations funded directly via taxes."*
-
-It closes a circuit. The levy and the tariff **fill** a treasury; the budget is the outflow. Money
-makes a full loop — corp → nation → corp — instead of draining into a field no reader could account
-for.
-
-It fits the player identity from both ends. A corporation is a **law subject, never a
-legislator**, which leaves it no lever of its own on the rules it works inside. Lobbying is the one
-mechanism that changes that: **you do not pass the law, you pay someone who does.** The player's
-champion lobbies foreign nations this way. The player's own nation is lobbied in turn by the firms on
-its ground (Ben, 2026-10-10, NR-1026, granted), which is one of the three parties the design test says a nation answers to
-(`docs/CONCEPT.md` § Player identity). The `lobby` verb is the *only* route to influence over a nation, and it
-is owned by BL-539 (lobbying).
+It was a two-way channel between corporations and nations: firms lobbied nations to move their law
+and budget, and nations paid firms through the budget. With no firms, nobody lobbies and nobody is
+paid; the `lobby` verb and its item retire with it. A nation still answers to other nations and to its
+population (`docs/CONCEPT.md` § Player identity).
 
 ### 1. What a treasury is for — **a weighted budget over priority lines**
 
@@ -541,29 +494,18 @@ nation's research points, which buy nodes of the age's tree (`../economy/RESEARC
 Ben: *"Nations should be able to save up, and so should corps. Payment to corps is direct and not
 on the market."*
 
-Two rules follow. **Every nation↔corp flow is a direct transfer** — it debits one balance and
-credits another in the same float and the same tick, never bidding and never clearing. And **both
-sides accumulate**: a nation does not spend to zero, a reserve is held back, and an underspent line
-carries forward.
+**A nation saves**: it does not spend to zero, a reserve is held back, and an underspent line carries
+forward. **Every transfer between actors conserves** — it debits one and credits another in the same
+float and the same tick. Since the corporations retired (Ben, 2026-10-23) the actors are nations
+alone, and the transfers are the tariff (importer to market nation) and the tax (wages back to the
+treasury).
 
-**One exception: a nation buys military equipment on the order book (Ben, 2026-10-10, NR-1028).**
-The nation that musters its own units (`../military/MILITARY.md` § The muster interface) bids for
-their equipment as a real buyer, and its bids clear against the shelf like any other. That purchase
-is a market purchase, not a transfer, so the two rules above do not reach it. Every other
-nation↔corp flow, the space programme's procurement included, stays a direct transfer.
-
-**A second exception: a major's state buildings trade on the market (Ben, 2026-10-11; § State
-industry).** They sell onto a market's shelf and buy their inputs as any corporation's building
-does, with the treasury in place of a balance. Those flows are market flows, not transfers.
-
-The market is otherwise untouched. `clear_markets` is the buyer of every landing and pays its owner with
-nobody's money, and total corporate cash rises and falls every tick by design. The two standards
-are explicitly different things, which is what BL-392's silent value destruction came from
-conflating.
-
-*One consequence, handled: the strategic-reserve line looks like it must buy on the market. It does
-not — it buys through BL-350's procurement seam from a named supplier, so the rule holds and an
-existing mechanism is reused.*
+**The market is the other half, and it does not conserve.** A nation's buildings sell onto a
+market's shelf and buy their inputs as any building does; its units' equipment is bid for on the
+order book as a real buyer (Ben, 2026-10-10, NR-1028). `clear_markets` is the buyer of every landing
+and pays its owner with nobody's money, so total treasury rises and falls every tick by design. The
+two standards are explicitly different things, which is what BL-392's silent value destruction came
+from conflating.
 
 ### 3. The levy rate — **not a number, an anchor**
 
@@ -593,13 +535,12 @@ base prices. We don't have to rederive wages every tick."* Three consequences:
   against it. A class whose equipment is deliberately cheap or dear may sit outside the band and
   say so.
 
-It also sets the **unit upkeep rate** MILITARY.md carries at `0.0`, and turns the levy question
-into a legible one: *this nation's levy funds N units a year.*
+It also sets the **unit upkeep rate** MILITARY.md carries at `0.0`.
 
 *Owned by BL-543 (value anchor). Divorcing the two halves leaves the wage itself unanchored — that
 is BL-544 (unit wage reference), whose likely answer is a multiple of the civilian `base_wage` the
 game already pays. Anchor and upkeep first, re-measure, then rule on the levy — doing both at once
-makes the benchmark uninterpretable.*
+makes the benchmark uninterpretable. The levy itself retired on 2026-10-23.*
 
 ### 4. Tariffs — **directional, and seeded from the pre-history**
 
@@ -671,8 +612,7 @@ that market conditions never come from a term inside an agent.
 Ben: *"Nation objectives should be terrestrial diplomacy. Figuring out which economic niche can be
 well filled, and how to avoid conflict while respecting historical grudges."*
 
-A corporation maximises profit — unbounded, accumulative, identical for every firm. A nation does
-not want to be rich; it wants to be **needed and unthreatened**. `src/world/nation_ai.{hpp,cpp}`
+A nation does not want to be rich; it wants to be **needed and unthreatened**. `src/world/nation_ai.{hpp,cpp}`
 is that objective as a pure, seeded, deterministic scorer over three terms in a fixed order:
 
 - **Niche fit** — complement what the neighbours lack, read as output **shares** so a nation never
@@ -696,60 +636,17 @@ constant lives in `nation_ai_params`; `tools/verify/nation_scorer_harness.cpp` g
 by mutating the thing it reads.
 
 A well-played nation in Io mostly **stays out of fights**. That is unusual for a strategy game and
-is much of the point — nations avoiding each other leaves the Conflict pillar to the companies,
-where the player's champion contests and the player's nation decides how far to back it.
+is much of the point: Conflict lives in the market as much as on the border — in what a nation
+builds, what it ships and what it tariffs — and war is the costly last resort.
 
 *Owned by BL-542 (nation scorer).*
 
-### 6. A nation's stance toward a corporation — **graded, multi-dimensional, derived**
+### 6 to 8. A nation's stance toward a corporation, the political grant, the lobbying fee — **retired** (Ben, 2026-10-23)
 
-Ben: *"Nations should have a stance towards corporations, but this is more like a digital spectrum,
-possibly multiple dimensions, and mostly derived towards who can act internationally in their
-borders."*
-
-It is **not** BL-448's corp-to-corp stance, and differs on each axis Ben named:
-
-| | Corp → corp (BL-448) | Nation → corp (BL-540) |
-|---|---|---|
-| Shape | discrete tri-state | **graded** |
-| Dimensions | one | **two: Access and Trust** |
-| Origin | **declared** — a corp opts in | **derived** — nobody declares it |
-
-The last row is load-bearing. Hostility is a state a corp opts into and *"may never acquire
-ambiently"* (Ben, 2026-08-17). A nation's stance is the opposite by construction: a **read** of
-what a company has actually done inside the jurisdiction, recomputed from public facts, never
-stored as a flag. Access and Trust are the two dimensions of the sentiment substrate at
-nation→corp grain (`docs/politics/RELATIONS.md` § The settled model), not a table of their own.
-
-**Access** gates who may operate inside the borders — the dimension Ben named, and the first
-place Io gates placement on a political fact rather than a physical one. **Trust** is the
-dimension **BL-377 (mercenary contract seam) rides**: a mercenary company's client relationship
-lives here rather than on a parallel axis invented for it.
-
-*Owned by BL-540 (nation→corp stance).*
-
-### 7. The grant reaches a rival acting politically against the player — **granted** (NR-517)
-
-A rival lobbying to shift a law that binds the player's corp, or a nation gating the player out
-of a territory, is a consequence imposed on **a corp a human owns** — the BL-450 class of widening,
-which needs an explicit dated grant rather than a reading of the 2026-08-18 nation grant as
-already covering it. Ben granted it on the same terms: deterministic, seeded, scored-utility,
-legal verbs only, never a planner. A rival may **lobby** a nation against the player, and a
-nation's derived stance may **gate the player's corp** out of a territory. It is recorded as a
-dated widening in `.claude/rules/io-standing-rules.md`.
-
-**What the grant does not admit:** a rival *enacting* law — only a nation can — and influence
-acquired by any route other than the `lobby` verb.
-
-### 8. A lobbying fee is **consumed** (NR-517)
-
-A cost, not a transfer. The treasury's inflows stay purely legal — levy, tariff, charter fees — and
-**a nation never profits from being lobbied**. The reason is the scorer: a nation that profited
-from lobbying would have an incentive to be corruptible. Transferred would also make lobbying a
-second tax.
-
-This is the one flow in the corp↔nation channel that deliberately does **not** conserve, and the
-harness must say so where a reader would otherwise assume the channel's rule.
+Each was a relation between a nation and the firms on its ground: a derived Access/Trust stance
+toward a corporation (BL-540), the grant letting a rival lobby or gate the player's corporation
+(NR-517), and the consumed lobbying fee. With no corporations they have no subject. A nation's read
+of another nation is `docs/politics/RELATIONS.md`'s.
 
 ---
 
@@ -762,7 +659,6 @@ harness must say so where a reader would otherwise assume the channel's rule.
 | The authored budgets | `src/world/world.hpp` § `nation_budgets` |
 | The law object, evaluation, tariff rates | `src/world/law.{hpp,cpp}` |
 | The predicate every law reads | `src/world/condition_set.{hpp,cpp}` |
-| The levy transfer | `src/world/budget_system.cpp` § `apply_budget` |
 | The tariff transfer | `src/world/market_clearing.cpp` |
 | The budget pass | `src/world/nation_budget.{hpp,cpp}` § `run_national_budget`, `budget_priority` |
 | The scorer | `src/world/nation_ai.{hpp,cpp}` § `score_national_budgets`, `nation_ai_params` |
@@ -773,16 +669,15 @@ harness must say so where a reader would otherwise assume the channel's rule.
 | Checks | `tools/verify/law_harness.cpp`, `law_author_harness.cpp`, `money_conservation.cpp`, `nation_budget_harness.cpp`, `nation_scorer_harness.cpp`, `nation_wiring.cpp` |
 
 **Related authorities.** `docs/generation/NATION_GENERATION.md` (how a nation is made),
-`docs/economy/FINANCE.md` (the money loop the levy is accounted in), `docs/economy/MARKETS.md`
-(§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment, the substrate
-nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Explicitly out of scope, the sell side
+`docs/economy/FINANCE.md` (the money loop a law's charge is accounted in), `docs/economy/MARKETS.md`
+(§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment between nations), `docs/economy/CONTRACTS.md` (§ Explicitly out of scope, the sell side
 the `contracted_force` line would buy through), `docs/military/MILITARY.md` (§ Nation garrisons, the
 `military_research` line's other consumer), `docs/SYSTEMS.md` (§ Policy, § Conditions),
 `.claude/rules/io-standing-rules.md` (the grant's exact terms).
 
-**Owning items.** BL-539 (lobbying), BL-540 (nation→corp stance), BL-541 (directional tariffs);
+**Owning items.** BL-541 (directional tariffs);
 BL-543 (value anchor) and BL-544 (unit wage reference) for the price anchor; BL-155 (law/policy
-surface) for the four-family taxonomy and the ten-law list; BL-186 (laws ledger UI); BL-399
-(company answerability); BL-555 (who is paying me) for the earmark surface; BL-572 (contract
+surface) for the four-family taxonomy and the ten-law list; BL-186 (laws ledger UI); BL-555 (who
+is paying me) for the earmark surface; BL-572 (contract
 offers) for the `contracted_force` line's derivation; BL-571 (nation garrisons) for the
 `military_research` line's garrison-upkeep consumer.

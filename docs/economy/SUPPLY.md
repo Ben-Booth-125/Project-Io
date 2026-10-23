@@ -123,7 +123,7 @@ For **space legs**, `distance` is the Euclidean distance between the parent bodi
 
 The cost is charged in full when the shipment leaves (`commit_trade_shipment` charges the trader before the convoy is created; a trader that cannot afford the cheapest route ships nothing). It is the term that makes distant arbitrage marginal: a profitable trade requires `source_price + logistical_cost_per_unit < destination_price`.
 
-**Logistics-node discount** (BL-148 / BL-149, logistics nodes). The intra-body haul cost is further discounted for each **logistics node** the A\* path crosses, so the world's cities — and the player's own hubs — form a cheap network the specialist corporation plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (the leg pricing, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
+**Logistics-node discount** (BL-148 / BL-149, logistics nodes). The intra-body haul cost is further discounted for each **logistics node** the A\* path crosses, so the world's cities — and the player's own hubs — form a cheap network a nation's trade plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (the leg pricing, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
 
 **A same-body leg runs market centre to market centre** (`price_market_leg`): from the source
 market's `centre_tile` — the goods were bought off its shelf — to the destination's `centre_tile`,
@@ -166,7 +166,7 @@ without reaching a shelf.
    anchor alone (Ben, 2026-10-23, NR-1060; [LOGISTICS.md](LOGISTICS.md) § A shipment draws points
    again). Trade points are the owner's capacity; Logistic Points are the place's; a
    shipment passes both (`TRADE.md` § The Planetary Marketplace).
-4. **It pays the haul now.** The trader's balance is charged the leg's cost when the shipment
+4. **It pays the haul now.** The trading nation's treasury is charged the leg's cost when the shipment
    leaves (§ Logistical cost). A trader that cannot cover the haul and the purchase ships nothing.
 5. **It travels as a convoy** on the lane the haul was priced on, seen and interdicted along it.
 6. **It lands and sells at the destination** on arrival, at that tick's clearing price, and pays

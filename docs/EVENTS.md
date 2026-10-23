@@ -89,7 +89,7 @@ same rung feel different on a second campaign** — and the game's stated target
 many campaigns, where a fixed sequence stops paying long before that. The bound (Ben, 2026-08-22):
 **variance in texture, never in the sequence itself.**
 
-**What it opens.** Reasons to hold reserves. Reasons for a market to move that no corporation
+**What it opens.** Reasons to hold reserves. Reasons for a market to move that no nation
 chose. A use for slack the optimiser would otherwise remove.
 
 **What it caps you at — and this is a real risk.** An event system with no ceiling is a difficulty
@@ -108,7 +108,7 @@ See § What must not happen.
         weight      relative likelihood, once eligible
         cooldown    ticks before it — or the chain it belongs to — may fire again
         effect      one or more scalar_modifiers, and/or a named consequence
-        scope       WHO it happens to — a corp, a nation, a body, a province
+        scope       WHO it happens to — a nation, a body, a province
         choice      a bounded set of responses, each with a priced outcome
         successor   the event this one may chain into
         text        what the player is told
@@ -126,8 +126,8 @@ hydrology and deposits, all generated. Effects land on `extraction_rate`, the mo
 Effects land on price, or on a contract's terms. Riskiest to balance, because the economy is
 already the most tuned part of the game.
 
-**3. Political** — a law enacted, a tariff raised, a grudge remembered. BL-537's national budget,
-BL-539's lobbying and BL-541's directional tariffs all produce discrete, dateable changes a player
+**3. Political** — a law enacted, a tariff raised, a grudge remembered. BL-537 (national budget) and
+BL-541 (directional tariffs) both produce discrete, dateable changes a player
 should be **told about**. **An event is the notification layer those systems need**, and that half
 is arguably not "random" at all.
 
@@ -211,7 +211,7 @@ elsewhere — which is why ruling them cost nothing and leaving them open cost a
 - **No event may be purely negative.** A system that only takes is a tax with a story. Ben's
   interconnectivity ask — *"a player only progresses so far using one system before the next becomes
   a natural consequence"* — argues that the best events **open a door rather than close one**: a
-  shortage that makes a trade route worth building, a succession that makes a nation lobbyable.
+  shortage that makes a trade route worth building, a succession that turns a neighbour's stance.
 - **No event may bypass the fog.** What a player is told about a rival must respect BL-068.
 
 ---

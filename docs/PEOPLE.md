@@ -18,13 +18,12 @@ the calls. Owned by BL-547 (named people and roles).
 
 ## The claim
 
-Every quantity in Io is held by an institution. A corporation has a balance, a nation has a
-treasury, a unit has a strength. **Nobody holds anything.**
+Every quantity in Io is held by an institution. A nation has a treasury and the buildings on its
+ground, a unit has a strength. **Nobody holds anything.**
 
 That is defensible for an economy and it becomes a real cost the moment the game has *relations*.
 Sentiment ([`politics/RELATIONS.md`](politics/RELATIONS.md)) is a directed float from one
-institution to another; lobbying (BL-539, lobbying) is a corporation influencing a nation. Both are
-correct and both are **abstract in a way that makes them hard to care about.**
+nation to another. It is correct and it is **abstract in a way that makes it hard to care about.**
 
 > **A person is what makes an institutional relation legible.** Sentiment is a number. A person is
 > who holds it.
@@ -50,8 +49,10 @@ tongues. A person's name is one more draw from that machinery.
 
 - **BL-370 (corp leader figure)** — from Ben's 2026-08-11 notes session: a named figure standing in
   for the player's corp, *"so the player feels a personal connection to the corp they play as."*
-  That is **one role**, and it is the role this system ships first.
-- **BL-207 (persona counsel packs)** — advisory personas seated per corporation, reading the
+  The corporations are retired (Ben, 2026-10-23), so the figure stands in for the player's
+  **nation**. That is **one role**, and it is the role this system ships first.
+- **BL-207 (persona counsel packs)** — advisory personas seated per nation (once per corporation,
+  re-seated with the corporations' retirement, Ben 2026-10-23), reading the
   blackboard, biasing the strategy weight through a bounded, transparent nudge. **That is already a
   person-with-a-role**, fully designed, deterministic, and moddable in Lua. It is the strongest
   precedent in the repo and this design extends it rather than inventing a rival.
@@ -73,8 +74,8 @@ cannot picture is one you will not reason about.**
 
 **What it opens.** Three things nothing else supplies:
 
-1. **A target for lobbying.** BL-539 has a corporation shifting *a nation's* weights. You do not
-   lobby a nation; you lobby someone in it.
+1. **A target for lobbying** — retired with the lobbying channel (Ben, 2026-10-23); a corporation
+   no longer shifts a nation's weights.
 2. **A holder for doctrine.** A campaign battle takes a `doctrine_row` per side, and the row the
    campaign layer supplies is all-zero (MILITARY.md). A commander is the natural thing for a doctrine
    to belong to.
@@ -93,7 +94,7 @@ cannot picture is one you will not reason about.**
     person {
         name        generated from the holder's own tongue
         role        WHAT they do — the mechanic
-        seat        WHERE they do it — a corp, a nation, a unit
+        seat        WHERE they do it — a nation, a unit
         tenure      when they took the seat; when they leave it
         biases      several, each of which must gate or bias something real
     }
@@ -108,31 +109,34 @@ ledger legibility for free — and so **a person costs an enumerator, not a subs
 ### Five roles, in order, each mapped to machinery that exists
 
 All five, in this order (Ben, 2026-08-22): company head → counsel → commander → minister → contact.
+The company head and counsel were seated in corporations; with the corporations retired (Ben,
+2026-10-23) both keep their gating and move to the nation, and the company head is now the
+player nation's **head**.
 
 | Role | Seat | Biases / gates | Precedent |
 |---|---|---|---|
-| **Company head** | the player's corp | attachment first; biases second | **BL-370** — the first role |
-| **Counsel** | any corp | the strategy weight, boundedly | **BL-207**, fully designed |
+| **Head** (was company head) | the player's nation | attachment first; biases second | **BL-370** — the first role |
+| **Counsel** | any nation | the build scorer's strategy weight, boundedly | **BL-207**, fully designed |
 | **Commander** | a unit | doctrine — the `doctrine_row` a campaign battle reads | MILITARY.md § Doctrine |
-| **Minister** | a nation | which priority line BL-537's budget favours | BL-537 (national budget), BL-539 (lobbying) |
-| **Contact** | a (buyer, supplier) pair | who the sentiment is *with* | RELATIONS.md, BL-546 (reputation as a sentiment view) |
+| **Minister** | a nation | which priority line BL-537's budget favours | BL-537 (national budget) |
+| **Contact** | a pair of nations | who the sentiment is *with* | RELATIONS.md, BL-546 (reputation as a sentiment view) |
 
 **Minister is the one that changes another system's design.** If a nation's budget weights are held
-by a person, then **lobbying has a target, succession is a political event, and BL-542's scorer has
+by a person, then **succession is a political event, and BL-542's scorer has
 somewhere for its preferences to live** other than in the nation as an abstraction.
 
 **The player's own figure is chosen at campaign setup, biases included** (Ben, 2026-08-22). The
-company head is a build decision rather than a portrait, which makes it a New World wizard concern
+head is a build decision rather than a portrait, which makes it a New World wizard concern
 (`ui/STARTUP.md`) as well as a generation one.
 
 ### Scale — the constraint that decides whether this is buildable
 
-Io has ~88 corporations, ~43 nations, and a unit roster that grows. **A person per institution per
+Io has ~43 nations and a unit roster that grows. **A person per institution per
 role is thousands of people**, none of whom the player will ever look at.
 
 > **A cast, not a population.** People are generated only where a role is *seated*, and roles are
-> seated sparsely — the player's own corp, nations the player has met, units the player commands,
-> suppliers the player has dealt with. **A person is created when someone would plausibly know
+> seated sparsely — the player's own nation, nations the player has met, units the player commands.
+> **A person is created when someone would plausibly know
 > their name**, which makes the discovery layer (BL-089's activity fog) the natural gate and costs
 > nothing to generate.
 

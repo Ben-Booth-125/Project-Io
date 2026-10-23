@@ -52,16 +52,16 @@ inventing where evidence already exists."*
 
 | Subject | Measures | Qualified by |
 |---|---|---|
-| `research` | does the corp's home nation hold this node (1/0) | `key`, a Digitisation node id |
-| `structure` | count of that building the corp owns | `structure` |
-| `stockpile` | units on the shelves of the markets the corp sits in | `resource` |
-| `produced` | has the corp ever made this good (1/0) (Ben, 2026-10-10) | `resource` |
+| `research` | does the nation hold this node (1/0) | `key`, a Digitisation node id |
+| `structure` | count of that building the nation owns | `structure` |
+| `stockpile` | units on the shelves of the markets the nation's buildings sit in | `resource` |
+| `produced` | has the nation ever made this good (1/0) (Ben, 2026-10-10) | `resource` |
 | `market` | mean resolved price across every market | `resource` |
-| `surplus` | the corp's cash balance | — |
-| `era` | campaign era of the corp | — |
+| `surplus` | the nation's treasury | — |
+| `era` | campaign era of the nation | — |
 | `military_units` | total unit count fielded | — |
 | `military_strength` | summed combat strength | — |
-| `province_held` | is this province held by the corp (1/0) | `province`, a province id |
+| `province_held` | is this province held by the nation (1/0) | `province`, a province id |
 
 **Five comparators:** `at_least` (the common case), `greater_than`, `exactly`, `at_most`,
 `less_than`.
@@ -83,9 +83,9 @@ inventing where evidence already exists."*
    the foundation, because *"a subject enum that enumerates only economic quantities is exactly the
    failure the pivot is trying to avoid."*
 
-**`evaluate` carries a subject corp.** Every consumer is per-corporation — a levy is charged to a
-corp, and a held node is read through the corp's home nation — so a world-only predicate could not
-answer either question.
+**`evaluate` carries a subject nation.** Every consumer is per-actor, and the actor is a nation
+(Ben, 2026-10-23) — a held node is the nation's, and so is the industry a predicate counts — so a
+world-only predicate could not answer the question. The parameter's type keeps its old corp name.
 
 
 **`condition_text` is shared on purpose.** One human rendering of a predicate, so the tech viewer
@@ -104,8 +104,8 @@ contested quantity is a predicate whose meaning is contested.
 
 | Consumer | Predicate asks |
 |---|---|
-| `law.cpp` | is this law in force on this corp? |
-| `corp_command.cpp` | is this buyer embargoed by this supplier? |
+| `law.cpp` | is this law in force on this nation? |
+| `corp_command.cpp` | is this buyer nation embargoed by this seller nation? |
 
 **Quests** are the third reader the header names: a quest node's deed is a predicate the nation
 must meet before the node completes (`docs/economy/RESEARCH.md` § Quests key the next age).
@@ -114,7 +114,7 @@ BL-087 (era-1 tech/quest system) owns the quest object.
 **The mercenary contract WAS a fifth, and it is what `province_held` exists for.** BL-570 gave
 `condition_set` its first location-qualified subject because a contract's spine — *"a contract is a
 condition_set the client will pay to have become true"* — could not be expressed against the
-world-wide corp scalars above. That contract was retired on 2026-08-30
+world-wide actor scalars above. That contract was retired on 2026-08-30
 ([`economy/CONTRACTS.md`](economy/CONTRACTS.md)), and its authored template table went with it.
 
 **The consequence is worth stating plainly: nothing in the game authors a non-empty
@@ -205,7 +205,7 @@ BL-479's own framing was that the effect vocabulary had been one field — `unlo
 - **Scalar effects** (`modifier_subject`). A subject names one scalar the simulation already
   computes, and a modifier moves it. Read by tech: a nation's held nodes, through
   `nation_scalar` (`nation_tech.hpp`).
-- **Money-flow effects** (`law_effect_kind` in `law.hpp` — `extraction_levy`, `import_tariff`). A
+- **Money-flow effects** (`law_effect_kind` in `law.hpp` — `extraction_levy`, `import_tariff`; the levy is retired, Ben 2026-10-23). A
   levy or a tariff is a **transfer between two balances**, not a scalar the simulation computes.
   There is no subject in the scalar list it could be expressed as, and inventing one would distort
   the vocabulary rather than share it. `law.{hpp,cpp}` includes `condition_set.hpp` and never
@@ -229,15 +229,15 @@ None of the three maps onto either of the others.
 A DIFFERENT axis from the two-vocabulary split above: what holding a node DOES. A node may unlock a
 *building type*, move a scalar, or unlock a *recipe* — the method a building already standing runs.
 A recipe unlock names a `recipe::name` (never an id — ids are positional and an unlock must survive
-a roster reorder). The nation holds the node and its corporations inherit it: `structure_unlocked`
-and `recipe_unlocked` (`src/world/nation_tech.hpp`) ask whether the corp's home nation holds every
+a roster reorder). The nation holds the node and builds under it: `structure_unlocked`
+and `recipe_unlocked` (`src/world/nation_tech.hpp`) ask whether the building nation holds every
 node that unlocks the thing, and `recipe_unlocked` is asked at both `construct_building` and
 `try_switch_recipe` — guarding only placement would leave a retool bypass, so both doors ask. A
 type or recipe no node unlocks is open to every nation. A
 recipe lock and a structure lock report the same `tech_locked` code on every seam — an agent cannot
 tell them apart, which is deliberate; the two stay distinct in MEANING, not in the code an agent
 reads. **`tech_locked` is the only method lock**: within the roster a campaign's era band admits,
-research decides what a corp may run, and nothing else does. See `docs/economy/PRODUCTION.md`
+research decides what a nation may run, and nothing else does. See `docs/economy/PRODUCTION.md`
 § Chain depth — the growth track.
 
 ---

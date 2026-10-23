@@ -103,7 +103,7 @@ path is directed (§ 1), so the per-tick trade pass pays each search once.
 
 ### 3. Reach — the placement constraint
 
-**The problem it solves:** without a distance rule, a corp can site a building arbitrarily far from
+**The problem it solves:** without a distance rule, a nation can site a building arbitrarily far from
 anything at no cost and with no refusal, which makes optimal siting *"the richest tile anywhere"* —
 **a lookup rather than a decision, and the first thing an AI on the command seam finds.** Reach as a
 placement constraint is BL-323 (buildings rework) S2.
@@ -185,7 +185,7 @@ as roads move toward it — which is the whole reason the term is per step and n
 
 **Reach (§ 3) is untouched by this.** An off-road tile is in a market's catchment without being in
 anybody's reach: the two answer different questions — *what does this tile sell into* and *where may
-a firm build* — and only the second is a permission. Keeping them apart is what lets a market render
+a nation build* — and only the second is a permission. Keeping them apart is what lets a market render
 whole while placement stays honest about the road.
 
 **The leg is three a step, times the ground it crosses (Ben, 2026-10-23, NR-1050).** Each step costs
@@ -262,8 +262,8 @@ centre held by another nation could otherwise be impossible to connect at all. O
 enough to touch the border and no more than that — it buys a connection, never a corridor through
 somebody's country.
 
-**The reach that follows is small, and it is meant to be (Ben, 2026-10-18).** A corporation builds
-from its home nation's ground, so most of a body is ground it may reach into and never build out
+**The reach that follows is small, and it is meant to be (Ben, 2026-10-18).** A nation builds
+only on its own ground (Ben, 2026-10-23; `../politics/NATIONS.md` § Own ground), so most of a body is ground it may reach into and never build out
 of. Measured in play and confirmed: the rule stands as written, and what was wrong was the REFUSAL
 the surface reported, which blamed the tier for a border. A muted road press names the rule that
 actually refused — another nation's ground, nothing here to build from, already at this tier, no
@@ -545,9 +545,10 @@ does not carry a later lane upstream, so the lanes the map draws still ride the 
 weight function, a lane is read by everything that reads traversal cost: a convoy between a
 colony's market and its metropole's lands cheaper than one to a stranger's, so a colony's chains
 close through its metropole *first* without any preferred seller being named — and **placement
-reach widens across the lane** (§ 3), so a firm on one shore may legally hold a site on the other.
+reach widens across the lane** (§ 3), so a nation on one shore may legally build on its own
+ground on the other.
 That second effect is wider than a market preference and it is intended: a tie only prices could
-see would be invisible to the corporate search, which reads reach cost (BL-812, phase 6 sees roads).
+see would be invisible to the landscape search, which reads reach cost (BL-812, phase 6 sees roads).
 
 **A lane outlives the polity that made it**, as a road outlives the empire that paved it. Whether
 a lane *decays* when its traffic stops is open in `../generation/EXPLORATION.md` § Open questions;
@@ -567,9 +568,10 @@ building that moves nothing.
   than the rail saves.
 - **Stations** are tile buildings (`PRODUCTION.md` § Infrastructure buildings): on a city tile
   touching a rail line, zero staff, a build cost and upkeep — the port's shape on land.
-- **Ownership:** track and stations are **state industry** in a major (`../politics/NATIONS.md`
-  § State industry — transport infrastructure is a strategic sector) and background firms' in a
-  minor.
+- **Ownership:** track and stations are the nation's, like every building on its ground, in a
+  major and a minor alike (Ben, 2026-10-23; `../politics/NATIONS.md` § What a nation owns). **Rail
+  is laid only on the nation's own ground** (`../politics/NATIONS.md` § Own ground) — never on another's, never on ground no
+  nation owns.
 - **Generation lays it** in Industrialisation (`../generation/INDUSTRIALISATION.md`); the player
   builds stations and lays track in play as its nation's verbs. **Track costs the treasury per tile,
   plus steel per tile, with upkeep per tile (Ben, 2026-10-13).**
@@ -577,9 +579,9 @@ building that moves nothing.
 - **Rail is built like anything else (Ben, 2026-10-15, at the live click).** The player selects a tile
   and picks track or a station from the same list of buildings the Construction view offers there —
   no separate armed tool.
-- **No track is ownerless (Ben, 2026-10-14).** Track laid over ground no nation holds, or through a
-  minor with no background firm, passes to the state of the nation whose ground is nearest along the
-  line, so every tile has an owner who bears its upkeep.
+- **No track is ownerless (Ben, 2026-10-14).** Track stands only on its nation's own ground (Ben,
+  2026-10-23), so every tile of it has an owner who bears its upkeep. The earlier rule passing
+  track over unowned ground to the nearest nation retires with that ground's eligibility.
 
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
@@ -623,7 +625,7 @@ per-pair paths and the flood fields behind them, and the per-body nearest-anchor
 over-clear costs one Dijkstra; **a missed clear is a reach field that lies.**
 
 Ben's 2026-08-08 ruling chose a simple every-event rule because *"each of these is rare against the
-per-frame reads."* That premise fails in a world where the corp AI builds every tick and hundreds of
+per-frame reads."* That premise fails in a world where the AI builds every tick and hundreds of
 generated sites complete through the warm start: the caches clear every econ tick, and the rebuilds
 — per-pair Dijkstras over 45,240 tiles plus the reach field — *become* the tick.
 
@@ -695,7 +697,7 @@ into passive and active. What follows replaces the bifold model, the city genera
 
 - **Made only by buildings, each on its own network.** A **logistics hub** makes points carried
   along **roads** (further on higher road tiers); a **railway station** along **rail**; a **port**
-  over **sea**. Cities make none. Anyone may build them — nations and corporations alike.
+  over **sea**. Cities make none. Any nation may build them, on its own ground (Ben, 2026-10-23).
 - **Reach fades with distance, and a better road reaches further (Ben, 2026-10-16).** A source's
   points reach **full strength** out to a threshold along its own network and then **fade to zero at
   double that distance**, so a nation needs several sources to cover its ground. The threshold is
@@ -720,12 +722,13 @@ into passive and active. What follows replaces the bifold model, the city genera
   goods already obey: they board and leave only at stations (§ 4c).
 - **Production consumes them.** A producing building needs Logistic Points to produce and uses them
   up each tick; short of its need it produces **in proportion** (half the points, half the output).
-- **The host nation's pool.** Every building on a nation's ground — its state's, its champion's,
-  other firms', foreign firms' — draws on **that nation's** pool, and a source on its ground adds to
-  it whoever built it, once it is connected to the capital (§ How a tile's points get to it). **The nation sets how its points are shared** among state, champion and other
-  firms; where no rule is set the share is mechanical, never a scored choice: every claim is met
-  while points suffice, and when they fall short the classes are **one queue**, served in the
-  routed order of § How a tile's points get to it (Ben, 2026-10-20).
+- **The nation's pool serves its own buildings only.** Every building on a nation's ground is that
+  nation's (Ben, 2026-10-23), so it draws on **that nation's** pool, and every source on its ground
+  adds to it once it is connected to the capital (§ How a tile's points get to it). **The share
+  rule has no classes:** the state / champion / other-firms split retires with the corporations
+  (Ben, 2026-10-23), so there is nothing to share points among. The share is mechanical, never a
+  scored choice: every claim is met while points suffice, and when they fall short every claim is
+  **one queue**, served in the routed order of § How a tile's points get to it (Ben, 2026-10-20).
 - **A source's points dim with its upkeep (Ben, 2026-10-14).** A hub, station or port makes points in
   proportion to the upkeep goods it actually receives — half its stone, half its points — never
   zeroed by a shortfall.
@@ -746,8 +749,7 @@ Three things follow, and each is a check rather than a preference:
 - **Every capital holds a source.** A nation whose capital makes no points has no centre for its
   chain to be anchored to (§ How a tile's points get to it), so a capital with no source is a
   generation defect, not a poor nation. The one exception is a source that stands but cannot be paid
-  for: a nation too poor to fund it even after its firms pay is reported as dark, not failed (Ben,
-  2026-10-22).
+  for: a nation too poor to fund it is reported as dark, not failed (Ben, 2026-10-22).
 - **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
   points than its capital at generation. A later build may overtake it — that is the player's doing
   and is allowed — but the world does not start that way.
@@ -762,15 +764,17 @@ points get to it), so no tile can hold more than a capital its sources reach at 
 second check is therefore that every capital is covered at full strength, which a source standing
 on it guarantees.
 
-**The order generation seeds in (BL-1367).** First a source on every capital, the state's — a
-minor's too, which may hold its network nodes as the state (Ben, 2026-10-22; `../politics/NATIONS.md`
-§ State industry); then
+**The order generation seeds in (BL-1367).** First a source on every capital, the nation's — a
+minor's too (Ben, 2026-10-22; `../politics/NATIONS.md` § What a nation owns); then
 each of the nation's other market centres, covered at full strength by the chain laid out from the
 capital; then the consumers. A centre is the anchor every shipment leaving its market draws at, so
-an uncovered centre is a market that cannot trade. A source must also be paid for: a nation too poor
-to fund its nodes at the opening is funded by the firms on its ground (`../generation/NATION_GENERATION.md`
-§ Pass 7, "No capital starts dark"), and a capital still unfunded after that is dark — its source
-stands and the funding gate idles it. The coverage census (`lp_coverage_census`) checks the three
+an uncovered centre is a market that cannot trade. A source must also be paid for, from the
+nation's treasury, nodes first (`../generation/NATION_GENERATION.md` § Pass 7, "No capital starts
+dark"). The firms that once topped a short nation's node bill up retire (Ben, 2026-10-23), but
+what they held is now the nation's: every building and balance on its ground is its own, so the
+opening node bill is paid from that whole treasury, and "no capital starts dark" stands. A capital
+that whole treasury still cannot fund is reported dark — its source stands and the funding gate
+idles it. The coverage census (`lp_coverage_census`) checks the three
 rules on every curated seed, reads them through the funding gate, reports dark capitals, and fails
 when a capital holds no source or a consumer is uncovered for a reason the seeding did not count.
 
@@ -840,9 +844,8 @@ requests) and BL-1361 (a shipment draws points).
   worthless until connected — what "supplies nothing" means, read strictly. Ground whose nation has
   no capital on that body passes every source, as above. Routing does not give a source its own
   budget; it decides **how much** of a request may
-  be granted and **when** the request is served. Where the nation has set a share rule, each
-  class's portion is served in the same queue order within that class; with no rule the classes
-  are one queue.
+  be granted and **when** the request is served. Every request is one queue: the share rule has no
+  classes (Ben, 2026-10-23).
 - **The fade caps a source's share, and the next source tops it up.** The qualifying sources
   that reach a tile are taken nearest first; each can carry its reach × the request (full reach,
   all of it; halfway down the fade, half), and the next one tops up the remainder, until the
@@ -882,11 +885,9 @@ nation whose ground that tile is, from what the march and production left there,
 routed cover caps its share as it caps any tile's request: where the qualifying sources reach the
 centre at half strength, a cargo carries half. A centre on nobody's ground, or one no connected
 source reaches, admits nothing — the trade waits until a source is built there, which is what makes
-a market's logistics a constraint on its trading. Where the nation has set a share rule, a
-shipment draws on its trader's class: the state, the champion, or the other firms, each keeping
-what its class did not spend. Space legs have no tile path and draw nothing.
-- Rail and stations: "anyone may build" widens LOGISTICS § 4c's state-industry ownership for
-  **new** stations; generated rail still passes as § 4c says.
+a market's logistics a constraint on its trading. There is no share class to draw on (the pool
+serves the nation's own buildings only, above). Space legs have no tile path and draw nothing.
+- Rail and stations: a nation builds them only on its own ground (§ 4c).
 
 BL-596 (LP active march) and BL-597 (LP passive convoys) own the build, BL-606 (throughput lens)
 the surface — all 2026-08-24, replacing the purged BL-464 umbrella. Ben, 2026-08-18: *"Let's begin codifying Logistic Points

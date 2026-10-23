@@ -8,9 +8,9 @@
 
 ## Preface
 
-Project Io is a single-player grand strategy game about running a **nation** and its **champion corporation** in a
-procedurally generated world that opens in 1960. You govern the state, and you run the firm that
-builds for it. You find the ground worth industrialising, you build on it, and you fight for it when
+Project Io is a single-player grand strategy game about running a **nation** in a
+procedurally generated world that opens in 1960. You govern the state, and you build and run every
+building on its ground. You find the ground worth industrialising, you build on it, and you fight for it when
 you must.
 
 This manual is for two readers. If you are **playing**, sections 1 through 4 are yours — what the
@@ -33,25 +33,25 @@ continents, its rivers, its peoples, and the centuries of settlement and war tha
 the way it looks when you arrive. Nothing is hand-authored. Every nation, city and person has a name
 coined from its own culture's sound system, and none of them is drawn from Earth.
 
-You arrive at the campaign epoch as a company of armed professionals with a base, a unit, and a
-balance. The world's polities want things from each other that they cannot take alone. That gap is
+You arrive at the campaign epoch as a major nation with territory, industry, a force and a
+treasury. The world's polities want things from each other that they cannot take alone. That gap is
 your business.
 
 ### 1.2 The player
 
-You are a **major nation**, chosen from the majors when the campaign begins, and you run its
-**champion** — the one corporation its ground produced. Three things follow from that, and they are
-the design's spine:
+You are a **major nation**, chosen from the majors when the campaign begins, and you own every
+building on its ground. There are no corporations: every nation owns the industry on its own ground
+(Ben, 2026-10-23). Three things follow from that, and they are the design's spine:
 
 - **At home you legislate.** Your budget, your tariffs and your law are levers you pull. Abroad they
-  are conditions your champion operates inside: route around them, price them in, or pay to have
-  them changed.
+  are conditions your trade operates inside: route around them or price them in.
 - **You raise your force; you do not manufacture it.** You muster your own units, and their
-  equipment is bought from corporations who are counterparties, not subsidiaries.
-- **You build to industrialise.** Your champion's holdings extract, refine and sell, and the
-  machinery it builds is your nation's road to space.
+  equipment is bought off the market's shelf, made by your own works or another nation's.
+- **You build to industrialise.** Your buildings extract, refine and sell, and the machinery you
+  build is your nation's road to space. You build only on your own ground, and nothing builds there
+  for you.
 
-You answer to three parties: other nations, your population, and your corporations.
+You answer to two parties: other nations and your population.
 
 ### 1.3 The loop
 
@@ -110,7 +110,7 @@ how abundant the world's resources are, and the lean of the generation. The one 
 nation count: before the world is built you choose how many nations it ends with (up to 40) and how
 many are **majors** (up to 6), and the history will arrive at exactly those numbers. The world is then generated
 in visible stages — planetology, continents, tiles, rivers, population, history, nations, roads,
-corporations — each stage a deterministic consequence of the one above it.
+charter buildings — each stage a deterministic consequence of the one above it.
 
 The **seed** is an 8-digit hex value. You can roll it, type one in, or copy the current one. The
 same seed and the same preferences always produce the same world; this is guaranteed, not
@@ -180,7 +180,7 @@ disagree, the dictionary is right.
 
 ### 3.3 Lenses
 
-Lenses tint the map to show one quantity. Eight are on the bar — **Corporation, Country, Resource,
+Lenses tint the map to show one quantity. On the bar are **Country, Resource,
 Market, Population, Opportunity, Production, Continent** — and four more are reachable only by
 cycling: **Scarcity, Industry, Reach, Supply-routes**.
 
@@ -228,8 +228,7 @@ Each ledger has one glyph on the left icon rail. Clicking an open ledger's glyph
 | Budget | Ledger | Where the money went, itemised |
 | Market | Market | What things cost, and where |
 | Construction | Industry | What is being built, and what you own |
-| Corporation | Corporation | Your own position |
-| Corporations table | Diplomacy | Everyone else's, as far as you can see it |
+| Nation overview | Corporation | Your own nation's position |
 | Economy | Workforce | Population and labour |
 | History | History | What has happened in the world |
 
@@ -262,7 +261,7 @@ A deterministic chain, each stage consuming the one above. **Planetology** settl
 chemistry and the biosphere's history. **Continents** derives tectonic plates and hands a height
 bias downward. **Tiles** generates the hex surface on three axes — substrate, cover and landform —
 and seeds deposits. **Rivers**, **population centres**, the **institutional history ladder**,
-**nations**, **roads** and **corporations** follow in order.
+**nations**, **roads** and the **charter buildings** each nation opens with follow in order.
 
 *Authority: `docs/generation/GENERATION_STRATEGY.md`, and the per-stage documents it maps.*
 
@@ -356,7 +355,7 @@ Two independent fogs. The **geographic fog** hides the tile map and deposits unt
 survey. The **activity fog** is lit by your own trade routes and presence, tiering each body from
 Unknown through Known, Stale and Visible. A place can be Known but unsurveyed.
 
-Rival buildings are visible; their production and finances are private. Markets are the public
+Rival nations' buildings are visible; their production and finances are private. Markets are the public
 intelligence channel.
 
 *Authority: `docs/ui/DISCOVERY.md`.*
@@ -364,7 +363,7 @@ intelligence channel.
 ### 4.9 Units and combat
 
 Units are hired at a military base from an era-keyed roster. A battle opens whenever hostile units
-share a province — declared hostility between corporations — and plays out over ticks in seeded
+share a province — declared hostility between nations — and plays out over ticks in seeded
 rounds, with withdrawal priced rather than free.
 Each round resolves unit class matchup by formation doctrine, modified by terrain, supply state and
 season. Winter costs the attacker attrition and the defender readiness. Your own battles show as a
@@ -374,30 +373,29 @@ battle card and post a dispatch to the Field channel every tick.
 
 ### 4.10 Procurement
 
-How you buy. Request a quote from a named supplier, accept it to open a contract, and pay a deposit
-plus a paced remainder. A supplier can **decline**, with a stated reason: no capacity, no input
-access, an embargo, or your standing being too low. Refusal is not payable-through — you route
-around it. Asking for a quote also tells you something real about the supplier's capacity.
+How you buy equipment. It comes off a market's shelf like any good, bought on the order book
+(Ben, 2026-10-23); the quote from a named supplier corporation retired with the corporations.
 
 *Authority: `docs/economy/CONTRACTS.md`.*
 
 ### 4.11 Law and technology
 
 A law is a predicate plus an effect, evaluated against the world, enacted by a nation and scoped to
-its territory. The extraction levy is enforced and visible as its own line in the budget; enacting
+its territory. The import tariff is enforced and visible as its own line in the budget; enacting
 nothing changes nothing, bit for bit. Technologies are gated by the same predicate machinery and
-earned per corporation, not per world.
+held by each nation, not per world.
 
-These are conditions you operate inside, not levers you pull. A nation can be **lobbied**; it cannot
-be legislated for.
+At home these are levers you pull. Abroad they are conditions you operate inside: another nation's
+law is its own, and it cannot be lobbied (Ben, 2026-10-23).
 
 *Authority: `docs/politics/NATIONS.md` and `docs/META_LAYER.md`.*
 
 ### 4.12 The opponent
 
-Rival companies run a deterministic scored-utility layer over the same command seam you use: they
-build, demolish, survey, road, hire and trade. Nations act in the same shape,
-allocating a budget over priority lines. There are no hidden AI exceptions — they play by your
+Rival nations, majors and minors, run a deterministic scored-utility layer over the same command
+seam you use: they build, demolish, survey, road, hire and trade, each on its own ground, and they
+allocate a budget over priority lines. Nothing acts for your nation strategically, and nothing
+builds on your ground for you. There are no hidden AI exceptions — they play by your
 rules or a defined subset of them.
 
 Above that sits the direction: a small local model driving the game through its word interface. The
@@ -444,7 +442,7 @@ not its constants — is what graduates into the campaign.
 
 ### 4.14 Relations
 
-Every actor — corporation or nation — holds a **sentiment** toward every other it has met, derived
+Every nation holds a **sentiment** toward every other it has met, derived
 from conduct and decaying with time. On top of it sits **stance**: hostility you declare, friendship
 both sides choose. Sentiment informs a declaration and never makes one.
 

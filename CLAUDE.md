@@ -108,7 +108,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/generation/trees/TREES.md` | **Retired**: generation runs no tech trees (Ben, 2026-10-10). Holds the table of what each former tree gate became (dates). The four tree docs and stores beside it are the record of a retired design. |
 | `docs/generation/PROVINCES.md` | The spatial unit of consequence: partition rules, three domains, walk order. |
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
-| `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |
+| `docs/generation/CORPORATION_GENERATION.md` | **Industry generation**: what a nation's ground opens with — charters as priced sets of nation-owned buildings, placement, opening stock. Corporations are retired (Ben, 2026-10-23). |
 | `docs/generation/GENERATION_LEDGER.md` | The why-did-this-tile-generate surface. |
 | `docs/generation/seed_library.json` | Sixteen curated worlds and what each one is for — a seed is the save. **Query it:** `node tools/session/seed_library.js [--for <tag>] [--seed N] [--check]`. |
 | `docs/generation/MILITARY_HISTORY.md` | **How force works inside the Era −1 sim** — `resolve_battle`, the band ladder, naval, the forage simplification, sea legs. A *generation* doc: its rules are what make a history cheap to generate, not claims about the game. `military/MILITARY.md` is its campaign-era sibling. |

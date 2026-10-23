@@ -19,8 +19,8 @@ nation's research queue names.
 ## Who holds technology, and where everyone starts
 
 **The nation holds technology (Ben, 2026-10-10).** A nation's tech state is the set of nodes it
-holds in the current age's tree, its research-point pool and its queue. A corporation reaches
-technology through its nation: what the nation holds, its firms may use.
+holds in the current age's tree, its research-point pool and its queue. What the nation holds, its
+buildings may use: every building is the nation's (Ben, 2026-10-23).
 
 **Every nation starts the campaign at the same tech level, holding nothing (Ben, 2026-10-10).**
 Research is not part of generation: the pre-game history runs no tech trees and spends no research,
@@ -40,14 +40,14 @@ dials:
 | **A base** | Every nation earns a fixed RP a quarter whatever its treasury, so every nation reaches its power surges |
 | **The research budget line** | The national budget's academic-research priority (`../politics/NATIONS.md`): RP grow with the **square root** of what the line spends, so wealth buys a lead with diminishing returns. The line pays only what the queue still owes; an empty queue spends nothing |
 | **Research institutes** | Each staffed research institute adds RP a quarter to its owner's nation |
-| **The economy** | RP a quarter in proportion to the income its home corporations filed the quarter before (Ben, 2026-10-15). A growing economy buys research; this is what lets RP keep pace with rising prices (§ Cost) |
+| **The economy** | RP a quarter in proportion to the income its quarterly return filed the quarter before (Ben, 2026-10-15; re-subjected from its home corporations, Ben, 2026-10-23). A growing economy buys research; this is what lets RP keep pace with rising prices (§ Cost) |
 | **Universities** | Each staffed University in the nation adds RP per quarter. A University may stand only in a City (4)+ centre (`POPULATION.md` § Strata gate buildings), and it also raises the nation's qualification fraction |
 
 **Why a base and a square root (Ben, 2026-10-10).** National treasuries span orders of magnitude.
 Research linear in spending let the richest nation buy the whole tree in a few years while half the
 field never reached its first major; a base with a concave line keeps every nation on the surge
 cadence and lets spending separate nations by a factor of about three, not a hundred thousand. The economy
-source widens that with growth: the nation whose firms earn most researches several times faster
+source widens that with growth: the nation whose buildings earn most researches several times faster
 than the median, and only by earning it.
 
 A held node's research modifier (*+N% national research*) scales the total. RP never trade between
@@ -192,4 +192,3 @@ for one. Placeholders are the deliberate case of the same rule.
 - The research line's conversion rate, the University's RP per quarter, and the RP unit — dials for
   the sweep, set against the pacing rule.
 - The goods basket research draws, and whether it sits on the University or the budget line.
-- Whether a corporation can fund research into its nation's pool, or license a node its nation holds.

@@ -1,5 +1,70 @@
 # REFINED — active worklist
 
+## Sprint 57 — nations own everything (opened 2026-10-23)
+
+**Goal.** `sprints.json` holds it. The corporation and company layer is deleted: every nation owns and
+builds every building on its own ground, every non-player nation builds through the scorer, the
+player builds its own. Rulings: GLOSSARY.md, CONCEPT.md § Player identity, NATIONS.md § What a nation
+owns / § Own ground, AI_OPPONENT.md § 11 last entry (Ben, 2026-10-23).
+
+**Gates.** Every merge: the item's harness, `world_determinism`, `save_roundtrip`. World movers add
+`market_viability` FULL (par_seeds) and `history_sim_harness`, measured on the commit before and after.
+Digests are NOT re-pinned per item: BL-1408 (sprint 57 re-bless) is the wave's one re-bless. A cold
+`code-reviewer` pass per item with a fix round budgeted. UI: Ben's live click.
+
+**Lanes.** Wave 1 is serial in the main session (the seam). Wave 2 runs four lanes in worktrees on
+disjoint files; BL-1404 owns `world_save.cpp` until BL-1407. Wave 3 is serial.
+
+### BL-1399 (nation builds own ground) — Delivery Full, group `own-ground`
+- [ ] **T1** `construct_state_*` drop the champion gate; tech and placement read the nation's own id
+  (`construction.cpp`, `placement_rules.cpp`, `nation_tech.cpp`). (R3)
+- [ ] **T2** The own-ground test in placement for every builder; unowned ground refused; `can_place_road`
+  keeps the one crossing in (`placement_rules.cpp`). (R1, R2)
+- [ ] **T3** `as_nation` accepts the nation itself (`corp_command.cpp`, `agent_protocol.cpp`). (R3)
+- [ ] **T4** `tools/verify/nation_actor_seam.cpp`, registered. (R1-R3)
+
+### BL-1401 (nation AI actor) — Delivery Full, group `nation-ai-actor`
+- [ ] **T1** `ai_actor` view: treasury, `state_assets`, nation focus, owner-keyed books (`corp_ai.{hpp,cpp}`). (R1)
+- [ ] **T2** Every non-player nation acts; champion state branch retires; player skipped, spectate kept. (R1, R2)
+- [ ] **T3** Sorted walks; stagger and jitter keyed on the new actor set. (R3)
+- [ ] **T4** `tools/verify/nation_ai_builds.cpp`. (R1, R2)
+
+### BL-1402 (fold to ground) — Delivery Full, group `fold-to-ground`
+- [ ] **T1** `fold_to_ground` replaces `hand_over_state_industry`: every building to its ground nation in
+  (firm id, asset order); balances to treasuries; units re-owned; HQ cleared; stock re-keyed. (R1, R2)
+- [ ] **T2** `fund_state_nodes_from_firms` retires; `is_player_owned` / `player_nation` read the nation. (R1)
+- [ ] **T3** `tools/verify/fold_census.cpp`. (R1-R3)
+
+### BL-1403 (nation money flows) — lane M, group `nation-money-flows`
+- [ ] **T1** Tax from wages (`nation_tax.hpp`, `budget_system.cpp`, `nation_step.cpp`). (R1)
+- [ ] **T2** Tariff on the foreign seller nation (`market_clearing.cpp`, `trade.cpp`). (R2)
+- [ ] **T3** No levy seeded; `public_works` / `charters` reserved; debt interest retires (`law.cpp`, `nation_budget.hpp`). (R3)
+- [ ] **T4** Re-point `tax_discontent_harness`, `nation_budget_harness`, `money_conservation`. (R1-R3)
+
+### BL-1404 (generation buys for nations) — lane G, group `generation-for-nations`
+- [ ] **T1** `generate_corporations` and its fallbacks retire (`landscape_search.cpp`, `corporation_generation.cpp`). (R1)
+- [ ] **T2** The charter web, firms and Marketplace retrofit build into the ground nation, own ground only. (R1)
+- [ ] **T3** `major_centres` feeds saved `nation_component::is_major` (save v55, v54 derives it). (R2)
+- [ ] **T4** `reconcile_majors` folds ground with its buildings; the seat lists majors (`spawn_seat.cpp`). (R2, R3)
+- [ ] **T5** RNG audit of the by-reference streams; measure market_viability FULL. (R4)
+
+### BL-1405 (LP one class) — lane L, group `lp-one-class`
+- [ ] **T1** One share class; the share rule and `set_logistics_shares` retire (`logistic_points.cpp`). (R1)
+
+### BL-1406 (UI and protocol as nation) — lane U, group `ui-as-nation`
+- [ ] **T1** Seat screen lists majors; header shows the treasury. (R1)
+- [ ] **T2** Corporation and Company lenses and the corporation/company/acquisition ledgers retire or re-subject. (R1)
+- [ ] **T3** `as_corp`, `buy_corporation`, `lobby` leave the wire; ACTIONS.json regenerated; question_log and ui_elements updated. (R2)
+- [ ] **T4** verifier-visual captures, then Ben's live click. (R1)
+
+### BL-1407 (delete corporation_component) — Delivery Full, group `delete-corporation`
+- [ ] **T1** Delete the type, `world::corporations`, `owner_kind::corporation`, corp-only verbs, balance branches. (R1)
+- [ ] **T2** Save v56 with a v54/v55 reader through `fold_to_ground`. (R2)
+- [ ] **T3** Harnesses: `harness_params.hpp` first; gates re-pointed; mechanism tests retired. (R1, R3)
+
+### BL-1408 (sprint 57 re-bless) — group `sprint-57-rebless`
+- [ ] **T1** Attribute every mover, re-pin on Ben's go, ruling-check against `rulings/sprint-57.json`. (R1)
+
 ## Sprint 55 — spectator to the end of Era 1 (opened 2026-10-15, continuing 2026-10-18)
 
 **Goal.** `sprints.json` holds it. The dependency spine is BL-1346 -> BL-1352 -> BL-1353/BL-1354 ->

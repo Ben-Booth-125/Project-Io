@@ -86,7 +86,7 @@ The tree carries Era 1's catastrophe test (`../ERAS.md` § Mistakes compound):
 |---|---|
 | Signal & Orbit, right arm | Espionage — signals intelligence |
 | Force, right arm | Espionage — covert operations |
-| Markets, right arm | Politics — lobbying and market regulation |
+| Markets, right arm | Politics — market regulation (lobbying retired, Ben 2026-10-23) |
 | Order, right arm | Politics — regime, elections, succession |
 
 ## Quests and the next age
@@ -114,7 +114,7 @@ advantage in machine form, one entry per lever (`../RESEARCH.md` § Effects no s
 | Kind | Fields | Moves |
 |---|---|---|
 | `modifier` | `subject`, `scope`, `op`, `value` | A named scalar (`modifier_subject`) where the scope matches: `all`, `resource:<good>`, `group:<recipe group>`, `recipe:<recipe>`, `building:<type>` or `site:<named extraction site>` (`site:farm` is the Farm, not a Fishing Wharf drawing the same good). A list of scopes is one modifier per member. `+5%` is `multiply 1.05`; a *+N% national research* share is `add 0.0N`, summed |
-| `unlock_recipe` | `recipe` | Closes a registry recipe until the corporation's nation holds the node |
+| `unlock_recipe` | `recipe` | Closes a registry recipe until the nation holds the node |
 | `unlock_structure` | `structure` | The same, for a building type |
 | `mechanic` | `key` | A named rule a system switches on |
 | `unread` | `what`, `waits_on` | Nothing: the lever is a system the game does not carry; `waits_on` names it |

@@ -13,6 +13,8 @@
 
 Research note, 2026-08-08 — not authority. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.
 
+> **Note (Ben, 2026-10-23).** Corporations are retired; the rival and the player are nations. Read "corporation" and "corp" below as the nation, and *N* as the rival-nation count.
+
 > **Ruled.** Ben adopted the recommendation in § 9 — the Cicero configuration — as Stage C's
 > concrete shape (2026-08-08, NR-094; `AI_OPPONENT.md` § 10g). `AI_OPPONENT.md` § 10d stays the
 > direction (MCP transport; small local runtime model; cloud inference as corpus generator, never

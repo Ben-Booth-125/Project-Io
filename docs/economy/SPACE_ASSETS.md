@@ -20,8 +20,8 @@ are **full assets**: owned objects with a position, a launch, cargo and upkeep, 
 world and drawn on the canvases (`../ui/CIRCUMPLANETARY.md`, `../ui/SOLAR.md`).
 
 **Nations launch (Ben, 2026-10-15).** A space asset belongs to a nation and is paid from its
-treasury. Corporations supply the goods it is built from, through the ordinary market; they do not
-own space assets in Era 1.
+treasury. Its goods are bought off the ordinary market's shelf, from whichever nations' buildings
+made them.
 
 The Era 1 classes:
 

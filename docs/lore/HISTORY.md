@@ -71,14 +71,16 @@ The campaign premise makes three big historical claims:
 1. **Markets, not command.** Every body hosts independent markets with dynamic prices; the
    background economy is saturated and privately legible.
 2. **No hegemon.** ~45 nations coexist; none can conquer the rest; power projection happens
-   through firms, not armies. The invariant is owned by **BL-224 (non-hegemony invariant)**, which
+   through industry and trade, not armies alone. The invariant is owned by **BL-224 (non-hegemony invariant)**, which
    turns "none can conquer the rest" from an assertion into an enforced property; its intended
    input is the `terrain_combat` scalars (`terrain_defence` / `terrain_attrition` /
    `terrain_resistance`, `src/world/terrain_combat.cpp`).
-3. **Corporations as first-class actors.** An immortal legal fiction can own, trade, and expand
-   across borders — and nations tolerate it. The *mechanism* — the enforceable promise, the
-   charter — is settled. The *player* is a major nation operating its champion corporation
-   (`docs/CONCEPT.md`, Ben 2026-10-10), and the rupture is **averted, not past** (Ben, 2026-07-30, BL-223).
+3. **Nations as the economic actors.** The claim that corporations were first-class actors is
+   retired with the corporation (Ben, 2026-10-23): every building is owned by the nation whose
+   ground it stands on. The *mechanism* of Stage 1 — the enforceable promise, the charter — stays
+   lore for how markets between strangers arose. The *player* is a major nation that builds its own
+   buildings (`docs/CONCEPT.md` § Player identity), and the rupture is **averted, not past** (Ben,
+   2026-07-30, BL-223).
 
 None of these are natural defaults. Each is the residue of specific historical stages. This
 document names those stages, states the causal lesson each one carries, and marks the hooks
@@ -108,14 +110,14 @@ History line: `"-XXXX: First granary cities on the {region} floodplain."`
 charter — an entity that outlives its members and can own, sue, and be sued.
 
 **Lesson.** The deep enabler of markets is not coinage but the enforceable promise between
-strangers. Corporate personhood is this stage's apex, and the game's core rule — *the
-corporation persists while it holds any asset* — is that legal doctrine made mechanical.
+strangers. Corporate personhood is this stage's apex in the lore. The game rule that made it mechanical —
+*the corporation persists while it holds any asset* — is retired with the corporation (Ben,
+2026-10-23).
 
 **Kepler divergence — the Charter Age.** Kepler needs a founding myth for corporate personhood,
-its VOC moment, and it comes *early* relative to Earth. The registered-in-a-home-nation but
-operationally-free compromise in `../generation/CORPORATION_GENERATION.md` is exactly the
-bargain sovereigns strike with chartered companies: taxability and seizability in exchange for
-freedom of operation. The charter cradle raises a **sealed-oath god** (`CREEDS.md`), and that
+its VOC moment, and it comes *early* relative to Earth. The registered-in-a-home-nation
+compromise industry generation once modelled is retired with the corporation (Ben, 2026-10-23);
+the myth stays lore. The charter cradle raises a **sealed-oath god** (`CREEDS.md`), and that
 creed buys its regions an industrialisation-date bonus — contract law reaching capital one stage
 early. Generation writes no dated line for the Charter Act: the charter is an institution the
 live sims carry, not a sentence pre-written over a finished map.
@@ -149,9 +151,9 @@ confiscate lose the next war.
 born. It is also why the campaign's nations respect corporate property: their ancestors that
 didn't were outcompeted.
 
-**Game-mechanical echo.** Asset seizure exists but is costly to the seizing nation (sentiment,
-credit access). Progressive loss instead of a lose screen mirrors the historical norm:
-sovereigns squeezed companies far more often than they destroyed them.
+**Game-mechanical echo.** Corporate asset seizure retired with the corporation (Ben, 2026-10-23).
+Progressive loss instead of a lose screen still mirrors the historical norm: sovereigns squeezed
+companies far more often than they destroyed them.
 
 **What the generator carries of it.** The stage's *mechanism* — credit disciplining the sovereign
 — is not simulated as such. Its legible consequence is that the charter culture's sealed-oath
@@ -287,7 +289,7 @@ run_history_sim               ->  the polities play forward to the epoch
 generate_nations                  seeded on the region anchors, FOLDED BY POLITY
 derive_national_character     ->  the three axes, as outputs
 seed_national_tariffs         ->  the tariff posture, as an enacted law
-generate_corporations         ->  focus from the corp's home region
+landscape search (charter walk) ->  a charter's focus from its centre's region
 ```
 
 **The region is the unit, and it exists to carry two things at once.** A cradle is a *people*; a
@@ -523,6 +525,5 @@ to state.
 - How much of this ladder surfaces to the player — a codex, generated history lines only, or
   ambient flavour in quest text? `../generation/CIVILISATION.md` § How a fall is told rules that the story surfaces in the
   history tab, quietly, which answers the pre-epoch half.
-- Does the Charter Age line name the player company's home-nation legal tradition? The Charter
-  Act names the charter cradle's nation; whether the player's company is bound to it depends on
-  the player-identity question `docs/CONCEPT.md` owns.
+- ~~Does the Charter Age line name the player company's home-nation legal tradition?~~ Retired:
+  the player is a nation, not a company (Ben, 2026-10-23; `docs/CONCEPT.md` § Player identity).

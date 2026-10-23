@@ -5,14 +5,15 @@
 > profile and a political character are derived from the ground a nation holds · how a nation
 > inherits its realm's name and colour · what treasury and substrate density it opens with · how
 > settlements are placed alongside · how many nations, and how many majors, a world ends with.
-> **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
-> corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
+> **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · what
+> industry its ground opens with (CORPORATION_GENERATION) · which ladder produced the history it
 > inherits (../lore/HISTORY).
 > **Confused with:** ../politics/NATIONS.md, CORPORATION_GENERATION.md, ../lore/HISTORY.md.
 
 Nations are the political and territorial layer overlaid on the tile map. They define the
 geopolitical backdrop at campaign start: who controls what land, what the diplomatic starting
-positions are, and what legal context corporations operate within.
+positions are, and whose ground each building stands on — a nation owns every building on its
+ground (Ben, 2026-10-23; `../politics/NATIONS.md` § What a nation owns).
 
 This document covers **only the generation strategy** — how a nation comes to exist. What a nation
 *does* afterwards is owned by **[`docs/politics/NATIONS.md`](../politics/NATIONS.md)**: the
@@ -20,7 +21,7 @@ treasury, law authorship and the nation-behaviour grant (Ben, 2026-08-18). Where
 about a field, generation wins on how it is **set** and NATIONS.md wins on what it **means**.
 
 **The player is one of the nations this doc makes (Ben, 2026-10-10).** It plays a **major** nation
-and operates that nation's champion (`docs/CONCEPT.md` § Player identity). Generation makes the
+and builds its own buildings (Ben, 2026-10-23; `docs/CONCEPT.md` § Player identity). Generation makes the
 player's nation exactly as it makes a rival's; nothing here is placed, sized or favoured for the
 player.
 
@@ -48,10 +49,16 @@ and the "no nations slider" that went with it. The player sets two numbers on th
 | Target | Means | Range |
 |---|---|---|
 | **Total** | nations alive on the homeworld when generation ends | at least the major target, **at most 40** |
-| **Major** | nations holding a champion when generation ends (`docs/GLOSSARY.md` § Major nation) | **1 to 6** |
+| **Major** | nations generation raises to a full actor when generation ends (`docs/GLOSSARY.md` § Major nation) | **1 to 6** |
 
 **Both targets are always hit (Ben, 2026-10-10).** A world that ends off either target is a defect,
 not a reported outcome — the reverse of NR-911's report-and-count rule, for these two numbers only.
+
+**A major is raised, not chartered (Ben, 2026-10-23).** A major is a nation generation raises to a
+full actor, chosen by the count target from where capital accumulated: the nations whose ground
+holds the most industry points. It is no longer a nation holding a champion; the champion and the
+specialist are retired with every corporation (`docs/CONCEPT.md` § Player identity). Every other
+nation is a minor.
 
 **How a target is hit: a lean, then in-world reconciliation (Ben, 2026-10-10, option C).** A count
 is never imposed by deleting, splitting or relabelling a nation. Two stages, in order:
@@ -67,9 +74,11 @@ is never imposed by deleting, splitting or relabelling a nation. Two stages, in 
    - **too many nations** — conquest and absorption, the Empires and Exploration verbs;
    - **too few nations** — a province seceding (a subject is already its own nation at the fold, so
      freeing one adds none);
-   - **too few majors** — a **national champion** chartered in the richest minor that lacks one;
-   - **too many majors** — a **cross-border buy-out**: one major's champion buys a surplus major's
-     specialist whole, and the seller becomes a minor.
+   - **too few majors** — the **richest minor is raised** to a major;
+   - **too many majors** — the **poorest surplus major is demoted** to a minor. Its ground and every
+     building on it stay its own: the 2026-10-11 fold moved a major's *specialists* into the richest
+     major's champion, and with no corporations there is nothing left to move (decided 2026-10-23,
+     on Ben's behalf; NR queue). The total is untouched.
 
 **The total is reconciled in Industrialisation's closing rounds; the majors after the landscape
 search (Ben, 2026-10-11).** The two counts come into being at different points of the pipeline, so
@@ -78,33 +87,23 @@ each is reconciled where it can be read:
   absorptions** (§ Pass 2c): a realm below the minimum territory is absorbed by its neighbour as an
   event of the span, and the remaining gap is closed by the verbs above in the same closing rounds.
   The nations that reach the fold are already on the total.
-- **The majors, after the search.** A major is a nation holding a champion, and champions are
-  chartered by the landscape search, after the history closes. So the majors are reconciled once
-  the search's winner is applied — a champion chartered or bought out — and each correction is
-  recorded as a history event **dated back** into Industrialisation's closing rounds, so the record
-  reads as one history.
+- **The majors, after the search.** The capital a major is chosen by is the industry the landscape
+  search spends, after the history closes. So the majors are reconciled once the search's winner is
+  applied — a minor raised or a major demoted — and each correction is recorded as a history event
+  **dated back** into Industrialisation's closing rounds, so the record reads as one history.
 
 **The three readings (Ben, 2026-10-11):**
 - **The richest minor** is the one with the most industry points standing on its ground
   (`region::industry_points`, summed) — what a charter is built from.
-- **A buy-out** is made by the richest champion, which buys the poorest major's specialist whole at
-  that specialist's charter price; the seller becomes a minor. "Richest" and "poorest" read the same
-  industry-point measure.
+- **The poorest surplus major** is demoted; "poorest" reads the same industry-point measure.
 - **The minimum-territory floor runs first.** No nation survives below it; reconciliation then
   closes whatever gap the floor leaves, adding nations back by secession where the floor took the count
   under the total.
-- **A state charter where a minor cannot afford its champion (Ben, 2026-10-11).** If the richest
-  championless minor's richest centre cannot meet a specialist's charter price, its treasury makes
-  up the gap, and the event is recorded as a **state charter**. The gap is paid **in credits, at the
-  specialist's real credit price** — the rate a corporation's charter costs — so a state charter is a
-  visible expense on the treasury, never a nominal one (Ben, 2026-10-11).
-- **A champion the reconciliation must charter may take any land tile of its nation (Ben,
-  2026-10-12).** Where no placement window of the minor's centres holds ground, the champion is
-  placed on any land tile its nation holds, so the major target is hit; it may open with weaker
-  holdings. Ordinary chartering keeps its windows. **Where the nation has no free land tile at
-  all** — its own background firms hold every one — the state charter founds the champion by
-  **consolidating those firms**: they merge into it with their holdings, recorded in the same
-  state-charter event, and nothing is destroyed (Ben, 2026-10-12).
+- **The state charter and the champion's fallbacks are retired (Ben, 2026-10-23).** A minor that
+  could not afford its champion had its treasury pay the gap as a **state charter** (2026-10-11); a
+  champion that found no window could take any land tile of its nation, or be founded by
+  consolidating its nation's background firms (2026-10-12). Raising a minor buys nothing and places
+  nothing, so none of them has a subject.
 - **The target outranks the floor (Ben, 2026-10-11).** Where no secession can leave both sides
   above the minimum territory, the closing rounds still split a province, choosing the split that
   leaves the smallest shortfall, so the total is always hit. A nation below the floor is the cost of
@@ -117,8 +116,9 @@ and the world's shape inside them stays the world's.
 
 The library spread shows why both stages are needed. Unforced, the curated worlds of
 `seed_library.json` end with 20 to 69 nations folded from 37 to 95 living polities, and 3 to 11
-nations holding a planned specialist (measured 2026-10-11). Reconciliation therefore removes nations on
-about half the library and adds them on the rest, and trims majors where more than six would form.
+nations holding a planned specialist (measured 2026-10-11, when a major was a nation holding a
+champion). Reconciliation therefore removes nations on about half the library and adds them on the
+rest, and trims majors where more than six would form.
 
 **Same pipeline, all bodies.** Nation generation runs only on bodies with sufficient habitable
 area — the homeworld. The pipeline is body-agnostic; it reads tile
@@ -150,7 +150,7 @@ untouched. Full stage design: `../lore/HISTORY.md`.
 
 The settlement pass is BL-218 (nations rewrite). Between the ladder and the seeds sits `run_settlement` (`src/world/settlement.cpp`), which turns
 the ladder's cradles and the creeds' pantheons into **regions** — the unit that actually gets
-settled, industrialised, fought over, and read by corporation generation.
+settled, industrialised, fought over, and read by industry generation.
 
 Per region it records: the anchor tile, the **culture it inherits** (the culture of the stream
 that reached it — [COLONISATION.md](COLONISATION.md) § Culture arrives by route — so the pantheon
@@ -392,7 +392,7 @@ reading he accepted, so a further drop still fails.
 Each nation's resource profile is computed by summing the deposit profiles of its tiles,
 weighted by composition type. The result is a read-only descriptor — `iron_ore_abundance`,
 `agricultural_abundance`, `petroleum_abundance`, etc. — used to characterise the nation
-economically for diplomacy initialisation and corporation generation.
+economically for diplomacy initialisation and industry generation.
 
 ### Pass 4 — Political character assignment
 
@@ -445,12 +445,11 @@ tongue is **not true of every site** — the exceptions are the reason a registe
 | Region names | `settlement.cpp` | Yes, **both halves** — the culture half and the quarter word |
 | City names | `city_names.cpp` | Yes — `coin_lexicon` over the founding culture's tongue |
 | Culture and god names | `creeds.cpp` | Yes — the tongue's own word builder |
-| **Corporation names** | `make_corp_name`, `corporation_generation.cpp` | **Partly.** The identifier half is invented or borrowed from the home nation's leading syllable, so it inherits that tongue; the **type** half is one of twelve English structural words (`k_corp_types`). See [CORPORATION_GENERATION.md](CORPORATION_GENERATION.md) § Pass 5 — Naming. |
+| ~~Corporation names~~ | — | **Retired** with the corporation (Ben, 2026-10-23; [CORPORATION_GENERATION.md](CORPORATION_GENERATION.md) § Pass 5 — Naming). |
 
-**The corporation type word is the one sanctioned English survival in generation**, and it is
-deliberate: a corporation is a modern institution the player reads as one, and "Holdings" does
-the work a coined syllable would not. Nothing else in the register may acquire an exception by
-resembling it.
+**No English survival is sanctioned in generation.** The corporation type word ("Holdings") was the
+one, and it retired with the corporation (Ben, 2026-10-23). Nothing in the register may acquire an
+exception by resembling it.
 
 **A tongue with no phoneme inventory cannot coin**, so `quarter_word` keeps an English fallback
 table for that case alone — a region with no name at all would be worse than one out of
@@ -563,9 +562,9 @@ nation-owned tile it finds the nearest population centre on the same body (Cheby
 and computes a **density ripple**: `max(0, 1 − dist/8) × centre.scale`, taking the strongest
 centre. That value is written to `tile_component.substrate_density`.
 
-**Nothing reads the field.** The background economy is carried by real background firms
+**Nothing reads the field.** The economy is carried by real buildings each nation owns
 (`CORPORATION_GENERATION.md` § Pass 6), not by a per-tile capacity aggregate, and the Industry
-lens (`body_surface_canvas.cpp`) reads those firms' plant on each tile directly. The ripple is a
+lens (`body_surface_canvas.cpp`) reads that plant on each tile directly. The ripple is a
 settlement-density description with no consumer. The pass requires population centres to already
 exist — which is why `generate_population_centres` runs before `generate_nations` in
 `hard_coded_world.cpp` (see § Settlement generation below).
@@ -577,11 +576,13 @@ nation and sees its starting credits, so a median nation opening on a fraction o
 defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
 across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
 granted at the handoff. **No major leaves generation on a zero treasury (Ben, 2026-10-19):** a major
-holds state industry — its share of the hubs that make Logistic Points among it — and a state that
-cannot fund any of it idles every hub at the first tick and starves the firms on its ground. Two
-rules hold it there. **A state founding leaves a year of the state bill in the chest, counted from the game's
-opening** (Ben, 2026-10-19): the twelve settle ticks before the opening plus four, sixteen ticks of
-what the funding gate would charge its state industry, hubs included: it pays only from what lies
+owns every building on its ground, its hubs among them (Ben, 2026-10-23), and a nation that
+cannot fund its hubs idles every one at the first tick and starves the industry that draws their
+Logistic Points. Two rules hold it there. **A state founding leaves a year of the node bill in the
+chest, counted from the game's opening** (Ben, 2026-10-19; read since 2026-10-23 as the network-node
+bill the treasury pays first, `../politics/NATIONS.md` § What a nation owns): the twelve settle ticks
+before the opening plus four, sixteen ticks of what the funding gate would charge its network
+nodes: it pays only from what lies
 above that, and a shortfall is the founding's, never a mint. **No realm closes the history empty**
 (Ben, 2026-10-19): the poorest realms earn more across the spans — the same earning lever as below,
 lifting the floor and keeping the order — until none folds an empty chest. Three rules carry it:
@@ -589,7 +590,7 @@ lifting the floor and keeping the order — until none folds an empty chest. Thr
 the standing army carries only a share of the earn, and tribute is a share of the earn rather than
 the chest (`EXPLORATION.md` § Force persists, and the tribute clause). The army share and the
 endowment floor are **calibrated together by sweep** against two targets: no major opens short of a
-year of its state bill, and the median nation still opens inside 1,000–2,000 credits.
+year of its node bill, and the median nation still opens inside 1,000–2,000 credits.
 **Calibrated (Ben, 2026-10-19):** the army carries **600 per mille** of the earn and the endowment
 floor is **500 per mille** of the average realm's. The sweep met neither target fully — it cut the
 majors short of a year from 20 of 78 to 7 on natural worlds — and Ben accepted it, tracing what
@@ -602,15 +603,12 @@ Logistic Point source, a minor's as a major's (`../economy/LOGISTICS.md` § Wher
 the sources), so every nation holding network nodes carries a bill for them from the first tick. The
 endowment floor stays at 500 per mille: swept from 500 to the cap, it lifted few of the short realms
 and pushed more seeds' medians out of the band, and no floor reaches a nation the history never held.
-Instead, **the firms on a nation's ground fund its opening node bill**: at the fold, a nation still
-short of sixteen ticks of its state bill once the foundings' reserve is taken is topped up by the
-corporations holding buildings on its ground — never by more than those ticks of its network nodes'
-share of the bill, each firm paying by the buildings it holds there and never more than its balance.
-It is a transfer, never a mint. A nation no firm stands on, or whose firms cannot pay, keeps what it
-has; its capital's source stands but the funding gate idles it, and the coverage census reports it as
-dark rather than failing. No
-nation, the player's or a rival's, takes on debt before the game starts —
-a state charter (§ The nation count is a target) is paid from a treasury the history filled. How much
+The top-up that made **the firms on a nation's ground fund its opening node bill** (2026-10-22) is
+retired with the firms (Ben, 2026-10-23): it was a transfer from their balances, and every building's
+money is now the treasury's. A nation still short of sixteen ticks of its node bill once the
+foundings' reserve is taken keeps what it has; its capital's source stands but the funding gate idles
+it, and the coverage census reports it as dark rather than failing. No nation, the player's or a
+rival's, takes on debt before the game starts. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
 (Ben, 2026-10-11):
 - **The target:** a typical (median) nation opens on **1,000 to 2,000 credits** — for now, to be
@@ -635,8 +633,9 @@ more, and through which earnings, is settled by measurement (BL-1298) against th
   2,200 credits pooled over 760 years against 307,000 folded; the standing-army bill then drains the
   chests, so the median nation opens on **0.02 credits** and 49 of 77 majors on under one.
 
-The rate's own rationale below was argued against the old median (0.41 credits) and the corporate
-economy as it stood; it is re-read once the measured chests land, rather than kept by inertia.
+The rate's own rationale below was argued against the old median (0.41 credits), the extraction
+levy and the corporate economy as they stood; the levy and the corporations are retired (Ben,
+2026-10-23), so the rationale is re-read once the measured chests land, rather than kept by inertia.
 
 `nation_component::treasury` opens on **what the history banked, not what the campaign has yet
 earned**. NATIONS.md's rule — a treasury nothing has credited is zero, and a treasury that started
@@ -669,8 +668,8 @@ that is, **0.01 per mille — one credit per 100,000 units of material**
 and **kept when the credit moved to the 1960 close (Ben, 2026-09-22, NR-912): the rate stands, and
 the skew below is the history's, not the rate's.** Measured on the reference seed's shipped world:
 
-- **The first quarter's budget.** Every nation's extraction levy (NATIONS.md § 3) is its whole
-  quarterly income at the open — ~7.5 credits a nation in quarter one when the rate was chosen. The
+- **The first quarter's budget, as argued.** Every nation's extraction levy (retired, Ben, 2026-10-23) was its
+  whole quarterly income at the open — ~7.5 credits a nation in quarter one when the rate was chosen. The
   rate was first argued on the median POLITY chest (~10 million material, ~100 credits: thirteen
   quarters of levy). But a nation opens on its OWN folded chest, and most realms fold small ones:
   on the reference seed the **median nation opened on 0.41 credits** when the rate was chosen (3.64,
@@ -678,7 +677,7 @@ summing 13,683, on the 2026-10-11 census), 22 of the 38 on under one,
   and 14 on 100 or more — thirteen quarters of levy and upward. So the reserve is held by the
   realms that inherited empires' chests, and most realms open on their levy alone. Ten times the
   rate (0.1 ‰) would lift that median to ~4 credits and multiply every hoard with it.
-- **The corporate economy it faces.** At 0.01 ‰ the reference seed's 38 treasuries sum to
+- **The corporate economy it faced, as argued.** At 0.01 ‰ the reference seed's 38 treasuries sum to
   **31,691 credits** and the richest realm opens on **5,420** — a state that can fund a line or two
   of its budget (NATIONS.md § 1) without becoming the economy's largest buyer on tick one. At
   0.1 ‰ the treasuries alone would sum to ~317,000, an order of magnitude past a corporate field's
@@ -691,8 +690,8 @@ close are — a consequence of the spans' own endowment and trade income, not a 
 authored here.
 
 **What this pass is not.** It is not a mint inside the campaign: it runs once, at world creation,
-as the fold of a stock the history already held, on the same footing as a corporation's opening
-capital (`CORPORATION_GENERATION.md`). It says nothing about what the treasury is *spent on* —
+as the fold of a stock the history already held. It is the only opening money any actor holds:
+the buildings generation places draw on it (`CORPORATION_GENERATION.md` § Pass 4). It says nothing about what the treasury is *spent on* —
 NATIONS.md § 1 owns the budget, and Industrialisation owns whatever the 1660 → 1960 span adds to it.
 
 ---
@@ -711,7 +710,7 @@ Each centre draws a **scale** 1–5 from a weighted distribution (40/30/20/8/2%)
 tongue rolled for the body, replaced later by `name_population_centres` — see Pass 5) so
 naming never perturbs placement.
 
-**Market carving** — after nations and corporations exist, `hard_coded_world.cpp` seeds the
+**Market carving** — after nations and their industry exist, `hard_coded_world.cpp` seeds the
 homeworld's markets from the centres. Markets anchor to population-centre tiles but are
 **resource-carved** (BL-096, resource-carved markets): each nation's tradeable-raw
 concentration (mean deposit per owned tile, seeded jitter ×[0.85, 1.15]) is classified against
@@ -793,24 +792,20 @@ already settled by then, and the recolour reads as them becoming real nations.
 
 ## Relationship to corporations
 
-Corporations are legally registered within a nation and operate within its territory by default.
-The nature of this relationship — what obligations it creates, what it restricts, and how it
-evolves across Eras — is an open design item. See `CORPORATION_GENERATION.md` § Open items and
-`docs/politics/NATIONS.md`.
+**Retired** (Ben, 2026-10-23). There are no corporations: a nation owns every building on its
+ground and builds only there (`docs/politics/NATIONS.md` § What a nation owns, § Own ground).
 
 ---
 
 ## Open items
 
-**Nation system design.** What nations actually *do* — tax corporations, issue licences, declare
+**Nation system design.** What nations actually *do* — build and run their industry, tax wages, declare
 war, provide infrastructure — is owned by [`docs/politics/NATIONS.md`](../politics/NATIONS.md),
 including the calls it leaves open. The generation layer exists so the world has political
 structure from turn one independent of how much of that system is designed.
 
-**Era-based reform.** There is a working hypothesis that later Eras will see corporations
-become de-facto powers above states, with the nation layer diminishing in authority as the
-game progresses. This has significant implications for what nations need to be able to *do*
-and how that capability decays. It is noted here and unscoped.
+**Era-based reform.** The hypothesis that later Eras see corporations become powers above states
+retired with the corporation (Ben, 2026-10-23).
 
 **Fragmentation and history.** Pass 2c is a *light* "in history" pass (over-seed +
 merge-below-the-size-floor, giving varied sizes and irregular borders), and the settlement sim
@@ -819,5 +814,5 @@ live political fact rather than a border shape — have no owner in the generati
 (war redraws borders) is the first thing that moves a border after generation.
 
 **Off-homeworld politics.** As colonies establish on other bodies, some form of jurisdiction
-and governance will be needed there. Whether this extends the nation model or introduces a
-new corporate governance model is unresolved.
+and governance will be needed there. Whether this extends the nation model is unresolved; a corporate
+governance model is not a candidate (Ben, 2026-10-23).

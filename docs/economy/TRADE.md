@@ -19,7 +19,7 @@ travels as a convoy (`SUPPLY.md`).
 
 ## The Planetary Marketplace
 
-A **Planetary Marketplace** is a building a corporation owns. It makes **trade points** for its
+A **Planetary Marketplace** is a building a nation owns, on its own ground. It makes **trade points** for its
 owner each tick, at its staffed rate, as a processor makes goods. Trade points are a **rate**,
 not a stock: made and spent within the tick, never banked — the Logistic Points rule
 (`LOGISTICS.md` § Logistic Points), applied to an owner's capacity.
@@ -88,7 +88,7 @@ so the Market ledger can say how much of a market's business is trade (`../ui/le
   resolved price**, the price the import tariff already charges on (`MARKETS.md` § Tariffs). A
   cargo intercepted on its lane never lands and is never counted in.
 
-Every corporation's trades count, the player's and every AI's alike: the figure describes the
+Every nation's trades count, the player's and every AI's alike: the figure describes the
 market, not the trader. Each accumulates through a quarter and is published at the quarter's
 end, so the ledger reads the **last completed quarter**. **It is a report, never an input**: no
 simulation step reads it, so it moves no price, decision or digest. **It is not saved**: a loaded
@@ -114,9 +114,12 @@ and propellant (`LOGISTICS.md`, `SUPPLY.md`). The same reach binds manual and au
   trade did not spend stay reserved: they are held back from every market in proportion to what
   it has left. Deterministic: candidates in a fixed order, ties broken by market and resource id.
 
-**Who may trade (Ben, 2026-10-10).** The player and every AI corporation. An AI corporation may
-set **manual** trades as well as run auto, and may **build a Planetary Marketplace** — two grants
-in `../ai/AI_OPPONENT.md` § 11 — under the grant constraints every AI decision is bound by.
+**Who may trade (Ben, 2026-10-10; re-subjected Ben, 2026-10-23).** The player's nation and every
+AI nation. An AI nation may set **manual** trades as well as run auto, and may **build a Planetary
+Marketplace** — two grants in `../ai/AI_OPPONENT.md` § 11, carried over from the corporation
+unchanged in their terms — under the grant constraints every AI decision is bound by. **Trade
+crosses borders:** a nation sells onto any market its shipments reach; only placement is bounded
+to its own ground (`../politics/NATIONS.md` § Own ground).
 
 ## Trade in generation
 
@@ -127,24 +130,23 @@ campaign opens with (Ben, 2026-10-10).**
   **trade points** where it trades, or where its relations with another are good. Those points
   move goods between the markets of the nations that hold them, by the same capacity and the same
   network, and they replace the Exploration age's trade flows (`../generation/EXPLORATION.md`).
-  The history's points are a nation's, not a corporation's: no corporation exists before the
-  charter walk.
+  The history's points are a nation's, as every trade point is.
 - **After Industrialisation, the record is spent.** The trade points a history accumulated are
   consumed to **retrofit Planetary Marketplaces** where trade most likely took place: on the
-  markets whose trade the history carried, owned by the corporations chartered there. A route
+  markets whose trade the history carried, owned by the nation whose ground each stands on. A route
   the history never traded gets no Marketplace for its sake.
 - **How the record is read (approved by Ben, 2026-10-10).** Each round, a nation's trade flows
   credit their volume to both ends, each at its own capital, and each standing mutual treaty
   credits its years to both sides' capitals (tribute does not count). At the end of generation
   the record converts to points by authored rates (`world_gen.trade_retrofit` in data) and each
   market whose history traded buys up to a capped count of Marketplaces at an authored price in
-  points. **Owner:** the corporation, other than the seat, with the most buildings in that
-  market's catchment (ties to the lower id); a market where no corporation holds ground gets
-  none. **Site:** the free tile of the catchment nearest the market's centre that placement
-  allows. A retrofitted Marketplace is built and staffed when the campaign opens.
-- **The 1960 settle** runs trade as play does, on the corporations' Marketplaces.
-- **The seat holds a Marketplace only if its corporation has one by the end of generation**
-  (Ben, 2026-10-10); the player builds the first otherwise.
+  points. **Site:** the free tile of the catchment nearest the market's centre that placement
+  allows. **Owner:** the nation whose ground the site stands on (Ben, 2026-10-23: every building
+  generation places is its ground nation's); a market with no nation's ground in its catchment
+  gets none. A retrofitted Marketplace is built and staffed when the campaign opens.
+- **The 1960 settle** runs trade as play does, on the nations' Marketplaces.
+- **The player's nation holds a Marketplace only if generation left it one** (Ben, 2026-10-10);
+  the player builds the first otherwise.
 
 ## The capacity table
 
@@ -154,7 +156,7 @@ approval (Ben, 2026-10-10). No value is final until he has approved it.
 
 ## What trade replaces
 
-The corporation convoy (a pool hauling its own surplus), the market export (a market shipping
-its shelf to a richer one), and sell orders all retire with corporation pools
+The owner's convoy (a pool hauling its own surplus), the market export (a market shipping
+its shelf to a richer one), and sell orders all retire with owners' pools
 (`MARKETS.md` § The shelf economy). Convoys remain as the **shipment** of a trade: the cargo,
 lane, interdiction and arrival rules in `SUPPLY.md` hold for a trade's goods in transit.

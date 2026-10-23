@@ -2,10 +2,10 @@
 
 > **Settles:** what a building is and what a recipe consumes and yields · how extraction and
 > processing throughput are shaped · how much labour a building demands and what a shortfall
-> does to its output · how construction and power are paid for · what a fresh corporation can
+> does to its output · how construction and power are paid for · what a fresh nation can
 > build on day one.
 > **Not here:** what a good is and what it is worth (RESOURCES) · where the labour comes from
-> and how it is contended for (POPULATION) · what a building costs the balance each tick
+> and how it is contended for (POPULATION) · what a building costs the treasury each tick
 > (FINANCE) · where the output goes to be sold (MARKETS).
 > **Confused with:** RESOURCES.md, POPULATION.md, FINANCE.md.
 
@@ -41,7 +41,7 @@ Output rate is the product of four factors:
 
 i.e. `output = base_rate × richness × workforce × (1 − hazard) × 0.8^(k−1)`, where `base_rate` is a Lua-authored economic constant and `k` is the site's 1-based rank in its tile's stack.
 
-Deposits **deplete** (BL-079, deposit depletion): `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), while `resource_remaining[r]` is a finite reserve — seeded at generation to richness × a reserve factor — that extraction draws down each tick. As the reserve nears empty the output **tapers**, then the building reports the deposit **exhausted** and stops. Richness sets the rate; the reserve sets how long the tile pays out — the boom-bust arc a resource-dependent corporation rides.
+Deposits **deplete** (BL-079, deposit depletion): `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), while `resource_remaining[r]` is a finite reserve — seeded at generation to richness × a reserve factor — that extraction draws down each tick. As the reserve nears empty the output **tapers**, then the building reports the deposit **exhausted** and stops. Richness sets the rate; the reserve sets how long the tile pays out — the boom-bust arc a resource-dependent economy rides.
 
 A tile can carry **several** extraction sites on one deposit. What that costs, and what it
 buys, is § Building stacks below — a fourth factor (stack rank) on the output above, and a
@@ -163,7 +163,7 @@ aggregate 12.6468** (spread 28.36% of the mean); `k` is that aggregate, and at i
 total **100.01%** of the pooled per-tile capacity.
 
 **At generation density it refuses nothing, and that is the expected outcome.** Measured
-post-background-firms across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115%
+post-background-economy across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115%
 used**, and **zero** provinces at their ceiling on any seed. Its value is forward: it is the
 ceiling that makes "pack more productivity into a smaller space" a real trade-off once density
 rises, and the natural place for infrastructure to pay off into.
@@ -319,7 +319,7 @@ belong here rather than there:
 
 - It sits at the **same depth as alloys**, one step below the Assembly Plant, deliberately. That
   is a statement about the roster's shape, not a lock: depth does not gate, so what keeps ordnance
-  off a starting corp's tick-one menu is the availability of its inputs, not a refusal.
+  off a starting nation's tick-one menu is the availability of its inputs, not a refusal.
 - It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
   consumer is one revert away from orphaning a good.
 - Its `base_price` (155.8) is **derived**, not authored — what its cheapest route needs under
@@ -341,7 +341,7 @@ army needs.
 The second route is the **heavy** one (NR-257): more structural mass and worked machinery, none
 of the refined-electronics chain. It is a *supply route* rather than an alternate method in
 § Alternate production methods' sense — its inputs are disjoint from the first's, so which one a
-corp runs is decided by what its industry already reaches, not by comparing two prices at one
+nation runs is decided by what its industry already reaches, not by comparing two prices at one
 building. It is also `machinery`'s first consumer.
 
 #### In-situ and premium routes
@@ -481,8 +481,8 @@ no Construction Yard and no Power Plant recipe. Verified by
 
 **The railway station (Ben, 2026-10-13).** A tile building on a city tile touching a rail line,
 like the port on land: zero staff, a build cost and upkeep. It is where goods board and leave the
-rail network (`LOGISTICS.md` § 4c); track is laid tile to tile beside it. Both are state industry
-in a major.
+rail network (`LOGISTICS.md` § 4c); track is laid tile to tile beside it. Both are the nation's,
+like every building on its ground (Ben, 2026-10-23).
 
 Infrastructure buildings affect logistical or economic capacity rather than extraction or processing directly.
 
@@ -541,11 +541,11 @@ version bump and no per-array edit (BL-107, save-format header).
 The pool this demand draws on — how much labour a body's centres yield, who wins it when it is
 scarce, and what it is paid — is [`POPULATION.md`](POPULATION.md) § Workforce model.
 
-**Demand** is the sum of `workforce_assigned` over the corp's producing buildings on the body
+**Demand** is the sum of `workforce_assigned` over the nation's producing buildings on the body
 (extraction and processing only; ports and hubs demand no labour), capped by the body's
 habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce).
 
-What a building's labour and maintenance cost the balance each tick is
+What a building's labour and maintenance cost the treasury each tick is
 [`FINANCE.md`](FINANCE.md) § Building operating cost.
 
 `workforce_assigned` itself is an authored constant set at placement (0.5 for producing types,
@@ -556,9 +556,9 @@ What a building's labour and maintenance cost the balance each tick is
 
 On top of the assigned fraction sits a **workforce target** (`building_component.workforce_target`, 0–200 internally, default 100). **The player reads it as 0–100 % of full employment** (Ben, 2026-10-13: *"100% is just the label for fully employed"*): the shown percentage is the internal target ÷ 2, so a building at the internal maximum reads 100 % and the economy is unchanged by the label — a scalar on both output and the labour portion of wages/maintenance, applied identically in `economy_system` and `budget_system`. The design is BL-181 (workforce auto-solver).
 
-**The game sets the player's workforce, and it moves one step a quarter** (Ben, 2026-10-13: *"let the game auto set the workforce, approaching a more profitable value every quarter"*). Each economy tick (a quarter), `solve_workforce_target` (economy_system.cpp) finds the target that maximises the building's estimated net profit on the grid **0, 25, 50, 75, 100 %** shown (0, 50, 100, 150, 200 internal), and the building's target moves **one 25 % step toward it** — never further in one quarter. A building already at the best target stays. The step is the game's answer to a solver that would otherwise jump: staffing follows the market, it does not snap to it. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, `docs/economy/MARKETS.md`). The solver reprices each candidate tier against that response — inside the same authored price band the market clears in (`wf_target_price`, MARKETS.md § Where the band lives) — and takes the best net. It is deterministic (reads last tick's market state), **player-corp only**, and applies only to producing types (extraction / processing).
+**The game sets the player's workforce, and it moves one step a quarter** (Ben, 2026-10-13: *"let the game auto set the workforce, approaching a more profitable value every quarter"*). Each economy tick (a quarter), `solve_workforce_target` (economy_system.cpp) finds the target that maximises the building's estimated net profit on the grid **0, 25, 50, 75, 100 %** shown (0, 50, 100, 150, 200 internal), and the building's target moves **one 25 % step toward it** — never further in one quarter. A building already at the best target stays. The step is the game's answer to a solver that would otherwise jump: staffing follows the market, it does not snap to it. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, `docs/economy/MARKETS.md`). The solver reprices each candidate tier against that response — inside the same authored price band the market clears in (`wf_target_price`, MARKETS.md § Where the band lives) — and takes the best net. It is deterministic (reads last tick's market state), **the player's nation only**, and applies only to producing types (extraction / processing).
 
-**The player has no workforce control** (Ben, 2026-10-13): the slider, the **Auto** control and the player's `set_workforce` verb are retired, and the building card shows the target read-only. This REVERSES the BL-181 opt-out (a manual tier pinned the value; Auto handed it back). It is still the sole sanctioned auto-action on the player's corp, now without the opt-out — `../ai/AI_OPPONENT.md` § 11 records the change. Rival corporations keep their own `set_workforce` verb under their grant, within the same internal 0–200 range.
+**The player has no workforce control** (Ben, 2026-10-13): the slider, the **Auto** control and the player's `set_workforce` verb are retired, and the building card shows the target read-only. This REVERSES the BL-181 opt-out (a manual tier pinned the value; Auto handed it back). It is still the sole sanctioned auto-action on the player's nation, now without the opt-out — `../ai/AI_OPPONENT.md` § 11 records the change. Rival nations keep their own `set_workforce` verb under their grant (carried over from the corporation, Ben, 2026-10-23), within the same internal 0–200 range.
 
 *Fidelity:* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (25 % steps) — so the target can hunt by ±one step between two tiers of near-equal net.
 
@@ -576,13 +576,13 @@ prices power on — never its own market's alone.
 
 ## Output and the shelf
 
-**A corporation holds no stock; its output lands on a market's shelf and is sold there (Ben,
+**A nation holds no stock; its buildings' output lands on a market's shelf and is sold there (Ben,
 2026-10-10).** `MARKETS.md` § The shelf economy owns the rule; this section is production's side
 of it.
 
 **A building clears in its own tile's market.** Its output lands on the shelf of the market whose
 catchment holds the building's tile (`market_for_tile`), and its inputs and upkeep are bought off
-that same shelf (Ben, 2026-09-15: the market, not the body, is the unit). A corporation with works
+that same shelf (Ben, 2026-09-15: the market, not the body, is the unit). A nation with works
 in two catchments on one body sells into and buys from two markets, and moving goods between them
 is a trade (`TRADE.md`).
 
@@ -599,11 +599,10 @@ haul it does not pay, not goods it does not buy.
 **Output lands at the clear, not when it is made.** A processor cannot draw a sibling's output from
 the same tick; the goods reach the shelf at the clear, for the next tick's draws.
 
-**What it costs, stated.** A firm whose works straddle a catchment line does not feed a processor
+**What it costs, stated.** A nation whose works straddle a catchment line does not feed a processor
 from a mine in the neighbouring catchment by moving goods between its own buildings; it trades, or
-its processor buys what its own market holds. Generation anchors a firm's holdings within about a
-tile of its home region, so most firms sit in one catchment, but the landscape search must score a
-straddling roster as the logistics problem it is. Labour pools stay per `(corp, body)`
+its processor buys what its own market holds. The landscape search must score a straddling
+placement as the logistics problem it is. Labour pools stay per `(owner, body)`
 (`POPULATION.md` § The labour pool) — people commute within a body; goods do not teleport within
 one.
 
@@ -613,8 +612,8 @@ for its output to go; a body's first completed building spawns its market
 is likewise not made (§ Power).
 
 **The opening stock is on the shelves.** Generation's opening stock is placed on the shelves of the
-markets each corporation sits in, split by how many of its buildings each market's catchment holds
-(its HQ market if none), and no money moves for it (`../generation/CORPORATION_GENERATION.md`
+markets each nation's buildings sit in, split by how many of its buildings each market's catchment
+holds (its capital's market if none), and no money moves for it (`../generation/CORPORATION_GENERATION.md`
 § Pass 4b).
 
 At the economy tick boundary:
@@ -626,11 +625,11 @@ At the economy tick boundary:
    this tick (the *want*, the whole need — MARKETS.md § Want and fill), plus population and
    background demand.
 3. **Transactions clear at the market.** A landing is paid at the tick's clearing price, and a
-   draw off the shelf is billed at the posted price it was drawn at, against the corporation's
-   balance. The price is resolved each Tick from the supply/demand ratio as
+   draw off the shelf is billed at the posted price it was drawn at, against the owning nation's
+   treasury. The price is resolved each Tick from the supply/demand ratio as
    `base × √(demand/supply)`, clamped to the `[0.25×, 10×]` band and EMA-smoothed. Demand and
    supply come from real actors: population centres and the offstage economy on the demand side,
-   real background firms on the supply side. See `docs/economy/MARKETS.md` for the clearing model.
+   every nation's real buildings on the supply side. See `docs/economy/MARKETS.md` for the clearing model.
 
 ---
 
@@ -705,6 +704,9 @@ the purchase is its upkeep draw. Ben, 2026-08-31, settling this:
 > good when it is taken as upkeep. Therefore corporations can buy power from each other, and
 > background companies can produce power with a profit."*
 
+The buyers and producers are nations' buildings (Ben, 2026-10-23); the ruling that power is bought
+and made at a profit stands.
+
 So power is:
 
 - **A bought good.** It has a price, it clears on the market, and a short building **bids for it** —
@@ -723,18 +725,18 @@ So power is:
 **Generation is sized per grid, not per body (Ben, 2026-10-07; BL-1232, power plants per grid).**
 Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation is measured where
 it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
-and a power firm is placed in a short grid's provinces. A surplus on the core grid never cancels a
+and a power plant is placed in a short grid's provinces. A surplus on the core grid never cancels a
 deficit on another. A grid needing less than half of one plant's output is left to a road that
 joins it to a bigger one rather than given a plant of its own. **Unpowered grids first (Ben,
-2026-10-08):** the body's power firms — a capped number — go first to short grids with no
+2026-10-08):** the body's power plants — a capped number — go first to short grids with no
 generation at all, and only then to grids that already have some, so a core grid's shortfall
-cannot take every firm and leave a secondary grid dark for the campaign. The scorer's power-plant estimate
+cannot take every plant and leave a secondary grid dark for the campaign. The scorer's power-plant estimate
 reads the same per-grid gap, and counts plants already under construction on that grid as supply
 (`../ai/AI_OPPONENT.md`). Measured before: generation put every plant on the body's core grid on
 four of five seeds, and the settle then started 11–13 plants on a grid needing one.
 
-**Generation is a business, not a cost centre.** Background firms build power plants and run them at
-a profit, which is the point: it gives the world a firm type with a reason to exist, and it means
+**Generation is a business, not a cost centre.** Nations build power plants and run them at
+a profit, which is the point: it gives the plant a reason to exist, and it means
 power supply is induced by price the way every other good's is.
 
 ### Why this closes the fuel chain at BOTH ends
@@ -750,11 +752,11 @@ upkeep bid. Both bid, so neither severs the chain — which is MARKETS.md proper
 satisfied twice over, and property 4's *derived demand propagates through links that bid* working
 exactly as designed.
 
-**An earlier draft of this section had power NOT traded** — generated by a corp for its own connected
+**An earlier draft of this section had power NOT traded** — generated by an owner for its own connected
 buildings. Ben overturned it the same day, and the reason is the one that matters: as private
-infrastructure, power demand is bounded by each corp's own generation, which is a small closed loop.
+infrastructure, power demand is bounded by each owner's own generation, which is a small closed loop.
 As a bought good, **every building on the map is a buyer**, which is the economy-scaled sink the
-census says is missing. It also fixes the harsher consequence of the private reading, where a corp
+census says is missing. It also fixes the harsher consequence of the private reading, where an owner
 with no fuel access was simply stuck; now it buys power from someone who has fuel, which is trade.
 
 ### It trades internationally, and that is not a detail
@@ -784,7 +786,7 @@ rupture. That is a system feeding **Trade and Conflict at once**, which is the t
 ### Power is what makes the Industry channel viable
 
 MARKETS.md's Industry channel ships its rates at **zero**, because the goods it drew — tools, planks
-— are *produced 0.0* in band, so every draw went unmet and the firms it drew from collapsed 227 → 19.
+— are *produced 0.0* in band, so every draw went unmet and the operating firms of the time collapsed 227 → 19.
 Power is the first entry in that basket the world will actually make, because making it is
 profitable. Turning Industry on for power is therefore a different proposition from turning it on for
 tools, and this is the order to do it in.
@@ -792,9 +794,9 @@ tools, and this is the order to do it in.
 ### The shortfall rule, and the lesson it inherits
 
 A building short of power **scales its output down**; it is not idled. This is not a preference, it
-is the BL-641 lesson applied before the fact: an upkeep draw that idles a firm kills the buyer that
+is the BL-641 lesson applied before the fact: an upkeep draw that idles a building kills the buyer that
 would have induced the supply, and the measured result was operating firms collapsing **227 → 19**.
-A firm that survives on reduced output keeps bidding for fuel, and the generation that answers it
+A building that survives on reduced output keeps bidding for fuel, and the generation that answers it
 gets built.
 
 ### Band
@@ -855,7 +857,7 @@ pool it becomes a correctness problem**, because capacity is contended: a scorer
 will propose builds the pool cannot serve, every evaluation, for as long as the pool is short.
 
 Construction is a **market-gated, pay-as-you-build** process, not an instant purchase (BL-095,
-construction pacing). Placing a building gates only on affordability (the corp must be able to
+construction pacing). Placing a building gates only on affordability (the nation's treasury must
 afford the whole build to commit to it) and does **not** debit up front. Each economy tick a
 building under construction:
 
@@ -892,7 +894,7 @@ an accident of arithmetic: a mountain build hauls more stone and keeps a crew lo
 **So it is priced at placement.** Every reader of a build's cost — the affordability gate, the
 Build door's capex preview and the rival scorer — prices `cost × site multiplier`, never the
 authored cost alone. A commitment gate that priced less than the build will draw admits a build
-the corp or the market cannot finish — a 35-steel base on a market holding 36.5 steel, at a site
+the nation or the market cannot finish — a 35-steel base on a market holding 36.5 steel, at a site
 that draws 43. Owner: BL-1066 (the player cannot build).
 
 ### Construction materials are per-named-building, not per-type (BL-590, 2026-08-24)
@@ -922,7 +924,7 @@ same physical building. See `scripts/economy.lua`'s `buildings.extraction_site.m
 / `buildings.processing_facility.material_overrides` for the authored table.
 
 **A second sink for the shallow goods**, beyond flavour: timber, stone, clay and the BL-585
-goods now cost something to a corp that is *building*, not only something a recipe consumes — the
+goods now cost something to a nation that is *building*, not only something a recipe consumes — the
 demand that makes an early quarry worth owning even before its output has a processor waiting.
 
 **A watch this item does NOT resolve**, recorded rather than silently assumed:
@@ -968,7 +970,7 @@ every one of them is priced and consumed, per the admission rule.
 
 \* The Coking Kiln's own required depth, not `charcoal`'s overall depth — the Burner keeps that at
 1, since chain depth is a **min across recipes** (§ Chain depth below). The Kiln is BL-587's
-alternate method: unreachable until a corp has already smelted blooms, cheaper by the guard's
+alternate method: unreachable until a nation has already smelted blooms, cheaper by the guard's
 reference prices once it is. See § Alternate production methods.
 
 **Rows five through eight are BL-585/BL-586's first slice of the wide ancient roster** (2026-08-24)
@@ -1021,7 +1023,7 @@ generic types, as for the industrial roster.
 ## Chain depth — the growth track
 
 **The growth spine is chain depth** (Ben's ruling, chosen over building tiers, the ancient tech
-ladder and settlement scale; BL-428, chain depth). How far down the production graph a corp can
+ladder and settlement scale; BL-428, chain depth). How far down the production graph a nation can
 reach is what gates its next building, so progress is a *consequence of the economy it has built*
 rather than a parallel unlock system laid over it. The decisive argument: every alternative is a
 second system that must be kept in agreement with the economy, and depth is read off the recipe
@@ -1054,13 +1056,13 @@ Measured on the authored recipes: **industrial max depth 4, ancient max depth 3*
 
 ### What depth does not do — it is a readout, not a gate
 
-Depth is a **measurement of the economy a corp has built**, and it is only that. It does not gate
+Depth is a **measurement of the economy a nation has built**, and it is only that. It does not gate
 a building, a recipe, or a retool, and no seam refuses anything on it.
 
 **Tech is the only lock on a method** (Ben, 2026-08-29): *"most direct unlocks should be a
 consequence of research, not just economy... allow both corporations and companies to build any
-building, or use any method surfaced with current tech."* A corporation may place any building and
-run any recipe its **tech** permits, whatever it has or has not produced before.
+building, or use any method surfaced with current tech."* A nation may place any building (on its
+own ground) and run any recipe its **tech** permits, whatever it has or has not produced before.
 
 The reasoning is that a second progression axis has to earn its keep against the one already there.
 Research is the axis the design wants unlocks to hang from, and depth-as-a-gate duplicated it from
@@ -1074,7 +1076,7 @@ What survives, and where it is still read:
   whether one production method strictly dominates an interchangeable sibling.
 - **`recipe_registry::recipe_required_depth`** — a recipe's deepest input's depth. Derived in the
   same fixed point as `depth_of`, so the two cannot drift.
-- **`corp_reached_depth`** over **`corporation_component::produced_ever`** — the deepest good a corp
+- **`corp_reached_depth`** over **`corporation_component::produced_ever`** — the deepest good an owner
   has ever made, set by `run_extraction` / `run_processing` at the moment a good is actually
   produced. Produced-once-ever and never cleared.
 
@@ -1089,13 +1091,13 @@ the tick-0 opening. Measured on the authored recipes, the ancient ladder reaches
 **`tech_locked` reaches a recipe as well as a building type** (BL-588). `unlock_recipe` is a node
 effect arm beside the structure unlock: a node names a `recipe::name`, and
 `recipe_unlocked(w, reg, corp, recipe_id)` (`src/world/nation_tech.hpp`) resolves the id to that
-name and asks whether the corp's home nation holds the node, at both `construct_building` (returning the
+name and asks whether the owning nation holds the node, at both `construct_building` (returning the
 SAME `construction_result::tech_locked` the structure-level check already used) and
 `try_switch_recipe` (a new `recipe_switch_result::tech_locked`). It is checked at **both** doors,
 and that is not redundancy: guarding only placement would leave a one-click bypass — place an
 ungated method, retool onto the locked sibling in the same group, and the lock never has to be
 cleared. **`tech_locked` is the only recipe-level lock**; the era band decides which roster a
-campaign sees, and within that roster tech decides what a corp may run.
+campaign sees, and within that roster tech decides what a nation may run.
 A recipe no node unlocks is open to every nation. The Toolmaker (BL-586), the Bessemer Converter
 (BL-587) and `refined_copper` (BL-589) are open to every nation from the start — NR-1022 (old gates
 open, Ben, 2026-10-10).
@@ -1107,29 +1109,29 @@ stated in the code's own comment: *"the door not showing what the gate would ref
 shown-and-locked (Ben, 2026-08-24, same elicitation form as the opening ruling) — the alternative
 would have needed a new lock-reason string and a UI affordance the door doesn't have yet; the
 existing precedent already answers the question the same way. The clause removes a recipe only
-where a node unlocks it and the corp's nation does not hold that node.
+where a node unlocks it and the nation does not hold that node.
 
 **Depth has no player-facing readout.** It is an internal measure of the recipe graph and of what
-a corp has produced; no surface displays a reached-depth number, and none needs to, because the
-number no longer decides anything the player can act on. A corporation is told what it may build by
+a nation has produced; no surface displays a reached-depth number, and none needs to, because the
+number no longer decides anything the player can act on. A nation is told what it may build by
 the Build door's own contents, which is filtered by era and tech alone.
 
 ---
 
-## The start gate — what a fresh corp actually sees (BL-589, 2026-08-24)
+## The start gate — what a fresh nation actually sees (BL-589, 2026-08-24)
 
 Ben's steer authoring Sprint 17: *"most building types, and most recipes are not buildable on
-game start."* The opposite is now the design (Ben, 2026-08-29): a corp may run **any method its
+game start."* The opposite is now the design (Ben, 2026-08-29): a nation may run **any method its
 tech permits**, so the start gate is a **tech** question and nothing else.
 
-A fresh ancient corp — its nation holding no node, no buildings, no balance — sees the ancient
+A fresh ancient nation — holding no node, no buildings, no treasury — sees the ancient
 band's processing recipes open on tick one:
 
 | Group | Open at tick 0 | Why |
 |---|---|---|
 | Fuel Production | Charcoal Burner, Peat Kiln, Coking Kiln | The Burner and the Kiln are a genuine supply-route pair (disjoint raws — R2's own classification). The Coking Kiln is the deeper fuel route; it is open, and what limits it is whether its reagent can be bought, not a lock. |
 | Food Processing | Food Rations, Miller | The any-band/ancient pair, both open. |
-| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | An early corp may sell trade goods without earning anything first. |
+| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | An early nation may sell trade goods without earning anything first. |
 | Construction Materials | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
 | Metal Foundry | Bloomery Furnace (ore + timber → steel, the band's depth-one route), Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The Furnace needs only raws; the bloom chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
 | Advanced Fabrication | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
@@ -1159,11 +1161,11 @@ shared by both arcs), `ancient`, or `industrial` (BL-433, era band). Authored as
 silent fallback, because a typo would quietly re-admit a space-era entry to the ancient roster.
 
 **The campaign's band is `industrial` for every nation (Ben, 2026-10-10, overturning NR-929's band
-per nation):** every nation is playable and starts at the same tech level, so no nation's firms are
+per nation):** every nation is playable and starts at the same tech level, so no nation's buildings are
 held to the ancient roster. The band is fixed — not derived from the history, not from the epoch —
 and reads the same on a new game (`app::load_economy`) and on a loaded save (`load_game_from`). The
-Launchpad, the petroleum and propellant chains and the spacecraft chain are open to every nation's
-firms, gated only by tech and placement. `ERAS.md` § Where the ladder starts owns the rule. Epoch 0
+Launchpad, the petroleum and propellant chains and the spacecraft chain are open to every nation,
+gated only by tech and placement. `ERAS.md` § Where the ladder starts owns the rule. Epoch 0
 is retired (NR-920).
 
 **The band masks; it never removes.** A recipe's id is its index in the authored list and that id
@@ -1182,7 +1184,7 @@ because no research reaches it), and the Selection panel's build door filters on
 `building_available` so the door does not offer what the gate would refuse. Guard:
 `tools/verify/era_roster.cpp`.
 
-The band is **not** ERAS.md's Era 1 / Era 2 — that axis is per-corp progression *within* the
+The band is **not** ERAS.md's Era 1 / Era 2 — that axis is per-nation progression *within* the
 industrial arc, gated on space access. The untagged (`any`) processing recipes shared by both
 arcs are `food_rations` and `refined_copper`; everything else is banded.
 
@@ -1215,7 +1217,7 @@ strategic commitment, and it never calls `try_switch_recipe`. See
 **The no-dominance guard.** `tools/verify/chain_depth.cpp`'s `R2` is the live guard (moved from
 `recipe_switch_harness.cpp`'s retired `R1` on 2026-08-16 — see that file's own header for the
 retraction). It groups recipes by (primary output resource, era band) and buckets every
-same-output sibling pair as a **supply route** (disjoint raws — which one a corp runs is decided
+same-output sibling pair as a **supply route** (disjoint raws — which one a nation runs is decided
 by deposit access, not price), a named **precondition pair** (differs by a placement fact the
 recipe data cannot carry, e.g. atmosphere vs airless body), or a genuine **interchangeable
 method** — and only the third bucket is compared, on input-basket cost (a fixed reference-price
@@ -1329,7 +1331,7 @@ The hand-calibrated core the economy is tuned on:
 - Workforce scalar applied to both extraction and processing output.
 - Output landing on the market's shelf each economy tick, sold to the market at the clearing price.
 - Per-market supply/demand aggregation with live price resolution — `base × √(demand/supply)`, banded and EMA-smoothed (`src/world/market_clearing.cpp`; the full model is `docs/economy/MARKETS.md`).
-- A running per-corporation balance: sales income less input purchases, maintenance, and wages (`docs/economy/FINANCE.md`).
+- A running per-nation treasury: sales income less input purchases, maintenance, and wages (`docs/economy/FINANCE.md`).
 - The economy panel making all of the above observable.
 
 Introducing a named building type is an enum extension on `building_type`, not an authoring pass; the named vocabulary in this document is design intent carried by the generic types, their `target_resource`, and their recipe groups.

@@ -7367,6 +7367,340 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "own-ground",
+   "title": "BL-1399 - The nation acts for itself, and builds only on its own ground",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1399 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: nation_actor_seam"
+     ],
+     "requirement": "A nation may build on its own ground and is refused on another nation's tiles and on unowned ground, for every building kind.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: nation_actor_seam"
+     ],
+     "requirement": "A road may be laid one crossing into foreign ground and never from it.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: nation_actor_seam"
+     ],
+     "requirement": "A minor nation can issue a build with no champion anywhere in the world.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "nation-ai-actor",
+   "title": "BL-1401 - The build scorer runs nations: every non-player nation, major and minor, builds",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1401 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: nation_ai_builds"
+     ],
+     "requirement": "Every non-player nation, majors and minors, issues builds through the scorer.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: nation_ai_builds"
+     ],
+     "requirement": "The player's nation is never built for in a seated session.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism"
+     ],
+     "requirement": "Same seed, same world: two runs are byte-identical.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "fold-to-ground",
+   "title": "BL-1402 - The fold: every building passes to the nation whose ground it stands on",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1402 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: fold_census"
+     ],
+     "requirement": "After the fold no building is owned by a firm and none stands on foreign or unowned ground.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: fold_census, money_conservation"
+     ],
+     "requirement": "Money is conserved across the fold: the sum of balances plus treasuries before equals treasuries after.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: save_roundtrip"
+     ],
+     "requirement": "The world saves and loads identically after the fold.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "nation-money-flows",
+   "title": "BL-1403 - Tax from wages, tariff on foreign goods, no levy, no firm budget lines",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1403 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: tax_discontent_harness"
+     ],
+     "requirement": "Tax returns the tier's share of wages paid to the treasury each quarter; Discontent responds to the tier as before.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: money_conservation"
+     ],
+     "requirement": "The tariff charges the foreign seller nation and exempts a nation's own goods; it is a transfer.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: nation_budget_harness"
+     ],
+     "requirement": "No levy is seeded and no public_works or charters claim is paid.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "generation-for-nations",
+   "title": "BL-1404 - Generation buys buildings for nations; the legacy 8-corporation path retires; majors are a saved fact",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1404 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: fold_census on fresh worlds, 16 seeds"
+     ],
+     "requirement": "A generated world holds no corporation records and every building is its ground nation's.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: nation_targets_harness, save_roundtrip"
+     ],
+     "requirement": "The major count target is still always hit, and is_major round-trips the save.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: seat_clean_slate"
+     ],
+     "requirement": "The seat lists major nations and the player entity is a nation.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: market_viability"
+     ],
+     "requirement": "market_viability's five gates are measured and reported on the new world (FULL, par_seeds).",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "lp-one-class",
+   "title": "BL-1405 - Logistic Point share classes collapse: a nation's pool serves its own buildings",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1405 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: lp_coverage_census, lp_pool_harness"
+     ],
+     "requirement": "A nation's pool serves its own buildings as one class; the census rules still pass.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "ui-as-nation",
+   "title": "BL-1406 - The UI and the agent seam speak as the nation: no corporation lenses, ledgers or verbs",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1406 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: verifier-visual lens scripts",
+      "live: Ben's click"
+     ],
+     "requirement": "The seat screen, header and lenses read as the nation; no corporation surface remains.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: agent protocol harness"
+     ],
+     "requirement": "The wire refuses as_corp, buy_corporation and lobby; ACTIONS.json matches the verbs.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "delete-corporation",
+   "title": "BL-1407 - Delete corporation_component, world::corporations and every corporation verb",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1407 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "build: build_app.bat and all harness targets"
+     ],
+     "requirement": "corporation_component, world::corporations and owner_kind::corporation no longer exist and the full build links.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: save_roundtrip"
+     ],
+     "requirement": "A v54 save loads into the nation-owned world.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism, market_viability, player_seed_sweep, history_sim_harness, lp_coverage_census, nation_targets_harness"
+     ],
+     "requirement": "The load-bearing gates run green or report their movement.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "sprint-57-rebless",
+   "title": "BL-1408 - Sprint 57's one re-bless: digests and market_viability floors, with the movers attributed",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "promoted_from": "backlog.json BL-1408 - sprint 57 (Ben, 2026-10-23)",
+   "batch": "sprint-57",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: player_seed_sweep"
+     ],
+     "requirement": "Digests and floors re-pinned once on Ben's go, every mover attributed.",
+     "notes": null
+    }
+   ]
   }
  ]
 }

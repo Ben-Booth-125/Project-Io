@@ -192,7 +192,7 @@ storing one. Consequences:
   ledger-open (or on a body switch) is imperceptible and keeps the world model free
   of analysis-only data.
 
-This is the same principle the corporation/nation generators follow — derive, do not
+This is the same principle the nation and industry generators follow — derive, do not
 store, when the derivation is deterministic and cheap.
 
 ---

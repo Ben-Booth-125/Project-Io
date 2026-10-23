@@ -40,7 +40,7 @@ about force, not a military doc that happens to be about the past. Its neighbour
 | Question | Here | `MILITARY.md` |
 |---|---|---|
 | Which resolver | `resolve_battle` — region beats region, this year, in one evaluation | `resolve_campaign_battle` — two forces in a province, over rounds, with withdrawal |
-| Which roster gate | `available_rows(const region&, band)` — authored region endowment | `available_rows(const world&, corp, band)` — the corp's stockpile and market access |
+| Which roster gate | `available_rows(const region&, band)` — authored region endowment | `available_rows(const world&, actor, band)` — the raising nation's stockpile and market access |
 | Naval | **Scores, and is exercised here** | **Unmodelled** (§ Naval) |
 | Supply over water | A simplification, applied by this caller (§ Forage) | Overseas supply works; there is no starvation model |
 | Sea legs, colonisation | Owned here | — |

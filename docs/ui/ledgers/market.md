@@ -89,9 +89,9 @@ of my trade capacity do I steer, and what could I be moving?"**
 
 | Section | Read | Columns |
 |---|---|---|
-| **Trade points** | The acting corp's `trade_points` made on the last pass, its `trade_reserve` as used (clamped to what it makes), and the rest — auto. The reserve field and its **Set reserve** press (`set_trade_reserve`); a warning when the reserve exceeds what is made, or the manual trades ask for more than it covers | `Made X pts · manual Y · auto Z` |
-| **My trades** | The acting corp's manual trades (`world::trades`) that **leave or land on the selected market**, in placement order — the order the reserve is spent in. A count of its trades elsewhere; the **Add a trade** fold (good, from, to, points → `set_trade`); the seam's answer to the last trade press | Good · Route (`from > to`, by city) · Pts · `x` (`clear_trade`); units a tick on hover |
-| **All trades here** | Every corporation's manual trades touching this market | Good · Holder · Route · Pts |
+| **Trade points** | The acting nation's `trade_points` made on the last pass, its `trade_reserve` as used (clamped to what it makes), and the rest — auto. The reserve field and its **Set reserve** press (`set_trade_reserve`); a warning when the reserve exceeds what is made, or the manual trades ask for more than it covers | `Made X pts · manual Y · auto Z` |
+| **My trades** | The acting nation's manual trades (`world::trades`) that **leave or land on the selected market**, in placement order — the order the reserve is spent in. A count of its trades elsewhere; the **Add a trade** fold (good, from, to, points → `set_trade`); the seam's answer to the last trade press | Good · Route (`from > to`, by city) · Pts · `x` (`clear_trade`); units a tick on hover |
+| **All trades here** | Every nation's manual trades touching this market | Good · Holder · Route · Pts |
 | **Potential trades** | The trade pass's own ranking (`rank_trade_routes`) of routes leaving this market: only goods trade carries, a source shelf that holds the good under the fair-price ceiling, a margin above `dispatch_margin()` of the source price. Margin per unit; ordered by margin per point, best first | Good · To · Margin · `+` (fills the Add a trade form); buy, sell, haul, per-unit and per-point margin on hover |
 | **Recent exchanges** | The exchange record filtered to this market, newest first | qtr · Good · With · **Revenue** |
 

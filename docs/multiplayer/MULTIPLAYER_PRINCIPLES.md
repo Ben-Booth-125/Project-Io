@@ -80,8 +80,9 @@ maintain today and are expensive to recover once lost. They are framed as constr
 
 2. **Keep player actions expressed as discrete, serialisable commands.**
    **`corp_command`** (`src/world/corp_command.hpp`) is exactly the lockstep primitive —
-   `{tick, corp, verb, args}` over an append-only `corp_verb` enum, with rejections returned as
-   data (`corp_command_result`) rather than thrown. Its sibling `canvas_command` is
+   `{tick, actor, verb, args}` over an append-only `corp_verb` enum, with rejections returned as
+   data (`corp_command_result`) rather than thrown. The actor is a nation (Ben, 2026-10-23); the
+   type keeps its old name. Its sibling `canvas_command` is
    **navigation-only**; `corp_command` is the sim-mutating one (AI_OPPONENT.md § 6). Route any
    new player action through that seam rather than mutating simulation state ad hoc.
 
@@ -94,16 +95,16 @@ maintain today and are expensive to recover once lost. They are framed as constr
    snapshot depend on wall-clock time, frame timing, or render state weakens both saves and the
    future resync path.
 
-5. **Key new state by corporation, never by "the player".** The world carries one seat
+5. **Key new state by nation, never by "the player".** The world carries one seat
    (`world::player_entity`, the one-`is_player` invariant), and that is the single-player fact
    multiplayer would have to widen to N seats. Every surface that reads the seat directly adds to
    that widening. When adding player-facing state — a dial, a flag, a cache, a notification queue —
-   store it per `corporation_component` and *read* it through the seat, so the seat stays a lookup
+   store it per nation and *read* it through the seat, so the seat stays a lookup
    rather than a shape baked into the data.
 
 6. **Derive what a viewer knows as a function of the viewer.** The two fogs, competitor visibility
    and anything else gated on knowledge (`docs/ui/DISCOVERY.md`) should be computed *for a given
-   corp* from shared state, not stored as one global "what the player has seen". Under lockstep every
+   nation* from shared state, not stored as one global "what the player has seen". Under lockstep every
    client holds the whole world; what differs is only whose view is drawn. A per-viewer derivation is
    also what the `--serve` actor boundary already needs (`docs/ai/AI_OPPONENT.md` § 10).
 
@@ -143,9 +144,9 @@ restructured:
   `"IOOB"`, `"IOPC"`, `"IOSV"`). Networked clients must agree on the exact byte layout, so a
   protocol/schema version handshake becomes necessary — but migration and forward compatibility
   are a deliberately deferred decision, not a reversal of one.
-- **Multiple simultaneous actors.** Multiplayer means several corporations acting at once. The data
+- **Multiple simultaneous actors.** Multiplayer means several nations acting at once. The data
   model is already required not to preclude multi-faction play (`TECH_FOUNDATIONS.md` § Factions),
-  and every corporation is an equal `corporation_component` acting through the same seam, so this
+  and every nation is an equal actor acting through the same seam, so this
   extends the existing model rather than replacing it.
 
 None of these is load-bearing on a decision being made now. They are named here only so a future

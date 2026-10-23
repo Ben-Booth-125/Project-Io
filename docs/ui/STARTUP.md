@@ -72,7 +72,7 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
 - **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Quit**.
 - **Quick Start (Ben, 2026-10-08)** — generates the world straight through with no wizard rounds
   drawn but the setup round, which it opens alone (§ Rounds): the cold build behind one loading bar, then the **seat
-  screen**, so the player still chooses the corporation. It is the same world the wizard builds
+  screen**, so the player still chooses the nation. It is the same world the wizard builds
   on the same settings (§ Handoff: a cold build and an adopted world open on one state hash), so
   it is a way past the rounds, not a different game.
 
@@ -192,7 +192,7 @@ so each is a round of its own, with its own span.
 **No named individual appears in any round (Ben, 2026-09-24).** No ruler, founder or chartering
 magnate is named on a board, in a ticker line or at a mark. PEOPLE.md's rule is the reason: a
 person exists only where a role gates something, and no role gates anything in a lapse — a
-realm, a people, a creed and a firm are the actors the rounds name, and a face on one would be
+realm, a people and a creed are the actors the rounds name, and a face on one would be
 decoration. **Every lapse header names the body** the round is playing on.
 
 **Round 3 — Culture.** The Life round's 2D map, holding through this round's wait under a
@@ -341,18 +341,19 @@ borders) and **decolonisation** (subjects refuse renewal and stand as their own 
 over empire flare, and on some worlds one becomes general).
 **The round draws what the record carries of each, and no more (Ben, 2026-09-24).**
 
-- **Company creation flashes.** A `works_chartered` event at a region's anchor, in-span, each
+- **Charter flashes.** A `works_chartered` event at a region's anchor, in-span, each
   time the region's industry points cross the next multiple of a fixed fraction of the
   **running** price — the stock so far within the region's trade reach (its landmass) over the
   charter divisor, the same price the close settles on, so an early charter and a late one are priced by one rule — capped per
   region per round and gated exactly as a furnace crossing is. **Each is a real charter (Ben,
-  2026-09-25, NR-925):** the firm is founded at that crossing and its points are debited, so a
-  flash in 1720 is a firm that exists from 1720 (INDUSTRIALISATION.md § Beat 1 — Industry: cities
-  make industry points; BL-1122). The fraction is measured against the 1960 firm
+  2026-09-25, NR-925):** what it buys is founded at that crossing and its points are debited, so a
+  flash in 1720 is industry that exists from 1720 (INDUSTRIALISATION.md § Beat 1 — Industry: cities
+  make industry points; BL-1122). A charter buys **buildings owned by its centre's nation**, never
+  a firm (Ben, 2026-10-23). The fraction is measured against the 1960 charter
   count before it is fixed. **At the close the
-  flashes are the real charters** — the firms the search chartered from each city's budget,
+  flashes are the real charters** — what the search chartered from each city's budget,
   richest centre first, each at its anchor tile, each dated by pairing a region's k-th real
-  firm with its k-th in-span crossing — and never the world-gen roster, which the player never
+  charter with its k-th in-span crossing — and never a world-gen roster, which the player never
   meets. Heat blooms at a charter are not drawn.
 - **The rung crossing is narrated.** A generated world lights no region furnace; what the span
   computes is the **realm's** crossing into the industrial materials band, and that is the
@@ -385,7 +386,7 @@ over empire flare, and on some worlds one becomes general).
 **Its run is the whole build, and its record lands at the 1960 close.** (BL-1068, round six
 plays the span; Ben, 2026-09-24.) Rounds 3–5 each stop generation at their own close. Round 6
 sets no stop: its worker runs the Industrialisation span and then everything after it —
-borders, roads, the old-road stamp, companies, the finishing of the outer bodies, and then the
+borders, roads, the old-road stamp, the charters' buildings, the finishing of the outer bodies, and then the
 landscape search and the settle that finish a campaign world (§ Handoff) — so the world it
 hands forward is the world play opens on. The span is most of the round's meaning and a small
 part of its wall time, so the two are split: the record is published whole at the span's last
@@ -404,7 +405,7 @@ plays on the same map as rounds 3–5. The span runs only when Exploration ran a
 nothing at world setup reads it, so a watched and an unwatched build are the same build.
 
 **The round closes on the map you will play, by construction (Ben, 2026-09-24).** The search
-and the settle run inside the round, so when the tail lands the firms the search chartered
+and the settle run inside the round, so when the tail lands the buildings the search chartered
 from each city's budget flash in place (the close above), over the market carve and its price
 field — the landscape that was selected, never the candidates that were scored. The player's
 last sight before Begin is the map they will play on, and Begin adds nothing to it.
@@ -551,7 +552,7 @@ captions sit beside the playing map, § Round 6.)
 **The lapse** begins when the record is whole and plays it from its first year at the pace the
 player chose. Accepting moves to the next round; rerolling runs it again.
 **The Industrialisation round's wait is its span alone (Ben, 2026-09-24).** The rest of the
-build — borders, roads, companies, the search, the settle — is the tail, and it runs behind the
+build — borders, roads, the charters' buildings, the search, the settle — is the tail, and it runs behind the
 lapse rather than in front of it (§ Round 6); the caption rule follows the tail there, naming
 the one step under way beside the playing map.
 
@@ -639,7 +640,7 @@ presentation half:
    Begin moves that banded copy into `m_registry`. The twelve pre-game ticks have no
    presentation half of their own — no agency comms, history samples or last report come from
    them (delegated reading, 2026-09-24, NEEDS_REVIEW): the ticks have no calendar and no
-   seated corp, so nothing they emit has a reader.
+   seated nation, so nothing they emit has a reader.
    **Their READINGS do have a reader** (Ben, 2026-10-13: *"since we simulate a few economy
    ticks before the game starts, we should be able to use those values for anything that needs
    an economy tick to update"*). This REVERSES the 2026-09-24 reading for every per-quarter
@@ -665,27 +666,24 @@ it adds **at most 15 s** on the minimum PC ([TECH_FOUNDATIONS.md](../tech/TECH_F
 § Target hardware). The cold path, with no wizard to hide behind, starts the bake when its world
 is built and waits as needed. Other bodies bake in the background once play opens.
 
-3. **Seat the player**: rank every specialist on phase 6's static landscape score,
-   marking the ones below the viability floor, and open the selection canvas
-   (§ The seat); the player's Confirm re-points `is_player` / `world::player_entity`
-   onto the firm picked, through the `take_seat` command. A path with no player to
-   ask (`--autostart`, the windowed autostart) draws one against the world seed
-   instead and says so; `--seat <corp-id>` makes the pick at launch. Owned by
-   CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
+3. **Seat the player**: open the nation selection screen over the major nations (§ The seat);
+   the player's Confirm seats the player on the major picked, through the `take_seat` command. A
+   path with no player to ask (`--autostart`, the windowed autostart) draws one against the world
+   seed instead and says so; `--seat` makes the pick at launch.
 4. **Rebase the clock** (fresh `sim_loop`; speed from the Lua config — generation, search and
    settle wall time must not become in-game days), then `m_screen = in_game`.
 
 **The settle keeps its meaning.** It is twelve quarterly econ ticks with no calendar meaning
 (`../economy/ERAS.md` § The opening position; BL-978, warm start retired), run **in spectate**
-— `corp_ai_params::spectating`, no corp seated — because the seat comes after it, so the card
-can show the figures it files; every corp opens onto non-empty pools and live markets rather
+— `corp_ai_params::spectating`, nobody seated — because the seat comes after it, so the card
+can show the figures it files; every nation opens onto non-empty pools and live markets rather
 than a cold zero state. Only the wait's caption names it ("Proving the field"), and the loading
 bar's label table carries that step and "Searching the landscape" at their measured weights.
 `run_serve` adopts the searched and settled world; `run_verify` opens on the unsearched
 seed-candidate world and stays cold — a golden reads generation alone, so it is pinned to the
 world before the search.
 
-Play opens on the corporation's home planet — the Planetary rung, home body
+Play opens on the player nation's home planet — the Planetary rung, home body
 selected (CANVASES.md § Default state).
 
 ### The world cache — Begin adopts the wizard's world
@@ -742,93 +740,67 @@ at every round boundary, not only at Begin.
 ## The seat
 
 **The player picks a major nation, on a nation selection screen at Begin (Ben, 2026-10-10;
-`../CONCEPT.md` § Player identity).** This overturns the corporation selection canvas below at the
-grain of the pick: the list is of **major nations**, and picking one is becoming that nation and
-operating its champion. Only majors are offered; a minor cannot be played. Majors and seats are
+`../CONCEPT.md` § Player identity).** The list is of **major nations**, and picking one is
+becoming that nation: the player governs it and builds every building on its ground (Ben,
+2026-10-23). Only majors are offered; a minor cannot be played. Majors and seats are
 one-to-one, so the screen offers exactly the major target's count of rows. **The screen is shaped for up to
 six humans, each taking one major, and seats one (Ben, 2026-10-10, NR-1025)**: multiplayer stays
 outside the prototype scope (`../tech/TECH_FOUNDATIONS.md`), so the prototype seats a single human
 and nothing in the screen's design assumes there is only one. The seat screen also offers
 **Spectate**, which opens the world with nobody seated (`../ai/AI_OPPONENT.md` § 10i).
 
-**The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries seven
-things, and the screen gives the nation more room than the firm card did:
+**The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries:
 
 - its **territory, highlighted on the map** when its row is hovered;
 - its **population and GDP**;
-- its **treasury, debt and budget weights**;
-- its **champion** — the firm card below, unchanged in content;
+- its **treasury and budget weights**;
 - its **resource profile and deposits**;
 - its **neighbours, with stances and grudges**;
 - its **history** (Ben, 2026-10-10): the pattern tags its polities carried (rose and fell, colonised,
   revolution, survived civil war, world war), a short timeline of its key events, and a link into
   the History ledger filtered to it (`../generation/GENERATION_STRATEGY.md` § History patterns).
 
-The briefing's origin sentence is read at the nation's grain where it names the realm, and at the
-champion's where it names the charter. The pick stays a game act and stays reproducible from
-(seed, pick); `take_seat` names a major nation. The rest of this section is the corporation
-canvas's design as ruled, and stands wherever it does not contradict the above.
+The card's former **champion** line — the firm card the corporation canvas drew — retires with
+the champion (Ben, 2026-10-23; `../GLOSSARY.md` § Champion). There is no debt line: a nation never
+runs into debt (`../politics/NATIONS.md` § What a nation owns).
 
+**The corporation selection canvas is retired.** Ben ruled it on 2026-09-09 (*"Begin should go
+directly to a 'corporation selection' interactive canvas"*), offering every specialist corporation
+ranked by phase 6's static landscape score, with a viability floor that marked the hard seats.
+The nation screen replaced it at the grain of the pick on 2026-10-10, and the firm it chose retired
+on 2026-10-23. What of its design survives, at the nation's grain:
 
-**The player picks the seat, on a corporation selection canvas at Begin** (Ben, 2026-09-09:
-*"Begin should go directly to a 'corporation selection' interactive canvas"*; asked whether that
-reverses the 2026-08-26 retirement of the selection screen: *"Yes, it's time to reverse that
-ruling."*). The random draw is retired as the seat mechanism. **The canvas offers every specialist**
-(Ben, 2026-09-24): the static score ranks them, and the viability floor **marks** the ones below
-it rather than removing them — a marked firm stays pickable, so a player can knowingly take a
-hard seat. The player chooses rather than being drawn for.
-[`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) § The spawn shortlist,
-and the seat owns the shortlist; this doc owns only the screen.
-
-**The floor reads the ground, not a trading record** (Ben, 2026-09-16, NR-881). The settle is
-too short for a trailing net to exist at any window, so the shortlist gates and ranks on the
-static landscape score phase 6 already computed for each seat. Trailing figures stay on the seat card
-as information; they are never the gate.
-
-**The canvas draws over a world that already exists.** It sits over the landscape the final
+**The screen draws over a world that already exists.** It sits over the landscape the final
 wizard round selected, so the wizard hands a **world** forward rather than a record, and Begin
 takes that world instead of building a second one (Ben, 2026-09-16, NR-811). A control move
 that changes the world invalidates what the wizard holds; a held world that no longer matches
 the controls is worse than a slow one.
 
-**The seat comes after the firms and after the settle**, which is what lets the canvas show a
-seat worth weighing at all — the 2026-08-26 stage showed no balances because it ran before any
-had moved.
+**The seat comes after the settle**, which is what lets the screen show a seat worth weighing at
+all — the 2026-08-26 stage showed no balances because it ran before any had moved.
 
-**The canvas chooses the firm the player *is*** (Ben, 2026-09-17, NR-885; `../CONCEPT.md` §
-Player identity). The seat is an identity, not an address: the shortlist is a list of corporations,
-and picking one is becoming it.
+**The seat is an identity, not an address** (Ben, 2026-09-17, NR-885; `../CONCEPT.md` § Player
+identity): picking a nation is becoming it.
 
-**The surface (Ben, 2026-09-24, the select-company design session).** *Its question: which
-corporation am I?*
-
-- **A ranked list beside the map.** The list is every specialist in static-score order, the
-  marked ones visibly below the floor; the map is the home body at the wizard's world, and it
-  **highlights the hovered row's firm** — its HQ, its works and its home market's catchment — so
-  where a firm stands is read by pointing at it, not by reading coordinates.
-- **A firm's card** shows four things and no more: the **industry and the goods it makes**; its
-  **HQ and home market, with that market's prices** for the firm's goods and inputs; its **cash,
-  debt and assets**; and **its nation and that nation's stance**. The landscape score is the list's
-  order, not a card line; trailing figures and rivals are not on the card.
-- **Picking opens a briefing, then a confirm.** The briefing is the firm's opening position in
-  prose — who you are, what you make, where you sell, what you owe, whose law you trade under,
-  and, for a marked firm, why the floor marked it — **and one sentence of origin (Ben,
-  2026-09-24):** *"Chartered from <city>'s industry, in <region>, under <nation>, the realm of
-  <X> since <year>"*, read from the firm's own founding year and origin region and from the
-  record's owner slice at that year. **When X is the realm the nation grew from, the sentence
-  says so once (Ben, 2026-09-25, NR-941):** *"…under <nation>, its own realm since <year>"*; the
-  full form is kept for ground the nation's realm did not hold (absorbed since, bought, a
-  colony's overlord). **"Since" is the realm's tenure, not the record's opening (Ben,
-  2026-09-25, NR-939):** where the same polity id holds the region at the close of the earlier
-  span, the sentence walks back into that span's record, and on until the holder differs, so a
-  realm that took the ground in 1310 reads *since 1310 CE*, not the year its record opens. A
-  polity id is one table across the three records, so the walk is well-defined. That sentence is the whole of the history the seat
-  carries: no opening card, no header change, and no city renamed for it. **Confirm** seats
-  the player and opens play; **Back** returns to the list with nothing changed. Choosing is a
-  deliberate act, so it takes two presses.
+- **A list beside the map.** The map is the home body at the wizard's world, and it **highlights
+  the hovered row's nation**, so where a nation stands is read by pointing at it, not by reading
+  coordinates.
+- **Picking opens a briefing, then a confirm.** The briefing is the nation's opening position in
+  prose — **and one sentence of origin (Ben, 2026-09-24),** read at the nation's grain, where it
+  names the realm. **When the realm is the one the nation grew from, the sentence says so once
+  (Ben, 2026-09-25, NR-941):** *"…its own realm since <year>"*; the full form is kept for ground
+  the nation's realm did not hold (absorbed since, bought, a colony's overlord). **"Since" is the
+  realm's tenure, not the record's opening (Ben, 2026-09-25, NR-939):** where the same polity id
+  holds the region at the close of the earlier span, the sentence walks back into that span's
+  record, and on until the holder differs, so a realm that took the ground in 1310 reads *since
+  1310 CE*, not the year its record opens. A polity id is one table across the three records, so
+  the walk is well-defined. That sentence is the whole of the history the seat carries: no
+  opening card, no header change, and no city renamed for it. **Confirm** seats the player and
+  opens play; **Back** returns to the list with nothing changed. Choosing is a deliberate act, so
+  it takes two presses.
 - **The seat is reproducible from (seed, pick):** the same world and the same pick seat the same
-  firm in the same state.
-- **The pick is a game act** (Ben, 2026-09-24): Confirm issues the `take_seat` command, which has
-  an action-dictionary entry although the wizard has none, so an agent can make the same pick
-  (`--seat <corp-id>` at launch). The seat is taken once, before play: the in-play agent hosts
-  refuse the command.
+  nation in the same state.
+- **The pick is a game act** (Ben, 2026-09-24): Confirm issues the `take_seat` command, naming a
+  major nation, which has an action-dictionary entry although the wizard has none, so an agent can
+  make the same pick (`--seat` at launch). The seat is taken once, before play: the in-play agent
+  hosts refuse the command.

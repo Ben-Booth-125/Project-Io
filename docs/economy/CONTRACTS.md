@@ -1,18 +1,22 @@
 # Project Io — Contracts
 
 > **Settles:** what makes a promise a contract rather than a market trade · who the named
-> parties are and what either of them may refuse · what a procurement deliverable is, how it is
-> priced, and what marks it complete · what is deliberately out of scope for the form.
+> parties are (nations) · that the one form Io had, procurement from a named supplier, is retired,
+> and the record of what it was · what is deliberately out of scope for the form.
 > **Not here:** the anonymous, instant, price-only exchange (MARKETS) · what carries a promised
-> cargo (SUPPLY) · what the payment does to the balance (FINANCE).
+> cargo (SUPPLY) · what the payment does to the treasury (FINANCE).
 > **Confused with:** MARKETS.md, SUPPLY.md, FINANCE.md.
 
 **A contract is a promise between two named parties, priced, paced, and refusable.** It is the
 alternative to the market: where the market is anonymous, instant and price-only, a contract has a
-counterparty who can say no.
+counterparty who can say no. **The named parties are nations** (Ben, 2026-10-23): there are no
+corporations or companies to be a party.
 
-Io has **one**: procurement, the buy side. The player is a **buyer** of promises, not a seller of
-them.
+**Io has no live contract form.** It had one, procurement — the buy side, a quote from a named
+supplier firm — and it **retired with the corporations** (Ben, 2026-10-23). Equipment comes off a
+market's shelf like any good (`MARKETS.md` § The shelf economy). The rest of this document is the
+record of that form and the reason a contract would exist; a new contract form between nations is a
+design question, not a gap here.
 
 | | **Procurement** — the buy side |
 |---|---|
@@ -20,7 +24,7 @@ them.
 | Deliverable | `resource + quantity` — fungible |
 | Completes when | `ticks_elapsed` reaches lead time |
 | Terminal states | completed, cancelled |
-| Item | BL-350 (procurement seam) |
+| Item | BL-350 (procurement seam) — **retired** (Ben, 2026-10-23) |
 
 **There is deliberately no sell side** (Ben, 2026-08-30). A symmetric mechanism — the player
 *hired*, against a `condition_set` and a deadline — is not part of the design. The military side of the game will be
@@ -40,12 +44,12 @@ Under SYSTEMS.md § The progression chain — *each system's ceiling is the next
 of these in eight weeks and I need to know now"*, and it has no memory of who you are. The first
 time either matters, you need a counterparty.
 
-**What it opens.** Procurement opens equipment you do not manufacture. That is what couples this document to
-force: a corporation that buys its materiel rather than building it reaches military capability through
-this seam, and through no other.
+**What it opened.** Procurement opened equipment you do not manufacture: a buyer that bought its
+materiel rather than building it reached military capability through this seam. With the seam
+retired, a nation buys materiel off a market's shelf.
 
-**What it caps you at.** Reputation. It is the axis on which a company can price itself out of its
-own supply.
+**What it capped you at.** Reputation, the axis on which a buyer could price itself out of its
+own supply. It retired with the named supplier (`../politics/RELATIONS.md` § 2).
 
 **The chain's own link from force to territory is not this document's, and this document does not
 claim it.** Contracts buy the *means*; what force is then worth is
@@ -55,7 +59,10 @@ claim it.** Contracts buy the *means*; what force is then worth is
 
 ## Procurement — the buy side
 
-A procurement contract is **a build order placed with someone else**: the commit-on-affordability,
+**Retired (Ben, 2026-10-23).** Its counterparty was a named supplier firm, and no firm remains;
+procurement goods come off a market's shelf instead. What follows records the form as it was.
+
+A procurement contract was **a build order placed with someone else**: the commit-on-affordability,
 draw-materials-per-tick, pay-across-the-build shape of construction pacing, with the goods
 bought off the **supplier's** market and the output landed on the **buyer's** market. The
 counterparty is a NAMED corp with a price, a lead time, and a possible refusal — not a purchase
@@ -134,7 +141,7 @@ carriage; a same-body delivery pays nothing.
 debited, in the same statement, deposit, instalments and freight alike — the supplier arranges the
 carriage, so paying them for it keeps the flow closed.
 
-**On completion the goods move from shelf to shelf (Ben, 2026-10-10).** A corporation holds no
+**On completion the goods move from shelf to shelf (Ben, 2026-10-10).** An owner holds no
 stock (`MARKETS.md` § The shelf economy), so the supplier **buys** what its home market's shelf
 holds of the good, at the posted price under the fair-price ceiling, and builds the rest to order
 (which is what a build order placed with someone else means). The delivery then **lands** on the
@@ -168,5 +175,5 @@ in this section.
 [`../military/MILITARY.md`](../military/MILITARY.md) (the force this seam equips).
 
 **Owning items.** BL-350 (procurement seam) — the buy side; BL-445 (procurement UI) and BL-446
-(scorer procures) its two users. BL-391 (reputation floor) — the standing that gates a supplier's
-refusal.
+(scorer procures) its two users. BL-391 (reputation floor) — the standing that gated a supplier's
+refusal. All retire with the named supplier (Ben, 2026-10-23).

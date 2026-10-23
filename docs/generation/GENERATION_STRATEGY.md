@@ -42,7 +42,7 @@ The subject docs:
   Exploration span, 1200 → 1660 (`EXPLORATION.md`). Stages 5–6 (the energy transition and
   saturation) fall *past* the epoch entirely and are DLC-era material (BL-223, averted rupture,
   owns their reshaping).
-- **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
+- **`CORPORATION_GENERATION.md`** — industry generation: what a nation's ground opens with — charters, placement, focus and opening stock (the corporation it once covered is retired, Ben, 2026-10-23).
 - **`GENERATION_LEDGER.md`** — the tuning surface that explains *why* a tile generated as it did.
 
 Generation runs, in `make_hard_coded_world` (`src/world/hard_coded_world.cpp`), in this order:
@@ -61,7 +61,7 @@ tiles → rivers                                           (Kepler, the homeworl
   → grudge sentiment → national tariffs → national coverage centres
   → centre naming → urban land use
   → history merge → provinces → anchor centres → roads
-  → corporations (specialists) → market carving → endemic demand
+  → industry (the charter walk) → market carving → endemic demand
 tiles                                                    (Selene, then the asteroids)
 laws → provinces (every other body) → province holders → garrisons
 ```
@@ -73,8 +73,8 @@ from the seed (§ What crosses each handoff).
 **The search and the settle are the ladder's last act, not the app's (Ben, 2026-09-24, superseding
 the 2026-09-15 reading in which the app ran them after the worker returned).** When
 `make_hard_coded_world` returns inside the Industrialisation round's worker, the same worker runs
-**phase 6 — the landscape search** (`search_landscape`; the winning candidate's background firms
-*are* the background economy) and then the **settle**, phase 6's single validation run of the
+**phase 6 — the landscape search** (`search_landscape`; the winning candidate's buildings
+*are* the opening economy, each owned by its ground nation) and then the **settle**, phase 6's single validation run of the
 winner (`../economy/ERAS.md`; BL-978, warm start retired, owns the settle). Both live in one
 `world/*` function, `finish_campaign_world`, which holds everything that finishes a world for play:
 the world halves of setup (the genesis history, the survey states), the recipe band read from the
@@ -110,9 +110,9 @@ earlier. On the homeworld the **province partition runs before roads** (Ben, 202
 BL-623, provinces before roads — overturning the 2026-08-21 roads-bind-provinces input): the
 partition reads rivers and urban transforms but **not** roads, every settlement-less province
 is then given its settlement, and only then are roads stamped — over the *complete* settlement
-set, so every anchor founding joins the lattice like any village. Corporations are placed after
+set, so every anchor founding joins the lattice like any village. Industry is placed after
 roads and before markets, so placement reach reads the real network and the market carve can
-read who competes where. On every other body the partition still runs last. Each pass sits
+read what stands where. On every other body the partition still runs last. Each pass sits
 under its own seed offset so it perturbs nothing above it. All passes are **deterministic**
 from the campaign seed.
 Within the tile-generation layer, the six-pass core stays fixed and every extension lands as a
@@ -124,40 +124,29 @@ Within the tile-generation layer, the six-pass core stays fixed and every extens
 ## The economic premise
 
 The campaign opens on a **saturated, earth-like economy**. The home world's broad industrial
-base — the bulk of ordinary extraction, processing, and manufacture — is **owned and run by
-real background corporations** (BL-365, background corporations), not a nation actor. It is not
-the player's playing field and is not surfaced as manageable detail on any per-firm basis; it is
-the saturated background the contest happens *on top of*.
+base — the bulk of ordinary extraction, processing, and manufacture — is **owned and run by the
+nations whose ground it stands on** (Ben, 2026-10-23: *"We can remove the corp/company layer
+entirely. Just have nations building their own buildings"*). There are no background corporations
+and no companies; every building is its ground nation's, in every sector
+(`../politics/NATIONS.md` § What a nation owns).
 
-**Real firms, calibrated count, not an injected substrate.** Background industry is
-**generated corporations** — `corporation_component.is_background = true` — with real buildings
-that produce and consume through the ordinary economy tick. There is no per-capita demand basket
-or abstract nation-level supply capacity injected into market arrays; every unit of background
-supply and demand has a building behind it. Generation is **calibrated, not authored**: firms are
-placed until real production reaches ~90% of real demand for the tradeable resource set
-(`docs/economy/MARKETS.md` § Background corporations) — a clearing fraction that is **emergent**
-rather than **injected**. This is a **corporation**, not a nation, actor deliberately: the broad
-base needs an actor that runs itself, and the corporation is the actor class with a sanctioned
-scored-utility layer. Background firms run the **full corp_ai scored-utility layer**, identical to
-the named rivals, not a cheaper reduced model (Ben, 2026-08-11). The markets they feed are
-**resource-carved** (BL-096, resource-carved markets): a nation's territory fractures into more
-markets where its tradeable-resource concentration is high and folds into a neighbour where it is
-barren, with nations the carving actor even though they do not own the industry. Together these
-keep the premise (a saturated base the player competes *on top of*) while making it a legible,
-fillable opportunity surface rather than an inert price floor.
+**Real buildings, not an injected substrate.** Every building generation places produces and
+consumes through the ordinary economy tick. There is no per-capita demand basket or abstract
+nation-level supply capacity injected into market arrays; every unit of supply and demand has a
+building behind it. Generation is **calibrated, not authored**: the landscape search spends each
+centre's charter budget (`INDUSTRIALISATION.md` § 1), so density follows where capital accumulated
+rather than a count picked per world. Every non-player nation, major and minor, runs its buildings
+through one scored-utility build layer (Ben, 2026-10-23; `../ai/AI_OPPONENT.md` § 11). The markets
+they feed are **resource-carved** (BL-096, resource-carved markets): a nation's territory fractures
+into more markets where its tradeable-resource concentration is high and folds into a neighbour
+where it is barren. That keeps the premise — a saturated base the player builds into — while
+making it a legible opportunity surface rather than an inert price floor.
 
-**Corporations are specialists, not full-chain industrialists.** The player and the major AI
-rivals each occupy a **focused slice** of the resource chain and are differentiated by a single
-shared trait: an **interest in expanding to space**. The strategic contest is therefore between
-a small number of competing, space-interested specialists — not a field of generic firms
-reproducing the whole economy.
-
-This premise is what **simplifies the gameplay loop**: the player does not have to own or
-balance an entire economy, only to compete as a specialist and convert that position into
-off-world reach. It is the reason corporation generation produces **lean, focus-coherent
-holdings** rather than a broad spread (see `CORPORATION_GENERATION.md` § Pass 3), and the
-reason the broad industrial base is carried by generated background firms rather than by the
-player managing it.
+**The player is a major nation that builds its own buildings** (`../CONCEPT.md` § Player identity).
+Its economy grows only by its own builds, and only on its own ground; nothing builds there for it.
+The specialist premise — a player competing as one focused slice of the chain, beside a background
+it does not own — retired with the corporation (Ben, 2026-10-23). The opening industry on the
+player's ground is placed exactly as a rival's is (`CORPORATION_GENERATION.md` § Pass 3).
 
 **Market co-generation** (BL-132, market co-generation). Three rules on top of the nation-carved
 market model, each reading the previous rather than replacing it: (1) population centres weight
@@ -166,11 +155,11 @@ alone — population spawns near rich resources. (2) A market's site is a static
 resource↔population **trade-flow proxy**: since live trade routes do not exist at generation
 time, each market centres on the strongest nearby pull toward a rich deposit within a bounded
 radius of its anchoring population tile, rather than sitting exactly on that tile.
-(3) **Corporations generate before markets**, and the nation-carving gate's concentration term
-factors how many distinct corporations already hold an asset in that territory — a
-commercially-contested territory fractures into more markets on top of raw geology, not geology
-alone. Nations remain the carving actor; this adds *who is competing there* as a second signal
-alongside *what the ground holds*.
+(3) **Industry generates before markets.** As ruled, the nation-carving gate's concentration term
+factored how many distinct corporations held an asset in a territory, so a commercially contested
+territory fractured into more markets. With every building its ground nation's (Ben, 2026-10-23),
+a territory has one owner and that term has no subject; what, if anything, replaces *who is
+competing there* as the second signal is open. Nations remain the carving actor.
 
 ---
 
@@ -218,7 +207,7 @@ an intention rather than a property, and a tuning change to any upstream pass ca
 the map without a single check going red.
 
 **A note on fairness, so it is not re-litigated.** An unequal start is not an unfair one here. The
-player is one corporation among several in a world none of them chose, and the campaign's shape —
+player is one major nation among several in a world none of them chose, and the campaign's shape —
 `docs/CONCEPT.md` § Stagnation as loss — already treats falling behind as progressive rather than
 terminal. A generator that made every start equivalent would be answering a multiplayer-ladder
 question this game does not ask.
@@ -263,7 +252,7 @@ nations a world ends with and how many of them are majors, and both are always h
 (`NATION_GENERATION.md` § The nation count is a target). The exception is narrow by design. It names
 two counts, not a shape: which nations they are, where they lie, how rich, how armed and how unequal
 stays the world's. And a count is hit by events the history already knows — conquest, release, a
-national champion's charter, a cross-border buy-out — never by deleting or relabelling a nation, so
+minor raised to a major, a major folded into another with its ground and buildings — never by deleting or relabelling a nation, so
 even the exception tunes forces and records a cause.
 
 ### History patterns — three targets, two leans (Ben, 2026-10-10)
@@ -338,20 +327,17 @@ input to the Generation Ledger as a tuning surface.
 ## How the layers compose
 
 - **Tiles** establish the physical reality: terrain, hazard, habitability, and resource
-  deposits. Nothing downstream contradicts tile data — nations and corporations are *placed
+  deposits. Nothing downstream contradicts tile data — nations and their buildings are *placed
   onto* it.
 - **Provinces** partition the tiles into the cells force and ceilings are measured in. The
   partition is grown from settlement and stopped by terrain and by national borders — no
   province holds tiles of two nations — and versions with generation (`PROVINCES.md`).
-- **Nations** draw territory over the tiles. A nation's `economic_focus` biases which
-  corporations register there; carving resource-carved markets stays a nation-level act even
-  though the broad industrial base itself is firm-owned.
-- **Corporations** are placed within their home nation's territory as **specialists**: a lean,
-  focus-coherent set of holdings clustered in the nation (see `CORPORATION_GENERATION.md`). A
-  separate, later generation pass places **background** corporations that carry the broad
-  industrial base the premise above describes (`CORPORATION_GENERATION.md` § Pass 6) — the
-  specialist premise for the player and named rivals is untouched; background firms fill in the
-  rest of the economy.
+- **Nations** draw territory over the tiles. A nation owns every building on its ground and
+  carves its resource-carved markets.
+- **Industry** is placed on each nation's own ground: the landscape search spends every centre's
+  charter budget as lean, focus-coherent sets of buildings owned by the centre's nation
+  (`CORPORATION_GENERATION.md` § Pass 3, § Pass 6). The legacy corporation roster, the specialists
+  and the background firms are retired (Ben, 2026-10-23).
 
 ---
 
@@ -384,10 +370,10 @@ through what it produced.
 | 12 | Exploration | Biography lines | Watched (as text) |
 | 13 | Roads | Road tiers on the planetary canvas | Watched |
 | 14 | Pre-authored homeworld installations | On-canvas buildings | Invisible by design — two authored stubs, not a generated fact |
-| 15 | **Corporations (placement + finance)** | **Loading screen, live** — map markers + charter ledger | Watched |
+| 15 | **Industry (placement)** | **Loading screen, live** — map markers + charter ledger | Watched |
 | 17 | Market carving | Market lens; market ledger | Watched (outcome) / **Owed** (*why* a nation fractured into N markets is nowhere) |
 | 18 | Prototype laws | Law panel | Watched |
-| 19 | Background firms | The Industrialisation round's close — the search that places them runs inside that round's worker (§ The eight phases), and the round closes on the winner's firms; Corporations panel, in play | Watched (outcome) — the ranking itself is not a spectacle, § The two watched passes |
+| 19 | The opening industry | The Industrialisation round's close — the search that places it runs inside that round's worker (§ The eight phases), and the round closes on the winner's buildings | Watched (outcome) — the ranking itself is not a spectacle, § The two watched passes |
 | 20 | The settle — twelve ticks on the winner | The Industrialisation round's caption ("Proving the field"), and the cold Begin path's bar | Partly watched — the caption is honest, but what the ticks prove is not shown |
 
 Three owed items, none of them blocking: the tile-derivation ledger (designed in
@@ -406,7 +392,7 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds):
 | Round | Phase | The moving object |
 |---|---|---|
 | **4** | **4 — The History** | A **2D map** in the globe's place, running a **time-lapse of 400 BCE → 1200 CE** (Ben, 2026-09-09) — the empire half of pass 1's 3,600 years; the migration half (2400 BCE → 400 BCE) is round 3's. Polity colour spreads, stalls, fractures. A **leaderboard** on the left ranks people share, land share, population and might (NR-876, 2026-09-15); the industry column joins on round 6 only (`../ui/STARTUP.md` § Rounds). |
-| **6** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **cities industrialising**, **mass migration** and **decolonisation**, closing on **firm markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `INDUSTRIALISATION.md` § Part II). |
+| **6** | **6 — The economic substrate** | A time-lapse of 1660 → 1960 showing **cities industrialising**, **mass migration** and **decolonisation**, closing on **building markers and their charters** and the **market carve with its price field** (Ben, 2026-09-15; `INDUSTRIALISATION.md` § Part II). |
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
@@ -579,9 +565,9 @@ might (§ The two watched passes), with industry joining on round 6 only (`../ui
 § Rounds).
 
 **Two of the three owed items above are paid by this.** The region surface is round 4's globe;
-the market-carving explanation is round 6's carve. Background firms stopped being owed the same
-way: the search that places them runs inside the Industrialisation round's worker and the round
-closes on them, so the "runs after the worker" objection went with the worker split it named.
+the market-carving explanation is round 6's carve. The opening industry stopped being owed the same
+way: the search that places it runs inside the Industrialisation round's worker and the round
+closes on it, so the "runs after the worker" objection went with the worker split it named.
 
 ---
 
@@ -605,10 +591,9 @@ social physics from nothing.
 | How an inland sea concentrates littoral power | "The Mediterranean" |
 | Plausible hegemony-formation speed, campaign-season length, supply radii | "Rome" |
 
-Every generated proper name — nation, region, population centre, corporation, body, person —
+Every generated proper name — nation, region, population centre, body, person —
 is **sci-fi / fantasy**, produced by the seeded template banks and phoneme tables described in
-the per-subject naming passes (`NATION_GENERATION.md` § Pass 5, `CORPORATION_GENERATION.md`
-§ Pass 5, `generate_city_name`). Two consequences worth stating because they are easy to get
+the per-subject naming passes (`NATION_GENERATION.md` § Pass 5, `generate_city_name`; corporation naming retired with the corporation, `CORPORATION_GENERATION.md` § Pass 5). Two consequences worth stating because they are easy to get
 wrong:
 
 1. **"Culture-flavoured" must not mean "Earth-culture-flavoured."** The template banks are
@@ -646,8 +631,8 @@ The pieces and who owns them:
 | Branch checkpoints (historical-extinction analogues) + lean × branch sweep | BL-210 (oral-history pivot) |
 
 The planetology state flows into settlement and nations: `run_history_ladder` consumes it and
-`nation_params_from_ladder` feeds its fragmentation into nation seeding. The corporation half of
-that connection — planetology and ladder outcomes shaping which corporations exist and where — is
+`nation_params_from_ladder` feeds its fragmentation into nation seeding. The industry half of
+that connection — planetology and ladder outcomes shaping what industry exists and where — is
 BL-210's to close. **Full architecture, rationale, and the per-doc open questions live in
 BL-210** (`backlog.json`).
 
@@ -748,7 +733,7 @@ fourth and fifth are the ones that can see a candidate at all:
    about evenness will drift toward it.
 4. **Realisation — actual closure over potential closure.** Of the terminals a market *could*
    close, how many are closed by a building that actually exists in its catchment. A landscape
-   with rich ground and no firms scores near 0; one whose firms close every chain the ground
+   with rich ground and no buildings scores near 0; one whose buildings close every chain the ground
    allows scores 1.
 5. **Reach quality — at what traversal cost a market's catchment is actually crossed.** Not
    *whether* a resource is reachable, which terms 1 and 4 already read as a boolean, but how
@@ -790,7 +775,7 @@ third spread beside completeness and balance. The level never enters the composi
 **Why the fourth term is not optional, and why the first three could not do its job.** Terms 1–3
 are computed from tiles, markets and population — none of which a candidate changes. Phase 6
 chooses among **rosters**, so an objective made only of those three is blind to the choice it is
-being asked to make; scored over candidates that differ by corporation count and placement seed,
+being asked to make; scored over candidates that differ by charter count and placement seed,
 every term comes back identical to the last digit. Realisation is what turns a measure of the
 *world's* saturation potential into a measure of **this roster's** use of it.
 
@@ -815,7 +800,7 @@ rank a landscape; this says where landscapes come from, and it was the half noth
 
 The search **starts from one seed candidate, scores it, perturbs the winner along one axis,
 re-scores, and keeps the better** — for a **fixed number of rounds**, never until convergence. The
-three axes are the ones point 3 above names and no others: corporation **rosters**, starting
+three axes are the ones point 3 above names and no others: charter **rosters**, starting
 **placements**, and **road/infrastructure tiers**. A round proposes a perturbation on each axis,
 scores the proposals, and the argmax over {incumbent, proposals} becomes the next incumbent.
 
@@ -889,7 +874,7 @@ target.
 |---|---|---|---|
 | **1 — Ancient** | The polity sim (`history_sim`), the Empires round | **400 BCE → 1200 CE** | Ancient borders, cultural doctrines — who walked where |
 | **2 — Exploration and Industrialisation** | The same polity sim, two further calls each resumed from the last handoff, sea legs open | **1200 → 1660 → 1960** | The extent of colonisation by major powers, which polities industrialised and when (and with them the campaign's recipe band, § The world descriptor), each nation's tariff posture — and it is an **economy-focused** pass, § Pass 2 is the economy pass |
-| **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which firms exist, what each market can close, the price field |
+| **3 — Settle** | The static candidate scorer, plus **one** validation run of `run_economy_step` on the winner | No calendar; the scorer has no clock and the validation run is short | Market conditions at game start: which buildings stand, what each market can close, the price field |
 
 **Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
 bands and the unit roster is era-keyed, so each later span is the first continued with more rows
@@ -947,11 +932,11 @@ fix is to advance those accumulators across the gap cheaply, never to simulate i
 **Where pass 1 is a polity pass, pass 2 is an ECONOMY pass.** Same engine, different question. Pass
 1 asks who holds what ground; pass 2 asks what that ground *produces and trades* — which polities
 industrialised and when, what colonisation carried where, and what each nation's tariff posture is
-by 1960. This is what makes pass 2 the bridge to phase 6: the substrate search selects a corporate
+by 1960. This is what makes pass 2 the bridge to phase 6: the substrate search selects an industrial
 landscape over a world whose trade relationships already have a cause.
 
 **Its output is round 6's**, exactly as pass 1's is round 4's: metros grown from the centres pass 1
-sacked, reach across water, firms and their charters, the market carve and its price field.
+sacked, reach across water, buildings and their charters, the market carve and its price field.
 
 **Pass 3 SELECTS a landscape; it does not settle one.** The earlier design made pass 3 the warm
 start promoted — the same undirected pre-game ticks, run longer, with firm spawn added and firm
@@ -1059,7 +1044,7 @@ every world, and recomputes nothing.
 term inside an agent. Tariffs, because a nation that industrialised late relative to its
 neighbours protects what it has; distance, because the landed price of a far competitor's good
 is high on the real road and sea network; ties, because history routed a colony's trade through
-its metropole. A local firm's early sales are sheltered by the same three, and a player can read
+its metropole. A nation's local industry's early sales are sheltered by the same three, and a player can read
 why on the map.
 
 **The cost is measured, and the second pass is not the expensive half (2026-09-09, `/O2`).** The
@@ -1081,15 +1066,14 @@ These are design questions that span more than one generation doc; each is also 
 owning doc's § Open items.
 
 - **Building tiers / levels.** A level/tier axis for buildings — distinct from **production
-  methods (recipes)**. A specialist corporation's footprint may be characterised as much by the
+  methods (recipes)**. A charter's footprint may be characterised as much by the
   *tier* of its assets as by their number. Unsettled; interacts with `PRODUCTION.md`.
-- **International relations & corporate origin.** Whether **allied nations share corporations**,
-  or **prefer generated franchises** across borders, is open — it couples nation diplomacy to
-  corporation generation (the Franchise open item in `CORPORATION_GENERATION.md`).
+- **International relations & corporate origin** — retired with the corporation (Ben, 2026-10-23):
+  a nation builds only on its own ground, so no firm is shared or franchised across a border.
 - **Post-WW2 industrial grounding.** The focus→asset-mix patterns should be grounded in research
-  on the post-WW2 industries that led to space-related capability, so a specialist's holdings
+  on the post-WW2 industries that led to space-related capability, so a charter's buildings
   read as a plausible pathway toward off-world reach rather than an arbitrary mix.
 - **The Industry lens and the background.** The background industry is generated, not authored
   (§ The economic premise), and the Industry map-lens (`docs/ui/LENSES.md`) renders its aggregate
   per body. The lens's rendering job is independent of the mechanism beneath it: it draws the
-  industry that real background firms own, not a per-tile field.
+  industry that each nation owns on its ground, not a per-tile field.

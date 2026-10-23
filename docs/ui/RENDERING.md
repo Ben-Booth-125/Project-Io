@@ -334,7 +334,7 @@ about a tile and a half, so neighbouring tiles melted together. Three changes an
 **What stands on a tile is drawn as structures in the art**: buildings, settlements
 and works render as real-looking painterly geometry stamped in the installation
 pass, in the same perspective and light as the ground. The vector building
-silhouette, the stacked-tile ring, the `+N` count badge, the corp emblem tag and the
+silhouette, the stacked-tile ring, the `+N` count badge, the owner emblem tag and the
 settlement skyline and ruin glyphs **retire from the canvas** (the glyph vocabulary
 survives everywhere else — panels, ledgers, chrome; [ICONS.md](ICONS.md) is narrowed,
 not retired).
@@ -376,8 +376,9 @@ scaffolding, because construction start and completion are events, not ticks.
 
 **Ownership never touches the ground art.** This settles what was the ground/chrome layer
 contract's sharpest open call: a structure carries no owner colour. Ownership is read from
-the hover card, the Selection element, the always-on player footprint outline, and the
-Corporation and Company lenses' owner multi-select ([LENSES.md](LENSES.md)).
+the hover card, the Selection element, the always-on player footprint outline, and the ground:
+a building's owner is always its ground's nation (Ben, 2026-10-23), so the national border band
+and the Nations lens ([LENSES.md](LENSES.md)) say whose it is.
 
 Consequences the design accepts and answers:
 

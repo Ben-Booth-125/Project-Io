@@ -47,7 +47,7 @@ See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
 **Under a lens the card is about the LENS'S STRUCTURE, not the tile.** Owned by BL-673 (per-lens
 hover cards). The card reads `hovered_structure` / `hovered_structure_kind` — what the resolver
 already decided this frame — so its subject cannot disagree with what a click at the same pixel
-would select. Corporation and Company name the owner; Market and Scarcity name the catchment and
+would select. Nations names the nation; Market and Scarcity name the catchment and
 differ in whether it is about price or shortfall; Continent names the plate. Resource is the
 exception: its structure *is* the deposit on the hovered tile, so the tile card already answers the
 lens's question.

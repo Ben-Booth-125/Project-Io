@@ -46,7 +46,7 @@ world it builds is the one the Industrialisation span closes on at 1960 whatever
 **Every nation opens on the industrial recipe band (Ben, 2026-10-10, overturning NR-929's band
 per nation).** Every nation is playable and every nation starts the campaign at the same tech level
 (`RESEARCH.md` § Who holds technology), so no nation is held to an ancient roster: the Launchpad, the
-petroleum and propellant chains and the spacecraft chain are open to every nation's firms, gated only
+petroleum and propellant chains and the spacecraft chain are open to every nation, gated only
 by technology and placement. The band is fixed, not derived from the history, and reads the same on a
 new game and a loaded save. **Epoch 0 is retired (Ben,
 2026-09-25, NR-920):** the epoch names the calendar only. `docs/development/ROADMAP.md` § The two arcs owns which is the commercial product,
@@ -78,7 +78,7 @@ call), run on the winner
 inside the Industrialisation round's worker as generation's last act — the round hands Begin a
 world already proved, and a cold Begin with no wizard makes the same call in the same order (Ben,
 2026-09-24) — under spectate with nobody seated, with the persona counsel and battle dispatches
-suppressed. The balances, shelves, filed returns and prices those ticks leave
+suppressed. The treasuries, shelves, filed returns and prices those ticks leave
 *are* the opening position; the seat card shows the returns they file. Twelve is **measured,
 not round**, and the instrument is `haulage_measure --per-tick` (the only harness that sees
 trade): pooled over five seeds, the per-tick convoy dispatch count climbs from zero — tick 1
@@ -92,7 +92,7 @@ nothing the player can see.
 floor reads the static score). Twelve ticks over a field still ramping from zero file no trading
 record a viability verdict could stand on, at any trailing window. The shortlist therefore gates
 and ranks on the static landscape score phase 6 computed before the run, and the run's figures —
-the closing balance and the trailing net over `k_spawn_trailing_quarters` = 8 filed returns — reach
+the closing treasury and the trailing net over `k_spawn_trailing_quarters` = 8 filed returns — reach
 the seat card as information only (`../generation/CORPORATION_GENERATION.md` § The spawn
 shortlist, and the seat).
 
@@ -123,15 +123,15 @@ history; the search itself is BL-770 (Era 0 candidate search).
   `ancient` tag survives for content no campaign nation is offered. It is **not** the Era of this
   document.
 - **`condition_subject::era`** (`src/world/condition_set.cpp`) is the predicate subject the laws
-  and techs layers evaluate. It measures **1 for a corp that owns a launchpad and 0 otherwise** —
-  a per-corp proxy for "has industrialised into space", chosen so that authored conditions keep
+  and techs layers evaluate. It measures **1 for a nation that owns a launchpad and 0 otherwise** —
+  a per-nation proxy for "has industrialised into space", chosen so that authored conditions keep
   their meaning when the Era measure becomes a lookup (NR-113). **Do not author an `era` condition
   that reads wrongly under it:** `era >= 1` means *owns a launchpad*, so a condition capturing "the
-  corp has reached space" is fine and one meaning "the campaign has advanced to Era 1" is not,
-  since the proxy is per-corp and the Era is world-wide. `condition_set_harness` C2h/C2l pin it.
+  nation has reached space" is fine and one meaning "the campaign has advanced to Era 1" is not,
+  since the proxy is per-nation and the Era is world-wide. `condition_set_harness` C2h/C2l pin it.
 - **The Era of this document** asks *how far has the campaign got within its arc*. It was renumbered
   1-based on 2026-08-31 (§ The ladder) and **the two axes above did not move with it** — `era_band`
-  is still `any`/`ancient`/`industrial`, and `condition_subject::era` still measures 1 for a corp
+  is still `any`/`ancient`/`industrial`, and `condition_subject::era` still measures 1 for a nation
   that owns a launchpad. That proxy now reads one Era later than its name suggests (space is Era 2
   in this document), which is exactly why the section below insists the axes never merge. A building can
   be `industrial`-band and still Era-0 (a refinery); nothing is `ancient`-band and Era 1. The three
@@ -188,7 +188,7 @@ test is taken, not its outcome.**
 
 Two properties keep this a skill test rather than a timer. **Alarm is relievable** — it decays,
 named nodes cut it, and trade interdependence suppresses it continuously. And **the player is not
-its only source**: rival corporations and nations raise it too, so a careful player can still lose a
+its only source**: rival nations raise it too, so a careful player can still lose a
 world someone else wrecked, and managing *others'* alarm is a legitimate goal.
 
 ### Mistakes compound — the red herrings
@@ -260,7 +260,7 @@ reason the answer is the same.
 
 ### Character
 
-The opening economy is heavy industry: iron ore, coal, petroleum, and the products derived from them. Corporations operate globally but the solar system is a project, not yet an industry. The player competes for terrestrial resources and market position while working toward the economic threshold required for space access.
+The opening economy is heavy industry: iron ore, coal, petroleum, and the products derived from them. Nations trade globally but the solar system is a project, not yet an industry. The player competes for terrestrial resources and market position while working toward the economic threshold required for space access.
 
 The epoch signals the technology level and industrial character, not historical accuracy. The home planet's specific resource profile varies between campaigns (procedurally generated); what matters is that Era 1 resources are bulk, extractable, and refinable with pre-space infrastructure.
 

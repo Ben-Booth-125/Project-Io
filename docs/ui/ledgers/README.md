@@ -24,7 +24,7 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
   `src/ui/foldout_column.hpp`), whose width is derived by `shell_column_width(disp.x)` — 380–460 px by
   resolution, ~380 px at 1720 wide; sub-views are one-question-per-view tabs (`ui::nav_button`).
 - **No two surfaces answer the same question** — an aggregate read belongs on exactly one ledger, and
-  Corporation and Market are the drill-downs beneath it.
+  the Nation overview and Market are the drill-downs beneath it.
 - **Toggle rule** — the rail icon toggles the ledger; re-clicking the **active tab closes the ledger**;
   cross-cutting selectors are exempt.
 - **Selection** — the Selection element is a band of its own, always open, with no rail slot
@@ -34,18 +34,18 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 
 | Doc | Default view | Sub-levels | Lens on open |
 |---|---|---|---|
-| [corporation.md](corporation.md) | Standings | one table + Selection drill (Profiles proposed) | `corporation`, fixed (proposed) |
+| [corporation.md](corporation.md) | Balance (the Nation overview, slot 1) | one card; the slot-8 stance ledger **retired** (Ben, 2026-10-23) | none |
 | [balance.md](balance.md) | Treasury | Treasury / Cashflow / Assets (proposed) | **none** (money has no map field) |
-| [acquisitions.md](acquisitions.md) | Purchasable / Possible groups (no tabs) | one flat column, plus the Profitability full-canvas fold-out | **none** — the pairing runs inward: the Company lens arms *this* ledger |
+| [acquisitions.md](acquisitions.md) | **Retired** with the buyout (Ben, 2026-10-23) — the doc is a record | — | — |
 | [market.md](market.md) | Goods | Goods (the flattened price table) / Trades | `market`, fixed |
 | [convoys.md](convoys.md) | Convoys in flight | one flat view (Routes and History proposed, neither backed by a store) | `supply_routes` |
 | [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + build bar) | **none** — `opportunity` is refused, see below |
-| [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / corp / nation | contextual (none) |
+| [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / nation | contextual (none) |
 | [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages / Tectonics | none |
 
 ## Cross-doc findings (see [_critic_notes.md](_critic_notes.md))
 - **A whole-enterprise aggregate ledger does not survive the duplication test.** Its cashflow view is
-  Balance's cashflow tab and its standing rank is Corporation's Standings, both to the same figures; the
+  Balance's cashflow tab and its standing rank was the retired corporation Standings, both to the same figures; the
   residue that is genuinely aggregate-only is thin, and the parts of it that name rivals disclose more
   than competitor visibility allows (`DISCOVERY.md`). Aggregation is a view on an owning ledger, not a
   ledger of its own.

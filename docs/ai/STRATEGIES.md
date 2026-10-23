@@ -24,6 +24,9 @@
 > is authored; cards ride in context at runtime; no telepathy; meta is judged by the existing
 > reward schema. Where earlier prose reads as an authored roster, the resolution wins.
 >
+> **The rival is a nation (Ben, 2026-10-23).** Corporations are retired; every rival nation builds
+> its own economy through the build scorer (code still `corp_ai`). Read "corp" below as that nation.
+>
 > **Vocabulary markers:** every card is tagged by the vocabulary it runs on — **[engine]** (the
 > engine's own blackboard and dictionary vocabulary), **[era1-tree]** (references the Era 1 tree
 > draft in `docs/research/ERA1_TECH_LANDSCAPE.md`). A **⚠** marks a signal the card needs that the
@@ -97,8 +100,8 @@ play (§ Resolutions), the way a player's own meta is.
    data update, not a retrain.
 3. **The deterministic layer.** `corp_strategy` (`src/world/corp_ai.hpp`) is an alias of
    `industrial_focus`. Each card carries a `weights` line that compiles to focus/bucket biases —
-   the library *extends* the engine enum rather than rivalling it, and the algorithmic corps
-   could run the same deck without a model in the loop. The compilation stays uncoupled until
+   the library *extends* the engine enum rather than rivalling it, and the algorithmic rival
+   nations could run the same deck without a model in the loop. The compilation stays uncoupled until
    the invention loop has validated the deck (§ Resolutions).
 4. **The eval harness.** Each card names trace-checkable *compliance* signatures
    (§ The invention loop), so "is the AI actually playing its card" is a mechanical question —
@@ -418,7 +421,7 @@ everywhere flattens the meta — both are reward-gate readings, visible in the e
 
 **The measuring instrument** is the Strategy readout ledger (BL-411, emergent-strategy readout —
 `src/ui/strategy_readout.{hpp,cpp}`, nav rail slot 12). It aggregates the corp_decision stream per
-corp over a rolling 64-quarter window — verb mix, spend split across the must/should/nice
+nation over a rolling 64-quarter window — verb mix, spend split across the must/should/nice
 priority buckets, reason-code tally, and the bucket split quarter-by-quarter as a stacked band.
 Same-seed comparison (step 4's reward gate) points at a *distribution shift* rather than
 asserting "the card worked". Two fences it keeps deliberately: **no score/margin aggregates**

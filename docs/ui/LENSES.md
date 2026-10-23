@@ -37,14 +37,12 @@ by the cycle without a literal being kept in step by hand.
 
 | `overlay_mode` | Surface (one line) |
 |---|---|
-| `corporation` | Planetary tile tint per **picked** corporation, the rest greyed; owner checklist key |
-| `company` | The Corporation lens's mirror over background firms — picked firms tinted, the rest greyed |
 | `resource` | Planetary contiguous-deposit flat fill; good selector in the legend |
 | `market` | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
 | `population` | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
 | `continent` | Planetary plate tint + boundary lift + plate-count key |
 | `scarcity` | Per-market shortfall blocks + key |
-| `industry` | Background-firm plant amber tint + key |
+| `industry` | Rival-plant amber tint + key |
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
@@ -52,8 +50,7 @@ by the cycle without a literal being kept in step by hand.
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 | `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
-Identity colours live in `presentation.hpp`; the corporation-identity helper is
-`palette::corp_colour`.
+Identity colours live in `presentation.hpp`.
 
 ---
 
@@ -94,21 +91,20 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
 | Supply *(keyboard-cycle only)* | per-convoy route lines | per-body convoy-count badge | per-tile convoy glyph |
-| **Corporation** | — | — | picked owners' tint, the rest grey + checklist key |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile workforce-efficiency **heatmap** |
 | **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
-| **Industry** *(keyboard-cycle only)* | — | — | background-firm plant amber tint + key |
+| **Industry** *(keyboard-cycle only)* | — | — | rival-plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
 | **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
 | **Throughput** | — | — | reach-cost field + per-anchor active-LP ring + key |
 
-**Per-lens rung notes.** Corporation, Resource, Population, Industry and Continent
-are **Planetary-only** — their unit of meaning (a tile, a building, a deposit, a
-background-plant reading, a plate) is sub-body and has no coherent inter-body
+**Per-lens rung notes.** Resource, Population, Industry and Continent
+are **Planetary-only** — their unit of meaning (a tile, a deposit, a
+rival-plant reading, a plate) is sub-body and has no coherent inter-body
 surface. Market and Supply are the genuinely multi-rung lenses (prices per
 body-market; logistics span the ladder). Reach and Supply-routes are body-level
 reads whose natural home is the Solar rung — the connected-body glow and the
@@ -148,7 +144,7 @@ whose buildings they could not see.
   per lens family (categorical, sequential), set by eye against captures. A tile the
   lens has no answer for takes **no wash** — the plain ground shows.
 - **The strengths (set against `lens_modes.lua`'s `lens_wash_*` captures, 2026-10-09).**
-  **Categorical** — Corporation, Company, Market, Continent, the Resource lens's deposits —
+  **Categorical** — Market, Continent, the Resource lens's deposits —
   washes at **0.46**: a hue says *which*, and hues separate at under half alpha even over
   textured ground, so the structures and forms keep reading through. **Sequential** —
   Population, Throughput, Scarcity, Industry — washes at **0.54**: a ramp says *how much*,
@@ -156,12 +152,11 @@ whose buildings they could not see.
   Where a sequential lens's value already set its strength (Scarcity's shortfall, Industry's
   density), the value scales the family strength the same way. The Resource lens's
   no-deposit ground keeps its white wash (§ Resource lens) at **0.50** over the bake, paler
-  than the fill path's 72% so the forms survive it. The owner lenses' picked identity and
-  unpicked owned-grey washes are categorical; the unpicked owner's dark rim stays a stroke.
+  than the fill path's 72% so the forms survive it.
   The Continent boundary keeps its lift toward white inside the plate wash. A lit
   structure's hover wash is a wash too, at full tile radius, so it never draws a grid.
-- **The lens's own marks stay vector chrome** above the wash: keys, the owner
-  rim, value marks, arrows, labels.
+- **The lens's own marks stay vector chrome** above the wash: keys, value marks, arrows,
+  labels.
 - **Hit-testing is unchanged** — a lens still resolves a press to its own structure grain
   (SELECTION.md § A lens collapses selection to ONE TIER).
 - **Before a body's ground exists** (the far page not yet baked) a lens falls back to the
@@ -208,143 +203,25 @@ The good selector shared by the Market and Scarcity lenses is one combo bound to
 `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting directly above the
 active key in the same region — never on the minimap bar, which carries glyphs only
 (BL-134, lens selector in legend). The Resource lens has its own search-and-checklist
-key instead (§ Resource lens), and the Corporation and Company lenses share that key's
-shape for their owner set (§ Corporation lens, owner multi-select).
+key instead (§ Resource lens).
 
 ---
 
-## Corporation lens
+## Corporation and Company lenses — retired
 
-**Intent.** Read the map as a *corporate landscape*: where corporations operate,
-who owns what, and how the player's footprint sits against rivals. National
-territory is the border band's job — and **the band is suppressed while any lens
-is up** (Ben, 2026-08-28), so nation context is absent from this lens by
-construction rather than merely absent from its fill. A lens asks one question;
-a national border over a corporate read competes with the answer.
+**Both retire with the corporation and the company (Ben, 2026-10-23;
+`docs/GLOSSARY.md` § Corporation, § Company).** The Corporation lens tinted a picked set of
+corporations' tiles over the rest in owned-grey; the Company lens was its mirror over background
+firms. With no firm between a nation and its buildings, a building's owner is always its
+ground's nation (`../politics/NATIONS.md` § Own ground), so "who owns what" is "whose ground is
+this" — the **Nations lens**'s question (§ The Nations lens, below). Neither lens's picked-owner
+set, checklist key nor glyph survives.
 
-**Population (settled 2026-08-28).** This lens admits **corporations only** — the
-player and its rivals — and never a background firm. Ben: *"The corporation lens
-narrows to player and rival, the company lens shows only background firms."*
-Before the narrowing, the tile tint (and the rival HQ-marker layer, since retired) drew every
-non-player corp, and background firms outnumber the rivals — so a lens asked
-"where are my rivals" and was answered "here is everyone". Background firms have
-their own lens, drawn identically: see **Company lens** below. The two
-populations are disjoint, which is the property `lens_modes.lua` captures them
-side by side to show.
-
-**Ownership definition (settled).** A *corporate-owned tile* is any tile on which
-a corporation holds a building. The mapping is derived at draw time from
-`w.corporations[].assets` → `building_component.tile` (a building id resolves to
-its tile). **There is no influence radius and no nation-domination heuristic** —
-only the literal building tile counts as owned. A tile with no corporate building
-is *unowned*.
-
-**Rung.** Planetary only. No Solar or Circumplanetary representation — the render
-pass is guarded entirely behind `overlay_mode::corporation` in
-[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp) and changes
-nothing on the other two canvases.
-
-**Colour.**
-- **Tiles of a picked owner** are washed in that corporation's identity colour over the
-  rendered ground (§ A lens washes the rendered ground), so the owner's buildings show
-  through their own colour.
-- **Tiles of an unpicked owner** are **greyed** — a wash of one neutral, desaturated owned-grey,
-  the same for every unpicked owner, distinct from unowned ground (which keeps its plain
-  terrain). Grey still says *someone holds this*; colour says *one of the owners you
-  asked about holds this*. The grey is a **mid value** (`palette::owned_grey`), clear of
-  both the pale terrain (ice, snow, salt) and the dark (forest, ash); because some ground
-  sits at mid value too, every unpicked owner's tile also carries a **dark inset rim** —
-  the colour-independent channel. Below the coarse level of detail the rim is dropped
-  and the grey carries the read alone.
-- The **player corporation** (`w.player_entity`) uses
-  `presentation::faction_colour(0)` for its tile fill and additionally gets a thin
-  border in `palette::selection` (white) so the player's holdings contrast against
-  any rival fill colour at a glance.
-- **Rival corporations** use their per-corp hashed identity slot
-  (`palette::corp_identity_colour`; a multiplicative hash kept off slot 0 so a rival
-  never collides with the player's colour).
-- **Unowned tiles** render in their plain terrain colour with **no tint** — there
-  is no nation underlay in this lens.
-
-**Glyph.** A filled square with a centred inner dot — a "seal" silhouette
-(`icons::corporation`; see [ICONS.md](ICONS.md)). Distinct from the
-extraction-site filled diamond, the processing-facility plain filled square, and
-the port/unit filled triangle.
-
-**Owner multi-select** (Ben, 2026-10-08, the sprint 51 visibility pass; owner BL-1240,
-owner multi-select). Buildings no longer carry an owner colour on the canvas (RENDERING.md
-§ Installations), so this lens is where ownership is read at a glance — and with every
-corporation tinted at once it answered "who owns what" with a map of every colour at
-once. The lens draws a **picked set** of owners instead:
-
-- **Default: the player only.** Opening the lens shows the player's holdings in colour and
-  every rival's in grey — "where am I, against everyone" — and the player adds the rivals
-  they want to compare.
-- **The key is a checklist** in the lens chrome region, the Resource lens's shape: a header
-  with the picked count ("Corporations (n picked)"), a search box, and a checklist of the
-  corporations holding ground on the active body, each row with its identity swatch
-  (filled when picked, empty when not). A corporation with nothing on the body earns no row.
-  No cap: identity colours are per corp, not per slot.
-- **Shift-click on an owned tile toggles its owner** in or out of the set, so the map itself
-  is a picker. A plain click is unchanged — it selects the tile or building and its
-  dossier, as under every lens (SELECTION.md § Lens-driven hover & selection resolution).
-- **Hover ignores the set.** Hovering an owned tile still lights that owner's whole group,
-  picked or not — that is how a player finds whom to pick.
-- **The set drives the tint and nothing else.** No HQ star draws for a picked owner, nor for
-  the player — the HQ glyph retired from the Planetary canvas (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
-- **The set is UI state** (`ui_state::lens_corps`), per session, not saved, and survives a
-  body switch — a picked corporation absent from the new body simply has no row there.
-
-**Legend.** The active lens is named by the strip glyph highlight and its hover
-tooltip (`overlay_mode_name` → "Corporation ownership"); the owner checklist above is its
-key.
-
-**Player identity chrome.** The player's white outline above is drawn as part of the
-Corporation lens's own fill/border pass, but the *general* player-identity accent — a subtle wash
-on the player's tiles at the plain default, plus an outline drawn under **every** lens — is
-separate, always-on chrome (`is_player_tile`, `corp_identity(w.player_entity)` in
-`body_surface_canvas.cpp`) drawn once regardless of which lens (if any) is active. The
-Corporation lens does not add a second player outline — it *extends the same identity language
-to rivals*, giving every corporation (not just the player) a readable tile tint. There is no HQ star on
-this canvas, the player's or anyone's (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
-
-**No corporate HQ marker** (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). The lens reads an owner by its tiles alone: no
-`hq` star marks any corporation's seat (`corporation_component::hq_building`, designated at
-generation — CORPORATION_GENERATION.md § Pass 3b), the player's included, and no reach ring
-surrounds one — the ring went first, as a fixed-radius circle that never grows as a corp builds
-outward and "doesn't show anything informative" (Ben's live critique, BL-329). `influence_range`
-is computed and stored — a future operate-gate may want it — but not drawn. A corporation is
-reached from the map by a press on ground it holds (SELECTION.md § A lens collapses selection to
-ONE TIER). The *gameplay* mechanic (range that gates operations, the national origin gate,
-multi-HQ building via advancement, the tall/wide axis, law/tech levers) is BL-182's (corporate
-borders). See `scripts/verify/corporate_reach.lua`.
-
----
-
-## Company lens
-
-**Intent.** The Corporation lens's mirror, for the other half of the commercial
-population: where the **background firms** operate (`corporation_component::is_background`,
-the BL-365 `generate_background_firms` pass). Ben, 2026-08-28, splitting the
-words: a *corporation* is the player and its rivals, a *company* is a background
-firm (`docs/GLOSSARY.md` § Company).
-
-**Drawn identically to the Corporation lens, deliberately.** Same identity tint for a
-picked firm and owned-grey for an unpicked one, same checklist key and shift-click
-picking, and no HQ marker for a firm's seat either. The two lenses differ in what
-they admit and in one default:
-
-- **Default: no firm picked.** The player owns no company, so the Corporation lens's
-  "the player only" has no counterpart here; the lens opens with every firm's ground in
-  owned-grey, which already answers "where do background firms operate", and the player
-  picks the firms they want named. The set is its own (`ui_state::lens_companies`), so
-  flipping between the two lenses keeps each one's picks.
-
-A player who has learned to read one lens has learned to read the other, and the pair
-can be flipped between to compare.
-
-**Glyph / access.** On the Planetary strip beside Corporation, with its own glyph
-distinct from the corporation mark (§ The strip rotates with the rung).
+The general **player-identity accent** — a subtle wash on the player's tiles at the plain
+default, plus an outline drawn under every lens (`is_player_tile` in `body_surface_canvas.cpp`) —
+was never the Corporation lens's, and stays. There is no HQ star on this canvas, the player's or
+anyone's (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"); the HQ
+itself retired (Ben, 2026-10-23, `docs/GLOSSARY.md` § Headquarters).
 
 ---
 
@@ -558,13 +435,12 @@ to do with plates. The choice was between a lens those three do not want and a s
 arming rule; Ben took the second rule (2026-08-30), stated here rather than left to be
 inferred from the code, which is what NR-722 exists to prevent.
 
-**Three lenses have no ledger to pair with, and that is not an omission.**
-`Corporation` and `Company` route to *that corporation's* / *that company's* ledger —
-per-entity surfaces reached through Selection, not rail slots, so there is no slot to
-arm from. `Throughput` is **inert** in that routing table and has no ledger at all: it is
+**One lens has no ledger to pair with, and that is not an omission.**
+`Throughput` is **inert** in that routing table and has no ledger at all: it is
 the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
 Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
-throughput's twin would be a **Logistics ledger that does not exist**.
+throughput's twin would be a **Logistics ledger that does not exist**. (The Corporation and
+Company lenses, which routed to a per-firm ledger, retired with the firms — Ben, 2026-10-23.)
 
 ## The strip rotates with the rung (Ben, 2026-08-28)
 
@@ -573,7 +449,7 @@ not a fixed set. Owned by BL-670 (rung-keyed lens strip).
 
 | Rung | On the strip |
 |---|---|
-| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow |
+| **Planetary** | Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow |
 | **Circumplanetary** | Market, Scarcity, Supply |
 | **Solar** | Supply, Reach, Supply-routes |
 
@@ -638,8 +514,8 @@ to a flood-fill grouping, so no flood-fill pass is built.
 
 **Rung.** Planetary only — deposits are per-tile and have no inter-body surface.
 The render pass is guarded behind `overlay_mode::resource` in
-[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp), matching the
-Corporation pattern.
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp), matching every
+other Planetary-only lens.
 
 **Colour.** Resource identity colours from
 [`presentation.hpp`](../../src/ui/presentation.hpp) (`presentation_of(res).colour`),
@@ -649,8 +525,8 @@ Hue carries identity. No per-faction colours are involved.
 **Glyph.** Three stacked horizontal strata, widening and deepening in opacity
 top-to-bottom — a gradient / deposit-density motif (`icons::resource`, the
 `ImU32`-colour overload). Distinct from the supply horizontal *pair* (thin,
-full-width, equal), the market *vertical* bars, the country shield, and the
-corporation seal-square; and distinct from the resource *pip* diamond (the
+full-width, equal), the market *vertical* bars and the country shield; and distinct from the
+resource *pip* diamond (the
 `resource_type` overload) it shares a name with.
 
 **Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus a key in
@@ -794,16 +670,17 @@ build already stands — distinct from where people live (the population-centre 
 where labour is efficient (Population). One of a three-layer read: Settlements (discrete
 markers) · Industry (this lens) · You (identity chrome).
 
-**Data definition (BL-373, industry lens re-point).** The lens reads the **buildings owned by
-background corporations** (`corporation_component.is_background`) standing on each tile of the
-active body, taken from the economy report's `building_report` rows. Per tile the field is
-`Σ (0.5 + 0.5 · output_share)` over those buildings, where `output_share` is the building's
-`output_quantity` normalised to the largest background output on that body. The `0.5` floor keeps
-an idle or under-construction background plant visible — its *presence* is the fact the lens
-reports — while the output term separates a token works from a real one, and two buildings on one
-tile stack. **Pure rendering**: nothing is written back. `tile.substrate_density` does not feed
-this lens (it is retained on the tile only because removing it would be a save-format touch for
-no gain — Ben, 2026-08-12).
+**Data definition (re-subjected, Ben, 2026-10-23).** The lens reads the **buildings owned by
+nations other than the player's** standing on each tile of the active body, taken from the
+economy report's `building_report` rows. A building's owner is always its ground's nation
+(`../politics/NATIONS.md` § Own ground), so these are the rivals' plants on their own ground. Per
+tile the field is `Σ (0.5 + 0.5 · output_share)` over those buildings, where `output_share` is the
+building's `output_quantity` normalised to the largest such output on that body. The `0.5` floor
+keeps an idle or under-construction plant visible — its *presence* is the fact the lens reports —
+while the output term separates a token works from a real one, and two buildings on one tile
+stack. **Pure rendering**: nothing is written back. `tile.substrate_density` does not feed this
+lens (it is retained on the tile only because removing it would be a save-format touch for no
+gain — Ben, 2026-08-12).
 
 The question it answers is **"where is the industry I did not build?"** — an *ownership*
 question, which is why it survived the roster pruning that retired the Production lens (§ Rung
@@ -814,9 +691,9 @@ question the player was asking at the strip, whereas "whose plant is already sta
 behind `overlay_mode::industry` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 
-**Colour.** A sequential dark→amber gradient: a tile carrying background plant composites its
+**Colour.** A sequential dark→amber gradient: a tile carrying a rival's plant composites its
 terrain hue toward industrial amber (`IM_COL32(210, 150, 70)`) at opacity `0.15 + 0.6·t`, where `t`
-is the tile's field value normalised to the body's maximum. Tiles with no background building keep
+is the tile's field value normalised to the body's maximum. Tiles with no rival building keep
 their terrain hue untinted. Sequential (not diverging) — density has a single good direction. No
 per-faction colours.
 
@@ -900,7 +777,7 @@ the field the terrain was actually derived from.
 
 ## Reach lens
 
-**Intent.** Read the map as *your commercial network*: which bodies the corp's
+**Intent.** Read the map as *your commercial network*: which bodies the player's
 persistent trade routes (`w.trade_routes`, DISCOVERY.md) actually connect, tiered by
 recency. Player's own routes only, per the competitor-visibility rule
 ([DISCOVERY.md](DISCOVERY.md)) — rival lanes stay private.
@@ -925,7 +802,7 @@ network)"; an unrouted body honestly says "no routes from this body".
 traffic volume, colour from recency — Supply shows convoys in flight, this shows
 the *standing lanes* they carved.
 
-**Surface.** Built from `w.trade_routes` at render time (upserted per pair + corp,
+**Surface.** Built from `w.trade_routes` at render time (upserted per pair + owner,
 so the player filter yields one entry per pair). On the Planetary canvas it reads
 as a **lane-list key** (`draw_supply_routes_key`, `body_surface_canvas.cpp`): one
 row per lane touching the active body, a **log-scaled thickness bar** from
@@ -951,7 +828,7 @@ asked of the player's question first. Owner: BL-1222 (trade-flow lens).
 **Visibility.** The player's own flows only (DISCOVERY.md § Competitor visibility). A market
 being short of a good is a public market signal; the refusal is a fact about the player's own
 surplus. No rival's shipments, shelves or refusals appear. A market's own shelf exports are
-no corporation's and do not appear either.
+no nation's shipments and do not appear either.
 
 **Surface (Planetary).**
 - **Flows** — one arrow per (source market, destination market, good) the player shipped,
@@ -961,7 +838,7 @@ no corporation's and do not appear either.
   player holds in surplus, coloured by the **best** class over the player's sources of
   that good. Hover lists the classes by good.
 
-**The classes** name the corporation dispatcher's rule that refused, ranked by how far a
+**The classes** name the nation dispatcher's rule that refused, ranked by how far a
 destination got through those rules, best last:
 - **no lane** — another body, and no lane off this one.
 - **price gate** — the destination does not pay the margin over the source. The dispatcher
@@ -978,10 +855,10 @@ The market-viability skill's logistics row classifies **market shelf** exports, 
 different dispatcher with its own order; its labels are the tool's
 (`body / noroute / gate / costly / noroom / room`), not these.
 
-**Data.** The dispatcher records, for the player's corporation only, each pass's
+**Data.** The dispatcher records, for the player's nation only, each pass's
 shipments and its best class per (good, destination market) as a transient output,
-tagged with the corporation it was taken for. The lens draws only passes taken for the
-corporation the player holds now, so a seat change shows nothing of the corporation
+tagged with the nation it was taken for. The lens draws only passes taken for the
+nation the player holds now, so a seat change shows nothing of the nation
 left behind. The simulation never reads the record and it is not saved, so a loaded
 game shows the lens from its first pass on.
 

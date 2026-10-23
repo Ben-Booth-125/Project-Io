@@ -257,7 +257,7 @@ spread widely. On a world built with its history, settled land provinces measure
 merge, taking one measured world from 773 settled provinces to 212 (median 54, p90 98, largest
 195). On a world built without its history the spread runs the other way (median 48, largest
 4,929), and the pass is chiefly a split. One pass evens that out **after nations are final** — after the strait
-rule and the closing rounds (`NATION_GENERATION.md` § Pass 2e) — and **before roads and firms are
+rule and the closing rounds (`NATION_GENERATION.md` § Pass 2e) — and **before roads and industry are
 placed**, so everything downstream is built on the normalised partition.
 
 **The band scales with the anchor.** A metropolis still holds a larger province than a village. A
@@ -472,7 +472,7 @@ generator.** Ben, ruling on a paleo-deposit measurement that moved the world's p
 
 The reasoning is the one this project applies everywhere else. Ground is a **fact about the
 world** — geology and biosphere history put oil where the ancient seas were, and how much is
-there is not a dial. What a corporation can *do* with it is bounded by something else entirely:
+there is not a dial. What a nation can *do* with it is bounded by something else entirely:
 how many buildings the province sustains, which is area × habitability × **roads** × population.
 So an extravagantly rich province is not an error to be tuned away at the point of placement; it
 is a province whose wealth is **gated behind infrastructure it has to build**, and that is a
@@ -557,6 +557,6 @@ rendered view), [`../ui/SELECTION.md`](../ui/SELECTION.md) § The province eleme
 
 **Owning items.** BL-515 (partition) and BL-516 (provinces over water) own the partition; BL-511
 (province as render unit) the selected grain; BL-513 (province building ceiling) and BL-512 (firm
-cap tunables) the ceiling; BL-532 (lens province blend) and BL-514 (global tile blend) the
+cap tunables, the per-province charter cap) the ceiling; BL-532 (lens province blend) and BL-514 (global tile blend) the
 rendering; BL-563 (province respects nation) the border edge; BL-567 (province is the conquest
 unit) and BL-518 (war redraws borders) what conquest moves.
