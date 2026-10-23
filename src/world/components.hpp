@@ -2275,10 +2275,12 @@ struct nation_component
     /// building, as `corporation_component::assets` is for a private one — a
     /// building is in exactly one corporation's `assets` or one nation's
     /// `state_assets`, never both, and owner lookups go through
-    /// `building_owner_of` (world.hpp). A MAJOR's only: a minor's list is always
-    /// empty. Filled at the fold by `hand_over_state_industry` and by the
-    /// player's own state builds; in stored (handover, then build) order, which
-    /// is the order the funding gate and every per-owner walk visit it.
+    /// `building_owner_of` (world.hpp). A major's state industry; a minor's list
+    /// holds only its logistics network nodes (Ben, 2026-10-22). Filled at the fold
+    /// by `hand_over_state_industry`, the Logistic Point seeding and the player's own
+    /// state builds; in stored (handover, then build) order, which is the order every
+    /// per-owner walk visits it - the funding gate pays its network nodes first,
+    /// then the rest in that order.
     /// SERIALISED in the v48 state-industry trailing section (world_save.cpp).
     std::vector<entity_id> state_assets;
 

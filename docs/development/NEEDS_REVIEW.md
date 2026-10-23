@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*40 entries — 31 open, 9 resolved.*
+*41 entries — 30 open, 11 resolved.*
 
 ---
 
@@ -262,13 +262,6 @@ Your grant excludes 'any chain for the player's nation or champion'. The 2026-10
 
 **Why it matters.** On the player's ground a rival's far site gets one hub that may not connect (so it covers nothing and adds nothing to the pool), while on every other nation's ground it gets a working chain. Reading the wording as builder-only would let rivals lay working chains on the player's ground too - hubs that also feed the player's pool.
 
-### NR-1062 — What a shipment's anchor draws against, now that the pool is the nation's
-*decision · raised 2026-10-22 · from BL-1361 (a shipment draws points by cargo), as the handoff asked: decide and log*
-
-Built: the anchor is the SOURCE MARKET'S CENTRE TILE. A shipment draws one point a unit from what the march and production left in the pool of the nation whose ground that tile is; the centre's routed cover caps its share (a half-covered centre ships half of each cargo); a centre on nobody's ground, or one no connected source reaches, ships nothing; under a share rule the trader draws its own class's pot; space legs draw nothing. The rival Marketplace estimate reads the anchor's leftover again (its grant text never stopped saying so) and scales by the cover. Written into LOGISTICS.md section How a tile's points get to it.
-
-**Why it matters.** Trade now waits on logistics at its source. Measured (16-seed market_viability, haulage --far-trade) before -> after: convoys window E 868 -> 791, Y 909 -> 803; units E 7493 -> 6308, Y 7178 -> 5561; G1t50 89.8 -> 88.2 and G2 176.3 -> 158.8, every gate passing; per seed G1t50 under 85 on seeds 12 (79.4), 46 (81.6), 10 (81.8) and 32 (84.4). A market centre generation leaves uncovered ships nothing until somebody builds a source there - which BL-1367's lesser sources at market centres would answer.
-
 ---
 
 ## Resolved
@@ -356,4 +349,22 @@ Your rule says a port's points cross 'water'. Built as SEA only (ocean and coast
 **Why it matters.** Decides whether a lake joined to the coast by a port reach counts as water the points travel over. Rare on generated worlds; no measured case.
 
 > **RESOLVED.** Ben, 2026-10-21: 'Ports should be able to cover lakes too.' b) any water: the sea walk crosses lakes and lands on their shores; a port still stands only on a sea coast. Built in BL-1396.
+
+### NR-1062 — What a shipment's anchor draws against, now that the pool is the nation's
+*decision · raised 2026-10-22 · from BL-1361 (a shipment draws points by cargo), as the handoff asked: decide and log*
+
+Built: the anchor is the SOURCE MARKET'S CENTRE TILE. A shipment draws one point a unit from what the march and production left in the pool of the nation whose ground that tile is; the centre's routed cover caps its share (a half-covered centre ships half of each cargo); a centre on nobody's ground, or one no connected source reaches, ships nothing; under a share rule the trader draws its own class's pot; space legs draw nothing. The rival Marketplace estimate reads the anchor's leftover again (its grant text never stopped saying so) and scales by the cover. Written into LOGISTICS.md section How a tile's points get to it.
+
+**Why it matters.** Trade now waits on logistics at its source. Measured (16-seed market_viability, haulage --far-trade) before -> after: convoys window E 868 -> 791, Y 909 -> 803; units E 7493 -> 6308, Y 7178 -> 5561; G1t50 89.8 -> 88.2 and G2 176.3 -> 158.8, every gate passing; per seed G1t50 under 85 on seeds 12 (79.4), 46 (81.6), 10 (81.8) and 32 (84.4). A market centre generation leaves uncovered ships nothing until somebody builds a source there - which BL-1367's lesser sources at market centres would answer.
+
+> **RESOLVED.** Ben, 2026-10-23 (the logistics funding form): keep the centre tile. a) as built.
+
+### NR-1063 — 'The capital is the peak' read as: every capital covered at full strength
+*decision · raised 2026-10-22 · from BL-1367 (where generation puts sources), re-read against routing as the handoff asked*
+
+Your 2026-10-18 rule says no tile of a nation may hold more points than its capital at generation. It was written for a field of points incident at a tile. Since BL-1356 a tile's points arrive as a SHARE of its request, at most all of it, so no tile can outrun a capital covered at full strength. Built: the check is that every capital is covered at full strength, which the state hub generation now stands on every capital guarantees. The census's old points-incident figures (cap_pts / max_pts) are still printed as report, and by that measure a rail station's tile still outruns most capitals.
+
+**Why it matters.** Decides whether the census gate is the routing reading (built; passes on all 16 seeds) or the field reading (fails wherever rail runs).
+
+> **RESOLVED.** Ben, 2026-10-23 (the logistics funding form): the routing reading. a) as built.
 

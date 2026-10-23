@@ -1290,7 +1290,8 @@ bool is_player_owned(const world& w, entity_id building);
 // BL-1296 — building ownership has two kinds (NATIONS.md § State industry)
 // ---------------------------------------------------------------------------
 // A building is owned by a CORPORATION (private industry, in its `assets`) or by
-// a major NATION outright (state industry, in its `state_assets`). Corporations
+// a NATION outright (in its `state_assets`: a major's state industry, or a minor's
+// logistics network nodes - Ben, 2026-10-22). Corporations
 // and nations draw their ids from the one entity allocator, so an owner id alone
 // names which; `building_owner_of` says so explicitly. Every economy flow keyed
 // by "owner" (landings, purchases, wants, labour pools, cash flows) takes a

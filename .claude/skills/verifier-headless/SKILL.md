@@ -1041,7 +1041,11 @@ in `tools/verify/README.md`.
   --digest-check` proves nothing about the split — this harness is what does.
 - **`lp_coverage_census`** — BL-1351: does the fold's `seed_logistics_sources` give every nation
   Logistic Points across its ground, and is a centralised capital with points fading outward even
-  possible? A **report, no gate**. Per nation per seed: sources by network, hubs landed on a market
+  possible? **A gate on three rules (BL-1367; LOGISTICS.md § Where generation puts the sources)**:
+  every capital holds a source, every capital is covered at full strength (the peak, NR-1063), and
+  every consumer is covered save those the seeding counted unconnectable — an `R` line per seed,
+  a `RULES PASS/FAIL` verdict, exit 1 on a break. An `A` line per seed counts market anchors
+  (centres) by cover, where a shipment draws (BL-1361). Everything else is report. Per nation per seed: sources by network, hubs landed on a market
   `centre_tile` against a consumer's own tile, pool against claim and the realised margin against
   `k_pool_margin`, the coverage distribution over the nation's ground / its building tiles / its
   consumers, and points incident at the capital tile against the most distant covered tile with

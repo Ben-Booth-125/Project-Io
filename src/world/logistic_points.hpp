@@ -432,6 +432,9 @@ struct lp_seed_report
     /// own dry tiles joins them (an island, or a holding beyond water or a neighbour).
     /// A road hub's chain cannot cross that, whatever its reach.
     int   unconnectable_cut_off = 0;
+    /// BL-1367: the building ids counted in `unconnectable`, ascending - so the coverage
+    /// census checks each uncovered consumer against the seeding's own reason, not a count.
+    std::vector<entity_id> unconnectable_ids;
     /// BL-1356: ports laid to bridge ground cut off from its capital by water, and the
     /// islands so bridged (a home port, where none was connected, plus an island port).
     int   ports_placed    = 0;

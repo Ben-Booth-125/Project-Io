@@ -738,8 +738,10 @@ blanket, and an outlying hub reads as a deliberate reach into thin ground.
 Three things follow, and each is a check rather than a preference:
 
 - **Every capital holds a source.** A nation whose capital makes no points has no centre for its
-  chain to be anchored to (§ How a tile's points get to it), so a capital with zero points is a
-  generation defect, not a poor nation.
+  chain to be anchored to (§ How a tile's points get to it), so a capital with no source is a
+  generation defect, not a poor nation. The one exception is a source that stands but cannot be paid
+  for: a nation too poor to fund it even after its firms pay is reported as dark, not failed (Ben,
+  2026-10-22).
 - **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
   points than its capital at generation. A later build may overtake it — that is the player's doing
   and is allowed — but the world does not start that way.
@@ -747,6 +749,24 @@ Three things follow, and each is a check rather than a preference:
   reach at the start; what must be covered is what **consumes** points. Uncovered ground is the
   room the logistics game is played in, so a sweep reporting most ground uncovered is reporting the
   intended world.
+
+**Read under routing, the peak is the capital's full cover (decided 2026-10-22, NR-1063).** A
+tile's points arrive as a share of its request, and that share is at most all of it (§ How a tile's
+points get to it), so no tile can hold more than a capital its sources reach at full strength. The
+second check is therefore that every capital is covered at full strength, which a source standing
+on it guarantees.
+
+**The order generation seeds in (BL-1367).** First a source on every capital, the state's — a
+minor's too, which may hold its network nodes as the state (Ben, 2026-10-22; `../politics/NATIONS.md`
+§ State industry); then
+each of the nation's other market centres, covered at full strength by the chain laid out from the
+capital; then the consumers. A centre is the anchor every shipment leaving its market draws at, so
+an uncovered centre is a market that cannot trade. A source must also be paid for: a nation too poor
+to fund its nodes at the opening is funded by the firms on its ground (`../generation/NATION_GENERATION.md`
+§ Pass 7, "No capital starts dark"), and a capital still unfunded after that is dark — its source
+stands and the funding gate idles it. The coverage census (`lp_coverage_census`) checks the three
+rules on every curated seed, reads them through the funding gate, reports dark capitals, and fails
+when a capital holds no source or a consumer is uncovered for a reason the seeding did not count.
 
 **The chain is laid outward from the capital (BL-1356).** A hub covers a consumer only where it is
 connected to its nation's capital (§ How a tile's points get to it), so generation reaches an

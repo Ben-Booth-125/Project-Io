@@ -544,12 +544,27 @@
    "title": "What a shipment's anchor draws against, now that the pool is the nation's",
    "raised": "2026-10-22",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1361 (a shipment draws points by cargo), as the handoff asked: decide and log",
    "what": "Built: the anchor is the SOURCE MARKET'S CENTRE TILE. A shipment draws one point a unit from what the march and production left in the pool of the nation whose ground that tile is; the centre's routed cover caps its share (a half-covered centre ships half of each cargo); a centre on nobody's ground, or one no connected source reaches, ships nothing; under a share rule the trader draws its own class's pot; space legs draw nothing. The rival Marketplace estimate reads the anchor's leftover again (its grant text never stopped saying so) and scales by the cover. Written into LOGISTICS.md section How a tile's points get to it.",
    "why_it_matters": "Trade now waits on logistics at its source. Measured (16-seed market_viability, haulage --far-trade) before -> after: convoys window E 868 -> 791, Y 909 -> 803; units E 7493 -> 6308, Y 7178 -> 5561; G1t50 89.8 -> 88.2 and G2 176.3 -> 158.8, every gate passing; per seed G1t50 under 85 on seeds 12 (79.4), 46 (81.6), 10 (81.8) and 32 (84.4). A market centre generation leaves uncovered ships nothing until somebody builds a source there - which BL-1367's lesser sources at market centres would answer.",
    "call": "a) keep (built); b) draw at the nearest connected source rather than the centre tile, so cover never caps; c) let an uncovered centre ship at a floor share.",
-   "known_limit": "market_component::trade_lp_spare, which the rival estimate reads, is every class's pot together: under a share rule (only a seated player sets one) a rival on that ground may estimate on a pot its class cannot draw."
+   "known_limit": "market_component::trade_lp_spare, which the rival estimate reads, is every class's pot together: under a share rule (only a seated player sets one) a rival on that ground may estimate on a pot its class cannot draw.",
+   "resolved": "2026-10-23",
+   "resolution": "Ben, 2026-10-23 (the logistics funding form): keep the centre tile. a) as built."
+  },
+  {
+   "id": "NR-1063",
+   "title": "'The capital is the peak' read as: every capital covered at full strength",
+   "raised": "2026-10-22",
+   "kind": "decision",
+   "status": "resolved",
+   "source": "BL-1367 (where generation puts sources), re-read against routing as the handoff asked",
+   "what": "Your 2026-10-18 rule says no tile of a nation may hold more points than its capital at generation. It was written for a field of points incident at a tile. Since BL-1356 a tile's points arrive as a SHARE of its request, at most all of it, so no tile can outrun a capital covered at full strength. Built: the check is that every capital is covered at full strength, which the state hub generation now stands on every capital guarantees. The census's old points-incident figures (cap_pts / max_pts) are still printed as report, and by that measure a rail station's tile still outruns most capitals.",
+   "why_it_matters": "Decides whether the census gate is the routing reading (built; passes on all 16 seeds) or the field reading (fails wherever rail runs).",
+   "call": "a) the routing reading (built); b) the field reading: points incident, rail included.",
+   "resolved": "2026-10-23",
+   "resolution": "Ben, 2026-10-23 (the logistics funding form): the routing reading. a) as built."
   }
  ]
 }

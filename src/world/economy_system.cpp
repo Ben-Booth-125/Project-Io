@@ -3028,7 +3028,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             // major's STATE buildings take the same reflexes its champion's
             // buildings take, logged under the champion (`corp` below). Never
             // the player's nation's — its champion is the player's corp — and
-            // never a nation with no champion (a minor holds no state industry).
+            // never a nation with no champion (a minor holds only its network nodes).
             entity_id corp = owner;
             if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
             {

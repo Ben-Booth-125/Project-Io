@@ -32,6 +32,13 @@
 // afterwards: every line is one record with named `key=value` fields, so a diff
 // of two runs is a diff of numbers.
 //
+// A GATE ON THREE RULES (BL-1367; LOGISTICS.md § Where generation puts the sources):
+// every capital holds a source; every capital is covered at full strength (under
+// routing a tile's cover is at most 1, so that is the peak - NR-1063); every consumer
+// is covered save those the seeding counted unconnectable. One `R` line per seed and a
+// `RULES` verdict; the exit code is 1 when any seed breaks a rule. Uncovered GROUND is
+// not a rule - it is the room the logistics game is played in.
+//
 // Build:  bash tools/verify/build_lua_harness.sh lp_coverage_census
 // Run:    build_gen/verify/lp_coverage_census.exe [--seeds 0,28,46]
 //         bash tools/verify/par_seeds.sh lp_coverage_census --build
@@ -99,6 +106,10 @@ struct nation_census
     int         c_full = 0, c_fade = 0, c_zero = 0;         ///< over its consumers
     double      cap_points = 0.0;
     double      max_points = 0.0;
+    bool        has_capital = false; ///< BL-1367: a capital tile on the read body
+    bool        cap_source  = false; ///< ... holding a running source of its own
+    bool        cap_dark    = false; ///< ... or one that stands, idled by the funding gate
+    float       cap_cover   = 0.0f;  ///< ... and its routed cover
     int         far_dist   = -1;
     double      far_points = 0.0;
     ring_acc    rings[4];
@@ -231,7 +242,7 @@ int main(int argc, char** argv)
     all.push_back({"minor"});
     all.push_back({"coastal"});
     all.push_back({"landlocked"});
-    long   total_hubs = 0, total_shortfall_nations = 0;
+    long   total_hubs = 0, total_shortfall_nations = 0, rule_fail_seeds = 0;
     double total_seed_ms = 0.0;
 
     for (const std::uint32_t seed : seeds)
@@ -249,7 +260,7 @@ int main(int argc, char** argv)
         build_app_base_world(lua, p, *start);
         apply_app_start_landscape(*start, in);
         world& w = start->w;
-        hand_over_state_industry(w, start->reg);
+        state_handover_report handover = hand_over_state_industry(w, start->reg);
         hand_over_rail(w);
 
         // Hubs that already stood before the seeding pass: generation's, not this
@@ -266,6 +277,50 @@ int main(int argc, char** argv)
             std::chrono::duration<double, std::milli>(t1 - t0).count();
         total_seed_ms += seed_ms;
         total_hubs += rep.hubs_placed;
+
+        // The fold's own tail after the seeding (finish_campaign_world): the foundings'
+        // reserve, then the reading AT THE FUNDING GATE (cold review) - a state source
+        // the gate would idle on the first tick makes nothing and reaches nobody, so it
+        // is idled for this reading, as `lp_seed_read_at_gate` does. The world is this
+        // census's own and is discarded after, so nothing is restored.
+        reserve_state_first_tick(w, start->reg, handover);
+        print_state_node_fund(fund_state_nodes_from_firms(w, start->reg)); // BL-1398
+        int gate_idled = 0;
+        std::set<entity_id> dark_nations; // nations the gate idles a network node of
+        {
+            bool flipped = false;
+            for (const entity_id bid : state_gate_would_idle(w, start->reg))
+            {
+                building_component& b = w.buildings.at(bid);
+                lp_network net;
+                if (lp_source_network(b.type, net) && lp_source_running(b))
+                {
+                    ++gate_idled;
+                    if (const auto dn = w.tile_to_nation.find(b.tile); dn != w.tile_to_nation.end())
+                        dark_nations.insert(dn->second);
+                    // Name the nation whose source the gate idles, and why: its chest
+                    // against the first tick's state bill.
+                    const auto tn = w.tile_to_nation.find(b.tile);
+                    if (tn != w.tile_to_nation.end() && w.nations.count(tn->second) != 0)
+                    {
+                        const nation_component& nc = w.nations.at(tn->second);
+                        std::printf("G seed=%u nation=%u major=%d capital=%d treasury=%.1f bill=%.1f\n",
+                                    seed, static_cast<unsigned>(tn->second),
+                                    is_major_nation(w, tn->second) ? 1 : 0,
+                                    nc.capital_tile == b.tile ? 1 : 0,
+                                    static_cast<double>(nc.treasury),
+                                    static_cast<double>(state_first_tick_bill(w, start->reg, tn->second)));
+                    }
+                }
+                if (!b.state_idle)
+                {
+                    b.state_idle = true;
+                    flipped = true;
+                }
+            }
+            if (flipped)
+                w.rail_networks.clear();
+        }
 
         // --- the reading -----------------------------------------------------
         const lp_tick t = resolve_logistic_points(w);
@@ -450,6 +505,30 @@ int main(int argc, char** argv)
             const entity_id cap = nit->second.capital_tile;
             const auto pit = points.find(cap);
             c.cap_points = pit != points.end() ? pit->second : 0.0;
+            // BL-1367: the three rules of LOGISTICS.md § Where generation puts the
+            // sources, read as checks.
+            if (cap != null_entity && w.tile_to_nation.count(cap) != 0
+                && w.tile_to_nation.at(cap) == nid)
+            {
+                c.has_capital = true;
+                // A source STANDS on the capital whether or not the funding gate lets it
+                // run; one that stands but is idled for want of money is DARK (Ben,
+                // 2026-10-22: the firms on its ground fund the opening node bill, and
+                // what is still dark is reported, not failed).
+                for (const auto& [bid, b] : w.buildings)
+                {
+                    lp_network net;
+                    if (b.tile != cap || !lp_source_network(b.type, net))
+                        continue;
+                    if (lp_source_running(b))
+                        c.cap_source = true;
+                    else if (b.state_idle)
+                        c.cap_dark = true;
+                }
+                if (c.cap_source)
+                    c.cap_dark = false;
+                c.cap_cover = lp_coverage_at(w, memo, cap);
+            }
             const auto git = ground.find(nid);
             if (git == ground.end())
                 continue;
@@ -486,6 +565,87 @@ int main(int argc, char** argv)
                     rep.partly_covered, rep.uncovered, rep.nobodys_ground, rep.unconnectable, rep.unconnectable_cut_off, rep.ports_placed, rep.islands_bridged,
                     static_cast<double>(rep.need_total), static_cast<double>(rep.pool_total),
                     static_cast<double>(rep.granted_total), seed_ms);
+
+        // BL-1361: every market's ANCHOR (its centre tile), where a shipment leaving it
+        // draws: full cover, fading, none on a nation's ground, or nobody's ground.
+        {
+            int a_full = 0, a_fade = 0, a_zero = 0, a_nobody = 0;
+            for (const auto& [mid, a] : t.trade_anchors)
+            {
+                (void)mid;
+                if (a.nation == null_entity) ++a_nobody;
+                else if (a.cover >= 1.0f)    ++a_full;
+                else if (a.cover > 0.0f)     ++a_fade;
+                else                         ++a_zero;
+            }
+            std::printf("A seed=%u anchors=%zu full=%d fade=%d zero=%d nobody=%d\n", seed,
+                        t.trade_anchors.size(), a_full, a_fade, a_zero, a_nobody);
+        }
+
+        // BL-1367 THE RULES (LOGISTICS.md § Where generation puts the sources): every
+        // capital holds a source; the capital is the peak of its nation's field - under
+        // routing a tile's cover is at most 1, so no tile outruns a capital covered at
+        // full strength (NR-1063); consumers are covered, save those the seeding counted
+        // unconnectable. Ground is not a rule: most of it uncovered is intended.
+        {
+            int capitals = 0, cap_src = 0, cap_full = 0, cap_dark = 0, cap_unmet = 0;
+            for (const auto& [nid, c] : cen)
+            {
+                (void)nid;
+                if (!c.has_capital)
+                    continue;
+                ++capitals;
+                if (c.cap_source)
+                    ++cap_src;
+                if (c.cap_dark)
+                    ++cap_dark;
+                if (c.cap_cover >= 1.0f)
+                    ++cap_full;
+                // Per capital (cold review): a running source covers it at full
+                // strength, or its source stands dark.
+                if (!(c.cap_source ? c.cap_cover >= 1.0f : c.cap_dark))
+                    ++cap_unmet;
+            }
+            // Rules 1 and 2 hold where a capital's source stands and runs; a DARK one
+            // (standing, its nation unable to fund it even after its firms paid) is
+            // reported, not failed (Ben, 2026-10-22). A capital with no source fails.
+            const bool r1 = cap_src + cap_dark == capitals;
+            const bool r2 = cap_unmet == 0;
+            // Rule 3 by CONSUMER (cold review): every consumer on a nation's ground below
+            // full cover, read at the funding gate, must be one the seeding itself counted
+            // unconnectable - never a count against a count.
+            // A consumer of a DARK nation - one whose network nodes the gate idles for
+            // want of money - is reported with it, not failed (Ben, 2026-10-22).
+            int uncovered = 0, unexplained = 0, dark_consumers = 0;
+            for (const lp_building_row& row : t.buildings)
+            {
+                if (row.nation == null_entity || row.coverage >= 1.0f)
+                    continue;
+                ++uncovered;
+                if (std::binary_search(rep.unconnectable_ids.begin(), rep.unconnectable_ids.end(),
+                                       row.building))
+                    continue;
+                if (dark_nations.count(row.nation) != 0)
+                    ++dark_consumers;
+                else
+                    ++unexplained;
+            }
+            // Nations the rules cannot read: no capital tile, or one on ground they do not
+            // hold. Printed, so a vacuous pass is visible.
+            int excluded = 0;
+            for (const auto& [nid, c] : cen)
+                if (!c.has_capital && w.nations.count(nid) != 0)
+                    ++excluded;
+            const bool r3 = unexplained == 0;
+            std::printf("R seed=%u capitals=%d excluded=%d cap_source=%d cap_dark=%d cap_full=%d consumers=%d "
+                        "uncovered=%d unconnectable=%d dark_consumers=%d unexplained=%d gate_idled=%d | %s "
+                        "every-capital-holds-a-source | %s capital-is-the-peak | %s consumers-covered\n",
+                        seed, capitals, excluded, cap_src, cap_dark, cap_full, rep.consumers, uncovered,
+                        rep.unconnectable, dark_consumers, unexplained, gate_idled,
+                        r1 ? "PASS" : "FAIL", r2 ? "PASS" : "FAIL", r3 ? "PASS" : "FAIL");
+            if (!(r1 && r2 && r3))
+                ++rule_fail_seeds;
+        }
 
         char seed_label[32];
         std::snprintf(seed_label, sizeof seed_label, "%u", seed);
@@ -549,6 +709,9 @@ int main(int argc, char** argv)
                 total_seed_ms / static_cast<double>(seeds.size()), total_shortfall_nations);
     for (const bucket& b : all)
         print_bucket("ALL", b);
+    // BL-1367: the census is a GATE on the three generation rules.
+    std::printf("RULES %s: %ld of %zu seed(s) break a rule\n", rule_fail_seeds == 0 ? "PASS" : "FAIL",
+                rule_fail_seeds, seeds.size());
     std::fflush(stdout);
-    return 0;
+    return rule_fail_seeds == 0 ? 0 : 1;
 }

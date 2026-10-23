@@ -1427,6 +1427,90 @@ lp_seed_report seed_logistics_sources(world& w)
         return true;
     };
 
+    // 0. THE CAPITAL IS THE PEAK (BL-1367; LOGISTICS.md § Where generation puts the
+    //    sources, Ben 2026-10-18). Seeded hierarchically, before any consumer: first a
+    //    source ON every capital, so each chain is anchored by points of its own (rule:
+    //    every capital holds a source); then the nation's other MARKET CENTRES, each
+    //    covered at full strength by the chain laid out from the capital - bridged by sea
+    //    where the centre's ground is cut off, as a consumer's is - the lesser sources,
+    //    and the anchors a shipment leaves from (BL-1361). Consumers come after, so a
+    //    chain to a centre is a chain they can extend. Ascending ids: order-independent.
+    //    WHOSE: the nation's own, a minor's as a major's - a minor may hold its network
+    //    nodes as the state (Ben, 2026-10-22; NATIONS.md § State industry). A capital
+    //    on water, or ground the nation does not hold, gets none here, and the census
+    //    counts it rather than this pass forcing it.
+    {
+        const auto step0_owner = [](entity_id nation) { return nation; };
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            (void)nc;
+            nids.push_back(nid);
+        }
+        std::sort(nids.begin(), nids.end());
+        for (const entity_id nid : nids)
+        {
+            const entity_id cap = w.nations.at(nid).capital_tile;
+            const entity_id owner = step0_owner(nid);
+            if (cap == null_entity || w.tiles.count(cap) == 0 || owner == null_entity
+                || rep.hubs_placed >= k_max_hubs)
+                continue;
+            // A capital that already holds a running source of any network (a rail
+            // station, a state port on a coastal seat) holds one: none is stacked on it.
+            bool holds = hub_tiles.count(cap) != 0;
+            for (const entity_id bid : in.ids)
+            {
+                const building_component& b = w.buildings.at(bid);
+                lp_network net;
+                if (b.tile == cap && lp_source_network(b.type, net) && lp_source_running(b))
+                    holds = true;
+            }
+            if (!holds && placeable(cap, nid))
+                place_source(nid, cap, owner, building_type::inland_logistics_hub);
+        }
+        std::vector<entity_id> mids;
+        for (const auto& [mid, mc] : w.markets)
+        {
+            (void)mc;
+            mids.push_back(mid);
+        }
+        std::sort(mids.begin(), mids.end());
+        for (const entity_id mid : mids)
+        {
+            if (rep.hubs_placed >= k_max_hubs)
+                break;
+            const entity_id centre = w.markets.at(mid).centre_tile;
+            const auto tit = w.tiles.find(centre);
+            const entity_id nation = host_nation(w, centre);
+            if (tit == w.tiles.end() || nation == null_entity || is_water(tit->second.substrate))
+                continue;
+            const entity_id owner = step0_owner(nation);
+            if (owner == null_entity)
+                continue;
+            const entity_id body = tit->second.body;
+            if (coverage_of(nation, body, centre) >= 1.0f)
+                continue;
+            const entity_id ct = chain_anchor(w, nation, body);
+            if (ct == null_entity)
+            {
+                if (placeable(centre, nation))
+                    place_hub(nation, centre, owner);
+                continue;
+            }
+            if (lay_chain(nation, body, ct, centre, owner)
+                || region_of(nation, body, ct).count(centre) != 0)
+                continue;
+            const std::set<entity_id> island = flood_own(nation, body, centre);
+            const auto key = std::make_tuple(nation, body, *island.begin());
+            if (bridged.count(key) == 0 && bridge(nation, body, ct, island, owner))
+            {
+                bridged.insert(key);
+                bridged_ground[{nation, body}].insert(island.begin(), island.end());
+            }
+            lay_chain(nation, body, ct, centre, owner);
+        }
+    }
+
     // TWO PASSES (cold review): an island the first pass could not bridge - the sea
     // too wide from the capital's coast - may be in reach of an island bridged LATER in
     // the same pass, whatever order the consumers' ids put them in. The second pass
@@ -1485,6 +1569,7 @@ lp_seed_report seed_logistics_sources(world& w)
         if (!covered && coverage_of(nation, body, b.tile) < 1.0f)
         {
             ++rep.unconnectable;
+            rep.unconnectable_ids.push_back(bid); // in.ids is ascending
             if (region_of(nation, body, ct).count(b.tile) == 0)
                 ++rep.unconnectable_cut_off;
         }
