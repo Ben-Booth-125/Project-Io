@@ -42,7 +42,7 @@ and so is the safety net.
 | `UI-022` Planetary Canvas > Activity/vision fog layers (permanent pockets, corridors, convoy beam) | sub-element | `commercial_fog`, `intrabody_fog`, `visibility`, `proximity_glimpse`, `sea_lane` | 25 | 0 | 0 |
 | `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-028` Minimap > Lens legend fold-out | sub-element | `lens_legend`, `lens_strip_and_fields` | 5 | 0 | 3 |
-| `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 6 | 0 | 2 |
+| `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 7 | 0 | 2 |
 | `UI-032` Lens system (overlay_mode family) > Resource lens | sub-element | `resource_lens`, `lens_modes`, `lens_strip_and_fields` | 7 | 0 | 2 |
 | `UI-033` Lens system (overlay_mode family) > Market lens | sub-element | `market_lens`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-034` Lens system (overlay_mode family) > Population lens | sub-element | `population_lens`, `population_legibility`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
@@ -72,7 +72,7 @@ and so is the safety net.
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 10 | 0 | 1 |
-| `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 17 | 0 | 0 |
+| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `lens_strip_and_fields` | 22 | 0 | 0 |
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 19 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |

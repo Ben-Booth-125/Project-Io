@@ -33,3 +33,25 @@ verify.capture("default_lens_nations_picked")
 -- Back to none — re-confirms the plain canvas is a reachable state.
 verify.set_overlay("none")
 verify.capture("default_lens_cleared")
+
+-- D3 (Ben, 2026-10-24): THE DEFAULT VIEW DOES NOT MARK THE PLAYER'S OWN BUILDINGS.
+-- Framed close on one of the player's buildings: with no lens the tile must carry no
+-- identity wash and no outline - the building drawn as every building is. The same
+-- frame under the Nations lens follows, where the player's footprint outline is still
+-- drawn (a lens the player picked may mark ownership), so the pair shows the outline
+-- is gone from the default view only. Capture-read: the verify API has no pixel probe.
+local own = nil
+for _, b in ipairs(verify.buildings()) do
+  if b.player and b.complete then own = b break end
+end
+verify.expect(own ~= nil, "D3: the player holds a completed building to frame")
+if own then
+  print("[default_lens] framing the player's " .. tostring(own.type) .. " at "
+        .. own.x .. "," .. own.y)
+  verify.set_overlay("none")
+  frame_tile(own.x, own.y, 12)
+  shot("default_lens_own_building_plain")
+  verify.set_overlay("nations")
+  shot("default_lens_own_building_nations")
+  verify.set_overlay("none")
+end

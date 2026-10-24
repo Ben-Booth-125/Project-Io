@@ -49,7 +49,7 @@ for k = 0, 2 do
 end
 
 -- The drawn network the Throughput lens keeps.
-verify.set_overlay("throughput")
+verify.set_overlay("logistics")
 verify.set_zoom(kMinZoom * 2)
 verify.set_pan(0, 0)
 settle()

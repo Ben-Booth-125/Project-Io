@@ -251,7 +251,7 @@
   ],
   [
    "lens.throughput",
-   "Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput)."
+   "Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp): the LOGISTICS lens (named Logistics, Ben 2026-10-24; the action id and overlay_mode::throughput keep the old name, and a verify script arms it as \"logistics\" or \"throughput\"). Its glyph is a TRUCK in profile (icons::throughput)."
   ],
   [
    "lens.trade_flow",

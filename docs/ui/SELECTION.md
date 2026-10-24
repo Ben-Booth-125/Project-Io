@@ -817,18 +817,19 @@ stack to walk, and rule 1 removes it. Under a lens a repeat click on the same gr
 the same structure, which is the honest reading: there is one tier, and it does not move.
 
 **Consequence — a lens with no structure grain is a pure read.** Population, Industry and
-Throughput draw a per-tile *value field* rather than a region: their subject is a number spread
+Logistics draw a per-tile *value field* rather than a region: their subject is a number spread
 across the map, not a thing on it. Under rule 3 they are entirely non-interactive — no hover card,
 no selection, anywhere on the body (Ben, 2026-08-28: "for lenses which return none, just don't
 surface a hover, and clicks will do nothing"). This is a deliberate category, not a gap: a value
 field is something you *read*, and giving it a fake selectable grain would promise a pivot it has
 no destination for.
 
-**Throughput takes a hover read, and still no selection (Ben, 2026-10-20, choosing option A
-for BL-1353, the throughput lens rework).** Its field is the player nation's own per-tile
-coverage, a figure that differs tile to tile and has a cause worth naming — so the pointer
+**Logistics takes a hover read, and still no selection (Ben, 2026-10-20, choosing option A
+for BL-1353, the throughput lens rework; the lens was renamed Logistics, Ben, 2026-10-24).** Its
+subject is the player nation's own per-tile supplied and requested points, figures that differs tile to tile and has a cause worth naming — so the pointer
 resolves to **the ground**, `structure_kind::ground`, and the hover card reads it. The card is
-the *why* behind the drawn number: the tile's coverage, the network whose reach is best there, its
+the *why* behind the drawn numbers: the tile's supplied over requested (on a road, the routed
+flow through it — LENSES.md § Logistics lens), the network whose reach is best there, its
 traversal cost to that network's nearest source, and whether that is inside full reach or on the
 fade. It names a network, not a building: coverage is read off one distance field per network
 seeded by all of them, so no single source is "the" one.
@@ -836,7 +837,7 @@ It is also the only read at a rung too far out for the per-tile numbers to draw.
 stays inert** and clears the band to resting, exactly as above: a hover read promises no pivot,
 so the "no destination" objection does not arise. Ground the lens leaves bare — another
 nation's — resolves to nothing and shows no card. Population and Industry are unchanged: still
-pure reads, no hover, no selection (Ben, same ruling: "Throughput only").
+pure reads, no hover, no selection (Ben, same ruling: "Throughput only" — the lens now named Logistics).
 
 ### The lens names the ledger the selection drives
 
@@ -851,7 +852,7 @@ validates the structure also routes it.
 | **Continent** | the **plate** | History ledger, at its tectonic record |
 | **Nations** | the **nation** whose territory is under the pointer | wherever a press on its border band goes — the same `structure_kind::nation` selection |
 | **Population** / **Industry** | nothing — inert | — |
-| **Throughput** | **the ground**, for the hover card only — a click is inert | — |
+| **Logistics** | **the ground**, for the hover card only — a click is inert | — |
 | **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
 **A tile group was the owner lenses' structure.** Under the retired Corporation and Company lenses,

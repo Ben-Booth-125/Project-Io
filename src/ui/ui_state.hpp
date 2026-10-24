@@ -1338,6 +1338,18 @@ struct ui_state
     std::vector<float> lp_reaching;
     int lp_reaching_gw = 0, lp_reaching_gh = 0;
 
+    // --- The Logistics lens's TWO NUMBERS per tile (Ben, 2026-10-24) -------------
+    // Same raster and footing as `lp_reaching` (-1 = not the player nation's ground).
+    // SUPPLIED over REQUESTED, both LP/tick. On a ROAD tile they are the routed flow
+    // through it (`lp_route_flow`: what the chain could deliver there - each source
+    // whose walk crosses the road, once, its points x its reach - over every request
+    // whose route to the capital crosses it) and the pair colours the road;
+    // on any other tile they are the points reaching it and its own buildings' need.
+    std::vector<float> lp_supplied;
+    std::vector<float> lp_requested;
+    std::vector<std::uint8_t> lp_on_road; ///< 1 where the cell is the player's ROAD tile
+    std::vector<float> lp_granted; ///< on a road: what its routed requests were granted (-1 elsewhere)
+
     /// The player nation's own figures for the key, all in LP/tick: what its connected
     /// sources GENERATED (the pool), how many sources made it, and what its buildings
     /// CONSUMED - production's grants, the marches' grants and what shipments drew -
@@ -1369,6 +1381,10 @@ struct ui_state
     float     lp_hover_distance = 0.0f;
     int       lp_hover_used     = 0;     ///< BL-1356: sources the cover was topped up from
     bool      lp_hover_blocked  = false; ///< BL-1356: a source reaches here but has no chain to the capital
+    float     lp_hover_supplied  = 0.0f;  ///< the tile's SUPPLIED figure (lp_supplied's cell)
+    float     lp_hover_requested = 0.0f;  ///< the tile's REQUESTED figure (lp_requested's cell)
+    bool      lp_hover_road      = false; ///< the pair is a road's routed flow, not the tile's own
+    float     lp_hover_granted   = 0.0f;  ///< on a road: what the routed requests were granted
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 

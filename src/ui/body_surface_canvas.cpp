@@ -1308,28 +1308,25 @@ void draw_industry_key(ImDrawList* dl, const ui_state& state)
     dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
-/// The logistics hue this canvas already speaks: the Supply lens's convoy glyph
-/// colour, reused so throughput and the convoys it admits read as one vocabulary
-/// rather than two unrelated blues.
-constexpr ImU32 k_throughput_hue = IM_COL32(80, 200, 255, 255);
-
-/// THE ABSOLUTE SCALE the Throughput field is keyed to (Ben, 2026-10-24: "absolute
-/// numbers rather than a percentage"; LENSES.md § Throughput lens). LP/tick reaching
-/// a tile, linear from 0 (navy) to this figure (the logistics cyan), saturating above
-/// it. 240 is two hubs at full strength (lp_source_points: hub 120, station 150, port
-/// 120), so one hub's full reach sits mid-ramp and the overlap of two reads as full -
-/// fixed, so the same colour means the same points on every body and every tick.
-constexpr float k_lp_lens_scale = 240.0f;
-
-/// The Throughput lens's FIELD ramp (BL-606): deep navy where throughput is
-/// furthest away, the logistics cyan at an anchor. Sequential, not diverging —
-/// capacity has a single good direction. @p t is 1 at an anchor and 0 at the
-/// body's furthest reachable ground (or anywhere unreachable).
-ImU32 throughput_field_colour(float t)
+/// THE LOGISTICS LENS'S ROAD RAMP (Ben, 2026-10-24; LENSES.md § Logistics lens). A
+/// road of the player's nation is coloured by SUPPLIED over REQUESTED - the points
+/// granted to the requests routed through it over those requests - on a log2 scale:
+/// a ratio of 2 or more is full green, 0.5 or less full yellow, 1 the midpoint. A road
+/// no request routes through reads green: its supply is at least double a zero request.
+constexpr ImU32 k_logistics_road_yellow = IM_COL32(236, 206,  60, 255);
+constexpr ImU32 k_logistics_road_green  = IM_COL32( 84, 214, 104, 255);
+float logistics_road_t(float supplied, float requested)
 {
-    // (Since 2026-10-24 @p t is the tile's absolute LP/tick over k_lp_lens_scale.)
-    t = std::clamp(t, 0.0f, 1.0f);
-    return lerp_colour(IM_COL32(16, 24, 42, 255), k_throughput_hue, t);
+    if (!(requested > 0.0f))
+        return 1.0f;
+    if (!(supplied > 0.0f))
+        return 0.0f;
+    return std::clamp((std::log2(supplied / requested) + 1.0f) * 0.5f, 0.0f, 1.0f);
+}
+ImU32 logistics_road_colour(float supplied, float requested)
+{
+    return lerp_colour(k_logistics_road_yellow, k_logistics_road_green,
+                       logistics_road_t(supplied, requested));
 }
 
 /// The Throughput lens's ANCHOR ramp: a distinctly HOTTER, near-white cyan over
@@ -1380,7 +1377,7 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     // nation's own figures - the points its sources make this tick, how many sources
     // made them, and what its ground is asking for - and the ramp says what the
     // numbers on the tiles mean.
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Logistic Points"); // fit-exempt: legend box sized to its measured entries (container 2)
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Logistics"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + (have ? 4.0f : 6.0f);
 
     if (!state.lp_player_known)
@@ -1391,20 +1388,23 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
         return;
     }
 
-    // Bar 1 - THE POINTS RAMP, absolute (k_lp_lens_scale), which is what the
-    // per-tile numbers are.
+    // Bar 1 - THE ROAD RAMP (Ben, 2026-10-24): a road's colour is SUPPLIED over
+    // REQUESTED on a log2 scale, yellow at half or less, green at double or more.
+    // The ground is not tinted, so this is the one ramp the lens draws.
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
         const float t0 = static_cast<float>(i) / segs;
         dl->AddRectFilled({ x + bar_w * t0, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h },
-                          throughput_field_colour(t0));
+                          lerp_colour(k_logistics_road_yellow, k_logistics_road_green, t0));
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0"); // fit-exempt: legend box sized to its measured entries (container 2)
-    char top[32];
-    std::snprintf(top, sizeof top, "%.0f+ LP/tick", static_cast<double>(k_lp_lens_scale));
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0.5x"); // fit-exempt: legend box sized to its measured entries (container 2)
+    const char* mid = "supplied / requested";
+    const ImVec2 mts = ImGui::CalcTextSize(mid);
+    dl->AddText({x + (bar_w - mts.x) * 0.5f, y}, IM_COL32(150, 155, 165, 255), mid); // fit-exempt: legend box sized to its measured entries (container 2)
+    const char* top = "2x+";
     const ImVec2 nts = ImGui::CalcTextSize(top);
     dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), top); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
@@ -1931,6 +1931,14 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_reaching.clear();
     state.lp_reaching_gw  = 0;
     state.lp_reaching_gh  = 0;
+    state.lp_supplied.clear();
+    state.lp_requested.clear();
+    state.lp_on_road.clear();
+    state.lp_granted.clear();
+    state.lp_hover_granted   = 0.0f;
+    state.lp_hover_supplied  = 0.0f;
+    state.lp_hover_requested = 0.0f;
+    state.lp_hover_road      = false;
     state.lp_player_pool     = 0.0f;
     state.lp_player_claim    = 0.0f;
     state.lp_player_need     = 0.0f;
@@ -2050,6 +2058,61 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 // nation's qualifying sources, in LP/tick - not the share of a request.
                 state.lp_reaching[i] = lp_points_reaching(w, memo, lp, tid);
             }
+
+            // THE TWO NUMBERS, AND THE ROAD'S COLOUR (Ben, 2026-10-24; LENSES.md
+            // § Logistics lens). A road carries the routed FLOW through it - every
+            // request whose route to the capital crosses it, and what those requests
+            // were granted (`lp_route_flow`, read back off the same per-source fields
+            // the resolver routed on, through this frame's memo). Any other tile of the
+            // nation carries the points reaching it over its own buildings' need.
+            const std::size_t n = state.lp_reaching.size();
+            state.lp_supplied.assign(n, -1.0f);
+            state.lp_requested.assign(n, -1.0f);
+            state.lp_on_road.assign(n, 0);
+            state.lp_granted.assign(n, -1.0f);
+            std::unordered_map<entity_id, float> own_need;
+            for (const lp_building_row& br : lp.buildings)
+                if (br.nation == pn && br.need > 0.0f)
+                    if (const auto b2 = w.buildings.find(br.building); b2 != w.buildings.end())
+                        own_need[b2->second.tile] += br.need;
+            // Held across frames on the body's stamp (tick, buildings, logistics
+            // generation): the walks back are a read of this tick's routing, so the
+            // answer only moves when one of those does.
+            static body_frame_stamp                       s_flow_stamp;
+            static entity_id                              s_flow_nation = null_entity;
+            static std::unordered_map<entity_id, lp_flow> s_flow;
+            const body_frame_stamp fstamp = make_body_frame_stamp(w, state.active_body);
+            if (fstamp != s_flow_stamp || pn != s_flow_nation)
+            {
+                s_flow_stamp  = fstamp;
+                s_flow_nation = pn;
+                s_flow        = lp_route_flow(w, memo, lp, pn, state.active_body);
+            }
+            const std::unordered_map<entity_id, lp_flow>& flow = s_flow;
+            for (std::size_t i = 0; i < raster.size() && i < n; ++i)
+            {
+                if (state.lp_reaching[i] < 0.0f)
+                    continue;
+                const entity_id tid = raster[i];
+                const auto tc = w.tiles.find(tid);
+                if (tc != w.tiles.end() && tile_has_road(tc->second))
+                {
+                    const auto fit = flow.find(tid);
+                    state.lp_on_road[i]   = 1;
+                    // SUPPLIED is what the chain COULD deliver through the road -
+                    // Ben's 2x-green / 0.5x-yellow scale needs supply able to exceed
+                    // the request - not the grant, which never can.
+                    state.lp_supplied[i]  = fit != flow.end() ? fit->second.available : 0.0f;
+                    state.lp_granted[i]   = fit != flow.end() ? fit->second.granted   : 0.0f;
+                    state.lp_requested[i] = fit != flow.end() ? fit->second.requested : 0.0f;
+                }
+                else
+                {
+                    const auto nit2 = own_need.find(tid);
+                    state.lp_supplied[i]  = state.lp_reaching[i];
+                    state.lp_requested[i] = nit2 != own_need.end() ? nit2->second : 0.0f;
+                }
+            }
             // BL-1353: the ground card's WHY for the tile under the pointer. The card
             // holds a const world, so it is read here, off the memo the loop above
             // just filled - a lookup, not a flood. The hovered kind is last frame's,
@@ -2078,6 +2141,21 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 state.lp_hover_used     = why.used;
                 state.lp_hover_blocked  = why.blocked;
                 state.lp_hover_tile     = state.hovered_structure;
+                // The card's stacked pair is the tile's own two numbers, read back.
+                if (const auto ht = w.tiles.find(state.hovered_structure);
+                    ht != w.tiles.end() && ht->second.body == state.active_body)
+                {
+                    const std::size_t hi = static_cast<std::size_t>(ht->second.grid_y)
+                                         * static_cast<std::size_t>(gw)
+                                         + static_cast<std::size_t>(ht->second.grid_x);
+                    if (hi < n && state.lp_supplied[hi] >= 0.0f)
+                    {
+                        state.lp_hover_supplied  = state.lp_supplied[hi];
+                        state.lp_hover_requested = state.lp_requested[hi];
+                        state.lp_hover_road      = state.lp_on_road[hi] != 0;
+                        state.lp_hover_granted   = std::max(0.0f, state.lp_granted[hi]);
+                    }
+                }
             }
             // And the player nation's own figures for the key - read off `lp`, the
             // resolve this function actually settled on, NOT `resolved`: before the
@@ -3585,72 +3663,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, ind, 0.15f + 0.6f * t);
             }
         }
-        // Throughput lens (BL-606, LOGISTICS.md § Logistic Points). "Throughput is
-        // a lens, extending Reach. The Reach lens shows a binary field; throughput
-        // is that field with a magnitude." The BINARY half is drawn here — served
-        // ground where it is near against ground where it is far — and the LP
-        // QUANTITY is drawn on the anchors themselves, below, because that is
-        // where LP is generated and where LOGISTICS.md constraint 2 insists its
-        // spatial locus stays.
-        //
-        // WHY THE FIELD IS THE REACH COST AND NOT "the LP serving this tile".
-        // Measured, not assumed: on the home body every anchor generates the same
-        // authored rate (57 anchors x 20 LP) and every tile has a FINITE reach
-        // cost, because ocean is crossable at a sea-leg cost. So both the binary
-        // "is it reached" and the per-tile "how much LP reaches it" are CONSTANTS
-        // over the whole grid — a flat wash carrying no information. What varies,
-        // and what the player actually needs, is how far the ground is from the
-        // capacity: the reach field's own magnitude, which is precisely the
-        // quantity the Reach lens throws away when it uses this field as a
-        // yes/no placement predicate.
-        //
-        // This does NOT assert that LP attenuates with distance — it does not,
-        // and pricing it by distance is the thing LOGISTICS.md constraint 3
-        // forbids. It asserts only what the field says: this ground is this far
-        // from the nearest generator.
-        //
-        // The read is `tile_reach_cost` — the CONST half of the reach-field pair,
-        // and the only one a canvas holding a `const world&` may call. Its
-        // three-way contract is honoured exactly: -1 is "not computed", which
-        // draws NOTHING rather than inventing an answer (the field is warmed for
-        // the active body one call before this draw, in app.cpp, so -1 means the
-        // body genuinely has no field, not that this pass arrived early);
-        // infinity is "computed and unreachable", which takes the cold end of the
-        // ramp; anything finite normalises against the body's own worst case.
-        // Nothing here can trigger the Dijkstra.
-        // BL-1353: THE FIELD IS THE POINTS, FOR THE PLAYER'S OWN GROUND.
-        //
-        // It was the reach cost - how far this ground is from the nearest supply
-        // anchor - normalised against the field's 90th percentile and square-root
-        // compressed, with a long measured argument behind both halves
-        // (throughput_field_census, Sprint 18 and 2026-08-28). That argument was sound
-        // for the quantity it shaded, and the quantity is what changed: LENSES.md
-        // justified shading reach BECAUSE a per-tile points figure could not vary,
-        // every anchor making the same authored rate. BL-1309 ended that - points are
-        // made by hubs, stations and ports and fade along their own networks - so the
-        // lens now shades what Ben asked to see: the COVERAGE this nation's sources
-        // give this tile, in [0,1], which is what decides whether a building here can
-        // run at full rate.
-        //
-        // ABSOLUTE SINCE 2026-10-24 (Ben: "absolute numbers rather than a percentage"):
-        // the field is the LP/tick reaching the tile, on the fixed k_lp_lens_scale,
-        // linear - so a colour means the same points everywhere. Ground this nation
-        // does not hold carries -1 and is left bare -
-        // the lens is the player's own network, and a neighbour's ground is not a
-        // value of zero, it is not the subject.
-        else if (state.overlay == overlay_mode::throughput && !state.lp_reaching.empty())
-        {
-            const int cx_ = tile.grid_x, cy_ = tile.grid_y;
-            if (cx_ >= 0 && cx_ < state.lp_reaching_gw && cy_ >= 0 && cy_ < state.lp_reaching_gh)
-            {
-                const float cov = state.lp_reaching[
-                    static_cast<std::size_t>(cy_) * static_cast<std::size_t>(state.lp_reaching_gw)
-                    + static_cast<std::size_t>(cx_)];
-                if (cov >= 0.0f)
-                    fill = lerp_colour(fill, throughput_field_colour(
-                                                 std::clamp(cov / k_lp_lens_scale, 0.0f, 1.0f)), 0.72f);
-            }
-        }
+        // The Logistics lens (overlay_mode::throughput) tints NO ground (Ben, 2026-10-24:
+        // "remove the colour gradient from tiles"). It shaded the points reaching each
+        // tile until then; its read is now the ROAD colour (supplied over requested, in
+        // the route pass) and the two numbers on every tile (LENSES.md § Logistics lens).
         // Continent lens (BL-226): tint each tile by the tectonic plate that owns
         // it, and brighten the tiles that touch another plate. The boundary is the
         // point of the lens — a plate interior is just a region, but a boundary is
@@ -3685,23 +3701,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (boundary)
                 fill = lerp_colour(fill, IM_COL32(255, 255, 245, 255), 0.45f);
         }
-        // Player-owned tile? Drives the persistent, lens-independent ownership
-        // accent: a subtle wash at the plain default plus an outline under every
-        // lens (drawn in the border pass), so "these tiles are mine" reads without
-        // the player having to pick the Corporation lens.
+        // Player-owned tile? It used to drive a plain-default identity wash here (30%
+        // of the player colour on the player's own tiles with no lens). RETIRED (Ben,
+        // 2026-10-24): the default view does not mark the player's own buildings at
+        // all - no wash, no outline (LENSES.md § The default view). The footprint
+        // outline stays under the lenses (the tile loop's ring), where the fill path
+        // never washed either.
         const bool is_player_tile = has_owner && (corp_it->second == player_owner
                                                   || corp_it->second == w.player_entity);
-        // Plain-default wash: tint the player's own tiles with the player identity
-        // colour when no lens is active. Suppressed under any lens — the outline
-        // carries identity there, so the wash never fights a lens fill.
-        //
-        // BL-596 removed the `!built` exemption that used to stand here. It existed
-        // because a built tile's owner PLATE already was the player's identity colour;
-        // with the plate gone, exempting built tiles would punch a hole in the middle
-        // of the player's own footprint — the one tile in a cluster that does not read
-        // as theirs would be the one they built on.
-        if (is_player_tile && state.overlay == overlay_mode::none)
-            fill = lerp_colour(fill, corp_identity(w.player_entity), 0.30f);
+        (void)is_player_tile;
 
         const bool   selected  = (id == state.selected_entity);
 
@@ -3777,28 +3785,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the composite changed (alpha over the bake, not a lerp over a terrain hue).
     // Relief, the survey mask and the fog are not here: the bake carries relief,
     // on_bake is surveyed by definition, and the fog is the wash list after this.
-    // The Throughput wash from a reach cost (lens_wash_of's Throughput case; the
-    // tile loop calls it by raster position, without the tile record).
-    // (Ben, 2026-10-24) It reads the ABSOLUTE points field, LP/tick reaching the
-    // tile (`ui_state::lp_reaching`), on the fixed k_lp_lens_scale - the same field
-    // compute_tile_fill and the per-tile numbers read. It used to shade the REACH
-    // COST here while the fill path shaded coverage, so the baked ground and the
-    // numbers on it answered two different questions. -1 (not the player's ground)
-    // stays bare.
-    const auto lp_reaching_rc = [&](int col, int row) -> float {
-        if (state.lp_reaching.empty() || col < 0 || row < 0
-            || col >= state.lp_reaching_gw || row >= state.lp_reaching_gh)
-            return -1.0f;
-        return state.lp_reaching[static_cast<std::size_t>(row)
-                                 * static_cast<std::size_t>(state.lp_reaching_gw)
-                                 + static_cast<std::size_t>(col)];
-    };
-    const auto throughput_wash_of = [&](float pts) -> ImU32 {
-        if (pts < 0.0f)
-            return 0u;
-        const float t = std::clamp(pts / k_lp_lens_scale, 0.0f, 1.0f);
-        return with_alpha(throughput_field_colour(t), k_lens_wash_sequential);
-    };
     const auto lens_wash_of = [&](entity_id id, const tile_component& tile) -> ImU32
     {
         const overlay_mode ov = state.overlay;
@@ -3849,8 +3835,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             return with_alpha(IM_COL32(210, 150, 70, 255),
                               k_lens_wash_sequential * (0.15f + 0.6f * t) / 0.75f);
         }
+        // The Logistics lens tints NO ground (Ben, 2026-10-24: "remove the colour
+        // gradient from tiles"): its read is the road colour and the two numbers.
         if (ov == overlay_mode::throughput)
-            return throughput_wash_of(lp_reaching_rc(tile.grid_x, tile.grid_y));
+            return 0u;
         if (ov == overlay_mode::continent && plates)
         {
             const int idx = tile.grid_x + tile.grid_y * gw;
@@ -4068,6 +4056,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         return { vo.x + (lp.x - grid_cx) * zoom, vo.y + (lp.y - grid_cy) * zoom };
     };
     // The road and lane network and the border rule of one tile copy.
+    // The Logistics lens's colour for the road on raster cell (col, row), or 0 where
+    // the lens does not colour it: the lens is off, or the cell is not a road of the
+    // player's own nation (DISCOVERY.md § Competitor visibility) - those keep the
+    // ordinary road colour.
+    const auto lens_road_colour = [&](int col, int row) -> ImU32 {
+        if (state.overlay != overlay_mode::throughput || state.lp_on_road.empty()
+            || col < 0 || row < 0 || col >= state.lp_reaching_gw || row >= state.lp_reaching_gh)
+            return 0u;
+        const std::size_t i = static_cast<std::size_t>(row)
+                            * static_cast<std::size_t>(state.lp_reaching_gw)
+                            + static_cast<std::size_t>(col);
+        if (i >= state.lp_on_road.size() || state.lp_on_road[i] == 0)
+            return 0u;
+        return logistics_road_colour(state.lp_supplied[i], state.lp_requested[i]);
+    };
     const auto emit_routes = [&](ImDrawList* out, int t_col, int t_row, const tile_component& tile,
                                  float cx, float cy, ImVec2 vo, int k, bool on_bake, float vision,
                                  std::vector<structure_hit_zone>& zones)
@@ -4346,15 +4349,26 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // no lens and region_hash keys only tile fields, so brightening the painted
             // asphalt per lens would re-bake every visible chunk on every toggle. The
             // sand tones stay for the plain canvas, where a road is part of the land.
+            //
+            // THE LOGISTICS LENS COLOURS THE ROAD BY SUPPLIED OVER REQUESTED (Ben,
+            // 2026-10-24), replacing the brighter white: green where what the routed
+            // requests were granted is at least double them, yellow at half or less
+            // (logistics_road_colour). Only the player nation's roads; every other road
+            // keeps its ordinary colour. The tier still sets the weight, and the tier's
+            // alpha ladder is kept, so Track, Road and Highway still read apart.
+            const ImU32 lens_col = route_lens ? lens_road_colour(t_col, t_row) : 0u;
+            const auto lens_tint = [lens_col](ImU32 ordinary) -> ImU32 {
+                return lens_col == 0u ? ordinary
+                                      : ((lens_col & ~IM_COL32_A_MASK) | (ordinary & IM_COL32_A_MASK));
+            };
             ImU32 col; float thick;
-            const bool lens_white = route_lens;
             switch (max_road_tier(tile))
             {
-                case 1:  col = lens_white ? IM_COL32(225, 232, 240, 225) : IM_COL32(175, 158, 120, 205);
+                case 1:  col = lens_tint(IM_COL32(175, 158, 120, 205));
                          thick = route_r * k_road_width_track;   break;
-                case 2:  col = lens_white ? IM_COL32(238, 243, 249, 240) : IM_COL32(205, 188, 140, 225);
+                case 2:  col = lens_tint(IM_COL32(205, 188, 140, 225));
                          thick = route_r * k_road_width_road;    break;
-                default: col = lens_white ? IM_COL32(250, 252, 255, 255) : IM_COL32(225, 205, 150, 238);
+                default: col = lens_tint(IM_COL32(225, 205, 150, 238));
                          thick = route_r * k_road_width_highway; break;
             }
             draw_network([](const tile_component& t) { return max_road_tier(t); },
@@ -4367,14 +4381,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          // tile's best. The ladder is the same one the legend and the bake
                          // use - Track thin/dim, Road medium, Highway thick/bright.
                          // This per-edge colour is what reaches the screen for every
-                         // tiered half, so the lens's white has to live HERE too, or the
+                         // tiered half, so the lens's colour has to live HERE too, or the
                          // sand wins under the lens (BL-1353).
-                         [lens_white](int tier, ImU32 fallback) -> ImU32 {
+                         [lens_tint](int tier, ImU32 fallback) -> ImU32 {
                              switch (tier)
                              {
-                                 case 1:  return lens_white ? IM_COL32(225, 232, 240, 225) : IM_COL32(175, 158, 120, 205);
-                                 case 2:  return lens_white ? IM_COL32(238, 243, 249, 240) : IM_COL32(205, 188, 140, 225);
-                                 case 3:  return lens_white ? IM_COL32(250, 252, 255, 255) : IM_COL32(225, 205, 150, 238);
+                                 case 1:  return lens_tint(IM_COL32(175, 158, 120, 205));
+                                 case 2:  return lens_tint(IM_COL32(205, 188, 140, 225));
+                                 case 3:  return lens_tint(IM_COL32(225, 205, 150, 238));
                                  default: return fallback;
                              }
                          },
@@ -4772,6 +4786,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 std::uint64_t own = 0x0Bull;
                 if (tile_flags[ci] & 16u)
                     own ^= fbits(anchor_share(raster[ci])) << 16;
+                // The Logistics lens's road colour is per tile and moves with the
+                // routed flow, not with the geometry: it is part of the bucket too.
+                own = mix(own, lens_road_colour(cc, r));
                 h = mix(h, own);
             }
 
@@ -5126,9 +5143,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     else if (const ImU32 lc = lens_wc_done
                                  ? lens_wc
                                  : (lens_wc_done = true,
-                                    lens_wc = state.overlay == overlay_mode::throughput
-                                        ? throughput_wash_of(lp_reaching_rc(t_col, t_row))
-                                        : lens_wash_of(id, tile_of()));
+                                    lens_wc = lens_wash_of(id, tile_of()));
                              (lc & IM_COL32_A_MASK) != 0u)
                     {
                         // The run is per wrap COPY: with two copies on screen the
@@ -5166,11 +5181,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         seam_segs.push_back(sv[k_side_verts[side][1]]);
                     }
                 }
-                if (is_player_tile)
-                {
-                    const ImU32 pid = corp_identity(w.player_entity);
-                    wash((pid & ~IM_COL32_A_MASK) | (ImU32(77) << IM_COL32_A_SHIFT)); // 0.30
-                }
+                // The player-identity wash RETIRED here (Ben, 2026-10-24): the default
+                // view marks none of the player's own buildings, and under a lens the
+                // fill path never washed them either (the outline carries ownership).
                 if (suitability_active && !selected)
                 {
                     const bool placeable = suitability_placeable(
@@ -5394,7 +5407,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // is already the player colour, so the bright selection accent keeps the
             // edge visible; elsewhere the player identity colour reads as ownership
             // against terrain and value fills. Rival tiles carry no ring.
-            if (is_player_tile)
+            //
+            // NOT ON THE DEFAULT VIEW (Ben, 2026-10-24): with no lens the player's own
+            // buildings are drawn and nothing more - no ring, no wash. A lens the player
+            // picked keeps the outline.
+            if (is_player_tile && state.overlay != overlay_mode::none)
             {
                 const ImU32 ring = corp_identity(w.player_entity);
                 dl->AddPolyline(verts, 6, ring, ImDrawFlags_Closed, 2.0f);
@@ -5808,53 +5825,65 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // --- BL-1353: A NUMBER ON EVERY TILE, under the Throughput lens ------------
+    // --- BL-1353: NUMBERS ON EVERY TILE, under the Logistics lens -------------
     //
     // Ben, 2026-10-16: "give a number to each tile, so we can see exactly how many
-    // points we have." The number is the LOGISTIC POINTS REACHING the tile, in
-    // LP/tick (Ben, 2026-10-24: "absolute numbers rather than a percentage") - every
-    // qualifying source of the player nation, its reach here x what it made this
-    // tick (lp_points_reaching). What the tile's buildings CONSUMED is on its hover
-    // card, and the nation's generated / consumed totals are in the key.
+    // points we have", absolute (Ben, 2026-10-24: "absolute numbers rather than a
+    // percentage"). The nation's generated / consumed totals are in the key.
     //
-    // ONLY WHERE THE TEXT FITS. Below a drawn radius of 18 px three glyphs do not fit
-    // in a hex and the map turns into a smear of digits, so the numbers appear as the
-    // camera comes in and the colour field carries the read before that. Same
+    // ONLY WHERE THE TEXT FITS. Below the floor the digits do not fit in a hex and
+    // the map turns into a smear, so the numbers appear as the camera comes in and
+    // the road colour carries the read before that. Same
     // vertical culling and horizontal wrap as every settlement label above, and the
     // same shadow, so a number over pale ground stays legible.
-    if (state.overlay == overlay_mode::throughput && !state.lp_reaching.empty()
-        && hit_r >= 18.0f && raster_ok)
+    //
+    // TWO NUMBERS, STACKED (Ben, 2026-10-24): SUPPLIED over REQUESTED, both LP/tick.
+    // On a road of the player's nation they are the routed flow through it - what
+    // the requests routed across it were granted, over those requests - the pair
+    // its colour is the ratio of. On any other tile of the nation, the points
+    // reaching it over its own buildings' need. Two lines want a taller hex, so the
+    // floor is 20 px where one line took 18.
+    if (state.overlay == overlay_mode::throughput && !state.lp_supplied.empty()
+        && hit_r >= 20.0f && raster_ok)
     {
         const float visible_top    = grid_area_origin.y - hit_r;
         const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+        const float line_h         = ImGui::GetTextLineHeight();
         for (int row = 0; row < state.lp_reaching_gh; ++row)
             for (int col = 0; col < state.lp_reaching_gw; ++col)
             {
                 const std::size_t ci = static_cast<std::size_t>(row)
                                      * static_cast<std::size_t>(state.lp_reaching_gw)
                                      + static_cast<std::size_t>(col);
-                if (ci >= state.lp_reaching.size())
+                if (ci >= state.lp_supplied.size() || ci >= state.lp_requested.size())
                     continue;
-                const float cov = state.lp_reaching[ci];
-                if (cov < 0.0f)
+                const float sup = state.lp_supplied[ci];
+                if (sup < 0.0f)
                     continue; // not the player's ground: not this lens's subject
+                const float req = state.lp_requested[ci];
                 const ImVec2 sc = to_screen(hex_local_centre(col, row, hex_size));
                 if (sc.y < visible_top || sc.y > visible_bottom)
                     continue;
-                char num[12];
-                std::snprintf(num, sizeof num, "%d",
-                              static_cast<int>(std::lround(std::clamp(cov, 0.0f, 99999.0f))));
-                const ImVec2 ts = ImGui::CalcTextSize(num);
+                char top[12], bot[12];
+                std::snprintf(top, sizeof top, "%d",
+                              static_cast<int>(std::lround(std::clamp(sup, 0.0f, 99999.0f))));
+                std::snprintf(bot, sizeof bot, "%d",
+                              static_cast<int>(std::lround(std::clamp(req, 0.0f, 99999.0f))));
+                const ImVec2 ts = ImGui::CalcTextSize(top);
+                const ImVec2 bs = ImGui::CalcTextSize(bot);
                 const int k_min = (period_px > 0.0f)
                     ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
                 const int k_max = (period_px > 0.0f)
                     ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
                 for (int k = k_min; k <= k_max; ++k)
                 {
-                    const ImVec2 tp{ sc.x + static_cast<float>(k) * period_px - ts.x * 0.5f,
-                                     sc.y - ts.y * 0.5f };
-                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(12, 16, 24, 210), num); // shadow // fit-exempt: a per-tile figure, sized against the hex it sits in
-                    dl->AddText(tp, IM_COL32(236, 244, 252, 255), num); // fit-exempt: a per-tile figure, sized against the hex it sits in
+                    const float x = sc.x + static_cast<float>(k) * period_px;
+                    const ImVec2 tp{ x - ts.x * 0.5f, sc.y - line_h };
+                    const ImVec2 bp{ x - bs.x * 0.5f, sc.y };
+                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(12, 16, 24, 210), top); // shadow // fit-exempt: a per-tile figure, sized against the hex it sits in
+                    dl->AddText(tp, IM_COL32(236, 244, 252, 255), top); // fit-exempt: a per-tile figure, sized against the hex it sits in
+                    dl->AddText({ bp.x + 1.0f, bp.y + 1.0f }, IM_COL32(12, 16, 24, 210), bot); // shadow // fit-exempt: a per-tile figure, sized against the hex it sits in
+                    dl->AddText(bp, IM_COL32(190, 200, 214, 255), bot); // fit-exempt: a per-tile figure, sized against the hex it sits in
                 }
             }
     }

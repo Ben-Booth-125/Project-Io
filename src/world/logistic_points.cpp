@@ -770,19 +770,20 @@ bool memo_connected(world& w, lp_reach_memo& memo, entity_id nation, const lp_so
     return memo_chain(w, memo, nation, body, centre).count(s.building) != 0;
 }
 
-} // namespace
+/// One qualifying source for a tile's request, as routing ranks it.
+struct route_cand { float norm; entity_id building; float reach; lp_network net; float dist; };
 
-lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
-                     entity_id tile)
+/// THE QUALIFYING SOURCES for @p tile, nearest first (a tie to the lower building id):
+/// every running source of @p nation on @p body whose own reach touches the tile and
+/// that is connected to the capital. The one ranking `lp_route_to` routes on and
+/// `lp_route_flow` reads back, so the two cannot disagree about which sources carry a
+/// request. @p blocked is set when a source reached the tile but has no chain back.
+std::vector<route_cand> route_cands(world& w, lp_reach_memo& memo, entity_id nation,
+                                    entity_id body, entity_id tile, bool& blocked)
 {
-    lp_route out;
-    if (nation == null_entity || tile == null_entity)
-        return out;
     // The chain's anchor is the nation's CAPITAL, whatever market the tile clears in.
     const entity_id centre = chain_anchor(w, nation, body);
-
-    struct cand { float norm; entity_id building; float reach; lp_network net; float dist; };
-    std::vector<cand> cands;
+    std::vector<route_cand> cands;
     for (const lp_source_ref& s : memo_sources(w, memo, nation, body))
     {
         const auto& f = memo_field(w, memo, s, body);
@@ -794,20 +795,32 @@ lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id 
             continue;
         if (!memo_connected(w, memo, nation, s, body, centre))
         {
-            out.blocked = true;
+            blocked = true;
             continue;
         }
         cands.push_back({dit->second / lp_full_reach[static_cast<std::size_t>(s.network)],
                          s.building, r, s.network, dit->second});
     }
-    if (cands.empty())
-        return out; // `blocked` survives: the card names why a near hub gives nothing
     // Nearest first; a tie in distance goes to the lower building id, never to order.
-    std::sort(cands.begin(), cands.end(), [](const cand& x, const cand& y) {
+    std::sort(cands.begin(), cands.end(), [](const route_cand& x, const route_cand& y) {
         return x.norm != y.norm ? x.norm < y.norm : x.building < y.building;
     });
+    return cands;
+}
+
+} // namespace
+
+lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
+                     entity_id tile)
+{
+    lp_route out;
+    if (nation == null_entity || tile == null_entity)
+        return out;
+    const std::vector<route_cand> cands = route_cands(w, memo, nation, body, tile, out.blocked);
+    if (cands.empty())
+        return out; // `blocked` survives: the card names why a near hub gives nothing
     float sum = 0.0f;
-    for (const cand& k : cands)
+    for (const route_cand& k : cands)
     {
         sum += k.reach;
         ++out.used;
@@ -1017,6 +1030,270 @@ float lp_points_reaching(world& w, lp_reach_memo& memo, const lp_tick& t, entity
     if (sources_out != nullptr)
         *sources_out = n;
     return sum;
+}
+
+namespace {
+
+/// The tiles of the cheapest walk from @p from back to the seed of @p s's own field,
+/// @p from first and the seed last - RECONSTRUCTED, not recorded: the resolver keeps
+/// only each tile's distance, so the walk is read back off that field by stepping, at
+/// every tile, to the 4-cardinal neighbour the Dijkstra in `lp_distance_field` relaxed
+/// it from - the neighbour P with dist(P) + step_cost(P -> here) equal to dist(here),
+/// the same float sum the walk made (a 1e-4 tolerance as a fallback), the lowest tile
+/// id where two qualify. Road only: a rail field is point to point and a sea walk
+/// crosses water, so neither crosses a road between its ends - for those the ends alone.
+std::vector<entity_id> field_walk_back(world& w, entity_id body, const lp_source_ref& s,
+                                       const std::unordered_map<entity_id, float>& f,
+                                       entity_id from)
+{
+    std::vector<entity_id> out;
+    out.push_back(from);
+    if (from == s.tile)
+        return out;
+    if (s.network != lp_network::road)
+    {
+        out.push_back(s.tile);
+        return out;
+    }
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return out;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const int step_dc[4] = {  0,  1,  0, -1 };
+    const int step_dr[4] = { -1,  0,  1,  0 };
+    entity_id cur = from;
+    for (int guard = 0; guard < 4096; ++guard)
+    {
+        const auto cit = f.find(cur);
+        if (cit == f.end() || !(cit->second > 0.0f))
+            break; // the seed (distance 0), or a tile the field never held
+        const tile_component& tc = w.tiles.at(cur);
+        entity_id best = null_entity, near = null_entity;
+        for (int k = 0; k < 4; ++k)
+        {
+            // P stepped INTO `cur` by (dc, dr), so P sits at cur - (dc, dr).
+            const int py = tc.grid_y - step_dr[k];
+            if (py < 0 || py >= gh)
+                continue;
+            const int px = ((tc.grid_x - step_dc[k]) % gw + gw) % gw; // columns wrap
+            const std::size_t pi = static_cast<std::size_t>(py) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(px);
+            if (pi >= grid.size() || grid[pi] == null_entity)
+                continue;
+            const entity_id p = grid[pi];
+            const auto pit = f.find(p);
+            if (pit == f.end() || !(pit->second < cit->second))
+                continue;
+            const tile_component& ptc = w.tiles.at(p);
+            const int side = hex_side_for_offset(step_dc[k], step_dr[k], (py & 1) != 0);
+            const float sc = step_cost(w, cur, tc, s.network, ptc, side);
+            if (sc < 0.0f)
+                continue;
+            const float d = pit->second + sc;
+            if (d == cit->second && (best == null_entity || p < best))
+                best = p;
+            else if (std::fabs(d - cit->second) <= 1e-4f && (near == null_entity || p < near))
+                near = p;
+        }
+        const entity_id next = best != null_entity ? best : near;
+        if (next == null_entity)
+            break;
+        out.push_back(next);
+        cur = next;
+    }
+    return out;
+}
+
+} // namespace
+
+std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& memo,
+                                                     const lp_tick& t, entity_id nation,
+                                                     entity_id body)
+{
+    std::unordered_map<entity_id, lp_flow> flow;
+    if (nation == null_entity || body == null_entity)
+        return flow;
+    const entity_id centre = chain_anchor(w, nation, body);
+    const std::vector<lp_source_ref>& list = memo_sources(w, memo, nation, body);
+
+    // 1. THE CHAIN AS A TREE. `memo_chain` keeps only WHICH sources are connected; the
+    // link each joined by is recovered here by repeating its closure exactly - the same
+    // rounds, the same ascending order, the same two tests in the same order - and
+    // recording the first link that admitted each source: its own reach touching the
+    // capital or a joined source's tile (the walk back along ITS field), else a joined
+    // source's reach touching its tile (the walk back along THAT source's field). A
+    // source's path to the capital is that link's tiles plus its parent's path.
+    std::map<entity_id, std::vector<std::pair<entity_id, entity_id>>> to_root; // source -> (tile, walk source), sorted unique
+    if (centre != null_entity)
+    {
+        std::vector<entity_id> anchor_tiles{centre};
+        std::vector<entity_id> anchor_owner{null_entity}; // null = the capital itself
+        std::vector<const lp_source_ref*> joined;
+        std::set<entity_id> in;
+        for (bool grew = true; grew;)
+        {
+            grew = false;
+            for (const lp_source_ref& s : list)
+            {
+                if (in.count(s.building) != 0)
+                    continue;
+                std::vector<entity_id> walk;
+                entity_id parent = null_entity, owner = null_entity;
+                bool linked = false;
+                const auto& f = memo_field(w, memo, s, body);
+                for (std::size_t a = 0; a < anchor_tiles.size() && !linked; ++a)
+                {
+                    const auto dit = f.find(anchor_tiles[a]);
+                    if (dit != f.end() && lp_reach(s.network, dit->second) > 0.0f)
+                    {
+                        walk   = field_walk_back(w, body, s, f, anchor_tiles[a]);
+                        parent = anchor_owner[a];
+                        owner  = s.building;
+                        linked = true;
+                    }
+                }
+                for (std::size_t j = 0; j < joined.size() && !linked; ++j)
+                {
+                    const auto& fj = memo_field(w, memo, *joined[j], body);
+                    const auto dit = fj.find(s.tile);
+                    if (dit != fj.end() && lp_reach(joined[j]->network, dit->second) > 0.0f)
+                    {
+                        walk   = field_walk_back(w, body, *joined[j], fj, s.tile);
+                        parent = joined[j]->building;
+                        owner  = joined[j]->building;
+                        linked = true;
+                    }
+                }
+                if (!linked)
+                    continue;
+                // Each tile of the link is tagged with the source whose FIELD the walk
+                // ran down - the source whose points are carried along that link.
+                std::vector<std::pair<entity_id, entity_id>> hop;
+                hop.reserve(walk.size());
+                for (const entity_id tile : walk)
+                    hop.push_back({tile, owner});
+                if (parent != null_entity)
+                {
+                    const auto pit = to_root.find(parent);
+                    if (pit != to_root.end())
+                        hop.insert(hop.end(), pit->second.begin(), pit->second.end());
+                }
+                std::sort(hop.begin(), hop.end());
+                hop.erase(std::unique(hop.begin(), hop.end()), hop.end());
+                to_root[s.building] = std::move(hop);
+                in.insert(s.building);
+                anchor_tiles.push_back(s.tile);
+                anchor_owner.push_back(s.building);
+                joined.push_back(&s);
+                grew = true;
+            }
+        }
+    }
+    const auto source_ref = [&](entity_id building) -> const lp_source_ref* {
+        const auto it = std::lower_bound(list.begin(), list.end(), building,
+            [](const lp_source_ref& r, entity_id id) { return r.building < id; });
+        return (it != list.end() && it->building == building) ? &*it : nullptr;
+    };
+
+    // 2. EVERY REQUEST, ALONG ITS ROUTE. Each producing building on this nation's ground
+    // here is routed exactly as the resolver routed it (`route_cands`, nearest first,
+    // topped up until covered); each source it drew on carries its share of the request
+    // - its reach there, the last one cut to what covers it - and the same share of
+    // what the building was GRANTED. That share is laid on every tile from the building
+    // back to the source, and on along the source's chain to the capital, each tile
+    // once per share. A building no source qualifies for lays its request on its own
+    // tile, with nothing granted. Every walk a share used also records, per tile, the
+    // source whose field it ran down - the sources whose points pass through there.
+    std::unordered_map<entity_id, std::vector<entity_id>> owners; // tile -> walk sources
+    std::vector<std::pair<entity_id, entity_id>> walk;             // (tile, source)
+    std::vector<entity_id> tiles;
+    for (const lp_building_row& br : t.buildings) // ascending building id
+    {
+        if (br.nation != nation || !(br.need > 0.0f))
+            continue;
+        const auto bit = w.buildings.find(br.building);
+        if (bit == w.buildings.end())
+            continue;
+        const entity_id home = bit->second.tile;
+        const auto tit = w.tiles.find(home);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        bool blocked = false;
+        const std::vector<route_cand> cands = route_cands(w, memo, nation, body, home, blocked);
+        float cover = 0.0f;
+        std::vector<std::pair<const route_cand*, float>> carried; // source, its share of cover
+        for (const route_cand& k : cands)
+        {
+            const float take = std::min(k.reach, 1.0f - cover);
+            carried.push_back({&k, take});
+            cover += take;
+            if (cover >= 1.0f)
+                break;
+        }
+        if (carried.empty() || !(cover > 0.0f))
+        {
+            flow[home].requested += br.need;
+            continue;
+        }
+        for (const auto& [k, take] : carried)
+        {
+            const lp_source_ref* s = source_ref(k->building);
+            if (s == nullptr)
+                continue;
+            const float share = take / cover;
+            walk.clear();
+            for (const entity_id tile :
+                 field_walk_back(w, body, *s, memo_field(w, memo, *s, body), home))
+                walk.push_back({tile, s->building});
+            const auto rit = to_root.find(s->building);
+            if (rit != to_root.end())
+                walk.insert(walk.end(), rit->second.begin(), rit->second.end());
+            tiles.clear();
+            for (const auto& [tile, src] : walk)
+            {
+                tiles.push_back(tile);
+                owners[tile].push_back(src);
+            }
+            std::sort(tiles.begin(), tiles.end());
+            tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
+            for (const entity_id tile : tiles)
+            {
+                lp_flow& fl = flow[tile];
+                fl.requested += br.need * share;
+                fl.granted   += br.granted * share;
+            }
+        }
+    }
+
+    // 3. WHAT THE CHAIN COULD DELIVER THERE. Each source whose walk crosses a tile is
+    // counted ONCE at that tile, however many requests' walks brought it: the points it
+    // made this tick x its reach at the tile (its own field there). Summed in ascending
+    // source id, so the float sum is replay-exact.
+    for (auto& [tile, srcs] : owners)
+    {
+        std::sort(srcs.begin(), srcs.end());
+        srcs.erase(std::unique(srcs.begin(), srcs.end()), srcs.end());
+        float avail = 0.0f;
+        for (const entity_id b : srcs)
+        {
+            const lp_source_ref* s = source_ref(b);
+            if (s == nullptr)
+                continue;
+            const auto sit = std::lower_bound(
+                t.sources.begin(), t.sources.end(), b,
+                [](const lp_source_row& row, entity_id id) { return row.building < id; });
+            if (sit == t.sources.end() || sit->building != b)
+                continue;
+            const auto& f = memo_field(w, memo, *s, body);
+            const auto dit = f.find(tile);
+            if (dit == f.end())
+                continue;
+            avail += sit->made * lp_reach(s->network, dit->second);
+        }
+        flow[tile].available = avail;
+    }
+    return flow;
 }
 
 // ---------------------------------------------------------------------------

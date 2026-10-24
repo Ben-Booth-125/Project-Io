@@ -151,7 +151,7 @@ end
 -- BL-1353: Throughput is a HOVER READ with no selection. The built tile is the
 -- player's, on its home nation's ground, so the field covers it and the pointer
 -- resolves to the ground - and a press there still clears the band to resting.
-verify.set_overlay("throughput")
+verify.set_overlay("logistics")
 local tp = dwell(built_col, built_row)
 verify.expect(tp.hovered_structure_kind == "ground",
               "throughput lens: the player nation's ground resolves to the ground")
@@ -160,7 +160,7 @@ verify.expect(tp.hover_card == true,
 verify.capture("one_tier_throughput_ground_card")
 verify.set_overlay("nations")
 press(built_col, built_row)
-verify.set_overlay("throughput")
+verify.set_overlay("logistics")
 local tpp = press(built_col, built_row)
 verify.expect(tpp.has_selection == false,
               "throughput lens: a press on the ground selects nothing and clears the band")

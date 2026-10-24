@@ -376,7 +376,7 @@ scaffolding, because construction start and completion are events, not ticks.
 
 **Ownership never touches the ground art.** This settles what was the ground/chrome layer
 contract's sharpest open call: a structure carries no owner colour. Ownership is read from
-the hover card, the Selection element, the always-on player footprint outline, and the ground:
+the hover card, the Selection element, the player footprint outline under a lens (none on the plain canvas: Ben, 2026-10-24), and the ground:
 a building's owner is always its ground's nation (Ben, 2026-10-23), so the national border band
 and the Nations lens ([LENSES.md](LENSES.md)) say whose it is.
 
@@ -476,7 +476,7 @@ points on the tile edge, not just the centre"*). This revises the geometry rule 
 - **No drawn road network on the plain canvas at any rung** (Ben, 2026-10-10: roads drew too much
   attention when zoomed out, because the drawn web kept a minimum width). Roads are the painted
   ground at every zoom and shrink with it like the ground; **the network as logistics is read on
-  the Throughput lens** (LENSES.md § Throughput lens).
+  the Logistics lens** (LENSES.md § Logistics lens).
 
 **Roads and sea lanes are painted into the ground** (Ben, 2026-10-09, after walking the
 sprint 51 build: *"roads go over buildings, rather than being painted as an optional part of
@@ -520,7 +520,7 @@ takes the light, the grade and the lens wash like the ground does:
   over one is drawn after the road, so it hides the road behind it.
 - **Sea lanes are a faint wake** painted on the water — a pale, broken trail along the lane's
   sea tiles — not a stroke over it.
-- **The drawn network is the Throughput lens's** (the bullet above): on the plain canvas,
+- **The drawn network is the Logistics lens's** (the bullet above): on the plain canvas,
   over baked ground, roads and lanes are painted only, at every rung. A tile whose ground is
   not yet baked (the vector fallback) has no painted road, so it keeps the drawn network.
 - A built or upgraded road dirties only the window around its tiles (§ Chunks, cache and
@@ -553,9 +553,9 @@ both draw by one rule:
   0.022, Highway 0.03** — thin pale threads, as in the references (Ben, 2026-10-10: roads
   about 2-3% of a hex; they were 0.06 / 0.09 / 0.12) — and the **sea lane 0.025**. On the
   ground a road is a detail of the land, not the logistics map: **the network is read
-  through a lens** (LENSES.md § Throughput lens draws the road network at full weight, at
+  through a lens** (LENSES.md § Logistics lens draws the road network at full weight, at
   the old 1 : 1.5 : 2 weights).
-- **LOD** (the drawn curve — the Throughput lens's network): below a **20 px drawn radius** (`k_route_lod_radius_px` — between the
+- **LOD** (the drawn curve — the Logistics lens's network): below a **20 px drawn radius** (`k_route_lod_radius_px` — between the
   second rung, ~13 px, and the third, ~27 px) a curve is **one stroke**, its two
   halves joined in a single path, with no round joint at the apex, and each half is
   tessellated at **two segments**; at the coarse fill (drawn radius ≤ 7 px) at one —

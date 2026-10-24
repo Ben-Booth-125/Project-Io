@@ -61,6 +61,7 @@
 #include "world/supply_system.hpp"  // price_convoy_leg: the sea-lane fixture prices as the dispatch does
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -114,6 +115,9 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "reach")       return overlay_mode::reach;
     if (s == "continent")   return overlay_mode::continent;
     if (s == "supply_routes") return overlay_mode::supply_routes;
+    // The lens is named Logistics (Ben, 2026-10-24); "throughput" stays an alias so an
+    // older script still arms it. The enum keeps its old identifier.
+    if (s == "logistics")   return overlay_mode::throughput;
     if (s == "throughput")  return overlay_mode::throughput;
     if (s == "trade_flow")  return overlay_mode::trade_flow;
     // BL-1323: a new name, not the retired "country" (see above).
@@ -138,7 +142,7 @@ const char* overlay_script_name(overlay_mode m)
         case overlay_mode::reach:         return "reach";
         case overlay_mode::continent:     return "continent";
         case overlay_mode::supply_routes: return "supply_routes";
-        case overlay_mode::throughput:    return "throughput";
+        case overlay_mode::throughput:    return "logistics";
         case overlay_mode::trade_flow:    return "trade_flow";
         case overlay_mode::nations:       return "nations";
         default:                          return "none";
@@ -1542,6 +1546,55 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["marches"]    = m_ui.lp_player_march;
         out["shipments"]  = m_ui.lp_player_shipping;
         out["consumed"]   = m_ui.lp_player_prod + m_ui.lp_player_march + m_ui.lp_player_shipping;
+        return out;
+    });
+
+    // The Logistics lens's ROADS (Ben, 2026-10-24: each road of the player's nation is
+    // coloured by supplied over requested, green at 2x, yellow at 0.5x): a census of the
+    // colour the canvas will draw, as COUNTS and TOTALS over the player nation's road
+    // tiles on the active body - never a tile's position or figure, so the standing
+    // rule on tile data is untouched. Zeros off the lens.
+    v.set_function("logistics_roads", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int roads = 0, routed = 0, green = 0, yellow = 0, between = 0, ground = 0, routed_green = 0;
+        double sup = 0.0, req = 0.0;
+        const std::size_t n = std::min({ m_ui.lp_on_road.size(), m_ui.lp_supplied.size(),
+                                         m_ui.lp_requested.size() });
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            if (m_ui.lp_supplied[i] < 0.0f)
+                continue;
+            if (m_ui.lp_on_road[i] == 0)
+            {
+                ++ground;
+                continue;
+            }
+            ++roads;
+            const float s = m_ui.lp_supplied[i], r = m_ui.lp_requested[i];
+            if (r > 0.0f)
+                ++routed;
+            sup += s;
+            req += r;
+            // The canvas's own ramp (logistics_road_t): log2 of the ratio, 2x and 0.5x
+            // the ends, an unrequested road green.
+            const float t = !(r > 0.0f) ? 1.0f
+                          : !(s > 0.0f) ? 0.0f
+                          : std::clamp((std::log2(s / r) + 1.0f) * 0.5f, 0.0f, 1.0f);
+            if (t >= 0.999f && r > 0.0f) ++routed_green;
+            if (t >= 0.999f)      ++green;
+            else if (t <= 0.001f) ++yellow;
+            else                  ++between;
+        }
+        out["roads"]     = roads;   // the player nation's road tiles here
+        out["routed"]    = routed;  // of them, with a request routed through
+        out["green"]     = green;   // ratio >= 2, or nothing requested
+        out["routed_green"] = routed_green; // ratio >= 2 with a request routed through
+        // `supplied` below is what the chain could deliver (available), not the grant.
+        out["yellow"]    = yellow;  // ratio <= 0.5
+        out["between"]   = between;
+        out["ground"]    = ground;  // the nation's other (non-road) tiles
+        out["supplied"]  = sup;     // summed over the roads, LP/tick
+        out["requested"] = req;
         return out;
     });
 
