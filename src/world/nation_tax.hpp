@@ -8,10 +8,12 @@
 // points production output accrues (economy_system.cpp), the AI tier pick in
 // nation_ai.cpp, the player's verb in corp_command.cpp.
 //
-// A nation taxes the firms HEADQUARTERED on its ground (`home_nation`) at a tier
-// I..V: each quarter it takes the tier's rate of the operating profit each such
-// firm's money loop earned that quarter — a TRANSFER, the firm debited and the
-// treasury credited the same float in the same tick. A tier above the middle
+// A nation taxes the WAGES its own buildings pay (BL-1403, Ben 2026-10-23: "Taxes
+// are taken from wages, which are also paid for by the nation") at a tier I..V:
+// each tick the tier's rate of those wages comes back to its treasury, so a higher
+// tier lowers the net wage bill (`nation_wage_tax`, economy_system.hpp). It
+// replaced the tax on home firms' operating profit, which had no firm left to
+// tax. A tier above the middle
 // raises the nation's Discontent each quarter, the middle holds it, a tier below
 // lowers it; above the bite threshold every building on the nation's GROUND (any
 // owner) loses output in proportion, up to `max_penalty` at full Discontent.
@@ -35,8 +37,8 @@ inline constexpr int k_tax_tier_count   = 5;
 /// values, so a registry that never read Lua runs the same mechanic.
 struct tax_params
 {
-    /// The share of a home firm's quarterly operating profit the nation takes,
-    /// by tier I..V. Each finite in [0, 1].
+    /// The share of the wages it pays that the nation takes back, by tier I..V
+    /// (BL-1403). Each finite in [0, 1].
     std::array<float, k_tax_tier_count> rate = {0.0f, 0.05f, 0.10f, 0.15f, 0.20f};
 
     /// Discontent added per quarter at each tier I..V (negative = ebbs). Each

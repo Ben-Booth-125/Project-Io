@@ -43,14 +43,14 @@ and leak treasury money into empty corporations. So the PORT lands first, the fo
   (firm id, asset order); balances to treasuries; units and rail re-owned; HQ cleared. (R1, R2)
 - [x] **T5** units join their base's nation (garrison upkeep, a budget claim, covers them); `is_player_owned` / `player_present_on` read the nation. (R1)
 - [x] **T6** `tools/verify/fold_census.cpp`. (R1-R3)
-- [ ] **T7** re-apply the BL-1403 patch (`docs/development/drafts/bl-1403-money-flows.patch`) once the fold is in, and measure both.
+- [ ] **T7** re-apply the BL-1403 patch (the parked patch (applied 2026-10-24)) once the fold is in, and measure both.
 - [x] **T9 fix round (cold review)** the loader admits a nation trade owner; a nation's trade reserve is not carried or set until BL-1407 saves it; the seat compares owners and opens unarmed on a folded world; the app builds, lays roads and demolishes as the player's nation; the census reads the shipped fold through a probe and checks money exactly; units follow their base; duplicate routes merge; firm exit is inert on a folded world; market_viability G2/G3 re-pointed (NR-1068); the scorer's floor reads the treasury before this tick's costs.
 
 ### BL-1403 (nation money flows) — lane M, group `nation-money-flows`
-- [ ] **T1** Tax from wages (`nation_tax.hpp`, `budget_system.cpp`, `nation_step.cpp`). (R1)
-- [ ] **T2** Tariff on the foreign seller nation (`market_clearing.cpp`, `trade.cpp`). (R2)
-- [ ] **T3** No levy seeded; `public_works` / `charters` reserved; debt interest retires (`law.cpp`, `nation_budget.hpp`). (R3)
-- [ ] **T4** Re-point `tax_discontent_harness`, `nation_budget_harness`, `money_conservation`. (R1-R3)
+- [x] **T1** Tax from wages (`nation_tax.hpp`, `budget_system.cpp`, `nation_step.cpp`). (R1)
+- [x] **T2** Tariff on the foreign seller nation (`market_clearing.cpp`, `trade.cpp`). (R2)
+- [x] **T3** No levy seeded; `public_works` / `charters` reserved; debt interest retires (`law.cpp`, `nation_budget.hpp`). (R3)
+- [x] **T4** Re-point `tax_discontent_harness`, `nation_budget_harness`, `money_conservation`. (R1-R3)
 
 ### BL-1404 (generation buys for nations) — lane G, group `generation-for-nations`
 - [ ] **T1** `generate_corporations` and its fallbacks retire (`landscape_search.cpp`, `corporation_generation.cpp`). (R1)

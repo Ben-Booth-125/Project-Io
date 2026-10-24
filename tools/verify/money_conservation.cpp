@@ -450,9 +450,22 @@ int main()
         std::printf("        tariff collected %.4f on %.0f units at %.4f\n",
                     treasury_gained, qty, dest_price);
 
-        // --- Same-nation shipment pays nothing -----------------------------
-        // Put the source market in the destination's nation and repeat: an
-        // internal shipment is not an import.
+        // --- A nation's own goods pay nothing (BL-1403, Ben 2026-10-23) -----
+        // The duty falls on a FOREIGN NATION'S goods entering: the shipper's
+        // nation, not the source market's. Make the shipper the destination
+        // nation's own and repeat: its own goods in its own market pay nothing.
+        {
+            recipe_registry creg;
+            fixture c = build_fixture(creg);
+            law dl = l; dl.enacting_nation = c.supplier_nat; c.w.laws.push_back(dl);
+            c.w.corporations.at(c.buyer).home_nation = c.supplier_nat;
+            post_arrival(c.w, c.buyer, c.buyer_mkt, c.supplier_mkt, resource_type::iron_ore, qty);
+            credit_arrived_convoys(c.w, 0);
+            check(near(total_nation_treasury(c.w), 0.0),
+                  "P2.8 a nation's OWN goods entering its own market are charged nothing");
+        }
+        // ...and the reverse of the retired rule: a foreign shipper's goods pay
+        // even when they leave from a market on the destination's own ground.
         {
             recipe_registry creg;
             fixture c = build_fixture(creg);
@@ -460,8 +473,8 @@ int main()
             c.w.tile_to_nation[c.w.markets.at(c.buyer_mkt).centre_tile] = c.supplier_nat;
             post_arrival(c.w, c.buyer, c.buyer_mkt, c.supplier_mkt, resource_type::iron_ore, qty);
             credit_arrived_convoys(c.w, 0);
-            check(near(total_nation_treasury(c.w), 0.0),
-                  "P2.8 a SAME-NATION shipment is charged nothing");
+            check(total_nation_treasury(c.w) > 0.0,
+                  "P2.9 a FOREIGN shipper's goods pay, though they left a market on the destination's ground");
         }
     }
 

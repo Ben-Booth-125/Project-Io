@@ -131,6 +131,18 @@ struct corp_budget
     }
 };
 
+/// BL-1403 (Ben, 2026-10-23; NATIONS.md § Taxes and Discontent): the tax a nation
+/// takes back from the @p wages its own buildings paid this tick, at tier @p tier —
+/// the tier's rate of the wages, 0 when nothing was paid. The one definition
+/// apply_budget's state pass credits and a harness re-derives.
+inline float nation_wage_tax(float wages, int tier, const tax_params& p)
+{
+    if (!std::isfinite(wages) || !(wages > 0.0f))
+        return 0.0f;
+    const float tax = wages * p.rate[tax_tier_index(tier)];
+    return (std::isfinite(tax) && tax > 0.0f) ? tax : 0.0f;
+}
+
 /// BL-1335: the tax a firm owes its home nation on this quarter's money loop at
 /// tier @p tier — the tier's rate of the operating profit (income less
 /// expenditure, maintenance, wages, interest, levies and upkeep; subsidies and

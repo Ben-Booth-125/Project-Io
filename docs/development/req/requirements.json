@@ -7497,38 +7497,38 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1403 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-24",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: tax_discontent_harness"
      ],
      "requirement": "Tax returns the tier's share of wages paid to the treasury each quarter; Discontent responds to the tier as before.",
-     "notes": null
+     "notes": "tax_discontent_harness 43/0 on the folded start: T1 each nation's ledger tax is exactly nation_wage_tax of the wages its buildings paid at its tier, its treasury ends higher by exactly that than with every rate 0, no corporation is taxed, the report rows equal the ledger; T2-T8 (Discontent climbs, bites, ebbs; the seam; the save; the scorer; determinism) unchanged and passing. Also fixes the harness's net_tail compile break."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: money_conservation"
      ],
      "requirement": "The tariff charges the foreign seller nation and exempts a nation's own goods; it is a transfer.",
-     "notes": null
+     "notes": "money_conservation ALL PASS: P2.8 a nation's own goods entering its own market pay nothing; P2.9 a foreign shipper's goods pay even when they left a market on the destination's ground (the retired source-market rule's reverse); the duty is a transfer (P2.7). A nation importer's duty is capped at its treasury (NR-1067)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_budget_harness"
      ],
      "requirement": "No levy is seeded and no public_works or charters claim is paid.",
-     "notes": null
+     "notes": "Generation seeds no extraction levy (hard_coded_world.cpp); public_works and charters are RESERVED enum values with no consumer (nation_budget.hpp); debt interest retired (budget_system.cpp). nation_budget_harness: 66 pass, the 8 R9 failures are the same rows red on main before this item (network-upkeep shelf purchases), unchanged."
     }
    ]
   },

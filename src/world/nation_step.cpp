@@ -229,19 +229,17 @@ void run_nation_taxes(world& w, const tax_params& p, economy_report& report)
     if (w.nations.empty() || !research_age_open(w))
         return;
 
-    // The tax itself was taken inside apply_budget, before the returns were
-    // filed (BL-1335 review: the returns must telescope). Here it is only
-    // reported: each nation's firms' booked taxes, in ascending corp order.
+    // The tax itself was taken inside apply_budget's state pass (BL-1403: the
+    // tier's share of the wages the nation's buildings paid). Here it is only
+    // reported, off the state ledger, ascending nation id (std::map).
+    // `firms_taxed` now counts the nation itself, 1 when anything was taxed.
     std::map<entity_id, nation_tax_row> rows;
-    for (const auto& [cid, b] : report.budgets)
+    for (const auto& [nid, led] : w.state_ledger)
     {
-        if (!(b.taxes > 0.0f))
+        if (!(led.taxes > 0.0f))
             continue;
-        const auto cit = w.corporations.find(cid);
-        if (cit == w.corporations.end())
-            continue;
-        nation_tax_row& r = rows[cit->second.home_nation];
-        r.collected += b.taxes;
+        nation_tax_row& r = rows[nid];
+        r.collected += led.taxes;
         ++r.firms_taxed;
     }
 

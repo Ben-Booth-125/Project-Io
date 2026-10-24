@@ -113,8 +113,10 @@ enum class budget_priority : uint8_t
     contracted_force      = 5, ///< Buying force it does not raise (CONTRACTS.md, BL-377).
     strategic_reserve     = 6, ///< Buying goods to HOLD. Distinct from `reserve_fraction`,
                                ///< which withholds CREDITS: this line spends them.
-    public_works          = 7, ///< Works a corporation builds and the nation pays for.
-    charters              = 8, ///< Paying a corporation to exist somewhere it otherwise would not.
+    public_works          = 7, ///< RESERVED (BL-1403, Ben 2026-10-23): paid a corporation to build
+                               ///< works; the nation builds its own. No consumer claims it, so it
+                               ///< pays nothing; kept because a weight vector is indexed by the enum.
+    charters              = 8, ///< RESERVED (BL-1403): paid a corporation to exist; there are none.
     space_programme       = 9, ///< Government satellite launches — spacecraft_components and
                                ///< propellant, bought procurement-style and CONSUMED
                                ///< (space_programme.hpp is the consumer; BL-644).

@@ -195,17 +195,15 @@ void apply_budget(world& w,
     // loop in sorted order. Debits stay per-corp and are untouched.
     std::vector<std::tuple<entity_id, entity_id, float>> levy_credits;
 
-    // BL-1335 (NATIONS.md § Taxes and Discontent): the quarter's tax, taken HERE
-    // — after interest, before the return is filed — so the filed `net` carries
-    // it and the returns telescope. The home nation's tier rate of the money
-    // loop's operating profit (income less every outflow, floored at 0). The
-    // debit is per corp in the loop; the credit is deferred and applied in
-    // ascending (corp, nation) order like the levy's, the same float. Never in
-    // the campaign settle (`research_age_open`): every nation opens play at
-    // tier III with Discontent 0 and no firm taxed.
+    // BL-1403 (Ben, 2026-10-23: "Taxes are taken from wages, which are also paid
+    // for by the nation"; NATIONS.md § Taxes and Discontent): the quarter's tax is
+    // the nation's tier share of the WAGES its own buildings paid, credited back to
+    // its treasury in the state pass below. It replaces BL-1335's tax on home
+    // firms' operating profit, which had no firm left to tax; a corporation is not
+    // taxed. Never in the campaign settle (`research_age_open`): every nation opens
+    // play at tier III with Discontent 0 and nothing taxed.
     const bool      tax_pass = research_age_open(w);
     const tax_params& taxp   = reg.tax();
-    std::vector<std::tuple<entity_id, entity_id, float>> tax_credits;
 
     // BL-626: this tick's quarterly returns, keyed by corp. Collected here and
     // FILED after the loop, in the map's own ascending entity_id order, because
@@ -430,31 +428,9 @@ void apply_budget(world& w,
 
         cc.balance += delta; // bit-identical to the pre-BL-072 arithmetic; may go negative
 
-        // BL-073: debt interest. Charged once per tick on the balance that is now
-        // negative (the outstanding debt after this tick's operating flows), so a
-        // corp underwater compounds its decline. Pure function of balance × the
-        // fixed rate — deterministic, no wall-clock. Zero while solvent.
-        if (cc.balance < 0.0f)
-        {
-            bud.interest = -cc.balance * k_debt_interest_per_quarter;
-            cc.balance  -= bud.interest;
-        }
-
-        // BL-1335: the tax (see tax_pass above).
-        if (tax_pass)
-        {
-            const auto nit = w.nations.find(cc.home_nation);
-            if (nit != w.nations.end())
-            {
-                const float tax = nation_tax_due(bud, nit->second.tax_tier, taxp);
-                if (tax > 0.0f)
-                {
-                    bud.taxes   = tax;
-                    cc.balance -= tax; // the debit half
-                    tax_credits.emplace_back(corp, cc.home_nation, tax);
-                }
-            }
-        }
+        // BL-073's debt interest RETIRED with BL-1403 (Ben, 2026-10-23): a nation
+        // never runs into debt, and the corporation it compounded on is being
+        // folded into its nation (BL-1402). `bud.interest` stays 0.
 
         if (breakdown)
             (*breakdown)[corp] = bud;
@@ -497,16 +473,6 @@ void apply_budget(world& w,
             if (nat != w.nations.end())
                 nat->second.treasury += amount;
         }
-    }
-
-    // BL-1335: the tax credits, ascending (corp, nation) — the same floats the
-    // loop debited, so the transfer conserves by construction.
-    if (!tax_credits.empty())
-    {
-        std::sort(tax_credits.begin(), tax_credits.end());
-        for (const auto& [payer, nation, amount] : tax_credits)
-            if (const auto nat = w.nations.find(nation); nat != w.nations.end())
-                nat->second.treasury += amount;
     }
 
     // BL-1296 — THE STATE PASS (NATIONS.md § State industry; § 2, the second
@@ -567,6 +533,17 @@ void apply_budget(world& w,
                 delta           -= opex.maintenance;
                 led.wages       += opex.wages;
                 delta           -= opex.wages;
+            }
+            // BL-1403: the wage tax — the tier's share of the wages the nation's
+            // own buildings paid this tick comes back to its treasury (a higher
+            // tier lowers the net wage bill; Discontent is its cost, nation_step).
+            // Taken on what was actually paid, after the wages, so it can never
+            // carry the treasury below where the wages left it.
+            if (tax_pass && led.wages > 0.0f)
+            {
+                const float tax = nation_wage_tax(led.wages, nc.tax_tier, taxp);
+                led.taxes = tax;
+                delta    += tax;
             }
             // BL-1255: the nation's track, after its buildings — FUNDED by this
             // tick's gate (plan_state_funding committed it), or IDLE

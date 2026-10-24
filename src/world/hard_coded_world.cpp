@@ -3807,13 +3807,12 @@ void run_tail(generation_cursor& c)
         report->stage_lines.emplace_back(buf);
     }
 
-    // BL-343/BL-480/BL-741: the prototype levy, seeded ENACTED — since BL-741
-    // by EVERY nation over its own jurisdiction (one nation's levy left 42
-    // treasuries empty and every state demand channel unfunded). Enactment is
-    // a governing-body act, not a player control; each levy is a transfer into
-    // its own author's treasury, bounded by that jurisdiction. Runs after
-    // generate_nations/generate_corporations. See law.cpp's seeding comment.
-    seed_prototype_laws(w);
+    // BL-1403 (Ben, 2026-10-23; NATIONS.md § 4. Law authorship): NO EXTRACTION
+    // LEVY IS SEEDED. BL-343/BL-480/BL-741 seeded one per nation, a transfer from
+    // the firms extracting on its ground into its treasury; with every building
+    // the nation's own (BL-1402), the author would charge itself. The treasury is
+    // funded by its own buildings' sales instead. `seed_prototype_laws` stays for
+    // the fixtures that exercise the levy machinery the save format still reads.
 
     // BL-466/BL-623: the CANONICAL whole-world province partition. The
     // homeworld was partitioned before its roads (BL-623, provinces before
