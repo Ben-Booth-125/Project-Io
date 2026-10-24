@@ -289,9 +289,10 @@ void settle_space_purchases(world& w,
             // transfer `net()` cannot explain (cold-review finding 4,
             // 2026-09-01). Claw it back in the same two places the pass wrote
             // it, exactly as the failed survey earmark is defended.
-            const auto cit = w.corporations.find(t.corp);
+            // BL-1402: the payee's purse, owner-generic (`purse_of`): a nation
+            // payee gives back what the pass credited to its treasury.
             const auto nit = w.nations.find(t.nation);
-            if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+            if (float* purse = purse_of(w, t.corp)) *purse -= t.credits;
             if (nit != w.nations.end())      nit->second.treasury += t.credits;
             continue;
         }
@@ -305,9 +306,10 @@ void settle_space_purchases(world& w,
         // is defended (nation_step.cpp), so the books balance and the nation
         // did not pay for a launch that never happened.
         {
-            const auto cit = w.corporations.find(t.corp);
+            // BL-1402: the payee's purse, owner-generic (`purse_of`): a nation
+            // payee gives back what the pass credited to its treasury.
             const auto nit = w.nations.find(t.nation);
-            if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+            if (float* purse = purse_of(w, t.corp)) *purse -= t.credits;
             if (nit != w.nations.end())      nit->second.treasury += t.credits;
         }
     }

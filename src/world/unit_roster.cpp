@@ -134,11 +134,14 @@ std::vector<const roster_row*> available_rows(const region& p, roster_band band)
 
 namespace {
 
+/// Does @p owner hold a port anywhere. BL-1402 (NATIONS.md § What a nation owns):
+/// owner-generic — a corporation's `assets` or a nation's `state_assets`
+/// (`assets_of`), so the naval gate serves a nation hiring as itself.
 bool corp_owns_port(const world& w, entity_id corp)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end()) return false;
-    for (const entity_id asset : cit->second.assets)
+    const std::vector<entity_id>* assets = assets_of(w, corp);
+    if (assets == nullptr) return false;
+    for (const entity_id asset : *assets)
     {
         const auto bit = w.buildings.find(asset);
         if (bit != w.buildings.end() && bit->second.type == building_type::port)
@@ -154,6 +157,10 @@ float corp_stockpile_total(const world& w, entity_id corp, resource_type res)
     // BL-1265 (MARKETS.md § The shelf economy): corporations hold no stockpiles,
     // so the gate reads the stock on the shelves of the markets the corp sits
     // in — what a hire there could buy (`corp_shelf_stock`).
+    // BL-1402: `corp_shelf_stock` / `buy_from_corp_shelves` (market_clearing.cpp,
+    // another lane's file) still read a CORPORATION's markets only, so a nation
+    // reads 0 here and its resource-gated rows stay closed — consistent with the
+    // debit, which would buy nothing for it. Owed with that file's port.
     return corp_shelf_stock(w, corp, static_cast<std::size_t>(res));
 }
 

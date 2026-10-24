@@ -104,7 +104,18 @@ void run_national_budget(world& w,
             continue;
         if (w.nations.find(c.nation) == w.nations.end())
             continue;
-        if (w.corporations.find(c.corp) == w.corporations.end())
+        // BL-1402 (NATIONS.md § What a nation owns, § 2. Conservation): the
+        // PAYEE is owner-generic — a corporation's balance or a nation's
+        // treasury (`purse_of`) — so a claim survives the corporations being
+        // folded into their nations. A claimant with no purse is dropped as
+        // before.
+        if (purse_of(w, c.corp) == nullptr)
+            continue;
+        // A nation claiming on its OWN budget would pay itself: debit and credit
+        // the same treasury, a circle that moves no money and would only round.
+        // Dropped here, before any arithmetic, so it is no transfer at all — not
+        // in the demand total, not in the report.
+        if (c.corp == c.nation)
             continue;
 
         // The earmark. A subject-taking line REQUIRES one and checks it exists;
@@ -359,9 +370,10 @@ void run_national_budget(world& w,
         std::sort(corp_credits.begin(), corp_credits.end());
         for (const auto& [corp, nation, amount] : corp_credits)
         {
-            const auto cit = w.corporations.find(corp);
-            if (cit != w.corporations.end())
-                cit->second.balance += amount;
+            // BL-1402: the payee's purse — a corporation's balance or a
+            // nation's treasury. The same (payee, nation, amount) order either way.
+            if (float* purse = purse_of(w, corp))
+                *purse += amount;
         }
     }
 

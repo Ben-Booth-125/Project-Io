@@ -114,9 +114,10 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
             {
                 // Claw back: reverse the transfer in the same two places the
                 // pass wrote it, so the tick's books still balance.
-                auto cit = w.corporations.find(t.corp);
+                // BL-1402: the payee's purse, owner-generic (`purse_of`): a nation
+                // payee gives back what the pass credited to its treasury.
                 auto nit = w.nations.find(t.nation);
-                if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+                if (float* purse = purse_of(w, t.corp)) *purse -= t.credits;
                 if (nit != w.nations.end())      nit->second.treasury += t.credits;
             }
             report.earmarks.push_back(er);
@@ -146,7 +147,11 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
         // will) IS a subsidy: credit that stays on the balance. `net()` carries
         // it so the delta is explained rather than appearing as income from
         // nowhere.
-        report.budgets[t.corp].subsidies += t.credits;
+        // BL-1402: a NATION payee keeps no corporation budget row — its credit
+        // landed on its treasury and the transfer record is its account — so
+        // no row is minted for it here.
+        if (w.corporations.find(t.corp) != w.corporations.end())
+            report.budgets[t.corp].subsidies += t.credits;
     }
 
     // ---- 4b. Settle the space programme (BL-644): each paid claim's lump

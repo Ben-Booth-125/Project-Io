@@ -495,6 +495,13 @@ bool demolish_building(world& w, entity_id corp, entity_id building)
     if (bld_it == w.buildings.end())
         return false;
 
+    // BL-1402 (NATIONS.md § What a nation owns): owner-generic. A NATION's
+    // building is in its `state_assets`, and the state door already removes one
+    // exactly as below, so a nation owner takes that door rather than a copy.
+    if (w.corporations.find(corp) == w.corporations.end()
+        && w.nations.find(corp) != w.nations.end())
+        return demolish_state_building(w, corp, building);
+
     const auto corp_it = w.corporations.find(corp);
     if (corp_it == w.corporations.end())
         return false;
@@ -525,9 +532,15 @@ construction_result place_road(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id tile, std::uint8_t tier,
                                std::uint8_t side)
 {
-    const auto corp_it = w.corporations.find(corp);
-    if (corp_it == w.corporations.end())
+    // BL-1402 (NATIONS.md § What a nation owns, § Own ground): the payer is
+    // OWNER-GENERIC — a corporation's balance or a nation's treasury
+    // (`purse_of`). The own-ground rule already asks the actor's nation
+    // (`placement_rules::can_place_road` reads `owner_home_nation`), so a nation
+    // laying road as itself needs only its purse here.
+    float* const purse = purse_of(w, corp);
+    if (purse == nullptr)
         return construction_result::no_corp;
+    const bool nation_payer = w.corporations.find(corp) == w.corporations.end();
 
     const auto tile_it = w.tiles.find(tile);
     if (tile_it == w.tiles.end())
@@ -556,7 +569,6 @@ construction_result place_road(world& w, const recipe_registry& reg,
         return construction_result::invalid_tile;
     }
 
-    corporation_component& cc = corp_it->second;
     const road_economics&  re = reg.road_econ(tier);
 
     // Material cost priced from the tile's local market, mirroring construct_building — but
@@ -581,7 +593,10 @@ construction_result place_road(world& w, const recipe_registry& reg,
     }
 
     const float total_cost = re.build_cost + material_cost;
-    if (cc.balance < total_cost)
+    // A corporation's room is its balance (the comparison it always made); a
+    // nation's is its UNCOMMITTED treasury, never below zero — a nation never
+    // runs into debt (BL-1402).
+    if (purse_room_of(w, corp) < total_cost)
         return construction_result::insufficient_funds;
 
     // Commit: raise the EDGE to the chosen road tier (both halves — BL-1340), THEN debit,
@@ -591,7 +606,11 @@ construction_result place_road(world& w, const recipe_registry& reg,
     // exactly the identity (review of 0831de6d).
     if (!lay_road_edge(w, tile, chosen, tier)) // BL-172: 1=Track, 2=Road, 3=Highway
         return construction_result::invalid_tile;
-    cc.balance -= total_cost;
+    *purse -= total_cost;
+    // A nation's road is booked where its track is (lay_track): the state
+    // ledger's construction line, so the treasury's fall is explained.
+    if (nation_payer)
+        w.state_ledger[corp].construction += total_cost;
     invalidate_logistics_caches(w);
 
     return construction_result::placed;
