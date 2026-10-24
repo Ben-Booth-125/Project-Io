@@ -1217,6 +1217,14 @@ rail_handover_report hand_over_rail(world& w)
         }
         if (owner == null_entity)
             continue;
+        // BL-1404 -- A STATION FOLLOWS ITS GROUND (NATIONS.md § Own ground): it
+        // stands in a city, and the city is the nation's whose ground it is on,
+        // whoever owns the track that reaches it (station 73709 on seed 0 stood
+        // on one nation's ground, its line another's). Unclaimed ground keeps the
+        // track's owner, as before.
+        if (const auto tn = w.tile_to_nation.find(tile);
+            tn != w.tile_to_nation.end() && w.nations.count(tn->second) != 0)
+            owner = tn->second;
         const entity_id bid = w.create_entity();
         building_component bc;
         bc.tile               = tile;
@@ -1242,7 +1250,7 @@ void print_rail_handover(const rail_handover_report& r)
 {
     std::printf("[rail] handover: %d links laid between market cities of %d (%d merged into one, "
                 "%d broken at water); %d track tiles (%d to majors, %d to minors' firms, %d of them "
-                "along the line, %d unowned), %d stations (%d a major's)\n",
+                "along the line, %d unowned), %d stations (%d a nation's)\n",
                 r.links_laid, r.links, r.links_merged, r.links_broken, r.track_tiles, r.to_nations,
                 r.to_firms, r.along_the_line, r.unowned, r.stations, r.station_nations);
     std::fflush(stdout);

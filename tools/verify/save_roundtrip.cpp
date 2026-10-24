@@ -296,6 +296,23 @@ int main()
     check(airless_bodies > 0 && aired_bodies > 0,
           "P1 v41: the generated world copies each body's atmosphere (an airless body AND one with air)");
 
+    // BL-1404 (v55): MAJORS ARE A SAVED FACT. The legacy roster marks every
+    // nation home to a specialist a major; DEMOTE the lowest such nation (its
+    // specialist stays, as `reconcile_majors`' TOO MANY leaves it), so the saved
+    // fact and the champion derivation DISAGREE on one nation and P1 cannot pass
+    // over a reader that re-derived instead of reading.
+    entity_id demoted_nation = null_entity;
+    int majors_saved = 0;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.is_major && (demoted_nation == null_entity || nid < demoted_nation))
+            demoted_nation = nid;
+    if (demoted_nation != null_entity)
+        w.nations.at(demoted_nation).is_major = false;
+    for (const auto& [nid, nc] : w.nations)
+        majors_saved += nc.is_major ? 1 : 0;
+    check(demoted_nation != null_entity && majors_saved > 0,
+          "P21 the fixture holds a demoted nation with a specialist and at least one major (not vacuous)");
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------
@@ -329,6 +346,57 @@ int main()
         check(read_ok && nit != loaded.nations.end()
                   && nit->second.qualification == 0.375f,
               "P1 nation qualification (BL-613) round-trips at its written value");
+    }
+
+    // BL-1404 (v55): the majors survive by VALUE — the demoted nation stays a
+    // minor though it still holds its specialist, and every other major stays one.
+    {
+        bool same = read_ok && loaded.nations.size() == w.nations.size();
+        for (const auto& [nid, nc] : w.nations)
+        {
+            const auto lit = loaded.nations.find(nid);
+            same = same && lit != loaded.nations.end() && lit->second.is_major == nc.is_major
+                && is_major_nation(loaded, nid) == nc.is_major;
+        }
+        check(same && demoted_nation != null_entity && !is_major_nation(loaded, demoted_nation)
+                  && champion_of(loaded, demoted_nation) != null_entity,
+              "P21 is_major (BL-1404, v55) round-trips by value; a demoted nation with a specialist stays a minor");
+        check(read_ok && loaded.state_hash(0) == w.state_hash(0),
+              "P21 the reloaded world's state_hash (which folds the majors) equals the saved one");
+        world flipped = w;
+        if (demoted_nation != null_entity)
+            flipped.nations.at(demoted_nation).is_major = true;
+        check(flipped.state_hash(0) != w.state_hash(0),
+              "P21 state_hash sees a major change (the sparse majors fold)");
+    }
+    // BL-1404: a v54 stream (this one less its majors' section, stamped 54)
+    // reads, with the majors DERIVED from the champions — the demoted nation
+    // holds a specialist, so it reads back a major, as every v54 world did.
+    {
+        std::string v54 = bytes_once.substr(0, bytes_once.size() - world_save_major_section_bytes(w));
+        const uint32_t pre = k_world_save_version_pre_major;
+        std::memcpy(&v54[4], &pre, sizeof pre);
+        world old;
+        bool ok = from_bytes(v54, old);
+        for (const auto& [nid, nc] : old.nations)
+        {
+            bool home = false;
+            for (const auto& [cid, cc] : old.corporations)
+                home = home || (!cc.is_background && cc.home_nation == nid);
+            ok = ok && nc.is_major == home;
+        }
+        check(ok && demoted_nation != null_entity && is_major_nation(old, demoted_nation),
+              "P21 a v54 stream (the v55 prefix) reads, its majors derived from its champions");
+        // A v55 stream naming a nation that is not in it is refused whole.
+        std::string bad = bytes_once;
+        if (world_save_major_section_bytes(w) > 4)
+        {
+            const entity_id ghost = 0x7FFFFFF0u;
+            std::memcpy(&bad[bad.size() - sizeof ghost], &ghost, sizeof ghost);
+        }
+        world sentinel;
+        check(world_save_major_section_bytes(w) > 4 && !from_bytes(bad, sentinel) && sentinel.nations.empty(),
+              "P21 a majors' section naming no nation in the stream is REFUSED, destination untouched");
     }
 
     // BL-1101: the band survives by VALUE — a save opens on the band its world

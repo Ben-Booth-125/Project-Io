@@ -105,6 +105,39 @@ void score_one(const world& base, const recipe_registry& reg,
     s.score = score_landscape(w, reg, p.score);
 }
 
+/// BL-1404 -- THE LEGACY PATH RETIRES (Ben, 2026-10-23). A world with no
+/// charter budget -- none, a refused spend, or one that opens no specialist --
+/// once fell back to the legacy overload (`generate_corporations`' weighted
+/// 8-corp draw plus the background firms). It now CHARTERS NOTHING: the road
+/// tier axis and the default recipes, as every apply does; the roster removed
+/// when the caller regenerates it; no specialist, no firm, nobody seated. An
+/// empty economy is the honest result of a world whose history left no
+/// industry to charter with. Pure and draw-free.
+void lay_unchartered_world(world& w, const recipe_registry& reg,
+                           const landscape_candidate& c, bool regenerate_specialists)
+{
+    bool moved = false;
+    for (auto& kv : w.tiles)
+    {
+        tile_component& t = kv.second;
+        for (int s = 0; s < 6; ++s) // BL-1340: the axis raises EDGES (see the legacy body)
+        {
+            const std::uint8_t cur = road_tier_on_side(t, s);
+            if (cur > 0 && cur < c.road_tier)
+            {
+                set_road_tier_on_side(t, s, c.road_tier);
+                moved = true;
+            }
+        }
+    }
+    if (moved)
+        invalidate_logistics_caches(w);
+    assign_default_recipes(w, reg, "landscape apply (unchartered)");
+    if (regenerate_specialists)
+        remove_specialist_roster(w);   // clears the majors with the roster
+    invalidate_logistics_caches(w);
+}
+
 } // namespace
 
 const char* landscape_axis_name(landscape_axis a)
@@ -266,6 +299,9 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                charter_spend_report* report)
 {
     // --- THE ONE BRANCH (BL-1032) ------------------------------------------
+    // BL-1404 (Ben, 2026-10-23): the three non-budget readings below no longer
+    // lay the legacy overload; each CHARTERS NOTHING (`lay_unchartered_world`).
+    // Where the comments below say "the legacy overload", read that.
     // No budget, or an empty one (the all-zero budget is the same state: the
     // type drops entries <= 0), is TODAY'S WORLD: the legacy overload, called
     // verbatim, with nothing before it and nothing after it. Nothing below this
@@ -277,7 +313,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     const budget_world_reading bw = read_budget_world(w, budget, spend, &reg);
     if (bw.kind == budget_world_kind::no_budget)
     {
-        apply_landscape_candidate(w, reg, c, regenerate_specialists);
+        lay_unchartered_world(w, reg, c, regenerate_specialists); // BL-1404: was the legacy overload
         return;
     }
 
@@ -290,7 +326,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // arrives.
     if (bw.kind == budget_world_kind::refused)
     {
-        apply_landscape_candidate(w, reg, c, regenerate_specialists);
+        lay_unchartered_world(w, reg, c, regenerate_specialists); // BL-1404: was the legacy overload
         if (report != nullptr)
             *report = charter_refused_report(*budget, bw.refusal);
         return;
@@ -303,7 +339,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // says it fell back, every point unspent as `no_specialist`.
     if (bw.kind == budget_world_kind::no_specialist)
     {
-        apply_landscape_candidate(w, reg, c, regenerate_specialists);
+        lay_unchartered_world(w, reg, c, regenerate_specialists); // BL-1404: was the legacy overload
         if (report != nullptr)
             *report = charter_fallback_report(*budget);
         return;

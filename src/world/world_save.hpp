@@ -466,8 +466,17 @@ inline constexpr uint32_t world_save_magic =
 /// branch: the integrator stacks this section after that one and moves
 /// `k_world_save_version_pre_net` to 53"). So v53 is the tile record's shape and v54 adds
 /// the exact-net section on top of it: v53 is a STRICT PREFIX of v54 and is read as a
-/// world whose nets are their f32 slots. Every version outside v47-v54 is refused whole.
-inline constexpr uint32_t world_save_version = 54;
+/// world whose nets are their f32 slots.
+///
+/// Bumped to 55 by BL-1404 (majors are a saved fact; NATION_GENERATION.md § The nation
+/// count is a target): a TRAILING SECTION after the exact nets carries every nation whose
+/// `is_major` is set, ascending id, as (u32 count, count x id). v54 is a STRICT PREFIX of
+/// v55 and is read too (`k_world_save_version_pre_major`), its majors derived from its
+/// champions (`mark_majors_from_champions`). Every version outside v47-v55 is refused whole.
+inline constexpr uint32_t world_save_version = 55;
+
+/// BL-1404: v54, a strict prefix of v55 (the majors' section is v55's only addition).
+inline constexpr uint32_t k_world_save_version_pre_major = 54;
 
 /// BL-1337: v53, a strict prefix of v54 (the exact-net section is v54's only addition).
 /// Moved from 52 to 53 on integration, because v53 carries BL-1340's tile record and this
@@ -521,8 +530,13 @@ std::size_t world_save_tax_section_bytes(const world& w);
 
 /// BL-1337: the byte length of the v54 exact-net section `write_world_snapshot`
 /// writes for @p w — what a harness cuts off a v54 stream to make the v52
-/// prefix. Every older prefix is cut through it too, since it is the last.
+/// prefix. Every older prefix is cut through it too (after the v55 majors' section,
+/// which follows it — BL-1404).
 std::size_t world_save_net_section_bytes(const world& w);
+
+/// BL-1404: the byte length of the v55 majors' section `write_world_snapshot` writes
+/// for @p w — the LAST section; a harness cuts it off a v55 stream to make the v54 prefix.
+std::size_t world_save_major_section_bytes(const world& w);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

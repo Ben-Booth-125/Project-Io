@@ -3056,11 +3056,30 @@ void run_tail(generation_cursor& c)
         // left the world in when this stage still laid one.
         w.player_entity = null_entity;
     }
-    else
+    else if (!era_minus_one_enabled(params))
     {
+        // BL-1404: a world with NO HISTORY (`prehistory_years` 0, the
+        // `no_prehistory()` fixture arc) has no stockpile to charter from, and
+        // keeps the retired weighted roster so the harnesses built on it have
+        // firms to read. The campaign always runs the history, so this never
+        // reaches a shipped world; and `finish_campaign_world`'s apply would
+        // remove it anyway (`lay_unchartered_world`).
         generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count,
                                                      .seed_starting_force = gen_cfg.seed_starting_force },
             /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
+    }
+    else
+    {
+        // BL-1404 -- THE LEGACY PATH RETIRES (Ben, 2026-10-23): a world whose
+        // history ran but left no charter budget (the legacy arc, a spend that
+        // opens nothing) no longer lays `generate_corporations`' weighted roster.
+        // It charters nothing and seats nobody; the finish's apply charters
+        // nothing either (`lay_unchartered_world`). An empty economy is the
+        // honest result. Said once, here.
+        w.player_entity = null_entity;
+        std::printf("[corporations] no charter budget: nothing chartered, nobody seated "
+                    "(BL-1404, the legacy roster retired)\n");
+        std::fflush(stdout);
     }
 
     // BL-1072: "Finishing" is entered HERE, so its caption covers what is

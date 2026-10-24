@@ -225,7 +225,7 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // major is a nation holding a champion, and champions are chartered by the
     // search, so the major target is met HERE -- a champion chartered in the
     // richest minor (a state charter where its treasury makes up the price), or
-    // a buy-out of the poorest major's specialist by the richest champion. Each
+    // the poorest surplus major demoted to a minor (BL-1404, NR-1065). Each
     // correction is written into the Industrialisation record, dated back into
     // its closing round, so the record reads as one history. Unset (0): nothing
     // runs and nothing moves. Before the charter web is published and before
@@ -268,7 +268,8 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // year its event is dated, not on its region's works notes.
     for (const major_reconciliation_record& rec : out.majors.records)
         if (reconcile_year != 0
-            && rec.kind != static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out))
+            && rec.kind != static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out)
+            && rec.kind != static_cast<std::uint8_t>(lapse_event_kind::major_demoted)) // BL-1404
             if (const auto c = w.corporations.find(rec.corp); c != w.corporations.end())
             {
                 c->second.founded_year = reconcile_year;
@@ -285,12 +286,12 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
             const auto k = static_cast<lapse_event_kind>(rec.kind);
             chartered += k == lapse_event_kind::champion_chartered;
             state     += k == lapse_event_kind::state_charter;
-            bought    += k == lapse_event_kind::champion_bought_out;
+            bought    += k == lapse_event_kind::major_demoted; // BL-1404: demoted, never bought
             shortfall += rec.treasury_shortfall;
             if (k == lapse_event_kind::state_charter) paid += rec.credits_moved;
         }
         std::printf("[majors] target %d: natural %d -> %d (%d champion charter(s), %d state "
-                    "charter(s), %d buy-out(s), dated %d)%s",
+                    "charter(s), %d demotion(s), dated %d)%s",
                     out.majors.target, out.majors.natural, out.majors.majors, chartered, state,
                     bought, static_cast<int>(reconcile_year), out.majors.missed ? " MISSED" : "");
         if (shortfall > 0.0f)
