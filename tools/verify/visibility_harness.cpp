@@ -45,6 +45,7 @@ int main()
     { nation_component cc{}; cc.name = "Player Co"; w.nations[player_corp] = cc; }
     { nation_component cc{}; cc.name = "Rival A";   w.nations[rival_a]     = cc; }
     { nation_component cc{}; cc.name = "Rival B";   w.nations[rival_b]     = cc; }
+    w.player_entity = player_corp; // BL-1407: the player IS its nation (was cc.is_player)
 
     const entity_id player_bld = add_building(player_corp);
     const entity_id rival_a_bld = add_building(rival_a);

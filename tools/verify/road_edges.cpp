@@ -72,6 +72,7 @@
 #include "world/river_generation.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
+#include <cstring> // BL-1407: memcpy (S2e)
 
 #include <algorithm>
 #include <cstdarg>
@@ -614,8 +615,20 @@ int main(int argc, char** argv)
             check(wrong == 0, fmt("S2d every migrated crossing is the LOWER of its two"
                                   " tiers (%lld disagree)", wrong));
             // The migrated world is now a v53 world: it saves at the current version.
-            check(to_bytes(r).size() == b53.size(),
-                  "S2e the migrated world's next save is a current-version stream");
+            // BL-1407: a pre-v53 stream carries no v56 NATION BOOKS (reserve, points,
+            // returns), and its majors are derived from its corporation records, of
+            // which the verification writer writes none — so the migrated world's
+            // save differs from the source's by exactly those two sections.
+            const std::string rb = to_bytes(r);
+            std::uint32_t rv = 0;
+            std::memcpy(&rv, rb.data() + sizeof(std::uint32_t), sizeof rv);
+            std::printf("       migrated save v%u %zu bytes (books %zu); source %zu bytes (books %zu)\n",
+                        static_cast<unsigned>(rv), rb.size(), world_save_books_section_bytes(r),
+                        b53.size(), world_save_books_section_bytes(w));
+            check(rv == world_save_version
+                      && rb.size() - world_save_books_section_bytes(r) - world_save_major_section_bytes(r)
+                             == b53.size() - world_save_books_section_bytes(w) - world_save_major_section_bytes(w),
+                  "S2e the migrated world's next save is a current-version stream (less the books and the majors a v52 stream with no corporation record cannot carry)");
         }
     }
 

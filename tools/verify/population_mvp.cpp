@@ -176,7 +176,9 @@ static void test_agglomeration_and_pool()
 
     // One corp owns all buildings.
     const entity_id corp = w.create_entity();
-    w.nations[corp] = nation_component{};
+    // BL-1407: the owner is a NATION, and a nation runs a building only when its
+    // treasury funds it (plan_state_funding); the retired firm ran unfunded.
+    { nation_component nc{}; nc.treasury = 1.0e6f; w.nations[corp] = nc; }
 
     // body_low: pop scale 1, labour_by_scale[1] = 1.0.
     const entity_id body_low = w.create_entity();
@@ -320,7 +322,9 @@ static void test_habitability_scalar()
     world w;
 
     const entity_id corp = w.create_entity();
-    w.nations[corp] = nation_component{};
+    // BL-1407: the owner is a NATION, and a nation runs a building only when its
+    // treasury funds it (plan_state_funding); the retired firm ran unfunded.
+    { nation_component nc{}; nc.treasury = 1.0e6f; w.nations[corp] = nc; }
 
     const entity_id body = w.create_entity();
     {
@@ -981,6 +985,7 @@ static void test_background_draw_real_clear()
     }
     const entity_id corp = w.create_entity();
     { nation_component cc{}; cc.treasury = 100000.0f; w.nations[corp] = cc; }
+    w.player_entity = corp; // BL-1407: was cc.is_player (not AI-driven)
     auto add_bld = [&](uint16_t recipe_id, int ticks_remaining) {
         const entity_id b = w.create_entity();
         building_component bc{}; bc.tile = tile; bc.type = building_type::processing_facility;

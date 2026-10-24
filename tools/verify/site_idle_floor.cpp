@@ -107,14 +107,28 @@ int main()
         else
         {
             completed_seen = true;
-            check(cb.maintenance > ex.maintenance * floor_ + 1e-4, "S3 completion tick: full maintenance",
-                  cb.maintenance, ex.maintenance);
-            check(cb.wages > 0.0f, "S3 completion tick: wages charged", cb.wages, 0.0);
-            const building_profit bp = estimate_building_profit(w, reg, rep, site);
-            check(bp.has_data, "S4 estimate has a row on the completion tick", bp.has_data ? 1 : 0, 1);
-            check(near(bp.maintenance, cb.maintenance) && near(bp.wages, cb.wages),
+            // BL-1407: the owner is a NATION, and a state site that completes this
+            // tick was funded for its construction, not for running — it idles the
+            // rest of the tick and is charged nothing (economy_system.cpp, BL-1296
+            // fix round), running from the NEXT gate. The retired corporation was
+            // charged full opex on the completion tick; the state's first running
+            // tick is the one after. S3/S4 read that tick.
+            check(b.state_idle && near(cb.maintenance, 0.0) && near(cb.wages, 0.0),
+                  "S3 completion tick: a state site idles the rest of the tick, charged nothing",
+                  cb.maintenance + cb.wages, 0.0);
+            economy_report rep2 = run_economy_step(w, reg);
+            std::map<entity_id, corp_budget> bd2;
+            apply_budget(w, reg, flows, rep2.workforce_contention, &bd2, &rep2.buildings, &rep2.building_labour);
+            const corp_budget& cb2 = bd2[corp];
+            std::printf("first running tick: maintenance %.4f  wages %.4f\n", cb2.maintenance, cb2.wages);
+            check(cb2.maintenance > ex.maintenance * floor_ + 1e-4, "S3 first running tick: full maintenance",
+                  cb2.maintenance, ex.maintenance);
+            check(cb2.wages > 0.0f, "S3 first running tick: wages charged", cb2.wages, 0.0);
+            const building_profit bp = estimate_building_profit(w, reg, rep2, site);
+            check(bp.has_data, "S4 estimate has a row on the first running tick", bp.has_data ? 1 : 0, 1);
+            check(near(bp.maintenance, cb2.maintenance) && near(bp.wages, cb2.wages),
                   "S4 building_profit estimate == budget charge", bp.maintenance + bp.wages,
-                  cb.maintenance + cb.wages);
+                  cb2.maintenance + cb2.wages);
         }
     }
     check(completed_seen, "the site completed within 5 ticks", completed_seen ? 1 : 0, 1);

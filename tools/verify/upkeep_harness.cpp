@@ -68,6 +68,18 @@ void check(bool ok, const std::string& what)
     ok ? ++g_pass : ++g_fail;
 }
 
+// BL-1407: THE CORPORATION UNIT VECTOR IS RETIRED WITH THE CORPORATION. Every unit
+// is a nation's, and a nation's unit takes run_unit_upkeep's garrison branch
+// (economy_system.cpp; MILITARY.md § Nation garrisons): no credits+goods draw, no
+// out-of-reach or unmet trigger, no decay or recovery — its upkeep is the nation's
+// budget claim. U1 (the shipped table) stands; the trigger rows U2-U6 measured the
+// corporation's vector and are reported as retired, never asserted.
+void retired_row(bool ok, const std::string& what)
+{
+    (void)ok;
+    std::printf("  RETIRED (BL-1407)  %s\n", what.c_str());
+}
+
 constexpr int   GW = 20, GH = 4;
 constexpr uint16_t ROSTER_LEVY = 0;
 
@@ -319,19 +331,19 @@ int main()
 
     std::printf("=== U2-U6: the one decay rule, its two triggers, and recovery ===\n\n");
 
-    check(s1.supply_out_of_reach_met == 900,
+    retired_row(s1.supply_out_of_reach_met == 900,
           "U2 out-of-reach + goods met decays by exactly supply_decay_permille (1000 -> 900)");
-    check(s1.supply_in_reach_met == 560,
+    retired_row(s1.supply_in_reach_met == 560,
           "U3 in-reach + goods met recovers by supply_recovery_permille instead of decaying (500 -> 560)");
-    check(s1.supply_in_reach_unmet == 900,
+    retired_row(s1.supply_in_reach_unmet == 900,
           "U4 in-reach + goods UNMET decays by the SAME amount as U2 (1000 -> 900)");
-    check(s1.supply_both_triggers == 900,
+    retired_row(s1.supply_both_triggers == 900,
           "U5 both triggers at once still subtract supply_decay_permille exactly ONCE (1000 -> 900, not 800)");
     check(s1.supply_out_of_reach_met == s1.supply_in_reach_unmet,
           "U2 and U4 land on the identical value -- one subtraction, two triggers, not two rules");
 
-    check(s1.tick.out_of_reach == 2, "U2/U5 counted as out_of_reach (2 units)");
-    check(s1.tick.unmet == 2, "U4/U5 counted as unmet (2 units)");
+    retired_row(s1.tick.out_of_reach == 2, "U2/U5 counted as out_of_reach (2 units)");
+    retired_row(s1.tick.unmet == 2, "U4/U5 counted as unmet (2 units)");
     check(s1.tick.disbanded == 0, "no unit is orphaned by this fixture");
     check(s1.tick.units == 4, "all four units survive the pass");
 
@@ -344,7 +356,7 @@ int main()
         const entity_id u    = add_unit(f.w, corp, at(f, 2, 0), 10, 560);
         add_market(f, 2, 0, 1000.0f); // BL-1265: the unit's own stocked shelf
         run_unit_upkeep(f.w, reg, g_upkeep_report);
-        check(f.w.units.at(u).supply_factor_permille == 620,
+        retired_row(f.w.units.at(u).supply_factor_permille == 620,
               "U6 recovery continues on a second in-supply tick (560 -> 620)");
     }
 

@@ -1201,7 +1201,9 @@ rail_handover_report hand_over_rail(world& w)
             continue;
         }
         ++per_owner[owner];
-        if (w.nations.count(owner) != 0) ++out.to_nations; else ++out.to_firms;
+        // BL-1407: every owner is a nation; "to minors' firms" now counts the
+        // minors themselves (the ground the retired background firm stood for).
+        if (is_major_nation(w, owner)) ++out.to_nations; else ++out.to_firms;
         if (rail_ground_owner(w, firm_of, tile) != owner)
             ++out.along_the_line;
     }

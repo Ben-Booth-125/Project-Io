@@ -163,32 +163,10 @@ int main()
         check(!vetoed(f, resource_type::stone), "U2 ... and a stone site there is not vetoed");
     }
 
-    std::printf("U3 procurement fulfilment\n");
-    {
-        fixture f = make_fixture();
-        const recipe_registry reg;
-        const entity_id buyer = f.w.create_entity();
-        nation_component bc{};
-        bc.name = "Buyer"; bc.treasury = 1.0e6f;
-        f.w.nations[buyer] = bc;
-        procurement_contract c{};
-        c.id = 1; c.buyer = buyer; c.supplier = f.corp; c.body = f.body;
-        c.resource = resource_type::machinery; c.delivery_body = f.body;
-        c.quantity = 6.0f; c.unit_price = 1.0f; c.lead_time_ticks = 2;
-        f.w.procurement_contracts.push_back(c);
-        check(vetoed(f, resource_type::machinery), "U3 not vacuous: before the contract runs, machinery is a dead market");
-        (void)run_economy_step(f.w, reg);
-        check(!f.w.procurement_contracts.empty()
-                  && f.w.markets.at(f.market).unposted_bid[ri(resource_type::machinery)] == 6.0f
-                  && !vetoed(f, resource_type::machinery),
-              "U3 on a lead-time tick, before it fulfils, the contract's want is already recorded (wanted, filled or not)");
-        f.w.current_econ_tick = 6;
-        (void)run_economy_step(f.w, reg);
-        check(f.w.procurement_contracts.empty(), "U3 the contract fulfilled on its second step");
-        check(f.w.markets.at(f.market).unposted_bid[ri(resource_type::machinery)] == 6.0f,
-              "U3 its quantity is recorded as wanted at the supplier's home market");
-        check(!vetoed(f, resource_type::machinery), "U3 ... and a machinery plant there is not vetoed");
-    }
+    // BL-1407: U3 (procurement fulfilment) RETIRED with the procurement contract
+    // (CONTRACTS.md: named-supplier procurement retired with the firm; the
+    // contract pacing pass is deleted, so no contract's want is ever recorded).
+    std::printf("U3 procurement fulfilment: RETIRED (BL-1407)\n");
 
     // BL-1265 (MARKETS.md § The shelf economy): corporations hold no pools, so a
     // launch's fuel and a building's upkeep are no longer OWN-POOL takes that

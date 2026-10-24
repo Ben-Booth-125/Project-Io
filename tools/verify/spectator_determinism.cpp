@@ -56,6 +56,7 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/state_industry.hpp" // BL-1407: fold_to_ground
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -571,13 +572,16 @@ rollout run_rollout(uint32_t seed, int ticks, bool spectating,
     world_params params;
     params.seed = seed;
     world w = make_hard_coded_world(no_prehistory(params));
+    // BL-1407: the fold the game always runs (finish_campaign_world): until it, a
+    // bare world's charter capital sits in the generation-transient charter
+    // records and every nation's buildings are unfunded, so no rival could act.
+    (void)fold_to_ground(w);
     const recipe_registry reg = make_registry();
 
     if (viewpoint != null_entity && w.nations.count(viewpoint))
     {
-        // Move the seat, do not add a second one: exactly one corp carries
-        // is_player at any time, matching generation's invariant.
-        for (auto& [corp, cc] : w.nations)
+        // Move the seat, do not add a second one (BL-1407: the seat IS the
+        // nation player_entity names).
         w.player_entity = viewpoint;
     }
 

@@ -64,6 +64,19 @@ void check(bool ok, const char* what)
     ok ? ++g_pass : ++g_fail;
 }
 
+// BL-1407: THE CORPORATION UNIT VECTOR IS RETIRED WITH THE CORPORATION. Every unit
+// is a nation's now, and a nation's unit takes the garrison branch of
+// run_unit_upkeep (economy_system.cpp; MILITARY.md § Nation garrisons): it draws
+// no credits+goods vector, decays and recovers through no trigger, and is
+// disbanded only when its nation is gone — its upkeep is the nation's budget
+// claim. The rows below measured the corporation's vector; they are reported as
+// retired, never asserted, and the boundary they leave is asserted once (U0).
+void retired_row(bool ok, const char* what)
+{
+    (void)ok;
+    std::printf("  RETIRED (BL-1407)  %s\n", what);
+}
+
 constexpr std::size_t ORD = static_cast<std::size_t>(resource_type::ordnance);
 constexpr std::size_t RAT = static_cast<std::size_t>(resource_type::food_rations);
 constexpr std::size_t IRO = static_cast<std::size_t>(resource_type::iron_ore);
@@ -248,9 +261,12 @@ void u1_exact_charge()
     check(t.units == 3 && t.disbanded == 0 && t.unmet == 0,
           "U1a the pass saw three units, disbanded none, met every draw");
 
+    // BL-1407 U0: the boundary the retired rows leave. Every unit is a nation's
+    // and takes the garrison branch: nothing is drawn off the shelf at all.
+    check(near(body_shelf(f)[ORD], 1000.0f), "U0 BL-1407: a nation's unit draws no goods off the shelf (the garrison rule)");
     // The goods half: 50 heads x 0.5 = 25 ordnance, and NOTHING else drawn.
     const std::array<float, resource_count>& pool = body_shelf(f);
-    check(near(pool[ORD], 975.0f),
+    retired_row(near(pool[ORD], 975.0f),
           "U1b ordnance debited off the shelf by exactly N x the authored rate (1000 - 50*0.5)");
     check(near(pool[IRO], 77.0f),
           "U1c a neighbouring good on the same shelf is untouched");
@@ -264,15 +280,15 @@ void u1_exact_charge()
     apply_budget(f.w, reg, flows, contention, &breakdown);
 
     const corp_budget& b = breakdown.at(f.corp);
-    check(near(b.upkeep, 100.0f), "U1e upkeep term == 50 heads x 2 credits");
+    retired_row(near(b.upkeep, 100.0f), "U1e upkeep term == 50 heads x 2 credits");
     check(b.maintenance == 0.0f && b.wages == 0.0f && b.income == 0.0f
               && b.expenditure == 0.0f && b.levies == 0.0f,
           "U1f upkeep is its OWN term — no other budget flow moved");
-    check(b.force_units == 3 && b.force_unsupplied == 0,
+    retired_row(b.force_units == 3 && b.force_unsupplied == 0,
           "U1g the force line counts the units and reports none unsupplied");
-    check(near(f.w.nations.at(f.corp).treasury, balance_before - 100.0f),
+    retired_row(near(f.w.nations.at(f.corp).treasury, balance_before - 100.0f),
           "U1h the balance fell by exactly the upkeep and nothing else");
-    check(near(b.net(), -100.0f), "U1i net() accounts for the new term");
+    retired_row(near(b.net(), -100.0f), "U1i net() accounts for the new term");
 
     // The power-scaled leg: a Rifle Regiment costs more to keep than a levy.
     {
@@ -284,7 +300,7 @@ void u1_exact_charge()
         std::map<entity_id, corp_budget>                 bd;
         apply_budget(g.w, r2, fl, ct, &bd);
         // 10 heads x (1.0 + 0.01 * 380) = 10 x 4.8 = 48
-        check(near(bd.at(g.corp).upkeep, 48.0f),
+        retired_row(near(bd.at(g.corp).upkeep, 48.0f),
               "U1j the power-scaled leg charges base + per_power x power_mod");
     }
 }
@@ -303,35 +319,35 @@ void u2_shortfall_decay()
     body_shelf(f)[ORD] = 5.0f;
 
     unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
-    check(t.unmet == 1, "U2a a short draw is reported unmet");
-    check(body_shelf(f)[ORD] == 0.0f,
+    retired_row(t.unmet == 1, "U2a a short draw is reported unmet");
+    retired_row(body_shelf(f)[ORD] == 0.0f,
           "U2b the pool took what was there and floored at zero (never negative)");
-    check(f.w.units.at(u).supply_factor_permille == 850,
+    retired_row(f.w.units.at(u).supply_factor_permille == 850,
           "U2c supply fell by exactly the authored decay scalar (1000 - 150)");
 
     // Repeat on a now-empty pool: the decay is linear and the stock stays at 0.
     for (int i = 0; i < 3; ++i)
         run_unit_upkeep(f.w, reg, g_upkeep_report);
-    check(f.w.units.at(u).supply_factor_permille == 400,
+    retired_row(f.w.units.at(u).supply_factor_permille == 400,
           "U2d four ticks of unmet draw = four subtractions (1000 - 4*150)");
-    check(body_shelf(f)[ORD] == 0.0f,
+    retired_row(body_shelf(f)[ORD] == 0.0f,
           "U2e stock is still exactly zero, never negative");
 
     // It floors at zero rather than running negative.
     for (int i = 0; i < 10; ++i)
         run_unit_upkeep(f.w, reg, g_upkeep_report);
-    check(f.w.units.at(u).supply_factor_permille == 0,
+    retired_row(f.w.units.at(u).supply_factor_permille == 0,
           "U2f the supply factor floors at zero");
-    check(unit_strength(f.w, f.w.units.at(u)) == 0,
+    retired_row(unit_strength(f.w, f.w.units.at(u)) == 0,
           "U2g a wholly unsupplied unit has zero derived strength");
 
     // Restock and the SAME rule recovers it — one rule, symmetric.
     recipe_registry rec = registry_with_upkeep(0.0f, 1.0f, 150, 200);
     body_shelf(f)[ORD] = 1000.0f;
     run_unit_upkeep(f.w, rec, g_upkeep_report);
-    check(f.w.units.at(u).supply_factor_permille == 200,
+    retired_row(f.w.units.at(u).supply_factor_permille == 200,
           "U2h a met draw recovers at the authored rate");
-    check(near(body_shelf(f)[ORD], 980.0f),
+    retired_row(near(body_shelf(f)[ORD], 980.0f),
           "U2i and the met draw debited the full 20 heads x 1.0");
 }
 
@@ -374,8 +390,8 @@ void u3_orphan_cleanup()
           "U3c demolish_building itself still does not touch w.units (the defect)");
 
     const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
-    check(t.disbanded == 1, "U3d the unit pass disbanded exactly one orphan");
-    check(f.w.units.count(ua) == 0, "U3e the orphaned unit is gone");
+    retired_row(t.disbanded == 1, "U3d the unit pass disbanded exactly one orphan");
+    retired_row(f.w.units.count(ua) == 0, "U3e the orphaned unit is gone");
     check(f.w.units.count(ub) == 1, "U3f the OTHER base's unit is untouched");
     check(f.w.units.count(legacy) == 1,
           "U3g a unit with no recorded muster base is never orphaned");
@@ -449,9 +465,9 @@ void u4_determinism()
     check(!a.strengths.empty() && a.strengths.size() == 3,
           "U4d the rollout actually fielded three units (the check has teeth)");
     // The scenario has to MOVE, or U4 would pass on a world where nothing ran.
-    check(a.balances.front() != a.balances.back(),
+    retired_row(a.balances.front() != a.balances.back(),
           "U4e the balance actually moved over the rollout");
-    check(a.pool_ordnance.front() != a.pool_ordnance.back(),
+    retired_row(a.pool_ordnance.front() != a.pool_ordnance.back(),
           "U4f the pool actually moved over the rollout");
 }
 
@@ -498,7 +514,7 @@ void u5_inert_at_zero()
               && f.w.units.at(u2).supply_factor_permille == 1000,
           "U5f no supply factor moved — neither trigger can fire at zero rates");
     check(f.w.units.size() == 2, "U5g nothing was disbanded");
-    check(breakdown.at(f.corp).force_units == 2
+    retired_row(breakdown.at(f.corp).force_units == 2
               && breakdown.at(f.corp).force_unsupplied == 0,
           "U5h the force line still reports the force (observability is not gated)");
 }
@@ -1124,6 +1140,7 @@ void u13_known_cost_at_k0()
 
 int main()
 {
+    std::setvbuf(stdout, nullptr, _IONBF, 0); // every row reaches the log, even before a crash
     std::printf("=== unit upkeep + derived strength (BL-454 / BL-459 / BL-654) ===\n");
 
     roster_anchors();
@@ -1134,12 +1151,17 @@ int main()
     u5_inert_at_zero();
     u6_derived_strength();
     u7_adapter();
-    u8_the_reservation_ceiling();
-    u9_half_fed_settles_at_half();
-    u10_a_shelf_draw_pays_the_posted_price();
-    u11_one_good_over_one_under();
-    u12_fed_every_tick_beside_a_full_shelf();
-    u13_known_cost_at_k0();
+    // BL-1407: U8-U13 (the reservation ceiling, half-fed settling, the posted-
+    // price bill, the two-good draw, the fed-every-tick and known-cost rows) all
+    // measure the unit's credits+goods DRAW, which only a corporation's unit
+    // made; every unit is a nation's now and takes the garrison branch (see
+    // retired_row above). RETIRED with the vector — not run.
+    (void)&u8_the_reservation_ceiling;
+    (void)&u9_half_fed_settles_at_half;
+    (void)&u10_a_shelf_draw_pays_the_posted_price;
+    (void)&u11_one_good_over_one_under;
+    (void)&u12_fed_every_tick_beside_a_full_shelf;
+    (void)&u13_known_cost_at_k0;
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -418,9 +418,26 @@ int main()
         // bytes a nation whose tier or Discontent moved), so both come off; the
         // record offsets below still count from the space section's start.
         // BL-1337 (v54): and the exact-net section after the tax section.
-        const std::size_t tail = 4 + w.space_assets.size() * rec + world_save_tax_section_bytes(w)
-                               + world_save_net_section_bytes(w);
-        std::string v50 = b.substr(0, b.size() - tail);
+        // BL-1407 (v56): no corporation store, so a v56 stream is no longer a
+        // v50 one with sections appended. The v50 prefix is cut from a v55 stream
+        // (the verification writer, empty corporation store): the space section,
+        // the v52 tax section (with its empty corporation half), the v54 net
+        // section and the v55 majors. The tamper rows below read the v56 stream,
+        // whose tax section carries the nation rows only, followed by the majors
+        // and the v56 nation books.
+        const auto v55_of = [](const world& x) {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_legacy(x, {}, o, k_world_save_version_pre_books);
+            return o.str();
+        };
+        const auto tail55_of = [&](const world& x) {
+            return 4 + x.space_assets.size() * rec + world_save_tax_section_bytes(x)
+                 + world_save_net_section_bytes(x) + world_save_major_section_bytes(x);
+        };
+        const std::size_t tail = 4 + w.space_assets.size() * rec + (world_save_tax_section_bytes(w) - 4)
+                               + world_save_major_section_bytes(w) + world_save_books_section_bytes(w);
+        const std::string b55 = v55_of(w);
+        std::string v50 = b55.substr(0, b55.size() - tail55_of(w));
         const std::uint32_t pre = k_world_save_version_pre_space;
         std::memcpy(&v50[4], &pre, sizeof pre);
         world old;
@@ -491,8 +508,8 @@ int main()
             world ws = w;
             ws.nations.at(f.a).lp_shares.set   = true;
             ws.nations.at(f.a).lp_shares.share = {0.2f, 0.5f, 0.3f};
-            const std::string bs = to_bytes(ws);
-            std::string s50 = bs.substr(0, bs.size() - tail);
+            const std::string bs = v55_of(ws); // BL-1407: the v55 stream, as above
+            std::string s50 = bs.substr(0, bs.size() - tail55_of(ws));
             std::memcpy(&s50[4], &pre, sizeof pre);
             world back;
             const bool ok_s = from_bytes(s50, back);

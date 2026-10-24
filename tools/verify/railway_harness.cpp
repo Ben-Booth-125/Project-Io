@@ -397,23 +397,17 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
             if (owner == null_entity) { own_ok = false; why = "an ownerless tile"; continue; }
             const auto tn = w.tile_to_nation.find(tile);
             const entity_id ground = tn != w.tile_to_nation.end() ? tn->second : null_entity;
-            if (w.nations.count(owner))
-            {
-                if (!is_major_nation(w, owner)) { own_ok = false; why = "a minor's state owning track"; }
-                if (ground != null_entity && is_major_nation(w, ground) && ground != owner)
-                { own_ok = false; why = "a major's ground carrying another's track"; }
-            }
-            else if (const auto cit = w.nations.find(owner); cit != w.nations.end())
-            {
-                if (!(!cit->second.is_major)) { own_ok = false; why = "a specialist owning track"; }
-            }
-            else { own_ok = false; why = "an owner that is neither"; }
+            // BL-1407: every owner is a NATION. A major's ground carries only its
+            // own track; a minor's line runs wherever its retired background firm laid it.
+            if (w.nations.count(owner) == 0) { own_ok = false; why = "an owner that is no nation"; continue; }
+            if (ground != null_entity && is_major_nation(w, ground) && ground != owner)
+            { own_ok = false; why = "a major's ground carrying another's track"; }
         }
-        check(own_ok, "R1", "every track tile is owned by a major or a minor's background firm, a major's ground by that major"
+        check(own_ok, "R1", "every track tile is owned by a nation, a major's ground by that major"
                             + (own_ok ? std::string() : " -- " + why));
         for (const auto& [o, n] : rh.per_owner_tiles)
             std::printf("    owner %u (%s): %d track tiles\n", static_cast<unsigned>(o),
-                        w.nations.count(o) ? "major" : "firm", n);
+                        is_major_nation(w, o) ? "major" : "minor", n);
         bool st_ok = true;
         int n = 0;
         for (const auto& [bid, b] : w.buildings)
@@ -527,10 +521,10 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
     (void)seat_player_corporation(w, seed, out.land.search.winner_score);
     const entity_id P  = w.player_entity;
     const entity_id pn = player_nation(w);
-    std::printf("    seat: corp %u nation %u (champion %u, major %d)\n", static_cast<unsigned>(P),
-                static_cast<unsigned>(pn), static_cast<unsigned>(champion_of(w, pn)),
-                is_major_nation(w, pn) ? 1 : 0);
-    if (pn != null_entity && champion_of(w, pn) == P)
+    std::printf("    seat: nation %u (player nation %u, major %d)\n", static_cast<unsigned>(P),
+                static_cast<unsigned>(pn), is_major_nation(w, pn) ? 1 : 0);
+    // BL-1407: the player IS its nation (no champion corporation exists).
+    if (pn != null_entity && pn == P && is_major_nation(w, pn))
     {
         agent_protocol::session ps;
         ps.actor = P;
@@ -580,13 +574,13 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         if (other_n != null_entity) rows.push_back({P_(fmt("verb=%u tile=%u nation=%u", LT, foreign, other_n)), "rejected_not_owner", "track for another nation (actor gate)"});
         if (city != null_entity)
         {
-            rows.push_back({P_(fmt("verb=%u tile=%u", LT, city)), "rejected_invalid", "track with no nation (a corporation's book)"});
+            rows.push_back({P_(fmt("verb=%u tile=%u", LT, city)), "rejected_invalid", "track naming no nation"});
             rows.push_back({P_(fmt("verb=%u tile=%u nation=abc", LT, city)), "rejected_invalid", "a malformed nation id"});
             rows.push_back({P_(fmt("verb=%u tile=%llu nation=%u", LT, 1ull << 40, pn)), "rejected_invalid", "a tile id past the entity domain"});
             rows.push_back({P_(fmt("verb=0 tile=%u type=11 nation=%u", city, pn)), "rejected_placement", "a station on a city touching no track"});
             // BL-1309: "anyone may build" a station, so a corporation's book is a
             // legal door now; off the line the build door still refuses it.
-            rows.push_back({P_(fmt("verb=0 tile=%u type=11", city)), "rejected_placement", "a corporation's station on a city touching no track"});
+            rows.push_back({P_(fmt("verb=0 tile=%u type=11", city)), "rejected_placement", "a station naming no nation, on a city touching no track"});
             rows.push_back({P_(fmt("verb=0 tile=%u type=12 nation=%u", city, pn)), "rejected_invalid", "a building type past the roster"});
         }
         rows.push_back({P_(fmt("verb=%u tile=0 nation=%u", LT, pn)), "rejected_invalid", "track on no tile"});
@@ -662,15 +656,16 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
                 }
             }
         }
-        // A rival champion's lay_track, in-process (the scorer's door): refused.
+        // A rival nation's lay_track, in-process (the scorer's door): refused.
+        // BL-1407: the rival is the major nation itself (no champion exists).
         {
             entity_id rn = null_entity, rc = null_entity;
             std::vector<entity_id> nids;
             for (const auto& [nid, nc] : w.nations) nids.push_back(nid);
             std::sort(nids.begin(), nids.end());
             for (const entity_id nid : nids)
-                if (nid != pn && is_major_nation(w, nid) && champion_of(w, nid) != null_entity)
-                { rn = nid; rc = champion_of(w, nid); break; }
+                if (nid != pn && is_major_nation(w, nid))
+                { rn = nid; rc = nid; break; }
             if (rn != null_entity)
             {
                 entity_id rt = null_entity;
@@ -687,20 +682,18 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
                 sc.corp = rc; sc.as_nation = rn; sc.verb = corp_verb::build; sc.type = building_type::railway_station; sc.tile = rt;
                 const corp_command_result r2 = apply_corp_command(w, reg, sc);
                 const bool unmoved = w.state_hash(0) == h0;
-                // BL-1309: a corporation's own-book station is a legal door now
-                // ("anyone may build"); asked on a copy, it is never refused as invalid.
-                world wc = w;
-                corp_command pc;
-                pc.corp = rc; pc.verb = corp_verb::build; pc.type = building_type::railway_station; pc.tile = rt;
-                const corp_command_result r3 = apply_corp_command(wc, reg, pc);
+                // BL-1407: the retired third row (a corporation's own-book station)
+                // has no subject — every builder is a nation, asked above.
+                std::printf("    rival nation %u: lay_track -> %d, station -> %d\n", static_cast<unsigned>(rn),
+                            static_cast<int>(r1), static_cast<int>(r2));
                 check(r1 == corp_command_result::rejected_not_owner && r2 == corp_command_result::rejected_not_owner
-                          && r3 != corp_command_result::rejected_invalid && unmoved,
-                      "R4", "a rival champion may not lay track or build a state station; a corporation's own station is a legal door (BL-1309)");
+                          && unmoved,
+                      "R4", "a rival nation may not lay track or build a state station through the command seam");
             }
         }
     }
     else
-        check(false, "R4", "the seat is its major nation's champion");
+        check(false, "R4", "the seat is its major nation");
 
     // ---- R5 upkeep ------------------------------------------------------------
     std::printf("--- R5 upkeep ---\n");
@@ -884,7 +877,15 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         check(same, "R6", fmt("v49 round-trips the track (%zu tiles) and a riding convoy's stations, equal state_hash",
                               c.rail_track.size()));
         check(to_bytes(back) == b, "R6", "re-serialising reproduces the stream byte for byte");
-        // A v48 stream: this stream less the rail section, stamped 48.
+        // A v48 stream: a v55 stream (BL-1407: the verification writer, so the
+        // corporation store a pre-v56 stream carries is present — empty) less the
+        // rail section and everything after it, stamped 48.
+        std::string b55;
+        {
+            std::ostringstream o55(std::ios::binary);
+            write_world_snapshot_legacy(c, {}, o55, k_world_save_version_pre_books);
+            b55 = o55.str();
+        }
         std::size_t tail = 2 * sizeof(uint32_t) + c.rail_track.size() * 2 * sizeof(entity_id);
         for (const convoy_component& k : c.convoys)
             if (k.station_a != null_entity) tail += sizeof(uint32_t) + 2 * sizeof(entity_id);
@@ -901,17 +902,17 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         tail += world_save_tax_section_bytes(c);
         tail += world_save_net_section_bytes(c); // BL-1337 (v54): the exact nets
         tail += world_save_major_section_bytes(c); // BL-1404 (v55): the majors, last
-        std::string v48 = b.substr(0, b.size() - tail);
+        std::string v48 = b55.substr(0, b55.size() - tail);
         const uint32_t ver = k_world_save_version_pre_rail;
         std::memcpy(&v48[4], &ver, sizeof ver);
         world old;
         check(from_bytes(v48, old) && old.rail_track.empty(), "R6", "a v48 stream reads, as a world with no rail");
         world tampered;
-        std::string bad = b;
+        std::string bad = b55; // BL-1407: offsets in the v55 layout above
         if (!c.rail_track.empty())
         {
             // The first track entry's owner set to an id no nation or corporation holds.
-            const std::size_t off = b.size() - tail + sizeof(uint32_t) + sizeof(entity_id);
+            const std::size_t off = b55.size() - tail + sizeof(uint32_t) + sizeof(entity_id);
             const entity_id junk = 0x7FFFFFF0u;
             std::memcpy(&bad[off], &junk, sizeof junk);
             check(!from_bytes(bad, tampered), "R6", "a track owner naming no actor is refused whole");

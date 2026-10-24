@@ -189,6 +189,9 @@ int main()
           "R2 draw: balance += exactly what the sites consumed (S is back to its opening balance)");
 
     // R3 — the pick.
+    // BL-1407: the pick names a MAJOR nation (the seat is taken over majors);
+    // the fixture's S is made one on the pick's copy.
+    copy.nations.at(x.s).is_major = true;
     corp_command cmd;
     cmd.corp = x.s;
     cmd.verb = corp_verb::take_seat;

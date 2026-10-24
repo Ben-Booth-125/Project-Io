@@ -189,19 +189,35 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     const recipe_registry& reg = out.reg;
 
     // ---- S1: the handover -------------------------------------------------
+    // BL-1407: generation creates no corporation; every building is its ground
+    // nation's from the moment it stands, and the handover works on the
+    // generation-transient CHARTER indices (world::gen_charters). A nation's
+    // STATE industry is what no charter's index lists; a charter "keeps" or
+    // "loses" a building from its index.
     std::printf("--- S1 the handover ---\n");
-    std::map<entity_id, std::vector<entity_id>> before;
-    for (const auto& [cid, cc] : w.nations) before[cid] = cc.state_assets;
+    const auto chartered_set = [&]() {
+        std::set<entity_id> out;
+        for (const auto& [cid, cc] : w.gen_charters) out.insert(cc.assets.begin(), cc.assets.end());
+        return out;
+    };
+    const auto state_of = [&](entity_id nid) {
+        const std::set<entity_id> ch = chartered_set();
+        std::vector<entity_id> out;
+        for (const entity_id b : w.nations.at(nid).state_assets) if (!ch.count(b)) out.push_back(b);
+        return out;
+    };
+    std::map<entity_id, std::vector<entity_id>> before; // charter -> its index
+    for (const auto& [cid, cc] : w.gen_charters) before[cid] = cc.assets;
     bool any_state_before = false;
-    for (const auto& [nid, nc] : w.nations) any_state_before |= !nc.state_assets.empty();
-    check(!any_state_before, "S1", "no nation owns a building before the handover");
+    for (const auto& [nid, nc] : w.nations) any_state_before |= !state_of(nid).empty();
+    check(!any_state_before, "S1", "no nation owns a STATE building before the handover (every one stands in a charter's index)");
 
     {
         // The ground the handover reads: buildings by owner kind x sector x the
         // ground's nation kind (reported, so a zero row explains itself).
         std::map<std::string, int> tally;
-        for (const auto& [cid, cc] : w.nations)
-            for (const entity_id bid : cc.state_assets)
+        for (const auto& [cid, cc] : w.gen_charters)
+            for (const entity_id bid : cc.assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end()) continue;
@@ -209,7 +225,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                 const char* ground = (tn == w.tile_to_nation.end()) ? "unclaimed"
                                    : is_major_nation(w, tn->second) ? "major" : "minor";
                 const strategic_sector sec = strategic_sector_of(reg, bit->second);
-                ++tally[fmt("%s %s type%d %s", cc.is_major == false ? "firm" : "spec", ground,
+                ++tally[fmt("%s %s type%d %s", cc.is_background ? "firm" : "spec", ground,
                             static_cast<int>(bit->second.type), strategic_sector_name(sec))];
             }
         for (const auto& [k, n] : tally)
@@ -223,17 +239,18 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     {
         const nation_component& nc = w.nations.at(nid);
         const bool major = is_major_nation(w, nid);
+        const std::vector<entity_id> st = state_of(nid); // BL-1407: the state's own
         (major ? majors : minors) += 1;
-        if (!nc.state_assets.empty()) (major ? majors_with : minors_with) += 1;
-        total_state += static_cast<int>(nc.state_assets.size());
+        if (!st.empty()) (major ? majors_with : minors_with) += 1;
+        total_state += static_cast<int>(st.size());
         if (major)
         {
             std::array<int, 6> sec{};
-            for (const entity_id bid : nc.state_assets)
+            for (const entity_id bid : st)
                 ++sec[static_cast<std::size_t>(strategic_sector_of(reg, w.buildings.at(bid)))];
             std::printf("    major %u \"%s\": %zu state building(s) (energy %d, steel %d, arms %d, "
                         "space %d), treasury %.1f\n",
-                        static_cast<unsigned>(nid), nc.name.c_str(), nc.state_assets.size(),
+                        static_cast<unsigned>(nid), nc.name.c_str(), st.size(),
                         sec[1], sec[2], sec[3], sec[5], static_cast<double>(nc.treasury));
         }
     }
@@ -244,14 +261,12 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     check(minors_with == 0, "S1b", fmt("no minor owns state industry (%d minors)", minors));
 
     {
-        std::set<entity_id> corp_owned;
-        for (const auto& [cid, cc] : w.nations)
-            for (const entity_id b : cc.state_assets) corp_owned.insert(b);
+        const std::set<entity_id> corp_owned = chartered_set(); // BL-1407: a charter's index
         std::set<entity_id> seen;
         bool ok = true;
         std::string why;
         for (const auto& [nid, nc] : w.nations)
-            for (const entity_id bid : nc.state_assets)
+            for (const entity_id bid : state_of(nid))
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end()) { ok = false; why = "dangling id"; continue; }
@@ -263,7 +278,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                         ? !state_runs(reg, bit->second.type, bit->second.recipe)
                         : strategic_sector_of(reg, bit->second) == strategic_sector::none)
                 { ok = false; why = "not a state sector"; }
-                if (corp_owned.count(bid)) { ok = false; why = "also corp-owned"; }
+                if (corp_owned.count(bid)) { ok = false; why = "also in a charter's index"; }
                 if (!seen.insert(bid).second) { ok = false; why = "listed twice"; }
                 if (building_owner_of(w, bid).kind != owner_kind::nation
                     || owner_nation_of(w, bid) != nid) { ok = false; why = "owner lookup disagrees"; }
@@ -278,18 +293,18 @@ void run_seed(lua_state& lua, std::uint32_t seed)
             if (f.building != null_entity) founded_ids.insert(f.building);
         for (const entity_id b : rep.port_buildings) founded_ids.insert(b); // founded, not passed
         for (const auto& [nid, nc] : w.nations)
-            for (const entity_id b : nc.state_assets)
+            for (const entity_id b : state_of(nid))
                 if (!founded_ids.count(b)) passed.insert(b);
         std::set<entity_id> lost_all;
-        for (const auto& [cid, cc] : w.nations)
+        for (const auto& [cid, cc] : w.gen_charters) // BL-1407: the charters' indices
         {
             const std::vector<entity_id>& was = before.at(cid);
-            if (!cc.is_major == false)
+            if (!cc.is_background)
             {
-                if (cc.state_assets != was) champ_ok = false;
+                if (cc.assets != was) champ_ok = false;
                 continue;
             }
-            std::set<entity_id> now(cc.state_assets.begin(), cc.state_assets.end());
+            std::set<entity_id> now(cc.assets.begin(), cc.assets.end());
             for (const entity_id b : was)
                 if (!now.count(b))
                 {
@@ -404,7 +419,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         {
             if (!is_major_nation(w, nid))
                 continue;
-            const entity_id champ = champion_of(w, nid);
+            const entity_id champ = nid; // BL-1407: the nation acts for itself
             // Fixture setup: a treasury the founding emptied could build
             // nothing; the rows below test the mechanics, not this seed's
             // purse, so each major is topped up to a working floor.
@@ -633,7 +648,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     std::printf("--- S8 changes after the gate ---\n");
     if (w.nations.count(pn) && !w.nations.at(pn).state_assets.empty())
     {
-        const entity_id champ = champion_of(w, pn);
+        const entity_id champ = pn; // BL-1407: the nation acts for itself
         const auto running = [&](const world& c) {
             std::vector<entity_id> out;
             for (const entity_id b : c.nations.at(pn).state_assets)
@@ -782,8 +797,8 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         if (other_sb != null_entity && pn != null_entity)
             rows.push_back({P_(fmt("verb=3 subject=%u workforce=50 nation=%u", other_sb, pn)),
                             "rejected_not_owner", "own nation, a building it does not own (seam)"});
-        rows.push_back({P_(fmt("verb=7 subject=%u nation=%u", w.home_body, pn)),
-                        "rejected_invalid", "a non-building verb (survey) for the state"});
+        // BL-1407: "a non-building verb (survey) for the state -> rejected_invalid"
+        // RETIRED — survey is the nation's own verb now (the player IS its nation).
         rows.push_back({P_("verb=3 subject=1 workforce=50 nation=abc"),
                         "rejected_invalid", "a malformed nation id (parse)"});
         rows.push_back({P_(fmt("verb=3 subject=1 workforce=50 nation=%llu", 1ull << 40)),
@@ -791,20 +806,18 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         if (own_sb != null_entity)
             rows.push_back({P_(fmt("verb=3 subject=%u workforce=201 nation=%u", own_sb, pn)),
                             "rejected_invalid", "workforce 201 on its own state building (parse)"});
-        if (own_tile != null_entity)
-            rows.push_back({P_(fmt("verb=0 tile=%u type=2 recipe=%u nation=%u", own_tile, food, pn)),
-                            "rejected_invalid", "a state build on a private-sector recipe"});
-        if (own_tile != null_entity)
-            rows.push_back({P_(fmt("verb=0 tile=%u type=1 nation=%u", own_tile, pn)),
-                            "rejected_invalid", "a state build of an extraction site"});
+        // BL-1407 / BL-1399 (Ben, 2026-10-23): "a state build on a private-sector
+        // recipe" and "a state build of an extraction site -> rejected_invalid"
+        // RETIRED — a nation builds any building and takes any recipe now.
+        (void)food;
         {
             entity_id rival = null_entity;
             for (const auto& [cid, cc] : w.nations)
-                if (!cc.is_major == false && cid != P) { rival = cid; break; }
+                if (cc.is_major && cid != P && (rival == null_entity || cid < rival)) rival = cid;
             if (rival != null_entity)
                 rows.push_back({fmt("COMMAND corp=%u verb=3 subject=%u workforce=50 nation=%u",
                                     static_cast<unsigned>(rival), other_sb, other_n),
-                                "rejected_not_owner", "acting as a rival champion (actor gate)"});
+                                "rejected_not_owner", "acting as a rival nation (actor gate)"});
         }
         for (const rej_row& row : rows)
         {

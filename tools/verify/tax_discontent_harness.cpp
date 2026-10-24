@@ -214,13 +214,20 @@ void t1_conserves(const app_start_world& out)
         const double tol = std::ldexp(std::max(1.0, std::fabs(static_cast<double>(ta))), -22);
         if (std::fabs((static_cast<double>(ta) - tb) - led.taxes) > tol) moved_ok = false;
     }
+    // BL-1407: no corporation exists to tax; every breakdown row is a NATION's
+    // own budget, and its `taxes` is that nation's ledger wage tax.
     bool firms_untaxed = true;
-    for (const auto& [cid, x] : ba) if (x.taxes != 0.0f) firms_untaxed = false;
+    for (const auto& [cid, x] : ba)
+    {
+        const auto lit = a.state_ledger.find(cid);
+        if (a.nations.count(cid) == 0 || lit == a.state_ledger.end() || x.taxes != lit->second.taxes)
+            firms_untaxed = false;
+    }
     check(taxed > 0, "T1", fmt("%d nations taxed on their wages, %d not", taxed, untaxed));
     check(per_nation, "T1", "each nation's tax is nation_wage_tax of the wages its buildings paid, at its tier");
     check(no_wages_no_tax, "T1", "a nation that paid no wages is taxed nothing");
     check(moved_ok, "T1", fmt("each treasury ends higher by exactly its tax (%.1f credits in all) than with every rate 0", collected));
-    check(firms_untaxed, "T1", "no corporation is taxed (the tax on firms' profit retired)");
+    check(firms_untaxed, "T1", "every breakdown row is a nation's, carrying its own wage tax (no firm exists to tax)");
 
     // A whole tick: report rows agree with the nations' ledger taxes.
     world probe = out.w;
@@ -375,7 +382,8 @@ void t5_seam(app_start_world& out)
     const recipe_registry& reg = out.reg;
     const entity_id P  = w.player_entity;
     const entity_id pn = player_nation(w);
-    if (pn == null_entity || champion_of(w, pn) != P) { check(false, "T5", "the seat is its major nation's champion"); return; }
+    // BL-1407: the player IS its nation (no champion corporation exists).
+    if (pn == null_entity || pn != P || !is_major_nation(w, pn)) { check(false, "T5", "the seat is its major nation"); return; }
     agent_protocol::session ps;
     ps.actor = P;
     const unsigned V = static_cast<unsigned>(corp_verb::set_tax_tier);
@@ -420,17 +428,18 @@ void t5_seam(app_start_world& out)
     const std::string o2 = serve(w, reg, ps, P_(fmt("nation=%u order=%d", pn, was)));
     check(result_is(o2, "applied") && w.nations.at(pn).tax_tier == was && w.state_hash(0) == h0, "T5",
           "setting it back restores the tier and the hash");
-    // A rival champion, in-process: refused (the AI's tier is its scorer's, never corp_ai's).
+    // A rival nation, in-process: refused (the AI's tier is its scorer's, never
+    // corp_ai's). BL-1407: the rival is the nation itself, not a champion.
     entity_id rn = null_entity;
-    for (const entity_id n : nation_ids(w)) if (n != pn && is_major_nation(w, n) && champion_of(w, n) != null_entity) { rn = n; break; }
+    for (const entity_id n : nation_ids(w)) if (n != pn) { rn = n; break; }
     if (rn != null_entity)
     {
         corp_command cmd;
-        cmd.corp = champion_of(w, rn); cmd.as_nation = rn; cmd.verb = corp_verb::set_tax_tier; cmd.order = 4;
+        cmd.corp = rn; cmd.as_nation = rn; cmd.verb = corp_verb::set_tax_tier; cmd.order = 4;
         const std::uint64_t h1 = w.state_hash(0);
         const corp_command_result r = apply_corp_command(w, reg, cmd);
         check(r == corp_command_result::rejected_not_owner && w.state_hash(0) == h1, "T5",
-              "a rival champion may not set its nation's tier through the command seam");
+              "a rival nation may not set its own tier through the command seam");
     }
     // The verb without a nation, in-process.
     {
@@ -438,7 +447,7 @@ void t5_seam(app_start_world& out)
         cmd.corp = P; cmd.verb = corp_verb::set_tax_tier; cmd.order = 4;
         const std::uint64_t h1 = w.state_hash(0);
         check(apply_corp_command(w, reg, cmd) == corp_command_result::rejected_invalid && w.state_hash(0) == h1,
-              "T5", "set_tax_tier on a corporation's own book is rejected_invalid");
+              "T5", "set_tax_tier naming no nation is rejected_invalid");
     }
 }
 
@@ -486,15 +495,31 @@ void t6_save(const app_start_world& out)
         for (const auto& [nid, nc] : r51.nations)
             if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f) defaults = false;
     check(defaults, "T6", "a v51 stream loads, every nation at tier III with Discontent 0");
+    // BL-1407: a v51 stream cannot carry the v56 NATION BOOKS (reserve, points,
+    // refund, returns), so the default world it hashes as is the opened world
+    // less those books.
     world base = out.w;
+    for (auto& [nid, nc] : base.nations)
+    {
+        nc.trade_reserve = 0.0f; nc.trade_points = 0.0f;
+        nc.refund_unbooked = 0.0f; nc.refund_opening = 0.0f;
+        nc.returns.clear();
+        // ...and the majors: a pre-v55 stream derives them from its corporation
+        // records, of which the verification writer writes none.
+        nc.is_major = false;
+    }
     check(ok51 && r51.state_hash(0) == base.state_hash(0), "T6",
-          "...and hashes as the default world (the fold is sparse)");
+          "...and hashes as the default world less the v56 books and the majors (the fold is sparse)");
 
     // Bad values refuse whole and leave the target untouched. The FIRST row of
     // the section is ids.front(): id (4) then tier (1) then discontent (4).
-    // The v54 net section and the v55 majors section (BL-1404) follow the tax floats.
-    const std::size_t net_tail = world_save_net_section_bytes(c) + world_save_major_section_bytes(c);
-    const std::size_t row0 = b52.size() - tail - net_tail + 4;
+    // BL-1407 (v56): the tax section carries the nation rows only (its
+    // corporation half is gone, so the helper's pre-v56 count of 4 is not
+    // written), and the v55 majors and v56 nation-books sections follow it.
+    const std::size_t tail56   = tail - 4;
+    const std::size_t books    = world_save_books_section_bytes(c);
+    const std::size_t net_tail = world_save_major_section_bytes(c) + books;
+    const std::size_t row0 = b52.size() - tail56 - net_tail + 4;
     const auto refuse = [&](const char* what, auto patch) {
         std::string bad = b52;
         patch(bad);
@@ -509,11 +534,23 @@ void t6_save(const app_start_world& out)
     refuse("a Discontent of 1.5", [&](std::string& s) { const float f = 1.5f; std::memcpy(&s[row0 + 5], &f, 4); });
     refuse("a negative Discontent", [&](std::string& s) { const float f = -0.25f; std::memcpy(&s[row0 + 5], &f, 4); });
     refuse("an unknown nation id", [&](std::string& s) { const std::uint32_t id = 0x7FFFFFF0u; std::memcpy(&s[row0], &id, 4); });
-    // The returns' taxes: count (4), then the corp's id (4), n (4), floats.
-    const std::size_t ret0 = b52.size() - tail - net_tail + 4 + 9 * moved_nations(c) + 4;
-    refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - net_tail - 4], &f, 4); }); // BL-1337 review: the v54 net section follows the tax floats
-    refuse("a return-tax count that is not the firm's return count", [&](std::string& s) {
-        std::uint32_t n = 0; std::memcpy(&n, &s[ret0 + 4], 4); n += 1; std::memcpy(&s[ret0 + 4], &n, 4); });
+    // BL-1407 (v56): a return's tax is in the NATION BOOKS, the last section:
+    // per nation (ascending) id (4), four floats (16), the returns (u32 n, n
+    // rows), then n f32 taxes, then n f64 exact nets. The LAST nation's last
+    // tax therefore sits just before its n nets at the stream's end.
+    (void)moved_nations(c);
+    entity_id last = null_entity;
+    for (const auto& [nid, nc] : c.nations)
+        if ((nc.trade_reserve != 0.0f || nc.trade_points != 0.0f || nc.refund_unbooked != 0.0f || !nc.returns.empty())
+            && (last == null_entity || nid > last))
+            last = nid;
+    const std::size_t n_last = last != null_entity ? c.nations.at(last).returns.size() : 0;
+    check(n_last > 0, "T6", "the last nation in the books section carries returns (the tax rows below are not vacuous)");
+    if (n_last > 0)
+        refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - 8 * n_last - 4], &f, 4); });
+    const std::size_t books0 = b52.size() - books; // u32 count, then the first nation
+    refuse("a return count that is not the rows that follow", [&](std::string& s) {
+        std::uint32_t n = 0; std::memcpy(&n, &s[books0 + 4 + 4 + 16], 4); n += 1; std::memcpy(&s[books0 + 4 + 4 + 16], &n, 4); });
 }
 
 void t7_scorer(const app_start_world& out)

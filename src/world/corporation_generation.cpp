@@ -2615,6 +2615,13 @@ void seed_starting_military(world& w, entity_id corp_id,
         author_building(w, best_tid, building_type::military_base, occupied_tiles);
     // The base is the nation's own (BL-1407: every building is its nation's).
     nation_it->second.state_assets.push_back(base_id);
+    // ...and, armed by a charter, it stands in that charter's index as every
+    // charter building does: the state industry's "holds none" test (the
+    // founding, the coastal port) reads a charter's buildings as not the
+    // state's, and the close keeps each nation's list in the order the retired
+    // fold appended it — exactly as when the base was the corporation's.
+    if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
+        cit->second.assets.push_back(base_id);
 
     // One basic unit, seeded on the same tile as the base. Roster index 0 is
     // the cheapest/first roster row — a deterministic starting choice, not a
@@ -7735,9 +7742,12 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
                 break;
             if (occupied.count(s.tile) != 0)
                 continue;
+            // BL-1407: the placement rules ask an OWNER's nation (own ground); a
+            // charter is no owner, so it is asked as its home nation — the
+            // nation the retired corporation answered to.
             if (!placement_rules::can_place_in_world(w, s.tile, building_type::planetary_marketplace,
                                                      resource_type::iron_ore, /*max_reach=*/-1.0f,
-                                                     owner, gate))
+                                                     w.gen_charters.at(owner).home_nation, gate))
                 continue;
             const entity_id bid = author_building(w, s.tile, building_type::planetary_marketplace, occupied);
             w.gen_charters.at(owner).assets.push_back(bid);

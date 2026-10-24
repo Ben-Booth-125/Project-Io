@@ -163,7 +163,13 @@ int main()
             for (const budget_claim& c : rep.budget_claims)
                 if (!nation_is_due(scan, c.nation, t, p)) { use_tick = t; break; }
         }
-        check(use_tick >= 0, "R1a a claim exists whose nation is off its cadence slot (the scorer will not overwrite it)");
+        // BL-1407: THE CLAIM PRODUCER RETIRED WITH THE CORPORATION. A claim was a
+        // FIRM's cash-gated survey asking its home nation (corp_ai.cpp); every
+        // actor is now a nation and the nation's scorer carries no survey
+        // candidate (the grant admits no verb that exists only because the actor
+        // is a nation — AI_OPPONENT.md § 11). So no claim is filed, and R1a-R1d
+        // and R2d assert that boundary instead of the loop they used to close.
+        check(use_tick < 0, "BL-1407 R1a no survey claim is filed: its producer (a firm's cash-gated survey) retired with the corporation");
 
         // Drive the real tick up to use_tick, then fund the off-slot claimants.
         for (int t = 0; t <= use_tick; ++t)
@@ -186,7 +192,7 @@ int main()
             w.nations.at(c.nation).treasury = c.amount * 2.0f; // Past the claim, comfortably.
             ++funded;
         }
-        check(funded > 0, "R1b at least one claim's nation was fundable this tick");
+        check(funded == 0, "BL-1407 R1b ...so no claimant nation is funded");
 
         const double treas_before = total_treasury(w);
         std::map<entity_id, float> bal_before;
@@ -225,8 +231,8 @@ int main()
         std::printf("  funded %d off-slot claimants  paid=%d dispatched=%d clawed=%d  paid=%.2f dispatched=%.2f\n",
                     funded, paid, dispatched, clawed, paid_credits, dispatched_credits);
 
-        check(paid > 0, "R1c a funded claim is PAID — run_national_budget is reached from the tick");
-        check(dispatched > 0, "R1d the survey of the claimed body is DISPATCHED the same tick");
+        check(paid == 0, "BL-1407 R1c nothing is paid for a claim nobody files");
+        check(dispatched == 0, "BL-1407 R1d and no survey is dispatched by the budget");
         check(survey_started, "R1e every dispatched earmark left its body's survey in progress (credit became a survey)");
         check(sum == probe.national_budget.total_transferred, "R2a Σ transfers.credits == total_transferred, bit-exact");
         check(fill_whole, "R3a every paid exploration transfer is whole (fill_fraction == 1.0): earmarked, never pro-rata");
@@ -242,7 +248,7 @@ int main()
         for (const auto& [cid, cc] : w.nations)
             if (std::fabs(cc.treasury - bal_before.at(cid)) > 1e-2) balances_restored = false;
         check(balances_restored, "R2c every corp balance is back where it started: the credit left as the survey cost");
-        check(dispatched_credits > 0.0, "R2d the conservation rows are not vacuous: credits actually moved");
+        check(dispatched_credits == 0.0, "BL-1407 R2d no credit moved through the (claimless) exploration line");
 
         // The clawback path (two claims on one body: the second cannot dispatch).
         if (clawed > 0)

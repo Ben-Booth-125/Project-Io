@@ -1279,7 +1279,14 @@ int main(int argc, char** argv)
         // own — so R1 reads those shelves: non-empty and prototype-scoped. The
         // per-corp focus split (R2) cannot be read off a shared shelf.
         float total = 0.0f;
-        for (const entity_id mid : corp_markets(w, cid))
+        // BL-1407: a charter is no owner (corp_markets reads an owner's list), so
+        // the markets it sits in are its own buildings' tile markets.
+        std::set<entity_id> charter_markets;
+        for (const entity_id bid : corp.assets)
+            if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
+                if (const entity_id m = market_for_tile(w, bit->second.tile); m != null_entity)
+                    charter_markets.insert(m);
+        for (const entity_id mid : charter_markets)
         {
             const auto& q = w.markets.at(mid).inventory;
             for (std::size_t r = 0; r < resource_count; ++r)

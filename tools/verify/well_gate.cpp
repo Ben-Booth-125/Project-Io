@@ -170,9 +170,17 @@ int main()
     const entity_id corp = w.create_entity();
     {
         nation_component cc{};
-        cc.treasury = 1.0e6f; 
+        cc.treasury = 1.0e6f;
         w.nations[corp] = cc;
     }
+    // BL-1407: the builder is a NATION, and a nation builds on its own ground
+    // (construct_nation); the retired corporation had none and was not asked.
+    for (auto& [tid, tc] : w.tiles)
+        if (w.tile_to_nation.count(tid) == 0)
+        {
+            w.tile_to_nation[tid] = corp;
+            w.nations.at(corp).tiles.push_back(tid);
+        }
     w.player_entity = corp;
     entity_id well = null_entity, refused = null_entity;
     const construction_result r_ok  = construct_building(w, reg, corp, river, building_type::extraction_site,

@@ -125,6 +125,9 @@ scenario make_scenario()
     b.type = building_type::extraction_site;
     s.w.buildings[s.anchor] = b;
     cc.state_assets.push_back(s.anchor);
+    // BL-1407: the owner is a NATION, whose "HQ market" is its capital's
+    // (corp_hq_market); the retired HQ was the anchor at A, so the capital is too.
+    cc.capital_tile = s.tile_a;
     s.w.nations[s.corp] = cc;
     s.w.player_entity = s.corp;
 
@@ -368,7 +371,17 @@ int main()
         }
         std::array<float, resource_count> stock{};
         stock[r_iron] = 30.0f;
-        seed_opening_stock(s.w, s.corp, stock);
+        // BL-1407: the opening stock is a CHARTER's (generation creates no
+        // corporation): a charter homed in the nation, indexing its three works.
+        const entity_id charter = s.w.create_entity();
+        {
+            charter_holding ch;
+            ch.home_nation = s.corp;
+            ch.assets      = s.w.nations.at(s.corp).state_assets;
+            ch.hq_building = s.anchor;
+            s.w.gen_charters[charter] = ch;
+        }
+        seed_opening_stock(s.w, charter, stock);
         check(s.w.markets.at(s.market_a).inventory[r_iron] == 0.0f,
               "(f).0 seeding holds the stock off the shelves until it is placed");
         place_opening_stock(s.w);
@@ -382,37 +395,9 @@ int main()
               "(f).3 placing again is a no-op (idempotent)");
     }
 
-    // -----------------------------------------------------------------------
-    // (h) a completing contract: the supplier buys off its HOME shelf on the
-    //     body and builds the rest to order; the buyer's delivery LANDS
-    // -----------------------------------------------------------------------
-    {
-        scenario s = make_scenario();
-        recipe_registry reg;
-        const entity_id buyer = s.w.create_entity();
-        s.w.nations[buyer] = nation_component{};
-        s.w.nations.at(buyer).treasury = 1.0e6f;
-        s.w.markets.at(s.market_a).inventory[r_iron] = 10.0f; // the supplier's home shelf (HQ in A)
-        s.w.markets.at(s.market_b).inventory[r_iron] = 50.0f; // another shelf on the body
-
-        procurement_contract c;
-        c.id              = 1;
-        c.buyer           = buyer;
-        c.supplier        = s.corp;
-        c.body            = s.body;
-        c.resource        = resource_type::iron_ore;
-        c.quantity        = 40.0f;
-        c.lead_time_ticks = 1;
-        s.w.procurement_contracts.push_back(c);
-
-        run_economy_step(s.w, reg);
-        check(s.w.procurement_contracts.empty(), "(h).1 the contract completed");
-        check(near(s.w.markets.at(s.market_a).inventory[r_iron], 0.0f) &&
-              near(s.w.markets.at(s.market_b).inventory[r_iron], 50.0f),
-              "(h).2 the supplier bought its HOME shelf's 10 (A 0) and touched no other shelf (B 50)");
-        check(near(s.w.landed(buyer, corp_home_market(s.w, buyer, s.body), r_iron), 40.0f),
-              "(h).3 the buyer's whole 40 LANDS on its home market (the rest built to order)");
-    }
+    // (h) a completing contract: RETIRED (BL-1407) with the procurement contract
+    // (CONTRACTS.md: named-supplier procurement retired with the firm; the
+    // contract pacing pass is deleted).
 
     std::printf("\n%s  (%d passed, %d failed)\n", g_fail == 0 ? "ALL PASS" : "FAILURES",
                 g_pass, g_fail);
