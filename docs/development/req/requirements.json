@@ -7588,20 +7588,20 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1405 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-24",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: lp_coverage_census, lp_pool_harness"
      ],
      "requirement": "A nation's pool serves its own buildings as one class; the census rules still pass.",
-     "notes": null
+     "notes": "From its lane (ddebcab8, on f1d05dfc): every claim counts under one class and trader_pot is one pot; set_logistics_shares refused for every actor (lp_pool_harness L6, 14 commands); L4 0 of 360 consumers owned off their ground nation on seed 0 (the folded-world claim verified); L5 a set share rule moves no grant. lp_coverage_census rules pass; world_determinism ALL PASS; save_roundtrip OK; fold_census 21/0; market_viability quick identical before/after. L7 (a v49 stream) red as on main, untouched."
     }
    ]
   },

@@ -60,7 +60,7 @@ and leak treasury money into empty corporations. So the PORT lands first, the fo
 - [ ] **T5** RNG audit of the by-reference streams; measure market_viability FULL. (R4)
 
 ### BL-1405 (LP one class) — lane L, group `lp-one-class`
-- [ ] **T1** One share class; the share rule and `set_logistics_shares` retire (`logistic_points.cpp`). (R1)
+- [x] **T1** One share class; the share rule and `set_logistics_shares` retire (`logistic_points.cpp`). (R1)
 
 ### BL-1406 (UI and protocol as nation) — lane U, group `ui-as-nation`
 - [ ] **T1** Seat screen lists majors; header shows the treasury. (R1)

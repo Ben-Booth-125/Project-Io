@@ -600,8 +600,8 @@
    "design": "SPRINT 57 ITEM 6. Rulings: docs/GLOSSARY.md (Corporation, Company, Own ground ...), docs/CONCEPT.md § Player identity, docs/politics/NATIONS.md § What a nation owns / § Own ground, docs/ai/AI_OPPONENT.md § 11 last entry (Ben, 2026-10-23). generate_corporations (:2757) retires with its no-budget fallbacks; charter_web_from_budget, charter_specialist_at, generate_background_firms and retrofit_marketplaces build into the ground nation's state_assets, only on its ground. charter_champion_centres becomes major_centres feeding a saved nation_component::is_major (save v55; the v54 reader derives it from champions). reconcile_majors' buyout becomes a ground fold - tiles change hands with their buildings. The seat shortlist lists major nations; the player entity is the nation. Audit every RNG passed by reference (:65, :105, :159, :602, :782) for draws that vanish. World mover: nation_targets_harness, history_sim_harness, market_viability, player_seed_sweep move; re-blessed in BL-1408. ADDED 2026-10-24 (BL-1401 lane): the rail handover (state_industry.cpp) assigns a station by who owns the TRACK, not who holds the ground - on seed 0 it gave the player nation station 73709 on another nation's tile 34282. Own ground applies: a station goes to its ground nation. SCOPE MOVED 2026-10-24 (main session): generation keeps chartering the specialists/champions in this item, because the seat is still a corporation handle until BL-1407; the FOLD converts their buildings. This item is: is_major saved (v55), too-many demotes, the legacy path retires, stations follow their ground. Generation that creates no corporation at all moves to BL-1407."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 57,
    "written": "2026-10-23",
    "parked": false,
