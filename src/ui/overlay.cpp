@@ -56,7 +56,7 @@ const char* overlay_mode_name(overlay_mode m)
         // BL-1353 (Ben, 2026-10-16: "we can drop the '(active logistics points)'
         // taglines"). The quantity it was explaining does not exist any more either:
         // active LP was the retired per-anchor model (BL-1352).
-        case overlay_mode::throughput:    return "Logistic Points";
+        case overlay_mode::throughput:    return "Logistics"; // Ben, 2026-10-24: the lens is named Logistics
         case overlay_mode::trade_flow:    return "Trade flow (your shipments and refusals)";
         case overlay_mode::nations:       return "Nations (whole territory)";
         default:                        return "None";
@@ -76,7 +76,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::continent:   return "Continent";
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
-        case overlay_mode::throughput:    return "Throughput";
+        case overlay_mode::throughput:    return "Logistics";
         case overlay_mode::trade_flow:    return "Trade flow";
         case overlay_mode::nations:       return "Nations";
         default:                        return "None";

@@ -414,6 +414,36 @@ float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile,
 float lp_points_reaching(world& w, lp_reach_memo& memo, const lp_tick& t, entity_id tile,
                          int* sources_out = nullptr);
 
+/// The routed FLOW across one tile (Ben, 2026-10-24: the Logistics lens colours each
+/// road by it, LENSES.md § Logistics lens). `requested` is the need of every producing
+/// building whose routed request crosses the tile on its way to the capital - its own
+/// tile's buildings and every building downstream; `granted` the points the resolver
+/// GRANTED those same requests; and `available` what the chain COULD deliver there -
+/// every source whose walk (building -> source, or a source -> capital link) crosses
+/// the tile, counted once, its points made this tick x its reach at the tile. The lens
+/// colours a road by available / requested. In LP/tick.
+struct lp_flow
+{
+    float requested = 0.0f;
+    float granted   = 0.0f;
+    float available = 0.0f;
+};
+
+/// The routed flow of @p nation's requests on @p body: tile -> flow, for every tile at
+/// least one request crosses. Each building's request is routed as `lp_route_to` routes
+/// it (the same qualifying sources, nearest first, topped up until covered); each
+/// source it draws on carries its share - its reach there, the last one cut to what
+/// covers - of the need and of what @p t granted. That share lies on every tile of the
+/// walk from the building back to the source, and on along the source's chain to the
+/// capital. Neither walk is recorded by the resolver (it keeps distances and the set of
+/// connected sources): both are READ BACK off the same per-source fields it routed on -
+/// see `field_walk_back` and the chain tree in logistic_points.cpp. A derived READ for
+/// the lens - pure, summed in ascending building id, never serialised, never read by
+/// the simulation.
+std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& memo,
+                                                     const lp_tick& t, entity_id nation,
+                                                     entity_id body);
+
 /// Validate a share rule as the value that lands (each finite, in [0,1], summing
 /// to 1 within 1e-4). The seam rejects anything else whole.
 bool lp_share_rule_valid(const std::array<float, lp_class_count>& share);

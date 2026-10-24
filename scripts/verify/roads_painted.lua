@@ -69,7 +69,7 @@ for _, f in ipairs(framings) do
                       "roads_painted: the " .. f.name .. " framing still has its city at "
                       .. f.city[1] .. "," .. f.city[2])
     end
-    for _, lens in ipairs({ "none", "throughput" }) do
+    for _, lens in ipairs({ "none", "logistics" }) do
         verify.set_overlay(lens)
         for _, k in ipairs({ 1, 2, 3, 4 }) do
             verify.center_tile(f.col, f.row, kMinZoom * (2 ^ k))

@@ -61,7 +61,7 @@ own structure or to nothing, and where it resolves to nothing **no card appears 
 2026-08-28; [SELECTION.md](SELECTION.md) § A lens collapses selection to ONE TIER owns the rule).
 Two lenses — Population and Industry — draw a value field with no structure grain, so the card is
 absent across the whole body while one of them is active. The card answers the question the lens
-is asking; a lens with no question about this ground gets no answer. **Throughput is the
+is asking; a lens with no question about this ground gets no answer. **Logistics is the
 exception:** its field resolves to the ground, so it shows a card and still takes no click (Ben,
 2026-10-20; SELECTION.md owns the rule).
 
@@ -116,7 +116,7 @@ lens is asking:
 | Entity | Lens | Content |
 |---|---|---|
 | **Tile** | Resource | composition · landform header, the selected resource's deposit richness, a richness-band why-line |
-| **Ground** | Throughput | the Logistic Points reaching the tile (LP/tick, and from how many sources) and what its buildings consumed against what they need, both absolute (Ben, 2026-10-24); then the network that reaches it best with its traversal cost to the nearest source, and a full-reach / fade why-line — the why behind the drawn number |
+| **Ground** | Logistics | the tile's two numbers stacked — *Supplied N LP/tick* over *Requested M LP/tick* (on a road, the routed flow through it; elsewhere the points reaching the tile over its buildings' need; Ben, 2026-10-24) — then what its buildings consumed; then the network that reaches it best with its traversal cost to the nearest source, and a full-reach / fade why-line — the why behind the drawn number |
 | **Tile** | *(default)* | header, habitability, and the landform's movement-cost multiplier (`landform_logistics_cost`) when not plains |
 | **Building** (player) | any | type, target/recipe line, workforce, an operational why-line (idle / understaffed / active) |
 | **Building** (rival) | any | type + owner emblem only — production/stockpile stay private (the competitor-visibility rule, DISCOVERY.md) |

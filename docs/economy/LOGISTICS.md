@@ -894,7 +894,7 @@ a market's logistics a constraint on its trading. There is no share class to dra
 serves the nation's own buildings only, above). Space legs have no tile path and draw nothing.
 - Rail and stations: a nation builds them only on its own ground (§ 4c).
 
-BL-596 (LP active march) and BL-597 (LP passive convoys) own the build, BL-606 (throughput lens)
+BL-596 (LP active march) and BL-597 (LP passive convoys) own the build, BL-606 (throughput lens; the Logistics lens)
 the surface — all 2026-08-24, replacing the purged BL-464 umbrella. Ben, 2026-08-18: *"Let's begin codifying Logistic Points
 in this sprint. It's an important layer for military and goods transport."* The reasoning below has
 survived two rulings and two rejected first cuts, and is recorded so the next cut starts from it.
@@ -1024,9 +1024,11 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   § A shipment).
 - **Throughput is a lens**, extending Reach. The Reach lens shows a binary field; throughput is
   that field with a magnitude, so it is a small step from an existing surface rather than a new one.
-  **It reads in absolute points (Ben, 2026-10-24):** the points reaching each tile, what a
-  tile's buildings consumed, and the nation's pool generated beside what it consumed — never a
-  share (`docs/ui/LENSES.md` § Throughput lens).
+  **It reads in absolute points (Ben, 2026-10-24)** and is named the **Logistics** lens: each
+  road of the nation coloured by what its chain could deliver there over the requests routed
+  through it, the supplied and requested points on every tile, and the nation's pool
+  generated beside what it consumed — never a share, and no ground tint (`docs/ui/LENSES.md`
+  § Logistics lens).
 - **Allocation under contention is order-independent** — a deterministic priority rule over a
   sorted set, never first-come by iteration order.
 - **Active lands first (Ben, 2026-08-24, the Sprint 18 design form)** — the priced march is the
@@ -1060,7 +1062,7 @@ LP is what makes that priority explicit, and it is the strongest argument for it
 (§ Logistics and transport capacity, which this document supersedes).
 
 **Owning items.** BL-596 / BL-597 (LP active march / passive convoys) — throughput; BL-606
-(throughput lens) — its lens. BL-458 (interdiction) — the cut network.
+(throughput lens; the Logistics lens) — its lens. BL-458 (interdiction) — the cut network.
 BL-608 (sea port gate) — the sea endpoint gate (BL-188's archived coastal-trade prose is
 reference). BL-452 (convoy verbs) and BL-453 (convoys ledger) — the
 player-facing halves. BL-323 (buildings rework) — reach. BL-146 / BL-172 (road generation) — roads.

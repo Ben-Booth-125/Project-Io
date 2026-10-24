@@ -373,7 +373,7 @@
    "source": [
     "docs/ui/PLANETARY.md § Visual elements"
    ],
-   "summary": "Always-on player-presence chrome (BL-085): a player-identity ring traced round each tile the player holds, over a light wash on the plain canvas. The HQ star retired from the Planetary canvas (Ben, 2026-10-10).",
+   "summary": "Player-presence chrome under a lens (BL-085): a player-identity ring traced round each tile the player holds. The plain canvas carries no ring and no identity wash (Ben, 2026-10-24: the default view does not mark the player's own buildings). The HQ star retired from the Planetary canvas (Ben, 2026-10-10).",
    "interesting_question": "n/a — narrowly-scoped, single-body chrome.",
    "resolution": "n/a",
    "checks": [
@@ -1559,7 +1559,7 @@
   },
   {
    "id": "UI-098",
-   "name": "Throughput lens",
+   "name": "Logistics lens",
    "kind": "sub-element",
    "parent": "UI-029",
    "source": [
@@ -1567,11 +1567,11 @@
     "docs/economy/LOGISTICS.md",
     "src/ui/ui_state.hpp"
    ],
-   "summary": "Active Logistic Points: the reach envelope (served / beyond reach) plus a per-anchor LP magnitude disc.",
+   "summary": "The player nation's Logistic Points (named Logistics, Ben 2026-10-24): its roads coloured green to yellow by supplied over requested along the routed chains, two numbers stacked on every tile (supplied over requested), a ring on every source, and the nation's generated / consumed key. No ground tint.",
    "interesting_question": "Every lens costs a bar slot, a key, three doc rows and a selection rule permanently. Two lenses were retired the same week this one landed - what makes this one worth the slot?",
    "resolution": "It answers a question no other lens can: whether a place is REACHABLE, not what is at it. LENSES.md gives it its own section and ui_state.hpp its own enum value (BL-598). The two retired the same week - Opportunity and Production (BL-604) - were per-tile value surfaces whose read Scarcity and Industry already carried between them, which is exactly the test this one passes.",
    "checks": [
-    "throughput_lens",
+    "logistics_lens",
     "lens_strip_and_fields"
    ]
   },

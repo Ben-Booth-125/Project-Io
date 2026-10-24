@@ -102,7 +102,7 @@ print(string.format("[lens_modes] wash framing (%d,%d), %d buildings within 5 ti
                     best and best.x or -1, best and best.y or -1, best_n))
 
 local wash_lenses = { "none", "nations", "market", "continent", "resource",
-                      "population", "scarcity", "industry", "throughput", "supply",
+                      "population", "scarcity", "industry", "logistics", "supply",
                       "reach", "supply_routes", "trade_flow" }
 verify.set_lens_resource("iron_ore")
 verify.toggle_lens_resource("coal")     -- a split tile shows its wedges as washes

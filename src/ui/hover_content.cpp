@@ -84,7 +84,7 @@ void hover_structure_plate(entity_id key)
     ImGui::TextDisabled("Click: History ledger");
 }
 
-// Throughput: THE GROUND, a hover read with no click (BL-1353; Ben, 2026-10-20,
+// Logistics lens: THE GROUND, a hover read with no click (BL-1353; Ben, 2026-10-20,
 // option A). The tile already carries its figure on the map; the card is the WHY -
 // which of the player nation's networks reaches here best, how far along it the
 // nearest source is, and where that sits on the network's full-then-fade curve.
@@ -102,14 +102,22 @@ void hover_structure_ground(const ui_state& ui)
     // ABSOLUTE POINTS, BOTH WAYS (Ben, 2026-10-24: "show both the amount generated,
     // and the amount consumed"). What reaches this tile from the nation's sources, and
     // what the tile's buildings actually drew this tick against what they need.
-    ImGui::Text("Reaching: %.0f LP/tick", static_cast<double>(ui.lp_hover_reaching));
-    if (ui.lp_hover_sources > 0)
+    //
+    // STACKED, as on the tile (Ben, 2026-10-24): SUPPLIED over REQUESTED. On a road
+    // the pair is the routed flow through it (what the chain could deliver across it,
+    // over the requests routed through it) and the road's colour is its ratio; elsewhere it
+    // is the points reaching the tile over its own buildings' need.
+    // On a road SUPPLIED is what the chain could deliver through it, so it reads
+    // "Available"; what was actually granted keeps its own line.
+    ImGui::Text(ui.lp_hover_road ? "Available %.0f LP/tick" : "Supplied %.0f LP/tick",
+                static_cast<double>(ui.lp_hover_supplied));
+    ImGui::Text("Requested %.0f LP/tick", static_cast<double>(ui.lp_hover_requested));
+    if (ui.lp_hover_road)
+        ImGui::TextDisabled("granted %.0f", static_cast<double>(ui.lp_hover_granted));
+    else if (ui.lp_hover_sources > 0)
         ImGui::TextDisabled("from %d source(s)", ui.lp_hover_sources);
     if (ui.lp_hover_consumers > 0)
-        ImGui::Text("Consumed: %.0f of %.0f", static_cast<double>(ui.lp_hover_consumed),
-                    static_cast<double>(ui.lp_hover_need));
-    else
-        ImGui::Text("Consumed: none here");
+        ImGui::TextDisabled("Consumed here %.0f", static_cast<double>(ui.lp_hover_consumed));
     const int n = ui.lp_hover_network;
     if (!ui.lp_hover_reached || n < 0 || n >= static_cast<int>(lp_network_count))
     {

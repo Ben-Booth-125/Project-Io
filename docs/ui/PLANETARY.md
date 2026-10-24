@@ -138,14 +138,14 @@ surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from `ui::terrain_colour` (substrate + cover hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
 | Buildings | **No marker.** A building is a structure baked into the ground art (RENDERING.md § Installations) — a cluster of up to three on a stacked tile. Type, count, owner and running state are read from the hover card, the Selection element and the Nations lens: [§ Building markers](#building-markers) below. |
-| Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). Below a 20 px drawn radius each curve is one stroke with no apex joint (RENDERING.md § Roads and sea lanes — the 60 fps budget). **Painted, not drawn, on the plain canvas at every rung** (Ben, 2026-10-10: the drawn web drew too much attention zoomed out): over baked ground a road or lane is painted into the ground with a surface per tier (RENDERING.md § Roads and sea lanes) and this drawn network does not draw at any rung; it draws only under the **Throughput lens** (LENSES.md § Throughput lens), and on a tile still showing the vector fallback, where no painted road exists yet. |
+| Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). Below a 20 px drawn radius each curve is one stroke with no apex joint (RENDERING.md § Roads and sea lanes — the 60 fps budget). **Painted, not drawn, on the plain canvas at every rung** (Ben, 2026-10-10: the drawn web drew too much attention zoomed out): over baked ground a road or lane is painted into the ground with a surface per tier (RENDERING.md § Roads and sea lanes) and this drawn network does not draw at any rung; it draws only under the **Logistics lens** (LENSES.md § Logistics lens), and on a tile still showing the vector fallback, where no painted road exists yet. |
 | Road-tier legend | **Contextual, not chrome** (Ben's call, 2026-08-09). The three tiers render by line weight and brightness alone, and roads are always-on terrain rather than a lens, so the per-lens legend drawer cannot carry them. Instead, selecting a roaded tile names its tier beside the coordinates in the Selection panel header — `Tile [x, y] · Highway` — with a hover tooltip giving the thin→thick ladder. A roadless tile shows nothing; no persistent chip is added anywhere. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned. Precedence is selected > pinned > hovered. |
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md)), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `substrate · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains. Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings carry their own variant (rival buildings show type + owner only — the competitor-visibility rule, [DISCOVERY.md](DISCOVERY.md)). A market centre has no hover target of its own on this canvas: its tile hovers as any tile does. |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. A **survey-status suffix** follows it: `UNSURVEYED`, `Survey en route`, or `Surveying k/N` — nothing once surveyed. |
 | Survey region mask | On a body whose survey is incomplete, tiles in **unrevealed regions** render as a flat dark "locked" fill `(12, 14, 20)` with no lens tint, borders, markers, selection outline, or hit-testing; revealed regions render normally. Regions reveal in deterministic raster (row-major) order as the survey scans ([DISCOVERY.md](DISCOVERY.md)). A fully surveyed body (the home planet, or a completed survey) shows everything. |
 | Settlements | Always-on, not lens-gated: **every** generated population centre is a **settlement structure** baked into the ground (RENDERING.md § Installations) whose footprint and height grow with its scale, and a **razed** centre (BL-624) bakes as a ruin — a ruin is a tile-scale fact. The skyline and ruin glyphs retire from this canvas (Ben, 2026-10-08). Far-zoom legibility is the art's job: a settled region must read as settled at the far page without a glyph. Only **City+** centres (scale ≥ 4) carry a name label. Ownership is never carried by a settlement's colour — tier is carried by the structure. On the plain canvas ownership is read from the national border band; under a lens the band is suppressed, so ownership is not on the canvas at all and is read from the Selection panel. |
-| Home-cluster ring | Always-on player-presence chrome: the player's holdings read as "my region" by a ring in the player-identity colour traced round **each tile the player holds** (under every lens), over a light player-identity wash on the plain canvas. Rival tiles carry no ring. It is drawn per tile, not as one circle round the cluster — the fixed-radius cluster circle retired with BL-329 (corp-reach circle). **No HQ star** — the `ui::icons::hq` origin mark is not drawn on this canvas, for the player or any nation, plain or under a lens (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). |
+| Home-cluster ring | Player-presence chrome **under a lens**: the player's holdings read as "my region" by a ring in the player-identity colour traced round **each tile the player holds**, under every lens. **The plain canvas carries neither the ring nor any identity wash** (Ben, 2026-10-24): with no lens the player's own buildings are drawn as every building is (LENSES.md § Rung applicability, the default view). Rival tiles carry no ring. It is drawn per tile, not as one circle round the cluster — the fixed-radius cluster circle retired with BL-329 (corp-reach circle). **No HQ star** — the `ui::icons::hq` origin mark is not drawn on this canvas, for the player or any nation, plain or under a lens (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). |
 | Market centres | **No marker and no hit zone** (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). A market is selected from the map through the **Market lens** — a press on its catchment selects it ([SELECTION.md](SELECTION.md) § A lens collapses selection to ONE TIER) — or from the Market ledger. With no lens, a press on a market's centre tile resolves as any other tile or building press. |
 | National border band | **Plain-canvas** political chrome, **suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07): a nation's border is a **hard edge only** — an inset stroke in its muted identity colour on each edge facing another owner, with no wash inside the territory (Ben, 2026-10-10) — and clicking the stroke's corridor selects the nation. Unlike roads, it is not always-on — a lens asks one question, and a national wash competes with the answer. See § The national border band below. |
 | Rivers | **Baked into the ground** as carved, curved water courses that widen downstream (RENDERING.md § Mountains, rivers and terrain variety). No canvas stroke and no chevron: the width gradient carries the flow direction. Terrain, not a lens; always on. |
@@ -177,7 +177,8 @@ built to answer it:
 
 **Ownership reads from the ground.** Since a building's owner is its ground's nation, the plain
 canvas's national border band already says whose every building is, and the player's own
-footprint outline stays always-on, so "where am I" survives; "all of everyone's, at once" is the
+footprint outline is drawn under every lens, so "where am I" survives a lens pick (the plain
+canvas carries no outline: Ben, 2026-10-24); "all of everyone's, at once" is the
 Nations lens's question, which is what a lens is for.
 
 **Hit-testing is unchanged.** A built tile still resolves to its building across the whole hex
@@ -405,7 +406,7 @@ Beyond the base grid and the chrome in the table above, the draw pass
   ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
   survives a saturated overlay.
 - **Built-tile chrome** — the home-cluster ring. Roads are painted into the ground at every
-  rung; the drawn road span is the Throughput lens's. Buildings and
+  rung; the drawn road span is the Logistics lens's. Buildings and
   settlements are **not** a layer here: they are baked into the ground
   ([§ Building markers](#building-markers); RENDERING.md § Installations).
 - **No HQ or market-centre markers** — both retired from this canvas (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
@@ -470,7 +471,7 @@ first, converted for their own four vertices. Draw order is unchanged.
 
 **What the vector layer gave up at the wide rungs**, each keyed on the drawn radius:
 
-- **Washes over the bake are one channel, not anti-aliased.** The player-identity,
+- **Washes over the bake are one channel, not anti-aliased.** The
   construction-suitability and vision-fog washes on baked ground are collected through
   the tile loop and emitted beneath every stroke. They tile the plane with their
   neighbours, so an AA fringe bought nothing but doubled vertices and a faint seam where
@@ -481,14 +482,14 @@ first, converted for their own four vertices. Draw order is unchanged.
   the difference is the width of a fringe.
 - **The drawn roads and lanes below 20 px take the wide-rung curve LOD** — one stroke per
   curve, two segments a half, no apex joint (RENDERING.md § Roads and sea lanes). The drawn
-  network is the Throughput lens's; the plain canvas draws none at any rung.
+  network is the Logistics lens's; the plain canvas draws none at any rung.
 - **No frontier pass.** The border band is the rule alone (hard edges only, 2026-10-10), so
   the per-tile depth relaxation that fed the inward wash is gone with the wash. The rule's
   own neighbour test finds the frontier, and on the baked ground it runs only when a static
   bucket rebuilds.
 
 **The static strokes are cached, not rebuilt (Ben, 2026-10-10: 60 fps at every zoom).**
-The border rule and the Throughput lens's drawn road and lane network and anchor rings
+The border rule and the Logistics lens's drawn road and lane network and anchor rings
 do not move while the player pans, so they are not re-tessellated
 every frame. They are built per **bucket** — sixteen columns of one row — at the view
 origin, stored as finished vertices, and re-emitted each frame with the pan added, for
@@ -539,7 +540,7 @@ plain canvas's drawn road and lane network halves the plain canvas's vertices at
 rungs — rung 0 ~108k → ~47k per frame, rung 1 ~87k → ~44k; rung 2 ~20k → ~16k — and drops
 two per-frame passes (the frontier depth relaxation and the wash). Frame work, pan: rung 0
 9.1 → 7.4 ms, rung 1 4.4 → 3.6, rungs 2-4 unchanged within the bench's noise (1.7 → 1.9,
-1.3 → 1.4, 0.9 → 1.1; the unchanged Throughput lens moved as much between runs). Throughput
+1.3 → 1.4, 0.9 → 1.1; the unchanged Logistics lens moved as much between runs). Throughput
 is untouched: its vertex counts are identical.
 
 **Frame timings need the live ground path.** Under `--verify` the ground layer re-snapshots
@@ -553,7 +554,7 @@ lanes, the border rule, markers and labels all draw at every rung; the captures 
 and 1 differ from the uncached ones in under 2.5% of pixels by more than 8/255, and in under
 0.1% by more than 32/255. Two layers were retired by ruling, not for cost (Ben, 2026-10-10):
 the border band's inward wash (hard edges only) and the plain canvas's drawn road and lane
-network (roads are the painted ground at every rung; the drawn network is the Throughput
+network (roads are the painted ground at every rung; the drawn network is the Logistics
 lens's).
 
 `IO_CANVAS_PASS_LOG=1` prints, every 120 frames, each map pass's vertices and CPU time

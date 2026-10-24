@@ -46,7 +46,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
+| `throughput` — the **Logistics** lens | Planetary: the player nation's roads coloured green → yellow by supplied over requested + a ring on every source + two numbers on every tile of the nation (supplied over requested) + key. No ground tint. |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 | `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
@@ -66,8 +66,9 @@ because it answers a question the player asks at *first sight* of a body — "wh
 the land shaped like that?" — which is exactly the moment they are looking at the
 strip.
 
-**Throughput carries its own glyph** (Ben, 2026-08-25: *"the only thing now is to add
-the glyph for our throughput lens"*). Logistics is one of the two things the whole
+**Logistics carries its own glyph** (Ben, 2026-08-25: *"the only thing now is to add
+the glyph for our throughput lens"* — the lens was named Throughput until Ben renamed it
+Logistics, 2026-10-24). Logistics is one of the two things the whole
 design is rate-limited by, which is a poor thing to leave undiscoverable. It carries
 its **own** glyph rather than the borrowed convoy chevron — a strip lens gets a
 distinct mark (BL-605). The glyph is a **truck** (Ben: *"just use a truck as the
@@ -80,6 +81,12 @@ canvas starts unskinned and the player picks a lens deliberately (Ben,
 2026-06-30, reversing an earlier Corporation default). The bar is single-select
 with a null state (re-selecting the active lens clears to plain terrain,
 `toggle_overlay`).
+
+**The default view does not mark the player's own buildings** (Ben, 2026-10-24). With no
+lens the player's buildings are drawn as every building is — no identity wash, no outline,
+no tint saying they are the player's. Ownership on the plain canvas is the national border
+band's (`PLANETARY.md` § Ownership reads from the ground); a lens the player picks may still
+mark the player's footprint (§ Corporation and Company lenses — retired, the outline).
 
 The per-rung representation of every lens, on-bar or keyboard-only. "—" = no
 representation intended. **This table is the only place a lens's rungs are
@@ -100,7 +107,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
-| **Throughput** | — | — | reach-cost field + per-anchor active-LP ring + key |
+| **Logistics** | — | — | roads coloured by supplied over requested + source ring + per-tile numbers + key |
 
 **Per-lens rung notes.** Resource, Population, Industry and Continent
 are **Planetary-only** — their unit of meaning (a tile, a deposit, a
@@ -217,9 +224,10 @@ ground's nation (`../politics/NATIONS.md` § Own ground), so "who owns what" is 
 this" — the **Nations lens**'s question (§ The Nations lens, below). Neither lens's picked-owner
 set, checklist key nor glyph survives.
 
-The general **player-identity accent** — a subtle wash on the player's tiles at the plain
-default, plus an outline drawn under every lens (`is_player_tile` in `body_surface_canvas.cpp`) —
-was never the Corporation lens's, and stays. There is no HQ star on this canvas, the player's or
+The general **player-identity accent** — an outline round the player's tiles drawn under every
+lens (`is_player_tile` in `body_surface_canvas.cpp`) — was never the Corporation lens's, and
+stays under the lenses. **The default view carries none of it** (Ben, 2026-10-24): no outline
+and no wash on the plain canvas (§ Rung applicability, the default view). There is no HQ star on this canvas, the player's or
 anyone's (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"); the HQ
 itself retired (Ben, 2026-10-23, `docs/GLOSSARY.md` § Headquarters).
 
@@ -436,10 +444,10 @@ arming rule; Ben took the second rule (2026-08-30), stated here rather than left
 inferred from the code, which is what NR-722 exists to prevent.
 
 **One lens has no ledger to pair with, and that is not an omission.**
-`Throughput` is **inert** in that routing table and has no ledger at all: it is
+`Logistics` is **inert** in that routing table and has no ledger at all: it is
 the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
 Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
-throughput's twin would be a **Logistics ledger that does not exist**. (The Corporation and
+the lens's twin would be a **Logistics ledger that does not exist**. (The Corporation and
 Company lenses, which routed to a per-firm ledger, retired with the firms — Ben, 2026-10-23.)
 
 ## The strip rotates with the rung (Ben, 2026-08-28)
@@ -449,7 +457,7 @@ not a fixed set. Owned by BL-670 (rung-keyed lens strip).
 
 | Rung | On the strip |
 |---|---|
-| **Planetary** | Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow |
+| **Planetary** | Resource, Market, Scarcity, Industry, Population, Continent, Logistics, Trade flow |
 | **Circumplanetary** | Market, Scarcity, Supply |
 | **Solar** | Supply, Reach, Supply-routes |
 
@@ -466,8 +474,8 @@ keyboard-only. Adding a lens means adding it to a rung row and giving it a glyph
 `src/ui/icons.*`, catalogued in ICONS.md.
 
 **Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
-(per-tile habitability), Industry (per-tile substrate throughput) and Throughput (the reach-cost
-field). Their subject is a number spread across the map rather than a thing standing on it, so
+(per-tile habitability), Industry (per-tile substrate throughput) and Logistics (the points
+supplied and requested on every tile, and the flow along every road). Their subject is a number spread across the map rather than a thing standing on it, so
 there is nothing for a selection to be *of*. SELECTION.md carries the reasoning.
 
 ## Resource lens
@@ -868,152 +876,131 @@ shared legend home.
 **Glyph / access.** On the Planetary strip with its own glyph (§ The strip rotates with the
 rung), and in the keyboard lens-cycle.
 
-## Throughput lens
+## Logistics lens
 
-**Intent.** Read the map as a *capacity surface*: how much can move through here,
-and how far is this ground from the capacity that would move it? Owned by BL-606
-(throughput lens), the surface half of
-[LOGISTICS.md](../economy/LOGISTICS.md) § Logistic Points, whose ruling is that
-**throughput is Reach with a magnitude** — an extension of an existing surface
+**Named Logistics** (Ben, 2026-10-24). The lens was called Throughput; the strip, the key,
+the hover card and this section all say **Logistics** now. Its `overlay_mode` value keeps the
+identifier `throughput`, and a script may arm it as `logistics` or `throughput`.
+
+**Intent.** Read the map as a *capacity surface*: where do the player nation's Logistic
+Points reach, and does each road carry what is asked of it? Owned by BL-606 (throughput
+lens), the surface half of [LOGISTICS.md](../economy/LOGISTICS.md) § Logistic Points, whose
+ruling is that the lens is **Reach with a magnitude** — an extension of an existing surface
 rather than a new one. Its companion duty is the same section's *"surfacing is
 non-optional"*: a cap nobody can see is silent interdiction again.
 
-**The road network is drawn at full weight under this lens** (Ben, 2026-10-10). On the
-ground roads are thin pale threads of the land (RENDERING.md § Roads and sea lanes), so the
-network as logistics — every road and lane by tier, at the 1 : 1.5 : 2 weights — is read
-here, over the reach-cost field the network itself produces.
-
 **Data definition (Ben, 2026-10-16).** The lens is **player-facing**: it shows the
-player's own nation's network and points, and nothing else. A rival's sources and ground
-are not drawn — not shaded zero, but left bare, because a neighbour's logistics is not a
-value of zero, it is not the subject.
+player's own nation's network and points, and nothing else. A rival's sources, roads and
+ground are not coloured, numbered or hovered — not shaded zero, but left as they are, because
+a neighbour's logistics is not a value of zero, it is not the subject (`DISCOVERY.md`
+§ Competitor visibility). Every figure the lens shows is in **Logistic Points per tick**,
+absolute (Ben, 2026-10-24: *"absolute numbers rather than a percentage … both the amount
+generated, and the amount consumed"*).
 
-**Absolute points, generated and consumed (Ben, 2026-10-24).** *"The logistics lens
-should show absolute numbers rather than a percentage. It should also show both the amount
-generated, and the amount consumed."* A share of a request cannot say whether the points
-exist, and generated beside consumed is how a player sees that the pool is being drawn on.
-Every figure the lens shows is in **Logistic Points per tick**.
+**The ground is not tinted** (Ben, 2026-10-24: remove the colour gradient from tiles).
+Neither the vector fill nor the wash over the baked ground carries a Logistics colour. The
+lens's read is the **road colour** and the **numbers**; the ground under them is the plain
+canvas's.
 
-- The **field** is the **points reaching** each of that nation's tiles: every running
-  source of the nation that qualifies for the tile — its own reach touches it and it is on
-  the chain back to the capital (`LOGISTICS.md` § How a tile's points get to it) —
-  contributes its reach there × the points it made this tick, summed
-  (`lp_points_reaching`). It counts every qualifying source, not only the ones a request
-  was topped up from: it is what is *available* on that ground. It is a read of the one
-  pool, not a budget the tile owns — the pool is the nation's (`LOGISTICS.md`, "Routing
-  does not give a source its own budget").
-- **The tint is keyed to a fixed absolute scale**: linear from **0** (deep navy) to
-  **240 LP/tick** (the logistics cyan), saturating above. 240 is two hubs at full
-  strength, so one hub's full reach sits mid-ramp. Fixed, so a colour means the same
-  points on every body and every tick.
-- **Every tile carries that number**, in LP/tick, wherever the rung gives the text room:
-  "a number to each tile, so we can see exactly how many points we have". Below a drawn
-  radius of 18 px the digits do not fit in a hex and the colour field carries the read
-  alone.
-- The **hover card** over the player's own ground gives the tile both ways: the points
-  **reaching** it and from how many sources, and the points its buildings **consumed**
-  this tick (their granted claims) against what they **need** at their run. Then the why:
-  the network that reaches it best, its cost to the nearest source, and full reach or
-  fade (`TOOLTIP.md` § Ground).
-- The **marks** are that nation's **sources** — each running logistics hub, railway
-  station and port with the points it actually makes, upkeep folded in, read off the
-  economy step's own resolve. **A city is not a source** (`LOGISTICS.md` § Logistic
-  Points, "Cities make none"), nor is one on ground no nation holds, nor one on a
-  neighbour's.
-- The **key** carries that nation's arithmetic, absolute: what its connected sources
-  **generated** this tick and how many; what its buildings **consumed** — production's
-  grants, the marches' grants and what shipments drew — with what is left **unused**; and
-  what production **needs** at its run, whatever reaches it — a nation with no connected
-  source still shows its ramp and its arithmetic, with *No connected source here*, so
-  "generated 0 against a need" reads as the shortfall it is. No tagline — the lens is
-  named for what it shows.
-- **Visibility.** Only the player's own nation, in full. Another nation's ground is not
-  shaded, numbered or hovered (`DISCOVERY.md` § Competitor visibility), so the key and
-  the card are always the player nation's.
+**The roads carry the colour: supplied over requested, by the routed flow** (Ben,
+2026-10-24). Every road tile of the player's nation is coloured by the flow routed through
+it along the chains of `LOGISTICS.md` § How a tile's points get to it:
 
-**What this replaced, and why the old argument expired.** The field was the *reach cost*
-— the weighted distance to the nearest supply anchor — and the reasoning for that was
-explicit: a per-tile points figure *could not vary*, because every anchor made the same
-authored rate and every tile had a finite reach cost, so both "is it reached" and "how
-much reaches it" were flat across the grid. BL-1309 ended that condition: points are made
-by buildings, each on its own network, and they fade with distance along it. The quantity
-the old argument said did not exist is now the one the player asks about, so the lens
-shades it. Reach is still a real question and still has its own lens.
+- **Requested** is the total need of every producing building whose routed request crosses
+  that road tile on its way back to the nation's capital — the buildings on the tile itself
+  and every building downstream whose route passes through it.
+- **Supplied** is what the chain **could deliver** there: every source whose walk crosses
+  the road tile — a building's walk back to its source, or a source's link back toward the
+  capital — counted **once** at that tile however many requests brought it, its points made
+  this tick × its reach at the tile, summed. Supply can therefore exceed the request, which
+  is what the scale below needs; what the resolver actually **granted** those requests is
+  kept beside it on the hover card.
+- A request is routed as the resolver routes it: its qualifying sources, nearest first,
+  topped up until covered. Each source it draws on carries a share of it — its reach there,
+  the last one cut to what covers the request — and that share of the need lies on every
+  tile from the building back to the source, and on along that source's chain to the
+  capital, once per share. A building no source qualifies for lays its request
+  on its own tile, with nothing supplied.
+- **The colour is the ratio supplied / requested on a log2 scale**: **2 or more is full
+  green**, **0.5 or less is full yellow**, interpolated between, so 1 sits at the midpoint.
+  A road no request routes through reads **green** — its supply is at least double a zero
+  request.
+- The road keeps its **tier** — width and the 1 : 1.5 : 2 weights, and the tier's opacity
+  ladder — only its colour is the lens's. Roads that are not the player nation's keep their
+  ordinary colour.
 
-**The roads go brighter white under this lens** (Ben, 2026-10-16). On the ground a road is
-a thin pale thread of the land (`RENDERING.md` § Roads and sea lanes); read as *the
-network*, it is drawn at full weight in the vector pass that already redraws it here, in
-a near-white at the same 1 : 1.5 : 2 tier weights. The painted asphalt in the bake is
-**not** recoloured per lens: the bake is keyed on tile fields alone, so a lens-dependent
-colour there would re-bake every visible chunk on every toggle.
+**Two numbers on every tile, stacked** (Ben, 2026-10-24). Wherever the rung gives the text
+room (a drawn radius of **20 px** or more), each tile of the player's nation carries
+**supplied** above **requested**, both LP/tick. On a **road** tile they are the routed flow
+above — the pair the road's colour is the ratio of. On **any other** tile they are the points
+**reaching** it — every qualifying source of the nation, its reach there × the points it made
+this tick (`lp_points_reaching`) — over the **need of the buildings on that tile**. Below
+20 px the digits do not fit and the road colour carries the read alone.
 
-**Rung.** Planetary only — anchors and the reach field are per-tile. Guarded
-behind `overlay_mode::throughput` in
-[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+**The hover card** over the player's own ground shows the same pair stacked — *Supplied N
+LP/tick* over *Requested M LP/tick*; on a road *Available N LP/tick* over *Requested M
+LP/tick*, then *granted G* — then what the tile's buildings consumed, then the why:
+the network that reaches it best, its cost to the nearest source, and full reach or fade
+(`TOOLTIP.md` § Ground).
 
-**Colour.** Two deliberately different sequential ramps, because the lens shows
-two things and one ramp cannot separate them.
+**The marks** are that nation's **sources** — each running logistics hub, railway station
+and port with the points it actually makes, upkeep folded in, read off the economy step's
+own resolve. **A city is not a source** (`LOGISTICS.md` § Logistic Points, "Cities make
+none"), nor is one on ground no nation holds, nor one on a neighbour's.
 
-- **Field:** deep navy (0 LP/tick) → the logistics cyan (240 LP/tick and above),
-  linear, on the fixed scale above — composited at `0.72` on the vector fill and at the
-  sequential wash strength on the baked ground, both reading the one points field.
+**The key** carries the road ramp (yellow *0.5x* → green *2x+*, "supplied / requested"),
+the source ring drawn exactly as the map draws it beside the largest source's rate, and the
+nation's arithmetic, absolute: what its connected sources **generated** this tick and how
+many; what its buildings **consumed** — production's grants, the marches' grants and what
+shipments drew — with what is left **unused**; and what production **needs** at its run,
+whatever reaches it. A nation with no connected source still shows its ramp and its
+arithmetic, with *No connected source here*, so "generated 0 against a need" reads as the
+shortfall it is. A seat with no nation says so instead. No tagline — the lens is named for
+what it shows.
 
-  *The reach-cost ramp below is the record of what the field used to shade.* It was
-  normalised against the cost field's **90th percentile** and **square-root
-  compressed**; owned by BL-669 (throughput ramp).
+**Why the road and not the ground.** The ground tint answered *how many points reach here*,
+which the numbers already say exactly; it buried the network under a wash. The question a
+player acts on is **where the network is short** — which road is asked to carry more than
+its chain delivers — and that is a property of the road and the requests routed along it,
+not of the tile alone. A request is drawn back along the same per-source fields the resolver
+routed it on, so the colour and the economy cannot disagree about which road carried it.
 
-  **Both halves are measured** — `tools/verify/throughput_field_census.cpp` is the
-  instrument, and it should be re-run whenever the anchor set moves, because this
-  ramp has now been wrong once for exactly that reason. The sqrt alone was
-  calibrated against 57 anchors; the home body carries **1917**, with median cost
-  `6.75` against a max of `81.58`, so half the grid sits in the bottom 8% of the
-  range the ramp was spread over.
+**What the field used to be.** The lens first shaded the *reach cost* — the weighted
+distance to the nearest supply anchor — because a per-tile points figure could not vary
+while every anchor made the same authored rate; BL-1309 ended that condition, the lens then
+shaded the absolute points reaching each tile, and the ground tint has now retired outright
+(above). `tools/verify/throughput_field_census.cpp` remains the record of the reach-cost
+ramp's measurement.
 
-  **A steeper curve does not fix that, which is the part worth keeping.** Share of
-  the grid landing in the single most crowded tenth of the ramp: linear 52%, sqrt
-  32%, quadratic 45%, quartic 35%, `1-d²` 75%, cube-root 28% — every one of them
-  rescales the same bunched input, and quadratic is *worse* than the sqrt it would
-  replace. The denominator was the problem: p90 is `42.58` against a max of
-  `81.58`, so the top decile of cost is 48% of the range and holds a tenth of the
-  tiles. Normalising against p90 drops the worst bucket to **21%** — same curve,
-  three times the spread.
+**Rung.** Planetary only — sources, roads and requests are per-tile. Guarded behind
+`overlay_mode::throughput` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+The drawn road network is this lens's at every rung (RENDERING.md § Roads and sea lanes);
+the painted asphalt in the bake is **not** recoloured per lens, because the bake is keyed on
+tile fields alone and a lens-dependent colour there would re-bake every visible chunk on
+every toggle.
 
-  The trade is deliberate: ground beyond p90 saturates instead of getting its own
-  gradient. The far tenth is all equally out of reach; the near ground is where a
-  player sites.
-- **Anchor:** a **ring** on the anchor tile, its thickness carrying that anchor's
-  share of the body's largest pool, in a hotter near-white cyan over a dark
-  backing. A ring rather than a disc because every anchor tile already carries a
-  settlement or building marker drawn after this pass — a filled mark is simply
-  hidden by it, which is what the first cut did at all 57 anchors.
+**Colour.**
 
-**Fogs.** The field is part of the tile fill, so the survey mask and the
-intra-body vision wash govern it exactly as they govern every other lens fill. The
-anchor ring follows the **marker** convention rather than the road-span one: the
-survey mask owns it, the vision fog does not dim it — an anchor is a city or a
-completed port, as public as the building glyph beside it.
+- **Road:** yellow `(236, 206, 60)` → green `(84, 214, 104)` on `t = (log2(supplied /
+  requested) + 1) / 2`, clamped to [0, 1]; the tier's own alpha.
+- **Source:** a **ring** on the source tile, its thickness carrying that source's share of
+  the body's largest, in a hot near-white cyan over a dark backing. A ring rather than a disc
+  because every source tile already carries a structure — a filled mark is hidden by it.
 
-**Glyph / access.** On the Planetary strip with its own glyph (`icons::throughput`).
+**Fogs.** The road colour and the numbers follow the road and marker conventions: the
+survey mask owns them; the source ring is as public as the structure beside it.
 
-**Legend.** A fixed-height gradient key (§ Legend placement) on the **foreground**
-draw list with an opaque fill, so it is readable over the Selection band. It
-carries the field ramp (`0` → `240+ LP/tick`), the source ring drawn exactly as the
-map draws it beside the largest source's rate, and four lines of the player nation's
-arithmetic: *Generated N /tick, K source(s)* · *Consumed M /tick, U unused* ·
-*production P of N needed* · *marches X, shipments Y*. A nation with no connected
-source on the body keeps the ramp and the arithmetic, and the source row reads *No
-connected source here*. A seat with no nation says so instead.
+**Glyph / access.** On the Planetary strip with its own glyph (`icons::throughput`, a truck).
 
-**Determinism.** The pools are rebuilt **every frame** by `update_body_throughput`
-(`body_surface_canvas.hpp`) — non-const, for the same reason `update_body_vision`
-is: the draw holds a `const world&` and must not be what populates a cache.
-Nothing is persisted: LP is a per-tick rate, so the lens holds a photograph of
-this tick's rate, never a stock carried across one. The anchor list is **sorted by
-tile id before it is reduced**, so neither the legend's total nor the per-tile
-lookup depends on hash-map iteration order.
+**Determinism.** Everything the lens shows is rebuilt from the tick's own resolve by
+`update_body_throughput` (`body_surface_canvas.hpp`) — non-const, for the same reason
+`update_body_vision` is: the draw holds a `const world&` and must not be what populates a
+cache. The routed flow (`lp_route_flow`) is a pure read summed in ascending building id,
+held across frames only until the tick, the buildings or the network move. Nothing is
+persisted and the simulation reads none of it.
 
 **Interaction notes.** Planetary-only, single-select, no selector. Verified by
-`scripts/verify/throughput_lens.lua`.
+`scripts/verify/logistics_lens.lua`.
 
 ## Placement-suitability surface *(not a strip lens)*
 

@@ -46,7 +46,7 @@ do
     print(string.format("CANVAS_MASTER %d/%d complete in %.0f ms", r.ready, r.total, r.ms))
 end
 
-for _, lens in ipairs({ "none", "market", "population", "throughput" }) do
+for _, lens in ipairs({ "none", "market", "population", "logistics" }) do
     verify.set_overlay(lens)
     for k = 0, 4 do
         verify.set_zoom(kMinZoom * (2 ^ k))

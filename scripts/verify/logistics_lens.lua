@@ -1,34 +1,33 @@
--- Visual verification for the Throughput lens (BL-598).
+-- Visual verification for the Logistics lens (BL-598; named Logistics, Ben 2026-10-24 -
+-- it was the Throughput lens). LENSES.md § Logistics lens owns what it shows.
 --
--- LOGISTICS.md § Logistic Points, "Refusal, surface and determinism":
---   "Throughput is a lens, extending Reach. The Reach lens shows a binary field;
---    throughput is that field with a magnitude, so it is a small step from an
---    existing surface rather than a new one."
---
--- The three claims this check photographs:
---   T1  the BINARY half — ground an anchor reaches is tinted the logistics cyan,
---       ground no anchor reaches goes dark. That is the reach field, drawn
---       through the CONST `tile_reach_cost` read; the canvas never runs the
---       Dijkstra itself.
---   T2  the MAGNITUDE half — every Logistic Point SOURCE carries a disc sized and
---       coloured by the points it makes this tick. BL-1352: a source is a running
+-- The claims this check photographs and asserts:
+--   T1  NO GROUND TINT, AND THE ROADS CARRY THE COLOUR (Ben, 2026-10-24). The whole
+--       grid: the ground is the plain canvas's, and every road of the player's nation
+--       is coloured green -> yellow by supplied over requested along the routed chains
+--       (2x or more green, 0.5x or less yellow, log2 between; nothing routed reads
+--       green). Other nations' roads keep their ordinary colour.
+--   T2  every Logistic Point SOURCE carries a ring. BL-1352: a source is a running
 --       logistics hub, railway station or port on some nation's ground. A CITY IS
---       NOT ONE and must carry no disc (LOGISTICS.md: "Cities make none"), which is
---       why this check frames a real source and no longer the largest city: aimed
---       at a city it would photograph empty ground and pass either way.
---   T3  the key is READABLE. Six of the seven gradient keys are drawn on the
---       background list and buried by the Selection band; this one takes the
---       Continent key's foreground list and opaque fill (BL-376), so the last
---       capture deliberately opens the Selection band UNDER it.
+--       NOT ONE and must carry no ring (LOGISTICS.md: "Cities make none").
+--   T3  the key is READABLE over an open Selection band (foreground list, BL-376).
+--   T4  the tile card's Logistics section (BL-1354).
+--   T5  the key's absolute arithmetic: generated, consumed, needed.
+--   T6  the same with a connected source staged.
+--   T7  THE ROAD CENSUS (Ben, 2026-10-24): the colour the canvas draws, as counts -
+--       the player nation has roads here, requests are routed through some of them,
+--       every road lands in one colour class, and what the routed requests were
+--       granted never exceeds what they asked. Close captures show the two stacked
+--       numbers (supplied over requested) and the stacked hover card.
 --
--- Run with: ProjectIo --verify scripts/verify/throughput_lens.lua
+-- Run with: ProjectIo --verify scripts/verify/logistics_lens.lua
 
 verify.goto_surface("home")
-verify.set_overlay("throughput")
+verify.set_overlay("logistics")
+verify.expect(verify.overlay_name() == "logistics", "the lens arms by its name, logistics")
 
--- T1 — the whole grid. The envelope is the subject at this zoom: the reach field
--- has shape, and its shape is what "Reach with a magnitude" extends.
-shot("throughput_lens_full")
+-- T1 - the whole grid: the network in its supplied-over-requested colours, no tint.
+shot("logistics_lens_full")
 
 -- Find the home body, then its largest city. Never hard-coded coordinates — the
 -- world moves under a generation change and a fixed pair silently frames empty
@@ -38,7 +37,7 @@ for _, b in ipairs(verify.buildings()) do
   if b.player then home_body = b.body break end
 end
 if not home_body then
-  error("throughput_lens: no player building, so the home body cannot be identified")
+  error("logistics_lens: no player building, so the home body cannot be identified")
 end
 
 -- A REAL SOURCE, not the largest city (BL-1352). The disc is drawn where points are
@@ -57,7 +56,7 @@ if not sx then
   -- A home body with no source at all is a FINDING, not a scene to photograph: the
   -- lens would render an all-dark envelope and an honest "no source makes Logistic
   -- Points here" key, and that would bless clean for ever.
-  error("throughput_lens: the home body carries no Logistic Point source (hub, "
+  error("logistics_lens: the home body carries no Logistic Point source (hub, "
         .. "station or port), so there is no magnitude to draw")
 end
 
@@ -70,27 +69,27 @@ for _, pc in ipairs(verify.population_centres()) do
   end
 end
 
-print("[throughput_lens] framing a " .. stype .. " at " .. sx .. "," .. sy)
+print("[logistics_lens] framing a " .. stype .. " at " .. sx .. "," .. sy)
 
--- T2 — in close on a source, where the disc and its ring read at size against the
+-- T2 — in close on a source, where its ring read at size against the
 -- served ground around it.
 frame_tile(sx, sy, 9)
-shot("throughput_lens_anchor")
+shot("logistics_lens_anchor")
 
 -- T2b — the same zoom on the largest CITY. Cities make no points, so this frame must
--- show served ground and NO disc. It is the half of T2 a city-aimed capture could
+-- show NO ring. It is the half of T2 a city-aimed capture could
 -- never state (BL-1352).
 if cx then
-  print("[throughput_lens] framing the largest city at " .. cx .. "," .. cy
-        .. " (scale " .. cscale .. ") - it must carry NO disc")
+  print("[logistics_lens] framing the largest city at " .. cx .. "," .. cy
+        .. " (scale " .. cscale .. ") - it must carry NO ring")
   frame_tile(cx, cy, 9)
-  shot("throughput_lens_city_no_source")
+  shot("logistics_lens_city_no_source")
 end
 
 -- T3 — the key over an OPEN Selection band. This is the capture that fails if the
 -- key ever moves back to the background draw list.
 verify.select_tile(sx, sy)
-shot("throughput_lens_key_over_selection")
+shot("logistics_lens_key_over_selection")
 
 -- T4 — BL-1354: the tile card's Logistics section on that same source tile. The
 -- source stands here, so "Makes" must carry its points.
@@ -102,7 +101,7 @@ verify.expect(card.lp_makes > 0,
               .. tostring(card.lp_makes) .. ")")
 verify.expect(card.lp_uses <= card.lp_need + 0.001,
               "BL-1354: what the tile uses never exceeds what it needs")
-print("[throughput_lens] tile card logistics: makes " .. tostring(card.lp_makes)
+print("[logistics_lens] tile card logistics: makes " .. tostring(card.lp_makes)
       .. ", uses " .. tostring(card.lp_uses) .. " of " .. tostring(card.lp_need)
       .. ", rivals hidden " .. tostring(card.lp_rivals_hidden))
 
@@ -116,7 +115,7 @@ verify.clear_selection()
 verify.econ_step(4)
 verify.frames(2)
 local k = verify.throughput_key()
-print(string.format("[throughput_lens] key: generated %.1f by %d source(s); consumed %.1f "
+print(string.format("[logistics_lens] key: generated %.1f by %d source(s); consumed %.1f "
       .. "(production %.1f of %.1f asked, %.1f needed; marches %.1f, shipments %.1f)",
       k.generated, k.sources, k.consumed, k.production, k.asked, k.needed, k.marches, k.shipments))
 verify.expect(k.known, "T5: the key has the player's nation to show")
@@ -135,20 +134,20 @@ if pt.ok then
   verify.mouse(pt.x, pt.y)
   verify.frames(40)
 end
-shot("throughput_lens_absolute_card")
+shot("logistics_lens_absolute_card")
 
 -- T6 - THE SAME FIGURES WITH A CONNECTED SOURCE STAGED, so the numbers have something
 -- to show whatever the generated world gives the seat. A logistics hub beside the
 -- source framed above joins it to the chain; the key must then generate, every
 -- consumed figure stays inside what was generated, and the hover card over the hub's
--- ground reads absolute points both ways (captured: throughput_lens_staged_card).
+-- ground reads absolute points both ways (captured: logistics_lens_staged_card).
 local hub = verify.stage_building(sx, sy - 1, "logistics_hub")
 verify.expect(hub ~= 0, "T6: a logistics hub stages beside the source")
 -- One tick, so the report's resolve (what the lens reads) includes the staged hub.
 verify.econ_step(1)
 verify.frames(3)
 local k6 = verify.throughput_key()
-print(string.format("[throughput_lens] staged: generated %.1f by %d source(s); consumed %.1f "
+print(string.format("[logistics_lens] staged: generated %.1f by %d source(s); consumed %.1f "
       .. "(production %.1f of %.1f asked)", k6.generated, k6.sources, k6.consumed,
       k6.production, k6.asked))
 verify.expect(k6.generated > 0, "T6: with a connected hub the player nation generates points ("
@@ -161,4 +160,32 @@ if pt6.ok then
   verify.mouse(pt6.x, pt6.y)
   verify.frames(40)
 end
-verify.capture("throughput_lens_staged_card")
+verify.capture("logistics_lens_staged_card")
+
+-- T7 - THE ROAD CENSUS (Ben, 2026-10-24). Counts and totals only; no tile figure
+-- crosses the seam. Supplied is what the resolver GRANTED the requests routed through
+-- a road, so it can never exceed what they requested.
+verify.clear_selection()
+verify.mouse(-100, -100)
+verify.frames(3)
+local r = verify.logistics_roads()
+print(string.format("[logistics_lens] roads: %d of the player's (%d routed, %d routed green); green %d, "
+      .. "between %d, yellow %d; other ground tiles %d; supplied %.1f of requested %.1f",
+      r.roads, r.routed, r.routed_green, r.green, r.between, r.yellow, r.ground, r.supplied, r.requested))
+verify.expect(r.roads > 0, "T7: the player nation has roads on the home body (" .. r.roads .. ")")
+verify.expect(r.routed > 0, "T7: some request routes through a road (" .. r.routed .. ")")
+verify.expect(r.green + r.between + r.yellow == r.roads,
+              "T7: every road lands in exactly one colour class")
+-- SUPPLIED is what the chain COULD deliver through a road, so a road whose hub has
+-- slack carries more than is asked of it and reads green.
+verify.expect(r.routed_green > 0,
+              "T7: a routed road with slack reads green (" .. r.routed_green .. ")")
+-- Close on the staged hub's road ground, where the two stacked numbers draw.
+frame_tile(sx, sy, 14)
+shot("logistics_lens_stacked_numbers")
+local pt7 = verify.tile_screen(sx, sy - 1)
+if pt7.ok then
+  verify.mouse(pt7.x, pt7.y)
+  verify.frames(40)
+end
+verify.capture("logistics_lens_stacked_card")

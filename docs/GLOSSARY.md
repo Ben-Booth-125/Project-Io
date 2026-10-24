@@ -178,7 +178,7 @@ A per-tile land cost-reducer, not a building — the `tile_component.road_level`
 A screen that the player navigates to inform decision making and understand what's happening on a body or in space.
 
 **Lens**
-An overlay mode a canvas draws over its base render, selected from the canvas control strip — one active at a time (`overlay_mode`, `src/ui/ui_state.hpp`). Roster: Supply, Market, Country, Corporation, Resource, Population, Opportunity, Production, Scarcity, Industry, Reach, Continent, and Supply-routes. See `docs/ui/LENSES.md` for each lens's surface and key.
+An overlay mode a canvas draws over its base render, selected from the canvas control strip — one active at a time (`overlay_mode`, `src/ui/ui_state.hpp`). Roster: Supply, Market, Resource, Population, Continent, Scarcity, Industry, Reach, Supply-routes, Logistics, Culture, Trade flow and Nations (`docs/ui/LENSES.md` § Roster is the authority). The **Logistics** lens is the one formerly named Throughput (Ben, 2026-10-24) — the player nation's Logistic Points, its roads coloured by supplied over requested. See `docs/ui/LENSES.md` for each lens's surface and key.
 
 **Active (state)**
 The navigation **anchor** — the body or tile the canvas zoom ladder is currently framed around. Persists until the player navigates. Distinct from Selection: selecting an entity does not change what is Active. Backed by `ui_state.active_body`; there is no per-tile anchor (BL-363). See `docs/ui/SELECTION.md`.

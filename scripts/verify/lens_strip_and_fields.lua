@@ -44,7 +44,7 @@ verify.capture("field_population_close")
 -- STRUCTURE — near ground bright, far ground dark, and a visible gradient
 -- between. throughput_field_census is the numeric half of the same claim.
 -- ---------------------------------------------------------------------------
-verify.set_overlay("throughput")
+verify.set_overlay("logistics")
 verify.set_zoom(3.0)
 verify.capture("field_throughput_wide")
 verify.center_tile(built_col, built_row, 9)
