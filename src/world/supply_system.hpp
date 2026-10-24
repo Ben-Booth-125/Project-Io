@@ -60,8 +60,9 @@ struct interception_record
 
 /// Cut every convoy standing on a tile held by a unit whose owner has declared
 /// hostility toward the convoy's corp. The cargo credits the interceptor's
-/// pool at the interception tile's market (BL-1003), or — if the interceptor is not
-/// a corporation, or the tile resolves to no body — is destroyed. The convoy is
+/// pool at the interception tile's market (BL-1003), or — if the interceptor is
+/// neither a corporation nor a nation (BL-1402), or the tile resolves to no body —
+/// is destroyed. The convoy is
 /// then erased: it never arrives and never credits its destination.
 ///
 /// **Conservation is the load-bearing property.** Captured quantity in equals
@@ -227,8 +228,9 @@ convoy_leg price_market_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id src_market,
                             entity_id dest_market, float qty);
 
-/// True if `corp` has a launchpad building whose tile is on `body`.
-bool corp_has_launchpad_on(const world& w, const corporation_component& corp, entity_id body);
+/// True if `owner` — a corporation or a nation (BL-1402, `assets_of`) — has a
+/// launchpad building whose tile is on `body`.
+bool owner_has_launchpad_on(const world& w, entity_id owner, entity_id body);
 
 /// The goods ONE space-lane launch burns (BL-308) — per LAUNCH, not per tonne and
 /// not per AU: the pad is the thing being fuelled, so a launch costs the same

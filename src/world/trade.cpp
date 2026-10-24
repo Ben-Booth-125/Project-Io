@@ -45,12 +45,8 @@ std::map<entity_id, float> market_trade_points(const world& w, const recipe_regi
     std::map<entity_id, float> out;
     // A corporation's trade buildings, or a nation's STATE ones (its coastal
     // seat's port, Ben 2026-10-14): the state carries the trade machinery.
-    const std::vector<entity_id>* assets = nullptr;
-    if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
-        assets = &cit->second.assets;
-    else if (const auto nit = w.nations.find(corp); nit != w.nations.end())
-        assets = &nit->second.state_assets;
-    else
+    const std::vector<entity_id>* assets = assets_of(w, corp);
+    if (assets == nullptr)
         return out;
     for (const entity_id bid : *assets)
     {
@@ -86,13 +82,50 @@ float corp_trade_points(const world& w, const recipe_registry& reg,
     return total;
 }
 
+float* trade_reserve_of(world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return &cit->second.trade_reserve;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return &nit->second.trade_reserve;
+    return nullptr;
+}
+
+float trade_reserve_of(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return cit->second.trade_reserve;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return nit->second.trade_reserve;
+    return 0.0f;
+}
+
+float* trade_points_of(world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return &cit->second.trade_points;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return &nit->second.trade_points;
+    return nullptr;
+}
+
+float trade_points_of(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return cit->second.trade_points;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return nit->second.trade_points;
+    return 0.0f;
+}
+
 std::vector<entity_id> corp_trade_markets(const world& w, entity_id corp)
 {
     std::vector<entity_id> out;
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1402: any owner — a corporation's trade buildings or a nation's state ones.
+    const std::vector<entity_id>* assets = assets_of(w, corp);
+    if (assets == nullptr)
         return out;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : *assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end() || !trade_building_active(bit->second))
@@ -110,7 +143,8 @@ bool trade_is_valid(const world& w, const recipe_registry& reg, const standing_t
     const std::size_t r = static_cast<std::size_t>(t.resource);
     if (r >= resource_count)
         return false;
-    if (w.corporations.find(t.owner) == w.corporations.end())
+    // BL-1402: the owner is a corporation or a nation (NATIONS.md § What a nation owns).
+    if (assets_of(w, t.owner) == nullptr)
         return false;
     if (t.from_market == t.to_market)
         return false;
@@ -210,44 +244,26 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     trade_tick out;
     const trade_params& tp = reg.trade();
 
-    std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& [cid, cc] : w.corporations)
-    {
-        (void)cc;
-        corp_ids.push_back(cid);
-    }
-    std::sort(corp_ids.begin(), corp_ids.end());
+    // BL-1402 (NATIONS.md § What a nation owns): ONE owner list, every
+    // corporation and every nation holding state industry, ascending id
+    // (`economic_owner_ids`) — it replaced corporations-then-state-traders. The
+    // shipping order below was already ascending id (`points` is an ordered
+    // map), so the merge moves only the order `points_made` sums in.
+    const std::vector<entity_id> owner_ids = economic_owner_ids(w);
 
-    // Every corporation's points this tick are stored whether or not it trades,
+    // Every owner's points this tick are stored whether or not it trades,
     // so a building lost or an upkeep unmet reads as zero, not as last tick's.
     // Ben, 2026-10-10 (NR-1018): each trade building makes its points for the
     // MARKET it stands in, and they are spent on trades leaving that market.
-    std::map<entity_id, std::map<entity_id, float>> points; // corp -> market -> points
-    // Then every nation holding state trade buildings, ascending id, AFTER the
-    // corporations (a fixed order): the state port's points (Ben, 2026-10-14).
-    {
-        std::vector<entity_id> nids;
-        for (const auto& [nid, nc] : w.nations)
-            for (const entity_id bid : nc.state_assets)
-                if (const auto bit = w.buildings.find(bid);
-                    bit != w.buildings.end() && (bit->second.type == building_type::port
-                                                 || bit->second.type == building_type::planetary_marketplace))
-                {
-                    nids.push_back(nid);
-                    break;
-                }
-        std::sort(nids.begin(), nids.end());
-        corp_ids.insert(corp_ids.end(), nids.begin(), nids.end());
-    }
-    for (const entity_id corp : corp_ids)
+    std::map<entity_id, std::map<entity_id, float>> points; // owner -> market -> points
+    for (const entity_id corp : owner_ids)
     {
         std::map<entity_id, float> pm = market_trade_points(w, reg, &report, corp);
         float p = 0.0f;
         for (const auto& [mid, v] : pm)
             p += v;
-        if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
-            cit->second.trade_points = p;
+        if (float* tp_out = trade_points_of(w, corp); tp_out != nullptr)
+            *tp_out = p;
         if (p > 0.0f)
         {
             points[corp] = std::move(pm);
@@ -322,12 +338,11 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             float made = 0.0f;
             for (const auto& [mid, v] : mpts)
                 made += v;
-            // ONE reserve per corporation (Ben, 2026-10-10): the points held
-            // back from auto for its manual trades, clamped to what it makes.
-            // A nation's state port reserves nothing: it runs auto alone.
-            const auto ccit = w.corporations.find(corp);
-            float reserve_left = (ccit != w.corporations.end())
-                ? std::clamp(ccit->second.trade_reserve, 0.0f, made) : 0.0f;
+            // ONE reserve per owner (Ben, 2026-10-10): the points held back
+            // from auto for its manual trades, clamped to what it makes.
+            // BL-1402: a nation's reserve too (`trade_reserve_of`); 0 until a
+            // nation sets one, so a state port runs auto alone as it did.
+            float reserve_left = std::clamp(trade_reserve_of(std::as_const(w), corp), 0.0f, made);
 
             // --- MANUAL: the owner's trades, in placement order, spend the
             // reserve out of the points of the market each one leaves.

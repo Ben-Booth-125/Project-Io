@@ -108,7 +108,8 @@ void init_survey_states(world& w);
 /// is centralised here and called from app (the UI surfaces hold a const world).
 /// `payer` defaults to the player corporation (null_entity → w.player_entity);
 /// the corp-command seam (BL-202) passes the acting AI corp so it pays for
-/// discovery like the player does. The survey *store* stays the single per-body
+/// discovery like the player does. BL-1402: the payer may be a NATION, paying
+/// from its uncommitted treasury (`purse_room_of`), never below zero. The survey *store* stays the single per-body
 /// world state either way (see corp_ai.hpp § fog design call).
 survey_dispatch_result dispatch_survey(world& w, entity_id body,
                                        entity_id payer = null_entity);
