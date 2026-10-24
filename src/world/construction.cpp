@@ -312,12 +312,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id& out_building,
                                        std::uint16_t recipe)
 {
-    out_building = null_entity;
-    const auto corp_it = w.corporations.find(corp);
-    if (corp_it == w.corporations.end())
-        return construction_result::no_corp;
-    return construct_for(w, reg, corp, tile, type, target, out_building, recipe,
-                         corp_it->second.balance, corp_it->second.assets);
+    // BL-1407: every builder is a NATION (the corporation is deleted); this is
+    // the nation's own door under its old name, kept for its callers.
+    return construct_nation(w, reg, corp, tile, type, target, recipe, out_building);
 }
 
 construction_result construct_nation(world& w, const recipe_registry& reg,
@@ -495,37 +492,9 @@ bool demolish_building(world& w, entity_id corp, entity_id building)
     if (bld_it == w.buildings.end())
         return false;
 
-    // BL-1402 (NATIONS.md § What a nation owns): owner-generic. A NATION's
-    // building is in its `state_assets`, and the state door already removes one
-    // exactly as below, so a nation owner takes that door rather than a copy.
-    if (w.corporations.find(corp) == w.corporations.end()
-        && w.nations.find(corp) != w.nations.end())
-        return demolish_state_building(w, corp, building);
-
-    const auto corp_it = w.corporations.find(corp);
-    if (corp_it == w.corporations.end())
-        return false;
-
-    // Ownership is the corp's `assets` list (world.hpp § Ownership accessors —
-    // there is no reverse index). Not finding the id there means this corp does
-    // not own the building, which is also the refusal condition.
-    corporation_component& cc = corp_it->second;
-    const auto asset_it = std::find(cc.assets.begin(), cc.assets.end(), building);
-    if (asset_it == cc.assets.end())
-        return false;
-
-    const building_type demolished_type = bld_it->second.type;
-    cc.assets.erase(asset_it);
-    w.buildings.erase(bld_it);
-    w.stockpiles.erase(building); // no-op if the building never had one
-
-    // A demolished port/hub stops anchoring supply; before this clear the stale
-    // reach field kept offering tiles anchored on the ghost. Any other type
-    // anchors nothing, and the corp AI demolishes at tick rate (2026-08-12).
-    if (building_affects_logistics(demolished_type))
-        invalidate_logistics_caches(w);
-
-    return true;
+    // BL-1407: every owner is a NATION; its door removes the building, its
+    // stockpile and its entry in `state_assets`, and refuses one it does not own.
+    return demolish_state_building(w, corp, building);
 }
 
 construction_result place_road(world& w, const recipe_registry& reg,
@@ -540,7 +509,7 @@ construction_result place_road(world& w, const recipe_registry& reg,
     float* const purse = purse_of(w, corp);
     if (purse == nullptr)
         return construction_result::no_corp;
-    const bool nation_payer = w.corporations.find(corp) == w.corporations.end();
+    const bool nation_payer = true; // BL-1407: every payer is a nation
 
     const auto tile_it = w.tiles.find(tile);
     if (tile_it == w.tiles.end())

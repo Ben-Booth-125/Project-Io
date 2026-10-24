@@ -224,8 +224,6 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     std::string actor_name;
     if (const auto nit = w.nations.find(actor); nit != w.nations.end())
         actor_name = nit->second.name;
-    else if (const auto cit = w.corporations.find(actor); cit != w.corporations.end())
-        actor_name = cit->second.name;
     if (owned == nullptr)
     {
         ImGui::TextDisabled("No nation data.");
@@ -362,8 +360,8 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
                             static_cast<double>(l.rate), author);
                 ImGui::TextDisabled("A law is a modifier over the market, never an "
                                     "override of it - the price you sell at does not move.");
-                ImGui::TextDisabled("Enacted by its author nation; corporations "
-                                    "cannot flip world law.");
+                ImGui::TextDisabled("Enacted by its author nation; only its author "
+                                    "can flip it.");
                 if (l.conditions.always())
                     ImGui::TextDisabled("Unconditional once enacted.");
                 else

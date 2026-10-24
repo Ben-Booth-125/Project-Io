@@ -1302,7 +1302,9 @@ static void fill_works_close(ui::history_lapse& h, const world& w, const generat
     {
         // A row whose corp the world no longer holds is not a firm to flash
         // (`date_chartered_firms` skips it too, so it carries no year).
-        if (w.corporations.find(r.corp) == w.corporations.end()) continue;
+        // BL-1407: the charters are closed by the finish, so a row is live by its
+        // own record (an absorbed row names no charter).
+        if (r.corp == null_entity) continue;
         const auto t = w.tiles.find(r.anchor_tile);
         if (t == w.tiles.end() || t->second.body != home) continue;
         h.works_close.push_back(ui::history_lapse::works_mark{
@@ -1410,7 +1412,7 @@ void app::poll_wizard_history()
                         m_wiz_world->params.seed, m_wiz_world->params.era_seed,
                         m_wiz_world->params.span_seed[0], m_wiz_world->params.span_seed[1],
                         m_wiz_world->params.span_seed[2], m_wiz_world->params.span_seed[3],
-                        m_wiz_world->w.corporations.size());
+                        std::size_t{0}); // BL-1407: no corporation exists
             std::fflush(stdout);
             // BL-1246 (STARTUP.md § Handoff): round 6's boundary --
             // finish_campaign_world is done and its future consumed, so the

@@ -277,25 +277,18 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
             const entity_id dest_nation  = nation_of(convoy.dest_market);
             const entity_id owner_nation = owner_home_nation(w, convoy.corp);
             const auto      tnit         = w.nations.find(dest_nation);
-            const auto      cit          = w.corporations.find(convoy.corp);
-            const auto      onit         = cit == w.corporations.end() ? w.nations.find(convoy.corp)
-                                                                       : w.nations.end();
+            const auto      onit         = w.nations.find(convoy.corp); // BL-1407: a nation
             if (dest_nation != null_entity && owner_nation != dest_nation
-                && tnit != w.nations.end()
-                && (cit != w.corporations.end() || onit != w.nations.end()))
+                && tnit != w.nations.end() && onit != w.nations.end())
             {
                 const float rate = nation_tariff_rate(w, dest_nation, convoy.cargo_resource);
                 const float px   = dispatch_market_price(mit->second,
                                                          static_cast<std::size_t>(convoy.cargo_resource));
                 float duty = convoy.cargo_qty * px * rate;
-                if (onit != w.nations.end())
-                    duty = std::min(duty, std::max(0.0f, onit->second.treasury));
+                duty = std::min(duty, std::max(0.0f, onit->second.treasury));
                 if (rate > 0.0f && std::isfinite(duty) && duty > 0.0f)
                 {
-                    if (cit != w.corporations.end())
-                        cit->second.balance  -= duty;
-                    else
-                        onit->second.treasury -= duty;
+                    onit->second.treasury -= duty;
                     tnit->second.treasury += duty;
                 }
             }

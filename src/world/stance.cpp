@@ -24,15 +24,16 @@ bool has_pending_friendship_offer(const world& w, entity_id offerer, entity_id t
 
 namespace
 {
-/// Both corps must exist in `w.corporations` and be distinct. Shared by every
-/// verb below — validated first, before anything reads or writes a table.
+/// Both must be NATIONS in `w.nations` and distinct (BL-1407; RELATIONS.md
+/// § Stance: stance is between nations). Shared by every verb below — validated
+/// first, before anything reads or writes a table.
 bool valid_pair(const world& w, entity_id a, entity_id b)
 {
     if (a == b)
         return false;
-    if (w.corporations.find(a) == w.corporations.end())
+    if (w.nations.find(a) == w.nations.end())
         return false;
-    if (w.corporations.find(b) == w.corporations.end())
+    if (w.nations.find(b) == w.nations.end())
         return false;
     return true;
 }

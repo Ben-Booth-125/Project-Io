@@ -31,7 +31,7 @@ float player_treasury(const world& w)
 bool ledger_net(const world& w, float& net)
 {
     const entity_id nation = player_nation(w);
-    if (nation == null_entity || !world_is_folded(w))
+    if (nation == null_entity) // BL-1407: every world is the nations'
         return false;
     const auto it = w.state_ledger.find(nation);
     if (it == w.state_ledger.end())

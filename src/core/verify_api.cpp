@@ -351,7 +351,7 @@ int app::run_autostart()
     }
 
     std::printf("[autostart] OK  bodies=%zu nations=%zu corps=%zu markets=%zu tiles=%zu\n",
-                m_world.bodies.size(), m_world.nations.size(), m_world.corporations.size(),
+                m_world.bodies.size(), m_world.nations.size(), std::size_t{0} /* BL-1407: no corporation */,
                 m_world.markets.size(), m_world.tiles.size());
     // BL-1073: the cold-build half of the adopt check (tools/verify/
     // begin_adopts_check.js compares it against --autostart-adopt's line).
@@ -622,7 +622,7 @@ int app::run_autostart_adopt()
     }
     memory_line("in play (after Begin)");
     std::printf("[autostart-adopt] OK  bodies=%zu nations=%zu corps=%zu markets=%zu tiles=%zu\n",
-                m_world.bodies.size(), m_world.nations.size(), m_world.corporations.size(),
+                m_world.bodies.size(), m_world.nations.size(), std::size_t{0} /* BL-1407: no corporation */,
                 m_world.markets.size(), m_world.tiles.size());
     std::printf("[autostart-adopt] state_hash=%016llX seed=%u\n",
                 static_cast<unsigned long long>(m_world.state_hash(m_world.current_day_tick)),
@@ -1672,7 +1672,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         sol::table out = m_lua.state().create_table();
         out["buildings_folded"] = r.buildings_folded;
         out["units_reowned"]    = r.units_reowned;
-        out["folded"]           = world_is_folded(m_world);
+        out["folded"]           = true; // BL-1407: every building is a nation's
         out["actor"]            = static_cast<unsigned int>(player_actor(m_world));
         out["nation"]           = static_cast<unsigned int>(player_nation(m_world));
         const float* purse      = purse_of(m_world, player_actor(m_world));
@@ -1849,11 +1849,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // The lowest-id background firm (a company), or 0 — the id a script offers
     // take_seat to prove a corporation id is never a seat.
     v.set_function("seat_background_firm", [this]() -> long long {
-        entity_id best = null_entity;
-        for (const auto& [id, cc] : m_world.corporations)
-            if (cc.is_background && (best == null_entity || id < best))
-                best = id;
-        return static_cast<long long>(best);
+        // BL-1407: no firm exists; 0 (the script reads it as "none to offer").
+        return 0LL;
     });
     // BL-1281: the lowest-id MINOR nation (no champion), or 0 — the id a script
     // offers take_seat to prove a minor cannot be played.
@@ -2030,11 +2027,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const auto t = m_world.tiles.find(kv.second.tiles.front());
             if (t != m_world.tiles.end() && t->second.body == home) ++total;
         }
-        std::vector<entity_id> majors;
-        for (const auto& kv : m_world.corporations)
-            if (!kv.second.is_background && kv.second.home_nation != null_entity
-                && std::find(majors.begin(), majors.end(), kv.second.home_nation) == majors.end())
-                majors.push_back(kv.second.home_nation);
+        std::vector<entity_id> majors; // BL-1404 / BL-1407: the saved fact
+        for (const auto& kv : m_world.nations)
+            if (kv.second.is_major)
+                majors.push_back(kv.first);
         return std::make_tuple(total, static_cast<int>(majors.size()),
                                m_active_world_params.nation_total_target,
                                m_active_world_params.major_target);
@@ -2808,7 +2804,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // verify.buildings()' `corp` field; an unknown id is a no-op, matching
     // select_building's silent-miss behaviour.
     v.set_function("select_corp", [this](unsigned id) {
-        if (m_world.corporations.count(static_cast<entity_id>(id)))
+        if (m_world.nations.count(static_cast<entity_id>(id))) // BL-1407: an actor is a nation
             m_ui.selected_entity = static_cast<entity_id>(id);
     });
 
@@ -2819,20 +2815,22 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // fit on screen.
     v.set_function("corps", [this]() {
         sol::table out = m_lua.state().create_table();
+        // BL-1407: the actors are the nations (the corporation is deleted); the
+        // row keeps its shape, `is_background` always false.
         std::vector<entity_id> ids;
-        ids.reserve(m_world.corporations.size());
-        for (const auto& kv : m_world.corporations)
+        ids.reserve(m_world.nations.size());
+        for (const auto& kv : m_world.nations)
             ids.push_back(kv.first);
         std::sort(ids.begin(), ids.end()); // never expose an unordered_map's walk order
         int i = 1;
         for (entity_id id : ids)
         {
-            const corporation_component& cc = m_world.corporations.at(id);
+            const nation_component& nc = m_world.nations.at(id);
             sol::table row = m_lua.state().create_table();
             row["id"]            = static_cast<unsigned int>(id);
-            row["name"]          = cc.name;
-            row["is_player"]     = cc.is_player;
-            row["is_background"] = cc.is_background;
+            row["name"]          = nc.name;
+            row["is_player"]     = id == m_world.player_entity;
+            row["is_background"] = false;
             out[i++] = row;
         }
         return out;
@@ -3508,17 +3506,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
 
     // BL-1266: the trade points the player's trade buildings made on the last pass.
     v.set_function("player_trade_points", [this]() -> double {
-        const auto it = m_world.corporations.find(m_world.player_entity);
-        return it == m_world.corporations.end() ? 0.0 : static_cast<double>(it->second.trade_points);
+        const auto it = m_world.nations.find(m_world.player_entity); // BL-1407: the player IS its nation
+        return it == m_world.nations.end() ? 0.0 : static_cast<double>(it->second.trade_points);
     });
 
     // Does the player own a building on this body — read from the world, not
     // from the surface. `market_trades().open` must equal this and nothing else.
     v.set_function("player_operates_on", [this](entity_id body) {
-        const auto cit = m_world.corporations.find(m_world.player_entity);
-        if (cit == m_world.corporations.end())
+        const auto cit = m_world.nations.find(m_world.player_entity); // BL-1407
+        if (cit == m_world.nations.end())
             return false;
-        for (const entity_id bid : cit->second.assets)
+        for (const entity_id bid : cit->second.state_assets)
         {
             const auto bit = m_world.buildings.find(bid);
             if (bit == m_world.buildings.end())
@@ -3551,9 +3549,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const auto bit = m_world.bodies.find(b);
             row["name"] = (bit != m_world.bodies.end()) ? bit->second.name : std::string{};
             bool operates = false;
-            const auto cit = m_world.corporations.find(m_world.player_entity);
-            if (cit != m_world.corporations.end())
-                for (const entity_id bid : cit->second.assets)
+            const auto cit = m_world.nations.find(m_world.player_entity); // BL-1407
+            if (cit != m_world.nations.end())
+                for (const entity_id bid : cit->second.state_assets)
                 {
                     const auto bd = m_world.buildings.find(bid);
                     if (bd == m_world.buildings.end())
@@ -3873,10 +3871,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("first_processing_building", [this]() {
         sol::state& s = m_lua.state();
         sol::table  out = s.create_table();
-        const auto cit = m_world.corporations.find(m_world.player_entity);
-        if (cit != m_world.corporations.end())
+        const auto cit = m_world.nations.find(m_world.player_entity); // BL-1407
+        if (cit != m_world.nations.end())
         {
-            for (const entity_id bld_id : cit->second.assets)
+            for (const entity_id bld_id : cit->second.state_assets)
             {
                 const auto bit = m_world.buildings.find(bld_id);
                 if (bit == m_world.buildings.end()) continue;
@@ -4977,8 +4975,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             out["result"] = std::string("unknown_recipe");
             return out;
         }
-        const auto cit = m_world.corporations.find(m_world.player_entity);
-        if (cit == m_world.corporations.end())
+        const auto cit = m_world.nations.find(m_world.player_entity); // BL-1407
+        if (cit == m_world.nations.end())
         {
             out["result"] = std::string("no_corp");
             return out;
@@ -4991,11 +4989,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (tc.body == m_ui.active_body && !occupied.count(tid))
                 tiles.push_back(tid);
         std::sort(tiles.begin(), tiles.end()); // deterministic scan order
-        const float saved_balance = cit->second.balance;
+        const float saved_balance = cit->second.treasury;
         std::string last = "no_tile";
         for (const entity_id tid : tiles)
         {
-            cit->second.balance = 1.0e9f;
+            cit->second.treasury = 1.0e9f;
             entity_id built = null_entity;
             const construction_result r =
                 construct_building(m_world, m_registry, m_world.player_entity, tid,
@@ -5030,7 +5028,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             out["recipe"] = rc ? rc->name : std::string();
             break;
         }
-        cit->second.balance = saved_balance;
+        cit->second.treasury = saved_balance;
         if (direct.value_or(false) && (last == "invalid_tile" || last == "out_of_range"))
         {
             const recipe* rc = m_registry.get_recipe(rid);
@@ -5052,7 +5050,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 b.active_recipe_index = static_cast<int>(rid);
                 b.ticks_remaining     = 0;
                 m_world.buildings[bid] = b;
-                cit->second.assets.push_back(bid);
+                cit->second.state_assets.push_back(bid);
                 out["id"]     = static_cast<unsigned>(bid);
                 out["tile"]   = static_cast<unsigned>(tid);
                 out["x"]      = tc.grid_x;
@@ -5094,7 +5092,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const int min_span = std::max(0, min_span_opt.value_or(0));
         const entity_id body = m_ui.active_body;
         const entity_id corp = m_world.player_entity;
-        if (m_world.corporations.find(corp) == m_world.corporations.end())
+        if (m_world.nations.find(corp) == m_world.nations.end()) // BL-1407
             return out;
 
         std::vector<entity_id> mkts;
@@ -5226,7 +5224,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                     pc.tile = pt;
                     pc.type = building_type::port; // built + active: ticks_remaining 0
                     m_world.buildings[p] = pc;
-                    m_world.corporations.at(corp).assets.push_back(p);
+                    m_world.nations.at(corp).state_assets.push_back(p);
                     placed.push_back(p);
                 }
                 invalidate_logistics_caches(m_world);
@@ -5242,7 +5240,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                         return out;
                     }
                 }
-                auto& assets = m_world.corporations.at(corp).assets;
+                auto& assets = m_world.nations.at(corp).state_assets;
                 for (const entity_id p : placed)
                 {
                     m_world.buildings.erase(p);
@@ -5588,9 +5586,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return static_cast<double>(survey_cost(m_world, body));
     });
     v.set_function("player_balance", [this]() -> double {
-        const auto it = m_world.corporations.find(m_world.player_entity);
-        return it == m_world.corporations.end() ? 0.0
-                                                 : static_cast<double>(it->second.balance);
+        const auto it = m_world.nations.find(m_world.player_entity); // BL-1407: the treasury
+        return it == m_world.nations.end() ? 0.0
+                                           : static_cast<double>(it->second.treasury);
     });
     // The Corporation ledger's Balance card, read as the MODEL THAT IS ACTUALLY
     // CHARTED (BL-691): `build_balance_columns` is the same call the drawer
@@ -5909,8 +5907,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // (nothing mutated).
     v.set_function("grant_marketplace", [this](unsigned market) -> unsigned {
         const auto mit = m_world.markets.find(static_cast<entity_id>(market));
-        const auto cit = m_world.corporations.find(m_world.player_entity);
-        if (mit == m_world.markets.end() || cit == m_world.corporations.end())
+        const auto cit = m_world.nations.find(m_world.player_entity); // BL-1407
+        if (mit == m_world.markets.end() || cit == m_world.nations.end())
             return 0u;
         long long cx = 0, cy = 0;
         if (const auto ct = m_world.tiles.find(mit->second.centre_tile); ct != m_world.tiles.end())
@@ -5950,14 +5948,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         bc.workforce_assigned = 0.5f; // the retrofit's staffing
         m_world.buildings[bid]  = bc;
         m_world.stockpiles[bid] = stockpile_component{};
-        cit->second.assets.push_back(bid);
+        cit->second.state_assets.push_back(bid);
         invalidate_logistics_caches(m_world);
         return static_cast<unsigned>(bid);
     });
 
     v.set_function("grant_stock", [this](const std::string& res, double qty) {
-        const auto it = m_world.corporations.find(m_world.player_entity);
-        if (it == m_world.corporations.end())
+        const auto it = m_world.nations.find(m_world.player_entity); // BL-1407
+        if (it == m_world.nations.end())
             return false;
         // BL-1265: onto the SHELF of the player's home market on the home body
         // (the HQ's market) — where a hire buys its kit. Corporations hold no
@@ -5983,7 +5981,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // -1 when the tile holds no building or the player has no corp.
     v.set_function("stock_building_inputs", [this](unsigned tile_u, double qty) -> int {
         const entity_id tile = static_cast<entity_id>(tile_u);
-        if (m_world.corporations.find(m_world.player_entity) == m_world.corporations.end())
+        if (m_world.nations.find(m_world.player_entity) == m_world.nations.end()) // BL-1407
             return -1;
         for (const auto& [bid, b] : m_world.buildings)
         {
@@ -6010,9 +6008,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     v.set_function("set_balance", [this](float value) {
-        const auto it = m_world.corporations.find(m_world.player_entity);
-        if (it != m_world.corporations.end())
-            it->second.balance = value;
+        const auto it = m_world.nations.find(m_world.player_entity); // BL-1407: the treasury
+        if (it != m_world.nations.end())
+            it->second.treasury = value;
     });
 
     // Data accessor: return every corporation building as a Lua array of
@@ -6026,18 +6024,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // Sorted corp order (review 2026-08-19 #11): corporations is an
         // unordered_map, and which rival a script's "first non-player row"
         // lands on must not vary by platform or stdlib.
+        // BL-1407: every owner is a nation.
         std::vector<entity_id> sorted_corp_ids;
-        sorted_corp_ids.reserve(m_world.corporations.size());
-        for (const auto& [cid, c] : m_world.corporations)
-            sorted_corp_ids.push_back(cid);
-        std::sort(sorted_corp_ids.begin(), sorted_corp_ids.end());
         // BL-1406: then every NATION's own buildings (`state_assets`), ascending
         // id - after the fold every building is a nation's, and `player` is the
         // player's nation. `corp` names the owner either way (one allocator).
         // Only once FOLDED, so an unfolded verify world lists exactly the rows it
         // always did and no existing script's "first rival row" moves.
         std::vector<entity_id> sorted_owner_ids = sorted_corp_ids;
-        if (world_is_folded(m_world))
         {
             std::vector<entity_id> nation_ids;
             for (const auto& [nid, n] : m_world.nations)
@@ -6055,8 +6049,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const bool  player = (corp_id == m_world.player_entity || corp_id == player_owner);
             // BL-365 `is_background`: a "company" rather than a "corporation"
             // since Ben's 2026-08-28 split. A nation is neither.
-            const auto  cit        = m_world.corporations.find(corp_id);
-            const bool  background = cit != m_world.corporations.end() && cit->second.is_background;
+            const bool  background = false; // BL-1407: no firm exists
             for (entity_id bld_id : *owned)
             {
                 const auto bld_it = m_world.buildings.find(bld_id);
@@ -6125,11 +6118,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // market supply/demand, building run states) to stderr, so a verify run gives
     // a textual confirmation of the same data the panel renders visually.
     v.set_function("dump_economy", [this]() {
-        for (const auto& [cid, cc] : m_world.corporations)
-            SDL_Log("economy balance: %-26s %.1f%s",
-                    cc.name.c_str(), cc.balance,
-                    cc.balance < 0.0f ? "  [NEGATIVE]" : "");
-        for (const auto& [cid, cc] : m_world.corporations) // BL-1266: trade, not pools
+        for (const auto& [cid, cc] : m_world.nations) // BL-1407: the treasuries
+            SDL_Log("economy treasury: %-26s %.1f%s",
+                    cc.name.c_str(), cc.treasury,
+                    cc.treasury < 0.0f ? "  [NEGATIVE]" : "");
+        for (const auto& [cid, cc] : m_world.nations) // BL-1266: trade, not pools
             if (cc.trade_points > 0.0f)
                 SDL_Log("economy trade points: %-26s %.1f (reserve %.1f)",
                         cc.name.c_str(), cc.trade_points, cc.trade_reserve);
@@ -6157,9 +6150,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         std::filesystem::create_directories(dir, ec);
         const auto path = [&](const char* name) { return dir + "/" + name; };
         const auto corp_name = [this](entity_id id) -> std::string {
-            const auto it = m_world.corporations.find(id);
-            return it != m_world.corporations.end() ? it->second.name
-                                                    : "corp#" + std::to_string(id);
+            const auto it = m_world.nations.find(id); // BL-1407: every actor is a nation
+            return it != m_world.nations.end() ? it->second.name
+                                               : "corp#" + std::to_string(id);
         };
         const auto body_name = [this](entity_id id) -> std::string {
             const auto it = m_world.bodies.find(id);
@@ -6174,16 +6167,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // corporations.csv — one row per corp: identity + solvency.
         {
             std::ofstream f(path("corporations.csv"));
+            // BL-1407: no corporation exists; the header stays so a reader parses.
             f << "corp_id,name,focus,home_nation,balance,starting_capital,since_start,buildings\n";
-            for (const auto& [cid, cc] : m_world.corporations)
-            {
-                std::string nation = "-";
-                const auto nit = m_world.nations.find(cc.home_nation);
-                if (nit != m_world.nations.end()) nation = nit->second.name;
-                f << cid << ",\"" << cc.name << "\"," << focus_name(cc.focus) << ",\"" << nation
-                  << "\"," << cc.balance << "," << cc.starting_capital << ","
-                  << (cc.balance - cc.starting_capital) << "," << cc.assets.size() << "\n";
-            }
+            (void)focus_name;
         }
         // stockpiles.csv RETIRED (BL-1265): corporations hold no pools; every
         // good is on a market's shelf, which the market rows below export.
@@ -6274,10 +6260,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Diagnostic: log every corporation building's grid position and owner so a
     // script author (or Claude) can aim the pan/zoom at the corporate tiles.
     v.set_function("log_buildings", [this]() {
-        for (const auto& [corp_id, corp] : m_world.corporations)
+        for (const auto& [corp_id, corp] : m_world.nations) // BL-1407: every owner is a nation
         {
             const bool player = (corp_id == m_world.player_entity);
-            for (entity_id bld_id : corp.assets)
+            for (entity_id bld_id : corp.state_assets)
             {
                 const auto bld_it = m_world.buildings.find(bld_id);
                 if (bld_it == m_world.buildings.end())
@@ -6399,7 +6385,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (rival)
         {
             entity_id best = null_entity;
-            for (const auto& [cid, cc] : m_world.corporations)
+            for (const auto& [cid, cc] : m_world.nations) // BL-1407: a rival nation
                 if (cid != m_world.player_entity && (best == null_entity || cid < best))
                     best = cid;
             if (best != null_entity)
@@ -6421,8 +6407,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 maybe_spawn_market(m_world, m_registry, tit->second.body, tile);
         if (building_affects_logistics(bc.type) && bc.ticks_remaining <= 0)
             invalidate_logistics_caches(m_world);
-        if (auto cit = m_world.corporations.find(owner); cit != m_world.corporations.end())
-            cit->second.assets.push_back(id);
+        if (auto cit = m_world.nations.find(owner); cit != m_world.nations.end())
+            cit->second.state_assets.push_back(id);
         return id;
     };
 

@@ -62,8 +62,8 @@ const char* bucket_gloss(int b)
 
 const char* corp_name(const world& w, entity_id corp)
 {
-    const auto it = w.corporations.find(corp);
-    return (it != w.corporations.end()) ? it->second.name.c_str() : "Unknown corp";
+    const char* nm = actor_name(w, corp); // BL-1407: every actor is a nation
+    return nm != nullptr ? nm : "Unknown nation";
 }
 
 /// Push one sample onto a band series, capped at the window length — the same
@@ -323,10 +323,10 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
     const float avail = ImGui::GetContentRegionAvail().x;
     ImGui::SetNextItemWidth(avail * 0.62f);
     if (ImGui::BeginCombo("Corp", st.strategy_readout_corp == null_entity
-                                      ? "All corporations"
+                                      ? "All nations"
                                       : corp_name(w, st.strategy_readout_corp)))
     {
-        if (ImGui::Selectable("All corporations", st.strategy_readout_corp == null_entity))
+        if (ImGui::Selectable("All nations", st.strategy_readout_corp == null_entity))
             st.strategy_readout_corp = null_entity;
         for (const auto& [c, p] : s.corps)
         {

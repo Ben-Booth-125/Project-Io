@@ -142,9 +142,7 @@ void date_fields(std::string& o, const world& w, std::uint64_t day_tick)
 
 std::string entity_name(const world& w, entity_id id)
 {
-    if (const auto c = w.corporations.find(id); c != w.corporations.end())
-        return c->second.name;
-    if (const auto n = w.nations.find(id); n != w.nations.end())
+    if (const auto n = w.nations.find(id); n != w.nations.end()) // BL-1407: every actor
         return n->second.name;
     return {};
 }
@@ -307,7 +305,7 @@ bool play_log::open(const world& w, const economy_report& last_report, std::uint
         kv_int(o, "id", id);
         kv_str(o, "name", w.nations.at(id).name);
         const entity_id champ = champion_of(w, id);
-        kv_bool(o, "major", champ != null_entity);
+        kv_bool(o, "major", is_major_nation(w, id)); // BL-1407: the saved fact
         kv_bool(o, "player", id == m_seat_nation);
         if (champ != null_entity)
         {
@@ -445,15 +443,16 @@ void play_log::snapshot(const world& w, const economy_report& report, std::uint6
         double last_income = 0.0;
         double last_net    = 0.0;
     };
+    // BL-1407: no corporation exists; the nation's OWN last filed return is the
+    // figure (FINANCE.md § The quarterly return), and the firm counts read 0.
     std::map<entity_id, corp_agg> corps;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [nid, nc] : w.nations)
     {
-        corp_agg& a = corps[cc.home_nation];
-        (cc.is_background ? a.background : a.specialists) += 1;
-        if (!cc.returns.empty())
+        corp_agg& a = corps[nid];
+        if (!nc.returns.empty())
         {
-            a.last_income += cc.returns.back().income;
-            a.last_net    += cc.returns.back().net;
+            a.last_income += nc.returns.back().income;
+            a.last_net    += nc.returns.back().net;
         }
     }
     std::map<entity_id, long long> population; // thousands
@@ -489,9 +488,8 @@ void play_log::snapshot(const world& w, const economy_report& report, std::uint6
     for (std::size_t k = held - take; k < held; ++k)
     {
         const corp_decision& d = ring.entries[(start + k) % held];
-        entity_id            nation = null_entity;
-        if (const auto c = w.corporations.find(d.corp); c != w.corporations.end())
-            nation = c->second.home_nation;
+        // BL-1407: the deciding actor IS a nation.
+        const entity_id nation = w.nations.count(d.corp) != 0 ? d.corp : null_entity;
         decision_agg& a = decisions[nation];
         ++a.count;
         ++a.by_verb[verb_name(d.command.verb)];
@@ -518,7 +516,7 @@ void play_log::snapshot(const world& w, const economy_report& report, std::uint6
         kv_int(o, "id", id);
         kv_bool(o, "player", id == m_seat_nation);
         const entity_id champ = champion_of(w, id);
-        kv_bool(o, "major", champ != null_entity);
+        kv_bool(o, "major", is_major_nation(w, id)); // BL-1407: the saved fact
         kv_num(o, "treasury", n.treasury);
 
         // Budget weights. The player's nation is weighted by the budget
@@ -604,20 +602,7 @@ void play_log::snapshot(const world& w, const economy_report& report, std::uint6
         kv_int(o, "background_firms", ca.background);
         kv_num(o, "corp_income", ca.last_income);
         kv_num(o, "corp_net", ca.last_net);
-        if (champ != null_entity)
-            if (const auto c = w.corporations.find(champ); c != w.corporations.end())
-            {
-                key(o, "champion");
-                o += '{';
-                kv_int(o, "id", champ);
-                kv_num(o, "balance", c->second.balance);
-                if (!c->second.returns.empty())
-                {
-                    kv_num(o, "income", c->second.returns.back().income);
-                    kv_num(o, "net", c->second.returns.back().net);
-                }
-                o += '}';
-            }
+        (void)champ; // BL-1407: the champion retired with the corporation
         kv_int(o, "population_k", population[id]);
 
         // The AI corps' scored decisions this quarter (the decision feed's

@@ -531,10 +531,11 @@ entity_id market_body(const world& w, entity_id market)
 
 entity_id corp_home_market(const world& w, entity_id corp, entity_id body)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1407: the owner is a NATION; its "HQ" is its capital tile.
+    const auto nit = w.nations.find(corp);
+    if (nit == w.nations.end())
         return market_on_body(w, body);
-    const corporation_component& cc = cit->second;
+    const nation_component& cc = nit->second;
 
     auto tile_on_body = [&](entity_id bid) -> entity_id {
         const auto bit = w.buildings.find(bid);
@@ -546,13 +547,13 @@ entity_id corp_home_market(const world& w, entity_id corp, entity_id body)
         return bit->second.tile;
     };
 
-    if (const entity_id hq_tile = tile_on_body(cc.hq_building); hq_tile != null_entity)
-        if (const entity_id mid = market_for_tile(w, hq_tile); mid != null_entity)
+    if (const auto ct = w.tiles.find(cc.capital_tile); ct != w.tiles.end() && ct->second.body == body)
+        if (const entity_id mid = market_for_tile(w, cc.capital_tile); mid != null_entity)
             return mid;
 
     entity_id best = null_entity;
     entity_id best_tile = null_entity;
-    for (const entity_id bid : cc.assets)
+    for (const entity_id bid : cc.state_assets)
     {
         const entity_id t = tile_on_body(bid);
         if (t != null_entity && (best == null_entity || bid < best))
@@ -569,13 +570,11 @@ entity_id corp_home_market(const world& w, entity_id corp, entity_id body)
 
 entity_id corp_hq_market(const world& w, entity_id corp)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1407: a nation's capital stands where the retired HQ did.
+    const auto nit = w.nations.find(corp);
+    if (nit == w.nations.end())
         return null_entity;
-    const auto bit = w.buildings.find(cit->second.hq_building);
-    if (bit == w.buildings.end())
-        return null_entity;
-    const auto tit = w.tiles.find(bit->second.tile);
+    const auto tit = w.tiles.find(nit->second.capital_tile);
     if (tit == w.tiles.end())
         return null_entity;
     return corp_home_market(w, corp, tit->second.body);
@@ -620,7 +619,7 @@ float buy_from_corp_shelves(world& w, entity_id corp, std::size_t r, float qty,
     float* purse = purse_of(w, corp);
     if (purse == nullptr || r >= resource_count || !(qty > 0.0f))
         return 0.0f;
-    const bool capped = w.corporations.find(corp) == w.corporations.end();
+    const bool capped = true; // BL-1407: every buyer is a nation, never into debt
     float bought = 0.0f;
     for (const entity_id mid : corp_markets(w, corp))
     {
@@ -1182,8 +1181,8 @@ void inject_endemic_demand(world& w, const recipe_registry& reg)
     // --- Per-nation wealth -------------------------------------------------
     //
     // THE WEALTH READ IS A DELEGATED CALL (this agent's, BL-647): the nation's
-    // treasury plus the summed POSITIVE balances of the corporations domiciled
-    // in it (corporation_component::home_nation). Chosen over the alternatives
+    // treasury (BL-1407: the corporation balances it once added are deleted
+    // with the type; their money is the treasury's). Chosen over the alternatives
     // because it is the quantity that most directly moves with player success —
     // grow a profitable corp in a nation and that nation's luxury pull grows
     // the same quarter — while the treasury half carries the state's own
@@ -1195,24 +1194,7 @@ void inject_endemic_demand(world& w, const recipe_registry& reg)
     //
     // Accumulated over SORTED corp ids so the float sum cannot vary with
     // `w.corporations`' unordered layout (the BL-406 class of defect).
-    std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& [cid, cc] : w.corporations)
-    {
-        (void)cc;
-        corp_ids.push_back(cid);
-    }
-    std::sort(corp_ids.begin(), corp_ids.end());
-
     std::map<entity_id, float> nation_wealth; // nation id -> credits
-    for (const entity_id cid : corp_ids)
-    {
-        const corporation_component& cc = w.corporations.at(cid);
-        if (cc.home_nation == null_entity)
-            continue;
-        if (cc.balance > 0.0f)
-            nation_wealth[cc.home_nation] += cc.balance;
-    }
     for (const auto& [nid, nc] : w.nations)
         if (nc.treasury > 0.0f)
             nation_wealth[nid] += nc.treasury; // one add per key: order-free.
@@ -1779,8 +1761,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         // BL-1296: a NATION is paid too — what its state buildings land is sold
         // like any building's output, and apply_budget settles it into the
         // treasury (NATIONS.md § 2, the second exception: market flows).
-        const bool paid = w.corporations.find(owner) != w.corporations.end()
-                       || w.nations.find(owner) != w.nations.end();
+        const bool paid = w.nations.find(owner) != w.nations.end(); // BL-1407: a nation
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             const float qty = landed.quantities[r];

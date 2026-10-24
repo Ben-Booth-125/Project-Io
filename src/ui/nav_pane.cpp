@@ -367,7 +367,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_decision_feed = !was_open;
             }
-            slot_tooltip("AI decisions", "What the rival corporations decided, and how close the call was.", false);
+            slot_tooltip("AI decisions", "What the rival nations decided, and how close the call was.", false);
             break;
         case 13: // Strategy readout (BL-411) — the shape of each corp's run
             if (ImGui::Selectable(id, state.show_strategy_readout, 0, {slot_size, slot_size})) {

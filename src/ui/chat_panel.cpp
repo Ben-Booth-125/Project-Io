@@ -18,8 +18,8 @@ constexpr std::size_t k_message_cap = 300;
 /// Corp display name, tolerant of a stale id.
 const char* corp_name(const world& w, entity_id corp)
 {
-    const auto it = w.corporations.find(corp);
-    return it != w.corporations.end() ? it->second.name.c_str() : "(unknown)";
+    const char* nm = actor_name(w, corp); // BL-1407: every actor is a nation
+    return nm != nullptr ? nm : "(unknown)";
 }
 
 /// Display name for a chat_message author of EITHER kind (BL-212: Public is
@@ -122,7 +122,7 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
         // Seed the draft with every corp unticked; sorted ids for a stable order.
         chat.group_name[0] = '\0';
         chat.group_draft.clear();
-        for (const auto& [id, corp] : w.corporations)
+        for (const auto& [id, nc] : w.nations) // BL-1407: the actors are nations
             chat.group_draft.emplace_back(id, false);
         std::sort(chat.group_draft.begin(), chat.group_draft.end());
         ImGui::OpenPopup("new_group");

@@ -2716,7 +2716,15 @@ float seat_clean_slate(world& w, entity_id nation)
             refund += paid;
     }
     if (refund > 0.0f)
-        w.nations.at(nation).treasury += refund;
+    {
+        // Booked on the nation's next quarterly return as `refunds`, opened from
+        // the exact pre-refund treasury (BL-1206's rule, re-subjected).
+        nation_component& nc = w.nations.at(nation);
+        if (nc.refund_unbooked == 0.0f)
+            nc.refund_opening = nc.treasury;
+        nc.treasury        += refund;
+        nc.refund_unbooked += refund;
+    }
     return refund;
 }
 

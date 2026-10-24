@@ -373,33 +373,10 @@ void draw_body_summary(const world& w, const ui_state& s, entity_id id)
 
 void draw_corporation_summary(const world& w, entity_id id)
 {
-    auto it = w.corporations.find(id);
-    if (it == w.corporations.end())
-    {
-        ImGui::TextDisabled("\xe2\x80\x94");
-        return;
-    }
-
-    const corporation_component& c = it->second;
-
-    // Title line: name in the selection colour, flagged when it is the player's.
-    const bool is_player = c.is_player || id == w.player_entity;
-    if (is_player)
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "%s (Player)", c.name.c_str());
-    else
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "%s", c.name.c_str());
-
-    // Home nation, when the registration reference resolves.
-    auto nation_it = w.nations.find(c.home_nation);
-    if (nation_it != w.nations.end())
-        ImGui::Text("Nation: %s", nation_it->second.name.c_str());
-
-    // BL-145: focus readout hidden blanket (industrial_focus stays a data-model
-    // field for world-gen/economy, just not surfaced in UI).
-    ImGui::Text("Capital: %s", ui::fmt::credits(c.starting_capital).c_str());
-    ImGui::Text("Assets: %zu", c.assets.size());
+    // BL-1407: the corporation is deleted; nothing is a corporation to summarise.
+    (void)w;
+    (void)id;
+    ImGui::TextDisabled("\xe2\x80\x94");
 }
 
 } // namespace ui

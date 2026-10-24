@@ -1802,48 +1802,23 @@ enum class industrial_focus : uint8_t
     trade       = 2, ///< Logistics and market operators; prefer port-adjacent tiles.
 };
 
-/// Whether a corporation's books and its equity are open to outsiders — Pass 2b
-/// of CORPORATION_GENERATION.md, design BL-631 (ownership class).
-///
-/// DERIVED, never authored. It reads the *same* BL-218 industrialisation-timing
-/// scalar Pass 2 already reads for focus (`region::industrialised`,
-/// `region::industrial_year` against `settlement_state::median_industrial_year`),
-/// plus the home nation's `politics` — which settlement.cpp derives from that
-/// same first-furnace record. There is no weighting table anywhere on this path:
-/// that is BL-219's principle, and it binds here exactly as it binds focus.
-///
-/// The enumerator names carry a trailing qualifier because `public` and
-/// `private` are C++ keywords; the design's words for them are *public*,
-/// *private* and *closed*.
-///
-/// The class does two jobs, both FINANCE.md's: it decides whether the corp files
-/// a quarterly return the player may read (§ Disclosure), and whether the corp
-/// may be bought outright (§ Whole-firm acquisition). Generation's part is only
-/// to derive the field.
-///
-/// IT IS A CORPORATION'S PROPERTY (BL-678, companies are open). A company — a
-/// background firm — is `publicly_held` always, so both jobs answer yes for it
-/// by construction and neither is a question generation asks. Only a corporation
-/// carries a derived class.
-enum class ownership_class : uint8_t
-{
-    publicly_held  = 0, ///< *public* — early industrialiser, enforceable-promise institutions. Files; buyable.
-    privately_held = 1, ///< *private* — late or statist industrialiser. Exists and trades; its books are its own.
-    closed         = 2, ///< *closed* — never industrialised. No filing, no market in the firm at all.
-};
+// BL-1407: `ownership_class` (Pass 2b, BL-631) retired with the firm; its pure
+// derivation lives on, generation-only, in corporation_generation.hpp, where it
+// still steers the legacy roster's focus reroll (so no RNG stream moves).
 
 // ---------------------------------------------------------------------------
 // The quarterly return (BL-626)
 // ---------------------------------------------------------------------------
 
-/// One corporation's filed balance sheet for one economy tick. An economy tick
-/// IS one quarter (`k_ticks_per_year` == 4), so the ledger's cadence is the money
-/// loop's own; `apply_budget` files one of these per corporation at the end of
-/// every tick. Authority: docs/economy/FINANCE.md § The quarterly return.
+/// One NATION's filed balance sheet for one economy tick (BL-1407: re-subjected
+/// from the retired corporation, FINANCE.md § The quarterly return). An economy
+/// tick IS one quarter (`k_ticks_per_year` == 4), so the ledger's cadence is the
+/// money loop's own; `apply_budget`'s state pass files one of these per nation at
+/// the end of every tick, into `nation_component::returns`. Authority: docs/economy/FINANCE.md § The quarterly return.
 ///
 /// **It is a RETAIN, not a second computation.** Every flow here already exists
 /// in `corp_budget` and is copied across unchanged; `net` is the movement the
-/// loop actually applied to `corporation_component::balance` this tick, read off
+/// loop actually applied to `nation_component::treasury` this tick, read off
 /// the balance itself rather than re-derived from the flows. That is the property
 /// that makes the record incapable of disagreeing with the loop that wrote it:
 /// summing a corp's filed `net` over a run telescopes back to its balance delta
@@ -1891,10 +1866,10 @@ struct quarterly_return
     /// SERIALISED in the v52 trailing tax section (only firms that ever paid).
     float taxes       = 0.0f;
 
-    /// Closing `corporation_component::balance`, after interest.
+    /// Closing `nation_component::treasury` (BL-1407; the field keeps its name).
     float balance = 0.0f;
 
-    /// `corporation_component::assets.size()` — the building count.
+    /// `nation_component::state_assets.size()` — the building count.
     uint32_t holdings = 0;
 
     /// Sum of `recipe_registry::economics(type).build_cost` over the holdings.
@@ -1915,201 +1890,16 @@ struct quarterly_return
 static_assert(sizeof(quarterly_return) == 56,
               "quarterly_return must stay padding-free: its bytes are compared raw");
 
-/// Rolling retention of `corporation_component::returns`: ten years at four
+/// Rolling retention of `nation_component::returns`: ten years at four
 /// economy ticks to the year (Ben, 2026-08-26). Bounded by construction, and
 /// that is the point — the record is world state and crosses the serialisation
 /// seam, so it must not grow with campaign length. Oldest dropped first.
 inline constexpr std::size_t k_quarterly_return_retention = 40;
 
-/// BL-628: how many filed quarters the whole-firm acquisition price averages
-/// `net` over — EIGHT, two years of the forty retained (FINANCE.md § Whole-firm
-/// acquisition), or fewer if the firm is younger than that.
-///
-/// A CONSTANT, not an authored parameter, while `k_acquisition_multiple` IS
-/// authored (`scripts/economy.lua`, `economy.acquisition.multiple`). The split is
-/// deliberate and follows the doc: the multiple is the acquisition market's
-/// price level and is meant to be tuned; the window is the design's statement of
-/// how much history a price is entitled to read, and moving it silently changes
-/// what a filed return MEANS rather than what it is worth.
-inline constexpr std::size_t k_acquisition_trailing_quarters = 8;
-
-// ---------------------------------------------------------------------------
-// Corporation component
-// ---------------------------------------------------------------------------
-
-/// All persistent data describing a single corporation at campaign start.
-/// Corporations take no autonomous actions in the prototype; this struct is
-/// generation output only. See docs/generation/CORPORATION_GENERATION.md and
-/// docs/development/backlog.json for the deferred behaviour design.
-struct corporation_component
-{
-    /// Generated name produced by Pass 5 of the corporation generation pipeline.
-    std::string name;
-
-    /// Nation entity this corporation is legally registered in.
-    /// Set by Pass 1 (nation assignment); never null after generation.
-    entity_id home_nation = null_entity;
-
-    /// Primary industrial focus; drawn by Pass 2 (focus assignment).
-    industrial_focus focus = ::industrial_focus::extraction;
-
-    /// Ownership class; DERIVED by Pass 2b (BL-631) from the corporation's home
-    /// region's industrialisation timing — the same read Pass 2 makes for
-    /// `focus` — with the home nation's `politics` supplying the
-    /// enforceable-promise term. A corporation with no home region (the rung-3
-    /// case) takes it from the national character instead, exactly as its focus
-    /// does.
-    ///
-    /// A COMPANY IS ALWAYS `publicly_held` (BL-678, companies are open). The
-    /// class is a corporation's property; a background firm is part of the
-    /// commercial population the player trades with, so it discloses and it is
-    /// buyable by construction. `generate_background_firms` still evaluates the
-    /// national-character derivation — pure, drawing nothing — and then
-    /// overrides it, so the generation RNG stream is unmoved by the rule.
-    ///
-    /// SERIALISED (world_save.cpp's corp record, immediately after `focus`) —
-    /// `world_save_version` moved with it.
-    ///
-    /// The member deliberately shares its enum's name, as REFINED.md's symbol
-    /// contract for this slice specifies; the declaration qualifies the type
-    /// with `::` for that reason, and so must any later member of this struct
-    /// that needs it.
-    ::ownership_class ownership_class = ::ownership_class::closed;
-
-    /// Starting capital in the economy's base currency unit; set by Pass 4.
-    float starting_capital = 0.0f;
-
-    /// Running cash balance, moved by the economy money loop (budget_system.hpp).
-    /// Opens at `starting_capital`; may go negative (no insolvency consequence in
-    /// the prototype — flagged red in the economy panel).
-    float balance = 0.0f;
-
-    /// True for exactly one corporation per campaign — the human player's
-    /// corporation. Set after all corps are generated.
-    bool is_player = false;
-
-    /// True for a BL-365 background firm — a real corporation generated purely
-    /// to fill the body's production/demand gap (the old abstract nation-substrate
-    /// injection's replacement). A corp is exactly one of player / rival /
-    /// background — is_player and is_background are never both true. Background
-    /// firms are otherwise ordinary corporations: real buildings, real recipes,
-    /// real stockpiles, picked up by corp_ai.cpp's uniform non-player iteration
-    /// like any rival.
-    bool is_background = false;
-
-    /// Building entity IDs owned by this corporation at campaign start.
-    /// Populated by Pass 3 (starting asset placement); each entry has a
-    /// building_component and a stockpile_component in the world.
-    std::vector<entity_id> assets;
-
-    /// Corporate border foundation (BL-182). The **HQ** is the corp's seat — the
-    /// holding nearest its holdings centroid on the home body, designated at
-    /// generation (Pass 3b) — and **influence_range** is the radius of its
-    /// HQ-projected border in *unit-hex* distance (hex_size = 1), so a renderer
-    /// obtains pixels by `influence_range * hex_size * zoom`, matching
-    /// `ui::hex_local_centre`'s geometry exactly. Together they let every corp draw
-    /// a border off real data rather than a render-time recompute. A corp with no
-    /// holdings on its home body keeps `{null_entity, 0}` — no border. **Render-only
-    /// today**: the border gates nothing until the deferred BL-182 operate-gate
-    /// lands (post-v0.1.0). See docs/generation/CORPORATION_GENERATION.md, LENSES.md.
-    ///
-    /// **The border RING itself was retired 2026-08-08 (BL-329)** — Ben's live
-    /// critique: a fixed-radius circle that never grew as the player built
-    /// outward showed nothing informative once the BL-323 reach fog existed to
-    /// show supply reach properly. `influence_range` is still computed and
-    /// stored (a future operate-gate may want it); only `body_surface_canvas.cpp`'s
-    /// `draw_corp_hq` (formerly `draw_corp_border`) stopped drawing it — the HQ
-    /// marker glyph itself is unaffected.
-    entity_id hq_building     = null_entity;
-    float     influence_range = 0.0f;
-
-    /// `science` — the BL-332 per-corp research accumulator — was REMOVED here
-    /// with BL-1273 (NR-1023, 2026-10-10). The nation holds technology now
-    /// (RESEARCH.md § Who holds technology): a completed research institute adds
-    /// RP to its owner corp's home nation's pool (`advance_research`,
-    /// nation_tech.hpp) instead of to a firm-level float nothing spent. Its
-    /// sibling `military_points` went the same way earlier (BL-455, NR-307) for
-    /// want of a consumer.
-
-    /// BL-428 growth spine: every good this corporation has EVER produced, set the
-    /// tick a building of its actually makes some (economy_system.cpp's
-    /// run_extraction / run_processing). Read through `recipe_registry` to obtain
-    /// the corp's reached chain depth.
-    ///
-    /// ⚠ WRITE-ONLY SINCE BL-692 (2026-08-29). Chain depth gates nothing any more
-    /// — tech is the only method lock — so nothing in `world/*` reads this bit to
-    /// decide anything. It survives because it is PINNED BY THE SAVE FORMAT
-    /// (`world_save.cpp`, field order for `world_save_version` 16): removing it
-    /// breaks every existing save. See `mark_produced` in economy_system.cpp for
-    /// the full note. A write with no read here is expected, not a defect.
-    ///
-    /// PRODUCED-ONCE-EVER, never cleared, and that is the design's legibility call
-    /// (Ben, 2026-08-15): progress must not evaporate because a building idled for
-    /// a tick or was demolished for a better site. A corp that has smelted iron
-    /// once knows how to smelt iron.
-    ///
-    /// A bool per resource rather than a bitset: `resource_count` is small, and a
-    /// plain array keeps this trivially copyable and order-independent, which
-    /// matters because the economy reads a number off it (the BL-406 lesson).
-    std::array<bool, resource_count> produced_ever = {};
-
-    /// BL-626: the corporation's filed quarterly returns, oldest first, at most
-    /// `k_quarterly_return_retention` of them. Appended by `apply_budget` in a
-    /// sorted `entity_id` walk, one row per economy tick.
-    ///
-    /// WORLD STATE, and that is the change this field represents.
-    /// `ui::player_plot_history` is a UI cache — player corp only, 64 samples,
-    /// never serialised. This is none of those things: it crosses the save seam,
-    /// it exists for every corporation, and a reloaded campaign comes back with
-    /// its history intact. The player's own profit chart keeps reading the UI
-    /// cache; that surface is unchanged.
-    std::vector<quarterly_return> returns;
-
-    /// BL-1206 (seat clean slate): a refund already credited to `balance` that no
-    /// return has booked yet. `apply_budget` books it as the next return's
-    /// `refunds` (that return's `net` runs from the previous close, so it
-    /// includes the refund and still telescopes) and zeroes it.
-    /// world_save_version 37.
-    float refund_unbooked = 0.0f;
-
-    /// BL-1206 review: the balance the refund was credited ONTO, kept exactly so
-    /// the booking return can open from it rather than from `balance - refund`
-    /// (fl(fl(C0 + R) - R) is not always C0). `apply_budget` uses it when the
-    /// balance it finds is still exactly `fl(refund_opening + refund_unbooked)`
-    /// — nothing else moved it since — and subtracts otherwise. Meaningful only
-    /// while `refund_unbooked > 0`. world_save_version 37.
-    float refund_opening = 0.0f;
-
-    /// BL-1099 -- THE FIRM'S ORIGIN (CORPORATION_GENERATION.md sec The spawn
-    /// shortlist; Ben, 2026-09-24, R15/R22). The search charters a firm from
-    /// a population centre's budget, so `origin_region` is the settlement
-    /// region of that centre (an index into `settlement_state::regions`, the
-    /// carve slot's own; -1 for a firm no budget chartered -- the legacy
-    /// roster, a fixture, a save from before the field), and `founded_year`
-    /// is the calendar year the Industrialisation span dates it to: the
-    /// region's k-th `works_chartered` note for its k-th charter, its
-    /// furnace year where the notes ran out, the epoch where it never lit
-    /// (`date_chartered_firms`). Meaningful only with an origin. The seat
-    /// briefing's origin sentence reads these two fields, never the report.
-    ///
-    /// SERIALISED after `returns` (world_save.cpp's corp record) --
-    /// `world_save_version` 27 moved with them.
-    int32_t founded_year  = 0;
-    int32_t origin_region = -1;
-
-    /// BL-1266 (TRADE.md § Auto and reserved trade): the trade points this
-    /// corporation RESERVES for its manual trades each tick; the rest of what
-    /// its Marketplaces and Ports make is auto. Clamped to what it makes at use.
-    /// Set by the player (and, under the AI_OPPONENT.md § 11 grant, by a rival)
-    /// through `set_trade_reserve`. SERIALISED (world_save_version 46).
-    float trade_reserve = 0.0f;
-    /// BL-1266: the trade points this corporation's trade buildings MADE on its
-    /// last trade pass (`run_trades`) — a rate, never banked (TRADE.md § The
-    /// Planetary Marketplace); kept for the surfaces and the scorer to read
-    /// between passes. SERIALISED (world_save_version 46) so a load reads what
-    /// the next tick's readers would have read.
-    float trade_points = 0.0f;
-};
+// BL-1407: `corporation_component` — and with it the whole-firm acquisition's
+// trailing window — is DELETED (Ben, 2026-10-23: no corporation and no company;
+// every building is its ground nation's, NATIONS.md § What a nation owns). The
+// quarterly return above is the NATION's now (`nation_component::returns`).
 
 /// BL-1407 — A CHARTER'S GENERATION RECORD (CORPORATION_GENERATION.md § Design
 /// principles: "A charter is the unit the budget buys ... It owns nothing and
@@ -2147,30 +1937,25 @@ struct charter_holding
     int32_t          origin_region   = -1;
 };
 
-/// BL-428: how far down the production graph @p c has actually reached — the
-/// deepest good it has ever produced. 0 for a fresh corporation (it has reached
-/// the raws and nothing beyond), which is exactly what an untouched
-/// `produced_ever` should mean.
+/// BL-428: how far down the production graph a PRODUCED-EVER set has reached —
+/// the deepest good in it. 0 for an empty set (the raws and nothing beyond).
+/// BL-1407: the per-corporation `produced_ever` retired with the type; the
+/// computation survives over any such set, exercised by `chain_depth.cpp`,
+/// because `depth_of` is a load-bearing dominance axis in that harness's R2 row.
+/// NO LONGER A GATE (BL-692, 2026-08-29).
 ///
-/// NO LONGER A GATE (BL-692, 2026-08-29). Every call site that refused a build or
-/// a retool on this number is gone; it survives as a pure computation over the
-/// recipe graph, exercised by `chain_depth.cpp` and kept because `depth_of` is a
-/// load-bearing dominance axis in that harness's R2 row.
+/// Unreachable goods (`depth_of` == -1) cannot raise it.
 ///
-/// Unreachable goods (`depth_of` == -1) cannot raise it: a corp cannot have
-/// produced a good the current era's graph says is unmakeable, and if a stale bit
-/// survived a band change it must not be allowed to unlock anything.
-///
-/// @param c    The corporation.
-/// @param reg  Loaded registry, read for `depth_of` under the campaign's band.
-/// @return     The corp's reached depth (>= 0).
+/// @param produced_ever  One flag per resource: has it ever been produced.
+/// @param reg            Loaded registry, read for `depth_of` under the campaign's band.
+/// @return               The reached depth (>= 0).
 template <typename Registry>
-int corp_reached_depth(const corporation_component& c, const Registry& reg)
+int reached_depth(const std::array<bool, resource_count>& produced_ever, const Registry& reg)
 {
     int best = 0;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (!c.produced_ever[r])
+        if (!produced_ever[r])
             continue;
         const int d = reg.depth_of(static_cast<resource_type>(r));
         if (d > best)
@@ -2326,9 +2111,25 @@ struct nation_component
     /// written ONLY through `trade_reserve_of` / `trade_points_of` (trade.hpp),
     /// which pick the corporation's field or these by owner, so the two kinds of
     /// owner cannot disagree. 0 reserve = all auto (what a state port always ran).
-    /// NOT YET SERIALISED: owed to world_save.cpp (BL-1402 port T).
+    /// BL-1407: SERIALISED in the v56 nation-books trailing section.
     float trade_reserve = 0.0f;
     float trade_points  = 0.0f;
+
+    /// BL-1407 — THE NATION'S QUARTERLY RETURNS (FINANCE.md § The quarterly
+    /// return; GLOSSARY.md § Quarterly return): oldest first, at most
+    /// `k_quarterly_return_retention` of them, one appended per economy tick by
+    /// `apply_budget`'s state pass in ascending nation id. A pure downstream
+    /// observation of the money loop. SERIALISED in the v56 nation-books section
+    /// (each row's f32 slots, its taxes and its exact double `net`).
+    std::vector<quarterly_return> returns;
+
+    /// BL-1206 / BL-1407: a refund already credited to `treasury` (the seat's
+    /// cancelled construction) that no return has booked yet, and the treasury it
+    /// was credited ONTO; the next return books it as `refunds` and opens from
+    /// `refund_opening` when nothing else moved the treasury since. SERIALISED in
+    /// the v56 nation-books section.
+    float refund_unbooked = 0.0f;
+    float refund_opening  = 0.0f;
 
     /// BL-1309 — how this nation's Logistic Points were shared among its state,
     /// its champion and other firms. RETIRED (BL-1405; LOGISTICS.md § Logistic

@@ -185,20 +185,8 @@ corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
         return r;
     }
 
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
-        return r;
-    r.balance = cit->second.balance;
-    if (!cit->second.returns.empty())
-        r.refunds = cit->second.returns.back().refunds; // BL-1215
-
-    const auto bit = report.budgets.find(corp);
-    if (bit != report.budgets.end())
-    {
-        r.budget          = bit->second;
-        r.budget_measured = true;
-    }
-
+    // BL-1407: no corporation exists; an actor that is not a nation has no books.
+    (void)report;
     return r;
 }
 
@@ -214,8 +202,6 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
     const char*     name = "Nation";
     if (const auto nit = w.nations.find(corp); nit != w.nations.end())
         name = nit->second.name.c_str();
-    else if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
-        name = cit->second.name.c_str();
 
     const corp_rollups r = derive_corp_rollups(w, reg, report, corp);
 

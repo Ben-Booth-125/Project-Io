@@ -267,21 +267,6 @@ std::int64_t research_price_ppm(const world& w, const research_params& p)
 }
 
 namespace {
-// A firm's contribution to its home nation's economy measure: the income of
-// its PREVIOUS quarter's return (returns[size - 2]), milli-credits, never
-// negative. Not the latest: the research pass runs in the tick whose
-// apply_budget filed it, and FINANCE.md § The quarterly return holds that no
-// branch reads a return during the tick that writes it.
-std::int64_t economy_milli_of(const corporation_component& c)
-{
-    if (c.returns.size() < 2)
-        return 0;
-    const double inc = static_cast<double>(c.returns[c.returns.size() - 2].income);
-    if (!std::isfinite(inc) || inc <= 0.0)
-        return 0;
-    return to_milli(inc); // credits -> milli-credits, the same 1000 and the same cap
-}
-
 // BL-1402 (NATIONS.md § What a nation owns): any economic owner's contribution.
 // A corporation's is its previous filed return (above). A nation holding
 // buildings files no return; its term is the sales its own buildings made
@@ -289,8 +274,8 @@ std::int64_t economy_milli_of(const corporation_component& c)
 // nation step reads it), never negative. One economy tick is one quarter.
 std::int64_t owner_economy_milli(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return economy_milli_of(cit->second);
+    // BL-1407: every owner is a nation (the corporation's previous-return term
+    // is deleted with the type).
     if (w.nations.find(owner) == w.nations.end())
         return 0;
     const auto lit = w.state_ledger.find(owner);

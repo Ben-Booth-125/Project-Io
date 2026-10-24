@@ -21,11 +21,7 @@ inline bool is_player_side(const world& w, entity_id id)
 /// building, unit and trade is one's) or a corporation; null when it is neither.
 inline const char* owner_display_name(const world& w, entity_id id)
 {
-    if (const auto nit = w.nations.find(id); nit != w.nations.end())
-        return nit->second.name.c_str();
-    if (const auto cit = w.corporations.find(id); cit != w.corporations.end())
-        return cit->second.name.c_str();
-    return nullptr;
+    return actor_name(w, id); // BL-1407: every owner is a nation
 }
 
 } // namespace ui

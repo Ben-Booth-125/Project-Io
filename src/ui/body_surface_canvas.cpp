@@ -2442,18 +2442,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 tile_to_bld[bld.tile] = bld_id;
             }
         }
-        for (const auto& [corp_id, corp] : w.corporations)
-        {
-            for (entity_id bld_id : corp.assets)
-            {
-                const auto bld_it = w.buildings.find(bld_id);
-                if (bld_it == w.buildings.end())
-                    continue;
-                const auto tile_it = w.tiles.find(bld_it->second.tile);
-                if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
-                    tile_to_corp[bld_it->second.tile] = corp_id;
-            }
-        }
         // BL-1406: a NATION's own buildings (`state_assets`) are owned ground too —
         // once the world is folded every building is a nation's, so without this
         // the index (and the player-identity accent it gates) would be empty. The
@@ -2721,10 +2709,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     float industry_max = 0.0f;
     if (state.overlay == overlay_mode::industry)
     {
-        const auto background_owned = [&w](entity_id corp) {
-            const auto cit = w.corporations.find(corp);
-            return cit != w.corporations.end() && cit->second.is_background;
-        };
+        // BL-1407: "background" industry was a background firm's; every building
+        // is a nation's now, so nothing reads as a firm's.
+        const auto background_owned = [](entity_id) { return false; };
 
         // Body-local output ceiling, so the share term is relative to this body's own
         // background industry rather than a cross-body absolute.

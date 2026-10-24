@@ -58,10 +58,11 @@ namespace {
 /// format, and do not assume it still gates anything — it gates nothing.
 void mark_produced(world& w, entity_id corp, resource_type r)
 {
-    const auto it = w.corporations.find(corp);
-    if (it == w.corporations.end())
-        return;
-    it->second.produced_ever[static_cast<std::size_t>(r)] = true;
+    // BL-1407: the produced-ever record was the corporation's and is deleted
+    // with it (the save seam that pinned it moved to v56); a nation keeps none.
+    (void)w;
+    (void)corp;
+    (void)r;
 }
 
 /// Body that a building sits on (via its tile). null_entity if the tile is gone.
@@ -1560,14 +1561,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                     b.construction_paid += drawn * posted_price(*m, r);
                 }
             }
-            const auto cit = w.corporations.find(corp);
-            if (cit != w.corporations.end())
-            {
-                const float flat = (econ.build_cost / duration) * rate;
-                cit->second.balance -= flat;
-                b.construction_paid += flat; // BL-1206: the flat half, as debited
-            }
-            else if (own.kind == owner_kind::nation)
+            if (own.kind == owner_kind::nation) // BL-1407: every owner is a nation
             {
                 // BL-1296: a state site's flat cost leaves its treasury — funded
                 // by this tick's gate, so it cannot overdraw it.
@@ -1670,9 +1664,8 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     // own actor - the tech gate reads its own tree, so a minor with no champion
     // retools too - and any recipe is admitted, the strategic-sector limit having
     // retired with the state/private split.
-    const auto cit = w.corporations.find(corp);
-    const auto nit = (cit == w.corporations.end()) ? w.nations.find(corp) : w.nations.end();
-    if (cit == w.corporations.end() && nit == w.nations.end())
+    const auto nit = w.nations.find(corp); // BL-1407: every owner is a nation
+    if (nit == w.nations.end())
         return recipe_switch_result::invalid;
     const entity_id gate_corp = corp;
 
@@ -1728,17 +1721,13 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         if (!std::isfinite(bill_rise))
             return recipe_switch_result::insufficient_funds;
     }
-    const float funds = (cit != w.corporations.end()) ? cit->second.balance
-                                                      : state_uncommitted_treasury(w, corp) - bill_rise;
+    const float funds = state_uncommitted_treasury(w, corp) - bill_rise;
     if (funds < cost)
         return recipe_switch_result::insufficient_funds;
     if (bill_rise > 0.0f)
         w.state_ledger[corp].committed += bill_rise;
 
-    if (cit != w.corporations.end())
-        cit->second.balance -= cost;
-    else
-        nit->second.treasury -= cost; // a one-off retool, paid from the treasury
+    nit->second.treasury -= cost; // a one-off retool, paid from the treasury
 
     b.recipe                 = new_recipe_id;
     b.active_recipe_index    = static_cast<int>(new_recipe_id); // registry index == id (recipe_at)
@@ -1872,111 +1861,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
-    // BL-350 procurement contracts: paced like a BL-095 build — the deposit
-    // was already debited at accept_quote, so each tick draws an even slice of
-    // the remainder from the BUYER's balance (a simplification of BL-095's own
-    // market-gated stretch/pause rate: a contract paces on a fixed schedule
-    // rather than the supplier's live throughput, a known first-cut cut — see
-    // BL-350's item resolution). Ascending contract id (insertion order — the
-    // vector is appended-to, never reordered) keeps this deterministic without
-    // an extra sort.
-    //
-    // BL-392 changed two things about what that instalment IS and where the
-    // goods go:
-    //
-    //   MONEY IS A TRANSFER. Each instalment now leaves the buyer AND ARRIVES
-    //   AT THE SUPPLIER, the same magnitude in the same statement. Before this,
-    //   the buyer's balance was debited and no balance anywhere was credited:
-    //   every contract in flight was quietly burning credits out of the economy.
-    //   The freight rides in the same total — the supplier arranges the
-    //   carriage, so paying them for it keeps the flow closed.
-    //
-    //   GOODS LAND ON `delivery_body`, the buyer's own body, not on the
-    //   supplier's. Crediting the supplier's body put the stock where the buyer
-    //   held no processor reservation, and the auto-surplus path liquidated it
-    //   in the tick it landed — a player ran twenty contracts and never saw a
-    //   single pool fact. Where the supplier holds the good in stock at the
-    //   fulfilment body it is DRAWN from their pool (a real move, not a copy);
-    //   any shortfall is built to order, which is what a build order placed with
-    //   someone else means.
-    {
-        const auto& pp = reg.procurement();
-        std::vector<std::size_t> completed;
-        for (std::size_t i = 0; i < w.procurement_contracts.size(); ++i)
-        {
-            procurement_contract& c = w.procurement_contracts[i];
-            const auto bit = w.corporations.find(c.buyer);
-            if (bit == w.corporations.end())
-                continue; // buyer no longer exists — leave the contract inert
-            const auto sit = w.corporations.find(c.supplier);
-            if (sit == w.corporations.end())
-                continue; // supplier gone — there is nobody to pay, so charge nothing
-
-            const float contract_total  = c.quantity * c.unit_price + c.freight_cost;
-            const float remaining_total = contract_total * (1.0f - pp.deposit_fraction);
-            const float per_tick = (c.lead_time_ticks > 0) ? remaining_total / static_cast<float>(c.lead_time_ticks) : remaining_total;
-            bit->second.balance -= per_tick;
-            sit->second.balance += per_tick;
-            ++c.ticks_elapsed;
-            // BL-1227 (AI_OPPONENT.md § 2B): procurement is a buyer that posts
-            // no bid. What it WANTS — the whole contract, filled from stock or
-            // built to order — is an unposted bid on the supplier's home market
-            // on EVERY tick of the lead time, not only the tick it fulfils
-            // (wanted, filled or not).
-            const std::size_t ri = static_cast<std::size_t>(c.resource);
-            if (const auto hmit = w.markets.find(corp_home_market(w, c.supplier, c.body));
-                hmit != w.markets.end())
-                note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
-            if (c.ticks_elapsed >= c.lead_time_ticks)
-            {
-                // BL-1265 (MARKETS.md § The shelf economy: procurement delivers
-                // "from and to shelves"). The supplier holds no stock, so it BUYS
-                // what its home market's shelf on the fulfilment body holds, at
-                // the posted price and under the fair-price ceiling, like any
-                // buyer, and builds the rest to order. The delivery LANDS on the
-                // buyer's home market on the delivery body — landing is selling,
-                // so the buyer is paid it at that tick's clearing price and the
-                // goods stand on the shelf for whoever buys them next, the buyer
-                // included. A contract names bodies, not markets: each side's
-                // HOME market there (`corp_home_market`).
-                const entity_id supply_mid = corp_home_market(w, c.supplier, c.body);
-                if (const auto smit = w.markets.find(supply_mid); smit != w.markets.end()
-                    && shelf_admits(smit->second, ri, reg.price_band().reservation_mult, /*off_buys=*/true))
-                {
-                    float& shelf = smit->second.inventory[ri];
-                    const float take = std::min(std::max(0.0f, shelf), c.quantity);
-                    if (take > 0.0f)
-                    {
-                        shelf -= take;
-                        report.purchases[std::make_pair(c.supplier, supply_mid)][ri] += take;
-                        report.wants[std::make_pair(c.supplier, supply_mid)][ri]     += take; // it bids
-                    }
-                }
-                const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
-                // A delivery body with no market has no shelf to land on: the
-                // goods land at the buyer's HQ market, else the supplier's —
-                // never destroyed after the buyer has paid (cold review).
-                entity_id land_mid = corp_home_market(w, c.buyer, land_on);
-                if (land_mid == null_entity)
-                    land_mid = corp_hq_market(w, c.buyer);
-                if (land_mid == null_entity)
-                    land_mid = supply_mid;
-                w.land_goods(c.buyer, land_mid, ri, c.quantity);
-                // BL-546: one `contract_completed` occurrence folded into the
-                // relational substrate, at the weight economy.lua authors
-                // (seeded from `reputation_on_complete`, so the magnitude is
-                // unchanged by the migration). The walk is ascending contract
-                // id, so the fold order is the same deterministic order the
-                // instalments above were paid in.
-                w.note_conduct(reg.sentiment(), c.buyer, c.supplier,
-                               sentiment_factor_kind::contract_completed);
-                completed.push_back(i);
-            }
-        }
-        // Erase back-to-front so earlier indices stay valid.
-        for (auto it = completed.rbegin(); it != completed.rend(); ++it)
-            w.procurement_contracts.erase(w.procurement_contracts.begin() + static_cast<long>(*it));
-    }
+    // BL-1407: the BL-350 procurement-contract pacing pass is DELETED with the
+    // corporation (CONTRACTS.md: named-supplier procurement is retired; the seam
+    // refuses the quote / accept / cancel verbs, so no contract can exist).
     phase_stamp(2); // credits+contracts (cooldowns, research, education, procurement)
 
     // BL-042: Derive per-body workforce supply from population centres.
@@ -2485,10 +2372,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         // stack onto the same deposit) and ownership is only readable the other way
         // round, corp → assets.
         std::map<entity_id, entity_id> corp_of_building;
-        for (const auto& [c, cc] : w.corporations)
-            for (const entity_id asset : cc.assets)
-                corp_of_building[asset] = c;
-        for (const auto& [n, nc] : w.nations) // BL-1296: a state owner, by nation id
+        for (const auto& [n, nc] : w.nations) // BL-1407: every owner is a nation // BL-1296: a state owner, by nation id
             for (const entity_id asset : nc.state_assets)
                 corp_of_building[asset] = n;
         const auto owner_of = [&](entity_id bid) -> entity_id {
@@ -3030,13 +2914,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             // the nation (`corp` below is the acting owner). Never the player's
             // nation's — the player's economy is the player's.
             const entity_id corp = owner;
-            const bool nation_owner = w.corporations.find(owner) == w.corporations.end();
-            if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-            {
-                if (cit->second.is_player)
-                    continue; // never auto-act on the player's own corp
-            }
-            else if (owner == player_nation(w))
+            const bool nation_owner = true; // BL-1407: every owner is a nation
+            if (owner == player_nation(w))
                 continue; // the player's nation's buildings are the player's
 
             for (const entity_id bid : *assets_of(w, owner))
@@ -3796,7 +3675,8 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         // is also what moves its `supply_factor_permille`. See MILITARY.md
         // § Nation garrisons: "A garrison does not draw the credits+goods
         // vector run_unit_upkeep charges corp units."
-        if (w.corporations.find(u.owner) == w.corporations.end())
+        // BL-1407: every unit is a NATION's, so every unit takes this branch.
+        if (u.owner != null_entity || u.owner == null_entity)
         {
             if (w.nations.find(u.owner) == w.nations.end())
                 disband.push_back(id);
@@ -3915,11 +3795,7 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
     // unordered and this walk is order-INDEPENDENT (each building has exactly one
     // owner, so the finished map is the same whatever order it was filled in);
     // the DRAW below then walks the std::map, which is sorted by building id.
-    std::map<entity_id, entity_id> owner_of;
-    for (const auto& [corp, cc] : w.corporations)
-        for (const entity_id bid : cc.assets)
-            if (w.buildings.find(bid) != w.buildings.end())
-                owner_of[bid] = corp;
+    std::map<entity_id, entity_id> owner_of; // BL-1407: every owner is a nation
     // BL-1296: a state building draws its basket under its nation's id, billed
     // to the treasury at the clear — unless the gate idled it this tick.
     for (const auto& [nid, nc] : w.nations)
@@ -4232,9 +4108,7 @@ std::vector<lp_march_claim> collect_march_claims(const world& w, const recipe_re
         // drew ITS victim's pool, starving the defender's industry to fund the attack.
         // A corporation's march is its home nation's; a nation-owned garrison (BL-571)
         // is its own nation's.
-        if (const auto cit = w.corporations.find(u.owner); cit != w.corporations.end())
-            c.nation = cit->second.home_nation;
-        else if (w.nations.find(u.owner) != w.nations.end())
+        if (w.nations.find(u.owner) != w.nations.end()) // BL-1407: a nation's own march
             c.nation = u.owner;
         claims.push_back(c);
     }
@@ -4322,8 +4196,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
         {
             float credit_cost = mil.active_lp_credit_per_unit_distance
                                * would_be_points * static_cast<float>(u.count);
-            if (w.corporations.find(u.owner) == w.corporations.end())
-                credit_cost = std::min(credit_cost, purse_room_of(w, u.owner));
+            credit_cost = std::min(credit_cost, purse_room_of(w, u.owner)); // BL-1407: a nation
             *purse -= credit_cost;
         }
 

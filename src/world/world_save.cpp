@@ -5,6 +5,7 @@
 #include "logistics.hpp"        // BL-1340: road_edges_mirrored — the mirror is checked on load
 #include "river_generation.hpp"  // BL-1340: hex_side_for_offset — the pre-v53 migration
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
+#include "state_industry.hpp" // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
 #include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
@@ -47,7 +48,6 @@ constexpr auto max_building   = building_type::railway_station; // BL-1255 (v49)
 constexpr auto max_survey     = survey_phase::surveyed;
 constexpr auto max_convoy     = convoy_mode::space;
 constexpr auto max_focus      = industrial_focus::trade;
-constexpr auto max_ownership  = ownership_class::closed; // BL-631: Pass 2b's derived class.
 constexpr auto max_ideology   = ideology::isolationist;
 constexpr auto max_posture    = expansionism::aggressive;
 constexpr auto max_econ_focus = economic_focus::trade;
@@ -484,12 +484,22 @@ bool r_return(std::istream& i, quarterly_return& q)
         && std::isfinite(q.book_value);
 }
 
-void w_corp(std::ostream& o, const corporation_component& c)
+// BL-1407: the PRE-v56 corporation record — read into scratch and folded away
+// (`legacy_corp_record`, world_save.hpp); written only by the verification
+// writer. The field order is the retired `corporation_component`'s.
+/// BL-1407: a nation carries v56 book state worth writing.
+bool nation_has_books(const nation_component& nc)
+{
+    return nc.trade_reserve != 0.0f || nc.trade_points != 0.0f || nc.refund_unbooked != 0.0f
+        || !nc.returns.empty();
+}
+
+void w_corp(std::ostream& o, const legacy_corp_record& c)
 {
     w_str(o, c.name);
     w_id(o, c.home_nation);
     w_enum(o, c.focus);
-    w_enum(o, c.ownership_class); // BL-631: world_save_version bumped for this.
+    w_u8(o, c.ownership); // BL-631: the retired class byte.
     w_f32(o, c.starting_capital);
     w_f32(o, c.balance);
     w_bool(o, c.is_player);
@@ -507,7 +517,7 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_f32(o, c.trade_points);      // BL-1266: world_save_version 46
 }
 
-bool r_corp(std::istream& i, corporation_component& c)
+bool r_corp(std::istream& i, legacy_corp_record& c)
 {
     // Field order is the declaration order, and BOTH of Sprint 20 wave 1's
     // additions sit in it: `ownership_class` (BL-631) immediately after `focus`,
@@ -515,7 +525,7 @@ bool r_corp(std::istream& i, corporation_component& c)
     // (`founded_year`, `origin_region`) last, after `returns`. The write side
     // above must match this exactly.
     if (!(r_str(i, c.name) && r_id(i, c.home_nation) && r_enum(i, c.focus, max_focus)
-          && r_enum(i, c.ownership_class, max_ownership)
+          && r_u8(i, c.ownership) && c.ownership <= 2 // the retired class, 0..2
           && r_f32(i, c.starting_capital) && r_f32(i, c.balance) && r_bool(i, c.is_player)
           && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
           && r_f32(i, c.influence_range)
@@ -1041,7 +1051,8 @@ void clear_derived_state(world& w)
 /// shape (BL-1340): `world_save_version` for a real save,
 /// `k_world_save_version_pre_road_edges` for the verification-only producer of a pre-edge
 /// stream. Nothing else differs — v52 is today's stream with yesterday's tile record.
-void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version)
+void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version,
+                             const std::map<entity_id, legacy_corp_record>* corps = nullptr)
 {
     w_u32(out, world_save_magic);
     w_u32(out, version);
@@ -1086,7 +1097,18 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     w_map(out, w.nation_budgets, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
           w_nation_budget);
     w_id_store(out, w.tile_to_nation);
-    w_store(out, w.corporations, w_corp);
+    // BL-1407 (v56): no corporation store. A PRE-v56 stream (the verification
+    // writers only) carries the given records, ascending id, or an empty store.
+    if (version < world_save_version)
+    {
+        w_count(out, corps != nullptr ? corps->size() : 0);
+        if (corps != nullptr)
+            for (const auto& [cid, c] : *corps)
+            {
+                w_id(out, cid);
+                w_corp(out, c);
+            }
+    }
 
     // --- pair-keyed economy tables ------------------------------------------
     // BL-1265 (v46): the corporation pools (BL-1003) retired — every good is
@@ -1312,16 +1334,20 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // Kept out of the return record so v51 stays a strict prefix: every
     // corporation with any taxed return, ascending id, as (id, u32 n = its
     // return count, n x f32 in filed order). Nobody taxed: one empty count.
+    // BL-1407: a corporation half, so PRE-v56 only (v56 keeps a nation's taxes
+    // in its books, below).
+    if (version < world_save_version)
     {
+        static const std::map<entity_id, legacy_corp_record> no_corps;
+        const std::map<entity_id, legacy_corp_record>& cs = corps != nullptr ? *corps : no_corps;
         std::vector<entity_id> taxed;
-        for (const auto& [cid, cc] : w.corporations)
+        for (const auto& [cid, cc] : cs)
             for (const quarterly_return& q : cc.returns)
                 if (q.taxes != 0.0f) { taxed.push_back(cid); break; }
-        std::sort(taxed.begin(), taxed.end());
         w_u32(out, static_cast<uint32_t>(taxed.size()));
         for (const entity_id cid : taxed)
         {
-            const std::vector<quarterly_return>& rs = w.corporations.at(cid).returns;
+            const std::vector<quarterly_return>& rs = cs.at(cid).returns;
             w_id(out, cid);
             w_u32(out, static_cast<uint32_t>(rs.size()));
             for (const quarterly_return& q : rs)
@@ -1342,21 +1368,23 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // BL-1340's migration a real v52 stream to read - must end before it, exactly as
     // the comment above says. Unconditional, it appended bytes no reader would eat.
     // BL-1404: v54 and later (the majors' v55 section follows it).
-    if (version > k_world_save_version_pre_net)
+    // BL-1407: a corporation section, so v54 and v55 only.
+    if (version > k_world_save_version_pre_net && version < world_save_version)
     {
+        static const std::map<entity_id, legacy_corp_record> no_corps;
+        const std::map<entity_id, legacy_corp_record>& cs = corps != nullptr ? *corps : no_corps;
         std::vector<entity_id> inexact;
-        for (const auto& [cid, cc] : w.corporations)
+        for (const auto& [cid, cc] : cs)
             for (const quarterly_return& q : cc.returns)
                 if (static_cast<double>(static_cast<float>(q.net)) != q.net)
                 {
                     inexact.push_back(cid);
                     break;
                 }
-        std::sort(inexact.begin(), inexact.end());
         w_u32(out, static_cast<uint32_t>(inexact.size()));
         for (const entity_id cid : inexact)
         {
-            const std::vector<quarterly_return>& rs = w.corporations.at(cid).returns;
+            const std::vector<quarterly_return>& rs = cs.at(cid).returns;
             w_id(out, cid);
             w_u32(out, static_cast<uint32_t>(rs.size()));
             for (const quarterly_return& q : rs)
@@ -1368,7 +1396,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // whose `is_major` is set, ascending id, as (u32 count, count x id). A world
     // with no major writes one empty count. A v54 (and older) stream ends before
     // it, and is read with the majors derived from its champions.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_books) // v55 and v56
     {
         std::vector<entity_id> majors;
         for (const auto& [nid, nc] : w.nations)
@@ -1379,6 +1407,43 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         for (const entity_id nid : majors)
             w_id(out, nid);
     }
+
+    // BL-1407 (world_save_version 56): THE NATION BOOKS, the last section. Every
+    // nation with any book state, ascending id, as (id, f32 trade_reserve, f32
+    // trade_points, f32 refund_unbooked, f32 refund_opening, u32 n, then n rows
+    // of `w_return`, then n x f32 taxes, then n x f64 exact nets, filed order).
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nation_has_books(nc))
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id nid : ids)
+        {
+            const nation_component& nc = w.nations.at(nid);
+            w_id(out, nid);
+            w_f32(out, nc.trade_reserve);
+            w_f32(out, nc.trade_points);
+            w_f32(out, nc.refund_unbooked);
+            w_f32(out, nc.refund_opening);
+            w_vec(out, nc.returns, w_return);
+            for (const quarterly_return& q : nc.returns)
+                w_f32(out, q.taxes);
+            for (const quarterly_return& q : nc.returns)
+                w_f64(out, q.net);
+        }
+    }
+}
+
+std::size_t world_save_books_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nation_has_books(nc))
+            n += 4 + 4 * 4 + 4 + nc.returns.size() * (12 * 4 + 4 + 8);
+    return n;
 }
 
 std::size_t world_save_major_section_bytes(const world& w)
@@ -1392,15 +1457,10 @@ std::size_t world_save_major_section_bytes(const world& w)
 
 std::size_t world_save_net_section_bytes(const world& w)
 {
-    std::size_t n = 4;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const quarterly_return& q : cc.returns)
-            if (static_cast<double>(static_cast<float>(q.net)) != q.net)
-            {
-                n += 4 + 4 + 8 * cc.returns.size();
-                break;
-            }
-    return n;
+    // BL-1407: a corporation section (v54/v55); a world holds no corporation,
+    // so the verification writer writes it as one empty count.
+    (void)w;
+    return 4;
 }
 
 std::size_t world_save_tax_section_bytes(const world& w)
@@ -1409,16 +1469,21 @@ std::size_t world_save_tax_section_bytes(const world& w)
     for (const auto& [nid, nc] : w.nations)
         if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f)
             n += 4 + 1 + 4;
-    n += 4;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const quarterly_return& q : cc.returns)
-            if (q.taxes != 0.0f) { n += 4 + 4 + 4 * cc.returns.size(); break; }
+    n += 4; // BL-1407: the corporation half, an empty count (pre-v56 layout)
     return n;
 }
 
 void write_world_snapshot(const world& w, std::ostream& out)
 {
     write_world_snapshot_at(w, out, world_save_version);
+}
+
+void write_world_snapshot_legacy(const world& w,
+                                 const std::map<entity_id, legacy_corp_record>& corps,
+                                 std::ostream& out, uint32_t version)
+{
+    // BL-1407, VERIFICATION ONLY: a real pre-v56 stream for the loader's fold.
+    write_world_snapshot_at(w, out, version, &corps);
 }
 
 void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out)
@@ -1452,8 +1517,13 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_tax
             && version != k_world_save_version_pre_road_edges // BL-1340: v52, migrated
             && version != k_world_save_version_pre_net        // BL-1337: v53, nets as f32
-            && version != k_world_save_version_pre_major))    // BL-1404: v54, majors derived
+            && version != k_world_save_version_pre_major      // BL-1404: v54, majors derived
+            && version != k_world_save_version_pre_books))    // BL-1407: v55, corporations folded
         return false; // mismatched version -- refuse rather than misread
+
+    // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
+    // world state) and folded away once every section has been read.
+    std::unordered_map<entity_id, legacy_corp_record> legacy;
 
     // Everything below builds into `s`, and `w` is not touched until the last
     // read has succeeded. That is what makes a failed load leave the caller's
@@ -1541,7 +1611,7 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false;
     if (!r_id_store(in, s.tile_to_nation))
         return false;
-    if (!r_store(in, s.corporations, r_corp))
+    if (version < world_save_version && !r_store(in, legacy, r_corp))
         return false;
 
     if (!r_map(in, s.workforce_supply_overrides, r_id_pair,
@@ -1670,7 +1740,7 @@ bool read_world_snapshot(world& w, std::istream& in)
         if (!r_u32(in, count) || count > s.nations.size())
             return false;
         std::set<entity_id> owned;
-        for (const auto& [cid, cc] : s.corporations)
+        for (const auto& [cid, cc] : legacy)
             for (const entity_id bid : cc.assets)
                 owned.insert(bid);
         std::set<entity_id> state_owned;
@@ -1726,7 +1796,7 @@ bool read_world_snapshot(world& w, std::istream& in)
                 return false;
             prev = tile;
             if (owner != null_entity && s.nations.count(owner) == 0
-                && s.corporations.count(owner) == 0)
+                && legacy.count(owner) == 0)
                 return false;
             s.rail_track.emplace_hint(s.rail_track.end(), tile, owner);
         }
@@ -1826,7 +1896,7 @@ bool read_world_snapshot(world& w, std::istream& in)
                 || s.nations.count(aid) != 0 || s.bodies.count(aid) != 0
                 || s.tiles.count(aid) != 0 || s.buildings.count(aid) != 0
                 || s.markets.count(aid) != 0 || s.units.count(aid) != 0
-                || s.population_centres.count(aid) != 0 || s.corporations.count(aid) != 0)
+                || s.population_centres.count(aid) != 0 || legacy.count(aid) != 0)
                 return false;
             prev = aid;
             // Owner and destination: a nation; a body with a slot (never the star),
@@ -1865,7 +1935,9 @@ bool read_world_snapshot(world& w, std::istream& in)
     // the stream, strictly ascending, with a tier in 1..5 and a Discontent
     // finite in [0, 1]. Refused whole otherwise. A v51 (and older) stream ends
     // before it: every nation at tier III with no Discontent (the defaults).
-    if (version >= k_world_save_version_pre_net) // v52 and v54 carry it
+    // BL-1407: v52 CARRIES THIS SECTION — the old `>= pre_net` gate skipped a v52
+    // stream's tiers (the BL-1404 lane's defect), and is fixed here.
+    if (version > k_world_save_version_pre_tax) // v52 and later carry it
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -1888,9 +1960,10 @@ bool read_world_snapshot(world& w, std::istream& in)
 
         // The returns' taxes. Untrusted: each names a corporation in the stream,
         // strictly ascending, with exactly its return count of finite,
-        // non-negative figures. Refused whole otherwise.
+        // non-negative figures. Refused whole otherwise. BL-1407: pre-v56 only.
         uint32_t ccount = 0;
-        if (!r_u32(in, ccount) || ccount > s.corporations.size())
+        if (version < world_save_version
+            && (!r_u32(in, ccount) || ccount > legacy.size()))
             return false;
         entity_id cprev = null_entity;
         for (uint32_t k = 0; k < ccount; ++k)
@@ -1899,8 +1972,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             uint32_t  n   = 0;
             if (!r_id(in, cid) || !r_u32(in, n))
                 return false;
-            const auto cit = s.corporations.find(cid);
-            if (cid == null_entity || (k > 0 && cid <= cprev) || cit == s.corporations.end()
+            const auto cit = legacy.find(cid);
+            if (cid == null_entity || (k > 0 && cid <= cprev) || cit == legacy.end()
                 || n != cit->second.returns.size())
                 return false;
             cprev = cid;
@@ -1919,10 +1992,10 @@ bool read_world_snapshot(world& w, std::istream& in)
     // figures, each of which rounds to the f32 slot its record already carried
     // (the writer wrote that slot from this very double). Refused whole
     // otherwise. A v52 (and older) stream ends before it: every net is its slot.
-    if (version > k_world_save_version_pre_net) // BL-1404: v54 and v55 carry it
+    if (version > k_world_save_version_pre_net && version < world_save_version) // v54, v55
     {
         uint32_t ccount = 0;
-        if (!r_u32(in, ccount) || ccount > s.corporations.size())
+        if (!r_u32(in, ccount) || ccount > legacy.size())
             return false;
         entity_id cprev = null_entity;
         for (uint32_t k = 0; k < ccount; ++k)
@@ -1931,8 +2004,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             uint32_t  n   = 0;
             if (!r_id(in, cid) || !r_u32(in, n))
                 return false;
-            const auto cit = s.corporations.find(cid);
-            if (cid == null_entity || (k > 0 && cid <= cprev) || cit == s.corporations.end()
+            const auto cit = legacy.find(cid);
+            if (cid == null_entity || (k > 0 && cid <= cprev) || cit == legacy.end()
                 || n != cit->second.returns.size())
                 return false;
             cprev = cid;
@@ -1954,7 +2027,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // strictly ascending, never null. Refused whole otherwise. A v54 (and older)
     // stream ends before it and predates the saved fact: its majors are DERIVED
     // from its champions, the rule `is_major_nation` read before this version.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_books) // v55 and v56
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -1972,7 +2045,67 @@ bool read_world_snapshot(world& w, std::istream& in)
         }
     }
     else
-        mark_majors_from_champions(s);
+    {
+        // v54 and older: a major is a nation home to a SPECIALIST (a non-background
+        // corporation) of the stream — the champion rule the saved fact replaced.
+        // Keyed writes: order-free.
+        for (const auto& [cid, cc] : legacy)
+            if (!cc.is_background)
+                if (const auto nit = s.nations.find(cc.home_nation); nit != s.nations.end())
+                    nit->second.is_major = true;
+    }
+
+    // BL-1407 (v56): the nation books. Untrusted: each names a nation in the
+    // stream, strictly ascending, never null; reserve and points finite and never
+    // negative; the unbooked refund finite and never negative, its opening
+    // finite; at most `k_quarterly_return_retention` returns, each read as
+    // `r_return` reads one, its taxes finite and never negative, its exact net
+    // finite, inside float range, and rounding to the row's f32 slot. Refused
+    // whole otherwise.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev))
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            nation_component& nc = nit->second;
+            if (!(r_f32(in, nc.trade_reserve) && r_f32(in, nc.trade_points)
+                  && r_f32(in, nc.refund_unbooked) && r_f32(in, nc.refund_opening)
+                  && r_vec(in, nc.returns, r_return)))
+                return false;
+            if (!(std::isfinite(nc.trade_reserve) && nc.trade_reserve >= 0.0f
+                  && std::isfinite(nc.trade_points) && nc.trade_points >= 0.0f
+                  && std::isfinite(nc.refund_unbooked) && nc.refund_unbooked >= 0.0f
+                  && std::isfinite(nc.refund_opening)
+                  && nc.returns.size() <= k_quarterly_return_retention))
+                return false;
+            for (quarterly_return& q : nc.returns)
+            {
+                float t = 0.0f;
+                if (!r_f32(in, t) || !std::isfinite(t) || t < 0.0f)
+                    return false;
+                q.taxes = t;
+            }
+            for (quarterly_return& q : nc.returns)
+            {
+                double v = 0.0;
+                if (!r_f64(in, v) || !std::isfinite(v)
+                    || std::fabs(v) > static_cast<double>(std::numeric_limits<float>::max())
+                    || static_cast<double>(static_cast<float>(v)) != q.net)
+                    return false;
+                q.net = v;
+            }
+        }
+    }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all
@@ -1984,12 +2117,33 @@ bool read_world_snapshot(world& w, std::istream& in)
         for (const standing_trade& t : s.trades)
         {
             if (++per_owner[t.owner] > 64) return false; // max_trades_per_corp
-            // BL-1402: a trade's owner is a corporation or, since the fold, a nation.
-            if (s.corporations.count(t.owner) == 0 && s.nations.count(t.owner) == 0) return false;
+            // BL-1402 / BL-1407: a trade's owner is a nation, or a pre-v56 stream's
+            // corporation (re-owned by the fold below).
+            if (legacy.count(t.owner) == 0 && s.nations.count(t.owner) == 0) return false;
             if (t.from_market == t.to_market) return false;
             if (s.markets.count(t.from_market) == 0 || s.markets.count(t.to_market) == 0) return false;
             if (t.id >= s.next_trade_id || !ids.insert(t.id).second) return false;
         }
+    }
+
+    // BL-1407 — THE PRE-v56 FOLD (R2): the stream's corporations pass to the
+    // nations — buildings to their ground, money and reserves home, units, track,
+    // trades, convoys and routes with them, the seat to its nation — and the
+    // records are discarded. Ascending firm id.
+    if (version < world_save_version)
+    {
+        std::map<entity_id, legacy_firm> firms;
+        for (const auto& [cid, cc] : legacy)
+        {
+            legacy_firm f;
+            f.home_nation   = cc.home_nation;
+            f.balance       = cc.balance;
+            f.trade_reserve = cc.trade_reserve;
+            f.is_background = cc.is_background;
+            f.assets        = cc.assets;
+            firms.emplace(cid, std::move(f));
+        }
+        (void)fold_legacy_firms(s, firms);
     }
 
     clear_derived_state(s);

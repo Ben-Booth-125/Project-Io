@@ -48,10 +48,10 @@ world_metrics measure(const world& w)
     world_metrics m;
     m.tiles    = w.tiles.size();
     m.nations  = w.nations.size();
-    m.corps    = w.corporations.size();
+    m.corps    = 0; // BL-1407: no corporation exists
     m.entities = w.bodies.size() + w.tiles.size() + w.buildings.size() +
                  w.stockpiles.size() + w.markets.size() + w.units.size() +
-                 w.population_centres.size() + w.nations.size() + w.corporations.size();
+                 w.population_centres.size() + w.nations.size();
     for (const auto& [id, tc] : w.tiles)
     {
         // BOTH AXES fold into the digest (BL-519). Hashing only the substrate
@@ -217,17 +217,14 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         if (nit != w.population_centre_name.end()) fold_str(h, nit->second);
     }
 
-    for (const entity_id id : sorted_ids(w.corporations))
+    // BL-1407: the corporation section is DELETED with the type; each nation's
+    // owned buildings (every building is a nation's) are folded in its place.
+    for (const entity_id id : sorted_ids(w.nations))
     {
-        const corporation_component& c = w.corporations.at(id);
+        const nation_component& n = w.nations.at(id);
         fold_u32(h, id);
-        fold_str(h, c.name);
-        fold_u32(h, c.home_nation);
-        fold_i32(h, static_cast<int32_t>(c.focus));
-        fold_f32(h, c.starting_capital);
-        fold_i32(h, c.is_player ? 1 : 0);
-        fold_u32(h, static_cast<uint32_t>(c.assets.size()));
-        for (const entity_id a : c.assets) fold_u32(h, a);
+        fold_u32(h, static_cast<uint32_t>(n.state_assets.size()));
+        for (const entity_id a : n.state_assets) fold_u32(h, a);
     }
 
     // The world log: generation narrates into it, so a pass that ran

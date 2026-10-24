@@ -364,25 +364,6 @@ std::array<float, resource_count> price_weights(const world& w, entity_id nation
 // Term 2 inputs — force standing near a border
 // ---------------------------------------------------------------------------
 
-/// Corps registered in each nation, ascending. `corporation_component::
-/// home_nation` is the registration, so this needs no building scan.
-std::map<entity_id, std::vector<entity_id>> corps_by_nation(const world& w)
-{
-    std::map<entity_id, std::vector<entity_id>> out;
-    std::vector<entity_id>                      cids;
-    cids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
-        cids.push_back(kv.first);
-    std::sort(cids.begin(), cids.end());
-    for (const entity_id cid : cids)
-    {
-        const entity_id home = w.corporations.at(cid).home_nation;
-        if (home != null_entity)
-            out[home].push_back(cid);
-    }
-    return out;
-}
-
 struct force_tables
 {
     /// nation -> force standing on its OWN ground. Deterrence.
@@ -398,8 +379,6 @@ struct force_tables
 force_tables build_force(const world& w, const raster_map& r, const nation_ai_params& p)
 {
     force_tables t;
-
-    const std::map<entity_id, std::vector<entity_id>> registered = corps_by_nation(w);
 
     std::vector<entity_id> uids;
     uids.reserve(w.units.size());
@@ -440,21 +419,12 @@ force_tables build_force(const world& w, const raster_map& r, const nation_ai_pa
 
         for (const entity_id threatened : touched) // ascending: pinned
         {
-            // PAIR-STATE (stance.hpp). A declared hostility toward a corp
-            // registered in the threatened nation AMPLIFIES the force; it never
-            // substitutes for it, so a hostile corp with no army near the border
-            // threatens nothing and an undeclared army still threatens something.
-            float       hostile_share = 0.0f;
-            const auto  rit           = registered.find(threatened);
-            if (rit != registered.end() && !rit->second.empty())
-            {
-                int hostile = 0;
-                for (const entity_id target : rit->second) // ascending: pinned
-                    if (is_hostile(w, uc.owner, target))
-                        ++hostile;
-                hostile_share =
-                    static_cast<float>(hostile) / static_cast<float>(rit->second.size());
-            }
+            // PAIR-STATE (stance.hpp). A declared hostility toward the
+            // threatened nation AMPLIFIES the force; it never substitutes for it,
+            // so a hostile nation with no army near the border threatens nothing
+            // and an undeclared army still threatens something. BL-1407: stance is
+            // between nations (RELATIONS.md § Stance), so the share is 0 or 1.
+            const float hostile_share = is_hostile(w, uc.owner, threatened) ? 1.0f : 0.0f;
             t.border[threatened][home] += raw * (1.0f + p.hostility_amplifier * hostile_share);
         }
     }

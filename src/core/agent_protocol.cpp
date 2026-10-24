@@ -137,11 +137,8 @@ namespace {
 /// BL-1407 deletes the type). Null when the actor names neither.
 entity_id session_nation(const world& w, entity_id actor)
 {
-    if (w.nations.find(actor) != w.nations.end())
-        return actor;
-    if (const auto it = w.corporations.find(actor); it != w.corporations.end())
-        return it->second.home_nation;
-    return null_entity;
+    // BL-1407: every actor is a nation.
+    return w.nations.find(actor) != w.nations.end() ? actor : null_entity;
 }
 
 /// BL-1406: the verbs a session may send once the world is folded — the ones the

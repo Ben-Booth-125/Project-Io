@@ -97,7 +97,7 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // stood. Inert at unauthored params; the player's corp is exempt inside
     // the pass itself.
     out.standings = compute_corp_standings(w, out.flows);
-    run_firm_exits(w, reg.firm_exit(), &out.report.firm_exits);
+    // BL-1407: firm exit retired with the corporation (FINANCE.md § Firm exit).
     lap_done(5); // standings + exits
 
     return out;

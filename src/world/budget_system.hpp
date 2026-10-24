@@ -55,6 +55,13 @@ building_opex compute_building_opex(const building_component& b,
 /// none. Unclamped — callers clamp as needed (compute_building_opex does).
 float body_mean_habitability(const world& w, entity_id body);
 
+/// BL-1407: THE MONEY LOOP IS EVERY NATION'S (FINANCE.md, The money loop). The
+/// corporation balance this once moved is deleted with the type; the treasury
+/// moves by income - expenditure - maintenance - wages + the wage tax, every
+/// nation files a `quarterly_return` into `nation_component::returns`, and the
+/// breakdown sink (when given) receives each nation's flows. Read every
+/// "corporation" / "balance" below as "nation" / "treasury".
+///
 /// Apply one economy tick's money loop to every corporation balance:
 ///   balance += income − expenditure − maintenance − wages − upkeep
 ///

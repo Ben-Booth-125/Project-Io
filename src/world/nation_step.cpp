@@ -147,11 +147,10 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
         // will) IS a subsidy: credit that stays on the balance. `net()` carries
         // it so the delta is explained rather than appearing as income from
         // nowhere.
-        // BL-1402: a NATION payee keeps no corporation budget row — its credit
-        // landed on its treasury and the transfer record is its account — so
-        // no row is minted for it here.
-        if (w.corporations.find(t.corp) != w.corporations.end())
-            report.budgets[t.corp].subsidies += t.credits;
+        // BL-1402 / BL-1407: every payee is a NATION, which keeps no subsidy row
+        // — its credit landed on its treasury and the transfer record is its
+        // account — so no row is minted for it here.
+        (void)t;
     }
 
     // ---- 4b. Settle the space programme (BL-644): each paid claim's lump

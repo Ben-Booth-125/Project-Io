@@ -66,13 +66,13 @@ std::string fmt(const char* f, ...)
 
 bool no_firm_holdings(const world& w, std::string& why)
 {
-    for (const auto& [cid, cc] : w.corporations)
-        if (!cc.assets.empty())
-        {
-            why = fmt("corporation %llu still holds %zu building(s)",
-                      static_cast<unsigned long long>(cid), cc.assets.size());
-            return false;
-        }
+    // BL-1407: the corporation type is deleted, so no record can hold a
+    // building; and no charter record outlives the finish.
+    if (!w.gen_charters.empty())
+    {
+        why = fmt("%zu charter record(s) survive the finish", w.gen_charters.size());
+        return false;
+    }
     std::set<entity_id> seen;
     for (const auto& [nid, nc] : w.nations)
         for (const entity_id bid : nc.state_assets)
@@ -140,15 +140,17 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         int firm_units = 0, firm_trades = 0, firm_convoys = 0, firm_routes = 0, firm_track = 0, off_base = 0;
         for (const auto& [uid, u] : w.units)
         {
-            if (w.corporations.count(u.owner)) ++firm_units;
+            if (!w.nations.count(u.owner)) ++firm_units; // BL-1407: every unit is a nation's
             if (u.muster_base != null_entity && w.buildings.count(u.muster_base)
                 && owner_nation_of(w, u.muster_base) != u.owner)
                 ++off_base;
         }
-        for (const auto& t : w.trades) if (w.corporations.count(t.owner)) ++firm_trades;
-        for (const auto& c : w.convoys) if (w.corporations.count(c.corp)) ++firm_convoys;
-        for (const auto& rt : w.trade_routes) if (w.corporations.count(rt.corp)) ++firm_routes;
-        for (const auto& [tile, owner] : w.rail_track) if (w.corporations.count(owner)) ++firm_track;
+        // BL-1407: re-pointed from "no corporation's" (vacuous once the type is
+        // deleted) to "every owner is a nation".
+        for (const auto& t : w.trades) if (!w.nations.count(t.owner)) ++firm_trades;
+        for (const auto& c : w.convoys) if (!w.nations.count(c.corp)) ++firm_convoys;
+        for (const auto& rt : w.trade_routes) if (!w.nations.count(rt.corp)) ++firm_routes;
+        for (const auto& [tile, owner] : w.rail_track) if (owner != null_entity && !w.nations.count(owner)) ++firm_track;
         check(firm_units + firm_trades + firm_convoys + firm_routes + firm_track + off_base == 0, "F1c",
               fmt("nothing else is a corporation's: units %d, trades %d, convoys %d, routes %d, track %d; "
                   "units off their base's owner %d (re-owned: units %d, trades %d, convoys %d, routes %d, "

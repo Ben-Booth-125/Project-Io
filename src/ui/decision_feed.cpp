@@ -43,8 +43,8 @@ namespace {
 
 const char* corp_name(const world& w, entity_id corp)
 {
-    const auto it = w.corporations.find(corp);
-    return (it != w.corporations.end()) ? it->second.name.c_str() : "Unknown corp";
+    const char* nm = actor_name(w, corp); // BL-1407: every actor is a nation
+    return nm != nullptr ? nm : "Unknown nation";
 }
 
 const char* body_name(const world& w, entity_id body)
@@ -504,10 +504,10 @@ void draw_decision_feed(const world& w, ui_state& st, bool* open)
 
     ImGui::SetNextItemWidth(avail * 0.62f);
     if (ImGui::BeginCombo("Corp", st.decision_feed_corp == null_entity
-                                      ? "All corporations"
+                                      ? "All nations"
                                       : corp_name(w, st.decision_feed_corp)))
     {
-        if (ImGui::Selectable("All corporations", st.decision_feed_corp == null_entity))
+        if (ImGui::Selectable("All nations", st.decision_feed_corp == null_entity))
             st.decision_feed_corp = null_entity;
         for (const entity_id c : corps)
         {

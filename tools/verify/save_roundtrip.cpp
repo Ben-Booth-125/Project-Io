@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -82,6 +83,16 @@ std::string to_bytes_pre_road_edges(const world& w)
     return out.str();
 }
 
+/// BL-1407: @p w as a PRE-v56 stream at @p version carrying @p corps as its
+/// corporation store — a real v54 / v55 stream for the loader's fold (R2).
+std::string to_bytes_legacy(const world& w, const std::map<entity_id, legacy_corp_record>& corps,
+                            uint32_t version)
+{
+    std::ostringstream out(std::ios::binary);
+    write_world_snapshot_legacy(w, corps, out, version);
+    return out.str();
+}
+
 /// Read a snapshot from @p bytes into @p w.
 bool from_bytes(const std::string& bytes, world& w)
 {
@@ -99,24 +110,24 @@ int main()
     generation_report report;
     world w = make_hard_coded_world(no_prehistory(), &report);
     seed_genesis_history(w, report);
-    // BL-1407 stage B: generation creates no corporation, but this stage's save
-    // format still carries corporation records (the v56 stream drops them), so
-    // the fixture builds one empty record per charter to keep those rows honest.
+    // BL-1407: generation creates no corporation and the v56 stream carries none.
+    // The fixture world's CHARTERS (never saved) are what a pre-v56 corporation
+    // store is built from for the legacy-stream rows below.
+    std::map<entity_id, legacy_corp_record> legacy_corps;
     for (const auto& [cid, ch] : w.gen_charters)
     {
-        corporation_component cc;
-        cc.name             = ch.name;
-        cc.home_nation      = ch.home_nation;
-        cc.focus            = ch.focus;
-        cc.starting_capital = ch.starting_capital;
-        cc.balance          = ch.balance;
-        cc.is_background    = ch.is_background;
-        w.corporations[cid] = cc;
+        legacy_corp_record lc;
+        lc.name             = ch.name;
+        lc.home_nation      = ch.home_nation;
+        lc.focus            = ch.focus;
+        lc.starting_capital = ch.starting_capital;
+        lc.is_background    = ch.is_background;
+        legacy_corps[cid]   = lc;
     }
 
     std::printf("Generated world: %llu tiles, %llu bodies, %llu corps, %llu history entries\n\n",
                 (unsigned long long)w.tiles.size(), (unsigned long long)w.bodies.size(),
-                (unsigned long long)w.corporations.size(),
+                (unsigned long long)legacy_corps.size(),
                 (unsigned long long)w.history_log.size());
 
     // BL-613: make the nation record's newest field non-trivial before the round
@@ -164,8 +175,9 @@ int main()
     // reserve and points, pinned at distinctive values so the round trip is
     // checked by VALUE. The trade names a live corporation and two standing
     // markets (the reader rejects anything else).
+    // BL-1407: the trade's owner is a NATION (the lowest id).
     entity_id trade_corp = null_entity, trade_m1 = null_entity, trade_m2 = null_entity;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.nations)
         if (trade_corp == null_entity || cid < trade_corp)
             trade_corp = cid;
     {
@@ -183,8 +195,8 @@ int main()
     {
         w.trades.push_back({ w.allocate_trade_id(), trade_corp, resource_type::steel,
                              trade_m1, trade_m2, 2.625f });
-        w.corporations.at(trade_corp).trade_reserve = 1.75f;
-        w.corporations.at(trade_corp).trade_points  = 3.125f;
+        w.nations.at(trade_corp).trade_reserve = 1.75f; // BL-1407: the v56 nation books
+        w.nations.at(trade_corp).trade_points  = 3.125f;
     }
 
     // BL-614: same treatment for the building record's newest field — the
@@ -210,12 +222,7 @@ int main()
     // fallback, which can class a whole world alike — so pin one corp to a
     // distinctive value before the trip, or P1's byte-equality could pass over a
     // uniform column. Lowest corp id, same discipline as the fixtures around it.
-    entity_id oc_corp = null_entity;
-    for (const auto& [cid, cc] : w.corporations)
-        if (oc_corp == null_entity || cid < oc_corp)
-            oc_corp = cid;
-    if (oc_corp != null_entity)
-        w.corporations.at(oc_corp).ownership_class = ownership_class::publicly_held;
+    // BL-1407: the ownership class retired with the corporation record.
 
     // BL-616: decline rides `growth_accumulator` as a NEGATIVE consecutive-
     // failure streak (no new persistent field, no version bump) — so make one
@@ -255,13 +262,14 @@ int main()
     // round trip: an empty vector would let P1's byte-equality pass over the
     // whole record. The full behavioural coverage is
     // tools/verify/quarterly_return.cpp; what is owed HERE is the seam.
+    // BL-1407: the returns are a NATION's (v56 nation books); the lowest id files.
     entity_id filing_corp = null_entity;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.nations)
         if (filing_corp == null_entity || cid < filing_corp)
             filing_corp = cid;
     if (filing_corp != null_entity)
     {
-        std::vector<quarterly_return>& hist = w.corporations.at(filing_corp).returns;
+        std::vector<quarterly_return>& hist = w.nations.at(filing_corp).returns;
         for (int q = 0; q < 3; ++q)
         {
             const float k = static_cast<float>(q + 1);
@@ -277,15 +285,17 @@ int main()
             r.balance     = 5000.0f - 19.0f * k;
             r.holdings    = static_cast<uint32_t>(q + 2);
             r.book_value  = 250.0f * k;
+            r.taxes       = 2.5f * k;              // BL-1407: carried in the v56 books
+            r.net        += (q == 1) ? 1.0e-9 : 0.0; // an exact net its f32 slot cannot hold
             hist.push_back(r);
         }
+        w.nations.at(filing_corp).refund_unbooked = 12.25f;
+        w.nations.at(filing_corp).refund_opening  = 48.5f;
         // BL-1099 (format v27): the firm's origin pair, two int32 at the
         // record's tail after `returns`. Generation stamps them only through
         // the charter walk, which this harness's fixture world never runs, so
         // hand-stamp distinct non-default values on the same corp: the
         // defaults (0 / -1) would let a dropped pair pass P1 unnoticed.
-        w.corporations.at(filing_corp).founded_year  = 1874;
-        w.corporations.at(filing_corp).origin_region = 3;
     }
 
     // world_save_version 41 (propellant routes follow the body's air, Ben
@@ -372,9 +382,8 @@ int main()
             same = same && lit != loaded.nations.end() && lit->second.is_major == nc.is_major
                 && is_major_nation(loaded, nid) == nc.is_major;
         }
-        check(same && demoted_nation != null_entity && !is_major_nation(loaded, demoted_nation)
-                  && champion_of(loaded, demoted_nation) != null_entity,
-              "P21 is_major (BL-1404, v55) round-trips by value; a demoted nation with a specialist stays a minor");
+        check(same && demoted_nation != null_entity && !is_major_nation(loaded, demoted_nation),
+              "P21 is_major (BL-1404, v55) round-trips by value; a demoted nation stays a minor");
         check(read_ok && loaded.state_hash(0) == w.state_hash(0),
               "P21 the reloaded world's state_hash (which folds the majors) equals the saved one");
         world flipped = w;
@@ -387,22 +396,24 @@ int main()
     // reads, with the majors DERIVED from the champions — the demoted nation
     // holds a specialist, so it reads back a major, as every v54 world did.
     {
-        std::string v54 = bytes_once.substr(0, bytes_once.size() - world_save_major_section_bytes(w));
-        const uint32_t pre = k_world_save_version_pre_major;
-        std::memcpy(&v54[4], &pre, sizeof pre);
+        // BL-1407: a REAL v54 stream (the legacy writer), its corporation store
+        // built from the fixture's charters; the loader derives its majors from
+        // those specialists before it folds them away.
+        const std::string v54 = to_bytes_legacy(w, legacy_corps, k_world_save_version_pre_major);
         world old;
         bool ok = from_bytes(v54, old);
         for (const auto& [nid, nc] : old.nations)
         {
             bool home = false;
-            for (const auto& [cid, cc] : old.corporations)
+            for (const auto& [cid, cc] : legacy_corps)
                 home = home || (!cc.is_background && cc.home_nation == nid);
             ok = ok && nc.is_major == home;
         }
         check(ok && demoted_nation != null_entity && is_major_nation(old, demoted_nation),
               "P21 a v54 stream (the v55 prefix) reads, its majors derived from its champions");
         // A v55 stream naming a nation that is not in it is refused whole.
-        std::string bad = bytes_once;
+        // A v55 stream (the legacy writer: the majors are its LAST section).
+        std::string bad = to_bytes_legacy(w, legacy_corps, k_world_save_version_pre_books);
         if (world_save_major_section_bytes(w) > 4)
         {
             const entity_id ghost = 0x7FFFFFF0u;
@@ -411,6 +422,97 @@ int main()
         world sentinel;
         check(world_save_major_section_bytes(w) > 4 && !from_bytes(bad, sentinel) && sentinel.nations.empty(),
               "P21 a majors' section naming no nation in the stream is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // P22 (BL-1407, requirement R2) -- A REAL v54 STREAM LOADS INTO THE
+    // NATION-OWNED WORLD. The legacy writer produces a v54 stream whose
+    // corporation store holds firms that OWN buildings, money, a reserve, a unit,
+    // a trade and the seat; the loader folds them on read and discards them.
+    // -----------------------------------------------------------------------
+    {
+        // Two nations: the firm's HOME, and the nation whose ground its building
+        // stands on (the same nation when the fixture has only one with ground).
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.state_assets.empty())
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        bool built = nids.size() >= 1;
+        world legacy_w = w;
+        std::map<entity_id, legacy_corp_record> firms;
+        entity_id firm_id = null_entity, moved = null_entity, home = null_entity, ground = null_entity;
+        entity_id unit_id = null_entity;
+        float home_before = 0.0f, home_reserve_before = 0.0f;
+        if (built)
+        {
+            ground = nids.front();
+            home   = nids.back();
+            // Take the ground nation's first building out of its list: in a v54
+            // world a firm, not the nation, held it.
+            std::vector<entity_id>& sa = legacy_w.nations.at(ground).state_assets;
+            moved = sa.front();
+            sa.erase(sa.begin());
+            firm_id = legacy_w.create_entity();
+            legacy_corp_record lc;
+            lc.name          = "Legacy Holdings";
+            lc.home_nation   = home;
+            lc.balance       = 321.5f;
+            lc.trade_reserve = 4.25f;
+            lc.is_player     = true;
+            lc.assets.push_back(moved);
+            firms[firm_id] = lc;
+            legacy_w.player_entity = firm_id; // a v54 seat named its corporation
+            // A unit the firm raised, with no muster base: it goes home.
+            unit_id = legacy_w.create_entity();
+            unit_component u{};
+            u.owner = firm_id;
+            u.count = 7;
+            u.position = legacy_w.buildings.at(moved).tile;
+            legacy_w.units[unit_id] = u;
+            // The firm's trade.
+            if (trade_m2 != null_entity)
+                legacy_w.trades.push_back({ legacy_w.allocate_trade_id(), firm_id, resource_type::steel,
+                                            trade_m1, trade_m2, 1.5f });
+            // The returns' books do not exist at v54: clear the nation books the
+            // fixture set, so the v54 world is one a v54 build could have written.
+            for (auto& [nid, nc] : legacy_w.nations)
+            {
+                nc.trade_reserve = nc.trade_points = 0.0f;
+                nc.refund_unbooked = nc.refund_opening = 0.0f;
+                nc.returns.clear();
+            }
+            home_before         = legacy_w.nations.at(home).treasury;
+            home_reserve_before = legacy_w.nations.at(home).trade_reserve;
+        }
+        const std::string v54 = built ? to_bytes_legacy(legacy_w, firms, k_world_save_version_pre_major)
+                                      : std::string();
+        world got;
+        const bool ok = built && from_bytes(v54, got);
+        check(ok, "P22 a real v54 stream with a building-holding corporation reads (BL-1407 R2)");
+        if (ok)
+        {
+            const entity_id ground_now = owner_nation_of(got, moved);
+            check(ground_now == ground,
+                  "P22 the firm's building joined the nation whose ground it stands on");
+            check(got.nations.at(home).treasury == home_before + 321.5f
+                      && got.nations.at(home).trade_reserve == home_reserve_before + 4.25f,
+                  "P22 the firm's balance and trade reserve went to its home treasury, exactly");
+            check(got.units.count(unit_id) == 1 && got.units.at(unit_id).owner == home,
+                  "P22 the firm's unit is its home nation's");
+            bool trade_ok = true;
+            for (const standing_trade& t : got.trades)
+                trade_ok = trade_ok && got.nations.count(t.owner) != 0;
+            check(trade_ok, "P22 every standing trade is a nation's after the load");
+            check(got.player_entity == home,
+                  "P22 the v54 seat (a corporation) loads as its home NATION");
+            check(is_major_nation(got, home),
+                  "P22 the v54 majors are derived from the stream's specialists");
+            // A v56 re-save carries none of it: the stream re-reads equal.
+            world again;
+            check(from_bytes(to_bytes(got), again) && to_bytes(again) == to_bytes(got),
+                  "P22 the folded world writes a v56 stream that re-reads byte for byte");
+        }
     }
 
     // BL-1101: the band survives by VALUE — a save opens on the band its world
@@ -456,9 +558,9 @@ int main()
                   && loaded.trades.back().points == 2.625f
                   && loaded.next_trade_id == w.next_trade_id,
               "P1 a manual trade (BL-1266, world_save_version 46) round-trips at its written values");
-        check(read_ok && loaded.corporations.at(trade_corp).trade_reserve == 1.75f
-                  && loaded.corporations.at(trade_corp).trade_points == 3.125f,
-              "P1 a corporation's trade_reserve / trade_points (BL-1266, v46) round-trip at their written values");
+        check(read_ok && loaded.nations.at(trade_corp).trade_reserve == 1.75f
+                  && loaded.nations.at(trade_corp).trade_points == 3.125f,
+              "P1 a nation's trade_reserve / trade_points (BL-1407, v56 books) round-trip at their written values");
 
         // A trade naming a market that does not stand cannot have been written
         // (the seam refuses it): the reader refuses the stream whole.
@@ -470,7 +572,7 @@ int main()
         world orphan2 = w;
         orphan2.trades.back().owner = entity_id{0x7FFFFFF1u};
         check(!from_bytes(to_bytes(orphan2), sink),
-              "P1 a manual trade whose owner is not a corporation is rejected (BL-1266)");
+              "P1 a manual trade whose owner is not a nation is rejected (BL-1266 / BL-1407)");
     }
     {
         const auto mit = loaded.markets.find(hh_market);
@@ -502,12 +604,12 @@ int main()
     // get wrong while still producing an equal-length record.
     if (filing_corp != null_entity)
     {
-        const auto cit = loaded.corporations.find(filing_corp);
-        bool ok = read_ok && cit != loaded.corporations.end()
-               && cit->second.returns.size() == w.corporations.at(filing_corp).returns.size();
+        const auto cit = loaded.nations.find(filing_corp);
+        bool ok = read_ok && cit != loaded.nations.end()
+               && cit->second.returns.size() == w.nations.at(filing_corp).returns.size();
         if (ok)
         {
-            const auto& want = w.corporations.at(filing_corp).returns;
+            const auto& want = w.nations.at(filing_corp).returns;
             const auto& got  = cit->second.returns;
             for (std::size_t i = 0; i < want.size() && ok; ++i)
                 ok = got[i].income == want[i].income
@@ -517,20 +619,14 @@ int main()
                   && got[i].levies == want[i].levies && got[i].upkeep == want[i].upkeep
                   && got[i].net == want[i].net && got[i].balance == want[i].balance
                   && got[i].holdings == want[i].holdings
-                  && got[i].book_value == want[i].book_value;
+                  && got[i].book_value == want[i].book_value
+                  && got[i].taxes == want[i].taxes;
         }
-        check(ok, "P1 filed quarterly returns (BL-626) round-trip by value, in order");
-        // BL-1099 (v27): the origin pair survives by value at the tail, and a
-        // corp the fixture left unstamped reads back as "no origin" (-1), not
-        // as a neighbour's value -- the transposition a misplaced tail read
-        // would produce.
-        bool origin_ok = read_ok && cit != loaded.corporations.end()
-                      && cit->second.founded_year == 1874 && cit->second.origin_region == 3;
-        for (const auto& [cid, cc] : loaded.corporations)
-            if (cid != filing_corp)
-                origin_ok = origin_ok && cc.founded_year == 0 && cc.origin_region == -1;
-        check(origin_ok, "P1 the firm's origin pair (BL-1099) round-trips by value; unstamped "
-                         "firms read back with no origin");
+        check(ok, "P1 a nation's filed quarterly returns (BL-626 / BL-1407, v56 books) round-trip "
+                  "by value, in order, the exact double net and the taxes included");
+        check(read_ok && cit != loaded.nations.end() && cit->second.refund_unbooked == 12.25f
+                  && cit->second.refund_opening == 48.5f,
+              "P1 a nation's unbooked refund and its opening (BL-1206 / BL-1407) round-trip");
     }
 
     // BL-624: the razed centre reloads as the ruin it is — flag, zeroed
@@ -1060,7 +1156,7 @@ int main()
             { "nations", w.nations.size(), loaded.nations.size() },
             { "nation_budgets", w.nation_budgets.size(), loaded.nation_budgets.size() },
             { "tile_to_nation", w.tile_to_nation.size(), loaded.tile_to_nation.size() },
-            { "corporations", w.corporations.size(), loaded.corporations.size() },
+            // BL-1407: `corporations` is deleted with the type; nothing to cover.
 
             { "workforce_supply_overrides", w.workforce_supply_overrides.size(), loaded.workforce_supply_overrides.size() },
             { "sentiment", w.sentiment.pairs.size(), loaded.sentiment.pairs.size() },

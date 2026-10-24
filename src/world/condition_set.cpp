@@ -58,9 +58,6 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
     const float*                  purse  = purse_of(w, subject_corp);
     if (assets == nullptr || purse == nullptr)
         return 0.0f; // An unknown owner measures zero on every subject, never throws.
-    const auto corp_it = w.corporations.find(subject_corp);
-    const corporation_component* cc =
-        corp_it != w.corporations.end() ? &corp_it->second : nullptr;
 
     switch (c.subject)
     {
@@ -167,8 +164,10 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
         case condition_subject::produced:
         {
             const std::size_t ri = static_cast<std::size_t>(c.resource);
-            // A nation keeps no produced_ever record (corporation-only): it reads 0.
-            return (cc != nullptr && ri < resource_count && cc->produced_ever[ri]) ? 1.0f : 0.0f;
+            // BL-1407: the produced-ever record was the corporation's and is
+            // deleted with it; a nation keeps none, so the subject reads 0.
+            (void)ri;
+            return 0.0f;
         }
     }
     return 0.0f;

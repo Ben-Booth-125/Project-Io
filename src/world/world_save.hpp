@@ -2,9 +2,13 @@
 
 #include "world.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
+#include <string>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // World snapshot -- the flat-binary save (BL-536)
@@ -473,7 +477,22 @@ inline constexpr uint32_t world_save_magic =
 /// `is_major` is set, ascending id, as (u32 count, count x id). v54 is a STRICT PREFIX of
 /// v55 and is read too (`k_world_save_version_pre_major`), its majors derived from its
 /// champions (`mark_majors_from_champions`). Every version outside v47-v55 is refused whole.
-inline constexpr uint32_t world_save_version = 55;
+///
+/// Bumped to 56 by BL-1407 (corporation_component deleted; GLOSSARY.md § Corporation,
+/// Ben 2026-10-23): THE STREAM CARRIES NO CORPORATION. The corporation store after
+/// `tile_to_nation` is gone, and with it the corporation halves of the v52 tax
+/// section and the v54 exact-net section; a TRAILING NATION-BOOKS SECTION after the
+/// majors carries, for every nation with any, its trade reserve and points, its
+/// unbooked refund and the treasury it was credited onto, and its quarterly returns
+/// (each row's slots, its taxes, its exact double net). v54 and v55 are still read:
+/// their corporation records are read into SCRATCH (`legacy_corp_record`), the fold's
+/// rules run over them (`fold_legacy_firms`: buildings to their ground nation, money
+/// and reserves to the home treasury, units, track, trades, convoys and routes to the
+/// home nation, the seat to its nation), and they are discarded. v47-v53 likewise.
+inline constexpr uint32_t world_save_version = 56;
+
+/// BL-1407: v55 — the last stream with corporation records; read and folded on load.
+inline constexpr uint32_t k_world_save_version_pre_books = 55;
 
 /// BL-1404: v54, a strict prefix of v55 (the majors' section is v55's only addition).
 inline constexpr uint32_t k_world_save_version_pre_major = 54;
@@ -537,6 +556,46 @@ std::size_t world_save_net_section_bytes(const world& w);
 /// BL-1404: the byte length of the v55 majors' section `write_world_snapshot` writes
 /// for @p w — the LAST section; a harness cuts it off a v55 stream to make the v54 prefix.
 std::size_t world_save_major_section_bytes(const world& w);
+
+/// BL-1407: the byte length of the v56 nation-books section `write_world_snapshot`
+/// writes for @p w — the LAST section of a v56 stream.
+std::size_t world_save_books_section_bytes(const world& w);
+
+/// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
+/// order the retired `w_corp` wrote it. The loader reads them into scratch and
+/// folds them away (`fold_legacy_firms`); the verification writer below writes
+/// them so a harness can produce a real v54 / v55 stream. Never world state.
+struct legacy_corp_record
+{
+    std::string                       name;
+    entity_id                         home_nation      = null_entity;
+    industrial_focus                  focus            = industrial_focus::extraction;
+    uint8_t                           ownership        = 2; ///< the retired class byte (0..2)
+    float                             starting_capital = 0.0f;
+    float                             balance          = 0.0f;
+    bool                              is_player        = false;
+    bool                              is_background    = false;
+    std::vector<entity_id>            assets;
+    entity_id                         hq_building      = null_entity;
+    float                             influence_range  = 0.0f;
+    std::array<bool, resource_count>  produced_ever{};
+    std::vector<quarterly_return>     returns;
+    int32_t                           founded_year     = 0;
+    int32_t                           origin_region    = -1;
+    float                             refund_unbooked  = 0.0f;
+    float                             refund_opening   = 0.0f;
+    float                             trade_reserve    = 0.0f;
+    float                             trade_points     = 0.0f;
+};
+
+/// BL-1407, VERIFICATION ONLY: @p w written as a PRE-v56 stream at @p version
+/// (47..55) carrying @p corps as its corporation store (and their halves of the
+/// tax and exact-net sections), every other section exactly as the writer writes
+/// it at that version. The game never writes an old version; this exists so the
+/// v54/v55 reader and its fold have a real producer (tools/verify/save_roundtrip).
+void write_world_snapshot_legacy(const world& w,
+                                 const std::map<entity_id, legacy_corp_record>& corps,
+                                 std::ostream& out, uint32_t version);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

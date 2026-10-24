@@ -361,8 +361,8 @@ inline shipped_landscape apply_shipped_landscape(
         {
             if (fold_probe* fp = charter.probe)
             {
-                for (const auto& [cid, cc] : w.corporations)
-                    fp->held_before.insert(fp->held_before.end(), cc.assets.begin(), cc.assets.end());
+                // BL-1407: no corporation holds a building (`held_before` stays
+                // empty: the fold folds nothing).
                 std::sort(fp->held_before.begin(), fp->held_before.end());
                 for (const auto& [nid, nc] : w.nations) fp->treasury_before.emplace_back(nid, nc.treasury);
                 std::sort(fp->treasury_before.begin(), fp->treasury_before.end());
@@ -809,7 +809,7 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
             // cost: BL-398 bounds the export and the evaluation to the one
             // open-channel corp; only the sort and the channels walk the set.
             int due = 0;
-            for (const auto& kv : w.corporations)
+            for (const auto& kv : w.nations) // BL-1407: the actors are the nations
                 if (corp_strategic_eval_due(w, kv.first, day))
                     ++due;
             timing->strategic_evals_due.push_back(due);

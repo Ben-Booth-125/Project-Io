@@ -3,13 +3,8 @@
 #include <algorithm>
 #include <unordered_set>
 
-// The disclosure gate (BL-633). Binary by FINANCE.md § Disclosure: a `public` corporation files
-// a return the player may read; a `private` or `closed` one does not file at all. There is no
-// graded middle — the five bands that used to supply one are retired.
-bool corp_files_return(ownership_class oc)
-{
-    return oc == ownership_class::publicly_held;
-}
+// BL-1407: the disclosure gate by ownership class retired with the class (FINANCE.md
+// § Disclosure): a nation always reads its own books, and only its own.
 
 std::vector<corp_standing> compute_corp_standings(
     const world& w,
@@ -47,8 +42,6 @@ std::vector<corp_standing> compute_corp_standings(
 
     for (const entity_id id : corp_ids)
     {
-        const auto                   cit = w.corporations.find(id);
-        const corporation_component* cc  = cit != w.corporations.end() ? &cit->second : nullptr;
         const std::vector<entity_id>* assets = assets_of(w, id);
         const float*                  purse  = purse_of(w, id);
         if (assets == nullptr || purse == nullptr)
@@ -85,9 +78,7 @@ std::vector<corp_standing> compute_corp_standings(
         // BL-1402: capital is the owner's purse. A nation files no return, so its treasury is
         // disclosed only to its own player (the same own-books exemption).
         cs.capital_balance   = *purse;
-        cs.capital_disclosed = cs.is_player
-                            || (cc != nullptr ? corp_files_return(cc->ownership_class)
-                                              : (my_nation != null_entity && id == my_nation));
+        cs.capital_disclosed = cs.is_player || (my_nation != null_entity && id == my_nation);
 
         // Market share: derived from the market aggregates, which are the deliberate public
         // signal — public for every corp for the same reason reach is.

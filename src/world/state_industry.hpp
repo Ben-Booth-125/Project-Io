@@ -28,6 +28,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -315,6 +316,33 @@ struct fold_report
 /// campaign finish, after the rail handover and the Logistic Point seeding (both
 /// may stand corporation-owned nodes) and before the opening reserve.
 fold_report fold_to_ground(world& w);
+
+/// BL-1407 — A PRE-v56 STREAM'S FIRM, read into scratch by the save loader and
+/// folded away (`fold_legacy_firms`); never world state. The fields the fold
+/// reads, and nothing else of the retired corporation record.
+struct legacy_firm
+{
+    entity_id              home_nation   = null_entity;
+    float                  balance       = 0.0f;
+    float                  trade_reserve = 0.0f;
+    bool                   is_background = false;
+    std::vector<entity_id> assets;        ///< its buildings, in its own stored order
+};
+
+/// BL-1407: the fold's rules over @p firms (ascending id): each firm's buildings
+/// to the nation whose ground they stand on (ground no nation owns: demolished),
+/// its positive balance and its trade reserve to its home treasury, its units,
+/// track, trades, convoys and routes to its home nation; then every nation
+/// building off its own ground re-homed, duplicate routes merged and the
+/// procurement records cleared. With @p firms empty only the ground and
+/// procurement rules run. Counts into @p out. Deterministic: sorted walks only.
+void fold_firms(world& w, const std::map<entity_id, legacy_firm>& firms, fold_report& out);
+
+/// BL-1407 — THE v54/v55 LOADER'S FOLD (R2): `fold_firms`, then the seat
+/// (`player_entity` naming a firm becomes its home nation) and every store still
+/// keyed by a firm id (stance pairs, embargo conditions, workforce overrides,
+/// sentiment pairs) dropped. The caller discards @p firms afterwards.
+fold_report fold_legacy_firms(world& w, const std::map<entity_id, legacy_firm>& firms);
 
 /// Print the step's one `[fold]` log line.
 void print_fold(const fold_report& r);

@@ -425,9 +425,10 @@ void run_port_rows(const world& w0, const recipe_registry& reg, const std::vecto
     std::printf("--- M6 refusals: procurement, trade ---\n");
     {
         const entity_id m = nations.front();
+        // BL-1407: no supplier firm exists; the counterparty is another nation.
         entity_id corp = null_entity;
-        for (const auto& kv : w0.corporations)
-            if (corp == null_entity || kv.first < corp) corp = kv.first;
+        for (const entity_id n : nations)
+            if (n != m) { corp = n; break; }
         world w = w0;
         for (const corp_verb v : {corp_verb::request_quote, corp_verb::accept_quote,
                                   corp_verb::cancel_contract})

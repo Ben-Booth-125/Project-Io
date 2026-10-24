@@ -280,10 +280,7 @@ void clear_trade_records()
 /// A corporation's display name; "Corp #n" when it has none.
 std::string corp_display_name(const world& w, entity_id id)
 {
-    const auto it = w.corporations.find(id);
-    if (it != w.corporations.end() && !it->second.name.empty())
-        return it->second.name;
-    // BL-1406: after the fold an owner is a NATION (trades re-owned to it).
+    // BL-1407: every owner is a NATION.
     if (const auto nit = w.nations.find(id); nit != w.nations.end() && !nit->second.name.empty())
         return nit->second.name;
     return "Owner #" + std::to_string(id);
@@ -521,7 +518,7 @@ std::vector<exchange_row_record> derive_exchange_rows(const world& w, entity_id 
         // NR-1021: a row folds every corporation's exchange of a good on this
         // market in a tick; `side` says which end is the market, `parties` how
         // many corporations stand on the other.
-        const std::string many = std::to_string(e.parties) + " corporations";
+        const std::string many = std::to_string(e.parties) + " nations";
         if (e.side == 0)
         {
             r.buyer  = counterparty_label(w, null_entity, r.buyer_is_market);

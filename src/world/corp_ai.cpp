@@ -570,13 +570,14 @@ namespace {
 /// NET WORTH: cash, plus the assessed value of the corp's buildings, plus the
 /// assessed value of the stock it holds. In credits.
 float standing_economic(const world& w, const recipe_registry& reg,
-                        entity_id corp, const corporation_component& cc)
+                        entity_id corp, const nation_component& cc)
 {
+    (void)corp;
     // Accumulated in double and narrowed once at the end. The terms differ by
     // orders of magnitude (a five-figure balance against a fractional pool
     // quantity), which is exactly where float accumulation loses the small
     // ones; the walk order is fixed, so this stays a deterministic answer.
-    double worth = cc.balance;
+    double worth = cc.treasury; // BL-1407: the actor is a nation
 
     // BUILDINGS, AT HISTORICAL COST — the registry's flat `build_cost`, summed
     // over `assets` (a vector: authored order, deterministic). This is
@@ -585,7 +586,7 @@ float standing_economic(const world& w, const recipe_registry& reg,
     // second: the build press charges `build_cost + material_cost`, where that
     // second term is priced at the CURRENT MARKET, and folding it in would make
     // a corp's standing move on commodity prices it does not own.
-    for (const entity_id bid : cc.assets)
+    for (const entity_id bid : cc.state_assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -626,10 +627,10 @@ standing_index corp_standing_index(const world& w, const recipe_registry& reg,
 {
     standing_index out;
 
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
-        return out; // an unknown corp stands at zero on every component
-    const corporation_component& cc = cit->second;
+    const auto cit = w.nations.find(corp); // BL-1407: the actor is a nation
+    if (cit == w.nations.end())
+        return out; // an unknown actor stands at zero on every component
+    const nation_component& cc = cit->second;
 
     // The measurement switch. A FOURTH COMPONENT ADDS ONE LINE HERE and nothing
     // else in this function — see `standing_component`'s append-only note.
@@ -887,16 +888,7 @@ bool make_actor(const world& w, entity_id id, ai_actor& out)
 {
     out = ai_actor{};
     out.id = id;
-    if (const auto cit = w.corporations.find(id); cit != w.corporations.end())
-    {
-        const corporation_component& cc = cit->second;
-        out.home_nation = cc.home_nation;
-        out.assets      = &cc.assets;
-        out.focus       = cc.focus;
-        out.is_player   = cc.is_player || id == w.player_entity;
-        out.hq_building = cc.hq_building;
-        return true;
-    }
+    // BL-1407: every actor is a nation (the corporation actor path is deleted).
     if (const auto nit = w.nations.find(id); nit != w.nations.end())
     {
         out.is_nation   = true;
@@ -913,20 +905,16 @@ bool make_actor(const world& w, entity_id id, ai_actor& out)
 /// uncommitted treasury (state_industry.hpp).
 float actor_money(const world& w, const ai_actor& a)
 {
-    if (a.is_nation)
-        return state_uncommitted_treasury(w, a.id);
-    const auto cit = w.corporations.find(a.id);
-    return cit != w.corporations.end() ? cit->second.balance : 0.0f;
+    return a.is_nation ? state_uncommitted_treasury(w, a.id) : 0.0f; // BL-1407: always a nation
 }
 
 ai_books actor_books(const world& w, const ai_actor& a)
 {
+    // BL-1407: a nation's books read zero here, as they always did for a nation
+    // (BL-1401: a nation proposes no trade); the corporation's are deleted.
+    (void)w;
+    (void)a;
     ai_books b;
-    if (const auto cit = w.corporations.find(a.id); cit != w.corporations.end())
-    {
-        b.trade_points  = cit->second.trade_points;
-        b.trade_reserve = cit->second.trade_reserve;
-    }
     return b;
 }
 
@@ -3844,15 +3832,17 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
     bb.corp = corp;
     bb.tick = tick;
 
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1407: the actor is a NATION (the corporation is deleted).
+    const auto cit = w.nations.find(corp);
+    if (cit == w.nations.end())
         return bb;
-    const corporation_component& cc = cit->second;
+    const nation_component& cc = cit->second;
 
-    // Section 0 — own corp: cash, buildings in full, pools. own_asset.
-    add_fact(bb, tick, corp, "cash", cc.balance, 1.0f, fact_provenance::own_asset);
+    // Section 0 — own nation: cash (its treasury), buildings in full. own_asset.
+    add_fact(bb, tick, corp, "cash", cc.treasury, 1.0f, fact_provenance::own_asset);
+    add_fact(bb, tick, corp, "treasury", cc.treasury, 1.0f, fact_provenance::own_asset);
     {
-        std::vector<entity_id> own = cc.assets;
+        std::vector<entity_id> own = cc.state_assets;
         std::sort(own.begin(), own.end());
         for (const entity_id bid : own)
         {
@@ -3866,31 +3856,12 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
             add_fact(bb, tick, bid, "building_workforce_target", b.workforce_target, 1.0f, fact_provenance::own_asset);
             add_fact(bb, tick, bid, "building_decommissioned", b.decommissioned ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
         }
-        // BL-1296: a CHAMPION operates its nation's state industry (corp_command
-        // `as_nation`), so its own view carries that book too — the treasury the
-        // verbs spend, and each state building in full, as own assets.
-        if (cc.home_nation != null_entity && champion_of(w, cc.home_nation) == corp)
-            if (const auto nit = w.nations.find(cc.home_nation); nit != w.nations.end())
-            {
-                add_fact(bb, tick, cc.home_nation, "treasury", nit->second.treasury, 1.0f,
+        // BL-1407: every building above is the nation's own (state industry and
+        // private retired into one); the idle flag the funding gate sets rides it.
+        for (const entity_id bid : own)
+            if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
+                add_fact(bb, tick, bid, "building_idle", bit->second.state_idle ? 1.0 : 0.0, 1.0f,
                          fact_provenance::own_asset);
-                std::vector<entity_id> state = nit->second.state_assets;
-                std::sort(state.begin(), state.end());
-                for (const entity_id bid : state)
-                {
-                    const auto bit = w.buildings.find(bid);
-                    if (bit == w.buildings.end())
-                        continue;
-                    const building_component& b = bit->second;
-                    add_fact(bb, tick, bid, "state_building_nation", static_cast<double>(cc.home_nation), 1.0f, fact_provenance::own_asset);
-                    add_fact(bb, tick, bid, "state_building_type", static_cast<double>(b.type), 1.0f, fact_provenance::own_asset);
-                    add_fact(bb, tick, bid, "state_building_tile", static_cast<double>(b.tile), 1.0f, fact_provenance::own_asset);
-                    add_fact(bb, tick, bid, "state_building_recipe", static_cast<double>(b.recipe), 1.0f, fact_provenance::own_asset);
-                    add_fact(bb, tick, bid, "state_building_workforce_target", b.workforce_target, 1.0f, fact_provenance::own_asset);
-                    add_fact(bb, tick, bid, "state_building_decommissioned", b.decommissioned ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
-                    add_fact(bb, tick, bid, "state_building_idle", b.state_idle ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
-                }
-            }
 
         // BL-1265 / BL-1266: no pools (the corporation holds no stock); its own
         // TRADE state instead — the points it made, its reserve, and each of its
@@ -3973,33 +3944,11 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
     // Section 2 — rival buildings: existence, type, tile ONLY (BL-068 —
     // internals private: no cash, no pools, no recipe, no workforce).
     {
-        std::vector<entity_id> rivals;
-        for (const auto& kv : w.corporations)
-            if (kv.first != corp)
-                rivals.push_back(kv.first);
-        std::sort(rivals.begin(), rivals.end());
-        for (const entity_id rc : rivals)
-        {
-            std::vector<entity_id> theirs = w.corporations.at(rc).assets;
-            std::sort(theirs.begin(), theirs.end());
-            for (const entity_id bid : theirs)
-            {
-                const auto bit = w.buildings.find(bid);
-                if (bit == w.buildings.end())
-                    continue;
-                add_fact(bb, tick, bid, "rival_building_type",
-                         static_cast<double>(bit->second.type), 1.0f, fact_provenance::rival_visible);
-                add_fact(bb, tick, bid, "rival_building_tile",
-                         static_cast<double>(bit->second.tile), 1.0f, fact_provenance::rival_visible);
-                add_fact(bb, tick, bid, "rival_building_owner",
-                         static_cast<double>(rc), 1.0f, fact_provenance::rival_visible);
-            }
-        }
-        // BL-1296: other nations' STATE buildings, on the same public terms —
-        // existence, type, tile and owner (the owner here is a NATION id).
+        // BL-1407: every rival is a NATION; its buildings on public terms —
+        // existence, type, tile and owner.
         std::vector<entity_id> state_nations;
         for (const auto& [nid, nc] : w.nations)
-            if (!nc.state_assets.empty() && nid != cc.home_nation)
+            if (!nc.state_assets.empty() && nid != corp)
                 state_nations.push_back(nid);
         std::sort(state_nations.begin(), state_nations.end());
         for (const entity_id nid : state_nations)

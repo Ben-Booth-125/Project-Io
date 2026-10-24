@@ -118,7 +118,7 @@ building_profit estimate_building_reading(const world& w, const recipe_registry&
 
     // A real tick's report: apply_budget filed this owner's budget in it. A
     // hand-built or empty report (before any tick) has none, and stays "no data".
-    const entity_id corp = owner_corp_of(w, building_id);
+    const entity_id corp = owner_nation_of(w, building_id); // BL-1407: the owner is a nation
     if (corp == null_entity || report.budgets.find(corp) == report.budgets.end())
         return out;
 

@@ -1915,13 +1915,12 @@ bool tile_touches_track(world& w, entity_id tile)
 
 entity_id rail_operator(const world& w, entity_id owner)
 {
+    // BL-1407 (RELATIONS.md § Stance: stance is between nations): the track's
+    // owner IS its operator — a nation; the champion that once operated it
+    // retired with the corporation.
     if (owner == null_entity)
         return null_entity;
-    if (w.corporations.count(owner) != 0)
-        return owner;
-    if (w.nations.count(owner) != 0)
-        return champion_of(w, owner);
-    return null_entity;
+    return w.nations.count(owner) != 0 ? owner : null_entity;
 }
 
 std::vector<entity_id> rail_cut_tiles(const world& w, entity_id body)

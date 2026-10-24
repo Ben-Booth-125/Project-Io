@@ -87,10 +87,10 @@ void post_nation_agency_comms(const world& w, const economy_report& report,
         std::unordered_map<entity_id, const agency_event*> best_per_nation;
         for (const agency_event& ev : report.agency_events)
         {
-            const auto cit = w.corporations.find(ev.corp);
-            if (cit == w.corporations.end() || cit->second.home_nation == null_entity)
-                continue; // no home nation to speak on this corp's behalf
-            const entity_id nation = cit->second.home_nation;
+            // BL-1407: the actor IS a nation, which speaks for itself.
+            if (w.nations.find(ev.corp) == w.nations.end())
+                continue;
+            const entity_id nation = ev.corp;
             const auto it = best_per_nation.find(nation);
             if (it == best_per_nation.end() || severity_of(ev.what) > severity_of(it->second->what))
                 best_per_nation[nation] = &ev;
@@ -173,9 +173,10 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
             acc[slot] += std::chrono::duration_cast<std::chrono::microseconds>(
                              clk::now() - from).count() / 1000.0;
         };
+        // BL-1407: the actors are the nations.
         std::vector<entity_id> corp_ids;
-        corp_ids.reserve(w.corporations.size());
-        for (const auto& [id, cc] : w.corporations)
+        corp_ids.reserve(w.nations.size());
+        for (const auto& [id, nc] : w.nations)
             corp_ids.push_back(id);
         std::sort(corp_ids.begin(), corp_ids.end());
 
@@ -194,9 +195,8 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
             else
             {
                 ui::chat_channel ch;
-                const auto cnit = w.corporations.find(corp);
-                ch.name = std::string("Counsel: ")
-                        + (cnit != w.corporations.end() ? cnit->second.name : "(unknown)");
+                const char* nm = actor_name(w, corp);
+                ch.name = std::string("Counsel: ") + (nm != nullptr ? nm : "(unknown)");
                 ch.members = { corp, w.player_entity };
                 chat.channels.push_back(std::move(ch));
                 channel = static_cast<int>(chat.channels.size()) - 1;

@@ -328,6 +328,11 @@ inline constexpr uint32_t save_game_magic =
 /// `polity` the cedent, `other` the receiver, either none for unheld ground).
 /// No field moves, so no version bump; a build that predates it refuses such
 /// a stream on the kind range check.
+/// v23 ALSO admits 43 `major_demoted` in the Industrialisation record (BL-1404:
+/// the poorest surplus major demoted to a minor). Confirmed by BL-1407 on the
+/// `exclave_ceded` precedent: no field moves, so no version bump; a build that
+/// predates it refuses such a stream on the kind range check. (The world
+/// snapshot inside the envelope carries its own version, world_save v56.)
 inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
 /// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;

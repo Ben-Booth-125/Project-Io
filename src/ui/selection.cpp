@@ -15,7 +15,8 @@ selection_kind selection_kind_of(const world& w, entity_id e)
     if (w.markets.count(e))      return selection_kind::market;
     if (w.bodies.count(e))       return selection_kind::body;
     if (w.nations.count(e))      return selection_kind::nation;
-    if (w.corporations.count(e)) return selection_kind::corporation;
+    // BL-1407: no corporation exists to select (`selection_kind::corporation`
+    // stays in the enum, never returned).
 
     return selection_kind::none;
 }

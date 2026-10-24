@@ -441,22 +441,10 @@ struct world
     /// A `std::set` so a deterministic walk over it needs no sort of its own.
     std::set<entity_id>                                 tile_settled;
 
-    /// Corporation entities keyed by their entity ID. Populated by
-    /// generate_corporations() after nation generation; empty until that call
-    /// is made. Exactly one entry will have corporation_component::is_player == true,
-    /// and world::player_entity will equal that entry's key.
-    ///
-    /// THE ONE-is_player INVARIANT, and the one path that can break it. On a
-    /// charter-budget world the spend picks the player among the specialists it
-    /// charters. A budget no centre can buy a specialist with falls back to the
-    /// no-budget world, which seats from its own roster (NR-910), so the
-    /// invariant holds there. The walk's RESIDUAL does not: a centre that
-    /// afforded a specialist and found no ground for one leaves a world with no
-    /// specialist, the spawn seat finds nobody to seat, and no entry is the
-    /// player. That case is reported, never patched: the app prints the count
-    /// on its seat line and player_seed_sweep fails a row that seats other
-    /// than exactly one.
-    faithful_unordered_map<entity_id, corporation_component> corporations;
+    /// BL-1407: `world::corporations` is DELETED with the type (Ben, 2026-10-23:
+    /// the player IS its nation, and every building is its ground nation's). A
+    /// pre-v56 save's corporation records are read into a scratch structure and
+    /// folded away on load (`fold_legacy_firms`, world_save.cpp).
 
     /// BL-1407 — THE CHARTERS GENERATION IS REASONING OVER (`charter_holding`,
     /// components.hpp): generation-transient, owning nothing. Generation creates
@@ -1209,8 +1197,8 @@ inline void bump_logistics_cache_generation(world& w)
 // ---------------------------------------------------------------------------
 // Ownership accessors (BL-068 — competitor information asymmetry)
 // ---------------------------------------------------------------------------
-// Ownership lives in `corporation_component::assets` (the forward list of owned
-// buildings); there is no reverse index, so these scan the ~dozen corporations.
+// Ownership lives in `nation_component::state_assets` (BL-1407: the forward list
+// of owned buildings); there is no reverse index, so these scan the nations.
 // Read-side only — no stored backing, no tick, no determinism impact. A reverse
 // `building_to_corp` map is the natural O(1) backing if profiling ever warrants;
 // the accessor is the stable seam either way.
@@ -1280,40 +1268,31 @@ void place_opening_stock(world& w);
 /// the shelf regardless. A no-op for a corporation with nothing placed.
 void unplace_opening_stock(world& w, entity_id corp);
 
-/// Resolve the corporation that owns @p building by scanning each corporation's
-/// `assets`. Siblings of `pool_at` / `workforce_supply`.
-///
-/// @param w        Read-only world state.
-/// @param building Building entity id to resolve.
-/// @return         Owning corporation id, or `null_entity` if unowned.
-entity_id owner_corp_of(const world& w, entity_id building);
-
-/// True iff @p building is owned by the player's corporation. The single branch
-/// point for the visibility rule (BL-068): everything not player-owned is treated
-/// uniformly as a rival.
+/// True iff @p building is owned by the player's NATION (BL-1407: the player IS
+/// its nation). The single branch point for the visibility rule (BL-068):
+/// everything not player-owned is treated uniformly as a rival.
 ///
 /// @param w        Read-only world state.
 /// @param building Building entity id to test.
-/// @return         Whether the owning corporation has `is_player` set.
+/// @return         Whether the player's nation lists it in `state_assets`.
 bool is_player_owned(const world& w, entity_id building);
 
 // ---------------------------------------------------------------------------
-// BL-1296 — building ownership has two kinds (NATIONS.md § State industry)
+// BL-1407 — every building is a NATION's (NATIONS.md § What a nation owns)
 // ---------------------------------------------------------------------------
-// A building is owned by a CORPORATION (private industry, in its `assets`) or by
-// a NATION outright (in its `state_assets`: a major's state industry, or a minor's
-// logistics network nodes - Ben, 2026-10-22). Corporations
-// and nations draw their ids from the one entity allocator, so an owner id alone
-// names which; `building_owner_of` says so explicitly. Every economy flow keyed
-// by "owner" (landings, purchases, wants, labour pools, cash flows) takes a
-// nation id for a state building; money for a nation lands on its `treasury`.
+// A building is owned outright by the nation whose ground it stands on and is
+// listed in that nation's `state_assets`; the corporation (private industry)
+// is deleted. Every economy flow keyed by "owner" (landings, purchases, wants,
+// labour pools, cash flows) takes a nation id; money lands on its `treasury`.
+// The helpers below keep their owner-generic names so a call site reads the
+// same; their only owner kind is the nation.
 
-/// Which kind of actor owns a building.
+/// Which kind of actor owns a building. BL-1407: only a nation (the value 1,
+/// the retired corporation's, is not reused).
 enum class owner_kind : std::uint8_t
 {
     none        = 0, ///< Unowned (or the building does not exist).
-    corporation = 1, ///< Private industry: in a corporation's `assets`.
-    nation      = 2, ///< State industry: in a nation's `state_assets`.
+    nation      = 2, ///< In a nation's `state_assets`.
 };
 
 /// A building's owner, as kind + id.
@@ -1323,74 +1302,64 @@ struct building_owner
     entity_id  id   = null_entity;
 };
 
-/// Resolve @p building's owner — a corporation or a nation. Linear in the
-/// owners' asset lists, like `owner_corp_of`.
+/// Resolve @p building's owner. Linear in the nations' asset lists.
 building_owner building_owner_of(const world& w, entity_id building);
 
-/// The nation that owns @p building as state industry, or null when a
-/// corporation (or nobody) owns it.
+/// The nation that owns @p building, or null when nobody does.
 entity_id owner_nation_of(const world& w, entity_id building);
 
-/// The asset list of @p owner — a corporation's `assets` or a nation's
-/// `state_assets` — or null when @p owner is neither.
+/// The asset list of NATION @p owner (`state_assets`), or null for anything else.
 const std::vector<entity_id>* assets_of(const world& w, entity_id owner);
 std::vector<entity_id>*       assets_of(world& w, entity_id owner); ///< BL-1402: the writable twin
 
-/// Every economic owner in one ascending-id list: every corporation and every
-/// nation holding state industry, interleaved by id. The visit order of every per-owner
-/// walk in the economy step; with no state industry anywhere it is exactly the
-/// sorted corporation ids it replaced, so such a world ticks byte-identically.
+/// Every economic owner in one ascending-id list: every nation holding a
+/// building. The visit order of every per-owner walk in the economy step.
 std::vector<entity_id> economic_owner_ids(const world& w);
 
 /// The nation an owner's buildings answer to for national effects (the tech
-/// tree's modifiers, the qualified pool): a corporation's home nation, or the
-/// nation itself for state industry. Null for anything else.
+/// tree's modifiers, the qualified pool): the nation itself; null otherwise.
 entity_id owner_home_nation(const world& w, entity_id owner);
 
-/// BL-1402 (sprint 57; NATIONS.md § What a nation owns): the money an owner pays
-/// from — a corporation's `balance` or a nation's `treasury` — the money twin of
-/// `assets_of`, so a path written once serves either owner while the corporations
-/// are folded away. Null when @p owner is neither. A caller that charges a nation
-/// must still respect "the nation never runs into debt": read `purse_room_of`.
+/// The money an owner pays from — a nation's `treasury`; null otherwise. A
+/// caller must respect "the nation never runs into debt": read `purse_room_of`.
 float*       purse_of(world& w, entity_id owner);
 const float* purse_of(const world& w, entity_id owner);
 
-/// What @p owner may commit now: a corporation's balance (which may go negative,
-/// as it always could), or a nation's UNCOMMITTED treasury (state_industry.hpp),
-/// never below zero. 0 for neither.
+/// What @p owner may commit now: a nation's UNCOMMITTED treasury
+/// (state_industry.hpp), never below zero. 0 for anything else.
 float purse_room_of(const world& w, entity_id owner);
 
-/// True when @p owner holds @p building (corporation `assets` or nation
-/// `state_assets`). The owner-generic `owns`.
+/// True when nation @p owner holds @p building (`state_assets`).
 bool owner_holds(const world& w, entity_id owner, entity_id building);
-
-/// BL-1402: true once the fold to ground has run on @p w - no corporation holds a
-/// building and some nation does. Until BL-1407 deletes the corporation type, the
-/// paths that must treat "the seat" as its nation ask this, never a single
-/// corporation's emptiness (an unfolded specialist may hold nothing yet).
-bool world_is_folded(const world& w);
 
 /// BL-1402 / BL-1407: the entity the player ACTS as - its nation, which
 /// `world::player_entity` names (Ben, 2026-10-23: the player is its nation).
 entity_id player_actor(const world& w);
 
-/// A nation's CHAMPION: the lowest-id specialist (non-background
-/// corporation) whose home nation it is; null for a minor.
+/// GENERATION ONLY (BL-1407): a nation's lowest-id SPECIALIST CHARTER
+/// (`world::gen_charters`), the record the charter walk and the reconciliation
+/// reason over; null for a minor and always null once the charters close.
 entity_id champion_of(const world& w, entity_id nation);
 
 /// True iff @p nation is a MAJOR nation — BL-1404: the saved fact
-/// `nation_component::is_major`, no longer read off the corporations.
+/// `nation_component::is_major`.
 bool is_major_nation(const world& w, entity_id nation);
 
-/// BL-1404: sets every nation's `is_major` to whether it is home to a
-/// non-background corporation (today's champion rule). Run where a roster is
-/// chartered (the charter walk, the legacy roster) and on a v54 load; never
-/// after `reconcile_majors`, whose demotions it would undo.
+/// BL-1404 / BL-1407: sets every nation's `is_major` to whether it is home to a
+/// SPECIALIST CHARTER (`world::gen_charters`). Run where a roster is chartered
+/// (the charter walk, the legacy roster); never after `reconcile_majors`, whose
+/// demotions it would undo. (A v54 load derives its majors from the stream's
+/// own specialists, `fold_legacy_firms`.)
 void mark_majors_from_champions(world& w);
 
 /// The player's nation: `world::player_entity` when it names a nation (BL-1407:
 /// the player IS its nation). Null with no player.
 entity_id player_nation(const world& w);
+
+/// BL-1407: the display name of actor @p id — a nation's name (every actor is a
+/// nation), or null when @p id names no nation. One place, for the surfaces
+/// that used to read a corporation's name.
+const char* actor_name(const world& w, entity_id id);
 
 /// Resolve the body a market entity sits on. Collapses market-level identity to
 /// body-level for the trade-route / fog systems (a body may host several markets;

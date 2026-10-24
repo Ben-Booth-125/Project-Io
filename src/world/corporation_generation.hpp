@@ -683,6 +683,17 @@ std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
 void publish_charter_web(generation_progress* progress, const world& w,
                          const charter_spend_report& rep);
 
+/// BL-1407: the class a firm's books once carried (BL-631) — RETIRED with the
+/// firm (FINANCE.md § Disclosure). Its pure derivation survives, generation-only,
+/// because the legacy roster's focus reroll still counts it (a "public" floor):
+/// removing it would move that path's RNG stream. Nothing stores or reads it.
+enum class ownership_class : uint8_t
+{
+    publicly_held  = 0,
+    privately_held = 1,
+    closed         = 2,
+};
+
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631)
 //

@@ -39,9 +39,8 @@
 #include <unordered_map>
 #include <vector>
 
-/// The disclosure gate, in one predicate: a corporation files a readable return iff its ownership
-/// class is `publicly_held`. Binary — there is no graded middle (FINANCE.md § Disclosure).
-bool corp_files_return(ownership_class oc);
+// BL-1407: `corp_files_return` (the ownership-class gate) retired with the class; every
+// owner ranked below is a nation, and a nation reads only its own books.
 
 struct corp_standing
 {

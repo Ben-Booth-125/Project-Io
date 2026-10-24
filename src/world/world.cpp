@@ -42,49 +42,30 @@ uint64_t world::state_hash(int tick) const
     uint64_t h = fnv_offset_basis;
     fnv1a_i32(h, tick);
 
-    // Corporations: balance is the tick-mutating field the money loop drives.
-    //
-    // THE SEAT IS FOLDED HERE TOO (BL-1082, ruled by Ben 2026-09-24): each
-    // corp's `is_player` inside the sorted walk, and `player_entity` once after
-    // it. The seat is the one folded field a tick never moves — the generator's
-    // draw or `corp_verb::take_seat` writes it, pre-play — and it is folded
-    // because a pick IS a different campaign: without it two different picks on
-    // one world hashed alike, and `seat_pick_check` had to read the player id
-    // beside the hash to tell them apart (found by BL-1076). Both halves are
-    // folded, not one: `player_entity` names the seat, the flags say exactly one
-    // corp carries it, and a world where the two disagree is a broken invariant
-    // the hash should see. Integer-only and cheap; every world carries a seat,
-    // so the fold moves every hash once, structurally (new state, not new
-    // behaviour).
+    // THE SEAT IS FOLDED (BL-1082, ruled by Ben 2026-09-24): `player_entity`
+    // once, at the head. A pick IS a different campaign, so two picks on one
+    // world must hash apart. BL-1407: the corporation block that used to sit
+    // here (each corporation's balance, seat flag, refund and trade books) is
+    // DELETED with the type; the seat is a nation, and the nation's books are
+    // folded below (sparse, so a nation that never traded or refunded hashes as
+    // before).
+    fnv1a_u32(h, player_entity);
     {
         std::vector<entity_id> ids;
-        ids.reserve(corporations.size());
-        for (const auto& kv : corporations) ids.push_back(kv.first);
+        for (const auto& [nid, nc] : nations)
+            if (nc.trade_reserve != 0.0f || nc.trade_points != 0.0f || nc.refund_unbooked != 0.0f)
+                ids.push_back(nid);
         std::sort(ids.begin(), ids.end());
         for (const entity_id id : ids)
         {
-            const corporation_component& cc = corporations.at(id);
+            const nation_component& nc = nations.at(id);
+            fnv1a_u32(h, 0x7AADEu);
             fnv1a_u32(h, id);
-            fnv1a_f32(h, cc.balance);
-            fnv1a_i32(h, cc.is_player ? 1 : 0);
-            // BL-1206: a refund credited at the seat and not yet booked —
-            // sparse, so a corporation with none hashes as before.
-            if (cc.refund_unbooked != 0.0f)
-            {
-                fnv1a_u32(h, id);
-                fnv1a_f32(h, cc.refund_unbooked);
-                fnv1a_f32(h, cc.refund_opening);
-            }
-            // BL-1266: the trade reserve and the points made — sparse, so a
-            // corporation that never traded hashes as before.
-            if (cc.trade_reserve != 0.0f || cc.trade_points != 0.0f)
-            {
-                fnv1a_u32(h, 0x7AADEu);
-                fnv1a_f32(h, cc.trade_reserve);
-                fnv1a_f32(h, cc.trade_points);
-            }
+            fnv1a_f32(h, nc.trade_reserve);
+            fnv1a_f32(h, nc.trade_points);
+            fnv1a_f32(h, nc.refund_unbooked);
+            fnv1a_f32(h, nc.refund_opening);
         }
-        fnv1a_u32(h, player_entity);
     }
 
     // Buildings: every field the AI / economy tick may mutate.
@@ -499,17 +480,6 @@ uint64_t world::state_hash(int tick) const
     return h;
 }
 
-entity_id owner_corp_of(const world& w, entity_id building)
-{
-    if (building == null_entity)
-        return null_entity;
-    for (const auto& [corp_id, cc] : w.corporations)
-        for (const entity_id a : cc.assets)
-            if (a == building)
-                return corp_id;
-    return null_entity;
-}
-
 bool is_player_owned(const world& w, entity_id building)
 {
     // BL-1407 (Ben, 2026-10-23): the player IS its nation, and `player_entity`
@@ -523,12 +493,6 @@ building_owner building_owner_of(const world& w, entity_id building)
     building_owner out;
     if (building == null_entity)
         return out;
-    if (const entity_id corp = owner_corp_of(w, building); corp != null_entity)
-    {
-        out.kind = owner_kind::corporation;
-        out.id   = corp;
-        return out;
-    }
     if (const entity_id nation = owner_nation_of(w, building); nation != null_entity)
     {
         out.kind = owner_kind::nation;
@@ -550,8 +514,6 @@ entity_id owner_nation_of(const world& w, entity_id building)
 
 const std::vector<entity_id>* assets_of(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return &cit->second.assets;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return &nit->second.state_assets;
     return nullptr;
@@ -559,8 +521,6 @@ const std::vector<entity_id>* assets_of(const world& w, entity_id owner)
 
 std::vector<entity_id>* assets_of(world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return &cit->second.assets;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return &nit->second.state_assets;
     return nullptr;
@@ -568,10 +528,8 @@ std::vector<entity_id>* assets_of(world& w, entity_id owner)
 
 std::vector<entity_id> economic_owner_ids(const world& w)
 {
+    // BL-1407: every owner is a nation; those holding a building, ascending.
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
-        ids.push_back(kv.first);
     for (const auto& [nid, nc] : w.nations)
         if (!nc.state_assets.empty())
             ids.push_back(nid);
@@ -581,17 +539,11 @@ std::vector<entity_id> economic_owner_ids(const world& w)
 
 entity_id owner_home_nation(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return cit->second.home_nation;
-    if (w.nations.find(owner) != w.nations.end())
-        return owner;
-    return null_entity;
+    return w.nations.find(owner) != w.nations.end() ? owner : null_entity;
 }
 
 float* purse_of(world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return &cit->second.balance;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return &nit->second.treasury;
     return nullptr;
@@ -599,8 +551,6 @@ float* purse_of(world& w, entity_id owner)
 
 const float* purse_of(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return &cit->second.balance;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return &nit->second.treasury;
     return nullptr;
@@ -608,8 +558,6 @@ const float* purse_of(const world& w, entity_id owner)
 
 float purse_room_of(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return cit->second.balance;
     // A nation's uncommitted treasury - state_uncommitted_treasury's rule
     // (state_industry.cpp), restated so this file needs no economy header.
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
@@ -628,17 +576,6 @@ bool owner_holds(const world& w, entity_id owner, entity_id building)
     return a != nullptr && std::find(a->begin(), a->end(), building) != a->end();
 }
 
-bool world_is_folded(const world& w)
-{
-    for (const auto& [cid, cc] : w.corporations)
-        if (!cc.assets.empty())
-            return false;
-    for (const auto& [nid, nc] : w.nations)
-        if (!nc.state_assets.empty())
-            return true;
-    return false;
-}
-
 entity_id player_actor(const world& w)
 {
     // BL-1407: the player acts as its nation, which `player_entity` names.
@@ -653,10 +590,6 @@ entity_id champion_of(const world& w, entity_id nation)
     // no corporation exists, and once the charters close no nation has one).
     entity_id best = null_entity;
     for (const auto& [cid, cc] : w.gen_charters)
-        if (!cc.is_background && cc.home_nation == nation && (best == null_entity || cid < best))
-            best = cid;
-    // A pre-v56 stream's corporation records (until the type is deleted).
-    for (const auto& [cid, cc] : w.corporations)
         if (!cc.is_background && cc.home_nation == nation && (best == null_entity || cid < best))
             best = cid;
     return best;
@@ -677,9 +610,6 @@ void mark_majors_from_champions(world& w)
     for (const auto& [cid, cc] : w.gen_charters) // BL-1407: the specialist charters
         if (!cc.is_background && cc.home_nation != null_entity)
             homes.insert(cc.home_nation);
-    for (const auto& [cid, cc] : w.corporations) // a v54 stream's specialists (the loader)
-        if (!cc.is_background && cc.home_nation != null_entity)
-            homes.insert(cc.home_nation);
     for (auto& [nid, nc] : w.nations)
         nc.is_major = homes.count(nid) != 0;
 }
@@ -689,6 +619,12 @@ entity_id player_nation(const world& w)
     // BL-1407 (CONCEPT.md § Player identity): `player_entity` IS the player's
     // nation. Null with no player, or when it names nothing that is a nation.
     return w.nations.find(w.player_entity) != w.nations.end() ? w.player_entity : null_entity;
+}
+
+const char* actor_name(const world& w, entity_id id)
+{
+    const auto nit = w.nations.find(id);
+    return nit != w.nations.end() ? nit->second.name.c_str() : nullptr;
 }
 
 entity_id body_of_market(const world& w, entity_id market)

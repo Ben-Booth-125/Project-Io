@@ -24,13 +24,11 @@ std::size_t pick(uint64_t seed, int salt, std::size_t n)
 
 const char* corp_name(const world& w, entity_id c)
 {
-    const auto it = w.corporations.find(c);
-    // A missing corp degrades to a noun rather than an empty string: a dispatch
-    // with a hole in it reads as a bug, and this layer must never be the thing
-    // that looks broken.
-    return (it != w.corporations.end() && !it->second.name.empty())
-               ? it->second.name.c_str()
-               : "an unmarked company";
+    // BL-1407: every belligerent is a nation. A missing one degrades to a noun
+    // rather than an empty string: a dispatch with a hole in it reads as a bug,
+    // and this layer must never be the thing that looks broken.
+    const char* nm = actor_name(w, c);
+    return (nm != nullptr && nm[0] != '\0') ? nm : "an unmarked power";
 }
 
 // The banks. Sci-fi / neutral voice throughout — the standing rule is that real

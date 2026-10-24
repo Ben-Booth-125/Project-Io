@@ -104,7 +104,7 @@ const char* selection_title(const world& w, selection_kind kind, entity_id id)
         case selection_kind::market:      return "Market";
         case selection_kind::unit:        return "Unit";
         case selection_kind::nation:      return w.nations.at(id).name.c_str();
-        case selection_kind::corporation: return w.corporations.at(id).name.c_str();
+        case selection_kind::corporation: return "Corporation"; // BL-1407: never selected
         case selection_kind::none:        return "Nothing";
     }
     return "?";
@@ -133,15 +133,10 @@ void draw_rival_building_summary(const world& w, const recipe_registry& reg,
     const building_component& b = it->second;
 
     // Owner corporation (public) — the building type already heads the panel.
-    const entity_id owner = owner_corp_of(w, id);
-    const auto cit = w.corporations.find(owner);
-    if (cit != w.corporations.end())
+    // BL-1407: the owner is the building's NATION (public).
+    if (const auto nit = w.nations.find(owner_nation_of(w, id)); nit != w.nations.end())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "Owner: %s", cit->second.name.c_str());
-    // BL-1296: a state building's owner is its nation (state industry, public).
-    else if (const auto nit = w.nations.find(owner_nation_of(w, id)); nit != w.nations.end())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "Owner: %s (state industry)%s", nit->second.name.c_str(),
+                           "Owner: %s%s", nit->second.name.c_str(),
                            b.state_idle ? " \xc2\xb7 idle: treasury short" : "");
 
     if (god_view)
@@ -923,17 +918,18 @@ namespace {
 void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
                                 const economy_report& report, entity_id id)
 {
-    const auto cit = w.corporations.find(id);
-    if (cit == w.corporations.end())
+    // BL-1407: the actor is a NATION (the corporation is deleted).
+    const auto cit = w.nations.find(id);
+    if (cit == w.nations.end())
     {
         ImGui::TextDisabled("\xe2\x80\x94");
         return;
     }
-    const corporation_component& c = cit->second;
+    const nation_component& c = cit->second;
 
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "God view");
 
-    ImGui::Text("Cash: %s", fmt::credits(c.balance).c_str());
+    ImGui::Text("Treasury: %s", fmt::credits(c.treasury).c_str());
     ImGui::Text("Reserve floor: %s", fmt::credits(corp_reserve_floor(w, reg, id)).c_str());
     ImGui::Text("Should-have buffer: %s",
                 fmt::credits(corp_should_have_buffer(w, reg, report, id)).c_str());
@@ -959,7 +955,7 @@ void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
     // Running production: one compact row per asset — what it runs, at what
     // staffing, and whether the tick-level agency has idled it.
     bool any_bld = false;
-    for (const entity_id bid : c.assets)
+    for (const entity_id bid : c.state_assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())

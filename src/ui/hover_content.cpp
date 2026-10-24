@@ -251,23 +251,9 @@ void hover_building_rival(const world& w, const recipe_registry* reg,
     // A tiny inline corp emblem (BL-090) precedes the name so the rival's identity
     // reads the same shape/colour here as on the canvas marker and in the Selection
     // header. Shape + colour route through the shared palette source of truth.
-    const entity_id owner = owner_corp_of(w, eid);
-    const auto      cit   = w.corporations.find(owner);
-    if (cit != w.corporations.end())
-    {
-        const float  gr = ImGui::GetTextLineHeight() * 0.42f;
-        const ImVec2 gc = ImGui::GetCursorScreenPos();
-        icons::corp_emblem(ImGui::GetWindowDrawList(),
-                           {gc.x + gr, gc.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
-                           palette::corp_emblem_shape(owner),
-                           palette::corp_identity_colour(owner, w.player_entity));
-        ImGui::Dummy({gr * 2.0f + ImGui::GetStyle().ItemSpacing.x, ImGui::GetTextLineHeight()});
-        ImGui::SameLine();
-        ImGui::Text("Owner: %s", cit->second.name.c_str());
-    }
-    // BL-1296: a state building's owner is its nation (state industry, public).
-    else if (const auto nit = w.nations.find(owner_nation_of(w, eid)); nit != w.nations.end())
-        ImGui::Text("Owner: %s (state industry)", nit->second.name.c_str());
+    // BL-1407: the owner is the building's NATION (public).
+    if (const auto nit = w.nations.find(owner_nation_of(w, eid)); nit != w.nations.end())
+        ImGui::Text("Owner: %s", nit->second.name.c_str());
     else
         ImGui::TextDisabled("Owner: unknown");
 

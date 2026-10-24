@@ -84,8 +84,7 @@ float corp_trade_points(const world& w, const recipe_registry& reg,
 
 float* trade_reserve_of(world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return &cit->second.trade_reserve;
+    // BL-1407: every owner is a nation.
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return &nit->second.trade_reserve;
     return nullptr;
@@ -93,8 +92,6 @@ float* trade_reserve_of(world& w, entity_id owner)
 
 float trade_reserve_of(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return cit->second.trade_reserve;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return nit->second.trade_reserve;
     return 0.0f;
@@ -102,8 +99,6 @@ float trade_reserve_of(const world& w, entity_id owner)
 
 float* trade_points_of(world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return &cit->second.trade_points;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return &nit->second.trade_points;
     return nullptr;
@@ -111,8 +106,6 @@ float* trade_points_of(world& w, entity_id owner)
 
 float trade_points_of(const world& w, entity_id owner)
 {
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        return cit->second.trade_points;
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
         return nit->second.trade_points;
     return 0.0f;

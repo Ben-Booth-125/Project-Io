@@ -162,9 +162,9 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         finish_campaign_world(w, rep, reg, params, cfg, /*progress=*/nullptr);
     // Before the warm-up ticks: the same moment --autostart hashes (after the
     // settle, before play), so the two lines compare digit for digit.
-    std::fprintf(stderr, "[serve] searched and settled: %zu corporations, winner placement=%08X; "
+    std::fprintf(stderr, "[serve] searched and settled: %zu nations, winner placement=%08X; "
                          "state_hash=%016llX seed=%u\n",
-                 w.corporations.size(), fin.search.winner.placement_seed,
+                 w.nations.size(), fin.search.winner.placement_seed,
                  static_cast<unsigned long long>(w.state_hash(w.current_day_tick)),
                  params.seed);
 
@@ -331,8 +331,9 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     }
 
     std::filesystem::create_directories(out_dir);
+    // BL-1407: the actors are the nations.
     std::vector<entity_id> corp_ids;
-    for (const auto& kv : w.corporations)
+    for (const auto& kv : w.nations)
         if (which == "all" || std::to_string(kv.first) == which)
             corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
@@ -453,7 +454,7 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
     }
     std::printf("[spectate-headless] seed=%u epoch=%d until=%d; world built in %.1f s "
                 "(%zu nations, %zu corporations, seat %u%s); state_hash=%016llX\n",
-                seed, epoch, until_year, gen_seconds, w.nations.size(), w.corporations.size(),
+                seed, epoch, until_year, gen_seconds, w.nations.size(), std::size_t{0} /* BL-1407: no corporation */,
                 static_cast<unsigned>(seat.seated), seat.floor_unmet ? " FLOOR UNMET" : "",
                 static_cast<unsigned long long>(w.state_hash(w.current_day_tick)));
     std::fflush(stdout);
@@ -485,16 +486,14 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
         std::map<entity_id, double> corp_inc_q; // latest filed quarterly_return::income
         std::map<entity_id, double> corp_net_q; // latest filed quarterly_return::net
         std::map<entity_id, int>    corp_n;
-        for (const auto& [cid, c] : w.corporations)
-        {
-            corp_bal[c.home_nation] += c.balance;
-            corp_n[c.home_nation] += 1;
-            if (!c.returns.empty())
+        // BL-1407: no corporation exists; the nation's own last return is read
+        // (its treasury is reported beside these), and the firm count is 0.
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.returns.empty())
             {
-                corp_inc_q[c.home_nation] += c.returns.back().income;
-                corp_net_q[c.home_nation] += c.returns.back().net;
+                corp_inc_q[nid] += nc.returns.back().income;
+                corp_net_q[nid] += nc.returns.back().net;
             }
-        }
 
         years << (first_year ? "\n" : ",\n") << "    {\"year\": " << year
               << ", \"econ_ticks\": " << econ_ticks_run << ", \"nations\": [";
@@ -557,8 +556,8 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
         const settle_tick_result tick =
             run_settle_tick(w, reg, first_live_step + (k - 1), day, /*spectating=*/true);
         for (const auto& [cid, f] : tick.flows)
-            if (const auto cit = w.corporations.find(cid); cit != w.corporations.end())
-                sales_year[cit->second.home_nation] += f.income;
+            if (w.nations.count(cid) != 0) // BL-1407: every seller is a nation
+                sales_year[cid] += f.income;
 
         if (k % 4 != 0) continue;
         const int year = epoch + k / 4;
@@ -592,7 +591,7 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
             std::printf("[spectate-headless] %d: %.1f s wall | treasury sum %.0f (%d negative) | "
                         "tech held %d | corps %zu | corp sales %.0f | median tax tier %d | "
                         "discontent>0.5 %d | state_hash=%016llX\n",
-                        year, secs, treas, neg, held, w.corporations.size(), sales_sum, median_tier,
+                        year, secs, treas, neg, held, std::size_t{0} /* BL-1407: no corporation */, sales_sum, median_tier,
                         biting, static_cast<unsigned long long>(w.state_hash(w.current_day_tick)));
             std::fflush(stdout);
         }
