@@ -1,62 +1,57 @@
-# Next session — after the v0.2.0 cut
+# Next session — sprint 57, nations own everything
 
-Handoff written **2026-10-23** by the session that finished sprint 55 and cut **v0.2.0** (the economy
-functions, logistics included; ROADMAP.md). Main and the `v0.2.0` tag are **local and not pushed** —
-pushing is Ben's (`git push origin main --follow-tags`). The next sprint is not cut yet; Ben opens it.
+Handoff written **2026-10-24** by the session that designed and built sprint 57. Main is **local and
+not pushed** (the `v0.2.0` tag too — pushing is Ben's: `git push origin main --follow-tags`).
 
 ---
 
 ## 1. Where it stands
 
-- **v0.2.0 tagged** on the cut commit. Sprints 55 and 56 are closed and archived cold with their
-  retros (`docs/development/archive/sprints-2026-Q4.json`); the sprint 55 ruling register is
-  `tools/session/rulings/sprint-55.json` (14 rulings, 0 failing).
-- **The digests are re-blessed** (BL-1338 (digest pins stale), Ben 2026-10-23): both
-  `player_seed_sweep` arcs pinned at `bd33e496`; the shape and every mover are in
-  `docs/development/drafts/v0.2.0-rebless.md`. The next world mover reports its digest movement and
-  waits for its wave's re-bless (DELIVERY.md § The digest re-bless is one act per WAVE).
-- **Gates at the tip:** market_viability FULL G1 95.7, G1t50 89.1, G1b 2.6, G2 157.5, G3 96.4 — all
-  pass; haulage --far-trade 834 / 971 convoys; `lp_coverage_census` every rule passes on 16 seeds
-  (21 capitals dark at the fold, 37 at the handoff — nations that cannot fund their nodes);
-  world_determinism and save_roundtrip pass.
-- **The backlog was cleared for the next sprint** (Ben, 2026-10-23): everything not sprint 55 was
-  closed — 4 complete, 32 cancelled — and archived cold. The hot file holds **20 rows**: sprint 55's
-  carry-over (the space waves BL-1326..BL-1333, the market-centre items BL-1349/1350/1358/1359,
-  BL-1336, BL-1355, BL-1369, BL-1383, BL-1384, BL-1388, BL-1392..1394). `--status cancelled` finds
-  the closed-unbuilt ones; three of them were partial and say what remains (BL-1119, BL-1222,
-  BL-1231).
+- **The design** (Ben, 2026-10-23): corporations and companies are retired; every building is owned by
+  the nation whose ground it stands on; a nation builds only on its own ground; the player is its
+  nation and builds its own; every AI nation, major and minor, builds through the scorer. Written in
+  GLOSSARY, CONCEPT, NATIONS, AI_OPPONENT § 11 and ~60 swept docs (e7879fc3). Ruling register
+  `tools/session/rulings/sprint-57.json`: 8 rulings, 0 failing.
+- **Landed:** BL-1399 (nation builds own ground), BL-1401 (nation AI actor), BL-1402 (fold to ground,
+  with ports E/T/M), BL-1403 (nation money flows), BL-1404 (majors a saved fact), BL-1405 (LP one class),
+  BL-1406 (UI and protocol as nation — code merged), BL-1407 (delete corporation_component, f0c62ee4).
+  `corporation_component` no longer exists; save version 56 (a v54 stream folds on read).
+- **Gates on main:** market_viability FULL G1 93.0, G1t50 85.2, G1b 4.6, G2 94.1, G3 100.0 (all pass;
+  G2/G3 now measure nations and buildings, NR-1068); world_determinism, save_roundtrip (97/0),
+  fold_census, nation_actor_seam, agent_seam (22/0), tax_discontent (44/0), money_conservation pass;
+  majors identical on all 16 library seeds. The app builds.
 
 ## 2. Waiting on Ben
 
-- **Sprint 55's six calls are ruled** (Ben, 2026-10-23; register `sprint-55.json`, 18 rulings,
-  0 failing). Rail now fades to zero at 40 (a world mover: its digest movement waits for the next
-  wave's re-bless). NR-1060 left two items: BL-1399 (no rival on player ground) and BL-1400
-  (shipment pays whole route), each with open questions to settle before building.
-- **Older open review calls** (NEEDS_REVIEW.md): NR-966..NR-1035, 24 entries.
+- **BL-1406 live click** — eight checks in its requirement row (`requirements.json`, group
+  `ui-as-nation`): header treasury, Nation overview, inert slots 5/9, Construct on own vs foreign
+  ground, unowned-ground road text, survey/hire/trade/research presses, seat screen, profile.
+- **Calls:** NR-1064 (sweep readings), NR-1065 (demote, not fold), NR-1066 (six questions: emblem,
+  embargo, rival disclosure, works lean, focus, Industry lens), NR-1067 (wage-tax rates, duty cap),
+  NR-1068 (G2/G3 re-pointed, firm exit inert, seat clean slate), NR-1069 (treasuries fall; seed 46
+  majors stop building), NR-1070 (verify.fold_world, deleted verify scripts, one golden),
+  NR-1071 (unit upkeep is the garrison claim, no AI hire, AI trade parked).
+- **BL-1408 (the one re-bless)** on Ben's go — digests and floors move with every item here, plus
+  the icon_silhouettes_overview golden and ai_skill bands.
 
 ## 3. Owed
 
-- **Live clicks:** BL-1335 (the Taxes control); the BL-1356 card wording ("Not tied to the capital",
-  "Topped up from N sources") has not been seen live.
-- **Red harnesses** (unchanged by the last items, each failing identically before them): supply_advance
-  R5, pools_per_market (a).1/(a).4, unposted_bid U2/U7a, railway_harness, state_industry_harness,
-  lp_pool_harness (L7, BL-1383), hauler_room, shelf_share, nation_budget_harness R9;
-  tax_discontent_harness does not compile (`net_tail`); the CMake `all` target does not link
-  (`battle_engagement_harness`). Sprint 56 recorded state_industry and lp_pool passing at its tip, so
-  their red arrived with sprint 55's work — worth a look first.
+- **BL-1409** — measure first: on seed 46 a whole-economy nation finds no viable build and treasuries
+  fall (27k -> 8.5k over 40 seated ticks on nation 47763). AI trade/Marketplace/survey for nations is
+  parked as `docs/development/drafts/bl-1402-t8-nation-ai-trade.patch`: re-opened it fails G1t50 (84.0;
+  84.6 with pins off). Same question; Ben decides after the measurement.
+- **Known reds, unchanged by sprint 57:** nation_budget R9a-m, lp_pool L7, railway R6,
+  history_sim R3a2/R3a3, spectator_determinism R1, a few visual scripts (lens_structure_pivot,
+  lens_one_tier, convoys_ledger, shell_pass). `.claude/skills/verifier-visual/SKILL.md` and
+  `verifier-headless/SKILL.md` still name retired scripts/harnesses (skill edits are Ben's).
 
-## 4. Traps this session paid for
+## 4. Traps this sprint paid for
 
-- **Shell heredocs eat `\n`** inside Python string literals written through them, even quoted: a C++
-  `"...\n"` arrived as a real newline four times. Write edit scripts to a file with the Write tool,
-  or use the Edit tool for anything holding an escape.
-- **`sed -i` rewrites CRLF files as LF.** Restore with `sed -i 's/\r*$/\r/' <file>` and check
-  `git ls-files --eol`.
-- **`harness_params.hpp` mirrors the fold's tail call for call.** A new fold step must be added
-  there too, or every harness measures the world without it (BL-1398's first reading did).
-- **Fixtures without a nation**: a shipment now draws Logistic Points, so a hand-built trade fixture
-  needs a nation and a source at its market centre — `tools/verify/lp_fixture.hpp`.
-- **A digest walk without switching branches**: `git archive <sha> | tar -x` into the scratchpad, set
-  `IO_DEPS_CACHE` to the main checkout's `_deps_cache`, build there.
-- Older traps (never `taskkill` cl.exe; hold keep-awake for full sweeps; NR ids mint across hot and
-  cold) still stand.
+- **Corp-keyed metrics go silently to zero** once ownership moves: market_viability's G2 read 0.0
+  until re-pointed. Any harness that walks owners must read nations.
+- **Never edit src while a gate script compiles from the tree** — later builds pick up the edit.
+- **harness_params.hpp mirrors finish_campaign_world call for call**; a new step goes in both.
+- **A pooled owner exposes double counting** that per-firm worlds hid (the scorer's floor read the
+  already-committed treasury).
+- Older traps still stand: shell heredocs eat `\n`; `sed -i` rewrites CRLF as LF; never `taskkill`
+  cl.exe; NR ids mint across hot and cold; background build exit codes are the echo's.
