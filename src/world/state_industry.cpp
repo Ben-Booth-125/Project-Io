@@ -1287,6 +1287,16 @@ fold_report fold_to_ground(world& w)
 {
     fold_report out;
 
+    // THE OPENING STOCK GOES ON THE SHELVES FIRST (CORPORATION_GENERATION.md
+    // § Pass 4b). place_opening_stock splits each charter's stock over the
+    // markets its buildings stand in, and reads the charter to do it; the fold
+    // closes the charters below, after which the settle's own call places
+    // nothing. Without this the opening stock was silently lost at every
+    // campaign start, Marketplaces and Ports never met their upkeep goods, and
+    // no trade point was made (haulage_measure read 0 convoys, 2026-10-24).
+    // Idempotent: a no-op when nothing is held.
+    place_opening_stock(w);
+
     // BL-1407 -- THE CHARTERS CLOSE. Generation creates no corporation: every
     // building a charter placed is already its ground nation's. What is left of
     // the old fold is (1) a charter building on ground no nation owns is
