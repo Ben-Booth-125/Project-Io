@@ -7644,38 +7644,38 @@
    "difficulty": 5,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1407 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-24",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "build: build_app.bat and all harness targets"
      ],
      "requirement": "corporation_component, world::corporations and owner_kind::corporation no longer exist and the full build links.",
-     "notes": null
+     "notes": "corporation_component, world::corporations and owner_kind::corporation are gone (no live use left in src or tools; two report fields and one string literal mention the word). The app builds (build/ProjectIo.exe 2026-10-24 15:37, main 964e1a46); every harness builds through build_harness / build_lua_harness; nmake links 149 targets incl. ProjectIo (73 Lua harnesses fail to link under CMake alone - the same gap as base). 14 harnesses retired with their mechanism (buyout, ownership class, firm exit, procurement, laws-as-levy, corp solvency...)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: save_roundtrip"
      ],
      "requirement": "A v54 save loads into the nation-owned world.",
-     "notes": null
+     "notes": "save_roundtrip 97/0 incl. P22: a real v54 stream reads into the nation-owned world, its corporations folded in a scratch structure and discarded; world_save_version 56 carries no corporation record and saves the nation's quarterly returns and trade reserve/points."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism, market_viability, player_seed_sweep, history_sim_harness, lp_coverage_census, nation_targets_harness"
      ],
      "requirement": "The load-bearing gates run green or report their movement.",
-     "notes": null
+     "notes": "Verified on main 964e1a46 by the main session: world_determinism ALL PASS, save_roundtrip OK, fold_census 21/0 (nothing left to fold), nation_actor_seam 95/0, money_conservation and tax_discontent_harness (44/0) pass, lp_coverage_census rules pass; market_viability FULL G1 93.0 G1t50 85.2 G1b 4.6 G2 94.1 G3 100.0 (from 92.9/85.8/4.6/95.8/100.0); nation_targets identical majors on 16 seeds; history_sim_harness 145/2 as base. Known reds unchanged: nation_ai_builds R1 seed 46 (BL-1409), lp_pool L7, nation_budget R9a-m. lp_pool L6 re-pointed to the seat-is-the-nation (main session)."
     }
    ]
   },

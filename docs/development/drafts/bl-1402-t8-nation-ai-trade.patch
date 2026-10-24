@@ -1,0 +1,59 @@
+diff --git a/src/world/corp_ai.cpp b/src/world/corp_ai.cpp
+index 8148b12c..7efc9cd0 100644
+--- a/src/world/corp_ai.cpp
++++ b/src/world/corp_ai.cpp
+@@ -910,11 +910,13 @@ float actor_money(const world& w, const ai_actor& a)
+ 
+ ai_books actor_books(const world& w, const ai_actor& a)
+ {
+-    // BL-1407: a nation's books read zero here, as they always did for a nation
+-    // (BL-1401: a nation proposes no trade); the corporation's are deleted.
+-    (void)w;
+-    (void)a;
++    // BL-1402 T8 (AI_OPPONENT.md § 11, Ben 2026-10-23: every corporation decision
++    // carries over to the nation): a nation's own trade books - the points its
++    // Marketplaces and Ports make and the reserve it holds for manual trades
++    // (trade.hpp accessors; serialised in the v56 stream).
+     ai_books b;
++    b.trade_points  = trade_points_of(w, a.id);
++    b.trade_reserve = trade_reserve_of(w, a.id);
+     return b;
+ }
+ 
+@@ -2650,10 +2652,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
+         emit_dials(*actor.assets, act_nation);
+ 
+         // ---- Survey candidates: paid discovery, bodies sorted ---------------
+-        // BL-1401: a corporation's verb. The nation's door carries no survey
+-        // (corp_command.cpp apply_state_command), and the grant admits no verb
+-        // that exists only because the actor is now a nation.
+-        if (!actor.is_nation)
++        // BL-1402 T8: a nation surveys for itself (the survey verb serves a nation
++        // acting as itself, corp_command.cpp; the treasury pays, dispatch_survey).
+         {
+             std::vector<entity_id> body_ids;
+             for (const auto& [id, b] : w.bodies)
+@@ -2846,11 +2846,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
+         // carry the Marketplace's own upkeep is no site: a Marketplace makes no
+         // points on a tick its upkeep goes unmet.
+         // One at a time: none while another of its trade buildings is still
+-        // under construction. Never the player's corp. BL-1401: a corporation's
+-        // only for now — trade.cpp makes trade points for corporations alone, so
+-        // a nation's Marketplace would carry no trade of its own (owed with the
+-        // nation's trade books).
+-        if (!actor.is_player && !actor.is_nation)
++        // under construction. Never the player's. BL-1402 T8: a nation builds its
++        // Marketplace - trade.cpp makes trade points for any owner since BL-1402.
++        if (!actor.is_player)
+         {
+             bool building_one = false;
+             for (const entity_id bid : *actor.assets)
+@@ -3102,7 +3100,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
+         // BL-1401: read off the actor's books; a nation's are empty (see ai_books).
+         const ai_books books = actor_books(w, actor);
+         const bool trade_eligible =
+-            !actor.is_player && !actor.is_nation && books.trade_points > 0.0f;
++            !actor.is_player && books.trade_points > 0.0f; // BL-1402 T8: a nation trades
+         if (trade_eligible)
+         {
+             const trade_params& tp = reg.trade();

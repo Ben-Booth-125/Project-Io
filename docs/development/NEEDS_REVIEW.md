@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*48 entries — 31 open, 17 resolved.*
+*49 entries — 32 open, 17 resolved.*
 
 ---
 
@@ -288,6 +288,17 @@ On the folded world (BL-1402), seed 46's 4 majors place NO production building i
 > **Recommendation:** (1) grant, verify-only and behind --verify like its siblings; (2) approve trimming the deleted names from SKILL.md; (3) re-bless the one golden at BL-1408.
 
 *Files: `src/core/verify_api.cpp`, `.claude/skills/verifier-visual/SKILL.md`, `scripts/verify/`*
+
+### NR-1071 — BL-1407 consequences: unit upkeep now runs only as the garrison budget claim, the nation scorer does not hire, and two smaller readings
+*decision · raised 2026-10-24 · from BL-1407 lane + main session*
+
+(1) UNIT UPKEEP: the credits+goods+supply-decay vector (run_unit_upkeep) only ever ran for CORPORATION units; with corporations gone every unit takes the garrison branch, whose upkeep is a military_research budget-line claim (MILITARY.md § Nation garrisons) - so the per-unit vector no longer runs anywhere. That is MILITARY.md's model for a nation's units, applied to all of them. (2) HIRE: the scorer's corporation hire/base branch is left OFF for nations - a nation raises force through the muster (MILITARY.md), and opening the corporation hire path too would give it two. The 2026-10-23 grant named hiring among the carried-over decisions, so this is a narrowing. (3) THE SCORER'S TRADE, MARKETPLACE AND SURVEY BRANCHES are dead after the delete (they were corporation-only), so no AI nation pins a trade, builds a Marketplace or surveys; AUTO trade still runs. Re-opening them under the grant (BL-1402 T8, parked as docs/development/drafts/bl-1402-t8-nation-ai-trade.patch) was measured: market_viability FULL G1t50 85.2 -> 84.0 (FAILS the 85 target), G2 94.1 -> 96.9, G1b 4.6 -> 4.9; with manual pins off but Marketplace and surveys on, G1t50 84.6 (still fails) and G1b 5.0. Left OFF so the gates pass; YOUR CALL: re-open (and accept or re-target the gate), or keep off until BL-1409 explains how a whole-economy nation trades against its own plants. (4) A nation's quarterly return counts the wage tax as income; the seat card's trailing net still reads 0 though nations now file returns.
+
+**Why it matters.** (1) and (2) decide what a nation's army costs it and how it grows one; (3) restores AI trade, which otherwise stopped entirely.
+
+> **Recommendation:** Keep it off and fold the question into BL-1409, whose measurement (treasury trajectory and seed 46) is the same question of how a nation that owns every plant spends.
+
+*Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/spawn_seat.cpp`*
 
 ---
 

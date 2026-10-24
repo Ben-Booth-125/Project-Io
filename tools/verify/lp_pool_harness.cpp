@@ -545,7 +545,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
 
     // ---- L6 -----------------------------------------------------------------
     std::printf("--- L6 the seam ---\n");
-    if (pn != null_entity && champion_of(w, pn) == P)
+    if (pn != null_entity && P == pn) // BL-1407: the seat IS its nation
     {
         agent_protocol::session ps;
         ps.actor = P;
@@ -609,16 +609,16 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         if (rn != null_entity)
         {
             corp_command cmd;
-            cmd.corp = champion_of(w, rn); cmd.as_nation = rn; cmd.verb = corp_verb::set_logistics_shares;
+            cmd.corp = rn; cmd.as_nation = rn; cmd.verb = corp_verb::set_logistics_shares; // BL-1407: a rival nation acting as itself
             cmd.quantity = 0.5f; cmd.floor_price = 0.5f;
             const std::uint64_t h1 = w.state_hash(0);
             const corp_command_result r = apply_corp_command(w, reg, cmd);
             check(r == corp_command_result::rejected_invalid && w.state_hash(0) == h1 && !w.nations.at(rn).lp_shares.set, "L6",
-                  "a rival champion's share command is refused whole (BL-1405: retired), nothing mutated");
+                  "a rival nation's share command is refused whole (BL-1405: retired), nothing mutated");
         }
     }
     else
-        check(false, "L6", "the seat is its major nation's champion");
+        check(false, "L6", "the seat is a nation (w.player_entity == player_nation)");
 
     // ---- L7 -----------------------------------------------------------------
     std::printf("--- L7 the save ---\n");
