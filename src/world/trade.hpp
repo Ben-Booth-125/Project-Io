@@ -66,14 +66,29 @@ std::map<entity_id, float> market_trade_points(const world& w, const recipe_regi
 float corp_trade_points(const world& w, const recipe_registry& reg,
                         const economy_report& report, entity_id corp);
 
+/// BL-1402 (TRADE.md § Auto and reserved trade; NATIONS.md § What a nation
+/// owns): THE ONE ACCESSOR for an owner's trade reserve — a corporation's
+/// `trade_reserve` or a nation's — so every reader and writer (the trade pass,
+/// the verbs, the surfaces) agrees which field an owner keeps. Null (const
+/// overload: 0) for an id that is neither. A nation's verb (`apply_state_command`)
+/// writes through the non-const overload.
+float* trade_reserve_of(world& w, entity_id owner);
+float  trade_reserve_of(const world& w, entity_id owner);
+
+/// BL-1402: the same accessor for the trade points an owner MADE on its last
+/// trade pass (`run_trades` writes it for every economic owner).
+float* trade_points_of(world& w, entity_id owner);
+float  trade_points_of(const world& w, entity_id owner);
+
 /// The markets @p corp TRADES FROM: every market whose catchment holds one of
 /// its completed, active trade buildings, ascending id (Ben, 2026-10-10,
 /// NR-1018). Its trades — auto and manual — leave from these; they reach any
 /// market a leg reaches from the source's centre (`rank_trade_routes`).
+/// BL-1402: @p corp is any owner — a corporation or a nation (`assets_of`).
 std::vector<entity_id> corp_trade_markets(const world& w, entity_id corp);
 
 /// Is @p t a well-formed manual trade in @p w as it stands — a live owner
-/// corporation, two distinct existing markets, a good trade carries
+/// (corporation or, BL-1402, nation), two distinct existing markets, a good trade carries
 /// (capacity > 0, not a grid good), finite points > 0, and a source market
 /// the owner trades from (`corp_trade_markets`; NR-1018)? The command seam refuses a trade
 /// this rejects; the save loader, which has no registry, checks the owner,
@@ -127,11 +142,12 @@ void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nod
 /// THE TRADE PASS, once per economy tick, after `run_economy_step` (its
 /// production has landed and its draws are made) and before `clear_markets`
 /// (which bills the trades' purchases and prices their wants). For every
-/// corporation, ascending id:
+/// economic owner (`economic_owner_ids`: corporations and state-industry
+/// nations, BL-1402), ascending id:
 ///   1. its trade points this tick, PER MARKET (`market_trade_points`), their
-///      sum stored on `corporation_component::trade_points`;
+///      sum stored through `trade_points_of`;
 ///   2. its MANUAL trades (`world::trades`, placement order) spend up to its
-///      one reserve (`trade_reserve`, clamped to the points made), each out of
+///      one reserve (`trade_reserve_of`, clamped to the points made), each out of
 ///      the points of the market it leaves: each ships up to
 ///      `points x capacity(R)` — bought, hauled, landed — margin or no margin;
 ///   3. the reserve manual trades left unspent is held back from every market

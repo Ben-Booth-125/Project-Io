@@ -121,15 +121,19 @@ survey_dispatch_result dispatch_survey(world& w, entity_id body, entity_id payer
 
     if (payer == null_entity)
         payer = w.player_entity; // default: the player corp pays (pre-BL-202 behaviour)
-    const auto pit = w.corporations.find(payer);
-    if (pit == w.corporations.end()) return survey_dispatch_result::invalid;
+    // BL-1402 (NATIONS.md § What a nation owns): the payer is a corporation
+    // (its balance) or a nation (its treasury, through `purse_of`). A nation
+    // commits only its uncommitted treasury and never runs below zero
+    // (`purse_room_of`); for a corporation the room IS its balance, as before.
+    float* purse = purse_of(w, payer);
+    if (purse == nullptr) return survey_dispatch_result::invalid;
 
     const float cost = survey_cost(w, body);
-    if (pit->second.balance < cost) return survey_dispatch_result::insufficient_funds;
+    if (purse_room_of(w, payer) < cost) return survey_dispatch_result::insufficient_funds;
 
     const survey_schedule sched = survey_compute_schedule(w, body);
 
-    pit->second.balance -= cost;            // debited upfront
+    *purse -= cost;                          // debited upfront
     s.phase           = survey_phase::in_transit;
     s.regions_total   = sched.regions_total;
     s.regions_done    = 0;

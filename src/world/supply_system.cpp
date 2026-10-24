@@ -160,9 +160,12 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
         // catchment holds the interception tile — where it physically is — and,
         // landing being selling, the interceptor is paid it at that tick's
         // clearing price. No market under the tile: nowhere to land, destroyed.
+        // BL-1402 (NATIONS.md § What a nation owns): the interceptor may be a
+        // corporation or a nation — any economic owner (`assets_of`) can land
+        // and be paid; a unit of no owner still destroys what it cuts.
         const entity_id capture_market = (rec.body != null_entity) ? market_for_tile(w, tile) : null_entity;
         const bool creditable = capture_market != null_entity &&
-                                w.corporations.find(interceptor_corp) != w.corporations.end() &&
+                                assets_of(w, interceptor_corp) != nullptr &&
                                 std::isfinite(cv.cargo_qty);
         if (creditable)
         {
@@ -400,10 +403,14 @@ float body_distance_au(const world& w, entity_id a, entity_id b, int day_tick)
 
 } // namespace
 
-/// True if `corp` has a launchpad building whose tile is on `body`.
-bool corp_has_launchpad_on(const world& w, const corporation_component& corp, entity_id body)
+/// True if `owner` has a launchpad building whose tile is on `body`.
+/// BL-1402: any owner — a corporation's `assets` or a nation's `state_assets`.
+bool owner_has_launchpad_on(const world& w, entity_id owner, entity_id body)
 {
-    for (entity_id asset : corp.assets)
+    const std::vector<entity_id>* assets = assets_of(w, owner);
+    if (assets == nullptr)
+        return false;
+    for (entity_id asset : *assets)
     {
         const auto bit = w.buildings.find(asset);
         if (bit == w.buildings.end())
@@ -928,13 +935,10 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     // port trades under the NATION's id -- the state carries the trade machinery
     // -- so the trader is a corporation or a nation; its home nation is the one
     // whose held nodes price the haul.
-    entity_id home = null_entity;
-    if (const auto cit = w.corporations.find(corp_id); cit != w.corporations.end())
-        home = cit->second.home_nation;
-    else if (w.nations.find(corp_id) != w.nations.end())
-        home = corp_id;
-    else
-        return leg;
+    if (assets_of(w, corp_id) == nullptr)
+        return leg; // neither a corporation nor a nation
+    const entity_id home = owner_home_nation(w, corp_id); // BL-1402
+
     // BL-1265: a trade moves goods from one market's shelf to another's.
     // Moving goods into the market they already sit on is not a haul.
     const auto sit = w.markets.find(src_market);
@@ -986,10 +990,9 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
 
     // Inter-body (TRADE.md § A trade, "Between bodies"): the space lane,
     // launchpad-gated — the trader must hold a pad on the source body.
-    // A nation's state trade has no launchpad of its own: its trade stays on
-    // the body (a state port is a sea anchor, not a space one).
-    const auto lcit = w.corporations.find(corp_id);
-    if (lcit == w.corporations.end() || !corp_has_launchpad_on(w, lcit->second, src_body))
+    // BL-1402 (NATIONS.md § What a nation owns): a corporation's pad or a
+    // nation's state one; a nation holding no pad still keeps its trade on the body.
+    if (!owner_has_launchpad_on(w, corp_id, src_body))
         return leg;
     // BL-308 / BL-1265: the pad also has to be FUELLED. A launch burns
     // `launch_draw_per_convoy()`, which the trader BUYS off the source shelf;
@@ -1050,12 +1053,8 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // The trader's purse: a corporation's balance, or -- for a state port's
     // trade (Ben, 2026-10-14) -- the nation's treasury, which pays the haul
     // now and its purchases at the clear (apply_budget, as state buildings').
-    float* purse = nullptr;
-    if (const auto cit = w.corporations.find(corp_id); cit != w.corporations.end())
-        purse = &cit->second.balance;
-    else if (const auto nit = w.nations.find(corp_id); nit != w.nations.end())
-        purse = &nit->second.treasury;
-    else
+    float* purse = purse_of(w, corp_id); // BL-1402: the one owner-generic purse
+    if (purse == nullptr)
         return false;
     const auto sit = w.markets.find(src_market);
     if (sit == w.markets.end() || w.markets.find(dest_market_id) == w.markets.end())

@@ -2284,6 +2284,16 @@ struct nation_component
     /// SERIALISED in the v48 state-industry trailing section (world_save.cpp).
     std::vector<entity_id> state_assets;
 
+    /// BL-1402 (TRADE.md § Auto and reserved trade; NATIONS.md § What a nation
+    /// owns): the nation's twins of `corporation_component::trade_reserve` and
+    /// `::trade_points`, for the trade buildings in `state_assets`. Read and
+    /// written ONLY through `trade_reserve_of` / `trade_points_of` (trade.hpp),
+    /// which pick the corporation's field or these by owner, so the two kinds of
+    /// owner cannot disagree. 0 reserve = all auto (what a state port always ran).
+    /// NOT YET SERIALISED: owed to world_save.cpp (BL-1402 port T).
+    float trade_reserve = 0.0f;
+    float trade_points  = 0.0f;
+
     /// BL-1309 — how this nation's Logistic Points are shared among its state,
     /// its champion and other firms (LOGISTICS.md § Logistic Points, "One pool").
     /// `set` false is the mechanical default (in proportion to need) and is the
