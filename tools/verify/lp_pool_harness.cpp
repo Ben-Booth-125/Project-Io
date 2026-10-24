@@ -22,20 +22,22 @@
 //   L3  PRODUCTION PROPORTIONAL TO POINTS: one economy step on two copies (every
 //       second hub idled on one); every extraction site working in both produces
 //       in the ratio of its granted fractions.
-//   L4  THE HOST NATION'S POOL: every consumer draws on the nation of its ground;
-//       a foreign firm's building counts under `other`; a source owned by a
-//       foreigner adds to the ground's nation.
-//   L5  SHARES: with a rule set and the pool short, each class gets its share (or
-//       its whole claim) and the surplus spills, served in queue order within the
-//       class; nothing granted beyond the pool; with no rule the classes are ONE
-//       queue (BL-1356, Ben 2026-10-20: distance orders the queue).
-//   L6  THE SEAM: set_logistics_shares through agent_protocol::service_line as
-//       the seat — every malformed or unauthorised command rejected with
-//       state_hash unchanged; a valid one applies; clear applies; a rival
-//       champion (in-process) is refused.
-//   L7  THE SAVE: v51 round-trips a rule with an equal state_hash; a v49 stream
-//       (v51 less its share-rule and space-asset sections) reads with no rule; a
-//       bad share refuses.
+//   L4  THE HOST NATION'S POOL, ONE CLASS (BL-1405): every consumer draws on the
+//       nation of its ground and counts under `state` - the one class - whoever
+//       owns it; a source owned by a foreigner adds to the ground's nation. On the
+//       folded world every consumer is its ground nation's (reported).
+//   L5  ONE QUEUE: the pool short, every claim on a nation is ONE queue (BL-1356,
+//       Ben 2026-10-20: distance orders the queue). The retired share rule
+//       (BL-1405), set directly on the nation, changes NOTHING: every building's
+//       grant and the shipment pot equal the no-rule tick exactly.
+//   L6  THE SEAM: set_logistics_shares RETIRED (BL-1405) - through
+//       agent_protocol::service_line as the seat, every command (formerly valid
+//       ones and the clear included) is refused with state_hash unchanged and no
+//       rule set; a rival champion (in-process) is refused rejected_invalid.
+//   L7  THE SAVE: the retired field still travels (old saves load) - v51
+//       round-trips a rule with an equal state_hash; a v49 stream (v51 less its
+//       share-rule and space-asset sections) reads with no rule; a bad share
+//       refuses.
 //
 // Build: bash tools/verify/build_lua_harness.sh lp_pool_harness
 // Run:   build_gen/verify/lp_pool_harness.exe [--seeds a,b,...] [seed ...]   (default 0)
@@ -426,17 +428,17 @@ void mechanics(app_start_world& out, std::uint32_t seed)
     // ---- L4 -----------------------------------------------------------------
     std::printf("--- L4 the host nation's pool ---\n");
     {
-        int wrong = 0, foreign = 0, foreign_bad = 0;
+        int wrong = 0, foreign = 0, not_state = 0, unfolded = 0, on_ground = 0;
         for (const lp_building_row& r : t.buildings)
         {
             const entity_id g = ground(w, w.buildings.at(r.building).tile);
             if (r.nation != g) ++wrong;
+            if (g == null_entity) continue;
+            ++on_ground;
+            if (r.cls != lp_class::state) ++not_state;
+            if (r.owner != g) ++unfolded; // BL-1402 fold: should be none
             const entity_id home = owner_home_nation(w, r.owner);
-            if (g != null_entity && home != null_entity && home != g)
-            {
-                ++foreign;
-                if (r.cls != lp_class::other) ++foreign_bad;
-            }
+            if (home != null_entity && home != g) ++foreign;
         }
         int fsrc = 0;
         for (const lp_source_row& s : t.sources)
@@ -446,7 +448,9 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             if (s.nation != null_entity && home != null_entity && home != s.nation) ++fsrc;
         }
         check(wrong == 0, "L4", fmt("every one of %zu consumers draws on the nation of its ground", t.buildings.size()));
-        check(foreign_bad == 0, "L4", fmt("%d foreign firms' buildings counted under 'other' on their host's pool", foreign));
+        check(not_state == 0, "L4", fmt("BL-1405 one class: every one of %d consumers on a nation's ground counts under 'state' (%d foreign-owned among them)",
+                                        on_ground, foreign));
+        std::printf("    fold: %d of %d consumers on a nation's ground are owned by someone other than that nation\n", unfolded, on_ground);
         std::printf("    %d sources stand on a nation's ground owned by a foreigner (added to the ground's pool: L1)\n", fsrc);
     }
 
@@ -456,17 +460,17 @@ void mechanics(app_start_world& out, std::uint32_t seed)
     const entity_id P  = w.player_entity;
     const entity_id pn = player_nation(w);
     {
-        // The fixture: the major whose ground carries claims in the most classes;
+        // The fixture: the major whose ground carries the largest claim (BL-1405: one
+        // class, so "claims in the most classes" no longer separates nations);
         // its consumers run at full (need x4 at most) and its sources are idled
         // one by one (descending id) until its pool is short of its claims.
         world c = w;
         entity_id ln = null_entity;
-        int best = -1;
+        float best = -1.0f;
         for (const lp_nation_row& r : t.nations)
         {
             if (!is_major_nation(c, r.nation)) continue;
-            int k = 0;
-            for (std::size_t j = 0; j < lp_class_count; ++j) if (r.claim[j] > 0.0f) ++k;
+            const float k = r.claim[0] + r.claim[1] + r.claim[2];
             if (k > best) { best = k; ln = r.nation; }
         }
         // Short the pool by dimming its sources' upkeep supply (points follow the
@@ -485,7 +489,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
                     bb.supply_factor_permille = std::min(1000, permille);
             }
         }
-        std::printf("    fixture: nation %u, %d classes claiming\n", ln, best);
+        std::printf("    fixture: nation %u, claims %.1f\n", ln, best);
         const entity_id lp_n = ln;
         const lp_tick mech = resolve_logistic_points(c);
         const lp_nation_row* mr = nation_row(mech, lp_n);
@@ -516,65 +520,27 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         check(totals && queue_holds(in_order), "L5",
               fmt("no rule: nation %u is ONE queue - %zu requests, %.1f handed of pool %.1f against claims %.1f; nobody later is served while an earlier request is short",
                   lp_n, in_order.size(), handed, mr ? mr->pool : 0.f, claims_all));
-        // The rule is set directly here (the verb is L6's subject).
+        // BL-1405: the retired rule, set directly (the verb is L6's subject and refuses
+        // it), is IGNORED - the ruled tick equals the mechanical one exactly.
         c.nations.at(lp_n).lp_shares.set = true;
         c.nations.at(lp_n).lp_shares.share = {0.6f, 0.3f, 0.1f};
         const lp_tick ruled = resolve_logistic_points(c);
         const lp_nation_row* r = nation_row(ruled, lp_n);
-        bool ok = r != nullptr && r->rule_set && r->pool < r->claim[0] + r->claim[1] + r->claim[2];
-        float total = 0.0f;
-        if (ok)
+        bool same = r != nullptr && mr != nullptr && !r->rule_set
+                 && ruled.buildings.size() == mech.buildings.size()
+                 && r->left == mr->left && r->granted == mr->granted && r->claim == mr->claim
+                 && r->pool < r->claim[0] + r->claim[1] + r->claim[2];
+        int differ = 0;
+        for (std::size_t i = 0; same && i < ruled.buildings.size(); ++i)
         {
-            const std::array<float, 3> sh = {0.6f, 0.3f, 0.1f};
-            std::array<float, 3> base{}, shortf{};
-            float surplus = 0.0f, st = 0.0f;
-            for (std::size_t k = 0; k < 3; ++k)
-            {
-                const float alloc = r->pool * sh[k];
-                base[k] = std::min(alloc, r->claim[k]);
-                surplus += std::max(0.0f, alloc - r->claim[k]);
-                shortf[k] = r->claim[k] - base[k];
-                st += shortf[k];
-            }
-            for (std::size_t k = 0; k < 3; ++k)
-            {
-                float want = base[k];
-                if (surplus > 0.0f && st > 0.0f) want += std::min(shortf[k], surplus * shortf[k] / st);
-                ok = ok && approx(r->granted[k], want, 1e-3f);
-                ok = ok && r->granted[k] + 1e-3f >= std::min(r->claim[k], r->pool * sh[k]); // its share, or its whole claim
-                total += r->granted[k];
-            }
-            ok = ok && total <= r->pool * (1.0f + 1e-5f) + 1e-4f;
-            std::printf("    rule 0.6/0.3/0.1: pool %.1f, claims %.1f/%.1f/%.1f, granted %.1f/%.1f/%.1f\n", r->pool,
-                        r->claim[0], r->claim[1], r->claim[2], r->granted[0], r->granted[1], r->granted[2]);
+            const lp_building_row& a = ruled.buildings[i];
+            const lp_building_row& m = mech.buildings[i];
+            if (a.building != m.building || a.granted != m.granted || a.fraction != m.fraction || a.cls != m.cls)
+                ++differ;
         }
-        // Per building: within a class, the QUEUE (BL-1356) - each class's portion is
-        // served nearest first, recomputed from the independent routing.
-        bool queued = ok;
-        {
-            const std::vector<src_rec> srcs = sources_of(ruled);
-            std::map<entity_id, std::unordered_map<entity_id, float>> cache;
-            struct qrow { bool full; float norm; entity_id b; const lp_building_row* row; };
-            std::array<std::vector<qrow>, 3> per;
-            for (const lp_building_row& b : ruled.buildings)
-            {
-                if (b.nation != lp_n || !(b.need > 0.0f)) continue;
-                const routed rt = route_independently(c, srcs, lp_n, c.buildings.at(b.building).tile, cache);
-                per[static_cast<std::size_t>(b.cls)].push_back({rt.full, rt.norm, b.building, &b});
-            }
-            for (auto& v : per)
-            {
-                std::sort(v.begin(), v.end(), [](const qrow& a, const qrow& b) {
-                    if (a.full != b.full) return a.full;
-                    if (a.norm != b.norm) return a.norm < b.norm;
-                    return a.b < b.b;
-                });
-                std::vector<const lp_building_row*> in_order;
-                for (const qrow& x : v) in_order.push_back(x.row);
-                queued = queued && queue_holds(in_order);
-            }
-        }
-        check(ok && queued, "L5", "with a rule set and the pool short: each class its share or its whole claim, the surplus spilled, served in queue order within a class, never beyond the pool");
+        same = same && differ == 0;
+        check(same, "L5", fmt("a retired share rule 0.6/0.3/0.1 on the short nation changes nothing: rule_set false, %d of %zu grants differ, pot equal",
+                              differ, ruled.buildings.size()));
     }
 
     // ---- L6 -----------------------------------------------------------------
@@ -592,8 +558,12 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             std::sort(nids.begin(), nids.end());
             for (const entity_id n : nids) if (n != pn) { other_n = n; break; }
         }
+        // BL-1405: the verb retired. Every row is refused and nothing moves - the
+        // formerly valid set and clear included.
         struct rej { std::string line; const char* want; const char* what; };
         std::vector<rej> rows = {
+            {P_(fmt("nation=%u quantity=0.5 floor_price=0.25", pn)), "rejected_invalid", "a formerly valid rule (retired)"},
+            {P_(fmt("nation=%u quantity=1 floor_price=0", pn)), "rejected_invalid", "all to the state (retired)"},
             {P_("quantity=0.5 floor_price=0.3"), "rejected_invalid", "no nation (a corporation's book)"},
             {P_(fmt("nation=%u quantity=0.7 floor_price=0.5", pn)), "rejected_invalid", "shares summing past 1"},
             {P_(fmt("nation=%u quantity=-0.1 floor_price=0.3", pn)), "rejected_invalid", "a negative share"},
@@ -603,7 +573,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             {P_(fmt("nation=%u quantity=1e300 floor_price=0", pn)), "rejected_invalid", "a share past float"},
             {P_(fmt("nation=%u quantity=0.5 floor_price=0.3 order=2", pn)), "rejected_invalid", "an order past clear"},
             {P_(fmt("nation=%u quantity=0.5 order=1", pn)), "rejected_invalid", "a clear carrying a share"},
-            {P_(fmt("nation=%u order=1", pn)), "rejected_state", "a clear with no rule set"},
+            {P_(fmt("nation=%u order=1", pn)), "rejected_invalid", "a clear (retired)"},
             {P_("nation=abc quantity=0.5"), "rejected_invalid", "a malformed nation id"},
         };
         if (other_n != null_entity)
@@ -616,16 +586,17 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             const bool ok = result_is(o, r.want) && w.state_hash(0) == h0 && !w.nations.at(pn).lp_shares.set;
             if (!ok) { all_rej = false; std::printf("    REJECT ROW FAILED: %s -> %s", r.what, o.c_str()); }
         }
-        check(all_rej, "L6", fmt("%zu malformed / unauthorised / illegal share commands rejected, state_hash unchanged", rows.size()));
-        const std::uint64_t h0 = w.state_hash(0);
-        const std::string o1 = serve(w, reg, ps, P_(fmt("nation=%u quantity=0.5 floor_price=0.25", pn)));
-        const auto& rule = w.nations.at(pn).lp_shares;
-        check(result_is(o1, "applied") && rule.set && approx(rule.share[0], 0.5f) && approx(rule.share[1], 0.25f)
-                  && approx(rule.share[2], 0.25f) && w.state_hash(0) != h0,
-              "L6", "a valid rule applies (0.5 / 0.25 / the rest 0.25) and moves the state hash");
-        const std::string o2 = serve(w, reg, ps, P_(fmt("nation=%u order=1", pn)));
-        check(result_is(o2, "applied") && !w.nations.at(pn).lp_shares.set && w.state_hash(0) == h0,
-              "L6", "clear applies: back to the mechanical default, the hash back where it was");
+        check(all_rej, "L6", fmt("%zu share commands, formerly valid ones and the clear among them, all refused, state_hash unchanged (BL-1405: retired)", rows.size()));
+        // The seat's nation acting as itself, in-process: refused too.
+        {
+            corp_command cmd;
+            cmd.corp = pn; cmd.as_nation = pn; cmd.verb = corp_verb::set_logistics_shares;
+            cmd.quantity = 0.5f; cmd.floor_price = 0.25f;
+            const std::uint64_t h1 = w.state_hash(0);
+            const corp_command_result r = apply_corp_command(w, reg, cmd);
+            check(r == corp_command_result::rejected_invalid && w.state_hash(0) == h1 && !w.nations.at(pn).lp_shares.set, "L6",
+                  "the player's nation acting as itself is refused whole (BL-1405: retired), nothing mutated");
+        }
         // A rival champion, in-process: refused.
         entity_id rn = null_entity;
         {
@@ -642,8 +613,8 @@ void mechanics(app_start_world& out, std::uint32_t seed)
             cmd.quantity = 0.5f; cmd.floor_price = 0.5f;
             const std::uint64_t h1 = w.state_hash(0);
             const corp_command_result r = apply_corp_command(w, reg, cmd);
-            check(r == corp_command_result::rejected_not_owner && w.state_hash(0) == h1, "L6",
-                  "a rival champion may not set its nation's shares (no AI grant)");
+            check(r == corp_command_result::rejected_invalid && w.state_hash(0) == h1 && !w.nations.at(rn).lp_shares.set, "L6",
+                  "a rival champion's share command is refused whole (BL-1405: retired), nothing mutated");
         }
     }
     else

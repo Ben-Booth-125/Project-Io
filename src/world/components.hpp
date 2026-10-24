@@ -2294,12 +2294,13 @@ struct nation_component
     float trade_reserve = 0.0f;
     float trade_points  = 0.0f;
 
-    /// BL-1309 — how this nation's Logistic Points are shared among its state,
-    /// its champion and other firms (LOGISTICS.md § Logistic Points, "One pool").
-    /// `set` false is the mechanical default (in proportion to need) and is the
-    /// only state an AI nation is ever in: no grant lets a scorer set it. Set by
-    /// the player's `set_logistics_shares` verb. SERIALISED in the v50 trailing
-    /// section (world_save.cpp).
+    /// BL-1309 — how this nation's Logistic Points were shared among its state,
+    /// its champion and other firms. RETIRED (BL-1405; LOGISTICS.md § Logistic
+    /// Points, "One pool"; Ben, 2026-10-23): after the fold a nation's pool
+    /// serves its own buildings as ONE class, so the resolver never reads this
+    /// and `set_logistics_shares` is refused. The field stays, still SERIALISED
+    /// in the v50 trailing section (world_save.cpp), so old saves load; nothing
+    /// in play can set it.
     struct logistics_share_rule
     {
         bool set = false;

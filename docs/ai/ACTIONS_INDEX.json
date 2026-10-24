@@ -67,7 +67,7 @@
   ],
   [
    "gameplay.set_logistics_shares",
-   "No UI control yet. The command seam only (--serve / MCP `issue_command` verb `set_logistics_shares` with `nation`; the verify API's `corp_command{verb=set_logistics_shares, as_nation=...}`)."
+   "RETIRED (BL-1405, Ben 2026-10-23: after the fold every building on a nation's ground is the nation's, so a nation's Logistic Point pool serves its own buildings as ONE class; the state / champion / other split has no subject (LOGISTICS.md § Logistic Points, \"One pool\")). No surface issues it. The corp_verb slot `set_logistics_shares` (37) survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering); a rule stored in an old save still loads and is ignored."
   ],
   [
    "gameplay.build_station",

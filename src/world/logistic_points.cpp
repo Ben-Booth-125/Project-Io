@@ -449,12 +449,11 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         const auto tit = w.tiles.find(b.tile);
         if (row.nation != null_entity && tit != w.tiles.end())
         {
-            if (row.owner == row.nation)
-                row.cls = lp_class::state;
-            else if (row.owner != null_entity && row.owner == champion_memo(w, in, row.nation))
-                row.cls = lp_class::champion;
-            else
-                row.cls = lp_class::other;
+            // BL-1405 (LOGISTICS.md § Logistic Points, "One pool"; Ben, 2026-10-23):
+            // ONE CLASS. After the fold every building on a nation's ground is the
+            // nation's, so its pool serves its own buildings as one queue - the
+            // state / champion / other split has no subject. Every claim is `state`.
+            row.cls = lp_class::state;
             const lp_route route = lp_route_to(w, memo, row.nation, tit->second.body, b.tile);
             row.coverage = route.cover;
             qkeys.push_back({route.full, route.norm});
@@ -467,50 +466,25 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         out.buildings.push_back(row);
     }
 
-    // 3. Grants per nation, per class. `plenty` marks a pot that covers every claim
-    //    on it, so step 4 hands those requests their claim EXACTLY rather than what
-    //    is left of a float sum drained in another order (cold review).
+    // 3. Grants per nation. `plenty` marks a pool that covers every claim on it, so
+    //    step 4 hands those requests their claim EXACTLY rather than what is left of
+    //    a float sum drained in another order (cold review). BL-1405: the share rule
+    //    retired, so `nation_component::lp_shares` is NOT read and `rule_set` is
+    //    always false - one class, one queue.
     std::map<entity_id, std::array<bool, lp_class_count>> plenty;
     for (auto& [nid, r] : rows)
     {
         std::array<bool, lp_class_count> g{};
-        const auto nit = w.nations.find(nid);
-        const bool rule = nit != w.nations.end() && nit->second.lp_shares.set;
-        r.rule_set = rule;
-        if (!rule)
-        {
-            const float total = r.claim[0] + r.claim[1] + r.claim[2];
-            // BL-1352: what the march left. A nation row created by a CONSUMER below
-            // (no sources, so no row at 1b) has pool 0 and granted 0, so this is 0 for
-            // it exactly as `pool` was before the march joined.
-            const float avail = std::max(0.0f, r.pool - r.march_granted);
-            const float f = total > 0.0f ? std::min(1.0f, avail / total) : 0.0f;
-            g.fill(avail >= total);
-            for (std::size_t k = 0; k < lp_class_count; ++k)
-                r.granted[k] = r.claim[k] * f;
-        }
-        else
-        {
-            const auto& sh = nit->second.lp_shares.share;
-            std::array<float, lp_class_count> base{}, shortfall{};
-            float surplus = 0.0f, short_total = 0.0f;
-            for (std::size_t k = 0; k < lp_class_count; ++k)
-            {
-                const float alloc = std::max(0.0f, r.pool - r.march_granted) * sh[k];
-                base[k]      = std::min(alloc, r.claim[k]);
-                surplus     += std::max(0.0f, alloc - r.claim[k]);
-                shortfall[k] = r.claim[k] - base[k];
-                short_total += shortfall[k];
-            }
-            for (std::size_t k = 0; k < lp_class_count; ++k)
-            {
-                float got = base[k];
-                if (surplus > 0.0f && short_total > 0.0f)
-                    got += std::min(shortfall[k], surplus * (shortfall[k] / short_total));
-                r.granted[k] = got;
-                g[k] = got >= r.claim[k];
-            }
-        }
+        r.rule_set = false;
+        const float total = r.claim[0] + r.claim[1] + r.claim[2];
+        // BL-1352: what the march left. A nation row created by a CONSUMER below
+        // (no sources, so no row at 1b) has pool 0 and granted 0, so this is 0 for
+        // it exactly as `pool` was before the march joined.
+        const float avail = std::max(0.0f, r.pool - r.march_granted);
+        const float f = total > 0.0f ? std::min(1.0f, avail / total) : 0.0f;
+        g.fill(avail >= total);
+        for (std::size_t k = 0; k < lp_class_count; ++k)
+            r.granted[k] = r.claim[k] * f;
         plenty[nid] = g;
     }
     // 4. SERVE IN QUEUE ORDER (BL-1356). Each nation's grant per class is what step 3
@@ -531,30 +505,19 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         if (qkeys[x].norm != qkeys[y].norm) return qkeys[x].norm < qkeys[y].norm;
         return a.building < b.building;
     });
-    // With a share rule each class has its own pot, served in queue order within the
-    // class; with none, the classes are ONE queue - the mechanical share is "in
-    // proportion to need" only while points suffice, and a queue when they do not.
-    std::map<entity_id, std::array<float, lp_class_count>> left;
+    // ONE QUEUE (BL-1405): the mechanical share is "in proportion to need" only while
+    // points suffice, and a queue when they do not.
+    std::map<entity_id, float> left;
     for (const auto& [nid, r] : rows)
-    {
-        std::array<float, lp_class_count> pots = r.granted;
-        if (!r.rule_set)
-        {
-            pots.fill(0.0f);
-            pots[0] = r.granted[0] + r.granted[1] + r.granted[2];
-        }
-        left[nid] = pots;
-    }
+        left[nid] = r.granted[0] + r.granted[1] + r.granted[2];
     for (const std::size_t i : order)
     {
         lp_building_row& row = out.buildings[i];
         if (row.nation != null_entity && row.need > 0.0f)
         {
-            const bool ruled = rows[row.nation].rule_set;
-            const std::size_t k = ruled ? static_cast<std::size_t>(row.cls) : 0u;
-            float& pot  = left[row.nation][k];
+            float& pot  = left[row.nation];
             const float claim = row.need * row.coverage;
-            const float give  = plenty[row.nation][k] ? claim : std::max(0.0f, std::min(claim, pot));
+            const float give  = plenty[row.nation][0] ? claim : std::max(0.0f, std::min(claim, pot));
             pot -= give;
             row.granted  = give;
             row.fraction = std::clamp(give / row.need, 0.0f, 1.0f);
@@ -572,31 +535,13 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
             rows[row.nation].granted[static_cast<std::size_t>(row.cls)] += row.granted;
     }
     // BL-1361: what a shipment may draw is the pool less the march's grant and
-    // production's (LOGISTICS.md: march, production, trade). With no share rule that is
-    // one pot. With one, each class keeps what it did not spend of its allocation; a
-    // class whose surplus spilled to a short one gave that much up, so the classes'
-    // unspent allocations are scaled to the true remainder.
+    // production's (LOGISTICS.md: march, production, trade) - one pot (BL-1405).
     for (auto& [nid, r] : rows)
     {
         const float avail = std::max(0.0f, r.pool - r.march_granted);
         const float total = std::max(0.0f, avail - (r.granted[0] + r.granted[1] + r.granted[2]));
         r.left.fill(0.0f);
-        if (!r.rule_set)
-        {
-            r.left[0] = total;
-            continue;
-        }
-        const auto& sh = w.nations.at(nid).lp_shares.share;
-        std::array<float, lp_class_count> raw{};
-        float raw_sum = 0.0f;
-        for (std::size_t k = 0; k < lp_class_count; ++k)
-        {
-            raw[k] = std::max(0.0f, avail * sh[k] - r.granted[k]);
-            raw_sum += raw[k];
-        }
-        if (raw_sum > 0.0f)
-            for (std::size_t k = 0; k < lp_class_count; ++k)
-                r.left[k] = raw[k] * (total / raw_sum);
+        r.left[0] = total;
     }
     // BL-1361: every market's anchor - its centre tile, routed as any request is, so a
     // shipment's share is capped by the cover there. Read here, with this tick's memo,
@@ -636,17 +581,11 @@ std::ptrdiff_t anchor_row(const lp_tick& t, const lp_trade_anchor& a)
     return (it != t.nations.end() && it->nation == a.nation) ? (it - t.nations.begin()) : -1;
 }
 
-/// The pot @p trader draws from at @p r's nation: its own class's under a share rule,
-/// else the one pot - the same class the production queue serves its buildings in.
-std::size_t trader_pot(const world& w, const lp_nation_row& r, entity_id trader)
+/// The pot a trader draws from at a nation: BL-1405, the one pot, whoever trades -
+/// the same single class the production queue serves its buildings in.
+std::size_t trader_pot(const world&, const lp_nation_row&, entity_id)
 {
-    if (!r.rule_set)
-        return 0;
-    if (trader == r.nation)
-        return static_cast<std::size_t>(lp_class::state);
-    if (trader != null_entity && trader == champion_of(w, r.nation))
-        return static_cast<std::size_t>(lp_class::champion);
-    return static_cast<std::size_t>(lp_class::other);
+    return static_cast<std::size_t>(lp_class::state);
 }
 
 } // namespace
