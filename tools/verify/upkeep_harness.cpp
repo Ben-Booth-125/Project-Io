@@ -142,10 +142,10 @@ entity_id add_market(fixture& f, int c, int r, float ordnance)
 entity_id add_corp(world& w)
 {
     const entity_id c = w.create_entity();
-    corporation_component cc{};
+    nation_component cc{};
     cc.name    = "Upkeep Test Corp";
-    cc.balance = 10000.0f;
-    w.corporations[c] = cc;
+    cc.treasury = 10000.0f;
+    w.nations[c] = cc;
     return c;
 }
 

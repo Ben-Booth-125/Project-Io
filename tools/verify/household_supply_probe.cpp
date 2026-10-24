@@ -168,10 +168,10 @@ void sample(const world& w, const recipe_registry& reg, const options& opt, int 
     std::map<entity_id, entity_id> owner;
     {
         std::vector<entity_id> cids;
-        for (const auto& kv : w.corporations) cids.push_back(kv.first);
+        for (const auto& kv : w.nations) cids.push_back(kv.first);
         std::sort(cids.begin(), cids.end());
         for (const entity_id c : cids)
-            for (const entity_id b : w.corporations.at(c).assets) owner[b] = c;
+            for (const entity_id b : w.nations.at(c).state_assets) owner[b] = c;
     }
     std::vector<entity_id> bids;
     for (const auto& kv : w.buildings) bids.push_back(kv.first);
@@ -259,7 +259,7 @@ void sample(const world& w, const recipe_registry& reg, const options& opt, int 
         int under = 0; float bal = 0;
         for (const entity_id c : maker_corps)
         {
-            const float cb = w.corporations.at(c).balance;
+            const float cb = w.nations.at(c).treasury;
             bal += cb; if (cb < 0.0f) ++under;
         }
 

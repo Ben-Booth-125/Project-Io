@@ -192,14 +192,14 @@ int main(int argc, char** argv)
         // target. If a body stops AT 40, the generator ran out of permission
         // before it ran out of demand to cover, and the market opens thin.
         std::map<entity_id, int> firms_per_body;
-        for (const auto& [cid, corp] : w.corporations)
+        for (const auto& [cid, corp] : w.nations)
         {
-            if (!corp.is_background)
+            if (!(!corp.is_major))
                 continue;
             entity_id home = null_entity;
-            if (!corp.assets.empty())
+            if (!corp.state_assets.empty())
             {
-                const auto bit = w.buildings.find(corp.assets.front());
+                const auto bit = w.buildings.find(corp.state_assets.front());
                 if (bit != w.buildings.end())
                 {
                     const auto tit = w.tiles.find(bit->second.tile);
@@ -256,11 +256,11 @@ int main(int argc, char** argv)
         // the measurement describes the shipped gate rather than a lookalike.
         std::map<uint32_t, int> firms_by_province;
         int firms_placed = 0;
-        for (const auto& [cid, corp] : w.corporations)
+        for (const auto& [cid, corp] : w.nations)
         {
-            if (!corp.is_background || corp.assets.empty())
+            if (!(!corp.is_major) || corp.state_assets.empty())
                 continue;
-            const auto abit = w.buildings.find(corp.assets.front());
+            const auto abit = w.buildings.find(corp.state_assets.front());
             if (abit == w.buildings.end())
                 continue;
             const uint32_t pid = w.provinces.province_of(abit->second.tile);

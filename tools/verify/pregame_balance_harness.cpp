@@ -173,17 +173,17 @@ int real_main(int argc, char** argv)
     // --- 1. Warm-start trajectory -------------------------------------------
     std::printf("New-charter pre-game warm start (base_capital = 0)\n");
     std::printf("Tick  0: balance = %.1f cr (opening — generation only)\n",
-                static_cast<double>(w.corporations[corp].balance));
+                static_cast<double>(w.nations[corp].treasury));
     bool went_negative = false;
     for (int t = 1; t <= warm_start_ticks; ++t)
     {
         tick(w, reg, t);
-        const float bal = w.corporations[corp].balance;
+        const float bal = w.nations[corp].treasury;
         if (bal < 0.0f)
             went_negative = true;
         std::printf("Tick %2d: balance = %.1f cr\n", t, static_cast<double>(bal));
     }
-    const float final_balance = w.corporations[corp].balance;
+    const float final_balance = w.nations[corp].treasury;
     std::printf("\nFinal (turn-one) balance: %.1f cr | went negative: %s\n\n",
                 static_cast<double>(final_balance), went_negative ? "YES" : "no");
 

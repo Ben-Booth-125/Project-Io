@@ -74,8 +74,8 @@ void read_world(const char* label, world& w, const recipe_registry& reg, std::si
                 tally& T)
 {
     std::map<entity_id, entity_id> owner;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id a : cc.assets) owner.emplace(a, cid);
+    for (const auto& [cid, cc] : w.nations)
+        for (const entity_id a : cc.state_assets) owner.emplace(a, cid);
 
     std::vector<entity_id> ids;
     for (const auto& kv : w.buildings) ids.push_back(kv.first);
@@ -118,11 +118,11 @@ void read_world(const char* label, world& w, const recipe_registry& reg, std::si
             path = "unowned";
         else
         {
-            const corporation_component& cc = w.corporations.at(oit->second);
+            const nation_component& cc = w.nations.at(oit->second);
             const auto cit = charter_of.find(oit->second);
-            if (cc.is_player)
+            if (oit->second == w.player_entity) // BL-1407
                 path = "seat";
-            else if (!cc.is_background)
+            else if (!(!cc.is_major))
                 path = "specialist";
             else if (cit == charter_of.end())
                 path = "pass6";
@@ -131,8 +131,7 @@ void read_world(const char* label, world& w, const recipe_registry& reg, std::si
             else
             {
                 path = std::string("charter:attached(") +
-                       (cc.focus == industrial_focus::extraction ? "extraction" :
-                        cc.focus == industrial_focus::processing ? "processing" : "trade") + ")";
+                       ("nation" /* BL-1407: no firm focus */) + ")";
                 add(t.attached_for, cit->second->good < resource_count
                                         ? gname(cit->second->good) : std::string("?"));
             }
@@ -264,7 +263,7 @@ int main(int argc, char** argv)
         std::map<entity_id, uint16_t> gen_recipe;
         for (const auto& kv : w.buildings) { gen_ids.insert(kv.first); gen_recipe[kv.first] = kv.second.recipe; }
         std::printf("seed %u (%zu charters, %zu corporations)\n", seed, rep.charters.size(),
-                    w.corporations.size());
+                    w.nations.size());
         {
             // Building census by type and state at GEN (decommissioned, under
             // construction, processor without a recipe).

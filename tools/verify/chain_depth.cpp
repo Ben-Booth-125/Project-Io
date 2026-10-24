@@ -708,7 +708,7 @@ int main()
 
         world w;
         const entity_id corp = w.create_entity();
-        w.corporations[corp] = corporation_component{}; // fresh: depth 0, no tech, no balance
+        w.nations[corp] = nation_component{}; // fresh: depth 0, no tech, no balance
 
         // The ruled opening, by recipe NAME (not display_name — the Smithy's two
         // recipes share a display_name and must not collide here).

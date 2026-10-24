@@ -243,9 +243,9 @@ int main()
         military_capability_params mil = f.reg.military();
         f.reg.set_military(mil);
         f.corp = f.w.create_entity();
-        corporation_component cc{}; cc.is_player = true; cc.balance = 1000.0f;
+        nation_component cc{}; cc.treasury = 1000.0f;
         const entity_id body = make_grid(f.w, 2, 3, terrain_landform::plains);
-        f.w.corporations[f.corp] = cc;
+        f.w.nations[f.corp] = cc;
         f.w.player_entity = f.corp;
         const entity_id hub = f.w.create_entity();
         building_component hb{};
@@ -263,7 +263,7 @@ int main()
         // BL-1361: the hub at (1,0) is the anchor's source; the ground must be a
         // nation's for its pool to exist.
         lp_fixture::stage(f.w, body, {});
-        return f.w.corporations[f.corp].balance;
+        return f.w.nations[f.corp].treasury;
     };
     // Price the leg and commit one 10-unit shipment; the haul is debited now
     // (the purchase is billed at the clear, which this harness does not run).
@@ -285,7 +285,7 @@ int main()
             check(cv.mode == convoy_mode::land, "intra-body plains route uses land mode, not space");
             check(cv.corp == f.corp, "convoy attributed to the trading corp");
         }
-        const float spent = bal_before - f.w.corporations[f.corp].balance;
+        const float spent = bal_before - f.w.nations[f.corp].treasury;
         check(spent > 0.0f, "intra-body logistics cost is debited from the corp balance");
         // A* (0,0)->(0,2) = 2 plains edges = 2.0; qty 10; land unit cost 0.02.
         check(approx(spent, 0.02f * 2.0f * 10.0f), "intra-body cost = land(0.02) * A*(2.0) * qty(10) = 0.4");
@@ -301,7 +301,7 @@ int main()
         f.w.population_centres[centre]     = pc;
         f.w.population_centre_tile[centre] = f.mid_tile;
         ship(f); // default node discount: city_per_scale 0.04, hub 0.12, cap 0.50
-        const float spent = bal_before - f.w.corporations[f.corp].balance;
+        const float spent = bal_before - f.w.nations[f.corp].treasury;
         check(spent > 0.0f && spent < 0.4f, "a route through a city costs less than the undiscounted 0.4");
         check(approx(spent, 0.4f * (1.0f - 0.12f)), "city scale-3 discount: 0.4 * (1 - 0.12) = 0.352");
     }
@@ -316,7 +316,7 @@ int main()
         hb.tile = f.mid_tile; hb.type = building_type::inland_logistics_hub; hb.ticks_remaining = 0;
         f.w.buildings[hub] = hb;
         ship(f);
-        const float spent = bal_before - f.w.corporations[f.corp].balance;
+        const float spent = bal_before - f.w.nations[f.corp].treasury;
         check(spent > 0.0f && spent < 0.4f, "a route through an inland logistics hub costs less than 0.4");
         check(approx(spent, 0.4f * (1.0f - 0.12f)), "hub flat discount: 0.4 * (1 - 0.12) = 0.352");
     }
@@ -332,7 +332,7 @@ int main()
         hb.ticks_remaining = 0; hb.decommissioned = true;
         f.w.buildings[hub] = hb;
         ship(f);
-        const float spent = bal_before - f.w.corporations[f.corp].balance;
+        const float spent = bal_before - f.w.nations[f.corp].treasury;
         check(approx(spent, 0.4f), "a decommissioned hub confers no discount (full 0.4 cost)");
     }
     // T10 — BL-147/BL-172 road placement: place_road(tier, side) raises THAT crossing to
@@ -349,10 +349,19 @@ int main()
     {
         world w;
         const entity_id corp = w.create_entity();
-        corporation_component cc{}; cc.balance = 1000.0f;
-        w.corporations[corp] = cc;
+        nation_component cc{}; cc.treasury = 1000.0f;
+        w.nations[corp] = cc;
         const entity_id body = make_grid(w, 3, 1, terrain_landform::plains);
         const entity_id t = tile_at(w, body, 1, 0);
+        // BL-1407: the builder is a NATION, and a nation lays road on its own
+        // ground only (placement_rules::can_place_road); the retired corporation
+        // had no ground and was not asked. The strip is the nation's.
+        for (auto& [tid, tc] : w.tiles)
+            if (tc.body == body)
+            {
+                w.tile_to_nation[tid] = corp;
+                w.nations.at(corp).tiles.push_back(tid);
+            }
 
         recipe_registry reg; // default road_econ (no Lua): Track 25 / Road 45 / Highway 90 cr
         // The inherited lattice: a Track from (0,0) across to (1,0) (side 0 = E), so the
@@ -360,12 +369,12 @@ int main()
         lay_road_edge(w, tile_at(w, body, 0, 0), 0, 1);
         (void)intra_body_path(w, body, tile_at(w,body,0,0), tile_at(w,body,2,0)); // warm the cache
         const bool cache_warm = !w.astar_cost_cache.empty();
-        float bal = w.corporations[corp].balance;
+        float bal = w.nations[corp].treasury;
 
         const construction_result r = place_road(w, reg, corp, t, 1, 0); // Track, east side
         check(r == construction_result::placed, "place_road (Track) from a roaded tile succeeds");
         check(road_tier_on_side(w.tiles[t], 0) == 1, "placed Track raises THAT crossing to 1");
-        check(approx(bal - w.corporations[corp].balance, 25.0f),
+        check(approx(bal - w.nations[corp].treasury, 25.0f),
               "Track debits its flat build_cost (25 cr, no market materials)");
         check(cache_warm && w.astar_cost_cache.empty(),
               "road placement invalidates the A* cost cache");
@@ -377,11 +386,11 @@ int main()
 
         // Upgrade Track -> Highway succeeds, raises the tier, and debits the Highway cost.
         (void)intra_body_path(w, body, tile_at(w,body,0,0), tile_at(w,body,2,0)); // re-warm
-        bal = w.corporations[corp].balance;
+        bal = w.nations[corp].treasury;
         const construction_result r_up = place_road(w, reg, corp, t, 3, 0); // Highway, same crossing
         check(r_up == construction_result::placed, "upgrading Track -> Highway succeeds");
         check(road_tier_on_side(w.tiles[t], 0) == 3, "upgrade raises the crossing to 3 (Highway)");
-        check(approx(bal - w.corporations[corp].balance, 90.0f),
+        check(approx(bal - w.nations[corp].treasury, 90.0f),
               "Highway debits its flat build_cost (90 cr)");
         check(w.astar_cost_cache.empty(), "the upgrade invalidates the A* cost cache");
 

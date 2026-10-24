@@ -349,7 +349,7 @@ struct flow_row
     { return income - expenditure - maintenance - wages - levies - upkeep; }
 };
 
-flow_row trailing(const corporation_component& cc, int window)
+flow_row trailing(const nation_component& cc, int window)
 {
     flow_row r;
     const std::size_t n = cc.returns.size();
@@ -358,15 +358,15 @@ flow_row trailing(const corporation_component& cc, int window)
     for (std::size_t i = first; i < n; ++i)
         r.add(cc.returns[i]);
     r.mean();
-    r.balance = cc.balance;
+    r.balance = cc.treasury;
     return r;
 }
 
 std::vector<entity_id> sorted_corp_ids(const world& w)
 {
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     return ids;
@@ -490,8 +490,8 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg,
 
         for (const entity_id corp : sorted_corp_ids(w))
         {
-            const corporation_component& cc = w.corporations.at(corp);
-            for (const entity_id bid : cc.assets)     // a vector — fixed order
+            const nation_component& cc = w.nations.at(corp);
+            for (const entity_id bid : cc.state_assets)     // a vector — fixed order
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end())
@@ -535,8 +535,8 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg,
     // ---- state at the close of the settle -------------------------------
     for (const entity_id corp : sorted_corp_ids(w))
     {
-        const corporation_component& cc = w.corporations.at(corp);
-        for (const entity_id bid : cc.assets)
+        const nation_component& cc = w.nations.at(corp);
+        for (const entity_id bid : cc.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -616,11 +616,11 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg,
     // ---- the census -----------------------------------------------------
     for (const entity_id corp : sorted_corp_ids(w))
     {
-        const corporation_component& cc = w.corporations.at(corp);
+        const nation_component& cc = w.nations.at(corp);
         corp_census c;
         c.corp   = corp;
         c.seated = (corp == w.player_entity);
-        for (const entity_id bid : cc.assets)
+        for (const entity_id bid : cc.state_assets)
         {
             const auto tit = track.find(bid);
             if (tit == track.end())
@@ -685,7 +685,7 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg,
         if (c.seated)
         {
             out.seated = c;
-            for (const entity_id bid : cc.assets)
+            for (const entity_id bid : cc.state_assets)
                 if (const auto tit = track.find(bid); tit != track.end())
                     out.seated_buildings.push_back(tit->second);
         }

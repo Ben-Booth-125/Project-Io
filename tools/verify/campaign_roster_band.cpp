@@ -89,7 +89,7 @@ int main()
         const entity_id corp = w.create_entity();
         const entity_id body = w.create_entity();
         w.player_entity = corp;
-        w.corporations[corp] = corporation_component{};
+        w.nations[corp] = nation_component{};
 
         // Satisfy every campaign gate axis (steel/ore, food, port, energy) so
         // gate failure cannot be confused with era gating.
@@ -114,7 +114,7 @@ int main()
         port_bldg.tile = tile; // the corp sits in `market` through this building
         const entity_id port_id = w.create_entity();
         w.buildings[port_id] = port_bldg;
-        w.corporations[corp].assets.push_back(port_id);
+        w.nations[corp].state_assets.push_back(port_id);
 
         const auto ancient_rows    = available_rows(w, corp, campaign_roster_band_for(era_band::ancient));
         const auto industrial_rows = available_rows(w, corp, campaign_roster_band_for(era_band::industrial));

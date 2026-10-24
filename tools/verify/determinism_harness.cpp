@@ -82,7 +82,7 @@ int main()
     check(a.buildings.size()          == b.buildings.size(),          "buildings count identical");
     check(a.markets.size()            == b.markets.size(),            "markets count identical");
     check(a.nations.size()            == b.nations.size(),            "nations count identical");
-    check(a.corporations.size()       == b.corporations.size(),       "corporations count identical");
+    check(a.nations.size()       == b.nations.size(),       "corporations count identical");
     check(a.population_centres.size() == b.population_centres.size(), "population-centre count identical");
     check(a.units.size()              == b.units.size(),              "units count identical");
     check(a.stockpiles.size()         == b.stockpiles.size(),         "stockpiles count identical");
@@ -93,7 +93,7 @@ int main()
     check(sorted_keys(a.buildings)          == sorted_keys(b.buildings),          "building id set identical");
     check(sorted_keys(a.markets)            == sorted_keys(b.markets),            "market id set identical");
     check(sorted_keys(a.nations)            == sorted_keys(b.nations),            "nation id set identical");
-    check(sorted_keys(a.corporations)       == sorted_keys(b.corporations),       "corporation id set identical");
+    check(sorted_keys(a.nations)       == sorted_keys(b.nations),       "corporation id set identical");
     check(sorted_keys(a.population_centres) == sorted_keys(b.population_centres), "population-centre id set identical");
 
     // Derived mappings (catches nation-ownership / pop-placement value divergence).

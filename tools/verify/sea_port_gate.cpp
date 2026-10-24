@@ -153,16 +153,15 @@ scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col
     s.dst_tile = tile_at(s.w, s.body, dst_col, dst_row);
 
     s.corp = s.w.create_entity();
-    corporation_component cc;
-    cc.balance   = balance;
-    cc.is_player = true; // keep the BL-202 strategic tier out of this harness
+    nation_component cc{};
+    cc.treasury   = balance;
 
     const entity_id bld = s.w.create_entity();
     building_component b{};
     b.tile = s.src_tile;
     b.type = building_type::extraction_site;
     s.w.buildings[bld] = b;
-    cc.assets.push_back(bld);
+    cc.state_assets.push_back(bld);
 
     for (const auto& [pc, pr] : port_cells)
     {
@@ -173,7 +172,7 @@ scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col
         s.w.buildings[p] = pb; // built + active: ticks_remaining=0, !decommissioned (defaults)
     }
 
-    s.w.corporations[s.corp] = cc;
+    s.w.nations[s.corp] = cc;
     s.w.player_entity = s.corp;
 
     s.src_market = s.w.create_entity();
@@ -276,10 +275,10 @@ std::string fingerprint(const world& w)
     std::ostringstream o;
     o.precision(9);
     std::vector<entity_id> corp_ids;
-    for (const auto& kv : w.corporations) corp_ids.push_back(kv.first);
+    for (const auto& kv : w.nations) corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
     for (const entity_id id : corp_ids)
-        o << "C" << id << ':' << w.corporations.at(id).balance << ';';
+        o << "C" << id << ':' << w.nations.at(id).treasury << ';';
     std::vector<entity_id> mids; // BL-1265: the shelves, not pools
     for (const auto& kv : w.markets) mids.push_back(kv.first);
     std::sort(mids.begin(), mids.end());
@@ -300,9 +299,9 @@ std::string fingerprint(const world& w)
 entity_id add_raider(scenario& s, entity_id tile)
 {
     const entity_id raider = s.w.create_entity();
-    corporation_component rc;
-    rc.balance = 100.0f;
-    s.w.corporations[raider] = rc;
+    nation_component rc{};
+    rc.treasury = 100.0f;
+    s.w.nations[raider] = rc;
     declare_hostile(s.w, raider, s.corp);
     const entity_id u = s.w.create_entity();
     unit_component uc{};
@@ -333,7 +332,7 @@ std::string run_sequence(const recipe_registry& reg)
     // R0 — both endpoints have an active Port: sea mode, normal dispatch.
     {
         scenario s = make_scenario(/*src_port=*/true, /*dst_port=*/true);
-        const float bal_before = s.w.corporations.at(s.corp).balance;
+        const float bal_before = s.w.nations.at(s.corp).treasury;
         const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied,
               "R0.1 both endpoints Port-equipped: dispatch_convoy applies");
@@ -344,7 +343,7 @@ std::string run_sequence(const recipe_registry& reg)
             check(c.mode == convoy_mode::sea,
                   "R0.3 a water-crossing path with both Ports gated is SEA mode");
             check(c.cost_paid > 0.0f &&
-                  std::fabs((bal_before - s.w.corporations.at(s.corp).balance) - c.cost_paid) < 1e-4f,
+                  std::fabs((bal_before - s.w.nations.at(s.corp).treasury) - c.cost_paid) < 1e-4f,
                   "R0.4 the sea-rate haul cost is recorded and debited");
             // sea unit cost .05 (recipe_registry default) x A* cost. Path crosses
             // 3 edges: land(1.0)-ocean(2.5) = 1.75, ocean-ocean = 2.5,
@@ -412,7 +411,7 @@ std::string run_sequence(const recipe_registry& reg)
     {
         scenario s = make_scenario(/*src_port=*/true, /*dst_port=*/false, 100.0f, 1000.0f,
                                    /*island=*/false);
-        const float bal_before = s.w.corporations.at(s.corp).balance;
+        const float bal_before = s.w.nations.at(s.corp).treasury;
         const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied,
               "R4.1 no port pair but an overland road: dispatch_convoy applies (B2)");
@@ -424,7 +423,7 @@ std::string run_sequence(const recipe_registry& reg)
             // 29 plains edges of 1.0, at the land rate, no handling.
             check(std::fabs(c.cost_paid - reg.logistics_cost(convoy_mode::land) * 29.0f * 25.0f) < 1e-2f,
                   "R4.3 cost = land_unit_cost x land-only path (29) x qty");
-            check(std::fabs((bal_before - s.w.corporations.at(s.corp).balance) - c.cost_paid) < 1e-4f,
+            check(std::fabs((bal_before - s.w.nations.at(s.corp).treasury) - c.cost_paid) < 1e-4f,
                   "R4.4 the land haul cost is recorded and debited");
             trace << "R4:" << static_cast<int>(c.mode) << ':' << c.cost_paid << ';';
         }

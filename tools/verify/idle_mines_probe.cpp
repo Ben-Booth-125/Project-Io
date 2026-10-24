@@ -228,16 +228,16 @@ unsigned focus_mask(const world& w, const building_component& b)
 std::map<entity_id, entity_id> owner_map(const world& w)
 {
     std::map<entity_id, entity_id> o;
-    for (const auto& [cid, cc] : w.corporations) for (const entity_id a : cc.assets) o.emplace(a, cid);
+    for (const auto& [cid, cc] : w.nations) for (const entity_id a : cc.state_assets) o.emplace(a, cid);
     return o;
 }
 
 int owner_class(const world& w, entity_id corp)
 {
-    const auto it = w.corporations.find(corp);
-    if (it == w.corporations.end()) return o_none;
-    if (it->second.is_player) return o_seat;
-    if (it->second.is_background) return o_bg;
+    const auto it = w.nations.find(corp);
+    if (it == w.nations.end()) return o_none;
+    if (corp == w.player_entity) return o_seat; // BL-1407
+    if ((!it->second.is_major)) return o_bg;
     return o_rival;
 }
 
@@ -264,7 +264,7 @@ void classify_uc(const world& w, const recipe_registry& reg, const building_comp
     s.cls = u_run; s.solo_rate = 1.0f; s.bind = 0; s.bind_ratio = 0;
     if (duration <= 0.0f) return;
     const auto oi = owners.find(s.bid);
-    s.neg_balance = oi != owners.end() && w.corporations.at(oi->second).balance < 0.0f;
+    s.neg_balance = oi != owners.end() && w.nations.at(oi->second).treasury < 0.0f;
     const entity_id mid = market_for_tile(w, b.tile);
     if (mid == null_entity || !w.markets.count(mid)) { s.cls = u_nomkt; s.solo_rate = 0; return; }
     const market_component& m = w.markets.at(mid);

@@ -169,7 +169,7 @@ void t0_settle_untaxed(const app_start_world& out)
         if (nc.tax_tier != k_default_tax_tier || nc.discontent != 0.0f) opening = false;
     bool untaxed = true;
     std::size_t filed = 0;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.nations) // BL-1407: the nation files the return
         for (const quarterly_return& q : cc.returns)
         {
             ++filed;
@@ -177,7 +177,7 @@ void t0_settle_untaxed(const app_start_world& out)
         }
     check(opening, "T0", fmt("after finish_campaign_world (econ tick %d) every one of %zu nations stands at tier III with Discontent 0",
                              w.current_econ_tick, w.nations.size()));
-    check(untaxed && filed > 0, "T0", fmt("no firm was taxed in the settle (%zu filed returns, every `taxes` 0)", filed));
+    check(untaxed && filed > 0, "T0", fmt("no nation was taxed in the settle (%zu filed returns, every `taxes` 0)", filed));
 }
 
 void t1_conserves(const app_start_world& out)
@@ -321,14 +321,15 @@ void t3_penalty(const app_start_world& out)
           fmt("extraction site %u (owner %u) on nation %u: draw %.4f at D 0, %.4f at D 1 (x%.5f)", site, owner, nation, q0, q1, q1 / q0));
     // Any owner: the same site under a different owner's id still pays its ground's cut.
     entity_id other_owner = null_entity;
-    for (const auto& [cid, c] : w0.corporations)
-        if (cid != owner && c.home_nation != nation) { other_owner = cid; break; }
+    // BL-1407: every owner is a nation; the lowest-id OTHER nation stands in.
+    for (const auto& [cid, c] : w0.nations)
+        if (cid != owner && cid != nation && (other_owner == null_entity || cid < other_owner)) other_owner = cid;
     if (other_owner != null_entity)
     {
         const float r0 = extraction_nominal(w0, out.reg, b, 1.0f, other_owner);
         const float r1 = extraction_nominal(w1, out.reg, b, 1.0f, other_owner);
         check(r0 > 0.0f && std::fabs(r1 / r0 - 0.85f) < 1e-5f, "T3",
-              fmt("the ground's cut binds a foreign owner too (corp %u: x%.5f)", other_owner, r0 > 0.0f ? r1 / r0 : 0.0f));
+              fmt("the ground's cut binds a foreign owner too (nation %u: x%.5f)", other_owner, r0 > 0.0f ? r1 / r0 : 0.0f));
     }
     // Another nation's Discontent does not touch this ground.
     {
@@ -451,17 +452,17 @@ void t6_save(const app_start_world& out)
     c.nations.at(ids.back()).tax_tier    = 1;
     c.nations.at(ids[ids.size() / 2]).discontent = 0.125f; // tier III, Discontent moved
     entity_id taxed_corp = null_entity;
-    for (auto& [cid, cc] : c.corporations)
+    for (auto& [cid, cc] : c.nations) // BL-1407: a nation's return
         if (!cc.returns.empty() && (taxed_corp == null_entity || cid < taxed_corp)) taxed_corp = cid;
     if (taxed_corp != null_entity)
-        c.corporations.at(taxed_corp).returns.back().taxes = 12.5f;
+        c.nations.at(taxed_corp).returns.back().taxes = 12.5f;
     const std::string b52 = to_bytes(c);
     world r;
     const bool rt = from_bytes(b52, r);
     check(rt && to_bytes(r) == b52 && r.state_hash(0) == c.state_hash(0)
               && r.nations.at(ids.front()).tax_tier == 5 && r.nations.at(ids.front()).discontent == 0.6875f
               && r.nations.at(ids.back()).tax_tier == 1 && r.nations.at(ids[ids.size() / 2]).discontent == 0.125f
-              && taxed_corp != null_entity && r.corporations.at(taxed_corp).returns.back().taxes == 12.5f,
+              && taxed_corp != null_entity && r.nations.at(taxed_corp).returns.back().taxes == 12.5f,
           "T6", fmt("v%u round-trips tiers, Discontent and a return's tax byte-identically (%zu bytes) with an equal state_hash",
                     static_cast<unsigned>(world_save_version), b52.size()));
 
@@ -632,8 +633,8 @@ int main(int argc, char** argv)
     std::printf("dials: rates %.2f %.2f %.2f %.2f %.2f | pressure %.4f %.4f %.4f %.4f %.4f | threshold %.3f | max penalty %.3f | ai headroom %.4f\n",
                 p.rate[0], p.rate[1], p.rate[2], p.rate[3], p.rate[4], p.pressure[0], p.pressure[1], p.pressure[2],
                 p.pressure[3], p.pressure[4], p.bite_threshold, p.max_penalty, p.ai_headroom);
-    std::printf("world: %zu nations, %zu corporations, seat %u (nation %u)\n", out.w.nations.size(),
-                out.w.corporations.size(), out.w.player_entity, player_nation(out.w));
+    std::printf("world: %zu nations, %zu charters, seat %u (nation %u)\n", out.w.nations.size(),
+                out.w.gen_charters.size(), out.w.player_entity, player_nation(out.w));
 
     t0_settle_untaxed(out);
     t1_conserves(out);

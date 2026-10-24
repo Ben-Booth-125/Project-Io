@@ -95,12 +95,12 @@ int main()
         building_component b{}; b.tile = tile; b.type = building_type::extraction_site;
         b.workforce_assigned = 1.0f; b.target_resource = target;
         w.buildings[bld] = b;
-        w.corporations[corp].assets.push_back(bld);
+        w.nations[corp].state_assets.push_back(bld);
     };
 
     const entity_id extractor_corp = w.create_entity();
-    { corporation_component cc; cc.name = "Miner Co"; cc.starting_capital = cc.balance = 100000.0f;
-      cc.is_player = true; w.corporations[extractor_corp] = cc; }
+    { nation_component cc{}; cc.name = "Miner Co"; cc.treasury = 100000.0f;
+      w.nations[extractor_corp] = cc; }
     make_extractor(resource_type::silica, extractor_corp);
     make_extractor(resource_type::copper_ore, extractor_corp);
     make_extractor(resource_type::rare_earth_ore, extractor_corp);
@@ -112,8 +112,8 @@ int main()
     const entity_id tile_p = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile_p] = tc; }
     const entity_id chain_corp = w.create_entity();
-    { corporation_component cc; cc.name = "Chain Co"; cc.starting_capital = cc.balance = 1.0e6f;
-      cc.is_player = true; w.corporations[chain_corp] = cc; }
+    { nation_component cc{}; cc.name = "Chain Co"; cc.treasury = 1.0e6f;
+      w.nations[chain_corp] = cc; }
     // Seed steel directly — steel's own iron_ore/coal chain is pre-existing,
     // tested elsewhere (econ_harness); this harness scopes to the NEW chain.
     // BL-1265: on the market shelf (corporations hold no pools).
@@ -124,7 +124,7 @@ int main()
         building_component b{}; b.tile = tile_p; b.type = building_type::processing_facility;
         b.workforce_assigned = 1.0f; b.recipe = recipe_id;
         w.buildings[bld] = b;
-        w.corporations[chain_corp].assets.push_back(bld);
+        w.nations[chain_corp].state_assets.push_back(bld);
     };
     make_processor(id_silicon);
     make_processor(id_refcopper);

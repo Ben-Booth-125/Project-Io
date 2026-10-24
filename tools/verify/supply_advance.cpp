@@ -131,10 +131,10 @@ static void test_dispatch_and_gate()
     w.bodies[dest_body] = bdst;
 
     // Corp with starting balance.
-    corporation_component corp;
-    corp.balance = 500.0f;
-    corp.is_player = true;
-    w.corporations[corp_id] = corp;
+    nation_component corp{};
+    corp.treasury = 500.0f;
+    // BL-1407: the player IS its nation (player_entity below)
+    w.nations[corp_id] = corp;
     w.player_entity = corp_id;
 
     // Dest market with iron shortfall (demand > supply).
@@ -183,7 +183,7 @@ static void test_dispatch_and_gate()
     // --- Test gate: NO launchpad on source body → no convoy ---
     check(!ship50(), "R6: the space lane is refused without a launchpad");
     check(w.convoys.empty(), "R6: no convoy without launchpad");
-    const float balance_before_gate = w.corporations.at(corp_id).balance;
+    const float balance_before_gate = w.nations.at(corp_id).treasury;
     check(near(balance_before_gate, 500.0f), "R6: balance unchanged without launchpad",
           balance_before_gate, 500.0f);
 
@@ -195,14 +195,14 @@ static void test_dispatch_and_gate()
         bc.type = building_type::launchpad;
         w.buildings[asset_id] = bc;
     }
-    w.corporations[corp_id].assets.push_back(asset_id);
+    w.nations[corp_id].state_assets.push_back(asset_id);
 
     // --- BL-308 gate: a pad with NO propellant is as shut as no pad at all ---
     check(!ship50(), "R6: no convoy from an UNFUELLED launchpad (BL-308)");
     check(w.convoys.empty(), "R6: ... and no convoy appended");
-    check(near(w.corporations.at(corp_id).balance, 500.0f),
+    check(near(w.nations.at(corp_id).treasury, 500.0f),
           "R6: balance unchanged without propellant",
-          w.corporations.at(corp_id).balance, 500.0f);
+          w.nations.at(corp_id).treasury, 500.0f);
 
     // Fuel the pad: 3 units of propellant on the source SHELF; a launch burns 1,
     // which the trader buys there (BL-1265).
@@ -222,7 +222,7 @@ static void test_dispatch_and_gate()
         // cost = space_rate × distance × qty = 1.0 × 1.0 × 50 = 50. The haul is
         // paid now; the purchase is billed at the clear (not run here).
         const float expected_cost = 1.0f * 1.0f * 50.0f;
-        const float balance_after = w.corporations.at(corp_id).balance;
+        const float balance_after = w.nations.at(corp_id).treasury;
         check(near(balance_after, 500.0f - expected_cost),
               "R5: corp balance debited by logistics cost",
               balance_after, 500.0f - expected_cost);
@@ -321,9 +321,9 @@ static void test_price_convergence()
     bb.grid_width = bb.grid_height = 4;
     w.bodies[body_b] = bb;
 
-    corporation_component cc{};
-    cc.balance = 1000.0f;
-    w.corporations[corp] = cc;
+    nation_component cc{};
+    cc.treasury = 1000.0f;
+    w.nations[corp] = cc;
 
     entity_id mkt_a = w.create_entity();
     {
@@ -453,9 +453,9 @@ static purity_trace run_purity_world(bool perturb_angles)
     author_body(src_b, "SrcB", 3.0f, 4.0f, 0.02f);
     author_body(dest,  "Dest", 2.0f, 1.0f, 0.01f);
 
-    corporation_component corp;
-    corp.balance = 100000.0f;
-    w.corporations[corp_id] = corp;
+    nation_component corp{};
+    corp.treasury = 100000.0f;
+    w.nations[corp_id] = corp;
 
     // A tile, a market and a Port on every body; a launchpad on each source.
     // Every market prices iron (a source must price what it sells), the
@@ -490,7 +490,7 @@ static purity_trace run_purity_world(bool perturb_angles)
             bc.type = building_type::port;
             w.buildings[port] = bc;
         }
-        w.corporations[corp_id].assets.push_back(port);
+        w.nations[corp_id].state_assets.push_back(port);
         if (body != dest)
         {
             entity_id pad = w.create_entity();
@@ -498,7 +498,7 @@ static purity_trace run_purity_world(bool perturb_angles)
             bc.tile = tile;
             bc.type = building_type::launchpad;
             w.buildings[pad] = bc;
-            w.corporations[corp_id].assets.push_back(pad);
+            w.nations[corp_id].state_assets.push_back(pad);
         }
     }
 
@@ -526,11 +526,11 @@ static purity_trace run_purity_world(bool perturb_angles)
             for (auto& [id, body] : w.bodies)
                 body.orbital_angle_rad = 5.777f + 0.13f * static_cast<float>(id + tick);
 
-        const float balance_before = w.corporations.at(corp_id).balance;
+        const float balance_before = w.nations.at(corp_id).treasury;
         economy_report rep;
         run_trades(w, reg, rep);
 
-        trace.costs.push_back(balance_before - w.corporations.at(corp_id).balance);
+        trace.costs.push_back(balance_before - w.nations.at(corp_id).treasury);
         if (w.convoys.size() == 1)
         {
             trace.speeds.push_back(w.convoys[0].speed);

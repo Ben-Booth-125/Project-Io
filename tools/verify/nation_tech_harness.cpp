@@ -171,7 +171,7 @@ entity_id add_building(world& w, entity_id corp, entity_id tile, building_type t
     // row deliberately overrides it.
     bc.workforce_assigned = workforce < 0.0f ? construction_initial_workforce(type) : workforce;
     w.buildings[b] = bc;
-    w.corporations.at(corp).assets.push_back(b);
+    w.nations.at(corp).state_assets.push_back(b);
     return b;
 }
 
@@ -195,14 +195,10 @@ fixture make_fixture(float treasury = 10000.0f)
     nb.reserve_fraction = 0.0f;
     f.w.nation_budgets[f.nation] = nb;
 
-    f.corp = f.w.create_entity();
-    corporation_component cc{};
-    cc.home_nation = f.nation;
-    f.w.corporations[f.corp] = cc;
-    f.corp2 = f.w.create_entity();
-    corporation_component c2{};
-    c2.home_nation = f.other;
-    f.w.corporations[f.corp2] = c2;
+    // BL-1407: no corporation — the owner acting on each nation's ground IS the
+    // nation, so the two "firms" are the nations themselves.
+    f.corp  = f.nation;
+    f.corp2 = f.other;
     return f;
 }
 
@@ -1050,8 +1046,8 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
     // BL-1265: a trade is shelf to shelf, so any homed corp can price any
     // same-body market pair. Ascending corp id, then market ids: a fixed order.
     std::vector<entity_id> cids;
-    for (const auto& kv : w.corporations)
-        if (kv.second.home_nation != null_entity) cids.push_back(kv.first);
+    for (const auto& kv : w.nations)
+        cids.push_back(kv.first); // BL-1407: every owner is a nation
     std::sort(cids.begin(), cids.end());
     if (cids.empty()) return false;
     const auto search = [&]() {
@@ -1080,7 +1076,7 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
     auto reprice = [&](const found_leg& f) {
         return price_trade_leg(w, reg, nodes, f.corp, f.src, f.dest, ri, qty);
     };
-    const entity_id home = w.corporations.at(overland.corp).home_nation;
+    const entity_id home = overland.corp; // BL-1407: the owner is its own nation
     entity_id elsewhere = null_entity;
     for (const auto& kv : w.nations)
         if (kv.first != home && (elsewhere == null_entity || kv.first < elsewhere)) elsewhere = kv.first;
@@ -1125,7 +1121,7 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
         if (ported.corp == null_entity) return false;
         saved = w;
     }
-    w.nation_tech[w.corporations.at(ported.corp).home_nation].held.set(static_cast<std::size_t>(fr));
+    w.nation_tech[ported.corp].held.set(static_cast<std::size_t>(fr));
     const float p_after = reprice(ported).cost;
     const double handling = static_cast<double>(reg.port_handling()) * 2.0 * qty; // two ports
     const double expect   = (static_cast<double>(ported.leg.cost) - handling) * 0.99 + handling;
@@ -1193,22 +1189,24 @@ void rows_r5()
               "R5f the quarterly pass charges the priced cost (200 RP at index 2: two passes of 100)");
     }
 
-    // The economy term: RP per credit of the home firms' PREVIOUS quarter's
-    // filed income — the latest return is the one this tick's apply_budget
-    // filed, which FINANCE.md says no branch reads in that tick. A loss counts
-    // as nothing; a firm with a single return has no previous quarter yet.
+    // The economy term (BL-1407 re-point): RP per credit of the nation's own
+    // buildings' sales, the state ledger's `income` (the corporation's
+    // previous-return term retired with the type). A loss counts as nothing; a
+    // nation holding no building has no economy.
     {
         research_params p{};
         p.base_rp_per_nation = 0.0f;
         p.rp_per_research_credit_sqrt = 0.0f;
         p.rp_per_economy_unit = 0.2f;
         fixture f = make_fixture(0.0f);
-        quarterly_return prev{}, latest{}, loss{};
-        prev.income   = 500.0f;
-        latest.income = 9000.0f; // filed this tick: not read
-        loss.income   = -300.0f;
-        f.w.corporations.at(f.corp).returns  = { prev, latest };
-        f.w.corporations.at(f.corp2).returns = { loss, latest };
+        const entity_id hb = f.w.create_entity();
+        f.w.buildings[hb] = building_component{};
+        f.w.nations.at(f.nation).state_assets.push_back(hb);
+        const entity_id ob = f.w.create_entity();
+        f.w.buildings[ob] = building_component{};
+        f.w.nations.at(f.other).state_assets.push_back(ob);
+        f.w.state_ledger[f.nation].income = 500.0f;
+        f.w.state_ledger[f.other].income  = -300.0f;
         std::vector<research_accrual> rows;
         advance_research(f.w, p, &rows);
         const research_accrual* a = row_for(rows, f.nation);
@@ -1216,10 +1214,10 @@ void rows_r5()
         check(a != nullptr && b != nullptr && a->economy == 500.0 && a->rp_milli == milli(100.0)
                   && b->economy == 0.0 && b->rp_milli == 0
                   && nation_economy_milli(f.w, f.nation) == milli(500.0),
-              "R5g RP grow with the economy: 0.2 RP per credit of the PREVIOUS quarter's filed income (500 -> 100 RP), never the return filed this tick; a loss adds none");
-        f.w.corporations.at(f.corp).returns = { latest };
+              "R5g RP grow with the economy: 0.2 RP per credit of the nation's buildings' sales (500 -> 100 RP); a loss adds none");
+        f.w.nations.at(f.nation).state_assets.clear();
         check(nation_economy_milli(f.w, f.nation) == 0,
-              "R5g2 ...and a firm with only this tick's return contributes nothing yet");
+              "R5g2 ...and a nation holding no building contributes nothing");
     }
 
     // Saturation (review): no finite input reaches a signed overflow.
@@ -1229,16 +1227,11 @@ void rows_r5()
         const std::int64_t c_cap  = node_cost_milli(n, huge, 1'000'000'000'000LL);
         const std::int64_t c_frac = node_cost_milli(n, huge, 1'500'000);
         fixture f = make_fixture(0.0f);
-        quarterly_return big{};
-        big.income = 3.0e38f;
-        for (int k = 0; k < 8; ++k)
-        {
-            const entity_id c = f.w.create_entity();
-            corporation_component cc{};
-            cc.home_nation = f.nation;
-            cc.returns = { big, big };
-            f.w.corporations[c] = cc;
-        }
+        // BL-1407: the nation's own ledger at the float ceiling.
+        const entity_id hb = f.w.create_entity();
+        f.w.buildings[hb] = building_component{};
+        f.w.nations.at(f.nation).state_assets.push_back(hb);
+        f.w.state_ledger[f.nation].income = 3.0e38f;
         const std::int64_t e = nation_economy_milli(f.w, f.nation);
         research_params p{};
         p.rp_per_economy_unit = 1.0e6f;
@@ -1499,8 +1492,8 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
     for (const auto& kv : w.nations) nids.push_back(kv.first);
     std::sort(nids.begin(), nids.end());
     std::map<entity_id, int> bldgs; // advance_research's own counting rule
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id bid : cc.assets)
+    for (const auto& [cid, cc] : w.nations)
+        for (const entity_id bid : cc.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end() || bit->second.ticks_remaining > 0 || bit->second.decommissioned
@@ -1511,8 +1504,8 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
                 if (const auto tn = w.tile_to_nation.find(bit->second.tile); tn != w.tile_to_nation.end())
                     ++bldgs[tn->second];
             }
-            else if (bit->second.type == building_type::research_institute && cc.home_nation != null_entity)
-                ++bldgs[cc.home_nation];
+            else if (bit->second.type == building_type::research_institute)
+                ++bldgs[cid]; // BL-1407: its owner nation
         }
 
     // The scripted queue (BL-1275 will be the real caller): every nation,

@@ -85,7 +85,7 @@ entity_id add_plant(fixture& f, const recipe_registry& reg)
     b.workforce_assigned = 1.0f;
     b.workforce_auto = false;
     f.w.buildings[p] = b;
-    f.w.corporations.at(f.corp).assets.push_back(p);
+    f.w.nations.at(f.corp).state_assets.push_back(p);
     return p;
 }
 
@@ -117,16 +117,16 @@ fixture make_fixture(const recipe_registry& reg, bool two_plants)
     w.markets[f.market] = mc;
 
     f.corp = w.create_entity();
-    corporation_component cc;
-    cc.name = "Fixture Co"; cc.is_player = false; cc.balance = 1.0e6f; cc.starting_capital = 1.0e6f;
-    w.corporations[f.corp] = cc;
+    nation_component cc{};
+    cc.name = "Fixture Co"; cc.treasury = 1.0e6f; 
+    w.nations[f.corp] = cc;
     // BL-1322: the game steps the PLAYER's workforce every quarter, so this
     // fixture's corp is no longer the seat; the seat is an empty corp of its own.
     {
         const entity_id seat = w.create_entity();
-        corporation_component sc;
-        sc.name = "Seat (empty)"; sc.is_player = true;
-        w.corporations[seat] = sc;
+        nation_component sc{};
+        sc.name = "Seat (empty)"; 
+        w.nations[seat] = sc;
         w.player_entity = seat;
     }
     f.p1 = add_plant(f, reg);

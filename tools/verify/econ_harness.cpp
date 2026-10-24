@@ -105,15 +105,19 @@ int main()
         b.type = building_type::extraction_site;
         b.workforce_assigned = 0.5f;
         b.target_resource = resource_type::iron_ore;
+        // BL-1407: the owner is a NATION and only the player's is never AI-driven;
+        // the corporation's `is_player` exclusion is gone. The scorer's own
+        // anti-thrash hold keeps its dial off this building, so the formula rows
+        // still measure the arithmetic, not the AI's first decision.
+        b.ai_cooldown = 1000;
         w.buildings[bld_e] = b;
     }
     const entity_id corp_e = w.create_entity();
     {
-        corporation_component cc;
+        nation_component cc{};
         cc.name = "Extractor Co";
-        cc.starting_capital = 1000.0f;
-        cc.balance = 1000.0f;
-        cc.assets.push_back(bld_e);
+        cc.treasury = 1000.0f;
+        cc.state_assets.push_back(bld_e);
         // NOT AI-DRIVEN (added 2026-07-31). run_economy_step stopped being pure
         // economy arithmetic when BL-202's strategic tier landed: it commands every
         // non-player corp at the end of the tick, and a workforce command rewrites
@@ -124,8 +128,7 @@ int main()
         // "this corp is not AI-driven" exclusion (corp_ai.cpp: is_player || ==
         // player_entity). Every asserted value is UNCHANGED by this - it restores
         // the isolation the assertions always assumed rather than relaxing them.
-        cc.is_player = true;
-        w.corporations[corp_e] = cc;
+        w.nations[corp_e] = cc;
     }
 
     // --- processing corp P: steel recipe, workforce 0.5, fed off the shelf ---
@@ -143,17 +146,16 @@ int main()
         b.type = building_type::processing_facility;
         b.workforce_assigned = 0.5f;
         b.recipe = steel_id;
+        b.ai_cooldown = 1000; // BL-1407: as bld_e above
         w.buildings[bld_p] = b;
     }
     const entity_id corp_p = w.create_entity();
     {
-        corporation_component cc;
+        nation_component cc{};
         cc.name = "Smelter Co";
-        cc.starting_capital = 1000.0f;
-        cc.balance = 1000.0f;
-        cc.assets.push_back(bld_p);
-        cc.is_player = true; // not AI-driven — see corp_e above
-        w.corporations[corp_p] = cc;
+        cc.treasury = 1000.0f;
+        cc.state_assets.push_back(bld_p);
+        w.nations[corp_p] = cc;
     }
     // BL-1265: no pool to seed — P buys its whole need (8 iron) off the shelf.
 
@@ -213,8 +215,8 @@ int main()
     //      maint 5, wage 0.5*8=4 -> +29.363 -> 1029.363   (was 1026.206)
     //   P: income 4*5=20, expend 8*2.5 (iron posted at base) = 20, maint 10,
     //      wage 0.5*12=6 -> -16 -> 984.000   (was 994.000: its pool covered 4)
-    check(near(w.corporations[corp_e].balance, 1029.363f), "A.R3 extraction corp balance: its landing paid at the resolved price (shipped k = 1)", w.corporations[corp_e].balance, 1029.363f);
-    check(near(w.corporations[corp_p].balance, 984.0f),    "A.R3 processing corp balance: sales at resolved, the shelf draw at posted", w.corporations[corp_p].balance, 984.0f);
+    check(near(w.nations[corp_e].treasury, 1029.363f), "A.R3 extraction corp balance: its landing paid at the resolved price (shipped k = 1)", w.nations[corp_e].treasury, 1029.363f);
+    check(near(w.nations[corp_p].treasury, 984.0f),    "A.R3 processing corp balance: sales at resolved, the shelf draw at posted", w.nations[corp_p].treasury, 984.0f);
 
     // R3.3 idle below t_idle: zero P's workforce-pool scenario -> empty pool, run again.
     {
@@ -227,7 +229,10 @@ int main()
         building_component bc{}; bc.tile = t2; bc.type = building_type::processing_facility;
         bc.workforce_assigned = 0.5f; bc.recipe = steel_id; w2.buildings[pb] = bc;
         const entity_id pc = w2.create_entity();
-        corporation_component cc; cc.balance = 0.0f; cc.assets.push_back(pb); w2.corporations[pc] = cc;
+        // BL-1407: a nation with an EMPTY treasury cannot fund the building
+        // (state_idle  it never reaches production), so the fixture funds it:
+        // the subject is the run's own idle below t_idle, not the funding gate.
+        nation_component cc{}; cc.treasury = 1000.0f; cc.state_assets.push_back(pb); w2.nations[pc] = cc;
         // no pool, no market -> coverage 0 < t_idle -> idle
         economy_report r = run_economy_step(w2, r2);
         bool idle = false;
@@ -254,7 +259,7 @@ int main()
             b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
             wd.buildings[eb] = b;
             const entity_id ec = wd.create_entity();
-            corporation_component cc; cc.assets.push_back(eb); wd.corporations[ec] = cc;
+            nation_component cc{}; cc.state_assets.push_back(eb); wd.nations[ec] = cc;
             economy_report r = run_economy_step(wd, reg);
             out = 0.0f; exhausted = false;
             for (const auto& br : r.buildings) if (br.building == eb) { out = br.output_quantity; exhausted = br.exhausted; }
@@ -289,8 +294,7 @@ int main()
         world ww;
         const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
         { market_component mc{}; mc.body = wb; ww.markets[ww.create_entity()] = mc; } // BL-1265: output lands on a market
-        corporation_component cc; cc.balance = 1000.0f;
-        cc.is_player = true; // not AI-driven — see corp_e above
+        nation_component cc{}; cc.treasury = 1000.0f;
         std::vector<entity_id> site_ids;
         for (int i = 0; i < 4; ++i)
         {
@@ -302,12 +306,13 @@ int main()
             const entity_id eb = ww.create_entity();
             building_component b{}; b.tile = t; b.type = building_type::extraction_site;
             b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
+            b.ai_cooldown = 1000; // BL-1407: hold the nation's AI dial off (see bld_e)
             ww.buildings[eb] = b;
-            cc.assets.push_back(eb);
+            cc.state_assets.push_back(eb);
             site_ids.push_back(eb);
         }
         const entity_id wc = ww.create_entity();
-        ww.corporations[wc] = cc;
+        ww.nations[wc] = cc;
 
         economy_report wr = run_economy_step(ww, reg);
         check(near(wr.workforce_contention[{wc, wb}], 0.75f),
@@ -335,12 +340,12 @@ int main()
         // staffed buildings only. Passing building_labour exercises the BL-614
         // per-building wage path in apply_budget.
         auto wf = clear_markets(ww, reg, wr);
-        const float before = ww.corporations[wc].balance;
+        const float before = ww.nations[wc].treasury;
         apply_budget(ww, reg, wf, wr.workforce_contention, nullptr, nullptr,
                      &wr.building_labour);
-        check(near(before - ww.corporations[wc].balance, 20.0f + 24.0f),
+        check(near(before - ww.nations[wc].treasury, 20.0f + 24.0f),
               "WF.R4 wages paid on allocated workforce (maint 20 + wages 24)",
-              before - ww.corporations[wc].balance, 44.0f);
+              before - ww.nations[wc].treasury, 44.0f);
     }
 
     // --- BL-614: a wage bid MOVES the allocation, and is paid as offered ---
@@ -353,8 +358,7 @@ int main()
         world ww;
         const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
         { market_component mc{}; mc.body = wb; ww.markets[ww.create_entity()] = mc; } // BL-1265: output lands on a market
-        corporation_component cc; cc.balance = 1000.0f;
-        cc.is_player = true;
+        nation_component cc{}; cc.treasury = 1000.0f;
         std::vector<entity_id> site_ids;
         for (int i = 0; i < 4; ++i)
         {
@@ -368,12 +372,13 @@ int main()
             b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
             if (i == 3)
                 b.wage_bid = 0.5f; // offered wage 8 * 1.5 = 12
+            b.ai_cooldown = 1000; // BL-1407: hold the nation's AI dial off (see bld_e)
             ww.buildings[eb] = b;
-            cc.assets.push_back(eb);
+            cc.state_assets.push_back(eb);
             site_ids.push_back(eb);
         }
         const entity_id wc = ww.create_entity();
-        ww.corporations[wc] = cc;
+        ww.nations[wc] = cc;
 
         economy_report wr = run_economy_step(ww, reg);
         check(near(wr.building_labour[site_ids[3]], 1.0f),
@@ -388,12 +393,12 @@ int main()
               wr.building_labour[site_ids[2]], 0.0f);
 
         auto wf = clear_markets(ww, reg, wr);
-        const float before = ww.corporations[wc].balance;
+        const float before = ww.nations[wc].treasury;
         apply_budget(ww, reg, wf, wr.workforce_contention, nullptr, nullptr,
                      &wr.building_labour);
-        check(near(before - ww.corporations[wc].balance, 20.0f + 28.0f),
+        check(near(before - ww.nations[wc].treasury, 20.0f + 28.0f),
               "WF.R6 (BL-614) wages paid at the OFFERED rate (maint 20 + wages 8+8+12)",
-              before - ww.corporations[wc].balance, 48.0f);
+              before - ww.nations[wc].treasury, 48.0f);
     }
 
     // --- A landing sells at the RESOLVED price (BL-1265; was BL-386's sell order) ---
@@ -412,7 +417,7 @@ int main()
         mc.price = mc.base_price;
         ws.markets[m] = mc;
         const entity_id corp = ws.create_entity();
-        { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 0.0f; ws.nations[corp] = cc; }
         ws.land_goods(corp, m, ri(resource_type::steel), 10.0f);
 
         economy_report empty; // no production this scenario
@@ -458,13 +463,13 @@ int main()
         check(market_for_tile(wm, tile_b) == mkt_b, "MM.2 tile near centre B routes to market B");
 
         const entity_id corp_a = wm.create_entity();
-        { corporation_component cc; const entity_id bid = wm.create_entity();
+        { nation_component cc{}; const entity_id bid = wm.create_entity();
           building_component bld{}; bld.tile = tile_a; wm.buildings[bid] = bld;
-          cc.assets.push_back(bid); wm.corporations[corp_a] = cc; }
+          cc.state_assets.push_back(bid); wm.nations[corp_a] = cc; }
         const entity_id corp_b = wm.create_entity();
-        { corporation_component cc; const entity_id bid = wm.create_entity();
+        { nation_component cc{}; const entity_id bid = wm.create_entity();
           building_component bld{}; bld.tile = tile_b; wm.buildings[bid] = bld;
-          cc.assets.push_back(bid); wm.corporations[corp_b] = cc; }
+          cc.state_assets.push_back(bid); wm.nations[corp_b] = cc; }
         // BL-1265: each corp's goods LAND on ITS building's catchment market.
         wm.land_goods(corp_a, market_for_tile(wm, tile_a), ri(resource_type::steel), 10.0f);
         wm.land_goods(corp_b, market_for_tile(wm, tile_b), ri(resource_type::steel), 10.0f);
@@ -516,9 +521,8 @@ int main()
             b.workforce_assigned = 0.5f; b.recipe = deep_id;
             qw.buildings[eb] = b;
             const entity_id ec = qw.create_entity();
-            corporation_component cc; cc.balance = 1000.0f; cc.is_player = true;
-            cc.assets.push_back(eb);
-            qw.corporations[ec] = cc;
+            nation_component cc{}; cc.treasury = 1000.0f;            cc.state_assets.push_back(eb);
+            qw.nations[ec] = cc;
             // BL-1265: the iron is on a market's shelf on the body (no pools).
             const entity_id qm = qw.create_entity();
             { market_component qmc{}; qmc.body = qb;

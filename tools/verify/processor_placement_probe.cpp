@@ -141,14 +141,14 @@ void read_world(read_ctx& c, const char* label, std::uint32_t seed, bool bodies,
     const double prate = reg.economics(building_type::processing_facility).base_rate;
 
     std::map<entity_id, entity_id> owner;
-    for (const auto& [cid, cc] : w.corporations) for (const entity_id a : cc.assets) owner.emplace(a, cid);
+    for (const auto& [cid, cc] : w.nations) for (const entity_id a : cc.state_assets) owner.emplace(a, cid);
     const auto cls_of = [&](entity_id bid, entity_id corp) {
         if (c.gen_ids && !c.gen_ids->count(bid)) return int(k_settle);
         if (corp == null_entity) return int(k_unowned);
-        const corporation_component& cc = w.corporations.at(corp);
-        if (cc.is_player) return int(k_seat);
-        if (!cc.is_background) return int(k_spec);
-        return cc.origin_region >= 0 ? int(k_charter) : int(k_pass6);
+        const nation_component& cc = w.nations.at(corp);
+        if (corp == w.player_entity) return int(k_seat); // BL-1407
+        if (!(!cc.is_major)) return int(k_spec);
+        return int(k_charter); // BL-1407: a nation has no firm origin to read
     };
 
     std::vector<entity_id> ids;

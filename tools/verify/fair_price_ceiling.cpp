@@ -132,13 +132,11 @@ scene make_scene(float iron_posted, float steel_posted, float shelf)
 entity_id add_corp(scene& s, entity_id b, float iron_pool)
 {
     const entity_id c = s.w.create_entity();
-    corporation_component cc;
+    nation_component cc{};
     cc.name = "Test Co";
-    cc.is_player = true; // excluded from the strategic tier; see econ_harness
-    cc.starting_capital = 10000.0f;
-    cc.balance = 10000.0f;
-    cc.assets.push_back(b);
-    s.w.corporations[c] = cc;
+    cc.treasury = 10000.0f;
+    cc.state_assets.push_back(b);
+    s.w.nations[c] = cc;
     (void)iron_pool; // no pool to seed
     return c;
 }
@@ -336,14 +334,14 @@ void c_construction()
         scene s = make_scene(k_iron_base, over, 1000.0f);
         const entity_id b = site(s);
         const entity_id c = add_corp(s, b, 0.0f);
-        const float bal0 = s.w.corporations.at(c).balance;
+        const float bal0 = s.w.nations.at(c).treasury;
         economy_report rep = run_economy_step(s.w, reg);
         check(s.w.buildings.at(b).ticks_remaining == 3 && near(s.w.buildings.at(b).construction_progress, 0.0f),
               "C2 over the ceiling the build PAUSES (no progress)");
         check(near(fill_of(rep, c, s.market, STEEL), 0.0f), "C2 no steel drawn", fill_of(rep, c, s.market, STEEL), 0.0);
         check(near(s.w.markets.at(s.market).inventory[ri(STEEL)], 1000.0f), "C2 the steel shelf is untouched");
-        check(near(s.w.corporations.at(c).balance, bal0), "C2 a paused build spends nothing, cash cost included",
-              s.w.corporations.at(c).balance, bal0);
+        check(near(s.w.nations.at(c).treasury, bal0), "C2 a paused build spends nothing, cash cost included",
+              s.w.nations.at(c).treasury, bal0);
         const auto flows = clear_markets(s.w, reg, rep);
         check(near(spent(flows, c), 0.0f) && buyer_rows(s.w, c, STEEL).n == 0,
               "C2 nothing billed, no exchange row");

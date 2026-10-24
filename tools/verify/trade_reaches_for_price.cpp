@@ -142,17 +142,16 @@ float consistent_demand(float supply, float price) { return supply * (price / k_
 entity_id add_trader(scenario& s, int col)
 {
     const entity_id c = s.w.create_entity();
-    corporation_component cc;
-    cc.balance   = 100000.0f;
-    cc.is_player = true; // keeps the strategic scorer out; auto trade is one rule for every corp
+    nation_component cc{};
+    cc.treasury   = 100000.0f;
     const entity_id mp = s.w.create_entity();
     building_component b{};
     b.tile               = tile_at(s.w, s.body, col, 2);
     b.type               = building_type::planetary_marketplace;
     b.workforce_assigned = 1.0f;
     s.w.buildings[mp] = b;
-    cc.assets.push_back(mp);
-    s.w.corporations[c] = cc;
+    cc.state_assets.push_back(mp);
+    s.w.nations[c] = cc;
     return c;
 }
 
@@ -167,7 +166,7 @@ void add_marketplace(scenario& s, entity_id corp, int col)
     b.type               = building_type::planetary_marketplace;
     b.workforce_assigned = 1.0f;
     s.w.buildings[mp] = b;
-    s.w.corporations.at(corp).assets.push_back(mp);
+    s.w.nations.at(corp).state_assets.push_back(mp);
 }
 
 // One plains body, a trader, and a supply anchor off the haul's row for the
@@ -462,7 +461,7 @@ int main()
         set_book(s, s.market_f, 0.0f, 50.0f);
         s.w.markets.at(s.market_a).inventory[r_iron] = 1000.0f;
         const entity_id other = s.w.create_entity();
-        s.w.corporations[other] = corporation_component{};
+        s.w.nations[other] = nation_component{};
         s.w.land_goods(other, s.market_f, r_iron, 20.0f);
         const float k = aim_factor(reg, 10.0f + haul_per_unit(s, reg, s.market_a, s.market_f));
         trade(s, reg);
@@ -477,7 +476,7 @@ int main()
         set_book(s, s.market_f, 0.0f, 50.0f);
         s.w.markets.at(s.market_a).inventory[r_iron] = 1000.0f;
         const entity_id other = s.w.create_entity();
-        s.w.corporations[other] = corporation_component{};
+        s.w.nations[other] = nation_component{};
         s.w.land_goods(other, s.market_f, r_iron, 50.0f); // F is already full
         trade(s, reg);
         check(s.w.convoys.size() == 1 && s.w.convoys[0].dest_market == s.market_n,

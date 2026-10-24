@@ -883,7 +883,9 @@ census_row census_one(std::uint32_t seed)
     {
         if (budget_ids.count(f) != 0) continue;
         ++row.pass6_firms;
-        const corporation_component& corp = w.corporations.at(f);
+        const auto cfit = w.gen_charters.find(f); // BL-1407: the charter record (closed at the fold)
+        if (cfit == w.gen_charters.end()) continue;
+        const charter_holding& corp = cfit->second;
         if (corp.assets.empty()) continue;
         const auto bit = w.buildings.find(corp.assets.front());   // the anchor: Pass 6 reads the cap here
         if (bit == w.buildings.end()) continue;

@@ -48,6 +48,7 @@
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
 #include "world/corporation_generation.hpp" // assign_default_recipes
+#include "world/state_industry.hpp"         // BL-1407: fold_to_ground
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -274,10 +275,10 @@ struct rollout_metrics
 int rival_processor_count(const world& w)
 {
     int n = 0;
-    for (const auto& [id, cc] : w.corporations)
+    for (const auto& [id, cc] : w.nations)
     {
-        if (cc.is_player) continue;
-        for (const entity_id bld : cc.assets)
+        if (id == w.player_entity) continue; // BL-1407
+        for (const entity_id bld : cc.state_assets)
         {
             const auto it = w.buildings.find(bld);
             if (it != w.buildings.end() && it->second.type == building_type::processing_facility)
@@ -308,9 +309,9 @@ std::vector<std::pair<entity_id, standing_index>>
 standing_field(const world& w, const recipe_registry& reg)
 {
     std::vector<std::pair<entity_id, standing_index>> field;
-    for (const auto& [id, cc] : w.corporations)
+    for (const auto& [id, cc] : w.nations)
     {
-        if (cc.is_player) continue;
+        if (id == w.player_entity) continue; // BL-1407
         field.emplace_back(id, corp_standing_index(w, reg, id));
     }
     std::sort(field.begin(), field.end(),
@@ -345,6 +346,11 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     // command), which is why the two read so differently. app::load_economy does
     // this; a harness that skips it measures a startup the game never performs.
     assign_default_recipes(w, reg);
+    // BL-1407: the fold the game always runs (finish_campaign_world). The
+    // corporation is gone; until the fold a bare world's charter capital sits in
+    // the generation-transient charter records and every nation's buildings are
+    // unfunded — a startup the game never performs, the same class as above.
+    (void)fold_to_ground(w);
 
     rollout_metrics m;
     const int processors_at_start = rival_processor_count(w);
@@ -372,11 +378,11 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
         {
             float net_worth = 0.0f;
             bool  any_below_zero = false;
-            for (const auto& [id, cc] : w.corporations)
+            for (const auto& [id, cc] : w.nations)
             {
-                if (cc.is_player) continue;
-                net_worth += cc.balance;
-                if (cc.balance < 0.0f) any_below_zero = true;
+                if (id == w.player_entity) continue; // BL-1407
+                net_worth += cc.treasury;
+                if (cc.treasury < 0.0f) any_below_zero = true;
             }
             m.net_worth_curve.push_back(net_worth);
             if (any_below_zero) ++m.solvency_ticks_below_zero;
@@ -402,11 +408,11 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     }
 
     int ai_corps = 0, ai_active = 0;
-    for (const auto& [id, cc] : w.corporations)
+    for (const auto& [id, cc] : w.nations)
     {
-        if (cc.is_player) continue;
+        if (id == w.player_entity) continue; // BL-1407
         ++ai_corps;
-        for (const entity_id bld : cc.assets)
+        for (const entity_id bld : cc.state_assets)
         {
             const auto it = w.buildings.find(bld);
             if (it != w.buildings.end() && !it->second.decommissioned) { ++ai_active; break; }
@@ -420,10 +426,10 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     // building with `existing` set, which is the model the build scorer priced
     // it with. A large positive gap says the scorer is promised a full run and
     // handed a starved one; a small gap says the economy really does pay this.
-    for (const auto& [id, cc] : w.corporations)
+    for (const auto& [id, cc] : w.nations)
     {
-        if (cc.is_player) continue;
-        for (const entity_id bld : cc.assets)
+        if (id == w.player_entity) continue; // BL-1407
+        for (const entity_id bld : cc.state_assets)
         {
             const auto it = w.buildings.find(bld);
             if (it == w.buildings.end() || it->second.decommissioned) continue;

@@ -58,7 +58,7 @@ int main()
     const entity_id corp = w.player_entity;
     const entity_id home = w.home_body;
 
-    const float starting_balance = w.corporations[corp].balance;
+    const float starting_balance = w.nations[corp].treasury;
     std::printf("Player starting balance: %.1f cr\n", static_cast<double>(starting_balance));
 
     // Every home-body tile, in stable entity-id order (deterministic spree order).
@@ -71,7 +71,7 @@ int main()
     float spent = 0.0f;
     for (const entity_id t : tiles)
     {
-        const float before = w.corporations[corp].balance;
+        const float before = w.nations[corp].treasury;
         entity_id built = null_entity;
 
         // Prefer extraction on a tile with an iron deposit; otherwise try a
@@ -89,15 +89,15 @@ int main()
         if (r == construction_result::placed)
         {
             ++placed;
-            spent += before - w.corporations[corp].balance;
+            spent += before - w.nations[corp].treasury;
         }
-        if (w.corporations[corp].balance < 100.0f) // below the cheapest build cost — spree is over
+        if (w.nations[corp].treasury < 100.0f) // below the cheapest build cost — spree is over
             break;
     }
 
     std::printf("Buildings placed in one uninterrupted spree: %d\n", placed);
     std::printf("Credits spent: %.1f  (balance remaining: %.1f)\n",
-                static_cast<double>(spent), static_cast<double>(w.corporations[corp].balance));
+                static_cast<double>(spent), static_cast<double>(w.nations[corp].treasury));
 
     const double pct_of_20_in_2_ticks = placed / 20.0 * 100.0;
     std::printf("As %% of the 20-buildings-per-2-econ-ticks benchmark: %.0f%%\n", pct_of_20_in_2_ticks);

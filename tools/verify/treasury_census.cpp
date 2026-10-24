@@ -470,15 +470,15 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
         const finish_campaign_result fr = finish_campaign_world(w, rep, seed_reg, p, dl.cfg, nullptr);
         (void)fr;
         o.finish_s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t1).count();
-        for (const auto& kv : w.corporations)
-            if (!kv.second.is_background && kv.second.home_nation != null_entity)
-                majors.insert(kv.second.home_nation);
+        for (const auto& kv : w.nations)
+            if (kv.second.is_major) // BL-1407: majors are a saved fact
+                majors.insert(kv.first);
 
         // The levy, settle quarters 1 and 12, attributed to the payer's home.
         std::map<entity_id, double> q1, q12;
-        for (const auto& kv : w.corporations)
+        for (const auto& kv : w.nations)
         {
-            const corporation_component& c = kv.second;
+            const nation_component& c = kv.second;
             const std::size_t n = c.returns.size();
             const auto at = [&](int k) -> double {
                 const long idx = static_cast<long>(n) - (k_campaign_settle_ticks - k);
@@ -486,7 +486,7 @@ seed_out run_seed(const data_layer& dl, uint32_t seed, bool do_finish)
             };
             const double a = at(0), b = at(k_campaign_settle_ticks - 1);
             o.levy_q1_world += a; o.levy_q12_world += b;
-            if (chest0.count(c.home_nation)) { q1[c.home_nation] += a; q12[c.home_nation] += b; }
+            if (chest0.count(kv.first)) { q1[kv.first] += a; q12[kv.first] += b; } // BL-1407
             else o.levy_q1_unattributed += a;
         }
         for (const entity_id id : ids)

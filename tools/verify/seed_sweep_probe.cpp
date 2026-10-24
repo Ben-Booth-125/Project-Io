@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
                 std::printf("[no budget: firms=%zu] ", firms.size());
             }
             std::printf("ok  (corps=%zu nations=%zu regions_hint=%lld battles=%lld)\n",
-                        w.corporations.size(), w.nations.size(),
+                        w.nations.size(), w.nations.size(),
                         (long long)rep.prehistory_foundings, (long long)rep.prehistory_battles);
         }
         catch (const std::exception& e)

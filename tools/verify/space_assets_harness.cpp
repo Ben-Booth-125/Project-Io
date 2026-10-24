@@ -475,15 +475,15 @@ int main()
             // asset's id. The control — the same corporation under a fresh id — loads.
             world okc = w;
             const entity_id fresh = okc.create_entity();
-            okc.corporations.emplace(fresh, corporation_component{});
+            okc.nations.emplace(fresh, nation_component{});
             world back_ok;
             const bool control = from_bytes(to_bytes(okc), back_ok);
             world clash = w;
-            clash.corporations.emplace(w.space_assets.begin()->first, corporation_component{});
+            clash.nations.emplace(w.space_assets.begin()->first, nation_component{});
             world back_clash;
             const bool clash_refused = !from_bytes(to_bytes(clash), back_clash);
             check(control && clash_refused, "A7",
-                  "an asset id a corporation also owns refuses the stream whole (control: a fresh-id corporation loads)");
+                  "an asset id a nation also owns refuses the stream whole (control: a fresh-id nation loads)");
         }
         {
             // A SET share rule in a v50 stream survives: the share section is read

@@ -278,7 +278,7 @@ int main(int argc, char** argv)
             // no pool may stay keyed by a market that folded.
             {
                 entity_id corp = null_entity;
-                for (const auto& [cid, cc] : w.corporations)
+                for (const auto& [cid, cc] : w.nations)
                     if (corp == null_entity || cid < corp) corp = cid;
                 std::vector<entity_id> mids;
                 for (const auto& [mid, mc] : w.markets)
@@ -376,7 +376,7 @@ int main(int argc, char** argv)
             std::printf("  seed %4u  markets %4zu  corps %4zu  folds twins %3" PRId64 " gravity %4" PRId64
                         " (shells %3" PRId64 ", across water %2" PRId64 ")  goods %.1f -> %.1f  tiles moved %" PRId64
                         " misrouted %" PRId64 "  %s\n",
-                        seed, w.markets.size(), w.corporations.size(), rep.markets_folded_twins,
+                        seed, w.markets.size(), w.nations.size(), rep.markets_folded_twins,
                         rep.markets_folded_gravity, rep.shells_folded, rep.markets_folded_across_water,
                         gb, ga, rep.market_fold_tiles_moved, rep.market_fold_misrouted,
                         ok ? "C1 ok" : "C1 FAIL");

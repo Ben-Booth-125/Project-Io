@@ -191,7 +191,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     // ---- S1: the handover -------------------------------------------------
     std::printf("--- S1 the handover ---\n");
     std::map<entity_id, std::vector<entity_id>> before;
-    for (const auto& [cid, cc] : w.corporations) before[cid] = cc.assets;
+    for (const auto& [cid, cc] : w.nations) before[cid] = cc.state_assets;
     bool any_state_before = false;
     for (const auto& [nid, nc] : w.nations) any_state_before |= !nc.state_assets.empty();
     check(!any_state_before, "S1", "no nation owns a building before the handover");
@@ -200,8 +200,8 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         // The ground the handover reads: buildings by owner kind x sector x the
         // ground's nation kind (reported, so a zero row explains itself).
         std::map<std::string, int> tally;
-        for (const auto& [cid, cc] : w.corporations)
-            for (const entity_id bid : cc.assets)
+        for (const auto& [cid, cc] : w.nations)
+            for (const entity_id bid : cc.state_assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end()) continue;
@@ -209,7 +209,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                 const char* ground = (tn == w.tile_to_nation.end()) ? "unclaimed"
                                    : is_major_nation(w, tn->second) ? "major" : "minor";
                 const strategic_sector sec = strategic_sector_of(reg, bit->second);
-                ++tally[fmt("%s %s type%d %s", cc.is_background ? "firm" : "spec", ground,
+                ++tally[fmt("%s %s type%d %s", cc.is_major == false ? "firm" : "spec", ground,
                             static_cast<int>(bit->second.type), strategic_sector_name(sec))];
             }
         for (const auto& [k, n] : tally)
@@ -245,8 +245,8 @@ void run_seed(lua_state& lua, std::uint32_t seed)
 
     {
         std::set<entity_id> corp_owned;
-        for (const auto& [cid, cc] : w.corporations)
-            for (const entity_id b : cc.assets) corp_owned.insert(b);
+        for (const auto& [cid, cc] : w.nations)
+            for (const entity_id b : cc.state_assets) corp_owned.insert(b);
         std::set<entity_id> seen;
         bool ok = true;
         std::string why;
@@ -281,15 +281,15 @@ void run_seed(lua_state& lua, std::uint32_t seed)
             for (const entity_id b : nc.state_assets)
                 if (!founded_ids.count(b)) passed.insert(b);
         std::set<entity_id> lost_all;
-        for (const auto& [cid, cc] : w.corporations)
+        for (const auto& [cid, cc] : w.nations)
         {
             const std::vector<entity_id>& was = before.at(cid);
-            if (!cc.is_background)
+            if (!cc.is_major == false)
             {
-                if (cc.assets != was) champ_ok = false;
+                if (cc.state_assets != was) champ_ok = false;
                 continue;
             }
-            std::set<entity_id> now(cc.assets.begin(), cc.assets.end());
+            std::set<entity_id> now(cc.state_assets.begin(), cc.state_assets.end());
             for (const entity_id b : was)
                 if (!now.count(b))
                 {
@@ -579,7 +579,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         std::printf("    state industry this tick: %.1f sold onto the shelf, %.1f bought off it\n",
                     static_cast<double>(sold), static_cast<double>(bought));
         run_nation_step(t, reg, r, tick);
-        run_firm_exits(t, reg.firm_exit(), &r.firm_exits);
+        // BL-1407: firm exit retired with the corporation (no run_firm_exits).
     }
 
     // ---- S4: an unpaid building idles ---------------------------------------
@@ -799,8 +799,8 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                             "rejected_invalid", "a state build of an extraction site"});
         {
             entity_id rival = null_entity;
-            for (const auto& [cid, cc] : w.corporations)
-                if (!cc.is_background && cid != P) { rival = cid; break; }
+            for (const auto& [cid, cc] : w.nations)
+                if (!cc.is_major == false && cid != P) { rival = cid; break; }
             if (rival != null_entity)
                 rows.push_back({fmt("COMMAND corp=%u verb=3 subject=%u workforce=50 nation=%u",
                                     static_cast<unsigned>(rival), other_sb, other_n),

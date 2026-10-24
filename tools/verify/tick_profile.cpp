@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
                 (long long)gen_report.prehistory_years, (long long)gen_report.prehistory_battles,
                 (long long)gen_report.prehistory_conquests, (long long)gen_report.prehistory_foundings);
     std::printf("  tiles=%zu  corps=%zu  markets=%zu  bodies=%zu\n\n",
-                tile_count, w.corporations.size(), w.markets.size(), w.bodies.size());
+                tile_count, w.nations.size(), w.markets.size(), w.bodies.size());
 
     phase_timer pt;
     const auto t_all0 = clock_t_::now();

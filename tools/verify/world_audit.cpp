@@ -624,8 +624,8 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                 for (const auto& be : rep.bodies)
                     if (be.is_homeworld) { home = be.id; break; }
                 std::set<entity_id> majors;
-                for (const auto& kv : sw.corporations)
-                    if (!kv.second.is_background && kv.second.home_nation != null_entity) majors.insert(kv.second.home_nation);
+                for (const auto& kv : sw.nations) // BL-1407: majors are a saved fact
+                    if (kv.second.is_major) majors.insert(kv.first);
                 std::vector<int> minor_sizes;
                 long total_tiles = 0, major_tiles = 0;
                 int  under_floor = 0;
@@ -733,10 +733,10 @@ int main(int argc, char** argv)
     // seeding has ever had). ---
     {
         bool has_base = false;
-        const auto pcit = w.corporations.find(w.player_entity);
-        if (pcit != w.corporations.end())
+        const auto pcit = w.nations.find(w.player_entity); // BL-1407: the seat is a nation
+        if (pcit != w.nations.end())
         {
-            for (entity_id asset : pcit->second.assets)
+            for (entity_id asset : pcit->second.state_assets)
             {
                 const auto bit = w.buildings.find(asset);
                 if (bit != w.buildings.end() && bit->second.type == building_type::military_base)
@@ -1036,7 +1036,7 @@ int main(int argc, char** argv)
         resource_type::water, resource_type::agricultural_produce };
 
     int extraction_assets = 0, bad = 0;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
         for (entity_id bid : corp.assets)
         {
@@ -1070,7 +1070,7 @@ int main(int argc, char** argv)
     // passes the reusable can_place() check; an ocean tile and a zero-deposit
     // tile are rejected. ---
     int seam_bad = 0;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
         for (entity_id bid : corp.assets)
         {
@@ -1189,7 +1189,7 @@ int main(int argc, char** argv)
         return "?";
     };
     int holdings_bad = 0;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
         // BL-476 seeds one `military_base` into EVERY corp's assets (it was the
         // player's alone under BL-330). `holdings_range` governs the corp's
@@ -1237,7 +1237,7 @@ int main(int argc, char** argv)
     //      body, scoped to the seven prototype resources (nothing else stocked);
     //   R2 focus correlation — extraction corps open richer in raws than trade;
     //   R3 determinism — a second generation yields identical stockpiles. ---
-    auto home_body_of = [&](const corporation_component& corp) -> entity_id {
+    auto home_body_of = [&](const charter_holding& corp) -> entity_id {
         for (entity_id bid : corp.assets)
         {
             const auto bit = w.buildings.find(bid);
@@ -1262,7 +1262,7 @@ int main(int argc, char** argv)
     int stock_corps = 0, stock_bad = 0;
     double ext_raw_sum = 0.0, trade_raw_sum = 0.0;
     int ext_n = 0, trade_n = 0;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
         if (corp.assets.empty()) continue;         // no holdings → no home body
         const entity_id hb = home_body_of(corp);
@@ -1464,7 +1464,7 @@ int main(int argc, char** argv)
     // generations (same seed -> same HQ entity + range). Render-only chrome, but the
     // data model must be sound. ---
     int hq_checked = 0, hq_bad = 0;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
         if (corp.assets.empty()) continue;            // no holdings -> no HQ (fine)
         const entity_id hb = home_body_of(corp);
@@ -1526,10 +1526,10 @@ int main(int argc, char** argv)
                 body_names_stable ? "PASS" : "FAIL");
 
     int hq_det_bad = 0;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
-        const auto it2 = w2.corporations.find(cid);
-        if (it2 == w2.corporations.end()) { ++hq_det_bad; continue; }
+        const auto it2 = w2.gen_charters.find(cid);
+        if (it2 == w2.gen_charters.end()) { ++hq_det_bad; continue; }
         if (corp.hq_building != it2->second.hq_building
             || corp.influence_range != it2->second.influence_range)
             ++hq_det_bad;
@@ -1552,7 +1552,7 @@ int main(int argc, char** argv)
         int single_region_corps = 0;
         long long spread_sum = 0; // summed max grid separation within a corp's holdings
         std::map<std::pair<terrain_substrate, terrain_cover>, int> holding_comp;
-        for (const auto& [cid, corp] : w.corporations)
+        for (const auto& [cid, corp] : w.gen_charters)
         {
             std::set<int> provs;
             std::vector<std::pair<int,int>> pts;

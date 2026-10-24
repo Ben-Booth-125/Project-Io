@@ -87,9 +87,9 @@ struct candidate
 /// shown to differ independently of the scorer.
 void note_fixture(candidate& c, const world& w)
 {
-    c.corps = static_cast<int>(w.corporations.size());
-    for (const auto& kv : w.corporations)
-        if (!kv.second.is_background)
+    c.corps = static_cast<int>(w.nations.size());
+    for (const auto& kv : w.nations)
+        if (!(!kv.second.is_major))
             ++c.specialists;
     for (const auto& kv : w.buildings)
     {
@@ -200,8 +200,8 @@ int main()
     // the live seam's own path rather than appending to it.
     const world base = make_hard_coded_world(wp, nullptr, gen_cfg);
     int base_specialists = 0;
-    for (const auto& kv : base.corporations)
-        if (!kv.second.is_background)
+    for (const auto& kv : base.nations)
+        if (!(!kv.second.is_major))
             ++base_specialists;
     std::printf("\n  base world: %d specialists laid by world-gen, settlement record %s\n",
                 base_specialists, base.gen_settlement ? "carried" : "MISSING");

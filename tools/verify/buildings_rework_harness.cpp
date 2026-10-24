@@ -149,8 +149,8 @@ int main()
         w.tiles.at(remote).resource_deposit[ri(resource_type::iron_ore)] = 100.0f;
 
         const entity_id corp = w.create_entity();
-        corporation_component cc; cc.balance = 100000.0f;
-        w.corporations.emplace(corp, cc);
+        nation_component cc{}; cc.treasury = 100000.0f;
+        w.nations.emplace(corp, cc);
 
         entity_id b1 = null_entity;
         const construction_result r1 = construct_building(w, reg, corp, near_plains,
@@ -238,8 +238,8 @@ int main()
         // Built through the real path: staffs at zero, and — ruling 3 — the
         // completed base is NOT a supply anchor, so the reach field is unchanged.
         const entity_id corp = w.create_entity();
-        corporation_component cc; cc.balance = 100000.0f;
-        w.corporations.emplace(corp, cc);
+        nation_component cc{}; cc.treasury = 100000.0f;
+        w.nations.emplace(corp, cc);
 
         // BL-344's tech gate on the military base retired with BL-1273
         // (NR-1022): the type is open to every nation, so no grant is needed.

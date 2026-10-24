@@ -115,7 +115,7 @@ double total_treasury(const world& w)
 double total_corp_cash(const world& w)
 {
     std::map<entity_id, double> by_id;
-    for (const auto& [cid, cc] : w.corporations) by_id[cid] = cc.balance;
+    for (const auto& [cid, cc] : w.nations) by_id[cid] = cc.treasury;
     double t = 0.0;
     for (const auto& [cid, v] : by_id) t += v;
     return t;
@@ -190,7 +190,7 @@ int main()
 
         const double treas_before = total_treasury(w);
         std::map<entity_id, float> bal_before;
-        for (const auto& [cid, cc] : w.corporations) bal_before[cid] = cc.balance;
+        for (const auto& [cid, cc] : w.nations) bal_before[cid] = cc.treasury;
 
         run_nation_step(w, reg, probe, use_tick);
 
@@ -239,8 +239,8 @@ int main()
         check(std::fabs(treas_fell - dispatched_credits) < 1e-2,
               "R2b the treasury fell by EXACTLY the dispatched earmarks (clawed-back claims netted to zero)");
         bool balances_restored = true;
-        for (const auto& [cid, cc] : w.corporations)
-            if (std::fabs(cc.balance - bal_before.at(cid)) > 1e-2) balances_restored = false;
+        for (const auto& [cid, cc] : w.nations)
+            if (std::fabs(cc.treasury - bal_before.at(cid)) > 1e-2) balances_restored = false;
         check(balances_restored, "R2c every corp balance is back where it started: the credit left as the survey cost");
         check(dispatched_credits > 0.0, "R2d the conservation rows are not vacuous: credits actually moved");
 
@@ -301,8 +301,8 @@ int main()
             apply_budget(without, reg, flows, r2.workforce_contention, &r2.budgets, &r2.buildings);
         }
         bool balances_equal = true;
-        for (const auto& [cid, cc] : with.corporations)
-            if (without.corporations.at(cid).balance != cc.balance) balances_equal = false;
+        for (const auto& [cid, cc] : with.nations)
+            if (without.nations.at(cid).treasury != cc.treasury) balances_equal = false;
         check(no_transfer, "R4a with every treasury at zero the step transfers nothing and dispatches nothing");
         check(balances_equal, "R4b ...and every corp balance is bit-identical to a run with the step absent");
         check(!with.nation_budgets.empty(), "R4c ...while the scorer still authored weights (preference is wealth-independent)");

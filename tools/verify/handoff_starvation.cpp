@@ -318,7 +318,7 @@ void run_seed(std::uint32_t seed, seed_out& out)
         start->reg.set_price_band(pb);
     }
     const recipe_registry& reg = start->reg;
-    if (w.corporations.empty()) { out.fail = "no corporations"; return; }
+    if (w.nations.empty()) { out.fail = "no corporations"; return; }
 
     std::set<entity_id> gen_ids;
     for (const auto& [bid, b] : w.buildings)
@@ -363,10 +363,10 @@ void run_seed(std::uint32_t seed, seed_out& out)
     std::map<entity_id, entity_id> owner;
     {
         std::vector<entity_id> cids;
-        for (const auto& kv : w.corporations) cids.push_back(kv.first);
+        for (const auto& kv : w.nations) cids.push_back(kv.first);
         std::sort(cids.begin(), cids.end());
         for (const entity_id c : cids)
-            for (const entity_id a : w.corporations.at(c).assets) owner[a] = c;
+            for (const entity_id a : w.nations.at(c).state_assets) owner[a] = c;
     }
 
     // Sorted building ids, the per-building market, and the makers index.

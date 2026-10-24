@@ -1028,7 +1028,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
     out.tiles     = static_cast<int>(w.tiles.size());
     out.markets   = static_cast<int>(w.markets.size());
     out.buildings = static_cast<int>(w.buildings.size());
-    out.corps     = static_cast<int>(w.corporations.size());
+    out.corps     = static_cast<int>(w.nations.size());
     out.centres   = static_cast<int>(w.population_centres.size());
     {
         // Integer accumulation, so the unordered walk cannot vary the sum.

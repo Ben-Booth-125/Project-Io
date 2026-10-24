@@ -176,7 +176,7 @@ static void test_agglomeration_and_pool()
 
     // One corp owns all buildings.
     const entity_id corp = w.create_entity();
-    w.corporations[corp] = corporation_component{};
+    w.nations[corp] = nation_component{};
 
     // body_low: pop scale 1, labour_by_scale[1] = 1.0.
     const entity_id body_low = w.create_entity();
@@ -259,7 +259,7 @@ static void test_agglomeration_and_pool()
         bld.workforce_assigned = 1.0f; // demand counts only non-zero assigned workers
         const entity_id bid   = w.create_entity();
         w.buildings[bid] = bld;
-        w.corporations[corp].assets.push_back(bid);
+        w.nations[corp].state_assets.push_back(bid);
     };
 
     // One extractor on each body.
@@ -320,7 +320,7 @@ static void test_habitability_scalar()
     world w;
 
     const entity_id corp = w.create_entity();
-    w.corporations[corp] = corporation_component{};
+    w.nations[corp] = nation_component{};
 
     const entity_id body = w.create_entity();
     {
@@ -368,7 +368,7 @@ static void test_habitability_scalar()
         bld.workforce_assigned = 1.0f;
         const entity_id bid    = w.create_entity();
         w.buildings[bid] = bld;
-        w.corporations[corp].assets.push_back(bid);
+        w.nations[corp].state_assets.push_back(bid);
     }
 
     recipe_registry reg;
@@ -980,13 +980,13 @@ static void test_background_draw_real_clear()
         w.markets[mB] = mc;
     }
     const entity_id corp = w.create_entity();
-    { corporation_component cc; cc.balance = 100000.0f; cc.is_player = true; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 100000.0f; w.nations[corp] = cc; }
     auto add_bld = [&](uint16_t recipe_id, int ticks_remaining) {
         const entity_id b = w.create_entity();
         building_component bc{}; bc.tile = tile; bc.type = building_type::processing_facility;
         bc.workforce_assigned = 0.5f; bc.recipe = recipe_id; bc.ticks_remaining = ticks_remaining;
         w.buildings[b] = bc;
-        w.corporations[corp].assets.push_back(b);
+        w.nations[corp].state_assets.push_back(b);
         return b;
     };
     const entity_id p1 = add_bld(steel_id, 0);

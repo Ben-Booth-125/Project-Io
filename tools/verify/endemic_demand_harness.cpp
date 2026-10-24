@@ -51,6 +51,7 @@
 #include "world/world.hpp"
 
 #include "world/resource_names.hpp"
+#include "world/state_industry.hpp" // BL-1407: fold_to_ground
 
 #include <algorithm>
 #include <array>
@@ -149,17 +150,12 @@ static fixture make_fixture(float balance_a, float balance_b)
         w.markets[f.mkt_b] = mc;
     }
 
-    f.corp_a = w.create_entity();
-    f.corp_b = w.create_entity();
-    {
-        corporation_component cc{};
-        cc.home_nation = f.nation_a;
-        cc.balance     = balance_a;
-        w.corporations[f.corp_a] = cc;
-        cc.home_nation = f.nation_b;
-        cc.balance     = balance_b;
-        w.corporations[f.corp_b] = cc;
-    }
+    // BL-1407: no corporation — the wealth that once sat in a firm homed in
+    // each nation is the nation's own treasury.
+    f.corp_a = f.nation_a;
+    f.corp_b = f.nation_b;
+    w.nations.at(f.nation_a).treasury = balance_a;
+    w.nations.at(f.nation_b).treasury = balance_b;
 
     return f;
 }
@@ -216,23 +212,19 @@ static void test_wealth_gates()
               db, 5.0f);
     }
 
-    // A corp in debt contributes zero, not a subtraction.
+    // A nation in debt (a negative treasury) pulls zero, never a negative demand.
+    // BL-1407: re-pointed from "a corp in debt contributes zero" — the corp is gone.
     {
-        fixture f = make_fixture(1000.0f, 0.0f);
-        const entity_id debtor = f.w.create_entity();
-        corporation_component cc{};
-        cc.home_nation = f.nation_a;
-        cc.balance     = -400.0f;
-        f.w.corporations[debtor] = cc;
+        fixture f = make_fixture(-400.0f, 0.0f);
 
         recipe_registry reg;
         reg.set_endemic_demand(flat_params(1.0f, 0.0f, 0.0f));
         inject_endemic_demand(f.w, reg);
 
         const float da = f.w.markets.at(f.mkt_a).demand[idx(resource_type::tobacco)];
-        check(std::fabs(da - 10.0f) < 1e-4f,
-              "a corp in debt contributes zero (10.0 unchanged, not 6.0)",
-              da, 10.0f);
+        check(da == 0.0f,
+              "a nation in debt pulls zero, never a negative demand",
+              da, 0.0f);
     }
 
     // A nation's pull splits across its markets; the TOTAL is carve-independent.
@@ -402,6 +394,10 @@ static void test_generated_world_integration()
     std::printf("--- E6: generated world — demand lands and survives clearing ---\n");
 
     world w = make_hard_coded_world(no_prehistory());
+    // BL-1407: the shipped close. A bare world holds its charters' capital in the
+    // generation-transient charter records until the fold credits it to the
+    // home treasuries — and a treasury is the only wealth there now is.
+    (void)fold_to_ground(w);
 
     recipe_registry reg;
     {
@@ -422,14 +418,14 @@ static void test_generated_world_integration()
     // The magnitude probe: what does the generated world hold?
     {
         std::vector<entity_id> corp_ids;
-        for (const auto& [cid, cc] : w.corporations) { (void)cc; corp_ids.push_back(cid); }
+        for (const auto& [cid, cc] : w.nations) { (void)cc; corp_ids.push_back(cid); }
         std::sort(corp_ids.begin(), corp_ids.end());
         std::map<entity_id, float> wealth;
         for (const entity_id cid : corp_ids)
         {
-            const corporation_component& cc = w.corporations.at(cid);
-            if (cc.home_nation != null_entity && cc.balance > 0.0f)
-                wealth[cc.home_nation] += cc.balance;
+            const nation_component& cc = w.nations.at(cid);
+            if (cc.treasury > 0.0f) // BL-1407: the nation's own treasury
+                wealth[cid] += cc.treasury;
         }
         float total = 0.0f;
         for (const auto& [nid, cr] : wealth) { (void)nid; total += cr; }

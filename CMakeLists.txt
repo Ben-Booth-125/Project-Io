@@ -649,36 +649,8 @@ target_link_libraries(ground_bake_check PRIVATE io_world_obj)
 target_compile_features(ground_bake_check PRIVATE cxx_std_20)
 target_compile_options(ground_bake_check PRIVATE ${IO_WARNING_FLAGS})
 
-# spawn_solvency (BL-635) is the fourth Lua-linked harness, and the reason is
-# stated in its own header: it asserts a MAGNITUDE, not a relation. Every other
-# economy harness restates scripts/economy.lua as C++ constants because the
-# property it checks holds whatever the constants are; this one reads the
-# per-flow attribution of the SHIPPED spawn off BL-626's filed quarterly returns,
-# and the shipped spawn opens at 0 CE, where the era band masks the recipe roster
-# down to the ancient one. A restated registry would answer about a world that
-# does not ship. Same shape as pregame_balance_harness above.
-add_executable(spawn_solvency
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/spawn_solvency.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
-    # world_gen_config.cpp: the harness PARSES scripts/world_gen.lua into a
-    # world_gen_config (its R0 row, the 2026-08-26 lesson) and so links
-    # load_from_lua - without this TU the target does not link, which under
-    # `nmake all` stops every target after it and reads as a suite of
-    # "Not Run" (found 2026-09-02, BL-744).
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
-    # works_registry.cpp: load_app_generation_inputs (harness_params.hpp) loads the
-    # app's works table, so the target links works_registry::load_from_lua.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
-)
-target_include_directories(spawn_solvency PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${sol2_src_SOURCE_DIR}/include"
-)
-target_link_libraries(spawn_solvency PRIVATE io_world_obj lua54)
-target_compile_features(spawn_solvency PRIVATE cxx_std_20)
-target_compile_options(spawn_solvency PRIVATE ${IO_WARNING_FLAGS})
-
+# BL-1407: spawn_solvency (BL-635) is RETIRED with the corporation it measured
+# (the player IS its nation, whose treasury never runs into debt).
 # landscape_score_harness (BL-770 slice 1) is the same shape as spawn_solvency
 # above and is hand-declared for the same reason: it constructs a lua_state,
 # calls recipe_registry::load_from_lua, and PARSES scripts/world_gen.lua into a
@@ -1054,33 +1026,8 @@ target_link_libraries(throughput_field_census PRIVATE io_world_obj lua54)
 target_compile_features(throughput_field_census PRIVATE cxx_std_20)
 target_compile_options(throughput_field_census PRIVATE ${IO_WARNING_FLAGS})
 
-# acquisition_viability (BL-634) — live-Lua, and it was reaching the generic glob
-# loop below instead, which links io_world_obj alone. That target cannot compile
-# it at all: the harness includes scripting/lua_state.hpp, so it dies on
-# `fatal error C1083: Cannot open include file: 'sol/sol.hpp'` before it ever gets
-# to a link. Declared here for the same reason spawn_solvency is, and its R0 row
-# says why in its own header: it LOADS AND PARSES the shipped scripts/world_gen.lua
-# into a world_gen_config, because the C++ fallback prices ten resources against
-# that table's forty-two and a sweep run on the fallback measures a world where a
-# third of the roster cannot be sold at all. So recipe_registry.cpp and
-# world_gen_config.cpp both come back. (contract_template.cpp used to come back
-# with them for run_nation_step's empty template registry; the mercenary contract
-# was torn out in cc88997c and took that TU with it.)
-add_executable(acquisition_viability
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/acquisition_viability.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
-)
-target_include_directories(acquisition_viability PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
-    "${sol2_src_SOURCE_DIR}/include"
-)
-target_link_libraries(acquisition_viability PRIVATE io_world_obj lua54)
-target_compile_features(acquisition_viability PRIVATE cxx_std_20)
-target_compile_options(acquisition_viability PRIVATE ${IO_WARNING_FLAGS})
-
+# BL-1407: acquisition_viability (BL-634) is RETIRED with the whole-firm buyout
+# (FINANCE.md § Whole-firm acquisition, retired).
 # demand_census (BL-649) is a FOURTH Lua-linked harness and was never declared
 # as one. It is the instrument Sprint 21 names for its own measurement - "per
 # resource, per band, who actually wants it" - and it calls lua_state,
@@ -1332,7 +1279,7 @@ set(IO_TEST_ARGS_nation_tech_harness --seeds 0) # BL-1273: fixture rows; the 16-
 # two of them for its determinism check. It is structurally long-running now,
 # not slow by accident, so it moves tier rather than having the check thinned.
 set(IO_TEST_LONG_HARNESSES
-    corp_terrain_matrix
+    # corp_terrain_matrix: RETIRED (BL-1407)
     era_world_harness
     econ_stability
     earthlike_lean_trace
@@ -1466,7 +1413,7 @@ set(IO_TEST_SWEEP_HARNESSES
     # never run is not the spawn the item is about. Deliberate run:
     #   $env:IO_RUN_SWEEPS=1; ctest --test-dir build -R spawn_solvency
     # or the exe directly, `spawn_solvency [seeds] [--fast]`.
-    spawn_solvency
+    # spawn_solvency: RETIRED (BL-1407)
 
     # Same cost, same reason, added 2026-08-21 (Sprint B3): settlement_density
     # generates a full world per seed with the shipped 400-year pre-epoch era —
@@ -1570,7 +1517,7 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # the whole point of the harness is that the magnitudes are the SHIPPED
     # ones — run from build/ it would measure a default registry and report a
     # spawn nobody plays.
-    spawn_solvency
+    # spawn_solvency: RETIRED (BL-1407)
     # ADDED 2026-09-16 (BL-982). Loads world_gen/works/recipes/economy and
     # docs/generation/seed_library.json by relative path; from build/ it finds
     # no seed library and FATALs.

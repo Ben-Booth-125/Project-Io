@@ -76,13 +76,11 @@ scene make_scene(const recipe_registry& reg, float steel_supply)
 
     s.corp = w.create_entity();
     {
-        corporation_component cc;
+        nation_component cc{};
         cc.name = "Builder Co";
-        cc.is_player = true; // exempt from the BL-079 agency so it can't interfere
-        cc.starting_capital = 10000.0f;
-        cc.balance = 10000.0f;
-        cc.assets.push_back(s.bld);
-        w.corporations[s.corp] = cc;
+        cc.treasury = 10000.0f;
+        cc.state_assets.push_back(s.bld);
+        w.nations[s.corp] = cc;
     }
     return s;
 }
@@ -111,7 +109,7 @@ int main()
     // --- Case A: AMPLE supply -> full rate (one whole tick of progress). ---
     {
         scene s = make_scene(reg, /*steel_supply=*/1000.0f);
-        const float bal0 = s.w.corporations[s.corp].balance;
+        const float bal0 = s.w.nations[s.corp].treasury;
         const economy_report rep = run_economy_step(s.w, reg);
         const building_component& b = s.w.buildings[s.bld];
         check(b.ticks_remaining == 2, "A: ample supply advances a whole tick (3 -> 2)",
@@ -122,7 +120,7 @@ int main()
             ? rep.purchases.at({s.corp, s.market})[ri(resource_type::steel)] : 0.0f;
         check(std::fabs(drawn - per_tick_need) < 1e-3f,
               "A: draws one tick of materials as market demand (pay-as-you-build)", drawn, per_tick_need);
-        const float spent = bal0 - s.w.corporations[s.corp].balance;
+        const float spent = bal0 - s.w.nations[s.corp].treasury;
         check(std::fabs(spent - 300.0f / 3.0f) < 1e-3f,
               "A: charges one tick of build_cost incrementally", spent, 100.0f);
     }
@@ -141,12 +139,12 @@ int main()
     // --- Case C: STARVED supply (below 1/max_stretch of need) -> paused. ---
     {
         scene s = make_scene(reg, /*steel_supply=*/per_tick_need * 0.05f); // < 1/10
-        const float bal0 = s.w.corporations[s.corp].balance;
+        const float bal0 = s.w.nations[s.corp].treasury;
         run_economy_step(s.w, reg);
         const building_component& b = s.w.buildings[s.bld];
         check(b.ticks_remaining == 3 && std::fabs(b.construction_progress) < 1e-4f,
               "C: starved build is paused (no progress)", b.construction_progress, 0.0f);
-        check(std::fabs(bal0 - s.w.corporations[s.corp].balance) < 1e-4f,
+        check(std::fabs(bal0 - s.w.nations[s.corp].treasury) < 1e-4f,
               "C: a paused build spends nothing", 0.0, 0.0);
     }
 
@@ -176,7 +174,7 @@ int main()
                                                resource_type::iron_ore);
         s.w.buildings.at(s.bld).ticks_remaining = ticks;
 
-        const float bal0 = s.w.corporations[s.corp].balance;
+        const float bal0 = s.w.nations[s.corp].treasury;
         float steel = 0.0f, capacity = 0.0f;
         for (int t = 0; t < 20 && s.w.buildings.at(s.bld).ticks_remaining > 0; ++t)
         {
@@ -187,7 +185,7 @@ int main()
                 capacity += it->second[cap];
             }
         }
-        const float cash = bal0 - s.w.corporations[s.corp].balance;
+        const float cash = bal0 - s.w.nations[s.corp].treasury;
         check(s.w.buildings.at(s.bld).ticks_remaining == 0, "D: the build completes", 0.0, 0.0);
         const float want_steel = 24.0f * static_cast<float>(ticks) / 3.0f;
         check(std::fabs(steel - want_steel) < 1e-2f,

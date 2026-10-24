@@ -114,9 +114,9 @@ int main(int argc, char** argv)
                 if (b.is_homeworld) { home = b.id; break; }
 
             std::set<entity_id> majors;
-            for (const auto& kv : w.corporations)
-                if (!kv.second.is_background && kv.second.home_nation != null_entity)
-                    majors.insert(kv.second.home_nation);
+            for (const auto& kv : w.nations) // BL-1407: majors are a saved fact (is_major)
+                if (kv.second.is_major)
+                    majors.insert(kv.first);
 
             struct row { int tiles; bool major; };
             std::vector<row> rows;

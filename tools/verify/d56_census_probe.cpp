@@ -59,12 +59,12 @@ void read(world& w, const recipe_registry& reg, const economy_report* rep, readi
     const std::size_t fuel = static_cast<std::size_t>(resource_type::refined_fuel);
     const std::size_t prop = static_cast<std::size_t>(resource_type::propellant);
     std::map<entity_id, entity_id> owner;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.nations)
     {
         ++R.corps;
-        if (!cc.is_background) ++R.specialists;
-        if (cc.is_player) ++R.players;
-        for (const entity_id a : cc.assets) owner.emplace(a, cid);
+        if (!(!cc.is_major)) ++R.specialists;
+        if (cid == w.player_entity) ++R.players; // BL-1407
+        for (const entity_id a : cc.state_assets) owner.emplace(a, cid);
     }
     for (const auto& [bid, b] : w.buildings)
     {
@@ -182,16 +182,16 @@ int main(int argc, char** argv)
             generate_background_firms(w, reg, static_cast<std::uint32_t>(s) ^ 0x8A21F00Du);
             const int second = assign_default_recipes(w, reg);
             int h = 0, ph = 0, np = 0;
-            for (const auto& [cid, cc] : w.corporations)
+            for (const auto& [cid, cc] : w.nations)
             {
-                if (cc.assets.empty()) { ++h; if (cc.is_player) ++ph; }
+                if (cc.state_assets.empty()) { ++h; if (cid == w.player_entity) ++ph; }
             }
             for (const auto& [bid, b] : w.buildings)
                 if (b.type == building_type::processing_facility) ++np;
             std::printf("raw seed %d: default pass unplaced %d then %d; corps %zu, holdless %d (player %d), "
-                        "processors %d\n", s, first, second, w.corporations.size(), h, ph, np);
+                        "processors %d\n", s, first, second, w.nations.size(), h, ph, np);
             tot_first += first; tot_second += second; holdless += h; player_holdless += ph;
-            corps += static_cast<int>(w.corporations.size()); procs += np;
+            corps += static_cast<int>(w.nations.size()); procs += np;
         }
         std::printf("RAW over %d seeds: unplaced %d (first pass) + %d (second); corps %d, holdless %d "
                     "(player %d); processors %d\n", raw_seeds, tot_first, tot_second, corps, holdless,

@@ -117,17 +117,15 @@ scenario make_scenario()
     s.tile_b = tile_at(s.w, s.body, 0, 3);
 
     s.corp = s.w.create_entity();
-    corporation_component cc;
-    cc.balance   = 10000.0f;
-    cc.is_player = true; // keep the strategic scorer out of this harness
+    nation_component cc{};
+    cc.treasury   = 10000.0f;
     s.anchor = s.w.create_entity();
     building_component b{};
     b.tile = s.tile_a;
     b.type = building_type::extraction_site;
     s.w.buildings[s.anchor] = b;
-    cc.assets.push_back(s.anchor);
-    cc.hq_building = s.anchor;
-    s.w.corporations[s.corp] = cc;
+    cc.state_assets.push_back(s.anchor);
+    s.w.nations[s.corp] = cc;
     s.w.player_entity = s.corp;
 
     // A supply anchor off the haul's column, so a shipment clears the
@@ -181,7 +179,7 @@ entity_id add_site(scenario& s, entity_id tile)
     b.type = building_type::processing_facility;
     b.ticks_remaining = 1;
     s.w.buildings[site] = b;
-    s.w.corporations.at(s.corp).assets.push_back(site);
+    s.w.nations.at(s.corp).state_assets.push_back(site);
     return site;
 }
 
@@ -234,7 +232,7 @@ int main()
         // lands, not whether it pays.
         b.workforce_auto = false;
         s.w.buildings[proc] = b;
-        s.w.corporations.at(s.corp).assets.push_back(proc);
+        s.w.nations.at(s.corp).state_assets.push_back(proc);
 
         const economy_report rep = run_economy_step(s.w, reg);
         float out = 0.0f;
@@ -366,7 +364,7 @@ int main()
             b.tile = tile_at(s.w, s.body, 1 + k, 3);
             b.type = building_type::extraction_site;
             s.w.buildings[b2] = b;
-            s.w.corporations.at(s.corp).assets.push_back(b2);
+            s.w.nations.at(s.corp).state_assets.push_back(b2);
         }
         std::array<float, resource_count> stock{};
         stock[r_iron] = 30.0f;
@@ -392,8 +390,8 @@ int main()
         scenario s = make_scenario();
         recipe_registry reg;
         const entity_id buyer = s.w.create_entity();
-        s.w.corporations[buyer] = corporation_component{};
-        s.w.corporations.at(buyer).balance = 1.0e6f;
+        s.w.nations[buyer] = nation_component{};
+        s.w.nations.at(buyer).treasury = 1.0e6f;
         s.w.markets.at(s.market_a).inventory[r_iron] = 10.0f; // the supplier's home shelf (HQ in A)
         s.w.markets.at(s.market_b).inventory[r_iron] = 50.0f; // another shelf on the body
 

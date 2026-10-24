@@ -180,8 +180,8 @@ int input_tier(world& w, const recipe_registry& reg, input_reach& ir, entity_id 
     if (mkt == null_entity) return 3;
     int best = 3;
     std::vector<entity_id> far;
-    const corporation_component* cc = nullptr;
-    if (auto it = w.corporations.find(corp); it != w.corporations.end()) cc = &it->second;
+    const nation_component* cc = nullptr; // BL-1407
+    if (auto it = w.nations.find(corp); it != w.nations.end()) cc = &it->second;
     for (const auto& [bid, b] : w.buildings)
     {
         if (bid == self || !building_produces(w, reg, b, r)) continue;
@@ -189,7 +189,7 @@ int input_tier(world& w, const recipe_registry& reg, input_reach& ir, entity_id 
         if (mp == null_entity) continue;
         if (mp == mkt)
         {
-            const bool mine = cc && std::find(cc->assets.begin(), cc->assets.end(), bid) != cc->assets.end();
+            const bool mine = cc && std::find(cc->state_assets.begin(), cc->state_assets.end(), bid) != cc->state_assets.end();
             best = std::min(best, mine ? 0 : 1);
         }
         else far.push_back(mp);
@@ -230,10 +230,10 @@ void run_seed(std::uint32_t seed, int play)
     {
         input_reach ir = make_input_reach(w, reg);
         std::vector<entity_id> cids;
-        for (const auto& [cid, cc] : w.corporations) if (!cc.is_background) cids.push_back(cid);
+        for (const auto& [cid, cc] : w.nations) if (!cc.is_major == false) cids.push_back(cid);
         std::sort(cids.begin(), cids.end());
         for (const entity_id cid : cids)
-            for (const entity_id a : w.corporations.at(cid).assets)
+            for (const entity_id a : w.nations.at(cid).state_assets)
             {
                 const auto bi = w.buildings.find(a);
                 if (bi == w.buildings.end() || bi->second.type != building_type::processing_facility) continue;
@@ -255,7 +255,7 @@ void run_seed(std::uint32_t seed, int play)
     }
     std::map<entity_id, float> bal_gen;
     std::map<entity_id, double> stock_gen;
-    for (const auto& [cid, cc] : w.corporations) { bal_gen[cid] = cc.balance; stock_gen[cid] = pool_units(w, cid); }
+    for (const auto& [cid, cc] : w.nations) { bal_gen[cid] = cc.treasury; stock_gen[cid] = pool_units(w, cid); }
 
     // --- the settle, every corp's per-building rows kept for the window ---
     std::vector<economy_report> settle_reps;
@@ -271,21 +271,21 @@ void run_seed(std::uint32_t seed, int play)
     const entity_id s = seat.seated;
     int rank = -1;
     for (std::size_t i = 0; i < seat.candidates.size(); ++i)
-        if (seat.candidates[i].corp == s) rank = static_cast<int>(i);
+        if (seat.candidates[i].nation == s) rank = static_cast<int>(i);
     std::printf("\n=== seed %u ===\n", seed);
     std::printf(" seat %llu (provisional generation pick %llu%s); drawn rank %d of %d specialists, shortlist %d%s; "
                 "first-ranked %llu%s\n",
                 (unsigned long long)s, (unsigned long long)provisional, provisional == s ? ", SAME" : "",
-                rank + 1, seat.specialist_count, seat.shortlist_size, seat.floor_unmet ? " FLOOR UNMET" : "",
-                seat.candidates.empty() ? 0ULL : (unsigned long long)seat.candidates.front().corp,
-                (!seat.candidates.empty() && seat.candidates.front().corp == s) ? " (= seat)" : "");
-    const auto cit = w.corporations.find(s);
-    if (cit == w.corporations.end()) { std::printf(" NO SEAT\n"); return; }
+                rank + 1, seat.major_count, seat.shortlist_size, seat.floor_unmet ? " FLOOR UNMET" : "",
+                seat.candidates.empty() ? 0ULL : (unsigned long long)seat.candidates.front().nation,
+                (!seat.candidates.empty() && seat.candidates.front().nation == s) ? " (= seat)" : "");
+    const auto cit = w.nations.find(s);
+    if (cit == w.nations.end()) { std::printf(" NO SEAT\n"); return; }
     {
-        const corporation_component& cc = cit->second;
+        const nation_component& cc = cit->second;
         std::printf(" \"%s\" focus %d; cash gen %.0f -> handoff %.0f (of which clean-slate refund %.1f); "
                     "pool units gen %.0f -> handoff %.0f\n",
-                    cc.name.c_str(), static_cast<int>(cc.focus), bal_gen[s], cc.balance,
+                    cc.name.c_str(), static_cast<int>(cc.focus), bal_gen[s], cc.treasury,
                     static_cast<double>(cc.refund_unbooked), stock_gen[s], pool_units(w, s));
         std::array<double, resource_count> by{};
         for (std::size_t r = 0; r < resource_count; ++r) by[r] = corp_shelf_stock(w, s, r); // BL-1265
@@ -313,7 +313,7 @@ void run_seed(std::uint32_t seed, int play)
     // --- holdings, and the reach of each processor input at the handoff ---
     std::vector<holding> hs;
     {
-        std::vector<entity_id> assets(cit->second.assets.begin(), cit->second.assets.end());
+        std::vector<entity_id> assets(cit->second.state_assets.begin(), cit->second.state_assets.end());
         std::sort(assets.begin(), assets.end());
         input_reach ir = make_input_reach(w, reg);
         for (const entity_id a : assets)
@@ -351,10 +351,10 @@ void run_seed(std::uint32_t seed, int play)
     // world — an attribution device only.
     if (g_drop_builds)
     {
-        corporation_component& sc = w.corporations.at(s);
+        nation_component& sc = w.nations.at(s);
         std::vector<entity_id> keep;
         int dropped = 0;
-        for (const entity_id a : sc.assets)
+        for (const entity_id a : sc.state_assets)
         {
             const auto bi = w.buildings.find(a);
             if (bi != w.buildings.end() && bi->second.ticks_remaining > 0)
@@ -366,7 +366,7 @@ void run_seed(std::uint32_t seed, int play)
             }
             keep.push_back(a);
         }
-        sc.assets = keep;
+        sc.state_assets = keep;
         invalidate_logistics_caches(w);
         std::printf("   COUNTERFACTUAL: dropped %d settle-started projects at the handoff\n", dropped);
     }
@@ -427,7 +427,7 @@ void run_seed(std::uint32_t seed, int play)
     }
 
     // --- flows ---
-    const corporation_component& cc = w.corporations.at(s);
+    const nation_component& cc = w.nations.at(s);
     const std::size_t n = cc.returns.size();
     const std::size_t total = static_cast<std::size_t>(k_settle_window + play);
     const std::size_t from = n > total ? n - total : 0;
@@ -474,7 +474,7 @@ void run_seed(std::uint32_t seed, int play)
                 "(inc %.1f exp %.1f maint %.1f wage %.1f levy %.1f upk %.1f) | cash %.0f -> %.0f\n",
                 seed, (unsigned long long)s, rank + 1, ns ? settle_sum / ns : 0.0, np ? play_sum / np : 0.0,
                 play_flow[0], play_flow[1], play_flow[2], play_flow[3], play_flow[4], play_flow[5],
-                bal_gen[s], cc.balance);
+                bal_gen[s], cc.treasury);
     std::fflush(stdout);
 }
 

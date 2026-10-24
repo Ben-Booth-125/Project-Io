@@ -124,8 +124,8 @@ fixture build(world& w, bool reverse_market_insert)
 
     f.c1 = w.create_entity();
     f.c2 = w.create_entity();
-    { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;  w.corporations[f.c1] = cc; }
-    { corporation_component cc; cc.balance = 10000.0f; cc.is_player = false; w.corporations[f.c2] = cc; }
+    { nation_component cc{}; cc.treasury = 10000.0f; w.nations[f.c1] = cc; }
+    { nation_component cc{}; cc.treasury = 10000.0f; w.nations[f.c2] = cc; }
 
     // BL-1265: goods LAND on a market and are sold at its clear (corporations
     // hold no pools). Landings by both corps, in two resources, across both

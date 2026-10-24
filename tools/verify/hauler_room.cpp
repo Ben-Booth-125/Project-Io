@@ -104,11 +104,11 @@ bool price_state_equal(const world& a, const world& b, std::string& where)
         if (std::memcmp(ma.supply.data(), mb.supply.data(), sizeof(ma.supply)) != 0) { where = "supply"; return false; }
         if (std::memcmp(ma.inventory.data(), mb.inventory.data(), sizeof(ma.inventory)) != 0) { where = "inventory"; return false; }
     }
-    for (const auto& [cid, ca] : a.corporations)
+    for (const auto& [cid, ca] : a.nations)
     {
-        const auto it = b.corporations.find(cid);
-        if (it == b.corporations.end()) { where = "corp set"; return false; }
-        if (std::memcmp(&ca.balance, &it->second.balance, sizeof(ca.balance)) != 0) { where = "balance"; return false; }
+        const auto it = b.nations.find(cid);
+        if (it == b.nations.end()) { where = "corp set"; return false; }
+        if (std::memcmp(&ca.treasury, &it->second.treasury, sizeof(ca.treasury)) != 0) { where = "balance"; return false; }
     }
     return true;
 }

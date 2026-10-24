@@ -82,7 +82,7 @@ draw order), and H5 that landform is still **not** a function of height. It also
 the tile assembly block in `tile_generation.cpp`.
 
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
-`history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
+`history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`,
 `trade_routes_harness`, **`nation_tech_harness`** (BL-1273: every nation's Digitisation tree
 state — accrual, the queue, the save seam, a 16-seed campaign run; BL-1324's rising prices
 in R5, and `--age 80 --age-only` runs R4, the 80-year per-decade pacing table; it replaced
@@ -150,57 +150,15 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\resource_chain_harness.cpp ^
 :: accumulator it tested is gone; research institutes feed the nation's pool,
 :: covered by nation_tech_harness — `node tools/verify/build_harness.js nation_tech_harness`.)
 
-:: Laws MVP (BL-343, reshaped by BL-480) — the law record, per-tick resolution
-:: (evaluate_laws) and the enforcement seam in apply_budget: a repealed law is
-:: inert, an enacted levy charges exactly rate x in-jurisdiction units on its
-:: own `levies` line, no other flow moves, repeal is bit-identical reversal,
-:: scoping/stacking/conditions work, processing output is never levied. Since
-:: BL-480 the fixture owns a nation (laws carry an author; jurisdiction bounds
-:: the levy) and the seed ships ENACTED by the player's home nation.
-cl /nologo /std:c++20 /EHsc /I src tools\verify\law_harness.cpp ^
-   src\world\world.cpp src\world\budget_system.cpp src\world\law.cpp ^
-   src\world\condition_set.cpp src\world\unit_roster.cpp ^
-   /Fo:build_gen\verify\law_harness\ /Fe:build_gen\verify\law_harness.exe
-.\build_gen\verify\law_harness.exe
+:: (law_harness, law_author_harness and procurement_harness retired with BL-1407:
+:: the levy on a corporation and the procurement contract between firms went with
+:: the corporation. The import tariff, the one surviving law effect, is covered by
+:: money_conservation below.)
 
-:: Law author + treasury transfer (BL-480, group "law-author-and-treasury") —
-:: the levy is a TRANSFER: sum debited from in-jurisdiction corps == sum
-:: credited to the enacting nation's treasury, bit-exact over a tick span (R1);
-:: out-of-jurisdiction corps (foreign territory, unclaimed tiles) pay zero;
-:: repeal returns the arithmetic bit-identical to the never-enacted baseline
-:: (R2); a no-enactment world is bit-identical to a no-law world; author choice
-:: is deterministic (player home nation, else largest territory/lowest id, else
-:: no law) and an authorless record is inert. R3's live half (read-only ledger
-:: line) is a UI check outside this harness.
-cl /nologo /std:c++20 /EHsc /I src tools\verify\law_author_harness.cpp ^
-   src\world\world.cpp src\world\budget_system.cpp src\world\law.cpp ^
-   src\world\condition_set.cpp src\world\unit_roster.cpp ^
-   /Fo:build_gen\verify\law_author_harness\ /Fe:build_gen\verify\law_author_harness.exe
-.\build_gen\verify\law_author_harness.exe
-
-:: Procurement/contract seam (BL-350) — one contract quoted, accepted, paced
-:: and delivered end to end with the treasury debited in the split shape
-:: (deposit at accept, remainder paced across lead time), plus one decline
-:: observed for each of the four refusal conditions (capacity, input access,
-:: embargo, reputation), plus cancellation forfeiting the deposit and moving
-:: reputation down.
-cl /nologo /std:c++20 /EHsc /I src tools\verify\procurement_harness.cpp ^
-   src\world\world.cpp src\world\economy_system.cpp ^
-   src\world\market_clearing.cpp src\world\budget_system.cpp ^
-   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
-   src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
-   src\world\unit_roster.cpp ^
-   /Fo:build_gen\verify\procurement_harness\ /Fe:build_gen\verify\procurement_harness.exe
-.\build_gen\verify\procurement_harness.exe
-
-:: BL-392 (procurement contracts destroy value) + the Sprint D4 import tariff.
-:: Money and goods conservation across BOTH flows: every credit a contract
-:: debits from the buyer arrives at the supplier (deposit, instalments and
-:: freight alike), and every credit the tariff debits arrives in the enacting
-:: nation's treasury. Also re-measures the round-trip economics the item was
-:: filed on (the -0.14-credit 20-unit iron round trip), asserts the lead time
-:: now tracks the SUPPLIER's throughput, and asserts that with no tariff law
-:: enacted the world is bit-identical to a control carrying no law record.
+:: The Sprint D4 import tariff (BL-1407: BL-392's procurement half retired with
+:: the corporation). Every credit the tariff debits from the shipping nation
+:: arrives in the enacting nation's treasury, and with no tariff law enacted
+:: the world is bit-identical to a control carrying no law record.
 ::
 :: NOTE ON WHAT IT DOES *NOT* CLAIM: the wider economy is not a closed system —
 :: the market is a buyer of last resort and pays sellers with nobody's money —

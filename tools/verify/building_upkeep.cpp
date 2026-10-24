@@ -119,14 +119,12 @@ struct fixture
         w.bodies[body].name = "Anvil";
 
         corp = w.create_entity();
-        corporation_component cc;
+        nation_component cc{};
         cc.name             = "Test Holdings";
-        cc.starting_capital = 1000.0f;
-        cc.balance          = 1000.0f;
+        cc.treasury          = 1000.0f;
         // Excluded from the AI tier for the same reason econ_harness excludes its
         // corps: this fixture pins ONE pass's arithmetic, and a scorer rewriting a
         // workforce dial mid-run would measure something else.
-        cc.is_player = true;
 
         for (int i = 0; i < n_buildings; ++i)
         {
@@ -142,9 +140,9 @@ struct fixture
             bc.workforce_assigned = 0.5f;
             w.buildings[b] = bc;
             buildings.push_back(b);
-            cc.assets.push_back(b);
+            cc.state_assets.push_back(b);
         }
-        w.corporations[corp] = cc;
+        w.nations[corp] = cc;
     }
 
     /// BL-1265 (MARKETS.md § The shelf economy): corporations hold no pools; a
@@ -322,7 +320,7 @@ void r1_the_draw_and_its_order()
         bc2.tile = tile2;
         bc2.type = building_type::extraction_site;
         f.w.buildings[b2] = bc2;
-        f.w.corporations.at(f.corp).assets.push_back(b2);
+        f.w.nations.at(f.corp).state_assets.push_back(b2);
 
         f.pool().quantities[ri(resource_type::tools)] = 10.0f;
         f.pool_on(body2).quantities[ri(resource_type::tools)] = 10.0f;
@@ -432,7 +430,7 @@ void r2_the_shortfall_rule()
     check(f.w.buildings.at(b).workforce_target == 100
               && f.w.buildings.at(b).workforce_assigned > 0.0f,
           "R2 ... and is not idled (its dials are untouched)");
-    check(f.w.corporations.at(f.corp).assets.size() == 1,
+    check(f.w.nations.at(f.corp).state_assets.size() == 1,
           "R2 ... and is still on its owner's books");
 
     // WHAT "RUNS BADLY" MEANS: the output scalar, which is the reader of the
@@ -936,9 +934,9 @@ void r10_a_shelf_draw_pays_the_posted_price()
         f.build(1, building_type::extraction_site);
         const entity_id mid = add_market(f, good, base, posted, shelf);
         const entity_id seller = f.w.create_entity();
-        corporation_component sc;
+        nation_component sc{};
         sc.name = "Seller";
-        f.w.corporations[seller] = sc;
+        f.w.nations[seller] = sc;
         f.w.land_goods(seller, mid, ri(good), 20.0f); // BL-1265: a landing the clear lists
         recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
@@ -1008,11 +1006,9 @@ struct grid_fixture
                 w.provinces.tile_province[t] = p.id;
 
         corp = w.create_entity();
-        corporation_component cc;
+        nation_component cc{};
         cc.name = "Wire Holdings";
-        cc.starting_capital = 1000.0f;
-        cc.balance = 1000.0f;
-        cc.is_player = true;
+        cc.treasury = 1000.0f;
         for (const int x : at)
         {
             const entity_id bid = w.create_entity();
@@ -1022,9 +1018,9 @@ struct grid_fixture
             bc.workforce_assigned = 0.5f;
             w.buildings[bid] = bc;
             buildings.push_back(bid);
-            cc.assets.push_back(bid);
+            cc.state_assets.push_back(bid);
         }
-        w.corporations[corp] = cc;
+        w.nations[corp] = cc;
 
         auto market = [&](entity_id centre, float price) {
             const entity_id mid = w.create_entity();
@@ -1150,9 +1146,9 @@ void r11_the_province_is_the_grid_cell()
             f.w.population_centre_tile[f.w.create_entity()] = f.tiles.front();
             f.w.population_centre_tile[f.w.create_entity()] = f.tiles.back();
             const entity_id seller = f.w.create_entity();
-            corporation_component sc;
+            nation_component sc{};
             sc.name = "Generator Co";
-            f.w.corporations[seller] = sc;
+            f.w.nations[seller] = sc;
             recipe_registry reg = power_registry(need);
             for (int i = 0; i < 60; ++i)
             {
@@ -1279,6 +1275,14 @@ void r11_the_province_is_the_grid_cell()
         // roaded tile, so (2,0)'s east side already stands at 1 and a Track there is
         // `already_road`. Road (2) is the strict upgrade that writes BOTH halves of the
         // crossing, which is what puts a road on (3,0).
+        // BL-1407: the builder is a NATION, and a nation lays road only on its own
+        // ground (placement_rules::can_place_road) — the retired corporation had
+        // no ground and was not asked. Give the fixture's nation the strip.
+        for (const entity_id t : f.tiles)
+        {
+            f.w.tile_to_nation[t] = f.corp;
+            f.w.nations.at(f.corp).tiles.push_back(t);
+        }
         const construction_result res = place_road(f.w, reg, f.corp, f.tiles[2], 2, 0);
         check(res == construction_result::placed, "R11f place_road placed a Road onto the second province's edge");
         check(f.grid_at(4) != 0 && f.grid_at(4) == f.grid_at(0),
@@ -1331,7 +1335,7 @@ entity_id add_plant(grid_fixture& f, int x, std::uint16_t recipe_id)
     bc.workforce_assigned = 0.5f;
     bc.workforce_target   = 100;
     f.w.buildings[bid]    = bc;
-    f.w.corporations.at(f.corp).assets.push_back(bid);
+    f.w.nations.at(f.corp).state_assets.push_back(bid);
     return bid;
 }
 } // namespace

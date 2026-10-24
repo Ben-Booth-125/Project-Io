@@ -83,10 +83,9 @@ world make_world()
 
     const entity_id corp = w.create_entity();
     {
-        corporation_component cc;
-        cc.balance   = 12345.5f;
-        cc.is_player = true;
-        w.corporations[corp] = cc;
+        nation_component cc{};
+        cc.treasury   = 12345.5f;
+        w.nations[corp] = cc;
     }
     // BL-1265: corporations hold no pools; the stock is on the market's shelf.
     (void)corp;

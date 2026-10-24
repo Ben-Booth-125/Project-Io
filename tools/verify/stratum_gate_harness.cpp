@@ -299,8 +299,8 @@ int main()
           reg.set_economics(building_type::university, uni); }
 
         const entity_id corp = f.w.create_entity();
-        corporation_component cc; cc.balance = 1000.0f;
-        f.w.corporations.emplace(corp, cc);
+        nation_component cc{}; cc.treasury = 1000.0f;
+        f.w.nations.emplace(corp, cc);
 
         entity_id built = null_entity;
         const construction_result on_town = construct_building(f.w, reg, corp, at(f, 3, 3),

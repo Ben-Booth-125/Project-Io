@@ -200,26 +200,23 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
     // the mundane industry that saturates the market. "The world contains corps
     // with processors" is true of the background firms almost by construction, so
     // counting them together would answer a question nobody asked.
-    std::vector<entity_id> specialists;
-    for (const auto& [id, cc] : w.corporations)
-        specialists.push_back(id);
-    std::sort(specialists.begin(), specialists.end());
-
+    // BL-1407: no corporation exists. The roster is the NATIONS' openings — the
+    // seat picks among majors, so "specialist" now reads is_major.
     // The landscape-search WINNER, as the app applies it — not the seed candidate
     // (BL-979; apply_shipped_landscape in harness_params.hpp). This also runs the
     // app's second assign_default_recipes pass, which the bare call here skipped.
     apply_shipped_landscape(w, reg, seed);
 
     std::vector<corp_row> rows;
-    for (const auto& [id, cc] : w.corporations)
+    for (const auto& [id, cc] : w.nations)
     {
         corp_row r;
         r.id        = id;
         r.name      = cc.name;
-        r.balance   = cc.balance;
-        r.is_player = (cc.is_player || id == w.player_entity);
-        r.specialist = std::binary_search(specialists.begin(), specialists.end(), id);
-        for (const entity_id bid : cc.assets)
+        r.balance   = cc.treasury;
+        r.is_player = (id == w.player_entity);
+        r.specialist = cc.is_major;
+        for (const entity_id bid : cc.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -556,12 +553,12 @@ void digest_at_seat(const app_start_world& out, const spawn_seat_result& res, wo
     fnv1a64 f;
     f.scalar(res.seated);
     f.flag(res.floor_unmet);
-    f.scalar(res.specialist_count);
+    f.scalar(res.major_count);
     f.scalar(res.shortlist_size);
     f.count(res.candidates.size());
     for (const spawn_seat_candidate& c : res.candidates)
     {
-        f.scalar(c.corp);
+        f.scalar(c.nation);
         f.scalar(c.landscape);
         f.scalar(c.holdings_scored);
         f.flag(c.shortlisted);
@@ -1937,10 +1934,9 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         }
         // BL-1044 — THE ONE-is_player INVARIANT (world.hpp), counted after the
         // seat. Other than exactly one fails the row in both modes.
-        int players = 0;
-        for (const auto& kv : start->w.corporations)
-            if (kv.second.is_player)
-                ++players;
+        // BL-1407: the player IS its nation; exactly one seat means player_entity
+        // names a nation.
+        int players = start->w.nations.count(start->w.player_entity) != 0 ? 1 : 0;
         // BL-1185 review: the roster as the landscape landed (specialists, and
         // background firms per body) — the firm-count reading the chain rule's
         // Pass 6 masking is judged by. Report only; no digest reads it.
@@ -1948,10 +1944,12 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
             std::map<entity_id, int> per_body;
             for (const entity_id f : start->land.firms)
             {
-                const auto cit = start->w.corporations.find(f);
-                if (cit == start->w.corporations.end())
+                // BL-1407: a charter closes at the fold, so a closed one counts
+                // under body 0 (it used to mean "exited during the settle").
+                const auto cit = start->w.gen_charters.find(f);
+                if (cit == start->w.gen_charters.end())
                 {
-                    ++per_body[null_entity];   // exited during the settle
+                    ++per_body[null_entity];
                     continue;
                 }
                 entity_id b = null_entity;   // the body of the firm's first holding
@@ -2359,11 +2357,14 @@ struct body_counts
 /// Corporations in the world and on its busiest body. A corporation's body is
 /// the body of its first holding's tile; one with no resolvable holding counts
 /// in the world total only.
+/// BL-1407: no corporation exists; this counts the generation-transient
+/// CHARTERS (world::gen_charters), which close at the fold — so a post-fold
+/// world reads zero, the honest reading of "how many firms are there".
 body_counts count_corporations(const world& w)
 {
     body_counts out;
     std::map<entity_id, std::pair<int, int>> by_body;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.gen_charters)
     {
         ++out.corps;
         if (cc.is_background)
@@ -2667,8 +2668,8 @@ void measure_stockpile_row(const world& w, const stockpile_budget& sb,
         cap.reserve(rep.specialists.size());
         for (const entity_id sid : rep.specialists)   // ascending id
         {
-            const auto it = w.corporations.find(sid);
-            if (it == w.corporations.end())
+            const auto it = w.gen_charters.find(sid);   // BL-1407: the charter record
+            if (it == w.gen_charters.end())
                 continue;
             cap.push_back(static_cast<double>(it->second.balance));
             if (!(it->second.balance > 0.0f))
@@ -2692,8 +2693,8 @@ void measure_stockpile_row(const world& w, const stockpile_budget& sb,
         {
             if (c.specialist || c.good == 0xFFFF)
                 continue;
-            const auto corp = w.corporations.find(c.corp);
-            if (corp == w.corporations.end())
+            const auto corp = w.gen_charters.find(c.corp);   // BL-1407: the charter record
+            if (corp == w.gen_charters.end())
                 continue;
             for (const entity_id bid : corp->second.assets)
             {
@@ -2911,8 +2912,11 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
     row.any_specialist = row.specialists > 0;
     {
         std::map<entity_id, int> by_nation;
-        for (const entity_id sid : run->land.specialists)
-            ++by_nation[w.corporations.at(sid).home_nation];
+        for (const entity_id sid : run->land.specialists)   // BL-1407: the charter record
+            if (const auto cit = w.gen_charters.find(sid); cit != w.gen_charters.end())
+                ++by_nation[cit->second.home_nation];
+            else
+                ++by_nation[null_entity];   // closed at the fold
         row.specialist_nations = static_cast<int>(by_nation.size());
         int most = 0;
         for (const auto& [nation, n] : by_nation)   // ascending id: a tie keeps the lower
@@ -3031,10 +3035,10 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         digest_at_seat(*run, res, row.dig);
     row.seated           = res.seated;
     row.floor_unmet      = res.floor_unmet;
-    row.seat_specialists = res.specialist_count;
+    row.seat_specialists = res.major_count;
     row.shortlist        = res.shortlist_size;
     for (const spawn_seat_candidate& c : res.candidates)
-        if (c.corp == res.seated)
+        if (c.nation == res.seated)
         {
             row.seat_found   = true;
             row.seat_balance = c.balance;
@@ -3042,8 +3046,8 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         }
     for (const entity_id sid : row.budget_specialists)
     {
-        const auto it = run->w.corporations.find(sid);
-        if (it == run->w.corporations.end())
+        const auto it = run->w.gen_charters.find(sid);   // BL-1407: closed at the fold
+        if (it == run->w.gen_charters.end())
             continue;
         ++row.specialists_at_seat;
         if (it->second.balance > 0.0f)   // spawn_seat_candidate's `solvent`
@@ -4783,26 +4787,26 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
             const auto start = std::make_unique<app_start_world>();
             const spawn_seat_result res = build_and_seat(lua, r.seed, fast, *start);
             const world& w = start->w;
-            for (const auto& kv : w.corporations)
-                if (kv.second.is_player)
-                    ++r.players;
+            // BL-1407: the player IS its nation — one seat means player_entity names one.
+            if (w.nations.count(w.player_entity) != 0)
+                ++r.players;
 
             r.seated      = res.seated;
             r.floor_unmet = res.floor_unmet;
-            r.specialists = res.specialist_count;
+            r.specialists = res.major_count;
             r.shortlisted = res.shortlist_size;
 
-            if (const auto cit = w.corporations.find(res.seated); cit != w.corporations.end())
+            if (const auto cit = w.nations.find(res.seated); cit != w.nations.end())
             {
                 seat_name = cit->second.name;
-                r.seated_is_specialist = !cit->second.is_background;
-                r.seat_balance         = cit->second.balance;
+                r.seated_is_specialist = cit->second.is_major;   // a seat is a major
+                r.seat_balance         = cit->second.treasury;
             }
 
             bool first = true;
             for (const spawn_seat_candidate& c : res.candidates)
             {
-                if (c.corp == res.seated)
+                if (c.nation == res.seated)
                 {
                     r.seat_processor = c.has_processor;
                     r.seat_pop_share = c.population_share;
@@ -4842,7 +4846,7 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
                 // drifted between two builds would move the shortlist silently.
                 bool same_rank = res2.candidates.size() == res.candidates.size();
                 for (std::size_t k = 0; same_rank && k < res.candidates.size(); ++k)
-                    same_rank = res2.candidates[k].corp == res.candidates[k].corp
+                    same_rank = res2.candidates[k].nation == res.candidates[k].nation
                              && res2.candidates[k].landscape == res.candidates[k].landscape;
                 r.reproduced = (res2.seated == res.seated)
                             && (res2.shortlist_size == res.shortlist_size)
@@ -4856,7 +4860,7 @@ int run_seat(const std::vector<uint32_t>& seeds, lua_state& lua, bool fast,
             std::printf("      rank:");
             for (const spawn_seat_candidate& c : res.candidates)
                 std::printf(" %.4f%s", c.landscape,
-                            c.corp == res.seated ? "*" : (c.shortlisted ? "" : "x"));
+                            c.nation == res.seated ? "*" : (c.shortlisted ? "" : "x"));
             std::printf("\n");
         }
         catch (const std::exception& e)
@@ -5721,14 +5725,14 @@ int main(int argc, char** argv)
             apply_shipped_landscape(w, reg, r.seed);
 
             const entity_id corp = w.player_entity;
-            const auto      cit  = w.corporations.find(corp);
-            if (cit == w.corporations.end())
+            const auto      cit  = w.nations.find(corp);   // BL-1407: the seat is a nation
+            if (cit == w.nations.end())
             {
                 r.threw = true;
             }
             else
             {
-                for (const entity_id bid : cit->second.assets)
+                for (const entity_id bid : cit->second.state_assets)
                 {
                     const auto bit = w.buildings.find(bid);
                     if (bit == w.buildings.end())
@@ -5740,14 +5744,14 @@ int main(int argc, char** argv)
                         default:                                 ++r.other;      break;
                     }
                 }
-                r.opening = cit->second.balance;
+                r.opening = cit->second.treasury;
                 for (int t = 1; t <= settle_ticks; ++t)
                 {
                     tick(w, reg, t);
-                    if (w.corporations[corp].balance < 0.0f)
+                    if (w.nations[corp].treasury < 0.0f)
                         r.went_negative = true;
                 }
-                r.final_bal = w.corporations[corp].balance;
+                r.final_bal = w.nations[corp].treasury;
             }
         }
         catch (const std::exception& e)

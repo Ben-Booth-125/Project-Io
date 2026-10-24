@@ -367,8 +367,8 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
             {
                 for (auto& [nid, nc] : bare.nations)
                     nc.state_assets.erase(std::remove(nc.state_assets.begin(), nc.state_assets.end(), it->first), nc.state_assets.end());
-                for (auto& [cid, cc] : bare.corporations)
-                    cc.assets.erase(std::remove(cc.assets.begin(), cc.assets.end(), it->first), cc.assets.end());
+                for (auto& [cid, cc] : bare.nations)
+                    cc.state_assets.erase(std::remove(cc.state_assets.begin(), cc.state_assets.end(), it->first), cc.state_assets.end());
                 bare.stockpiles.erase(it->first);
                 it = bare.buildings.erase(it);
             }
@@ -403,9 +403,9 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
                 if (ground != null_entity && is_major_nation(w, ground) && ground != owner)
                 { own_ok = false; why = "a major's ground carrying another's track"; }
             }
-            else if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+            else if (const auto cit = w.nations.find(owner); cit != w.nations.end())
             {
-                if (!cit->second.is_background) { own_ok = false; why = "a specialist owning track"; }
+                if (!(!cit->second.is_major)) { own_ok = false; why = "a specialist owning track"; }
             }
             else { own_ok = false; why = "an owner that is neither"; }
         }
@@ -488,7 +488,7 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         entity_id raider = null_entity;
         {
             std::vector<entity_id> ids;
-            for (const auto& [cid, cc] : c.corporations) ids.push_back(cid);
+            for (const auto& [cid, cc] : c.nations) ids.push_back(cid);
             std::sort(ids.begin(), ids.end());
             for (const entity_id cid : ids) if (cid != op) { raider = cid; break; }
         }

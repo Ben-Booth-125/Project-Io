@@ -473,11 +473,8 @@ proc_tally tally_processors(const world& w, const economy_report& rep, const rec
 double field_income(const world& w)
 {
     double s = 0.0;
-    for (const auto& [cid, cc] : w.corporations)
-    {
-        (void)cid;
-        if (!cc.returns.empty()) s += cc.returns.back().income;
-    }
+    // BL-1407: no corporation exists; the field's sales are the nations' (their
+    // returns carry the same figure, so only the ledger is read, never both).
     // BL-1402: a nation's buildings' sales this tick (the state pass's ledger),
     // in ascending nation id (std::map) so the double sum is fixed.
     for (const auto& [nid, led] : w.state_ledger)
@@ -854,8 +851,8 @@ void lg_snapshot(const world& w, lg_probe& p)
     const recipe_registry& reg = *p.reg;
     const float res_mult = reg.price_band().reservation_mult;
     std::map<entity_id, entity_id> owner;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id a : cc.assets) owner.emplace(a, cid);
+    for (const auto& [cid, cc] : w.nations) // BL-1407: every owner is a nation
+        for (const entity_id a : cc.state_assets) owner.emplace(a, cid);
     p.snap.clear();
     for (const entity_id bid : sorted_processors(w))
     {
@@ -1164,7 +1161,7 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     const recipe_registry& reg = start->reg;
     const clk::time_point t_built = clk::now();
     r.secs_build = std::chrono::duration<double>(t_built - t0).count();
-    if (w.corporations.empty()) { r.fail = "no corporations after the build"; return; }
+    if (w.nations.empty()) { r.fail = "no nations after the build"; return; } // BL-1407
     r.built = true;
 
     for (const auto& [bid, b] : w.buildings)
@@ -1180,11 +1177,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         ++r.proc_at_build;
         if (b.decommissioned) ++r.decom_at_build;
     }
-    for (const auto& [cid, cc] : w.corporations)
-    {
-        (void)cid;
-        if (cc.focus == industrial_focus::trade) ++r.trade_corps_at_build;
-    }
+    // BL-1407: no corporation (of any focus) exists at the handoff; the count reads 0.
+    r.trade_corps_at_build = 0;
     last_row_map last_row;
     settle_starve_map settle_starve_rows;
     lg_probe slg; // L over the settle (G1b's window): the play row's reader, every settle tick
@@ -1344,28 +1338,25 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             ++r.t_marketplaces_handoff;
     if (r.g1_handoff.total() == 0) r.fail = "zero processors at the handoff";
     if (r.inc_close <= 0.0 && r.fail.empty()) r.fail = "zero field income at the settle close";
-    if (r.seat == null_entity && r.fail.empty()) r.fail = "no corporation seated";
+    if (r.seat == null_entity && r.fail.empty()) r.fail = "no nation seated";
 
     std::set<entity_id> cohort;
-    const bool folded_cohort = world_is_folded(w); // BL-1402: buildings, not firms
-    if (folded_cohort)
-        for (const auto& [bid, b] : w.buildings) { (void)b; cohort.insert(bid); }
-    else
-        for (const auto& [cid, cc] : w.corporations) { (void)cc; cohort.insert(cid); }
+    const bool folded_cohort = true; // BL-1402 / BL-1407: buildings, not firms
+    for (const auto& [bid, b] : w.buildings) { (void)b; cohort.insert(bid); }
     r.firms_handoff = static_cast<int>(cohort.size());
     const std::map<entity_id, int> heads0 = centre_heads(w);
     r.centres_handoff = static_cast<int>(heads0.size());
     for (const auto& [cid, h] : heads0) { (void)cid; r.heads_handoff += h; }
 
     // --- G4: the seat's last 8 settle quarters and its processors ---
-    if (const auto it = w.corporations.find(r.seat); it != w.corporations.end())
+    if (const auto it = w.nations.find(r.seat); it != w.nations.end()) // BL-1407: the seat is a nation
     {
-        const corporation_component& sc = it->second;
+        const nation_component& sc = it->second;
         r.seat_name = sc.name;
         const std::size_t n = sc.returns.size();
         const std::size_t from = n > static_cast<std::size_t>(k_seat_settle_window) ? n - k_seat_settle_window : 0;
         for (std::size_t i = from; i < n; ++i) r.seat_opnet.push_back(operating_net(sc.returns[i]));
-        std::vector<entity_id> assets(sc.assets.begin(), sc.assets.end());
+        std::vector<entity_id> assets(sc.state_assets.begin(), sc.state_assets.end());
         std::sort(assets.begin(), assets.end());
         for (const entity_id a : assets)
         {
@@ -1535,8 +1526,9 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         else if (rec.gone) ++r.g5_removed;
     }
     for (const entity_id c : cohort)
-        if (folded_cohort ? w.buildings.count(c) != 0 : w.corporations.count(c) != 0) ++r.firms_survived;
-    r.firms_end = static_cast<int>(folded_cohort ? w.buildings.size() : w.corporations.size());
+        if (w.buildings.count(c) != 0) ++r.firms_survived; // BL-1407: buildings
+    r.firms_end = static_cast<int>(w.buildings.size());
+    (void)folded_cohort;
     {
         const std::map<entity_id, int> heads1 = centre_heads(w);
         r.centres_end = static_cast<int>(heads1.size());

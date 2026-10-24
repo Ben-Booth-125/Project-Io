@@ -92,11 +92,11 @@ std::string fingerprint(const world& w)
     o.precision(9);
 
     std::vector<entity_id> corp_ids;
-    for (const auto& kv : w.corporations) corp_ids.push_back(kv.first);
+    for (const auto& kv : w.nations) corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
     for (const entity_id id : corp_ids)
-        o << "C" << id << ':' << w.corporations.at(id).balance << ':'
-          << w.corporations.at(id).trade_reserve << ';';
+        o << "C" << id << ':' << w.nations.at(id).treasury << ':'
+          << w.nations.at(id).trade_reserve << ';';
 
     for (const standing_trade& t : w.trades) // placement order: the spending order
         o << "X" << t.id << ':' << t.owner << ':' << static_cast<int>(t.resource) << ':'
@@ -181,17 +181,16 @@ entity_id tile_at(world& w, entity_id body, int c, int r)
 entity_id add_trader(scenario& s, float balance)
 {
     const entity_id c = s.w.create_entity();
-    corporation_component cc;
-    cc.balance   = balance;
-    cc.is_player = true; // keep the BL-202 strategic tier out of this harness
+    nation_component cc{};
+    cc.treasury   = balance;
     const entity_id mp = s.w.create_entity();
     building_component b{};
     b.tile               = tile_at(s.w, s.body, 20, 0);
     b.type               = building_type::planetary_marketplace;
     b.workforce_assigned = 1.0f;
     s.w.buildings[mp] = b;
-    cc.assets.push_back(mp);
-    s.w.corporations[c] = cc;
+    cc.state_assets.push_back(mp);
+    s.w.nations[c] = cc;
     return c;
 }
 
@@ -365,7 +364,7 @@ int main()
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario(100.0f);
-        const float bal_before = s.w.corporations.at(s.corp).balance;
+        const float bal_before = s.w.nations.at(s.corp).treasury;
 
         const corp_command_result r = apply_corp_command(s.w, reg, trade_cmd(s, 1.0f));
         check(r == corp_command_result::applied, "R0.1 set_trade applies through the seam");
@@ -391,7 +390,7 @@ int main()
             check(c.mode == convoy_mode::land && !c.held && !c.arrived,
                   "R0.9 an all-plains intra-body lane is land mode, moving, not held");
             check(c.cost_paid > 0.0f &&
-                  std::fabs((bal_before - s.w.corporations.at(s.corp).balance) - c.cost_paid) < 1e-4f,
+                  std::fabs((bal_before - s.w.nations.at(s.corp).treasury) - c.cost_paid) < 1e-4f,
                   "R0.10 the haul cost is recorded on the convoy and debited from the balance "
                   "(the purchase is billed at the clear)");
             // A* down a 4-tall plains column = 3 edges = 3.0; land unit cost 0.02.
@@ -651,8 +650,8 @@ int main()
                   "R4.3 IDENTICAL SPEED: the same lane takes the same number of ticks");
             check(ac.mode == pc.mode && ac.cargo_qty == pc.cargo_qty,
                   "R4.4 IDENTICAL MODE and cargo");
-            check(std::fabs((1000.0f - a.w.corporations.at(a.corp).balance) -
-                            (1000.0f - p.w.corporations.at(p.corp).balance)) < 1e-6f,
+            check(std::fabs((1000.0f - a.w.nations.at(a.corp).treasury) -
+                            (1000.0f - p.w.nations.at(p.corp).treasury)) < 1e-6f,
                   "R4.5 both corps are debited the same amount");
         }
     }

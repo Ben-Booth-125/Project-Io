@@ -376,8 +376,8 @@ void after_lap(const world& w, int lap, void* ctx)
 std::map<entity_id, entity_id> owner_map(const world& w)
 {
     std::map<entity_id, entity_id> owner;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id a : cc.assets) owner.emplace(a, cid);
+    for (const auto& [cid, cc] : w.nations)
+        for (const entity_id a : cc.state_assets) owner.emplace(a, cid);
     return owner;
 }
 
@@ -454,7 +454,7 @@ void run_seed(std::uint32_t seed, seed_out& out)
     catch (const std::exception& e) { out.fail = std::string("world build threw: ") + e.what(); return; }
     world& w = start->w;
     const recipe_registry& reg = start->reg;
-    if (w.corporations.empty()) { out.fail = "no corporations"; return; }
+    if (w.nations.empty()) { out.fail = "no corporations"; return; }
 
     probe p;
     p.reg = &reg;
@@ -743,9 +743,9 @@ void run_seed(std::uint32_t seed, seed_out& out)
                 if (sb.ticks_remaining <= 0 || market_for_tile(w, sb.tile) != mid) continue;
                 if (!(reg.resource_build_cost_for(sb.type, sb.target_resource, sb.recipe)[g] > 0.0f)) continue;
                 const auto so = owner_end.find(sid);
-                const auto sc = so != owner_end.end() ? w.corporations.find(so->second) : w.corporations.end();
-                const char* who = sc == w.corporations.end() ? "noowner"
-                                : sc->second.is_player ? "player" : sc->second.is_background ? "background" : "rival";
+                const auto sc = so != owner_end.end() ? w.nations.find(so->second) : w.nations.end();
+                const char* who = sc == w.nations.end() ? "noowner"
+                                : sc->first == w.player_entity ? "player" : sc->second.is_major == false ? "background" : "rival";
                 std::string what = sb.type == building_type::processing_facility
                                  ? (reg.get_recipe(sb.recipe) ? "proc." + reg.get_recipe(sb.recipe)->name : std::string("proc.?"))
                                  : sb.type == building_type::extraction_site ? "ext." + gname(static_cast<std::size_t>(sb.target_resource))

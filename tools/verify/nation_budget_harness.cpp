@@ -171,10 +171,10 @@ entity_id add_nation(world& w, const char* name, float treasury)
 entity_id add_corp(world& w, const char* name, float balance)
 {
     const entity_id c = w.create_entity();
-    corporation_component cc{};
+    nation_component cc{};
     cc.name    = name;
-    cc.balance = balance;
-    w.corporations[c] = cc;
+    cc.treasury = balance;
+    w.nations[c] = cc;
     return c;
 }
 
@@ -218,8 +218,8 @@ constexpr float k_paid_per_tick  = 487.5f;
 float world_credit(const world& w)
 {
     std::map<entity_id, float> ordered;
-    for (const auto& [id, cc] : w.corporations)
-        ordered[id] = cc.balance;
+    for (const auto& [id, cc] : w.nations)
+        ordered[id] = cc.treasury;
     for (const auto& [id, nc] : w.nations)
         ordered[id] = nc.treasury;
     float total = 0.0f;
@@ -232,8 +232,8 @@ float world_credit(const world& w)
 std::map<entity_id, float> snapshot(const world& w)
 {
     std::map<entity_id, float> s;
-    for (const auto& [id, cc] : w.corporations)
-        s[id] = cc.balance;
+    for (const auto& [id, cc] : w.nations)
+        s[id] = cc.treasury;
     for (const auto& [id, nc] : w.nations)
         s[id] = nc.treasury;
     return s;
@@ -245,8 +245,8 @@ std::map<entity_id, float> snapshot(const world& w)
 double world_credit_exact(const world& w)
 {
     std::map<entity_id, double> ordered;
-    for (const auto& [id, cc] : w.corporations)
-        ordered[id] = static_cast<double>(cc.balance);
+    for (const auto& [id, cc] : w.nations)
+        ordered[id] = static_cast<double>(cc.treasury);
     for (const auto& [id, nc] : w.nations)
         ordered[id] = static_cast<double>(nc.treasury);
     double total = 0.0;
@@ -375,8 +375,8 @@ int main()
               "R1a shares are spendable x normalised weight (750 -> 375 / 187.5 "
               "/ 187.5)");
 
-        check(same(f.w.corporations.at(f.corp_1).balance, k_corp1_per_tick) &&
-              same(f.w.corporations.at(f.corp_2).balance, k_corp2_per_tick),
+        check(same(f.w.nations.at(f.corp_1).treasury, k_corp1_per_tick) &&
+              same(f.w.nations.at(f.corp_2).treasury, k_corp2_per_tick),
               "R1b each NAMED corporation is credited exactly its claims "
               "(corp_1 275, corp_2 212.5) - direct, not via the market");
 
@@ -417,8 +417,8 @@ int main()
               "R1f every tick of an 8-tick span pays the same exact total");
         check(conserved,
               "R1g ...and world credit is conserved bit-exactly on every one");
-        check(same(f.w.corporations.at(f.corp_1).balance, k_corp1_per_tick * 8.0f) &&
-              same(f.w.corporations.at(f.corp_2).balance, k_corp2_per_tick * 8.0f),
+        check(same(f.w.nations.at(f.corp_1).treasury, k_corp1_per_tick * 8.0f) &&
+              same(f.w.nations.at(f.corp_2).treasury, k_corp2_per_tick * 8.0f),
               "R1h ...and the span totals are the arithmetic totals "
               "(2200 and 1700)");
     }
@@ -470,8 +470,8 @@ int main()
 
         // ...and the credits are that same total. Corp balances start at zero, so
         // each credit lands exactly and the world total is bit-exact too.
-        check(same(f.w.corporations.at(f.corp_1).balance +
-                   f.w.corporations.at(f.corp_2).balance, a ? a->paid : -1.0f),
+        check(same(f.w.nations.at(f.corp_1).treasury +
+                   f.w.nations.at(f.corp_2).treasury, a ? a->paid : -1.0f),
               "R1m ...and lands, to the bit, on the named corporations");
 
         check(same(f.w.nations.at(f.nation_b).treasury, 777.77f),
@@ -494,16 +494,16 @@ int main()
             for (int i = 0; i < ticks; ++i)
             {
                 if (sweep)
-                    for (auto& [id, cc] : f.w.corporations)
-                        cc.balance = 0.0f;
+                    for (auto& [id, cc] : f.w.nations)
+                        cc.treasury = 0.0f;
                 f.w.nations[f.nation_a].treasury = 1234.56f; // this tick's income
                 const double c0 = world_credit_exact(f.w);
                 const auto   t  = run(f);
                 cum   += world_credit_exact(f.w) - c0;
                 moved += static_cast<double>(t.total_transferred);
                 credits += static_cast<int>(f.claims.size());
-                for (const auto& [id, cc] : f.w.corporations)
-                    peak_balance = std::max(peak_balance, cc.balance);
+                for (const auto& [id, cc] : f.w.nations)
+                    peak_balance = std::max(peak_balance, cc.treasury);
             }
         };
 
@@ -521,7 +521,7 @@ int main()
 
         // The accumulating span WILL drift, and that is not a defect: adding ~540
         // to a balance of ~34000 rounds, exactly as `apply_budget`'s
-        // `cc.balance += delta` has always rounded. The bound is therefore the
+        // `cc.treasury += delta` has always rounded. The bound is therefore the
         // DESTINATIONS' OWN rounding budget - half a ULP of the largest balance,
         // once per credit applied - and not a magic epsilon. A leak proportional
         // to throughput would be four orders above it.
@@ -681,9 +681,9 @@ int main()
         const auto  qt = run(q);
         const auto* qr = result_for(qt, q.nation_a);
         float credited = 0.0f;
-        for (const auto& [id, cc] : std::map<entity_id, corporation_component>(
-                 q.w.corporations.begin(), q.w.corporations.end()))
-            credited += cc.balance;
+        for (const auto& [id, cc] : std::map<entity_id, nation_component>( // BL-1407
+                 q.w.nations.begin(), q.w.nations.end()))
+            if (id != q.nation_a && id != q.nation_b) credited += cc.treasury; // the claimants only
         check(qr != nullptr && qr->paid > 0.0f &&
               same(q.w.nations.at(q.nation_a).treasury, 1000.0f - qr->paid) &&
               std::fabs(credited - qr->paid) <= 1e-6f,
@@ -730,7 +730,7 @@ int main()
         const auto kt = run(k);
         const auto* kr = result_for(kt, k.nation_a);
         check(kr != nullptr && same(kr->lines[k_charters].paid, 0.0f) &&
-              same(k.w.corporations.at(k.corp_1).balance, k_corp1_per_tick),
+              same(k.w.nations.at(k.corp_1).treasury, k_corp1_per_tick),
               "R4d a non-positive claim never becomes a credit");
 
         // A LINE OUTSIDE THE ENUM. `budget_priority` has a `uint8_t` underlying
@@ -750,7 +750,7 @@ int main()
         const auto pt = run(p);
         const auto* pr = result_for(pt, p.nation_a);
         check(pr != nullptr && same(pr->paid, k_paid_per_tick) &&
-              same(p.w.corporations.at(p.corp_1).balance, k_corp1_per_tick) &&
+              same(p.w.nations.at(p.corp_1).treasury, k_corp1_per_tick) &&
               same(p.w.nations.at(p.nation_a).treasury, 1000.0f - k_paid_per_tick),
               "R4f a claim naming a line outside the enum is dropped at gather "
               "time - the tick is bit-identical to the one without it");
@@ -889,7 +889,7 @@ int main()
         m.claims.push_back({m.nation_b, m.corp_1, budget_priority::charters, 400.0f});
         run(m);
         check(same(m.w.nations.at(m.nation_b).treasury, 1000.0f) &&
-              same(m.w.corporations.at(m.corp_1).balance, k_corp1_per_tick),
+              same(m.w.nations.at(m.corp_1).treasury, k_corp1_per_tick),
               "R4e a claim on a nation with no authored budget pays nothing");
     }
 
@@ -1035,8 +1035,8 @@ int main()
                   "R6f (3a) an earmarked claim above the line's remaining share "
                   "is SKIPPED WHOLE - 100 paid in full, 150 paid nothing rather "
                   "than 87.5; the line says so (skipped 1, rationed, fill 0.4)");
-            check(same(m.w.corporations.at(m.corp_2).balance, 112.5f) &&
-                  same(m.w.corporations.at(m.corp_1).balance, 175.0f) &&
+            check(same(m.w.nations.at(m.corp_2).treasury, 112.5f) &&
+                  same(m.w.nations.at(m.corp_1).treasury, 175.0f) &&
                   same(m.w.nations.at(m.nation_a).treasury, 1000.0f - 287.5f) &&
                   same(mr->paid, 287.5f),
                   "R6g ...the treasury is untouched by the skipped claim (pays "
@@ -1192,7 +1192,7 @@ int main()
                   "leaves the shelf and lands nowhere - the satellite launched");
             check(same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
                   s.f.claims.empty() && t.transfers.empty() &&
-                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  same(s.f.w.nations.at(s.f.corp_1).treasury, 0.0f) &&
                   world_credit_exact(s.f.w) == credit_before - 24.0,
                   "R7c ...the treasury pays the 24.0 directly (1024 -> 1000): no "
                   "claim, no transfer, no corporation paid - the money leaves "
@@ -1351,7 +1351,7 @@ int main()
             national_budget_tick t;
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
             settle_space_purchases(s.f.w, intents, t);
-            check(same(s.f.w.corporations.at(s.f.corp_2).balance, 0.0f) &&
+            check(same(s.f.w.nations.at(s.f.corp_2).treasury, 0.0f) &&
                   same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
                   intents.size() == 2 && intents[0].completed && intents[1].completed &&
                   world_credit_exact(s.f.w) == credit_before - 24.0,
@@ -1610,7 +1610,7 @@ int main()
             check(same(s.f.w.nations.at(s.f.nation_a).treasury, 960.0f) &&
                   s.f.claims.empty() && t.transfers.empty() &&
                   same(intents[0].paid, 32.0f) && same(intents[1].paid, 32.0f) &&
-                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  same(s.f.w.nations.at(s.f.corp_1).treasury, 0.0f) &&
                   world_credit_exact(s.f.w) == credit_before - 64.0,
                   "R9c ...the treasury pays the 64.0 directly (1024 -> 960): no "
                   "claim, no transfer, no corporation paid - exactly 64.0 leaves "
@@ -1689,7 +1689,7 @@ int main()
             run_national_budget(r.f.w, r.f.budgets, r.f.claims, &rt);
             settle_network_purchases(r.f.w, r_intents, rt);
             check(drained_ok &&
-                  same(r.f.w.corporations.at(r.f.corp_2).balance, 0.0f) &&
+                  same(r.f.w.nations.at(r.f.corp_2).treasury, 0.0f) &&
                   same(r.f.w.nations.at(r.f.nation_a).treasury, 960.0f) &&
                   r_intents.size() == 2 && r_intents[0].completed && r_intents[1].completed &&
                   world_credit_exact(r.f.w) == r_credit_before - 64.0,
@@ -1765,7 +1765,7 @@ int main()
                   same(mc.inventory[k_stone], 84.0f) &&
                   same(mc.inventory[k_timber], 92.0f) &&
                   same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 64.0f) &&
-                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  same(s.f.w.nations.at(s.f.corp_1).treasury, 0.0f) &&
                   s.f.claims.empty(),
                   "R9k (BL-742) a stocked shelf: the purchase comes off market "
                   "inventory - treasury debited directly, inventory drawn, no "

@@ -58,8 +58,7 @@ int main()
         { building_component b{}; b.tile = tile; b.type = building_type::processing_facility;
           b.workforce_assigned = 0.5f; b.recipe = steel_id; w.buildings[bld] = b; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;
-          cc.assets.push_back(bld); w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 10000.0f;          cc.state_assets.push_back(bld); w.nations[corp] = cc; }
         // No pool seeded either — zero available from any source.
 
         const economy_report rep = run_economy_step(w, reg);
@@ -86,8 +85,7 @@ int main()
         { building_component b{}; b.tile = tile; b.type = building_type::processing_facility;
           b.workforce_assigned = 0.5f; b.recipe = steel_id; w.buildings[bld] = b; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;
-          cc.assets.push_back(bld); w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 10000.0f;          cc.state_assets.push_back(bld); w.nations[corp] = cc; }
 
         const economy_report rep = run_economy_step(w, reg);
         float out = 0.0f; bool idle = true;
@@ -121,8 +119,7 @@ int main()
         { building_component b{}; b.tile = tile; b.type = building_type::processing_facility;
           b.workforce_assigned = 0.5f; b.recipe = steel_id; w.buildings[bld] = b; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;
-          cc.assets.push_back(bld); w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 10000.0f;          cc.state_assets.push_back(bld); w.nations[corp] = cc; }
 
         const economy_report rep = run_economy_step(w, reg);
         float out = 0.0f; bool idle = true;
@@ -147,7 +144,7 @@ int main()
         { market_component mc; mc.body = body; mc.base_price[ri(resource_type::steel)] = 8.0f;
           mc.price = mc.base_price; w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 1000.0f; cc.is_player = true; w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 1000.0f; w.nations[corp] = cc; }
         w.land_goods(corp, market, ri(resource_type::steel), 50.0f); // 50 steel landed this tick
 
         const economy_report rep = run_economy_step(w, reg);
@@ -178,11 +175,11 @@ int main()
           mc.inventory[ri(resource_type::steel)] = 5.0f; // half of what the build needs this tick.
           w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 10000.0f; w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 10000.0f; w.nations[corp] = cc; }
         const entity_id bld = w.create_entity();
         { building_component b{}; b.tile = tile; b.type = building_type::processing_facility;
           b.ticks_remaining = 1; b.construction_progress = 0.0f; w.buildings[bld] = b;
-          w.corporations[corp].assets.push_back(bld); }
+          w.nations[corp].state_assets.push_back(bld); }
 
         // run_construction is file-internal to economy_system.cpp; reached here
         // through the public run_economy_step entry point, whose first pass it is.
@@ -217,7 +214,7 @@ int main()
           mc.inventory[ri(resource_type::steel)]        = 1000.0f;
           w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 5000.0f; w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 5000.0f; w.nations[corp] = cc; }
 
         constexpr int n = 8;
         double income = 0.0, spend = 0.0;
@@ -238,7 +235,7 @@ int main()
         check(std::fabs(steel - want_steel) < 1e-3f * want_steel,
               "R7 a durable shelf with no buyer drains geometrically: 1000 x 0.98^8");
         check(food < steel, "R7 the perishable drains faster than the durable");
-        check(income == 0.0 && spend == 0.0 && w.corporations.at(corp).balance == 5000.0f,
+        check(income == 0.0 && spend == 0.0 && w.nations.at(corp).treasury == 5000.0f,
               "R7 nobody is charged: no flow, and the corp's balance is untouched");
     }
 
@@ -257,7 +254,7 @@ int main()
           mc.base_price[ri(resource_type::food_rations)] = 13.6f; mc.price = mc.base_price;
           mc.inventory[ri(resource_type::food_rations)] = 100.0f; w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 100.0f; w.corporations[corp] = cc; }
+        { nation_component cc{}; cc.treasury = 100.0f; w.nations[corp] = cc; }
         (void)corp;
         spoil_market_shelves(w, reg4);
         check(near(w.markets.at(market).inventory[ri(resource_type::food_rations)], 75.0f),

@@ -337,8 +337,8 @@ int main(int argc, char** argv)
             std::map<int, std::size_t> taken;
             for (const charter_record& c : charter_rep.charters)
             {
-                const auto cit = w.corporations.find(c.corp);
-                if (cit == w.corporations.end()) continue;
+                const auto cit = w.gen_charters.find(c.corp) /* BL-1407: the charter record */;
+                if (cit == w.gen_charters.end()) continue;
                 const int org = cit->second.origin_region;
                 const int far = (org >= 0 && static_cast<std::size_t>(org) < R.size()
                                  && reg_lm[static_cast<std::size_t>(org)] != heart) ? 1 : 0;
@@ -436,8 +436,8 @@ int main(int argc, char** argv)
         }
         // Firms and specialists by origin region.
         auto corp_region = [&](entity_id cid) -> int {
-            const auto c = w.corporations.find(cid);
-            if (c == w.corporations.end()) return -1;
+            const auto c = w.gen_charters.find(cid) /* BL-1407: the charter record; closed at the fold */;
+            if (c == w.gen_charters.end()) return -1;
             const int o = c->second.origin_region;
             return (o >= 0 && o < static_cast<int>(R.size())) ? o : -1;
         };
@@ -458,7 +458,7 @@ int main(int argc, char** argv)
         }
         for (const spawn_seat_candidate& c : seat.candidates)
         {
-            const int o = corp_region(c.corp);
+            const int o = corp_region(c.nation);
             if (o < 0) continue;
             ++LM[reg_lm[o]].seats;
             ++NAT[pol[o]].seats;
@@ -469,7 +469,7 @@ int main(int argc, char** argv)
             const int l = tile_lm(b.tile);
             if (l == -2) continue;
             ++LM[l].buildings;
-            const int o = corp_region(owner_corp_of(w, bid));
+            const int o = corp_region(owner_nation_of(w, bid));
             if (o >= 0) ++NAT[pol[o]].buildings;
         }
         for (const polity& q : fx.industrialisation_handoff.polities)

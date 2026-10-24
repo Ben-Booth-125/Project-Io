@@ -107,12 +107,11 @@ scene make_scene()
         w.buildings[bld] = b;
 
         const entity_id corp = w.create_entity();
-        corporation_component cc;
-        cc.name = name; cc.is_player = is_player;
-        cc.focus = industrial_focus::extraction;
-        cc.starting_capital = cash; cc.balance = cash;
-        cc.assets.push_back(bld);
-        w.corporations[corp] = cc;
+        nation_component cc{};
+        cc.name = name; 
+        cc.treasury = cash;
+        cc.state_assets.push_back(bld);
+        w.nations[corp] = cc;
         out_bld = bld;
         return corp;
     };
@@ -121,8 +120,7 @@ scene make_scene()
     s.corp_b = make_corp(false, "Vantage Holdings",     400.0f, s.t_home, s.bld_b);
     w.player_entity = w.create_entity(); // an untouched player corp, distinct from both
     {
-        corporation_component cc; cc.name = "Player Co"; cc.is_player = true;
-        w.corporations[w.player_entity] = cc;
+        nation_component cc{}; cc.name = "Player Co";        w.nations[w.player_entity] = cc;
     }
 
     // A completed trade route on the Known-but-unsurveyed body — activity fog

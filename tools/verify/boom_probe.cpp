@@ -399,9 +399,9 @@ int main(int argc, char** argv)
                 bool built = false;
                 for (const tracked& t : c.sites)
                     if (t.placed == k && t.tile == l.tile && t.r == static_cast<std::size_t>(l.target))
-                        if (const auto ci = w.corporations.find(l.corp); ci != w.corporations.end()
-                            && std::find(ci->second.assets.begin(), ci->second.assets.end(), t.bid)
-                               != ci->second.assets.end())
+                        if (const auto ci = w.nations.find(l.corp); ci != w.nations.end()
+                            && std::find(ci->second.state_assets.begin(), ci->second.state_assets.end(), t.bid)
+                               != ci->second.state_assets.end())
                             built = true;
                 if (built) { ++lifts_built_all; ++seed_built; }
             }

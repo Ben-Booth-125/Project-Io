@@ -204,9 +204,9 @@ static void test_raze()
     const entity_id c = f.add_centre(0, 3, 200, 0.8f);
 
     const entity_id corp = f.w.create_entity();
-    corporation_component cc{};
+    nation_component cc{};
     cc.name               = "Razer";
-    f.w.corporations[corp] = cc;
+    f.w.nations[corp] = cc;
 
     recipe_registry reg;
     corp_command cmd{};

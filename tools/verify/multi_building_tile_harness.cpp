@@ -45,7 +45,7 @@ int main()
     const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
 
     const entity_id corp = w.create_entity();
-    { corporation_component cc; cc.balance = 100000.0f; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 100000.0f; w.nations[corp] = cc; }
 
     std::printf("Multi-building tile (BL-366) harness\n");
 

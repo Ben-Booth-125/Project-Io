@@ -167,10 +167,10 @@ void built(const world& w, const economy_report* rep, int tick)
         else       { ++n_farm;  run_farm  += active; out_farm  += out; }
     }
     int firm_wharf = 0, firm_farm = 0;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.nations)
     {
-        if (cc.assets.empty()) continue;
-        const auto bi = w.buildings.find(cc.assets.front());
+        if (cc.state_assets.empty()) continue;
+        const auto bi = w.buildings.find(cc.state_assets.front());
         if (bi == w.buildings.end()) continue;
         const building_component& b = bi->second;
         if (b.type != building_type::extraction_site
@@ -224,8 +224,8 @@ void top_wells(world& w, const recipe_registry& reg, int n)
 std::map<entity_id, int> water_owners(const world& w)
 {
     std::map<entity_id, int> out;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id a : cc.assets)
+    for (const auto& [cid, cc] : w.nations)
+        for (const entity_id a : cc.state_assets)
         {
             const auto bi = w.buildings.find(a);
             if (bi == w.buildings.end() || bi->second.decommissioned) continue;
@@ -315,7 +315,7 @@ int main(int argc, char** argv)
         if (samples.count(0)) built(w, &last, 0);
         if (scorer) top_wells(w, reg, 4);
         std::set<entity_id> cohort;
-        for (const auto& [cid, cc] : w.corporations) { (void)cc; cohort.insert(cid); }
+        for (const auto& [cid, cc] : w.nations) { (void)cc; cohort.insert(cid); }
 
         income_window iw;
         std::vector<trace_acc> tr(trace.size());
@@ -370,7 +370,7 @@ int main(int argc, char** argv)
             if (income && k >= k_win_lo && k <= k_win_hi)
             {
                 const std::map<entity_id, int> own = water_owners(w);
-                for (const auto& [cid, cc] : w.corporations)
+                for (const auto& [cid, cc] : w.nations)
                 {
                     if (cc.returns.empty()) continue;
                     const double inc = cc.returns.back().income;
@@ -409,7 +409,7 @@ int main(int argc, char** argv)
             std::printf("\n");
         }
         int alive = 0;
-        for (const entity_id c : cohort) alive += w.corporations.count(c) ? 1 : 0;
+        for (const entity_id c : cohort) alive += w.nations.count(c) ? 1 : 0;
         std::printf("  FIRMS handoff %zu, alive at play tick %d: %d\n", cohort.size(), ticks, alive);
         if (samples.count(ticks)) ground(w);
     }

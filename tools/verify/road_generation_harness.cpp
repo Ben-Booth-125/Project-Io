@@ -1073,7 +1073,7 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
         app_start_world o2;
         build_app_base_world(lua, params, o2);
         apply_app_start_landscape(o2);
-        for (const auto& [cid, cc] : o2.w.corporations)
+        for (const auto& [cid, cc] : o2.w.nations)
         {
             const int f = static_cast<int>(cc.focus);
             if (f >= 0 && f < 3) ++r.corp_focus[f];

@@ -60,16 +60,23 @@ scene make_scene()
         b.type = building_type::extraction_site;
         b.workforce_assigned = 0.5f;
         b.target_resource = resource_type::iron_ore;
+        // BL-1407: the owner is now a NATION, and a rival nation's strategic
+        // tier evaluates on the shared cadence from tick 1 — its workforce dial
+        // zeroes this loser at once (an agency_event::workforce_set), which
+        // leaves the BL-079 REFLEX, this harness's subject, nothing to judge.
+        // The scorer's own anti-thrash hold (`ai_cooldown`, AI_OPPONENT.md § 5)
+        // keeps the strategic tier off the building for the run, so the row
+        // still measures the reflex alone.
+        b.ai_cooldown = 1000;
         w.buildings[bld] = b;
 
         const entity_id corp = w.create_entity();
-        corporation_component cc;
+        nation_component cc{};
         cc.name = name;
-        cc.is_player = is_player;
-        cc.starting_capital = 1000.0f;
-        cc.balance = 1000.0f;
-        cc.assets.push_back(bld);
-        w.corporations[corp] = cc;
+        cc.treasury = 1000.0f;
+        cc.state_assets.push_back(bld);
+        w.nations[corp] = cc;
+        if (is_player) w.player_entity = corp; // BL-1407: the player IS its nation
         return bld;
     };
 

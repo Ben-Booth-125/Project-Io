@@ -231,7 +231,7 @@ struct traffic_plan
 };
 
 /// Build the schedule from the generated world. Deterministic: every collection is
-/// gathered in ascending entity-id order (w.markets / w.corporations / w.bodies are
+/// gathered in ascending entity-id order (w.markets / w.nations / w.bodies are
 /// ordered maps).
 ///
 /// Takes a mutable world because it may have to AUTHOR markets. Measured 2026-08-01:
@@ -251,9 +251,9 @@ traffic_plan plan_traffic(world& w)
     // Player corp first (its convoys are the ones that stamp glimpses — see
     // credit_arrived_convoys, which gates record_proximity_glimpses on the player),
     // then the lowest-id others, so the schedule exercises both branches.
-    if (w.player_entity != null_entity && w.corporations.count(w.player_entity) != 0)
+    if (w.player_entity != null_entity && w.nations.count(w.player_entity) != 0)
         plan.corps.push_back(w.player_entity);
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.nations)
     {
         if (static_cast<int>(plan.corps.size()) >= k_max_traffic_corps) break;
         if (cid != w.player_entity) plan.corps.push_back(cid);
@@ -384,7 +384,7 @@ const char* const k_counter_names[c_count] = {
     "world.population_centre_name",
     "world.nations",
     "world.tile_to_nation",
-    "world.corporations",
+    "world.nations",
     "corporation.assets (sum)",
     "nation.tiles (sum)",
     "world.trades",
@@ -433,7 +433,7 @@ long long distinct_entities(const world& w)
     for (const auto& kv : w.units)              ids.push_back(kv.first);
     for (const auto& kv : w.population_centres) ids.push_back(kv.first);
     for (const auto& kv : w.nations)            ids.push_back(kv.first);
-    for (const auto& kv : w.corporations)       ids.push_back(kv.first);
+    for (const auto& kv : w.nations)       ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
     return static_cast<long long>(ids.size());
@@ -457,11 +457,11 @@ sample take_sample(int tick, const world& w, const economy_report& rep,
     s.v[c_population_centre_name]   = static_cast<long long>(w.population_centre_name.size());
     s.v[c_nations]                  = static_cast<long long>(w.nations.size());
     s.v[c_tile_to_nation]           = static_cast<long long>(w.tile_to_nation.size());
-    s.v[c_corporations]             = static_cast<long long>(w.corporations.size());
+    s.v[c_corporations]             = static_cast<long long>(w.nations.size());
 
     long long assets = 0;
-    for (const auto& [cid, corp] : w.corporations)
-        assets += static_cast<long long>(corp.assets.size());
+    for (const auto& [cid, corp] : w.nations)
+        assets += static_cast<long long>(corp.state_assets.size());
     s.v[c_corp_assets_total] = assets;
 
     long long nation_tiles = 0;
@@ -601,7 +601,7 @@ int main(int argc, char* argv[])
     std::printf("World generated in %.2f s: %zu bodies, %zu tiles, %zu buildings, %zu markets,\n"
                 "  %zu corporations, %zu nations, %zu population centres.\n\n",
                 build_s, w.bodies.size(), w.tiles.size(), w.buildings.size(), w.markets.size(),
-                w.corporations.size(), w.nations.size(), w.population_centres.size());
+                w.nations.size(), w.nations.size(), w.population_centres.size());
 
     std::vector<sample> samples;
     samples.reserve(marks.size());

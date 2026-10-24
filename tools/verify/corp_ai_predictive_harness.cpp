@@ -137,12 +137,11 @@ int main()
         }
         const entity_id corp = w.create_entity();
         {
-            corporation_component cc;
-            cc.name = "Feeder"; cc.is_player = false;
-            cc.focus = industrial_focus::processing;
-            cc.balance = 1000.0f; cc.starting_capital = 1000.0f;
-            cc.assets.push_back(pf_bld);
-            w.corporations[corp] = cc;
+            nation_component cc{};
+            cc.name = "Feeder"; 
+            cc.treasury = 1000.0f; 
+            cc.state_assets.push_back(pf_bld);
+            w.nations[corp] = cc;
         }
         economy_report rep{};
         // Empty report -> estimate_building_profit falls back to a live estimate;
@@ -310,11 +309,10 @@ int main()
         }
         const entity_id corp = w.create_entity();
         {
-            corporation_component cc;
-            cc.name = "Meridian"; cc.is_player = false;
-            cc.focus = industrial_focus::extraction;
-            cc.balance = 1000.0f; cc.starting_capital = 1000.0f;
-            w.corporations[corp] = cc;
+            nation_component cc{};
+            cc.name = "Meridian"; 
+            cc.treasury = 1000.0f; 
+            w.nations[corp] = cc;
         }
 
         economy_report rep{};

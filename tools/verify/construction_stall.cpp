@@ -116,8 +116,8 @@ struct ctx_t
 std::map<entity_id, entity_id> owners(const world& w)
 {
     std::map<entity_id, entity_id> o;
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id a : cc.assets) o[a] = cid;
+    for (const auto& [cid, cc] : w.nations)
+        for (const entity_id a : cc.state_assets) o[a] = cid;
     return o;
 }
 

@@ -560,7 +560,7 @@ int main(int argc, char** argv)
                     longest_still, still_since_s, longest_at * 100.0f,
                     longest_label >= 0 && longest_label < generation_stage_label_count
                         ? generation_stage_labels[longest_label] : "?");
-        std::printf("  nations %zu, corps %zu\n", w.nations.size(), w.corporations.size());
+        std::printf("  nations %zu, corps %zu\n", w.nations.size(), w.nations.size());
         std::fflush(stdout);
         // BL-1119 D1: after the watcher has stopped, so the replays cannot read as a
         // still bar; on the built world, before anything else touches it.

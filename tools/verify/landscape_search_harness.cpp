@@ -574,7 +574,7 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
             sc.ledger_specialists += r.planned_specialists;
             sc.ledger_firms       += r.planned_firms;
         }
-        sc.base_corporations = static_cast<int>(base.corporations.size());
+        sc.base_corporations = static_cast<int>(base.nations.size());
         if (sc.budget_world)
         {
             const std::map<entity_id, charter_nation_plan> plan =

@@ -333,11 +333,11 @@ census_row measure(const world& w, uint32_t seed)
     }
 
     // --- Corporations ------------------------------------------------------
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.nations)
     {
         ++r.corps;
-        if (cc.is_player || cid == w.player_entity) ++r.corps_player;
-        else if (cc.is_background)                  ++r.corps_background;
+        if (cid == w.player_entity) ++r.corps_player; // BL-1407
+        else if (cc.is_major == false)                  ++r.corps_background;
         else                                        ++r.corps_specialist;
         const int f = static_cast<int>(cc.focus);
         if (f >= 0 && f < 3) ++r.corp_focus[static_cast<std::size_t>(f)];

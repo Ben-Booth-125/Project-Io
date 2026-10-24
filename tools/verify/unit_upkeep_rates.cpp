@@ -80,16 +80,16 @@ fixture make_fixture()
     f.w.tiles[f.tile] = tc;
 
     f.corp = f.w.create_entity();
-    corporation_component cc{};
-    cc.name = "Measured Corp"; cc.balance = 100000.0f;
-    f.w.corporations[f.corp] = cc;
+    nation_component cc{};
+    cc.name = "Measured Corp"; cc.treasury = 100000.0f;
+    f.w.nations[f.corp] = cc;
     f.w.player_entity = f.corp;
 
     f.base = f.w.create_entity();
     building_component b{};
     b.type = building_type::military_base; b.tile = f.tile; b.ticks_remaining = 0;
     f.w.buildings[f.base] = b;
-    f.w.corporations[f.corp].assets.push_back(f.base);
+    f.w.nations[f.corp].state_assets.push_back(f.base);
     return f;
 }
 

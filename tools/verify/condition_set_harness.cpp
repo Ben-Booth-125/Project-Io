@@ -67,7 +67,7 @@ entity_id add_building(world& w, entity_id corp, entity_id body, building_type t
     bc.type = type;
     bc.tile = tile;
     w.buildings[b] = bc;
-    w.corporations[corp].assets.push_back(b);
+    w.nations[corp].state_assets.push_back(b);
     return b;
 }
 
@@ -78,11 +78,10 @@ fixture make_fixture()
     f.w.bodies[f.body] = body_component{};
 
     f.corp = f.w.create_entity();
-    corporation_component cc{};
+    nation_component cc{};
     cc.name      = "Test Corp";
-    cc.balance   = 5000.0f;
-    cc.is_player = true;
-    f.w.corporations[f.corp] = cc;
+    cc.treasury   = 5000.0f;
+    f.w.nations[f.corp] = cc;
     f.w.player_entity        = f.corp;
 
     add_building(f.w, f.corp, f.body, building_type::extraction_site);
@@ -170,11 +169,12 @@ int main()
         c.resource = resource_type::iron_ore;
         check(measure_condition(c, w, f.corp) == 0.0f,
               "C2p1 produced reads 0 for a good on the shelf the corp never made");
-        world w2 = w;
-        w2.corporations.at(f.corp).produced_ever[static_cast<std::size_t>(resource_type::copper_ore)] = true;
+        // BL-1407: C2p2 ("reads 1 for a good the corp has produced") RETIRED —
+        // the produced-ever record was the corporation's and went with it; a
+        // nation keeps none, so the subject reads 0 (condition_set.cpp).
         c.resource = resource_type::copper_ore;
-        check(measure_condition(c, w2, f.corp) == 1.0f,
-              "C2p2 produced reads 1 for a good the corp has produced, with none on any shelf");
+        check(measure_condition(c, w, f.corp) == 0.0f,
+              "C2p2 produced reads 0 for a nation (the produced-ever record retired with the corporation)");
     }
     {
         condition c = make(condition_subject::market, condition_comparator::at_least, 0.0f);
@@ -193,9 +193,7 @@ int main()
         c.key = "DG-PR-EX-T1";
         check(measure_condition(c, w, f.corp) == 0.0f, "C2i research reads 0 for an unheld node");
         fixture g = make_fixture();
-        const entity_id nation = g.w.create_entity();
-        g.w.nations[nation] = nation_component{};
-        g.w.corporations.at(g.corp).home_nation = nation;
+        const entity_id nation = g.corp; // BL-1407: the subject IS its nation
         g.w.nation_tech[nation].held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T1")));
         check(measure_condition(c, g.w, g.corp) == 1.0f, "C2j research reads 1 once the corp's nation holds it");
         check(measure_condition(c, g.w, 99999) == 0.0f, "C2k research reads 0 for a corp with no such nation");
@@ -343,7 +341,7 @@ int main()
         // province_partition::find's (binary search) actual contract.
         fixture g = make_fixture();
         const entity_id rival = g.w.create_entity();
-        g.w.corporations[rival] = corporation_component{};
+        g.w.nations[rival] = nation_component{};
 
         province held_by_corp;   held_by_corp.id   = 10; held_by_corp.body = g.body; held_by_corp.tiles = { 100 };
         province held_by_rival;  held_by_rival.id  = 20; held_by_rival.body = g.body; held_by_rival.tiles = { 200 };

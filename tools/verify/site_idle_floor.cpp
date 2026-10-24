@@ -67,7 +67,7 @@ int main()
       w.tiles[tile] = tc; }
 
     const entity_id corp = w.create_entity();
-    { corporation_component cc{}; cc.is_player = true; cc.balance = 1.0e6f; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 1.0e6f; w.nations[corp] = cc; }
     w.player_entity = corp;
 
     const entity_id site = w.create_entity();
@@ -76,7 +76,7 @@ int main()
       b.ticks_remaining = 3;
       b.workforce_auto = false; // hold the target at 100: the fixture has no market, so the solver would idle it
       w.buildings[site] = b; }
-    w.corporations[corp].assets.push_back(site);
+    w.nations[corp].state_assets.push_back(site);
 
     bool completed_seen = false;
     for (int tick = 1; tick <= 5 && !completed_seen; ++tick)

@@ -310,9 +310,9 @@ int main()
         // The three-class split is REPORTED rather than asserted, so a genuine
         // regression is still visible to a reader.
         std::vector<int> counts(3, 0);
-        for (const auto& kv : w1.corporations)
+        for (const auto& kv : w1.nations)
             ++counts[static_cast<std::size_t>(kv.second.focus)];
-        const int corps = static_cast<int>(w1.corporations.size());
+        const int corps = static_cast<int>(w1.nations.size());
         const int classes_present = (counts[0] > 0) + (counts[1] > 0) + (counts[2] > 0);
         std::printf("      (focus split: extraction %d, processing %d, trade %d, of %d corps)\n",
                     counts[0], counts[1], counts[2], corps);

@@ -238,15 +238,13 @@ fixture make_fixture(recipe_registry& reg, float base_price)
 
     f.corp = f.w.create_entity();
     {
-        corporation_component cc;
+        nation_component cc{};
         cc.name              = "Band Co";
-        cc.starting_capital  = 10000.0f;
-        cc.balance           = 10000.0f;
-        cc.assets.push_back(f.bld);
+        cc.treasury           = 10000.0f;
+        cc.state_assets.push_back(f.bld);
         // Not AI-driven: the strategic tier would rewrite workforce_target at the
         // end of the tick, and these rows measure the band, not the scorer.
-        cc.is_player = true;
-        f.w.corporations[f.corp] = cc;
+        f.w.nations[f.corp] = cc;
     }
     return f;
 }
@@ -284,7 +282,7 @@ float settle_at_ceiling(recipe_registry& reg, float base_price, int ticks)
     fixture f = make_fixture(reg, base_price);
 
     // Remove the extractor: this fixture must have no supply at all.
-    f.w.corporations.at(f.corp).assets.clear();
+    f.w.nations.at(f.corp).state_assets.clear();
     f.w.buildings.erase(f.bld);
 
     for (int i = 0; i < ticks; ++i)

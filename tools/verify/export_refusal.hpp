@@ -87,7 +87,7 @@ struct context
     context(world& w_, const recipe_registry& reg_)
         : w(w_), reg(reg_), margin(reg_.dispatch_margin()), nodes(collect_logistics_nodes(w_))
     {
-        for (const auto& kv : w.corporations) corp_ids.push_back(kv.first);
+        for (const auto& kv : w.nations) corp_ids.push_back(kv.first);
         for (const auto& kv : w.markets) mids.push_back(kv.first);
         std::sort(corp_ids.begin(), corp_ids.end());
         std::sort(mids.begin(), mids.end());

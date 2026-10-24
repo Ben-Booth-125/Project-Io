@@ -474,15 +474,15 @@ int main(int argc, char** argv)
             // is byte-identical either side of the attempt.
             world probe = w;
             entity_id corp = null_entity;
-            for (const auto& [cid, cc] : probe.corporations)
+            for (const auto& [cid, cc] : probe.nations)
                 if (corp == null_entity || cid < corp) corp = cid;
             if (corp != null_entity)
             {
-                probe.corporations.at(corp).balance = 1.0e6f;
+                probe.nations.at(corp).treasury = 1.0e6f;
                 const std::string before = to_bytes(probe);
                 const construction_result r =
                     place_road(probe, reg, corp, wet_a, t, static_cast<std::uint8_t>(wet_side));
-                const float bal = probe.corporations.at(corp).balance;
+                const float bal = probe.nations.at(corp).treasury;
                 check(r == construction_result::invalid_tile,
                       "P1d place_road refuses it as invalid_tile");
                 check(to_bytes(probe) == before && bal == 1.0e6f,
@@ -492,11 +492,11 @@ int main(int argc, char** argv)
             {
                 world probe2 = w;
                 entity_id corp2 = null_entity;
-                for (const auto& [cid, cc] : probe2.corporations)
+                for (const auto& [cid, cc] : probe2.nations)
                     if (corp2 == null_entity || cid < corp2) corp2 = cid;
                 if (corp2 != null_entity)
                 {
-                    probe2.corporations.at(corp2).balance = 1.0e6f;
+                    probe2.nations.at(corp2).treasury = 1.0e6f;
                     const std::string before = to_bytes(probe2);
                     corp_command cmd;
                     cmd.corp      = corp2;

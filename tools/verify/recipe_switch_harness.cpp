@@ -92,9 +92,9 @@ void run_mechanism_checks()
     w.bodies[body] = body_component{};
 
     const entity_id corp = w.create_entity();
-    { corporation_component cc; cc.is_player = true; cc.balance = 25.0f; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 25.0f; w.nations[corp] = cc; }
     const entity_id bld = make_processor(w, body, id0);
-    w.corporations[corp].assets.push_back(bld);
+    w.nations[corp].state_assets.push_back(bld);
 
     // S1 — a successful switch debits the cost and starts the cooldown.
     {
@@ -102,7 +102,7 @@ void run_mechanism_checks()
         const recipe_switch_result r = try_switch_recipe(w, reg, corp, b, id1);
         check(r == recipe_switch_result::applied, "S1a a fundable switch applies");
         check(b.recipe == id1, "S1b the building's recipe actually changed");
-        check(w.corporations[corp].balance == 15.0f, "S1c the switch cost (10) was debited");
+        check(w.nations[corp].treasury == 15.0f, "S1c the switch cost (10) was debited");
         check(b.recipe_switch_cooldown == 3, "S1d the cooldown was set from recipe_switch_params");
     }
 
@@ -110,11 +110,11 @@ void run_mechanism_checks()
     // and mutates nothing.
     {
         building_component& b = w.buildings.at(bld);
-        const float before = w.corporations[corp].balance;
+        const float before = w.nations[corp].treasury;
         const recipe_switch_result r = try_switch_recipe(w, reg, corp, b, id0);
         check(r == recipe_switch_result::on_cooldown, "S2a a switch mid-cooldown is refused");
         check(b.recipe == id1, "S2b ...and the recipe did not change");
-        check(w.corporations[corp].balance == before, "S2c ...and nothing was debited");
+        check(w.nations[corp].treasury == before, "S2c ...and nothing was debited");
     }
 
     // S3 — the cooldown decrements one per economy tick (run_economy_step),
@@ -139,11 +139,11 @@ void run_mechanism_checks()
         building_component& b = w.buildings.at(bld);
         b.recipe_switch_cooldown = 0; // S3b's own switch left this on cooldown; clear it so this
                                       // check isolates the FUNDS leg, not the cooldown leg.
-        w.corporations[corp].balance = 2.0f; // below the 10cr switch cost
+        w.nations[corp].treasury = 2.0f; // below the 10cr switch cost
         const recipe_switch_result r = try_switch_recipe(w, reg, corp, b, id1);
         check(r == recipe_switch_result::insufficient_funds, "S4a a corp that cannot afford it is refused");
         check(b.recipe == id0, "S4b ...and the recipe did not change");
-        check(w.corporations[corp].balance == 2.0f, "S4c ...and the balance is untouched");
+        check(w.nations[corp].treasury == 2.0f, "S4c ...and the balance is untouched");
     }
 
     // S5 — the BL-079 reflex switch stays free/instant: it mutates b.recipe
@@ -153,14 +153,14 @@ void run_mechanism_checks()
     // decision logic — since that logic needs a live market context this
     // fixture does not build.
     {
-        w.corporations[corp].balance = 100.0f;
+        w.nations[corp].treasury = 100.0f;
         building_component& b = w.buildings.at(bld);
         b.recipe_switch_cooldown = 0;
-        const float before_balance = w.corporations[corp].balance;
+        const float before_balance = w.nations[corp].treasury;
         b.recipe = id1; // the reflex's own idiom: direct assignment, no seam call
         check(b.recipe_switch_cooldown == 0,
               "S5 a direct (reflex-style) recipe assignment leaves the cooldown untouched");
-        check(w.corporations[corp].balance == before_balance,
+        check(w.nations[corp].treasury == before_balance,
               "...and leaves the corp's balance untouched (free/instant, as designed)");
     }
 
@@ -182,12 +182,12 @@ void run_mechanism_checks()
         const uint16_t idB1 = reg.add_recipe(rB1);
 
         const entity_id bld6 = make_processor(w, body, idA1);
-        w.corporations[corp].assets.push_back(bld6);
-        w.corporations[corp].balance = 1000.0f;
+        w.nations[corp].state_assets.push_back(bld6);
+        w.nations[corp].treasury = 1000.0f;
 
         building_component& b6 = w.buildings.at(bld6);
         const recipe_switch_result r6a = try_switch_recipe(w, reg, corp, b6, idA2); // intra-group
-        const float intra_cost = 1000.0f - w.corporations[corp].balance;
+        const float intra_cost = 1000.0f - w.nations[corp].treasury;
         check(r6a == recipe_switch_result::applied, "S6a intra-group switch applies");
         check(b6.recipe == idA2, "S6b ...and the recipe actually changed");
         check(intra_cost == sw.switch_cost,
@@ -195,9 +195,9 @@ void run_mechanism_checks()
                   std::to_string(intra_cost) + ")");
 
         b6.recipe_switch_cooldown = 0; // clear S6's own cooldown so the next switch is testable
-        const float before_cross = w.corporations[corp].balance;
+        const float before_cross = w.nations[corp].treasury;
         const recipe_switch_result r6b = try_switch_recipe(w, reg, corp, b6, idB1); // cross-group
-        const float cross_cost = before_cross - w.corporations[corp].balance;
+        const float cross_cost = before_cross - w.nations[corp].treasury;
         check(r6b == recipe_switch_result::cross_group, "S6d cross-group switch is refused outright");
         check(b6.recipe == idA2, "S6e ...and the recipe did NOT change");
         check(cross_cost == 0.0f, "S6f ...and nothing was debited (a rejection mutates nothing)");
@@ -218,14 +218,14 @@ void run_mechanism_checks()
 
         w.bodies[body].atmosphere = atmosphere_class::thin; // airless (planetology's rule)
         const entity_id bld7 = make_processor(w, body, idV);
-        w.corporations[corp].assets.push_back(bld7);
-        w.corporations[corp].balance = 1000.0f;
+        w.nations[corp].state_assets.push_back(bld7);
+        w.nations[corp].treasury = 1000.0f;
         building_component& b7 = w.buildings.at(bld7);
 
         const recipe_switch_result r7a = try_switch_recipe(w, reg, corp, b7, idA);
         check(r7a == recipe_switch_result::wrong_air,
               "S7a on an airless body the atmosphere route is refused at the retool seam (wrong_air)");
-        check(b7.recipe == idV && w.corporations[corp].balance == 1000.0f,
+        check(b7.recipe == idV && w.nations[corp].treasury == 1000.0f,
               "S7b ...the recipe did not change and nothing was debited");
 
         corp_command cmd;

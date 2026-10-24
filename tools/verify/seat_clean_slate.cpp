@@ -88,7 +88,7 @@ entity_id add_proc(fixture& x, int ticks_remaining)
     bc.ticks_remaining = ticks_remaining;
     x.w.buildings[id] = bc;
     x.w.stockpiles[id] = stockpile_component{};
-    x.w.corporations.at(x.s).assets.push_back(id);
+    x.w.nations.at(x.s).state_assets.push_back(id);
     return id;
 }
 
@@ -122,16 +122,15 @@ fixture make_fixture()
     // the scorer never acts on it (the econ_harness isolation idiom); the seat
     // below re-points onto it, which is the "pick the provisional" case.
     x.s = x.w.create_entity();
-    corporation_component sc;
-    sc.name = "Slate Works"; sc.balance = 5000.0f; sc.starting_capital = 5000.0f;
-    sc.is_player = true;
-    x.w.corporations[x.s] = sc;
+    nation_component sc{};
+    sc.name = "Slate Works"; sc.treasury = 5000.0f; 
+    x.w.nations[x.s] = sc;
     x.w.player_entity = x.s;
     // A second, penniless specialist so the world is not a one-firm world.
     x.other = x.w.create_entity();
-    corporation_component oc;
-    oc.name = "Other"; oc.balance = 0.0f;
-    x.w.corporations[x.other] = oc;
+    nation_component oc{};
+    oc.name = "Other"; oc.treasury = 0.0f;
+    x.w.nations[x.other] = oc;
 
     x.f = add_proc(x, 0); // finished
     x.a = add_proc(x, 3); // site
@@ -145,13 +144,13 @@ const quarterly_return* tick(world& w, const recipe_registry& reg, entity_id cor
     economy_report rep = run_economy_step(w, reg);
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention);
-    const auto& rs = w.corporations.at(corp).returns;
+    const auto& rs = w.nations.at(corp).returns;
     return rs.empty() ? nullptr : &rs.back();
 }
 
 bool gone(const world& w, entity_id corp, entity_id bid)
 {
-    const auto& as = w.corporations.at(corp).assets;
+    const auto& as = w.nations.at(corp).state_assets;
     return w.buildings.count(bid) == 0 && w.stockpiles.count(bid) == 0
         && std::find(as.begin(), as.end(), bid) == as.end();
 }
@@ -163,10 +162,10 @@ int main()
     std::printf("seat_clean_slate — BL-1206\n");
     const recipe_registry reg = make_registry();
     fixture x = make_fixture();
-    const double b0 = x.w.corporations.at(x.s).balance;
+    const double b0 = x.w.nations.at(x.s).treasury;
     tick(x.w, reg, x.s, 0);
     tick(x.w, reg, x.s, 1);
-    const double b1 = x.w.corporations.at(x.s).balance;
+    const double b1 = x.w.nations.at(x.s).treasury;
     const double pa = x.w.buildings.at(x.a).construction_paid;
     const double pb = x.w.buildings.at(x.b).construction_paid;
     std::printf("  balance %.4f -> %.4f after two ticks; paid A %.4f B %.4f; sites left A %d B %d ticks\n",
@@ -181,7 +180,7 @@ int main()
 
     // R2 — the draw's re-point.
     const bool ok = repoint_player(x.w, x.s);
-    const double b2 = x.w.corporations.at(x.s).balance;
+    const double b2 = x.w.nations.at(x.s).treasury;
     std::printf("  draw: balance %.4f -> %.4f (refund %.4f)\n", b1, b2, b2 - b1);
     check(ok && gone(x.w, x.s, x.a) && gone(x.w, x.s, x.b),
           "R2 draw: both sites cancelled — no building, stockpile or asset entry left");
@@ -194,13 +193,13 @@ int main()
     cmd.corp = x.s;
     cmd.verb = corp_verb::take_seat;
     const corp_command_result res = apply_corp_command(copy, reg, cmd);
-    const double b3 = copy.corporations.at(x.s).balance;
+    const double b3 = copy.nations.at(x.s).treasury;
     check(res == corp_command_result::applied && gone(copy, x.s, x.a) && gone(copy, x.s, x.b)
               && copy.buildings.count(x.f) == 1 && b3 == b2,
           "R3 pick (take_seat): the same cancellation and the same balance, to the float");
 
     // R4 — the books.
-    const float prev_close = x.w.corporations.at(x.s).returns.back().balance; // tick 1's return
+    const float prev_close = x.w.nations.at(x.s).returns.back().balance; // tick 1's return
     const quarterly_return* q = tick(x.w, reg, x.s, 2);
     const double rebuilt = q ? static_cast<double>(q->income) - q->expenditure - q->maintenance
                                    - q->wages - q->interest - q->levies - q->upkeep + q->refunds
@@ -215,7 +214,7 @@ int main()
     // fl(fl(C0 + R) - R), so net is exactly the difference of the two closes.
     check(q != nullptr && q->net == static_cast<double>(q->balance) - static_cast<double>(prev_close),
           "R4 bit-exact telescoping across the seat: net == balance - previous return's balance");
-    check(x.w.corporations.at(x.s).refund_unbooked == 0.0f, "R4 nothing is left unbooked");
+    check(x.w.nations.at(x.s).refund_unbooked == 0.0f, "R4 nothing is left unbooked");
 
     // R4b — the rounding case the stored opening exists for: a balance and a
     // refund whose float sum does not subtract back exactly.
@@ -233,8 +232,8 @@ int main()
             rounds = back != c0 && (c - c0) != (c - back);
         }
         fixture y = make_fixture();
-        corporation_component& yc = y.w.corporations.at(y.s);
-        yc.balance = c0;
+        nation_component& yc = y.w.nations.at(y.s);
+        yc.treasury = c0;
         y.w.buildings.at(y.a).construction_paid = r;
         y.w.buildings.at(y.b).construction_paid = 0.0f;
         repoint_player(y.w, y.s);
@@ -246,8 +245,8 @@ int main()
     }
 
     // R5 — idempotent.
-    const double b4 = x.w.corporations.at(x.s).balance;
-    check(seat_clean_slate(x.w, x.s) == 0.0f && x.w.corporations.at(x.s).balance == b4,
+    const double b4 = x.w.nations.at(x.s).treasury;
+    check(seat_clean_slate(x.w, x.s) == 0.0f && x.w.nations.at(x.s).treasury == b4,
           "R5 seating again refunds nothing");
 
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,

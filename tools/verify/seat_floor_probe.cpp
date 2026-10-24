@@ -85,18 +85,18 @@ int main(int argc, char** argv)
                         (unsigned long long)m.market, m.actual, m.balance, m.extractors, m.processors, m.rated);
 
     std::vector<entity_id> specs;
-    for (const auto& [id, c] : w.corporations) if (!c.is_background) specs.push_back(id);
+    for (const auto& [id, c] : w.nations) if (!c.is_major == false) specs.push_back(id);
     std::sort(specs.begin(), specs.end());
     std::printf("specialists after the settle: %zu (the search's roster: %zu)\n", specs.size(), out.land.specialists.size());
     for (const entity_id id : specs)
     {
-        const corporation_component& c = w.corporations.at(id);
+        const nation_component& c = w.nations.at(id);
         int held = 0;
         const double s = seat_landscape_score(w, sc, id, &held);
         const bool in_roster = std::find(out.land.specialists.begin(), out.land.specialists.end(), id) != out.land.specialists.end();
         std::printf(" corp %llu \"%s\" home_nation %llu  in search roster %s  assets %zu  seat score %.4f (%d holdings scored)\n",
-                    (unsigned long long)id, c.name.c_str(), (unsigned long long)c.home_nation,
-                    in_roster ? "yes" : "NO", c.assets.size(), s, held);
+                    (unsigned long long)id, c.name.c_str(), (unsigned long long)id,
+                    in_roster ? "yes" : "NO", c.state_assets.size(), s, held);
         // The home nation's budgeted centres, richest first (the walk's own
         // order: points descending, ties to the lower id), with each centre's
         // market and that market's viability -- the champion is chartered at
@@ -109,7 +109,7 @@ int main(int argc, char** argv)
                 const auto t = w.population_centre_tile.find(cid);
                 if (t == w.population_centre_tile.end()) continue;
                 const auto own = w.tile_to_nation.find(t->second);
-                if (own == w.tile_to_nation.end() || own->second != c.home_nation) continue;
+                if (own == w.tile_to_nation.end() || own->second != id) continue;
                 rows.push_back({ cid, pts });
             }
             std::sort(rows.begin(), rows.end(), [](const row& a, const row& b) {
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
                             mit != by_market.end() ? mit->second->processors : -1);
             }
         }
-        for (const entity_id bid : c.assets)
+        for (const entity_id bid : c.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end()) { std::printf("    building %llu MISSING\n", (unsigned long long)bid); continue; }
@@ -171,7 +171,7 @@ int main(int argc, char** argv)
                 ++affording[own->second];
         }
         std::set<entity_id> with_spec;
-        for (const entity_id id : specs) with_spec.insert(w.corporations.at(id).home_nation);
+        for (const entity_id id : specs) with_spec.insert(id /* BL-1407: its own nation */);
         int lost = 0;
         for (const auto& [n, c] : affording)
             if (!with_spec.count(n))
@@ -193,7 +193,7 @@ int main(int argc, char** argv)
     std::printf("\n");
     for (const entity_id id : specs)
     {
-        const entity_id nat = w.corporations.at(id).home_nation;
+        const entity_id nat = id /* BL-1407: its own nation */;
         for (const charter_unspent& u : rep.unspent)
         {
             const auto t = w.population_centre_tile.find(u.centre);
@@ -211,7 +211,7 @@ int main(int argc, char** argv)
     // in the catchment the floor reads.
     std::map<entity_id, int> seen;
     for (const entity_id id : specs)
-        for (const entity_id bid : w.corporations.at(id).assets)
+        for (const entity_id bid : w.nations.at(id).state_assets)
             if (const auto bit = w.buildings.find(bid); bit != w.buildings.end() && w.tiles.count(bit->second.tile))
                 seen[market_for_tile(w, bit->second.tile)] = 1;
     for (const auto& [mk, unused] : seen)
@@ -221,17 +221,17 @@ int main(int argc, char** argv)
         int tiles_in = 0;
         for (const auto& [tid, tc] : w.tiles)
             if (market_for_tile(w, tid) == mk) ++tiles_in;
-        for (const auto& [cid, cc] : w.corporations)
-            for (const entity_id bid : cc.assets)
+        for (const auto& [cid, cc] : w.nations)
+            for (const entity_id bid : cc.state_assets)
                 if (const auto bit = w.buildings.find(bid); bit != w.buildings.end()
                     && w.tiles.count(bit->second.tile) && market_for_tile(w, bit->second.tile) == mk)
                     ++by_owner[{ cid, static_cast<int>(bit->second.type) }];
         std::printf("market %llu: %d tiles; buildings by (owner, type):", (unsigned long long)mk, tiles_in);
         for (const auto& [k, n] : by_owner)
         {
-            const auto cit = w.corporations.find(k.first);
+            const auto cit = w.nations.find(k.first);
             std::printf(" [%llu%s %s x%d]", (unsigned long long)k.first,
-                        cit == w.corporations.end() ? "?" : (cit->second.is_background ? " bg" : " SPEC"),
+                        cit == w.nations.end() ? "?" : (cit->second.is_major == false ? " bg" : " SPEC"),
                         btype(static_cast<building_type>(k.second)), n);
         }
         std::printf("\n");

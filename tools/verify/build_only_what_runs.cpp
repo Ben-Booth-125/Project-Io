@@ -172,24 +172,23 @@ scene make_scene()
 
     // The player corp holds every producer (the scorer never acts on it).
     s.pl = s.w.create_entity();
-    corporation_component pc;
-    pc.name = "Player"; pc.is_player = true; pc.balance = 1000.0f;
-    s.w.corporations[s.pl] = pc;
+    nation_component pc{};
+    pc.name = "Player"; pc.treasury = 1000.0f;
+    s.w.nations[s.pl] = pc;
     s.w.player_entity = s.pl;
 
     // The AI corp: cash, and one plain anchor building on its own ground in A.
     s.ai = s.w.create_entity();
-    corporation_component ac;
-    ac.name = "Rival"; ac.balance = 1.0e6f; ac.starting_capital = 1.0e6f;
-    ac.focus = industrial_focus::processing;
+    nation_component ac{};
+    ac.name = "Rival"; ac.treasury = 1.0e6f; 
     s.ai_tile = tile_at(s.w, s.body, 1, 1);
     const entity_id anchor = s.w.create_entity();
     building_component b{};
     b.tile = s.ai_tile; b.type = building_type::extraction_site;
     b.target_resource = resource_type::iron_ore; b.workforce_assigned = 0.5f;
     s.w.buildings[anchor] = b;
-    ac.assets.push_back(anchor);
-    s.w.corporations[s.ai] = ac;
+    ac.state_assets.push_back(anchor);
+    s.w.nations[s.ai] = ac;
     return s;
 }
 
@@ -230,7 +229,7 @@ entity_id add_mine(scene& s, int col, int row)
     b.tile = t; b.type = building_type::extraction_site;
     b.target_resource = resource_type::coal; b.workforce_assigned = 0.5f;
     s.w.buildings[m] = b;
-    s.w.corporations.at(s.pl).assets.push_back(m);
+    s.w.nations.at(s.pl).state_assets.push_back(m);
     return m;
 }
 
@@ -248,7 +247,7 @@ entity_id add_plant(scene& s, const recipe_registry& reg, entity_id corp, int co
     b.workforce_auto = false;
     b.decommissioned = idled;
     s.w.buildings[p] = b;
-    s.w.corporations.at(corp).assets.push_back(p);
+    s.w.nations.at(corp).state_assets.push_back(p);
     return p;
 }
 
@@ -263,7 +262,7 @@ bool coal_ok(scene& s, const recipe_registry& reg, float need, entity_id self = 
 int processors_of(const scene& s, entity_id corp)
 {
     int n = 0;
-    for (const entity_id b : s.w.corporations.at(corp).assets)
+    for (const entity_id b : s.w.nations.at(corp).state_assets)
         if (const auto it = s.w.buildings.find(b);
             it != s.w.buildings.end() && it->second.type == building_type::processing_facility)
             ++n;
@@ -594,7 +593,7 @@ int main()
                 s.w.current_econ_tick = t;
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg7, rep, t);
-                for (const entity_id b : s.w.corporations.at(s.ai).assets)
+                for (const entity_id b : s.w.nations.at(s.ai).state_assets)
                     if (const auto it = s.w.buildings.find(b);
                         it != s.w.buildings.end() && it->second.type == building_type::processing_facility)
                         return it->second.recipe;
@@ -633,7 +632,7 @@ int main()
         };
         auto coal_mines_of = [&](const scene& s, entity_id corp) {
             int n = 0;
-            for (const entity_id b : s.w.corporations.at(corp).assets)
+            for (const entity_id b : s.w.nations.at(corp).state_assets)
                 if (const auto it = s.w.buildings.find(b);
                     it != s.w.buildings.end() && it->second.type == building_type::extraction_site
                     && it->second.target_resource == resource_type::coal)
@@ -678,9 +677,8 @@ int main()
             // own (one processor per tile) — and so refuses nothing.
             auto add_other = [&](scene& sc) {
                 const entity_id id = sc.w.create_entity();
-                corporation_component c;
-                c.name = "Other"; c.balance = 1.0e6f; c.starting_capital = 1.0e6f;
-                c.focus = industrial_focus::extraction;
+                nation_component c{};
+                c.name = "Other"; c.treasury = 1.0e6f; 
                 const entity_id t = tile_at(sc.w, sc.body, 3, 1);
                 const entity_id anchor = sc.w.create_entity();
                 building_component a{};
@@ -693,14 +691,14 @@ int main()
                 pb.recipe = reg.recipe_id("steel_forge"); pb.target_resource = resource_type::machinery;
                 pb.workforce_assigned = 0.5f; pb.workforce_auto = false;
                 sc.w.buildings[plant] = pb;
-                c.assets = {anchor, plant};
-                sc.w.corporations[id] = c;
+                c.state_assets = {anchor, plant};
+                sc.w.nations[id] = c;
                 return id;
             };
             const entity_id other = add_other(s);
             // The refusing AI corp still refuses (and would lift for itself) but
             // cannot afford a mine, so the deposit's one slot stays open to Other.
-            s.w.corporations.at(s.ai).balance = 1.0f;
+            s.w.nations.at(s.ai).treasury = 1.0f;
             int other_lifts = 0;
             for (int t = 1; t <= 4; ++t)
             {
@@ -715,7 +713,7 @@ int main()
             // Not vacuous: the same corp DOES build that mine once A bids for coal.
             scene s2 = staged();
             const entity_id other2 = add_other(s2);
-            s2.w.corporations.at(s2.ai).balance = 1.0f;
+            s2.w.nations.at(s2.ai).treasury = 1.0f;
             s2.w.markets.at(s2.a).demand[r_coal] = 50.0f;
             for (int t = 1; t <= 4; ++t)
             {
@@ -731,13 +729,13 @@ int main()
         // ground sold) and the cash back — vetoed again.
         {
             scene s = staged();
-            corporation_component& ac = s.w.corporations.at(s.ai);
-            ac.balance = 1.0f;
+            nation_component& ac = s.w.nations.at(s.ai);
+            ac.treasury = 1.0f;
             int lifts1 = 0;
             one_eval(s, lifts1);
             const int built1 = coal_mines_of(s, s.ai);
-            ac.balance = 1.0e6f;
-            ac.assets.clear();
+            ac.treasury = 1.0e6f;
+            ac.state_assets.clear();
             int lifts2 = 0;
             for (int t = 5; t <= 8; ++t)
             {
@@ -757,8 +755,6 @@ int main()
         // AI corp made the seat and the scorer told it is spectating.
         {
             scene s = staged();
-            s.w.corporations.at(s.ai).is_player = true;
-            s.w.corporations.at(s.pl).is_player = false;
             s.w.player_entity = s.ai;
             corp_ai_params sp;
             sp.spectating = true;
@@ -794,7 +790,7 @@ int main()
         auto mines_for = [&](bool plant_idled) {
             scene s = make_scene(); place_bound(s, reg);
             s.w.markets.at(s.a).demand[r_steel] = 50.0f;
-            s.w.corporations.at(s.ai).balance = 1.0f; // the processing-focus AI stays out (no chain start)
+            s.w.nations.at(s.ai).treasury = 1.0f; // the processing-focus AI stays out (no chain start)
             const entity_id ct = tile_at(s.w, s.body, 2, 2);
             s.w.tiles.at(ct).resource_deposit[r_coal]   = 1.0f;
             s.w.tiles.at(ct).resource_remaining[r_coal] = 1.0e6f;
@@ -802,9 +798,8 @@ int main()
             // The mine-builder: holds ground in A whose tile already carries a
             // processor, so it offers no processor candidate (and refuses none).
             const entity_id other = s.w.create_entity();
-            corporation_component oc;
-            oc.name = "Other"; oc.balance = 1.0e6f; oc.starting_capital = 1.0e6f;
-            oc.focus = industrial_focus::extraction;
+            nation_component oc{};
+            oc.name = "Other"; oc.treasury = 1.0e6f; 
             const entity_id t = tile_at(s.w, s.body, 3, 1);
             const entity_id anchor = s.w.create_entity();
             building_component a{};
@@ -817,8 +812,8 @@ int main()
             pb.recipe = reg.recipe_id("steel_forge"); pb.target_resource = resource_type::machinery;
             pb.workforce_assigned = 0.5f; pb.workforce_auto = false;
             s.w.buildings[plant] = pb;
-            oc.assets = {anchor, plant};
-            s.w.corporations[other] = oc;
+            oc.state_assets = {anchor, plant};
+            s.w.nations[other] = oc;
             bool ran = false;
             for (int t2 = 1; t2 <= 4; ++t2)
             {
@@ -829,7 +824,7 @@ int main()
                     if (br.corp == s.pl && br.type == building_type::processing_facility && br.active) ran = true;
             }
             int mines = 0;
-            for (const entity_id b : s.w.corporations.at(other).assets)
+            for (const entity_id b : s.w.nations.at(other).state_assets)
                 if (const auto it = s.w.buildings.find(b);
                     it != s.w.buildings.end() && it->second.type == building_type::extraction_site
                     && it->second.target_resource == resource_type::coal)
@@ -885,7 +880,7 @@ int main()
                 b.tile = t; b.type = building_type::extraction_site;
                 b.target_resource = resource_type::iron_ore; b.workforce_assigned = 0.5f;
                 s.w.buildings[mine] = b;
-                s.w.corporations.at(s.pl).assets.push_back(mine);
+                s.w.nations.at(s.pl).state_assets.push_back(mine);
             }
             s.w.current_econ_tick = 1;
             const economy_report rep = run_economy_step(s.w, reg10);
@@ -957,7 +952,7 @@ int main()
             b.tile = t; b.type = building_type::extraction_site;
             b.target_resource = resource_type::coal; b.workforce_assigned = 0.5f;
             s.w.buildings[mine] = b;
-            s.w.corporations.at(s.pl).assets.push_back(mine);
+            s.w.nations.at(s.pl).state_assets.push_back(mine);
         }
         const entity_id centre = s.w.create_entity();
         {
@@ -973,7 +968,7 @@ int main()
         }
         // The processing AI stays out: a coal plant it started this step would
         // be a committed processor draw on the same spare (BL-1234), not R2's.
-        s.w.corporations.at(s.ai).balance = 1.0f;
+        s.w.nations.at(s.ai).treasury = 1.0f;
         s.w.current_econ_tick = 1;
         economy_report rep = run_economy_step(s.w, reg11);
         (void)clear_markets(s.w, reg11, rep); // the clear, as run_settle_tick runs it

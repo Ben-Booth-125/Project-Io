@@ -534,8 +534,8 @@ entity_id best_endowed_corp(const world& w)
     entity_id best = null_entity;
     int       best_extractors = -1;
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end()); // deterministic tie-break
     for (const entity_id corp : ids)
@@ -543,7 +543,7 @@ entity_id best_endowed_corp(const world& w)
         if (corp == w.player_entity)
             continue;
         int extractors = 0;
-        for (const entity_id bid : w.corporations.at(corp).assets)
+        for (const entity_id bid : w.nations.at(corp).state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit != w.buildings.end() && bit->second.type == building_type::extraction_site)
@@ -573,12 +573,11 @@ rollout run_rollout(uint32_t seed, int ticks, bool spectating,
     world w = make_hard_coded_world(no_prehistory(params));
     const recipe_registry reg = make_registry();
 
-    if (viewpoint != null_entity && w.corporations.count(viewpoint))
+    if (viewpoint != null_entity && w.nations.count(viewpoint))
     {
         // Move the seat, do not add a second one: exactly one corp carries
         // is_player at any time, matching generation's invariant.
-        for (auto& [corp, cc] : w.corporations)
-            cc.is_player = (corp == viewpoint);
+        for (auto& [corp, cc] : w.nations)
         w.player_entity = viewpoint;
     }
 
@@ -613,11 +612,11 @@ rollout run_rollout(uint32_t seed, int ticks, bool spectating,
         }
     }
 
-    for (const auto& [corp, cc] : w.corporations)
+    for (const auto& [corp, cc] : w.nations)
     {
         rollout::corp_state st;
-        st.balance = cc.balance;
-        for (const entity_id bid : cc.assets)
+        st.balance = cc.treasury;
+        for (const entity_id bid : cc.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -867,8 +866,8 @@ int main()
         spectating.spectating = true;
 
         std::vector<entity_id> corp_ids;
-        corp_ids.reserve(w.corporations.size());
-        for (const auto& kv : w.corporations)
+        corp_ids.reserve(w.nations.size());
+        for (const auto& kv : w.nations)
             corp_ids.push_back(kv.first);
         std::sort(corp_ids.begin(), corp_ids.end());
 

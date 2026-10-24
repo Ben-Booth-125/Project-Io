@@ -190,8 +190,8 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
     std::unordered_map<entity_id, float> s_prev, s_cur;
     auto snap = [&](std::unordered_map<entity_id, float>& m) {
         m.clear();
-        for (const auto& [id, cc] : w.corporations)
-            m[id] = cc.balance;
+        for (const auto& [id, cc] : w.nations)
+            m[id] = cc.treasury;
     };
     auto attribute = [&](double phase_deltas::*field) {
         if (!phases)
@@ -222,7 +222,7 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
     attribute(&phase_deltas::nation);
     attribute(&phase_deltas::arrivals);
     // BL-743: the insolvency wind-up, last — app::step_economy's own order.
-    run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);
+    // BL-1407: firm exit retired with the corporation (no run_firm_exits).
     attribute(&phase_deltas::exits);
     rep_out = std::move(rep);
     return flows;
@@ -231,8 +231,8 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
 std::vector<entity_id> sorted_corp_ids(const world& w)
 {
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     return ids;
@@ -343,10 +343,10 @@ double exchange_revenue_at(const world& w, int t)
     return total;
 }
 
-int distinct_footprint_tiles(const world& w, const corporation_component& cc)
+int distinct_footprint_tiles(const world& w, const nation_component& cc)
 {
     std::set<entity_id> tiles;
-    for (const entity_id bid : cc.assets)
+    for (const entity_id bid : cc.state_assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit != w.buildings.end())
@@ -418,14 +418,13 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
     out.corps_index = "corp,name,focus,home_nation,is_background\n";
     for (const entity_id id : sorted_corp_ids(w))
     {
-        const corporation_component& cc = w.corporations.at(id);
+        const nation_component& cc = w.nations.at(id);
         const char* focus =
-            cc.focus == industrial_focus::extraction ? "extraction" :
-            cc.focus == industrial_focus::processing ? "processing" : "trade";
+            "nation" /* BL-1407: no firm focus */;
         appendf(out.corps_index, "%llu,%s,%s,%llu,%d\n",
                 static_cast<unsigned long long>(id), cc.name.c_str(), focus,
-                static_cast<unsigned long long>(cc.home_nation),
-                cc.is_background ? 1 : 0);
+                static_cast<unsigned long long>(id), // BL-1407: its own nation
+                (!cc.is_major) ? 1 : 0);
     }
 
     out.corps_csv = "tick,corp,balance,income,expenditure,maintenance,wages,interest,"
@@ -455,7 +454,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
     std::vector<int> entry_ticks;
     int idle_entries = 0;
     for (const entity_id id : sorted_corp_ids(w))
-        prev_balance[id] = w.corporations.at(id).balance;
+        prev_balance[id] = w.nations.at(id).treasury;
     out.markets_csv = "tick,market,body,resource,price,base_price,supply,demand,shortfall\n";
     out.world_csv = "tick,valued_production,exchange_revenue,convoys,buildings_active,"
                     "buildings_idle,corps,corps_in_debt,hostile_pairs,friend_pairs,"
@@ -471,7 +470,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
         {
             prev_balance.clear();
             for (const entity_id id : sorted_corp_ids(w))
-                prev_balance[id] = w.corporations.at(id).balance;
+                prev_balance[id] = w.nations.at(id).treasury;
             continue;   // the settle is unlogged; the measured window logs
         }
 
@@ -484,7 +483,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
 
         for (const entity_id id : sorted_corp_ids(w))
         {
-            const corporation_component& cc = w.corporations.at(id);
+            const nation_component& cc = w.nations.at(id);
             corp_budget b{};
             const auto bit = rep.budgets.find(id);
             if (bit != rep.budgets.end())
@@ -497,7 +496,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                 const auto pb = prev_balance.find(id);
                 if (pb != prev_balance.end())
                 {
-                    const double delta = static_cast<double>(cc.balance) - pb->second;
+                    const double delta = static_cast<double>(cc.treasury) - pb->second;
                     out.phase_residual_max =
                         std::max(out.phase_residual_max, std::fabs(delta - pd.total()));
                 }
@@ -506,13 +505,13 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                     "%d,%llu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d,%d,%.6f,"
                     "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,",
                     t, static_cast<unsigned long long>(id),
-                    static_cast<double>(cc.balance),
+                    static_cast<double>(cc.treasury),
                     static_cast<double>(b.income), static_cast<double>(b.expenditure),
                     static_cast<double>(b.maintenance), static_cast<double>(b.wages),
                     static_cast<double>(b.interest), static_cast<double>(b.levies),
                     static_cast<double>(b.upkeep), static_cast<double>(b.subsidies),
                     static_cast<double>(b.net()),
-                    static_cast<int>(cc.assets.size()),
+                    static_cast<int>(cc.state_assets.size()),
                     distinct_footprint_tiles(w, cc),
                     sit == share.end() ? 0.0 : static_cast<double>(sit->second),
                     pd.convoys, pd.agency, pd.budget, pd.nation, pd.arrivals, pd.exits,
@@ -522,7 +521,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                 cp = cit->second;
             int under_construction = 0, mothballed = 0, supply_n = 0, supply_zero = 0;
             double supply_sum = 0.0;
-            for (const entity_id bid : cc.assets)
+            for (const entity_id bid : cc.state_assets)
                 if (const auto bt = w.buildings.find(bid); bt != w.buildings.end())
                 {
                     if (bt->second.ticks_remaining > 0) ++under_construction;
@@ -561,7 +560,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
 
                 const auto pb = prev_balance.find(id);
                 const bool was_solvent = (pb == prev_balance.end()) || pb->second >= 0.0f;
-                if (was_solvent && cc.balance < 0.0f && !entered.count(id))
+                if (was_solvent && cc.treasury < 0.0f && !entered.count(id))
                 {
                     entered.insert(id);
                     trailing_row s4;
@@ -577,7 +576,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                         if (r.income <= 0.0) ++idle;
                     }
                     int ext = 0, proc = 0, other = 0;
-                    for (const entity_id bid : cc.assets)
+                    for (const entity_id bid : cc.state_assets)
                     {
                         const auto bt = w.buildings.find(bid);
                         if (bt == w.buildings.end()) { ++other; continue; }
@@ -595,14 +594,13 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                     entry_ticks.push_back(t);
                     if (idle >= static_cast<int>(dq.size())) ++idle_entries;
                     const char* focus =
-                        cc.focus == industrial_focus::extraction ? "extraction" :
-                        cc.focus == industrial_focus::processing ? "processing" : "trade";
+                        "nation" /* BL-1407: no firm focus */;
                     appendf(out.debt_csv,
                             "%d,%llu,%s,%.2f,%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"
                             "%.2f,%d,%d,%d,%d,%d,%d,%s,%d\n",
                             t, static_cast<unsigned long long>(id), focus,
-                            static_cast<double>(cc.balance),
-                            static_cast<int>(cc.assets.size()), ext, proc, other,
+                            static_cast<double>(cc.treasury),
+                            static_cast<int>(cc.state_assets.size()), ext, proc, other,
                             s4.income, s4.inputs, s4.maintenance, s4.wages, s4.interest,
                             s4.upkeep, s4.capital, s4.convoys, s4.arrivals,
                             s4.produced, cp.active, cp.idle, cp.limited,
@@ -611,7 +609,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                     ++out.debt_entries;
                 }
             }
-            prev_balance[id] = cc.balance;
+            prev_balance[id] = cc.treasury;
         }
 
         // --- per-market rows, priced resources only -------------------------
@@ -648,7 +646,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
         }
         int in_debt = 0;
         for (const entity_id id : sorted_corp_ids(w))
-            if (w.corporations.at(id).balance < 0.0f)
+            if (w.nations.at(id).treasury < 0.0f)
                 ++in_debt;
         double treasury_sum = 0.0;
         {
@@ -669,7 +667,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                 "%d,%.4f,%.4f,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%d\n",
                 t, valued, exchange_revenue_at(w, t),
                 static_cast<int>(w.convoys.size()), active, idle,
-                static_cast<int>(w.corporations.size()), in_debt,
+                static_cast<int>(w.nations.size()), in_debt,
                 static_cast<int>(w.corp_hostile_pairs.size()),
                 static_cast<int>(w.corp_friend_pairs.size()),
                 static_cast<int>(w.trades.size()), treasury_sum, state_qty,

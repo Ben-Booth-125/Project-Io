@@ -705,7 +705,7 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_re
                      &rep.building_labour);
         run_nation_step(w, reg, rep, econ_tick);
 
-        run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);
+        // BL-1407: firm exit retired with the corporation (no run_firm_exits).
 
         // A convoy that left the world without arriving (a wound-up firm's
         // cargo) will never deliver: close it as lost rather than wait for it.

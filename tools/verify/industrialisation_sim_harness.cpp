@@ -3422,9 +3422,9 @@ int main(int argc, char** argv)
                     if (tc.resource_deposit[r] > 0.0f) goods[mi->second].set(r);
             }
             std::set<entity_id> corps_on_body;
-            for (const auto& [corp_id, cc] : w.corporations)
+            for (const auto& [corp_id, cc] : w.nations)
             {
-                for (entity_id bid : cc.assets)
+                for (entity_id bid : cc.state_assets)
                 {
                     const auto bit = w.buildings.find(bid);
                     if (bit == w.buildings.end()) continue;

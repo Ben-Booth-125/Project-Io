@@ -121,15 +121,13 @@ fixture make_fixture(int sites, float reserve, bool with_market = false)
 
     f.corp = f.w.create_entity();
     {
-        corporation_component cc;
+        nation_component cc{};
         cc.name             = "Stacker Co";
-        cc.starting_capital = 100000.0f;
-        cc.balance          = 100000.0f;
-        cc.assets           = f.sites;
+        cc.treasury          = 100000.0f;
+        cc.state_assets           = f.sites;
         // Not AI-driven: BL-202's strategic tier would command this corp at the end
         // of the tick and move the very dials being asserted (see econ_harness).
-        cc.is_player        = true;
-        f.w.corporations[f.corp] = cc;
+        f.w.nations[f.corp] = cc;
     }
     f.w.player_entity = f.corp;
 
@@ -163,7 +161,7 @@ entity_id add_site(fixture& f)
     b.workforce_auto     = false;
     f.w.buildings[bid]   = b;
     f.sites.push_back(bid);
-    f.w.corporations[f.corp].assets.push_back(bid);
+    f.w.nations[f.corp].state_assets.push_back(bid);
     return bid;
 }
 

@@ -102,10 +102,10 @@ fixture make_fixture()
     f.w.bodies[f.body] = body_component{};
 
     f.corp = f.w.create_entity();
-    corporation_component cc{};
+    nation_component cc{};
     cc.name    = "Test Corp";
-    cc.balance = 10000.0f;
-    f.w.corporations[f.corp] = cc;
+    cc.treasury = 10000.0f;
+    f.w.nations[f.corp] = cc;
     f.w.player_entity        = f.corp;
 
     f.tile = add_tile(f.w, f.body);
@@ -116,7 +116,7 @@ fixture make_fixture()
     bc.tile            = f.tile;
     bc.ticks_remaining = 0;
     f.w.buildings[f.base] = bc;
-    f.w.corporations[f.corp].assets.push_back(f.base);
+    f.w.nations[f.corp].state_assets.push_back(f.base);
 
     return f;
 }
@@ -242,7 +242,7 @@ void u1_exact_charge()
     body_shelf(f)[ORD] = 1000.0f;
     body_shelf(f)[IRO] = 77.0f; // an untouched neighbour
 
-    const float balance_before = f.w.corporations.at(f.corp).balance;
+    const float balance_before = f.w.nations.at(f.corp).treasury;
 
     const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(t.units == 3 && t.disbanded == 0 && t.unmet == 0,
@@ -270,7 +270,7 @@ void u1_exact_charge()
           "U1f upkeep is its OWN term — no other budget flow moved");
     check(b.force_units == 3 && b.force_unsupplied == 0,
           "U1g the force line counts the units and reports none unsupplied");
-    check(near(f.w.corporations.at(f.corp).balance, balance_before - 100.0f),
+    check(near(f.w.nations.at(f.corp).treasury, balance_before - 100.0f),
           "U1h the balance fell by exactly the upkeep and nothing else");
     check(near(b.net(), -100.0f), "U1i net() accounts for the new term");
 
@@ -352,7 +352,7 @@ void u3_orphan_cleanup()
         bc.type = building_type::military_base;
         bc.tile = tile2;
         f.w.buildings[base2] = bc;
-        f.w.corporations[f.corp].assets.push_back(base2);
+        f.w.nations[f.corp].state_assets.push_back(base2);
     }
 
     const entity_id ua = add_unit(f, ROW_LEVY, 10, f.base);
@@ -381,7 +381,7 @@ void u3_orphan_cleanup()
           "U3g a unit with no recorded muster base is never orphaned");
 
     // A unit whose owning corp is gone goes too.
-    f.w.corporations.erase(f.corp);
+    f.w.nations.erase(f.corp);
     run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.empty(), "U3h units of an erased corp are disbanded");
 }
@@ -418,7 +418,7 @@ rollout run_rollout(int ticks)
     {
         run_unit_upkeep(f.w, reg, g_upkeep_report);
         apply_budget(f.w, reg, flows, contention);
-        r.balances.push_back(f.w.corporations.at(f.corp).balance);
+        r.balances.push_back(f.w.nations.at(f.corp).treasury);
         r.pool_ordnance.push_back(body_shelf(f)[ORD]);
     }
 
@@ -471,7 +471,7 @@ void u5_inert_at_zero()
     const entity_id u1 = add_unit(f, ROW_LEVY,  40, f.base);
     const entity_id u2 = add_unit(f, ROW_RIFLE, 25, f.base);
 
-    const float balance_before = f.w.corporations.at(f.corp).balance;
+    const float balance_before = f.w.nations.at(f.corp).treasury;
 
     std::unordered_map<entity_id, corp_cash_flow>    flows;
     std::map<std::pair<entity_id, entity_id>, float> contention;
@@ -487,7 +487,7 @@ void u5_inert_at_zero()
         apply_budget(f.w, reg, flows, contention, &breakdown);
     }
 
-    check(f.w.corporations.at(f.corp).balance == balance_before,
+    check(f.w.nations.at(f.corp).treasury == balance_before,
           "U5b the balance is bit-identical after 25 ticks");
     check(breakdown.at(f.corp).upkeep == 0.0f, "U5c the upkeep term is exactly zero");
     check(breakdown.at(f.corp).net() == 0.0f,  "U5d net() is exactly zero");
@@ -852,9 +852,9 @@ void u10_a_shelf_draw_pays_the_posted_price()
         const entity_id u   = add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
         const entity_id seller = f.w.create_entity();
-        corporation_component sc{};
+        nation_component sc{};
         sc.name = "Seller";
-        f.w.corporations[seller] = sc;
+        f.w.nations[seller] = sc;
         f.w.land_goods(seller, mid, ORD, 40.0f); // BL-1265: a landing the clear lists
         recipe_registry reg = reg_for(k_shipped_shelf_ticks);
 

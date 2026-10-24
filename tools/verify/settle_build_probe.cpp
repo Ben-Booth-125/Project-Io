@@ -103,7 +103,7 @@ economy_report probe_tick(world& w, const recipe_registry& reg, int econ_step, b
                  &report.buildings, &report.building_labour);
     run_nation_step(w, reg, report, w.current_econ_tick);
     (void)compute_corp_standings(w, flows);
-    run_firm_exits(w, reg.firm_exit(), &report.firm_exits);
+    // BL-1407: firm exit retired with the corporation (no run_firm_exits).
     return report;
 }
 
@@ -349,7 +349,7 @@ int main(int argc, char** argv)
                 std::sort(pipe.begin(), pipe.end());
                 const std::set<entity_id> same(built.begin(), built.end());
                 std::map<entity_id, entity_id> owner;
-                for (const auto& [cid, cc] : w.corporations) for (const entity_id a : cc.assets) owner.emplace(a, cid);
+                for (const auto& [cid, cc] : w.nations) for (const entity_id a : cc.state_assets) owner.emplace(a, cid);
 
                 for (const entity_id bid : built)
                 {

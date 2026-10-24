@@ -100,11 +100,12 @@ entity_id make_grid_body(world& w, int gw, int gh)
 
 entity_id add_corp(world& w, const char* name)
 {
+    // BL-1407: every belligerent is a nation (the corporation retired).
     const entity_id c = w.create_entity();
-    corporation_component cc{};
-    cc.name    = name;
-    cc.balance = 10000.0f;
-    w.corporations[c] = cc;
+    nation_component cc{};
+    cc.name     = name;
+    cc.treasury = 10000.0f;
+    w.nations[c] = cc;
     return c;
 }
 
@@ -723,8 +724,8 @@ int main()
         const entity_id ud      = add_unit(w, nation, t);
         const uint32_t province = w.provinces.province_of(t);
 
-        check(active_mercenary_contract_for(w, corp, province) == null_entity,
-              "B17 setup: the contract stub returns none (BL-573 has not landed)");
+        // BL-1407: the mercenary-contract stub retired with the corporation;
+        // the attacker is a nation with no stance row.
         check(w.battles.empty(), "B17 setup: no battle exists before opening one");
 
         const bool opened = open_battle(w, 0, province, corp, nation);

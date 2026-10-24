@@ -1,7 +1,7 @@
 // Headless harness for the Visibility model (BL-068) — no SDL / Lua / ImGui.
 // Builds a tiny world by hand and asserts the read-side ownership accessors that
 // the competitor information-asymmetry rule branches on:
-//   R: owner_corp_of resolves a building to its owning corporation (the reverse of
+//   R: owner_nation_of resolves a building to its owning corporation (the reverse of
 //      corporation_component::assets), and null_entity for an unowned building.
 //   R: is_player_owned is true only for the player corp's buildings (the uniform
 //      branch point — every non-player corp is treated identically as a rival).
@@ -38,13 +38,13 @@ int main()
     auto add_building = [&w](entity_id corp) {
         const entity_id b = w.create_entity();
         w.buildings[b] = building_component{};
-        w.corporations[corp].assets.push_back(b);
+        w.nations[corp].state_assets.push_back(b);
         return b;
     };
 
-    { corporation_component cc; cc.name = "Player Co"; cc.is_player = true;  w.corporations[player_corp] = cc; }
-    { corporation_component cc; cc.name = "Rival A";   cc.is_player = false; w.corporations[rival_a]     = cc; }
-    { corporation_component cc; cc.name = "Rival B";   cc.is_player = false; w.corporations[rival_b]     = cc; }
+    { nation_component cc{}; cc.name = "Player Co"; w.nations[player_corp] = cc; }
+    { nation_component cc{}; cc.name = "Rival A";   w.nations[rival_a]     = cc; }
+    { nation_component cc{}; cc.name = "Rival B";   w.nations[rival_b]     = cc; }
 
     const entity_id player_bld = add_building(player_corp);
     const entity_id rival_a_bld = add_building(rival_a);
@@ -54,13 +54,13 @@ int main()
     const entity_id orphan_bld = w.create_entity();
     w.buildings[orphan_bld] = building_component{};
 
-    // --- R: owner_corp_of resolves the forward assets list in reverse ---
-    std::printf("\nR — owner_corp_of resolves ownership\n");
-    check(owner_corp_of(w, player_bld)  == player_corp, "player building -> player corp");
-    check(owner_corp_of(w, rival_a_bld) == rival_a,     "rival A building -> rival A corp");
-    check(owner_corp_of(w, rival_b_bld) == rival_b,     "rival B building -> rival B corp");
-    check(owner_corp_of(w, orphan_bld)  == null_entity, "unowned building -> null_entity");
-    check(owner_corp_of(w, null_entity) == null_entity, "null building -> null_entity");
+    // --- R: owner_nation_of resolves the forward assets list in reverse ---
+    std::printf("\nR — owner_nation_of resolves ownership\n");
+    check(owner_nation_of(w, player_bld)  == player_corp, "player building -> player corp");
+    check(owner_nation_of(w, rival_a_bld) == rival_a,     "rival A building -> rival A corp");
+    check(owner_nation_of(w, rival_b_bld) == rival_b,     "rival B building -> rival B corp");
+    check(owner_nation_of(w, orphan_bld)  == null_entity, "unowned building -> null_entity");
+    check(owner_nation_of(w, null_entity) == null_entity, "null building -> null_entity");
 
     // --- R: is_player_owned is the single uniform branch point ---
     std::printf("\nR — is_player_owned branch (uniform rival treatment)\n");

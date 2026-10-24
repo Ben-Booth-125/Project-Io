@@ -50,7 +50,7 @@ int main()
     w.home_body = home;
 
     const entity_id corp = w.create_entity();
-    { corporation_component cc; cc.balance = 50000.0f; cc.is_player = true; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 50000.0f; w.nations[corp] = cc; }
     w.player_entity = corp;
 
     init_survey_states(w);
@@ -103,13 +103,13 @@ int main()
     check(dispatch_survey(w, home) == survey_dispatch_result::already_surveyed, "dispatch(home) -> already_surveyed");
     check(dispatch_survey(w, 99999) == survey_dispatch_result::invalid, "dispatch(bad id) -> invalid");
     // insufficient funds: drop balance below far cost, attempt, expect no debit
-    w.corporations[corp].balance = 1000.0f;
+    w.nations[corp].treasury = 1000.0f;
     check(dispatch_survey(w, far_large) == survey_dispatch_result::insufficient_funds, "dispatch(far) with 1000 -> insufficient_funds");
-    check(near(w.corporations[corp].balance, 1000.0), "balance unchanged after insufficient_funds", w.corporations[corp].balance, 1000.0);
+    check(near(w.nations[corp].treasury, 1000.0), "balance unchanged after insufficient_funds", w.nations[corp].treasury, 1000.0);
     // success debits exactly cost
-    w.corporations[corp].balance = 50000.0f;
+    w.nations[corp].treasury = 50000.0f;
     check(dispatch_survey(w, near_small) == survey_dispatch_result::success, "dispatch(near) -> success");
-    check(near(w.corporations[corp].balance, 50000.0 - 932.0), "balance debited by exactly cost(near)", w.corporations[corp].balance, 50000.0 - 932.0);
+    check(near(w.nations[corp].treasury, 50000.0 - 932.0), "balance debited by exactly cost(near)", w.nations[corp].treasury, 50000.0 - 932.0);
     check(w.bodies[near_small].survey.phase == survey_phase::in_transit, "near now in_transit");
     check(dispatch_survey(w, near_small) == survey_dispatch_result::in_progress, "second dispatch(near) -> in_progress");
 
@@ -136,7 +136,7 @@ int main()
     const entity_id b2 = add_body(w2, 5.0f, 80, 80);
     w2.home_body = h2;
     const entity_id c2 = w2.create_entity();
-    { corporation_component cc; cc.balance = 50000.0f; cc.is_player = true; w2.corporations[c2] = cc; }
+    { nation_component cc{}; cc.treasury = 50000.0f; w2.nations[c2] = cc; }
     w2.player_entity = c2;
     init_survey_states(w2);
     dispatch_survey(w2, b2);
@@ -164,7 +164,7 @@ int main()
         const entity_id f3   = add_body(w3, 5.0f, 80, 80);   // 100 regions
         w3.home_body = h3;
         const entity_id c3 = w3.create_entity();
-        { corporation_component cc; cc.balance = 50000.0f; cc.is_player = true; w3.corporations[c3] = cc; }
+        { nation_component cc{}; cc.treasury = 50000.0f; w3.nations[c3] = cc; }
         w3.player_entity = c3;
         init_survey_states(w3);
         const survey_schedule en = survey_compute_schedule(w3, n3);

@@ -132,10 +132,10 @@ static scene make_scene()
     s.victim = s.w.create_entity();
     s.raider = s.w.create_entity();
     {
-        corporation_component cc;
-        cc.balance = 1000.0f;
-        s.w.corporations[s.victim] = cc;
-        s.w.corporations[s.raider] = cc;
+        nation_component cc{};
+        cc.treasury = 1000.0f;
+        s.w.nations[s.victim] = cc;
+        s.w.nations[s.raider] = cc;
     }
     s.w.player_entity = s.victim;
 

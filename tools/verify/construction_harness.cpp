@@ -91,7 +91,7 @@ int main()
 
     // Player corp with a modest balance.
     const entity_id corp = w.create_entity();
-    { corporation_component cc; cc.balance = 250.0f; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 250.0f; w.nations[corp] = cc; }
     w.player_entity = corp;
 
     std::printf("Layer 4 construction harness\n");
@@ -111,9 +111,9 @@ int main()
                                     resource_type::iron_ore, built);
     check(r_ext == construction_result::placed && built != null_entity,
           "C.R2 valid extraction placed");
-    check(near(w.corporations[corp].balance, 250.0f),
-          "C.R2 placement does NOT debit up-front (pay-as-you-build)", w.corporations[corp].balance, 250.0f);
-    check(w.corporations[corp].assets.size() == 1 && w.corporations[corp].assets[0] == built,
+    check(near(w.nations[corp].treasury, 250.0f),
+          "C.R2 placement does NOT debit up-front (pay-as-you-build)", w.nations[corp].treasury, 250.0f);
+    check(w.nations[corp].state_assets.size() == 1 && w.nations[corp].state_assets[0] == built,
           "C.R2 building appended to corp assets");
     check(w.buildings.count(built) == 1 &&
           w.buildings[built].target_resource == resource_type::iron_ore &&
@@ -128,8 +128,8 @@ int main()
                                      resource_type::iron_ore, proc);
     check(r_proc == construction_result::placed && w.buildings[proc].recipe == steel_id,
           "C.R3 processing facility seeded with default recipe");
-    check(near(w.corporations[corp].balance, 250.0f),
-          "C.R3 processing placement also un-charged at placement", w.corporations[corp].balance, 250.0f);
+    check(near(w.nations[corp].treasury, 250.0f),
+          "C.R3 processing placement also un-charged at placement", w.nations[corp].treasury, 250.0f);
 
     // R4: the affordability GATE is retained (BL-095) — a build a corp cannot afford
     // the whole of is refused up front with no mutation, even though payment is now
@@ -137,19 +137,19 @@ int main()
     // (150; no market here so material_cost is 0 -> total_cost == build_cost), then
     // attempt a VALID processing tile (Any terrain, so the refusal is the funds check,
     // not terrain — a Port would short-circuit to invalid_tile and mask it).
-    w.corporations[corp].balance = 100.0f; // < 150 processing build_cost
+    w.nations[corp].treasury = 100.0f; // < 150 processing build_cost
     const entity_id land2 = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
       tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land2] = tc; }
-    const std::size_t n_before = w.corporations[corp].assets.size();
+    const std::size_t n_before = w.nations[corp].state_assets.size();
     entity_id none_built = null_entity;
     auto r_broke = construct_building(w, reg, corp, land2, building_type::processing_facility,
                                       resource_type::iron_ore, none_built);
     check(r_broke == construction_result::insufficient_funds &&
           none_built == null_entity &&
-          near(w.corporations[corp].balance, 100.0f) &&
-          w.corporations[corp].assets.size() == n_before,
+          near(w.nations[corp].treasury, 100.0f) &&
+          w.nations[corp].state_assets.size() == n_before,
           "C.R4 unaffordable build refused by the gate (no build, no spend)");
 
     // R5: unknown corp / tile are refused.
@@ -184,7 +184,7 @@ int main()
     // --- BL-166/BL-168: both buildings resolve to agricultural_produce --------
     // R4 above drove the corp's balance down to 100 to test the funds gate;
     // restore headroom so these placements aren't refused on affordability.
-    w.corporations[corp].balance = 1000.0f;
+    w.nations[corp].treasury = 1000.0f;
     entity_id hydro_built = null_entity;
     auto r_hydro = construct_building(w, reg, corp, no_deposit_tile, building_type::processing_facility,
                                       resource_type::agricultural_produce, hydro_built, hydro_id);

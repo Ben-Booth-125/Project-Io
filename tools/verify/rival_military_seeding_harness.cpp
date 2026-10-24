@@ -55,32 +55,39 @@ void check(bool ok, const char* what)
     if (!ok) ++g_failures;
 }
 
-// Every non-background corp id, sorted for a deterministic report order
-// (unordered_map iteration is unspecified).
+// BL-1407: the corporation is retired and the force is the NATION'S
+// (`arm_rivals` arms a nation, anchored at its first specialist charter). The
+// "non-background" set is therefore every nation holding a specialist charter
+// (world::gen_charters, generation-transient), the "background" set every
+// nation holding only background charters. Sorted ascending.
 std::vector<entity_id> non_background_corp_ids(const world& w)
 {
     std::vector<entity_id> ids;
-    for (const auto& [cid, cc] : w.corporations)
-        if (!cc.is_background)
-            ids.push_back(cid);
+    for (const auto& [cid, cc] : w.gen_charters)
+        if (!cc.is_background && cc.home_nation != null_entity && w.nations.count(cc.home_nation) != 0)
+            ids.push_back(cc.home_nation);
     std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
     return ids;
 }
 
 std::vector<entity_id> background_corp_ids(const world& w)
 {
+    const std::vector<entity_id> spec = non_background_corp_ids(w);
     std::vector<entity_id> ids;
-    for (const auto& [cid, cc] : w.corporations)
-        if (cc.is_background)
-            ids.push_back(cid);
+    for (const auto& [cid, cc] : w.gen_charters)
+        if (cc.is_background && cc.home_nation != null_entity && w.nations.count(cc.home_nation) != 0
+            && !std::binary_search(spec.begin(), spec.end(), cc.home_nation))
+            ids.push_back(cc.home_nation);
     std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
     return ids;
 }
 
-int count_military_bases(const world& w, const corporation_component& cc)
+int count_military_bases(const world& w, const nation_component& cc)
 {
     int n = 0;
-    for (entity_id bid : cc.assets)
+    for (entity_id bid : cc.state_assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit != w.buildings.end() && bit->second.type == building_type::military_base)
@@ -139,16 +146,16 @@ int main()
         {
             if (cid == w.player_entity) continue;
             ++rivals;
-            if (count_military_bases(w, w.corporations.at(cid)) == 1
+            if (count_military_bases(w, w.nations.at(cid)) == 1
                 && count_generation_seeded_units(w, cid) == 1)
                 ++rivals_armed;
         }
         const bool seat_bare = w.player_entity != null_entity
-            && count_military_bases(w, w.corporations.at(w.player_entity)) == 0
+            && count_military_bases(w, w.nations.at(w.player_entity)) == 0
             && count_generation_seeded_units(w, w.player_entity) == 0;
         bool bg_bare = true;
         for (const entity_id bid : background_corp_ids(w))
-            if (count_military_bases(w, w.corporations.at(bid)) != 0
+            if (count_military_bases(w, w.nations.at(bid)) != 0
                 || count_generation_seeded_units(w, bid) != 0)
                 bg_bare = false;
         std::printf("\n=== R0: shipped default — %d of %d rivals armed; seat %s ===\n",
@@ -171,7 +178,7 @@ int main()
             const entity_id old_seat = w.player_entity;
             entity_id pick = null_entity;
             for (const entity_id cid : non_background_corp_ids(w))
-                if (cid != old_seat && count_military_bases(w, w.corporations.at(cid)) == 1)
+                if (cid != old_seat && count_military_bases(w, w.nations.at(cid)) == 1)
                 {
                     pick = cid;
                     break;
@@ -182,13 +189,22 @@ int main()
             cmd.verb = corp_verb::take_seat;
             const bool applied = pick != null_entity
                 && apply_corp_command(w, reg, cmd) == corp_command_result::applied;
-            int pick_units = 0;
+            // BL-1407: the picked seat is a NATION, which may own units that
+            // were never its opening force (a garrison has no muster base);
+            // the row's subject is the OPENING force, so it counts what
+            // seed_starting_military authors (muster_base set), and prints both.
+            int pick_units = 0, pick_units_all = 0;
             for (const auto& [uid, uc] : w.units)
-                if (uc.owner == pick) ++pick_units;
+                if (uc.owner == pick)
+                {
+                    ++pick_units_all;
+                    if (uc.muster_base != null_entity) ++pick_units;
+                }
+            std::printf("  (the picked nation owns %d unit(s) in all)\n", pick_units_all);
             const int pick_bases = pick != null_entity
-                ? count_military_bases(w, w.corporations.at(pick)) : -1;
+                ? count_military_bases(w, w.nations.at(pick)) : -1;
             const bool old_armed = old_seat != null_entity
-                && count_military_bases(w, w.corporations.at(old_seat)) == 1
+                && count_military_bases(w, w.nations.at(old_seat)) == 1
                 && count_generation_seeded_units(w, old_seat) == 1;
             std::printf("  %s: picked %u (was armed) over seat %u -> picked holds %d units, %d bases; "
                         "the seat it left %s\n", label, static_cast<unsigned>(pick),
@@ -227,7 +243,7 @@ int main()
         bool all_ok = true;
         for (entity_id cid : corp_ids)
         {
-            const corporation_component& cc = w.corporations.at(cid);
+            const nation_component& cc = w.nations.at(cid);
             const int bases = count_military_bases(w, cc);
             const int units = count_generation_seeded_units(w, cid);
 
@@ -251,7 +267,7 @@ int main()
             {
                 all_ok = false;
                 std::printf("  BAD  corp=%u \"%s\" is_player=%d bases=%d units=%d (expected 1/1 or 0/0)\n",
-                            static_cast<unsigned>(cid), cc.name.c_str(), cc.is_player ? 1 : 0, bases, units);
+                            static_cast<unsigned>(cid), cc.name.c_str(), cid == w.player_entity ? 1 : 0, bases, units);
             }
         }
         std::printf("  seeded=%d/%zu, land-poor-skips=%d\n",
@@ -267,7 +283,7 @@ int main()
         bool bg_clean = true;
         for (entity_id cid : bg_ids)
         {
-            const corporation_component& cc = w.corporations.at(cid);
+            const nation_component& cc = w.nations.at(cid);
             if (count_military_bases(w, cc) != 0 || count_generation_seeded_units(w, cid) != 0)
             {
                 bg_clean = false;
@@ -299,18 +315,18 @@ int main()
         {
             const entity_id cid_a = ids_a[i];
             const entity_id cid_b = ids_b[i];
-            const corporation_component& cc_a = a.corporations.at(cid_a);
-            const corporation_component& cc_b = b.corporations.at(cid_b);
+            const nation_component& cc_a = a.nations.at(cid_a);
+            const nation_component& cc_b = b.nations.at(cid_b);
 
             // Find each corp's military_base tile (0 or 1 present, per R1).
             entity_id tile_a = null_entity, tile_b = null_entity;
-            for (entity_id bid : cc_a.assets)
+            for (entity_id bid : cc_a.state_assets)
             {
                 const auto bit = a.buildings.find(bid);
                 if (bit != a.buildings.end() && bit->second.type == building_type::military_base)
                     tile_a = bit->second.tile;
             }
-            for (entity_id bid : cc_b.assets)
+            for (entity_id bid : cc_b.state_assets)
             {
                 const auto bit = b.buildings.find(bid);
                 if (bit != b.buildings.end() && bit->second.type == building_type::military_base)
@@ -404,10 +420,11 @@ int main()
 
         if (!corp_ids.empty())
         {
-            const corporation_component& cc = w.corporations.at(corp_ids.front());
+            // BL-1407: the charter's force would be its home NATION'S.
+            const nation_component& cc = w.nations.at(nation);
             check(count_military_bases(w, cc) == 0,
                   "R3 no military_base is authored when no valid land tile exists");
-            check(count_generation_seeded_units(w, corp_ids.front()) == 0,
+            check(count_generation_seeded_units(w, nation) == 0,
                   "R3 no starting unit is created when no valid land tile exists");
         }
     }

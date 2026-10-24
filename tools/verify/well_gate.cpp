@@ -169,10 +169,9 @@ int main()
     // P8 through the real construction seam.
     const entity_id corp = w.create_entity();
     {
-        corporation_component cc;
-        cc.balance = 1.0e6f; cc.starting_capital = 1.0e6f;
-        cc.is_player = true; // not AI-driven: this harness pins arithmetic
-        w.corporations[corp] = cc;
+        nation_component cc{};
+        cc.treasury = 1.0e6f; 
+        w.nations[corp] = cc;
     }
     w.player_entity = corp;
     entity_id well = null_entity, refused = null_entity;
@@ -213,7 +212,7 @@ int main()
         b.target_resource = food; b.workforce_assigned = 0.5f;
         b.workforce_auto = false;
         w.buildings[id] = b;
-        w.corporations[corp].assets.push_back(id);
+        w.nations[corp].state_assets.push_back(id);
         return id;
     };
     const entity_id inland_wharf = force_site(dry);
@@ -236,7 +235,7 @@ int main()
         b.workforce_auto = false;
         w.buildings[control] = b;
     }
-    w.corporations[corp].assets.push_back(control);
+    w.nations[corp].state_assets.push_back(control);
 
     // BL-1322 (workforce stepped auto): the game steps the SEATED player's workforce
     // each tick, and this fixture has no market, so it would step the Well toward 0.
@@ -244,9 +243,8 @@ int main()
     // owner stays is_player (the corp AI never steers it) and nothing steps its sites.
     {
         const entity_id seat = w.create_entity();
-        corporation_component sc;
-        sc.is_player = true;
-        w.corporations[seat] = sc;
+        nation_component sc{};
+        w.nations[seat] = sc;
         w.player_entity = seat;
     }
     const std::size_t rw = ri(resource_type::water);

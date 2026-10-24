@@ -181,14 +181,11 @@ scene make_scene(float ai_cash)
         w.buildings[bld] = b;
 
         const entity_id corp = w.create_entity();
-        corporation_component cc;
+        nation_component cc{};
         cc.name             = name;
-        cc.is_player        = is_player;
-        cc.focus            = industrial_focus::extraction;
-        cc.starting_capital = cash;
-        cc.balance          = cash;
-        cc.assets.push_back(bld);
-        w.corporations[corp] = cc;
+        cc.treasury          = cash;
+        cc.state_assets.push_back(bld);
+        w.nations[corp] = cc;
         out_bld = bld;
         return corp;
     };
@@ -323,17 +320,13 @@ chain_result run_chain_scene(int rich_col, float max_reach)
         mc.price = mc.base_price;
         w.markets[m] = mc;
     }
-    const entity_id ai = w.create_entity();
-    {
-        corporation_component cc; cc.name = "Far Reach Mining"; cc.focus = industrial_focus::extraction;
-        cc.starting_capital = cc.balance = 1.0e6f; cc.home_nation = nation;
-        w.corporations[ai] = cc;
-    }
+    // BL-1407: the rival IS the nation (the corporation retired).
+    const entity_id ai = nation;
+    w.nations.at(ai).treasury = 1.0e6f;
     const entity_id pl = w.create_entity();
     {
-        corporation_component cc; cc.name = "Player Co"; cc.is_player = true;
-        cc.starting_capital = cc.balance = 10.0f;
-        w.corporations[pl] = cc;
+        nation_component cc{}; cc.name = "Player Co";        cc.treasury = 10.0f;
+        w.nations[pl] = cc;
     }
     w.player_entity = pl;
 
@@ -358,7 +351,7 @@ chain_result run_chain_scene(int rich_col, float max_reach)
     chain_result out;
     entity_id site = null_entity;
     std::vector<entity_id> hubs;
-    for (const entity_id bid : w.corporations.at(ai).assets)
+    for (const entity_id bid : w.nations.at(ai).state_assets)
     {
         const building_component& b = w.buildings.at(bid);
         if (b.type == building_type::extraction_site && b.tile == tiles[static_cast<std::size_t>(rich_col)])
@@ -416,16 +409,16 @@ int main()
 
         // Rejected command mutates NOTHING: snapshot, fire at the ocean, compare.
         const std::size_t n_bld  = s.w.buildings.size();
-        const float       ai_bal = s.w.corporations.at(s.ai_corp).balance;
-        const float       pl_bal = s.w.corporations.at(s.pl_corp).balance;
+        const float       ai_bal = s.w.nations.at(s.ai_corp).treasury;
+        const float       pl_bal = s.w.nations.at(s.pl_corp).treasury;
         corp_command bad = build;
         bad.tile = s.t_ocean;
         const auto r2 = apply_corp_command(s.w, reg, bad);
         check(r2 == corp_command_result::rejected_placement,
               "BL-202 R1: an ocean-tile build is rejected by the placement seam");
         check(s.w.buildings.size() == n_bld &&
-              s.w.corporations.at(s.ai_corp).balance == ai_bal &&
-              s.w.corporations.at(s.pl_corp).balance == pl_bal,
+              s.w.nations.at(s.ai_corp).treasury == ai_bal &&
+              s.w.nations.at(s.pl_corp).treasury == pl_bal,
               "BL-202 R1: the rejected command mutates nothing");
 
         // Ownership guard: dialling a building the corp does not own is refused.
@@ -655,7 +648,7 @@ int main()
             bc.type           = building_type::military_base;
             bc.ticks_remaining = 0;
             s.w.buildings[b] = bc;
-            s.w.corporations[s.ai_corp].assets.push_back(b);
+            s.w.nations[s.ai_corp].state_assets.push_back(b);
         };
 
         // BL-1265: corporations hold no pools — goods on the SHELVES of the
@@ -679,7 +672,7 @@ int main()
                 b.tile = s.t_hidden;
                 b.type = building_type::extraction_site;
                 s.w.buildings[hb] = b;
-                s.w.corporations.at(s.ai_corp).assets.push_back(hb);
+                s.w.nations.at(s.ai_corp).state_assets.push_back(hb);
             }
             shelve(s.w, k_home, resource_type::steel, 3.0f);
             shelve(s.w, k_hidden, resource_type::steel, 4.0f);
@@ -760,7 +753,7 @@ int main()
             bc.type            = bt;
             bc.ticks_remaining = 0;
             s.w.buildings[b] = bc;
-            s.w.corporations[s.ai_corp].assets.push_back(b);
+            s.w.nations[s.ai_corp].state_assets.push_back(b);
         };
 
         // The axes are disjoint by construction; assert it, because the
@@ -862,93 +855,31 @@ int main()
     // =====================================================================
     // R6 — the budget-claim producer (BL-537 / Sprint N3 T5)
     // =====================================================================
-    // A survey the rival WANTED and could not afford becomes a claim on its
-    // home nation's `public_exploration` line: the FULL survey cost, earmarked
-    // to the body (NR-568). One per corp per evaluation — the top-scoring gated
-    // survey — none from a corp with no home nation, none when the survey was
-    // not gated. The scene's hidden body sits 2 AU out (cost 4508); a second
-    // hidden body at 1 AU (cost 2508) scores higher (same area, lower cost), so
-    // the claim must name THAT one and carry 2508, not 4508.
+    // BL-1407: RETIRED WITH THE CORPORATION. The claim was a FIRM asking its home
+    // nation to fund a survey it could not afford; every actor is now a nation,
+    // and a nation's scorer carries no survey candidate at all (corp_ai.cpp: the
+    // nation's door has no survey verb, and the grant admits no verb that exists
+    // only because the actor is a nation — AI_OPPONENT.md § 11). What stands is
+    // that boundary: a rival NATION, rich or poor, neither dispatches a survey
+    // nor files a survey claim.
     {
         const recipe_registry reg = make_registry();
-
-        auto add_nation = [](scene& s) {
-            const entity_id n = s.w.create_entity();
-            nation_component nc{};
-            nc.name     = "Homeland";
-            nc.treasury = 0.0f; // the pass is not run here; the claim is the subject
-            s.w.nations[n] = nc;
-            return n;
-        };
-        auto add_near_hidden = [](scene& s) {
+        for (const float cash : { 1000.0f, 20000.0f })
+        {
+            scene s = make_scene(cash);
             const entity_id b = s.w.create_entity();
             body_component bc{};
-            bc.name         = "Near Veil";
-            bc.type         = body_type::planet;
-            bc.grid_width   = 4;
-            bc.grid_height  = 4;
-            bc.orbital_radius_au = 1.0f;
+            bc.name = "Near Veil"; bc.type = body_type::planet;
+            bc.grid_width = 4; bc.grid_height = 4; bc.orbital_radius_au = 1.0f;
             bc.survey.phase = survey_phase::hidden;
             s.w.bodies[b] = bc;
-            return b;
-        };
-
-        // Cash-poor, with a home nation: exactly one claim, the right fields.
-        {
-            scene s = make_scene(1000.0f);
-            const entity_id nation = add_nation(s);
-            const entity_id near   = add_near_hidden(s);
-            s.w.corporations.at(s.ai_corp).home_nation = nation;
             economy_report rep;
             run_corp_strategic_step(s.w, reg, rep, /*tick=*/4);
-
-            const float near_cost = survey_cost(s.w, near);
-            const float far_cost  = survey_cost(s.w, s.hidden);
-            check(near_cost < far_cost && near_cost > 1000.0f,
-                  "BL-537 R6: the probe is not vacuous - both surveys cost more than "
-                  "the corp holds, and the near body is the cheaper (higher-scoring) one");
-            check(rep.budget_claims.size() == 1,
-                  "BL-537 R6: a cash-gated rival with a home nation files exactly ONE "
-                  "claim per evaluation, though two hidden bodies were gated");
-            if (rep.budget_claims.size() == 1)
-            {
-                const budget_claim& c = rep.budget_claims[0];
-                check(c.nation == nation && c.corp == s.ai_corp &&
-                      c.line == budget_priority::public_exploration,
-                      "BL-537 R6: the claim names the home nation, the corp, and the "
-                      "public_exploration line");
-                check(c.subject == near && c.amount == near_cost,
-                      "BL-537 R6: the claim is earmarked to the TOP-SCORING gated survey "
-                      "and carries that body's FULL survey cost (NR-568)");
-            }
-            check(s.w.bodies.at(near).survey.phase == survey_phase::hidden &&
-                  s.w.bodies.at(s.hidden).survey.phase == survey_phase::hidden,
-                  "BL-537 R6: filing a claim dispatches nothing - both bodies stay hidden");
-        }
-
-        // No home nation: nobody to ask; no claim.
-        {
-            scene s = make_scene(1000.0f);
-            add_near_hidden(s);
-            economy_report rep;
-            run_corp_strategic_step(s.w, reg, rep, /*tick=*/4);
-            check(rep.budget_claims.empty() &&
-                  s.w.corporations.at(s.ai_corp).home_nation == null_entity,
-                  "BL-537 R6: a cash-gated rival with NO home nation files no claim");
-        }
-
-        // Rich: the survey passes the gate and is dispatched; no claim.
-        {
-            scene s = make_scene(20000.0f);
-            const entity_id nation = add_nation(s);
-            const entity_id near   = add_near_hidden(s);
-            s.w.corporations.at(s.ai_corp).home_nation = nation;
-            economy_report rep;
-            run_corp_strategic_step(s.w, reg, rep, /*tick=*/4);
-            check(rep.budget_claims.empty() &&
-                  s.w.bodies.at(near).survey.phase == survey_phase::in_transit,
-                  "BL-537 R6: a rival that could afford its survey dispatches it and "
-                  "files no claim - the gate, not the wish, is the trigger");
+            check(rep.budget_claims.empty() && s.w.bodies.at(b).survey.phase == survey_phase::hidden
+                      && s.w.bodies.at(s.hidden).survey.phase == survey_phase::hidden,
+                  cash < 5000.0f
+                      ? "BL-1407 R6: a cash-poor rival nation files no survey claim and dispatches nothing"
+                      : "BL-1407 R6: a rich rival nation dispatches no survey (the nation's door carries none)");
         }
     }
 
@@ -1030,8 +961,8 @@ int main()
             const standing_index armed = corp_standing_index(s.w, reg, s.ai_corp);
             scene bare_s = make_scene(1000.0f);
             const standing_index bare = corp_standing_index(bare_s.w, reg, bare_s.ai_corp);
-            check(s.w.corporations.at(s.ai_corp).balance ==
-                      bare_s.w.corporations.at(bare_s.ai_corp).balance,
+            check(s.w.nations.at(s.ai_corp).treasury ==
+                      bare_s.w.nations.at(bare_s.ai_corp).treasury,
                   "BL-700 R7: the probe is not vacuous - both corps hold the same cash");
             check(armed.total > bare.total,
                   "BL-700 R7: equal balances rank UNEQUAL - the composite is not the bank balance");
@@ -1100,7 +1031,7 @@ int main()
         {
             scene s = staged(1000.0f);
             std::vector<entity_id> ids;
-            for (const auto& [id, cc] : s.w.corporations) ids.push_back(id);
+            for (const auto& [id, cc] : s.w.nations) ids.push_back(id);
             std::sort(ids.begin(), ids.end());
 
             std::vector<standing_index> forward;
@@ -1191,7 +1122,7 @@ int main()
             b.target_resource    = resource_type::steel;
             b.recipe             = reg.recipe_id(incumbent);
             s.w.buildings[f] = b;
-            s.w.corporations.at(s.ai_corp).assets.push_back(f);
+            s.w.nations.at(s.ai_corp).state_assets.push_back(f);
 
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
@@ -1293,7 +1224,7 @@ int main()
             b.target_resource    = resource_type::steel;
             b.recipe             = reg.recipe_id("alpha_iron");
             s.w.buildings[f] = b;
-            s.w.corporations.at(s.ai_corp).assets.push_back(f);
+            s.w.nations.at(s.ai_corp).state_assets.push_back(f);
 
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
@@ -1317,7 +1248,7 @@ int main()
                 m.workforce_auto     = false;
                 m.target_resource    = resource_type::coal;
                 s.w.buildings[mine] = m;
-                s.w.corporations.at(s.pl_corp).assets.push_back(mine);
+                s.w.nations.at(s.pl_corp).state_assets.push_back(mine);
             }
 
             walked out;

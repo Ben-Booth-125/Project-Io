@@ -149,14 +149,14 @@ int main(int argc, char** argv)
 
         const entity_id actor = w.player_entity;
         entity_id own_nation = null_entity;
-        if (const auto cit = w.corporations.find(actor); cit != w.corporations.end())
-            own_nation = cit->second.home_nation;
+        if (const auto cit = w.nations.find(actor); cit != w.nations.end())
+            own_nation = cit->first; // BL-1407: the actor is its own nation
         check(actor != null_entity, "the world has a player to ask as");
 
         // The body the player stands on: the one their first asset sits on.
         entity_id body = null_entity;
-        if (const auto cit = w.corporations.find(actor); cit != w.corporations.end())
-            for (const entity_id bid : cit->second.assets)
+        if (const auto cit = w.nations.find(actor); cit != w.nations.end())
+            for (const entity_id bid : cit->second.state_assets)
                 if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
                     if (const auto tit = w.tiles.find(bit->second.tile); tit != w.tiles.end())
                     { body = tit->second.body; break; }

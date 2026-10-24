@@ -83,10 +83,9 @@ scene make_scene()
 
     auto make_corp = [&](bool is_player, const char* name, int n_buildings) -> entity_id {
         const entity_id corp = w.create_entity();
-        corporation_component cc;
-        cc.name = name; cc.is_player = is_player;
-        cc.focus = industrial_focus::extraction;
-        cc.starting_capital = 500.0f; cc.balance = 500.0f;
+        nation_component cc{};
+        cc.name = name; 
+        cc.treasury = 500.0f;
         for (int i = 0; i < n_buildings; ++i)
         {
             const entity_id tile = make_tile(w, s.body, i, 0, terrain_substrate::rocky, 0.5f);
@@ -95,9 +94,9 @@ scene make_scene()
             b.tile = tile; b.type = building_type::extraction_site;
             b.workforce_assigned = 0.5f; b.target_resource = resource_type::iron_ore;
             w.buildings[bld] = b;
-            cc.assets.push_back(bld);
+            cc.state_assets.push_back(bld);
         }
-        w.corporations[corp] = cc;
+        w.nations[corp] = cc;
         return corp;
     };
 
@@ -105,8 +104,7 @@ scene make_scene()
     s.strong = make_corp(false, "Meridian Extraction",  5);
     w.player_entity = w.create_entity();
     {
-        corporation_component cc; cc.name = "Player Co"; cc.is_player = true;
-        w.corporations[w.player_entity] = cc;
+        nation_component cc{}; cc.name = "Player Co";        w.nations[w.player_entity] = cc;
     }
     return s;
 }

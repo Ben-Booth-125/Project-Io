@@ -340,8 +340,16 @@ int main()
         reg.set_construction(cp);
 
         const entity_id corp = f.w.create_entity();
-        corporation_component cc; cc.balance = 1000.0f;
-        f.w.corporations.emplace(corp, cc);
+        nation_component cc{}; cc.treasury = 1000.0f;
+        f.w.nations.emplace(corp, cc);
+        // BL-1407: the builder is a NATION, and a nation builds on its own ground
+        // (construct_nation); the retired corporation had none and was not asked.
+        for (auto& [tid, tc] : f.w.tiles)
+            if (tc.body == f.body && f.w.tile_to_nation.count(tid) == 0)
+            {
+                f.w.tile_to_nation[tid] = corp;
+                f.w.nations.at(corp).tiles.push_back(tid);
+            }
 
         body_reach_field(f.w, f.body); // cache an all-infinite field
 

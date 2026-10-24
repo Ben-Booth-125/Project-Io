@@ -58,7 +58,7 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
         int live = 0, decom = 0, building = 0;
         for (const auto& [bid, b] : w.buildings) { (void)bid; if (b.decommissioned) ++decom; else if (b.ticks_remaining > 0) ++building; else ++live; }
         std::printf("  t%4d econ | corps %3zu | buildings live %5d under-construction %4d decommissioned %5d | rows %5d (ext %d proc %d) active %5d idle %5d | eff-workforce %.0f | grant mean %.3f, %d below 0.99\n",
-                    tick, w.corporations.size(), live, building, decom, rows, ext, proc, active, idle, eff,
+                    tick, w.nations.size(), live, building, decom, rows, ext, proc, active, idle, eff,
                     ng ? grant / ng : 0.0f, contended);
         (void)starved;
     }

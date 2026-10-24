@@ -110,11 +110,11 @@ int main(int argc, char** argv)
         // Marketplaces in the world, by owner / nation / body.
         std::map<entity_id, entity_id> owner_of; // building -> corp
         std::vector<entity_id> corp_ids;
-        for (const auto& kv : w.corporations)
+        for (const auto& kv : w.nations)
             corp_ids.push_back(kv.first);
         std::sort(corp_ids.begin(), corp_ids.end());
         for (const entity_id cid : corp_ids)
-            for (const entity_id bid : w.corporations.at(cid).assets)
+            for (const entity_id bid : w.nations.at(cid).state_assets)
                 owner_of[bid] = cid;
         int total_mp = 0, mp_owned = 0;
         std::map<entity_id, int> by_nation, by_body;
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
             check(o->second != w.player_entity || w.player_entity == null_entity,
                   "a Marketplace retrofitted for the seat", seed);
             ++by_corp[o->second];
-            ++by_nation[w.corporations.at(o->second).home_nation];
+            ++by_nation[o->second]; // BL-1407: the owner is its own nation
             if (const auto t = w.tiles.find(bc.tile); t != w.tiles.end())
                 ++by_body[t->second.body];
         }
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
         int spec = 0, bg = 0, spec_hold = 0, bg_hold = 0;
         for (const entity_id cid : corp_ids)
         {
-            const bool background = w.corporations.at(cid).is_background;
+            const bool background = !w.nations.at(cid).is_major; // BL-1407
             (background ? bg : spec)++;
             if (by_corp.count(cid) != 0)
                 (background ? bg_hold : spec_hold)++;
@@ -182,13 +182,13 @@ int main(int argc, char** argv)
         // ladder is read from offline (the owner is found at every rate).
         for (const marketplace_retrofit_row& row : r.rows)
         {
-            const auto oc = w.corporations.find(row.owner);
+            const auto oc = w.nations.find(row.owner);
             std::printf("\nROW %u %llu %lld %lld %llu %d %d %llu", seed,
                         static_cast<unsigned long long>(row.market),
                         static_cast<long long>(row.flow_volume), static_cast<long long>(row.relation_years),
                         static_cast<unsigned long long>(row.owner),
-                        oc != w.corporations.end() && oc->second.is_background ? 1 : 0, row.owner_holdings,
-                        static_cast<unsigned long long>(oc != w.corporations.end() ? oc->second.home_nation
+                        oc != w.nations.end() && oc->second.is_major == false ? 1 : 0, row.owner_holdings,
+                        static_cast<unsigned long long>(oc != w.nations.end() ? oc->first
                                                                                    : null_entity));
         }
         std::printf("\n  ladder (flow/1000, rel/yr, price, cap -> bought):");

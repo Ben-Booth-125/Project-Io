@@ -145,20 +145,28 @@ entity_id add_consumer(world& w, entity_id tile, entity_id owner, float assigned
     building_component& bc = w.buildings.at(b);
     bc.workforce_assigned  = assigned;
     bc.workforce_target    = target;
-    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-        cit->second.assets.push_back(b);
+    if (const auto cit = w.nations.find(owner); cit != w.nations.end())
+        cit->second.state_assets.push_back(b);
     return b;
 }
 
 entity_id add_corp(world& w, const char* name, float balance = 10000.0f,
                    entity_id home_nation = null_entity)
 {
+    // BL-1407: no corporation. An actor homed in a nation IS that nation (its
+    // marches draw its own pool); an unhomed one is a fresh nation.
+    // Its capital is the nation's (the fold credits a firm's money to its home
+    // treasury), so the actor can pay what the retired firm paid.
+    if (home_nation != null_entity && w.nations.count(home_nation) != 0)
+    {
+        w.nations.at(home_nation).treasury += balance;
+        return home_nation;
+    }
     const entity_id c = w.create_entity();
-    corporation_component cc{};
-    cc.name         = name;
-    cc.balance      = balance;
-    cc.home_nation  = home_nation; // BL-1352: whose pool its marches draw
-    w.corporations[c] = cc;
+    nation_component cc{};
+    cc.name     = name;
+    cc.treasury = balance;
+    w.nations[c] = cc;
     return c;
 }
 
@@ -300,7 +308,7 @@ void l2_granted_draw()
     order_along_row(w, unit, body, 1, 4);
 
     const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.1f);
-    const float balance_before = w.corporations.at(corp).balance;
+    const float balance_before = w.nations.at(corp).treasury;
 
     const march_tick_result t = march_tick(w, reg);
 
@@ -312,7 +320,7 @@ void l2_granted_draw()
     // Plains cost 1.0 a tile, so 2.0 points move exactly two tiles.
     check(w.units.at(unit).position == tile_at(w, body, 3),
           "the unit moved exactly as its march points alone would predict (two plains tiles)");
-    const float paid = balance_before - w.corporations.at(corp).balance;
+    const float paid = balance_before - w.nations.at(corp).treasury;
     check(approx(paid, 0.1f * 2.0f * 50.0f),
           "credits debited = price x points x head (the price, separate from the cap)");
 }
@@ -339,7 +347,7 @@ void l3_refused_mutates_nothing()
     const recipe_registry reg = make_registry(/*march_pts=*/3.0f, /*credit=*/0.1f);
     const movement_order order_before   = w.units.at(unit).order;
     const entity_id      position_before = w.units.at(unit).position;
-    const float          balance_before = w.corporations.at(corp).balance;
+    const float          balance_before = w.nations.at(corp).treasury;
 
     const march_tick_result t = march_tick(w, reg);
 
@@ -347,7 +355,7 @@ void l3_refused_mutates_nothing()
     check(w.units.at(unit).position == position_before, "the unit did not move");
     check(order_equal(w.units.at(unit).order, order_before),
           "its order, path, index and banked progress are byte-identical");
-    check(approx(w.corporations.at(corp).balance, balance_before),
+    check(approx(w.nations.at(corp).treasury, balance_before),
           "and no credits were charged for a march that did not happen");
     const lp_nation_row* r = nation_row(t.lp, nation);
     check(r != nullptr && approx(r->march_claim, 3.0f) && approx(r->march_granted, 0.0f),
@@ -482,7 +490,12 @@ void l5_contention_order()
     const int refused_2 = run(&h2, &p2);
 
     check(refused_1 == 1, "a pool covering one march of two refuses exactly one");
-    check(h1 && !p1, "the mobilised corp's unit is served first, the peaceful one waits");
+    // BL-1407: "the mobilised corp's unit is served first" RETIRED — it set two
+    // corporations of ONE nation against each other in that nation's pool. With
+    // the corporation gone both units are the one nation's, so its mobilisation
+    // is a single fact; what stands is that exactly one of its two marches is
+    // served from a pool covering one.
+    check(h1 != p1, "BL-1407: one nation's two marches, a pool covering one: exactly one is served");
     check(refused_1 == refused_2 && h1 == h2 && p1 == p2,
           "two independent runs of the same scenario resolve identically");
 }
@@ -1233,15 +1246,15 @@ void l9_shipment_draws()
               "a 50-unit trade sends the 20 the anchor admits");
         check(w.convoys.size() == 1 && approx(w.convoys.front().cargo_qty, sent, 1e-4f),
               "and the convoy carries exactly that");
-        check(approx(w.corporations.at(corp).balance, 100000.0f - 5.0f * (sent / 50.0f), 1e-2f),
+        check(approx(w.nations.at(corp).treasury, 100000.0f - 5.0f * (sent / 50.0f), 1e-2f),
               "a trimmed cargo pays its share of the haul and no more");
         const float shelf = w.markets.at(a).inventory[0];
-        const float bal   = w.corporations.at(corp).balance;
+        const float bal   = w.nations.at(corp).treasury;
         refused = false;
         const bool again = commit_trade_shipment(w, reg, rep, corp, a, b, 0, 10.0f, leg, &refused, &sent);
         check(!again && refused, "with the pot spent the next shipment is refused, for want of points");
         check(w.convoys.size() == 1 && w.markets.at(a).inventory[0] == shelf
-                  && w.corporations.at(corp).balance == bal,
+                  && w.nations.at(corp).treasury == bal,
               "and the refusal mutates nothing");
     }
 }

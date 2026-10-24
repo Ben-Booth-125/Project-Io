@@ -1,6 +1,10 @@
 // quarterly_return — the BL-626 filed balance sheet (requirement group
 // `quarterly-return`, rows R1-R6). No SDL / Lua / ImGui.
 //
+// BL-1407: the corporation is retired; THE NATION FILES THE RETURN. Every
+// "corporation" / "balance" below now reads "nation" / "treasury" — the rows
+// are unchanged in kind, re-pointed at nation_component::returns.
+//
 // Build and run (from the repo root):
 //   node tools/verify/build_harness.js quarterly_return --run
 //
@@ -80,6 +84,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp" // BL-1335: run_nation_step (R7)
+#include "world/state_industry.hpp" // BL-1407: fold_to_ground
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/trade.hpp"
@@ -193,14 +198,15 @@ fixture build_fixture(const recipe_registry& reg)
 
     const auto make_corp = [&](const char* name, float capital,
                                std::vector<entity_id> assets) {
+        // BL-1407: the owner is a NATION — the corporation retired, and the
+        // nation files the return (FINANCE.md § The quarterly return). Nothing in
+        // this harness's tick runs an AI, so neither nation is commanded.
         const entity_id c = w.create_entity();
-        corporation_component cc;
-        cc.name             = name;
-        cc.starting_capital = capital;
-        cc.balance          = capital;
-        cc.assets           = std::move(assets);
-        cc.is_player        = true; // not AI-driven; see the fixture comment
-        w.corporations[c] = cc;
+        nation_component cc;
+        cc.name         = name;
+        cc.treasury     = capital;
+        cc.state_assets = std::move(assets);
+        w.nations[c] = cc;
         return c;
     };
 
@@ -227,8 +233,8 @@ void tick(world& w, const recipe_registry& reg, int t,
 std::vector<entity_id> sorted_corp_ids(const world& w)
 {
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     return ids;
@@ -237,10 +243,10 @@ std::vector<entity_id> sorted_corp_ids(const world& w)
 float book_of(const world& w, const recipe_registry& reg, entity_id corp)
 {
     float sum = 0.0f;
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    const auto cit = w.nations.find(corp);
+    if (cit == w.nations.end())
         return sum;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : cit->second.state_assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -257,7 +263,7 @@ std::string returns_image(const world& w)
     std::string bytes;
     for (const entity_id id : sorted_corp_ids(w))
     {
-        const auto& hist = w.corporations.at(id).returns;
+        const auto& hist = w.nations.at(id).returns;
         const char* p = reinterpret_cast<const char*>(hist.data());
         bytes.append(p, hist.size() * sizeof(quarterly_return));
     }
@@ -283,7 +289,7 @@ void run_fixture_rows(const recipe_registry& reg)
         fixture f = build_fixture(reg);
         std::map<entity_id, float> opening;
         for (const entity_id id : sorted_corp_ids(f.w))
-            opening[id] = f.w.corporations.at(id).balance;
+            opening[id] = f.w.nations.at(id).treasury;
 
         std::map<entity_id, corp_budget> sink;
         tick(f.w, reg, 0, &sink);
@@ -292,7 +298,7 @@ void run_fixture_rows(const recipe_registry& reg)
         bool bal_match = true, holdings_match = true, book_match = true;
         for (const entity_id id : sorted_corp_ids(f.w))
         {
-            const corporation_component& cc = f.w.corporations.at(id);
+            const nation_component& cc = f.w.nations.at(id);
             one_each = one_each && cc.returns.size() == 1;
             if (cc.returns.empty())
                 continue;
@@ -305,17 +311,17 @@ void run_fixture_rows(const recipe_registry& reg)
                 && q.interest == b.interest && q.levies == b.levies
                 && q.upkeep == b.upkeep;
             net_exact      = net_exact
-                          && q.net == static_cast<double>(cc.balance)
+                          && q.net == static_cast<double>(cc.treasury)
                                     - static_cast<double>(opening.at(id));
-            bal_match      = bal_match && q.balance == cc.balance;
+            bal_match      = bal_match && q.balance == cc.treasury;
             holdings_match = holdings_match
-                          && q.holdings == static_cast<uint32_t>(cc.assets.size());
+                          && q.holdings == static_cast<uint32_t>(cc.state_assets.size());
             book_match     = book_match && q.book_value == book_of(f.w, reg, id);
         }
-        check(one_each,       "R1", "one return filed per corporation per econ tick");
+        check(one_each,       "R1", "one return filed per nation per econ tick");
         check(flows_match,    "R1", "the seven flows are bit-identical to corp_budget's");
         check(net_exact,      "R1", "net is the exact balance delta this tick");
-        check(bal_match,      "R1", "balance is the closing corporation_component.balance");
+        check(bal_match,      "R1", "balance is the closing nation_component.treasury");
         check(holdings_match, "R1", "holdings is assets.size()");
         check(book_match,     "R1", "book_value is the registry build_cost over the holdings");
     }
@@ -342,7 +348,7 @@ void run_fixture_rows(const recipe_registry& reg)
         fixture f = build_fixture(reg);
         std::map<entity_id, double> initial;
         for (const entity_id id : sorted_corp_ids(f.w))
-            initial[id] = static_cast<double>(f.w.corporations.at(id).balance);
+            initial[id] = static_cast<double>(f.w.nations.at(id).treasury);
 
         for (int t = 0; t < 40; ++t)
             tick(f.w, reg, t);
@@ -350,11 +356,11 @@ void run_fixture_rows(const recipe_registry& reg)
         bool exact = true, non_trivial = false;
         for (const entity_id id : sorted_corp_ids(f.w))
         {
-            const corporation_component& cc = f.w.corporations.at(id);
+            const nation_component& cc = f.w.nations.at(id);
             double sum = 0.0;
             for (const quarterly_return& q : cc.returns)
                 sum += static_cast<double>(q.net);
-            const double delta = static_cast<double>(cc.balance) - initial.at(id);
+            const double delta = static_cast<double>(cc.treasury) - initial.at(id);
             exact = exact && cc.returns.size() == 40 && sum == delta;
             non_trivial = non_trivial || delta != 0.0;
         }
@@ -371,13 +377,13 @@ void run_fixture_rows(const recipe_registry& reg)
         {
             tick(f.w, reg, t);
             for (const entity_id id : sorted_corp_ids(f.w))
-                closing[id].push_back(f.w.corporations.at(id).balance);
+                closing[id].push_back(f.w.nations.at(id).treasury);
         }
 
         bool capped = true, window_ok = true;
         for (const entity_id id : sorted_corp_ids(f.w))
         {
-            const corporation_component& cc = f.w.corporations.at(id);
+            const nation_component& cc = f.w.nations.at(id);
             capped = capped && cc.returns.size() == k_quarterly_return_retention;
             if (cc.returns.size() != k_quarterly_return_retention)
                 continue;
@@ -386,7 +392,7 @@ void run_fixture_rows(const recipe_registry& reg)
             for (std::size_t i = 0; i < k_quarterly_return_retention; ++i)
                 window_ok = window_ok && cc.returns[i].balance == seq[first + i];
         }
-        check(capped,    "R3", "a corp run past the retention holds exactly 40 returns");
+        check(capped,    "R3", "a nation run past the retention holds exactly 40 returns");
         check(window_ok, "R3", "the retained 40 are the LAST 40, in order (oldest dropped first)");
     }
 
@@ -394,8 +400,8 @@ void run_fixture_rows(const recipe_registry& reg)
     {
         fixture f = build_fixture(reg);
         tick(f.w, reg, 0);
-        const float a = f.w.corporations.at(f.corp_a).returns.back().book_value;
-        const float b = f.w.corporations.at(f.corp_b).returns.back().book_value;
+        const float a = f.w.nations.at(f.corp_a).returns.back().book_value;
+        const float b = f.w.nations.at(f.corp_b).returns.back().book_value;
         const float want_a = reg.economics(building_type::extraction_site).build_cost * 2.0f;
         const float want_b = reg.economics(building_type::processing_facility).build_cost
                            + reg.economics(building_type::port).build_cost;
@@ -410,30 +416,28 @@ void run_fixture_rows(const recipe_registry& reg)
 }
 
 // ---------------------------------------------------------------------------
-// R7 — BL-1335: the tax is in the SAME quarter's filed return
+// R7 — BL-1335 / BL-1403: the tax is in the SAME quarter's filed return
 // ---------------------------------------------------------------------------
-// The fixture's two corporations are given a home nation at tier V and run 20
-// live quarters (past the settle, so the tax is on) through apply_budget AND
-// run_nation_step. The tax is taken inside apply_budget before the return is
-// filed, so the sum of the filed nets equals the real balance change across the
-// whole run EXACTLY — the nation step moves no balance here (no budget, no
-// claims) — every return's flows, taxes included, rebuild its net, and the
-// treasury rose by exactly the taxes the returns booked.
+// BL-1407: the fixture's two owners are NATIONS at tier V, run 20 live quarters
+// (past the settle, so the tax is on) through apply_budget AND run_nation_step.
+// The tax is the tier's share of the wages the nation's own buildings paid,
+// credited back to its treasury inside apply_budget before the return is filed
+// (BL-1403, NATIONS.md § Taxes and Discontent) — so at nation grain `taxes` is a
+// CREDIT in the return. The sum of the filed nets equals the real treasury
+// change across the whole run EXACTLY (the nation step moves no treasury here:
+// no budget, no claims), every return's flows rebuild its net, and every row's
+// taxes are exactly the tier's share of that row's wages.
 void run_tax_rows(const recipe_registry& reg)
 {
     std::printf("\nR7 — BL-1335: the tax lands in the filed return, run_nation_step included\n");
     fixture f = build_fixture(reg);
-    const entity_id nation = f.w.create_entity();
-    f.w.nations[nation] = nation_component{};
-    f.w.nations[nation].name     = "Fixture Nation";
-    f.w.nations[nation].tax_tier = 5;
-    for (auto& [cid, cc] : f.w.corporations)
-        cc.home_nation = nation;
+    for (auto& [nid, nc] : f.w.nations)
+        nc.tax_tier = 5;
 
+    bool tier_share = true;
     std::map<entity_id, double> initial;
     for (const entity_id id : sorted_corp_ids(f.w))
-        initial[id] = static_cast<double>(f.w.corporations.at(id).balance);
-    const double treasury0 = static_cast<double>(f.w.nations.at(nation).treasury);
+        initial[id] = static_cast<double>(f.w.nations.at(id).treasury);
 
     for (int t = 0; t < 20; ++t)
     {
@@ -444,12 +448,23 @@ void run_tax_rows(const recipe_registry& reg)
         economy_report report = run_economy_step(f.w, reg);
         run_trades(f.w, reg, report);
         auto flows = clear_markets(f.w, reg, report);
-        // The fixture has no shelf its firms sell onto, so the market income is
-        // supplied: 100 a quarter to each firm, the term the tax is levied on.
+        // The fixture has no shelf its buildings sell onto, so the market income
+        // is supplied: 100 a quarter to each nation.
         for (const entity_id id : sorted_corp_ids(f.w))
             flows[id].income += 100.0f;
+        // The tier is read BEFORE the pass that taxes at it: run_nation_step may
+        // move a background nation's tier (the scored set_tax verb).
+        std::map<entity_id, int> tier_at;
+        for (const entity_id id : sorted_corp_ids(f.w))
+            tier_at[id] = f.w.nations.at(id).tax_tier;
         apply_budget(f.w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings, &report.building_labour);
+        for (const entity_id id : sorted_corp_ids(f.w))
+        {
+            const quarterly_return& q = f.w.nations.at(id).returns.back();
+            tier_share = tier_share
+                && q.taxes == (q.wages > 0.0f ? nation_wage_tax(q.wages, tier_at.at(id), reg.tax()) : 0.0f);
+        }
         run_nation_step(f.w, reg, report, econ);
     }
 
@@ -457,37 +472,35 @@ void run_tax_rows(const recipe_registry& reg)
     double taxes = 0.0;
     for (const entity_id id : sorted_corp_ids(f.w))
     {
-        const corporation_component& cc = f.w.corporations.at(id);
+        const nation_component& cc = f.w.nations.at(id);
         double sum = 0.0;
         for (const quarterly_return& q : cc.returns)
         {
             sum   += static_cast<double>(q.net);
             taxes += static_cast<double>(q.taxes);
             const double flows_net = static_cast<double>(q.income) - q.expenditure - q.maintenance
-                                   - q.wages - q.interest - q.levies - q.upkeep - q.taxes + q.refunds;
+                                   - q.wages - q.interest - q.levies - q.upkeep + q.taxes + q.refunds;
             rebuild = rebuild && std::fabs(flows_net - q.net) <= 1e-3 * std::max(1.0, std::fabs(static_cast<double>(q.net)));
         }
         exact = exact && cc.returns.size() == 20
-             && sum == static_cast<double>(cc.balance) - initial.at(id);
+             && sum == static_cast<double>(cc.treasury) - initial.at(id);
     }
     for (const entity_id id : sorted_corp_ids(f.w))
     {
         double inc = 0.0, out = 0.0;
-        for (const quarterly_return& q : f.w.corporations.at(id).returns)
+        for (const quarterly_return& q : f.w.nations.at(id).returns)
         {
             inc += q.income;
             out += static_cast<double>(q.expenditure) + q.maintenance + q.wages + q.interest + q.levies + q.upkeep;
         }
-        std::printf("       corp %u: income %.2f, outflows %.2f over the run\n", static_cast<unsigned>(id), inc, out);
+        std::printf("       nation %u: income %.2f, outflows %.2f over the run\n", static_cast<unsigned>(id), inc, out);
     }
-    const double raised = static_cast<double>(f.w.nations.at(nation).treasury) - treasury0;
     char buf[200];
     std::snprintf(buf, sizeof buf, "the run taxed something (%.4f credits over 20 quarters at tier V)", taxes);
     check(taxes > 0.0, "R7", buf);
-    check(exact, "R7", "sum of 20 filed nets == the real balance change with the tax and run_nation_step on, EXACTLY");
-    check(rebuild, "R7", "every filed return's flows, taxes included, rebuild its net");
-    std::snprintf(buf, sizeof buf, "the treasury rose by the returns' taxes (%.4f vs %.4f)", raised, taxes);
-    check(std::fabs(raised - taxes) <= 1e-3 * std::max(1.0, taxes), "R7", buf);
+    check(exact, "R7", "sum of 20 filed nets == the real treasury change with the tax and run_nation_step on, EXACTLY");
+    check(rebuild, "R7", "every filed return's flows, taxes (a credit) included, rebuild its net");
+    check(tier_share, "R7", "every row's taxes are exactly the tier's share of that row's wages");
 }
 
 // ---------------------------------------------------------------------------
@@ -518,17 +531,19 @@ void run_save_rows(const recipe_registry& reg)
               "write -> read -> write is byte-equal (read and write sides agree)");
     }
 
-    // P1b — BL-1337: an exact net NO FLOAT CAN HOLD survives the round trip
-    // through the exact-net section; a stream cut to the predecessor's prefix
-    // reads it back as its f32 slot; and an exact net that disagrees with its
-    // own slot is refused whole. Planted on purpose: the fixture's nets may all
-    // be float-exact, which would leave the section empty and these rows vacuous.
+    // P1b — BL-1337 / BL-1407: an exact net NO FLOAT CAN HOLD survives the round
+    // trip through the v56 nation-books section, and an exact net that disagrees
+    // with its own slot is refused whole. Planted on purpose, on the HIGHEST
+    // nation id, whose last net is therefore the stream's last 8 bytes (the books
+    // section is the last; world_save.cpp). The v54 / v55 prefixes this row used
+    // to cut are corporation streams now, read and folded by save_roundtrip P22.
     {
         world x = f.w;
-        const entity_id cid = sorted_corp_ids(x).front();
-        quarterly_return& q = x.corporations.at(cid).returns.back();
+        const entity_id cid = sorted_corp_ids(x).back();
+        quarterly_return& q = x.nations.at(cid).returns.back();
         const float b0 = 17.7972374f, b1 = -1.70437169f; // the t=24 crossing row
         q.net = static_cast<double>(b1) - static_cast<double>(b0);
+        q.balance = b1;
         const double exact = q.net;
         const double slot  = static_cast<double>(static_cast<float>(exact));
         check(slot != exact, "R5", "the planted net is one a float cannot hold (not vacuous)");
@@ -538,32 +553,21 @@ void run_save_rows(const recipe_registry& reg)
             world back;
             std::istringstream in(xb, std::ios::binary);
             const bool ok = read_world_snapshot(back, in);
-            check(ok && back.corporations.at(cid).returns.back().net == exact
+            check(ok && back.nations.at(cid).returns.back().net == exact
                      && to_bytes(back) == xb,
-                  "R5", "an exact net round-trips bit for bit (the exact-net section)");
+                  "R5", "an exact net round-trips bit for bit (the nation-books section)");
         }
 
-        const std::size_t sec = world_save_net_section_bytes(x);
-        const std::size_t n   = x.corporations.at(cid).returns.size();
-        check(sec == 4 + 4 + 4 + 8 * n, "R5",
-              "the exact-net section carries exactly the one inexact history");
-        constexpr std::size_t k_version_offset = sizeof(uint32_t);
+        const std::size_t sec = world_save_books_section_bytes(x);
+        std::size_t rows = 0;
+        for (const entity_id id : sorted_corp_ids(x))
+            rows += x.nations.at(id).returns.size();
+        check(sec == 4 + 2 * (4 + 16 + 4) + rows * (12 * 4 + 4 + 8), "R5",
+              "the books section carries exactly the two nations' histories");
         {
-            // BL-1404: less the v55 majors' section that follows the nets.
-            std::string pre = xb.substr(0, xb.size() - world_save_major_section_bytes(x) - sec);
-            const uint32_t v = k_world_save_version_pre_net;
-            std::memcpy(pre.data() + k_version_offset, &v, sizeof v);
-            world back;
-            std::istringstream in(pre, std::ios::binary);
-            const bool ok = read_world_snapshot(back, in);
-            check(ok && back.corporations.at(cid).returns.back().net == slot, "R5",
-                  "the predecessor's prefix still reads, each net as its f32 slot");
-        }
-        {
-            std::string bad = xb; // the last 8 bytes before the v55 majors' section are this net
+            std::string bad = xb; // the last 8 bytes of a v56 stream are this net
             const double wrong = exact + 1.0;
-            std::memcpy(bad.data() + bad.size() - world_save_major_section_bytes(x) - sizeof wrong,
-                        &wrong, sizeof wrong);
+            std::memcpy(bad.data() + bad.size() - sizeof wrong, &wrong, sizeof wrong);
             world sentinel = build_fixture(reg).w;
             const std::string before = returns_image(sentinel);
             std::istringstream in(bad, std::ios::binary);
@@ -635,6 +639,7 @@ world settled_world(const recipe_registry& reg, uint32_t seed)
     world w = make_hard_coded_world(p);
     assign_default_recipes(w, reg);
     generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
+    (void)fold_to_ground(w); // BL-1407: the shipped close — buildings to their nations, capital to treasuries
     for (int t = 0; t < k_settle_ticks; ++t)
         tick(w, reg, t);
     return w;
@@ -655,14 +660,14 @@ history_read read_histories(const world& w, const std::vector<entity_id>& ids)
     history_read h;
     for (const entity_id id : ids)
     {
-        const corporation_component& cc = w.corporations.at(id);
+        const nation_component& cc = w.nations.at(id);
         h.every_files = h.every_files && !cc.returns.empty();
         h.capped      = h.capped && cc.returns.size() <= k_quarterly_return_retention;
         h.shortest    = std::min(h.shortest, cc.returns.size());
         h.longest     = std::max(h.longest, cc.returns.size());
         if (cc.returns.empty())
             continue;
-        h.last_is_live = h.last_is_live && cc.returns.back().balance == cc.balance;
+        h.last_is_live = h.last_is_live && cc.returns.back().balance == cc.treasury;
     }
     return h;
 }
@@ -681,6 +686,7 @@ void run_settle_rows(const recipe_registry& reg)
     world w = make_hard_coded_world(p);
     assign_default_recipes(w, reg);
     generate_background_firms(w, reg, 7u ^ 0x8A21F00Du);
+    (void)fold_to_ground(w); // BL-1407: the shipped close — buildings to their nations, capital to treasuries
 
     // Per corp, the apply_budget movement measured tick by tick — the loop's own
     // delta, taken immediately either side of the call.
@@ -697,19 +703,28 @@ void run_settle_rows(const recipe_registry& reg)
         run_trades(w, reg, report); // BL-1266: the trade pass (was dispatch_convoys), before the clear
         const auto flows = clear_markets(w, reg, report);
 
+        // BL-1407: a nation's opening is its treasury LESS an unbooked refund
+        // credited outside the loop (a demolition / cancel refund lands on the
+        // treasury before apply_budget, and its return books it as `refunds`),
+        // taken with budget_system.cpp's own float expression.
         std::map<entity_id, float> before;
-        for (const auto& kv : w.corporations)
-            before[kv.first] = kv.second.balance;
+        for (const auto& kv : w.nations)
+        {
+            const nation_component& nc = kv.second;
+            const bool exact_open = nc.refund_unbooked != 0.0f
+                                 && nc.treasury == nc.refund_opening + nc.refund_unbooked;
+            before[kv.first] = exact_open ? nc.refund_opening : nc.treasury - nc.refund_unbooked;
+        }
         apply_budget(w, reg, flows, report.workforce_contention);
         for (const auto& [id, b0] : before)
         {
-            const auto cit = w.corporations.find(id);
-            if (cit == w.corporations.end() || cit->second.returns.empty())
+            const auto cit = w.nations.find(id);
+            if (cit == w.nations.end() || cit->second.returns.empty())
             {
-                per_tick_exact = false; // a corp that did not file is a failure
+                per_tick_exact = false; // a nation that did not file is a failure
                 continue;
             }
-            const double d = static_cast<double>(cit->second.balance)
+            const double d = static_cast<double>(cit->second.treasury)
                            - static_cast<double>(b0);
             measured[id].push_back(d);
 
@@ -742,7 +757,7 @@ void run_settle_rows(const recipe_registry& reg)
             const double net_d = cit->second.returns.back().net;
             per_tick_exact = per_tick_exact && net_d == d
                           && static_cast<float>(static_cast<double>(b0) + net_d)
-                                 == cit->second.balance;
+                                 == cit->second.treasury;
             ++per_tick_rows;
         }
 
@@ -750,28 +765,28 @@ void run_settle_rows(const recipe_registry& reg)
         if (t + 1 == k_settle_ticks)
         {
             const std::vector<entity_id> ids = sorted_corp_ids(w);
-            check(!ids.empty(), "R6", "the generated world actually holds corporations");
+            check(!ids.empty(), "R6", "the generated world actually holds nations");
             const history_read h = read_histories(w, ids);
-            std::printf("       at the settle: %zu corporations, history length %zu..%zu\n",
+            std::printf("       at the settle: %zu nations, history length %zu..%zu\n",
                         ids.size(), h.shortest, h.longest);
-            check(h.every_files, "R6", "every corporation has a filed history at the settle");
+            check(h.every_files, "R6", "every nation has a filed history at the settle");
             check(h.last_is_live, "R6",
-                  "at the settle, each corp's last return's balance == its live "
-                  "corporation_component.balance");
+                  "at the settle, each nation's last return's balance == its live "
+                  "nation_component.treasury");
         }
     }
 
     const std::vector<entity_id> ids = sorted_corp_ids(w);
     const history_read h = read_histories(w, ids);
-    std::printf("       at tick %d: %zu corporations, history length %zu..%zu (retention %zu)\n",
+    std::printf("       at tick %d: %zu nations, history length %zu..%zu (retention %zu)\n",
                 k_past_retention_ticks, ids.size(), h.shortest, h.longest,
                 k_quarterly_return_retention);
-    check(h.every_files, "R6", "every corporation still has a filed history past retention");
+    check(h.every_files, "R6", "every nation still has a filed history past retention");
     check(h.capped,      "R6", "no history exceeds the retention");
     check(h.longest == k_quarterly_return_retention, "R6",
           "the run reached the retention (the cap row above is not vacuous)");
     check(h.last_is_live, "R6",
-          "past retention, each corp's last return's balance == its live balance");
+          "past retention, each nation's last return's balance == its live balance");
 
     // R2 on the real world: EVERY filed net is EXACTLY what apply_budget added to
     // the balance that tick. This is the record checked against the loop rather
@@ -790,7 +805,7 @@ void run_settle_rows(const recipe_registry& reg)
         bool window_exact = true, non_trivial = false, trimmed = false;
         for (const entity_id id : ids)
         {
-            const corporation_component& cc = w.corporations.at(id);
+            const nation_component& cc = w.nations.at(id);
             const std::vector<double>&   m  = measured[id];
             if (cc.returns.size() > m.size())
             {
@@ -821,8 +836,8 @@ void run_settle_rows(const recipe_registry& reg)
         const std::string ib = returns_image(b);
         check(!ia.empty() && ia == ib, "R6",
               "two identical settles produce byte-identical filed records");
-        std::printf("       record image %zu bytes across %zu corporations\n",
-                    ia.size(), a.corporations.size());
+        std::printf("       record image %zu bytes across %zu nations\n",
+                    ia.size(), a.nations.size());
     }
 }
 

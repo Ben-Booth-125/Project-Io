@@ -181,9 +181,16 @@ int main(int argc, char** argv)
                 if (c.planned_specialists > 0) { r.specialists += static_cast<int>(c.planned_specialists); with_spec.insert(c.nation); }
         }
         else
-            for (const auto& kv : w.corporations)
+        {
+            // BL-1407: the specialist charters (generation-transient) while they
+            // stand; after the fold closed them, the majors they made.
+            for (const auto& kv : w.gen_charters)
                 if (!kv.second.is_background && kv.second.home_nation != null_entity)
                 { ++r.specialists; with_spec.insert(kv.second.home_nation); }
+            if (w.gen_charters.empty())
+                for (const auto& kv : w.nations)
+                    if (kv.second.is_major) { ++r.specialists; with_spec.insert(kv.first); }
+        }
         r.nations_with_specialist = static_cast<int>(with_spec.size());
         const era_timelapse& last = !ind.steps.empty() ? ind : (!exp.steps.empty() ? exp : emp);
         if (!last.steps.empty()) r.living_polities = last.steps.back().sample_count;

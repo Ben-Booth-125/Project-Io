@@ -132,19 +132,19 @@ snapshot read(world& w, const recipe_registry& reg)
 
     // ownership: building -> is it a background corp's?
     std::vector<entity_id> cids;
-    for (const auto& [cid, cc] : w.corporations) { (void)cc; cids.push_back(cid); }
+    for (const auto& [cid, cc] : w.nations) { (void)cc; cids.push_back(cid); }
     std::sort(cids.begin(), cids.end());
     std::map<entity_id, bool> bg_owned;
     std::set<entity_id> player_owned;
     std::map<entity_id, std::set<entity_id>> corp_tiles, corp_proc_tiles;
     for (const entity_id cid : cids)
     {
-        const corporation_component& cc = w.corporations.at(cid);
-        for (const entity_id bid : cc.assets)
+        const nation_component& cc = w.nations.at(cid);
+        for (const entity_id bid : cc.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end()) continue;
-            if (!cc.is_player) { corp_tiles[cid].insert(bit->second.tile); bg_owned[bid] = true; }
+            if (cid != w.player_entity) { corp_tiles[cid].insert(bit->second.tile); bg_owned[bid] = true; } // BL-1407
             else player_owned.insert(bid);
             if (bit->second.type == building_type::processing_facility) corp_proc_tiles[cid].insert(bit->second.tile);
         }

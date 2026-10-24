@@ -49,9 +49,8 @@ void check(bool ok, const char* label)
 std::vector<entity_id> rival_ids(const world& w)
 {
     std::vector<entity_id> ids;
-    for (const auto& [id, cc] : w.corporations)
-        if (!cc.is_player && id != w.player_entity) ids.push_back(id);
-    // BL-1401: every nation but the player's is an actor on the same cadence.
+    // BL-1401 / BL-1407: every nation but the player's is an actor on the same
+    // cadence (no corporation exists).
     const entity_id pn = player_nation(w);
     for (const auto& [id, nc] : w.nations)
         if (id != pn) ids.push_back(id);

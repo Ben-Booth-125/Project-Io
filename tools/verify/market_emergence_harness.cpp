@@ -69,7 +69,7 @@ int main()
       tc.resource_deposit[ri(resource_type::iron_ore)] = 100.0f; w.tiles[outpost_tile] = tc; }
 
     const entity_id corp = w.create_entity();
-    { corporation_component cc; cc.balance = 100000.0f; w.corporations[corp] = cc; }
+    { nation_component cc{}; cc.treasury = 100000.0f; w.nations[corp] = cc; }
 
     std::printf("Spontaneous market emergence (BL-263) harness\n");
 

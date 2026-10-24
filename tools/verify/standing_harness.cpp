@@ -7,7 +7,9 @@
 //   - R1: the bands are gone. Enforced by construction: the enum, its three banding functions
 //     and their boundary constants no longer exist, so any file still naming one would fail to
 //     compile, and the shape tripwire below fails if a banded field creeps back in.
-//   - The disclosure gate (FINANCE.md § Disclosure): capital_disclosed is TRUE iff the firm's
+//   - BL-1407: the class-based gate below RETIRED with ownership_class; a nation reads only its own
+//     books, so capital_disclosed is TRUE for the observer's own row alone.
+//   - (retired) The disclosure gate (FINANCE.md § Disclosure): capital_disclosed is TRUE iff the firm's
 //     ownership_class is publicly_held. It is a fact about the FIRM, never about the reader —
 //     tested by giving the player's own corp each class in turn and getting the firm's answer.
 //   - The public axes (DISCOVERY.md § Competitor visibility): reach and market share are exact
@@ -71,25 +73,16 @@ int main()
               "(no production/stockpile/recipe/workforce field)");
     }
 
-    // =====================================================================
-    // The disclosure gate in isolation — binary, no graded middle.
-    // =====================================================================
-    {
-        check(corp_files_return(ownership_class::publicly_held),
-              "corp_files_return(public) == true (a public firm files)");
-        check(!corp_files_return(ownership_class::privately_held),
-              "corp_files_return(private) == false (its books are its own)");
-        check(!corp_files_return(ownership_class::closed),
-              "corp_files_return(closed) == false (no filing at all)");
-    }
+    // BL-1407: the disclosure gate in isolation (`corp_files_return` over the
+    // ownership class) RETIRED with the class. Every owner is a nation, and a
+    // nation reads only its OWN books (FINANCE.md § Disclosure; NR-662).
 
     // =====================================================================
-    // compute_corp_standings — 4-corp world, one per disclosure case.
-    //   player   : public   (files)
-    //   rival_a  : private  (does not file, negative balance)
-    //   rival_b  : closed   (does not file, large balance)
-    //   rival_c  : public   (files — a RIVAL whose capital is readable exactly,
-    //                        which the retired banding could never show)
+    // compute_corp_standings — 4-nation world (BL-1407: the owners are nations).
+    //   player   : reads its own books
+    //   rival_a  : negative treasury, books its own
+    //   rival_b  : large treasury, no buildings
+    //   rival_c  : one building on Beta
     // =====================================================================
     {
         world w;
@@ -126,8 +119,9 @@ int main()
             w.tiles[tile_b] = tc;
         }
 
-        auto make_corp = [&](bool is_player, const char* name, float cash, ownership_class oc,
+        auto make_corp = [&](bool is_player, const char* name, float cash,
                              std::vector<entity_id> tiles) -> entity_id {
+            (void)is_player;
             std::vector<entity_id> assets;
             for (entity_id t : tiles)
             {
@@ -139,24 +133,18 @@ int main()
                 assets.push_back(bld);
             }
             const entity_id corp = w.create_entity();
-            corporation_component cc;
+            nation_component cc{};
             cc.name            = name;
-            cc.is_player       = is_player;
-            cc.balance         = cash;
-            cc.assets          = assets;
-            cc.ownership_class = oc;
-            w.corporations[corp] = cc;
+            cc.treasury         = cash;
+            cc.state_assets          = assets;
+            w.nations[corp] = cc;
             return corp;
         };
 
-        const entity_id player_corp = make_corp(true,  "Player Co", 25000.0f,
-                                                ownership_class::publicly_held, {tile_a, tile_b});
-        const entity_id rival_a     = make_corp(false, "Rival A",   -50.0f,
-                                                ownership_class::privately_held, {tile_a});
-        const entity_id rival_b     = make_corp(false, "Rival B",   60000.0f,
-                                                ownership_class::closed, {});
-        const entity_id rival_c     = make_corp(false, "Rival C",   1000.0f,
-                                                ownership_class::publicly_held, {tile_b});
+        const entity_id player_corp = make_corp(true,  "Player Co", 25000.0f, {tile_a, tile_b});
+        const entity_id rival_a     = make_corp(false, "Rival A",   -50.0f,   {tile_a});
+        const entity_id rival_b     = make_corp(false, "Rival B",   60000.0f, {});
+        const entity_id rival_c     = make_corp(false, "Rival C",   1000.0f,  {tile_b});
         w.player_entity = player_corp;
 
         std::unordered_map<entity_id, corp_cash_flow> flows;
@@ -167,7 +155,9 @@ int main()
         const std::vector<corp_standing> a  = compute_corp_standings(w, flows);
         const std::vector<corp_standing> b2 = compute_corp_standings(w, flows);
 
-        check(a.size() == 4, "compute_corp_standings: one entry per corp");
+        // BL-1407: the ranked owners are the nations HOLDING a building
+        // (economic_owner_ids); rival_b holds none, so it has no row.
+        check(a.size() == 3, "compute_corp_standings: one entry per nation holding a building (rival_b holds none)");
 
         int player_count = 0;
         for (const corp_standing& cs : a)
@@ -200,90 +190,41 @@ int main()
             if (cs.corp == rival_b)     rb = &cs;
             if (cs.corp == rival_c)     rc = &cs;
         }
-        check(p && ra && rb && rc, "compute_corp_standings: all four corps found in output");
+        check(p && ra && !rb && rc, "compute_corp_standings: the three holders found; the holderless rival_b absent");
 
         // -----------------------------------------------------------------
         // The public axes — exact for EVERY corp, player and rival alike, at
-        // every ownership class. This is what retiring the bands bought.
+        // whatever the books' disclosure. This is what retiring the bands bought.
         // -----------------------------------------------------------------
         if (p)
         {
-            check(p->reach_bodies == 2, "player (public): reach_bodies == 2 (two distinct bodies)");
+            check(p->reach_bodies == 2, "player: reach_bodies == 2 (two distinct bodies)");
             // total income this tick = 30 (player) + 10 (rival_a) + 0 + 0 = 40.
-            check(std::fabs(p->market_share - 0.75f) < 1e-6f, "player (public): market_share == 0.75");
-            check(p->capital_disclosed, "player (public): capital_disclosed == true");
-            check(std::fabs(p->capital_balance - 25000.0f) < 1e-6f, "player (public): capital_balance == 25000");
+            check(std::fabs(p->market_share - 0.75f) < 1e-6f, "player: market_share == 0.75");
+            check(p->capital_disclosed, "player: capital_disclosed == true (its own books)");
+            check(std::fabs(p->capital_balance - 25000.0f) < 1e-6f, "player: capital_balance == 25000");
         }
         if (ra)
         {
-            check(ra->reach_bodies == 1, "rival_a (private): reach_bodies == 1 — PUBLIC axis, printed anyway");
+            check(ra->reach_bodies == 1, "rival_a: reach_bodies == 1 — PUBLIC axis, printed anyway");
             check(std::fabs(ra->market_share - 0.25f) < 1e-6f,
-                  "rival_a (private): market_share == 0.25 — PUBLIC axis, printed anyway");
-            check(!ra->capital_disclosed, "rival_a (private): capital_disclosed == false (a dash on screen)");
+                  "rival_a: market_share == 0.25 — PUBLIC axis, printed anyway");
+            check(!ra->capital_disclosed, "rival_a: capital_disclosed == false (another nation's books; a dash on screen)");
         }
         if (rb)
         {
-            check(rb->reach_bodies == 0, "rival_b (closed): reach_bodies == 0 (no assets)");
-            check(rb->market_share == 0.0f, "rival_b (closed): market_share == 0.0 (no cash-flow entry this tick)");
-            check(!std::isnan(rb->market_share), "rival_b (closed): market_share is not NaN");
-            check(!rb->capital_disclosed, "rival_b (closed): capital_disclosed == false (a dash on screen)");
+            check(rb->reach_bodies == 0, "rival_b: reach_bodies == 0 (no assets)");
+            check(rb->market_share == 0.0f, "rival_b: market_share == 0.0 (no cash-flow entry this tick)");
+            check(!std::isnan(rb->market_share), "rival_b: market_share is not NaN");
+            check(!rb->capital_disclosed, "rival_b: capital_disclosed == false (a dash on screen)");
         }
         if (rc)
         {
-            check(rc->reach_bodies == 1, "rival_c (public): reach_bodies == 1");
-            check(rc->capital_disclosed, "rival_c (public): capital_disclosed == true — a RIVAL's exact capital");
-            check(std::fabs(rc->capital_balance - 1000.0f) < 1e-6f, "rival_c (public): capital_balance == 1000");
+            check(rc->reach_bodies == 1, "rival_c: reach_bodies == 1");
+            check(!rc->capital_disclosed, "rival_c: capital_disclosed == false (no class makes a rival's books public)");
         }
 
-        // -----------------------------------------------------------------
-        // The gate is a fact about the FIRM, not about the reader. Flip the
-        // player's own corp to `closed` and its own row stops filing; flip a
-        // rival to `public` and its row files. Nothing about who is reading
-        // enters the computation.
-        // -----------------------------------------------------------------
-        // RE-SPECIFIED (NR-662). The property is still "the gate follows the FIRM,
-        // not the reader" -- but it is demonstrated on RIVALS, because disclosure
-        // governs what one firm may learn about ANOTHER and the observer's own
-        // corporation is outside its scope entirely. A corporation always reads its
-        // own books whatever its class; a firm that could not would be unrunnable,
-        // and a closed firm reading its own books while publishing none is exactly
-        // what `closed` means. FINANCE.md § Disclosure is the authority.
-        {
-            w.corporations.at(player_corp).ownership_class = ownership_class::closed;
-            w.corporations.at(rival_c).ownership_class     = ownership_class::closed;
-            w.corporations.at(rival_b).ownership_class     = ownership_class::publicly_held;
-            const std::vector<corp_standing> flipped = compute_corp_standings(w, flows);
-
-            bool player_still_reads_own = false;
-            bool rival_c_now_closed = false;
-            bool rival_b_now_public = false;
-            bool axes_unmoved = true;
-            for (const corp_standing& cs : flipped)
-            {
-                if (cs.corp == player_corp)
-                {
-                    player_still_reads_own = cs.capital_disclosed;
-                    axes_unmoved = axes_unmoved && cs.reach_bodies == 2 &&
-                                   std::fabs(cs.market_share - 0.75f) < 1e-6f;
-                }
-                if (cs.corp == rival_c)
-                    rival_c_now_closed = !cs.capital_disclosed;
-                if (cs.corp == rival_b)
-                    rival_b_now_public = cs.capital_disclosed;
-            }
-            check(rival_c_now_closed,
-                  "gate follows the FIRM: a rival set closed => capital_disclosed == false");
-            check(rival_b_now_public,
-                  "gate follows the FIRM: a rival set public => capital_disclosed == true");
-            check(player_still_reads_own,
-                  "the observer reads its OWN books whatever its class (NR-662): player set closed => still disclosed");
-            check(axes_unmoved,
-                  "the public axes are unaffected by ownership class (reach/share unchanged)");
-
-            // Restore for nothing in particular — the world dies with the scope.
-            w.corporations.at(player_corp).ownership_class = ownership_class::publicly_held;
-            w.corporations.at(rival_b).ownership_class     = ownership_class::closed;
-        }
+        // BL-1407: "the gate follows the FIRM's class" RETIRED with the class.
     }
 
     // =====================================================================
@@ -293,10 +234,17 @@ int main()
         world w;
         const entity_id c1 = w.create_entity();
         const entity_id c2 = w.create_entity();
-        corporation_component cc1; cc1.name = "Zero A"; cc1.balance = 100.0f;
-        corporation_component cc2; cc2.name = "Zero B"; cc2.balance = 200.0f;
-        w.corporations[c1] = cc1;
-        w.corporations[c2] = cc2;
+        nation_component cc1{}; cc1.name = "Zero A"; cc1.treasury = 100.0f;
+        nation_component cc2{}; cc2.name = "Zero B"; cc2.treasury = 200.0f;
+        // BL-1407: a standing row needs a holding (economic_owner_ids).
+        for (nation_component* nc : { &cc1, &cc2 })
+        {
+            const entity_id bld = w.create_entity();
+            w.buildings[bld] = building_component{};
+            nc->state_assets.push_back(bld);
+        }
+        w.nations[c1] = cc1;
+        w.nations[c2] = cc2;
         w.player_entity = c1;
 
         std::unordered_map<entity_id, corp_cash_flow> zero_flows;
@@ -322,11 +270,8 @@ int main()
                 empty_ok = false;
         check(empty_ok, "compute_corp_standings: empty cash-flow map => market_share == 0.0 for every corp");
 
-        // corporation_component defaults ownership_class to `closed`, so a corp nobody generated
-        // a class for does NOT file — the safe default, and the one FINANCE.md wants.
-        // RE-SPECIFIED (NR-662): scoped to corps that are NOT the observer's own. This
-        // fixture sets w.player_entity = c1, and c1 reads its own books by the exemption
-        // above, so asserting over EVERY row would be asserting the opposite property.
+        // BL-1407: a RIVAL nation's books are never disclosed; the observer's own are
+        // (NR-662). This fixture sets w.player_entity = c1.
         bool defaults_closed = true;
         bool own_books_readable = false;
         for (const corp_standing& cs : out)
@@ -335,9 +280,9 @@ int main()
             if (cs.capital_disclosed) defaults_closed = false;
         }
         check(defaults_closed,
-              "a RIVAL with the default ownership_class (closed) does not file — safe default");
+              "a RIVAL nation's capital is not disclosed");
         check(own_books_readable,
-              "and the observer's own default-closed corp still reads its own books (NR-662)");
+              "and the observer reads its own books (NR-662)");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

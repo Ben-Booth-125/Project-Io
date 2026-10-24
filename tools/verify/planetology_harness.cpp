@@ -544,9 +544,9 @@ int main()
             wp.seed = static_cast<uint32_t>(i) * 0x9E3779B1u;
             const world wr = make_hard_coded_world(no_prehistory(wp));
 
-            const auto cit = wr.corporations.find(wr.player_entity);
-            if (cit == wr.corporations.end()) continue;
-            for (const entity_id bid : cit->second.assets)
+            const auto cit = wr.nations.find(wr.player_entity);
+            if (cit == wr.nations.end()) continue;
+            for (const entity_id bid : cit->second.state_assets)
             {
                 const auto bit = wr.buildings.find(bid);
                 if (bit != wr.buildings.end() &&

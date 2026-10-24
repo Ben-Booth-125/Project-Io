@@ -111,12 +111,12 @@ std::string trade_book(const world& w)
         s += buf;
     }
     std::vector<entity_id> ids;
-    for (const auto& [cid, cc] : w.corporations) { (void)cc; ids.push_back(cid); }
+    for (const auto& [cid, cc] : w.nations) { (void)cc; ids.push_back(cid); }
     std::sort(ids.begin(), ids.end());
     for (const entity_id cid : ids)
     {
         std::snprintf(buf, sizeof buf, "c%llu res%08X\n", static_cast<unsigned long long>(cid),
-                      fbits(w.corporations.at(cid).trade_reserve));
+                      fbits(w.nations.at(cid).trade_reserve));
         s += buf;
     }
     return s;
@@ -141,7 +141,7 @@ entity_id give_marketplace(world& w, entity_id corp, entity_id tile)
     b.workforce_target   = 100;
     b.ticks_remaining    = 0;
     w.buildings[id] = b;
-    w.corporations.at(corp).assets.push_back(id);
+    w.nations.at(corp).state_assets.push_back(id);
     return id;
 }
 
@@ -181,11 +181,11 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
     // --- the actors -------------------------------------------------------
     const entity_id player = w.player_entity;
     std::vector<entity_id> ids;
-    for (const auto& [cid, cc] : w.corporations) { (void)cc; ids.push_back(cid); }
+    for (const auto& [cid, cc] : w.nations) { (void)cc; ids.push_back(cid); }
     std::sort(ids.begin(), ids.end());
     entity_id rival = null_entity;
     for (const entity_id c : ids)
-        if (c != player && !w.corporations.at(c).is_player) { rival = c; break; }
+        if (c != player) { rival = c; break; } // BL-1407
 
     const entity_id body = w.home_body;
     entity_id tile = null_entity;
@@ -202,9 +202,9 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         check(false, "fixture: a rival, a seated player, a home tile and two home markets");
         return rec;
     }
-    w.corporations.at(rival).balance += 1.0e7f; // the solvency gate is not under test here
-    w.corporations.at(rival).trade_points = 20.0f;   // as made on the last trade pass
-    w.corporations.at(player).trade_points = 20.0f;
+    w.nations.at(rival).treasury += 1.0e7f; // the solvency gate is not under test here
+    w.nations.at(rival).trade_points = 20.0f;   // as made on the last trade pass
+    w.nations.at(player).trade_points = 20.0f;
 
     // --- the route: a viable home-body pair and the good with the best margin
     const trade_params& tp = reg.trade();
@@ -265,7 +265,7 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         pc.target = static_cast<resource_type>(rr.r); pc.quantity = 3.0f;
         const bool ok = apply_corp_command(w, reg, pc, nullptr) == corp_command_result::applied;
         if (verbose) check(ok, "fixture: the player's losing trade is placed through the seam");
-        w.corporations.at(player).trade_reserve = 7.0f;
+        w.nations.at(player).trade_reserve = 7.0f;
     }
     const std::string player_book_before = [&] {
         std::string s;
@@ -310,9 +310,15 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
     {
         std::printf("T1 pin\n");
         check(!ranked.empty(), "the shared ranking names at least one route for the rival");
-        check(mine.size() == 1, "the rival pinned exactly one manual trade (one per evaluation)");
-        check(count_reason(d1, rival, corp_decision_reason::trade_pin) == 1,
-              "the decision log carries one trade_pin for the rival");
+        // BL-1407: the scorer's TRADE family (pin / shrink / unpin / reserve, and
+        // the Marketplace build below) is the corporation's alone (corp_ai.cpp,
+        // `trade_eligible` and the Marketplace candidate: `!actor.is_nation`);
+        // every rival is now a nation, so a rival pins NOTHING. A nation trade
+        // family would be a new widening of the grant (AI_OPPONENT.md § 11) —
+        // raised, not assumed — so these rows assert the boundary.
+        check(mine.empty(), "BL-1407: a rival NATION pins no manual trade (the trade family was the corporation's)");
+        check(count_reason(d1, rival, corp_decision_reason::trade_pin) == 0,
+              "BL-1407: the decision log carries no trade_pin for the rival nation");
         if (!mine.empty() && !ranked.empty())
         {
             const standing_trade& t = mine.front();
@@ -327,10 +333,10 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
                         static_cast<unsigned long long>(t.to_market), ranked.front().margin_per_unit);
         }
         std::printf("T2 reserve\n");
-        check(std::fabs(w.corporations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
+        check(std::fabs(w.nations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
               "the rival's reserve equals its manual trades' points, same evaluation");
-        check(count_reason(d1, rival, corp_decision_reason::trade_reserve) == 1,
-              "the decision log carries the reserve correction");
+        check(count_reason(d1, rival, corp_decision_reason::trade_reserve) == 0,
+              "BL-1407: no reserve correction for a rival nation (it pinned nothing)");
     }
 
     // A second evaluation at unchanged prices: nothing to unpin, the held route
@@ -347,7 +353,7 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         check(dup == 0, "a held route is never pinned twice");
         check(count_reason(d2, rival, corp_decision_reason::trade_unpin) == 0,
               "a still-earning trade is not unpinned");
-        check(std::fabs(w.corporations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
+        check(std::fabs(w.nations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
               "the reserve still equals the manual points after a second evaluation");
     }
 
@@ -370,11 +376,11 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         std::size_t still = 0;
         for (const standing_trade& t : w.trades)
             if (std::find(losing_ids.begin(), losing_ids.end(), t.id) != losing_ids.end()) ++still;
-        check(held_before >= 1 && still == held_before - 1,
-              "one losing trade is cleared this evaluation (one unpin per evaluation)");
-        check(count_reason(d3, rival, corp_decision_reason::trade_unpin) == 1,
-              "the decision log carries one trade_unpin for the rival");
-        check(std::fabs(w.corporations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
+        check(held_before == 0 && still == 0,
+              "BL-1407: a rival nation holds no manual trade to unpin");
+        check(count_reason(d3, rival, corp_decision_reason::trade_unpin) == 0,
+              "BL-1407: the decision log carries no trade_unpin for the rival nation");
+        check(std::fabs(w.nations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
               "the reserve follows the manual points down");
     }
 
@@ -390,7 +396,7 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         }();
         check(player_book_after == player_book_before && !player_book_before.empty(),
               "the player's losing manual trade still stands (never unpinned for it)");
-        check(w.corporations.at(player).trade_reserve == 7.0f,
+        check(w.nations.at(player).trade_reserve == 7.0f,
               "the player's reserve is untouched");
         check(!names_player(d1) && !names_player(d2) && !names_player(d3),
               "no decision names the player's corp in a played session");
@@ -418,15 +424,15 @@ void run_marketplace_build(world& w, const recipe_registry& reg)
     const logistics_nodes nodes = collect_logistics_nodes(w);
     trade_haul_memo memo;
     std::vector<entity_id> ids;
-    for (const auto& [cid, cc] : w.corporations) { (void)cc; ids.push_back(cid); }
+    for (const auto& [cid, cc] : w.nations) { (void)cc; ids.push_back(cid); }
     std::sort(ids.begin(), ids.end());
 
     entity_id   rival = null_entity;
     rigged_route rr;
     for (const entity_id c : ids)
     {
-        const corporation_component& cc = w.corporations.at(c);
-        if (c == w.player_entity || cc.is_player || w.nations.count(cc.home_nation) == 0)
+        const nation_component& cc = w.nations.at(c);
+        if (c == w.player_entity) // BL-1407: every actor is a nation
             continue;
         const std::vector<entity_id> trading = corp_trade_markets(w, c);
         for (const entity_id a : corp_markets(w, c))
@@ -459,7 +465,7 @@ void run_marketplace_build(world& w, const recipe_registry& reg)
         return;
     }
     rig_profitable(w, rr);
-    w.corporations.at(rival).balance += 1.0e7f; // the solvency gate is not under test here
+    w.nations.at(rival).treasury += 1.0e7f; // the solvency gate is not under test here
     std::vector<trade_route_offer> ranked;
     {
         trade_haul_memo m2;
@@ -533,9 +539,9 @@ void run_marketplace_build(world& w, const recipe_registry& reg)
     }
 
     rig_spare(w, true, 1.0e6f);
-    check(proposes(w, true), "a rival with no trade building in a market and a margin route out of it, "
-                             "with spare goods, spare upkeep and Logistic Points left, "
-                             "builds a Planetary Marketplace in that market's catchment");
+    // BL-1407: the Marketplace candidate is the corporation's (see T1).
+    check(!proposes(w, true), "BL-1407: a rival NATION, even with a margin route, spare goods, upkeep "
+                              "and Logistic Points, builds no Planetary Marketplace (the candidate was the corporation's)");
 }
 
 } // namespace

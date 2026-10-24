@@ -381,16 +381,16 @@ straddle_reading read_straddle(const world& w)
 {
     straddle_reading r;
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations) ids.push_back(kv.first);
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations) ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     r.corps = static_cast<int>(ids.size());
     for (const entity_id cid : ids)
     {
-        const corporation_component& cc = w.corporations.at(cid);
+        const nation_component& cc = w.nations.at(cid);
         std::map<entity_id, int> by_market;
         int home_buildings = 0;
-        for (const entity_id bid : cc.assets)
+        for (const entity_id bid : cc.state_assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end()) continue;
@@ -405,16 +405,16 @@ straddle_reading read_straddle(const world& w)
         r.buildings_home += home_buildings;
         ++r.hist[span];
         r.max_span = std::max(r.max_span, span);
-        if (cc.is_background) ++r.bg_home; else ++r.spec_home;
-        if (cc.is_player) r.player_span = span;
+        if ((!cc.is_major)) ++r.bg_home; else ++r.spec_home;
+        if (cid == w.player_entity) r.player_span = span; // BL-1407
         if (span >= 2)
         {
             ++r.straddlers;
-            if (cc.is_background) ++r.bg_straddlers; else ++r.spec_straddlers;
+            if ((!cc.is_major)) ++r.bg_straddlers; else ++r.spec_straddlers;
             int modal = 0;
             for (const auto& [m, k] : by_market) modal = std::max(modal, k);
             r.buildings_outside_first += home_buildings - modal;
-            r.widest.push_back({ cid, cc.is_background, cc.is_player, home_buildings, span });
+            r.widest.push_back({ cid, (!cc.is_major), cid == w.player_entity, home_buildings, span });
         }
     }
     std::sort(r.widest.begin(), r.widest.end(), [](const auto& a, const auto& b) {

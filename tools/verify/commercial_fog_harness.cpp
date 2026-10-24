@@ -47,9 +47,8 @@ static body_market make_body_market(world& w, const char* name)
 static entity_id make_player(world& w)
 {
     const entity_id p = w.create_entity();
-    corporation_component pc{};
-    pc.is_player = true;
-    w.corporations[p] = pc;
+    nation_component pc{};
+    w.nations[p] = pc;
     w.player_entity = p;
     return p;
 }
@@ -63,7 +62,7 @@ static void add_player_building(world& w, entity_id body)
     const entity_id bld = w.create_entity();
     building_component bc{}; bc.tile = tile;
     w.buildings[bld] = bc;
-    w.corporations[w.player_entity].assets.push_back(bld);
+    w.nations[w.player_entity].state_assets.push_back(bld);
 }
 
 static void add_route(world& w, entity_id a, entity_id b, entity_id corp, int last_tick)

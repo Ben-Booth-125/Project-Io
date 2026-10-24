@@ -277,10 +277,10 @@ int main(int argc, char** argv)
 
         // Corporations, the charter, the arms.
         long long corps = 0, rivals = 0;
-        for (const auto& [id, c] : w.corporations)
+        for (const auto& [id, c] : w.nations)
         {
             ++corps;
-            if (!c.is_player) ++rivals;
+            if (id != w.player_entity) ++rivals; // BL-1407
         }
         kv("corporations", corps);
         kv("firms", static_cast<long long>(out->land.firms.size()));
@@ -289,9 +289,9 @@ int main(int argc, char** argv)
         long long rival_groups = 0, rival_units = 0, player_units = 0, other_units = 0;
         for (const auto& [id, u] : w.units)
         {
-            const auto c = w.corporations.find(u.owner);
-            if (c == w.corporations.end()) { other_units += u.count; continue; }
-            if (c->second.is_player) { player_units += u.count; continue; }
+            const auto c = w.nations.find(u.owner);
+            if (c == w.nations.end()) { other_units += u.count; continue; }
+            if (c->first == w.player_entity) { player_units += u.count; continue; }
             armed.insert(u.owner);
             ++rival_groups;
             rival_units += u.count;
@@ -302,7 +302,7 @@ int main(int argc, char** argv)
         kv("rival_units", rival_units);
         kv("player_units", player_units);
         kv("non_corp_units", other_units);
-        kv("seat_menu", seat.specialist_count);
+        kv("seat_menu", seat.major_count);
         kv("seat_shortlist", seat.shortlist_size);
         kv("seat_floor_unmet", seat.floor_unmet ? 1 : 0);
 
@@ -312,14 +312,14 @@ int main(int argc, char** argv)
         {
             long long player_bal = 0, bg_sum = 0, rival_sum = 0, rivals_neg = 0;
             std::vector<long long> rbal;
-            for (const auto& [id, c] : w.corporations)
+            for (const auto& [id, c] : w.nations)
             {
-                const long long b = static_cast<long long>(c.balance);
-                if (c.is_player) { player_bal += b; continue; }
+                const long long b = static_cast<long long>(c.treasury);
+                if (id == w.player_entity) { player_bal += b; continue; } // BL-1407
                 rival_sum += b;
                 rbal.push_back(b);
                 if (b < 0) ++rivals_neg;
-                if (c.is_background) bg_sum += b;
+                if ((!c.is_major)) bg_sum += b;
             }
             kv("player_balance", player_bal);
             kv("rival_balance_sum", rival_sum);

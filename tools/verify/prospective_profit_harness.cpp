@@ -116,22 +116,20 @@ int main()
 
     const entity_id corp = w.create_entity();
     {
-        corporation_component cc;
+        nation_component cc{};
         cc.name = "Estimator Co";
-        cc.starting_capital = 100000.0f;
-        cc.balance          = 100000.0f;
+        cc.treasury          = 100000.0f;
         // Not AI-driven: BL-202's strategic tier rewrites workforce_target at the end
         // of run_economy_step, which would move the very opex terms being asserted.
-        cc.is_player = false;
-        w.corporations[corp] = cc;
+        w.nations[corp] = cc;
     }
     // BL-1322: the game steps the PLAYER's workforce every quarter, so this
     // fixture's corp is no longer the seat; the seat is an empty corp of its own.
     {
         const entity_id seat = w.create_entity();
-        corporation_component sc;
-        sc.name = "Seat (empty)"; sc.is_player = true;
-        w.corporations[seat] = sc;
+        nation_component sc{};
+        sc.name = "Seat (empty)"; 
+        w.nations[seat] = sc;
         w.player_entity = seat;
     }
 
@@ -336,7 +334,7 @@ int main()
         const std::size_t buildings_before = w.buildings.size();
         const float       reserve_before   =
             w.tiles[tile_iron].resource_remaining[ri(resource_type::iron_ore)];
-        const float       balance_before   = w.corporations[corp].balance;
+        const float       balance_before   = w.nations[corp].treasury;
 
         for (int i = 0; i < 5; ++i)
             (void)estimate_prospective_profit(w, reg, tile_iron, building_type::extraction_site,
@@ -346,7 +344,7 @@ int main()
 
         check(w.buildings.size() == buildings_before &&
               near(w.tiles[tile_iron].resource_remaining[ri(resource_type::iron_ore)], reserve_before) &&
-              near(w.corporations[corp].balance, balance_before),
+              near(w.nations[corp].treasury, balance_before),
               "P.R8 repeated calls mutate no world state");
         check(near(again.net(), est_ext.net()),
               "P.R8 repeated calls give the identical answer (no caches, no RNG)",

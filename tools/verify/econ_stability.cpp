@@ -133,12 +133,11 @@ static built_world build_world(world& w, float iron_base, float steel_base, uint
             }
             const entity_id corp_e = w.create_entity();
             {
-                corporation_component cc;
+                nation_component cc{};
                 cc.name = "Extractor Co";
-                cc.starting_capital = 1000.0f;
-                cc.balance = 1000.0f;
-                cc.assets.push_back(bld_e);
-                w.corporations[corp_e] = cc;
+                cc.treasury = 1000.0f;
+                cc.state_assets.push_back(bld_e);
+                w.nations[corp_e] = cc;
             }
 
             // --- processing corp P: steel recipe ---
@@ -160,12 +159,11 @@ static built_world build_world(world& w, float iron_base, float steel_base, uint
             }
             const entity_id corp_p = w.create_entity();
             {
-                corporation_component cc;
+                nation_component cc{};
                 cc.name = "Smelter Co";
-                cc.starting_capital = 1000.0f;
-                cc.balance = 1000.0f;
-                cc.assets.push_back(bld_p);
-                w.corporations[corp_p] = cc;
+                cc.treasury = 1000.0f;
+                cc.state_assets.push_back(bld_p);
+                w.nations[corp_p] = cc;
             }
 
             if (bw.ore_tile == null_entity) { bw.ore_tile = tile_e; bw.corp_e = corp_e; bw.corp_p = corp_p; }
@@ -307,10 +305,10 @@ int main()
         if (reserve > prev_reserve + 1e-3f) reserve_mono = false; // never refills
         prev_reserve = reserve;
 
-        for (const auto& [cid, corp] : w.corporations)
+        for (const auto& [cid, corp] : w.nations)
         {
-            if (!finite_ok(corp.balance)) all_finite = false;
-            if (std::fabs(corp.balance) > k_balance_bound) balance_bound = false;
+            if (!finite_ok(corp.treasury)) all_finite = false;
+            if (std::fabs(corp.treasury) > k_balance_bound) balance_bound = false;
         }
         // Shelf quantities finite (BL-1265: the shelves hold every good now).
         for (const auto& [mid, mc] : w.markets)
@@ -323,7 +321,7 @@ int main()
     const float final_reserve = w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)];
     std::printf("  final iron reserve = %.2f (seeded 1200)\n", final_reserve);
     std::printf("  final balances: E=%.2f  P=%.2f\n",
-                w.corporations[corp_e].balance, w.corporations[corp_p].balance);
+                w.nations[corp_e].treasury, w.nations[corp_p].treasury);
 
     check(price_in_band, "R2 all market prices stay within [0.25x, 4x] base_price over the run");
     check(all_finite,    "R3 no NaN/Inf in any price, shelf quantity, or balance");
@@ -413,8 +411,8 @@ int main()
         pt.min_ms    = tt.min();
         pt.mean_ms   = tt.mean();
         pt.p95_ms    = tt.p95();
-        for (const auto& [cid, corp] : sw.corporations)
-            if (!finite_ok(corp.balance)) pt.finite = false;
+        for (const auto& [cid, corp] : sw.nations)
+            if (!finite_ok(corp.treasury)) pt.finite = false;
 
         char growth[48] = "  --  baseline";
         // Guard the denominator: a fast rung whose min measures exactly 0.0 (clock

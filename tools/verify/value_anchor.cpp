@@ -567,13 +567,8 @@ levy_probe probe_seeded_levy()
     w.tile_to_nation[tile] = nation;
     w.nations[nation].tiles.push_back(tile);
 
-    const entity_id corp = w.create_entity();
-    corporation_component cc{};
-    cc.name        = "Anchor Holdings";
-    cc.balance     = 0.0f;
-    cc.is_player   = true;
-    cc.home_nation = nation;
-    w.corporations[corp] = cc;
+    // BL-1407: the player IS its nation; the law is evaluated for it.
+    const entity_id corp = nation;
     w.player_entity      = corp;
 
     // DEFAULT ARGUMENT DELIBERATELY. The seeded rate is law.hpp's business; a

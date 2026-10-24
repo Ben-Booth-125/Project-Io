@@ -88,15 +88,15 @@ fixture make_fixture()
     w.nations[f.nation] = nc;
 
     f.corp = w.create_entity();
-    corporation_component cc;
-    cc.name = "Firm"; cc.balance = 1.0e6f; cc.starting_capital = 1.0e6f;
+    nation_component cc{};
+    cc.name = "Firm"; cc.treasury = 1.0e6f; 
     f.building = w.create_entity();
     building_component b{};
     b.tile = f.tile; b.type = building_type::processing_facility; b.workforce_assigned = 0.5f;
     b.workforce_auto = false;
     w.buildings[f.building] = b;
-    cc.assets.push_back(f.building);
-    w.corporations[f.corp] = cc;
+    cc.state_assets.push_back(f.building);
+    w.nations[f.corp] = cc;
     w.current_econ_tick = 5;
     return f;
 }
@@ -168,9 +168,9 @@ int main()
         fixture f = make_fixture();
         const recipe_registry reg;
         const entity_id buyer = f.w.create_entity();
-        corporation_component bc;
-        bc.name = "Buyer"; bc.balance = 1.0e6f;
-        f.w.corporations[buyer] = bc;
+        nation_component bc{};
+        bc.name = "Buyer"; bc.treasury = 1.0e6f;
+        f.w.nations[buyer] = bc;
         procurement_contract c{};
         c.id = 1; c.buyer = buyer; c.supplier = f.corp; c.body = f.body;
         c.resource = resource_type::machinery; c.delivery_body = f.body;
@@ -332,7 +332,7 @@ int main()
                 building_component lb{};
                 lb.tile = f.tile; lb.type = building_type::launchpad;
                 f.w.buildings[lp] = lb;
-                f.w.corporations.at(f.corp).assets.push_back(lp);
+                f.w.nations.at(f.corp).state_assets.push_back(lp);
             }
             f.w.markets.at(f.market).inventory[prop]                         = propellant;
             f.w.markets.at(f.market).inventory[ri(resource_type::iron_ore)] = 100.0f;
@@ -362,7 +362,7 @@ int main()
         running.tile = f.tile; running.type = building_type::processing_facility;
         running.workforce_auto = false; running.workforce_target = 40;
         f.w.buildings[run_id] = running;
-        f.w.corporations.at(f.corp).assets.push_back(run_id);
+        f.w.nations.at(f.corp).state_assets.push_back(run_id);
         check(dial_idled(f.w.buildings.at(f.building)) && !dial_idled(f.w.buildings.at(run_id)),
               "U8 not vacuous: one plant is dial-idled, one is dialled above zero");
         const int n = seat_release_dial_idled(f.w, f.corp);

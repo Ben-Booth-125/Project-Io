@@ -107,11 +107,11 @@ bool state_equal(const world& a, const world& b, std::string& where)
         if (std::memcmp(ma.supply.data(), mb.supply.data(), sizeof(ma.supply)) != 0) { where = "supply"; return false; }
         if (std::memcmp(ma.inventory.data(), mb.inventory.data(), sizeof(ma.inventory)) != 0) { where = "inventory"; return false; }
     }
-    for (const auto& [cid, ca] : a.corporations)
+    for (const auto& [cid, ca] : a.nations)
     {
-        const auto it = b.corporations.find(cid);
-        if (it == b.corporations.end()) { where = "corp set"; return false; }
-        if (std::memcmp(&ca.balance, &it->second.balance, sizeof(ca.balance)) != 0) { where = "balance"; return false; }
+        const auto it = b.nations.find(cid);
+        if (it == b.nations.end()) { where = "corp set"; return false; }
+        if (std::memcmp(&ca.treasury, &it->second.treasury, sizeof(ca.treasury)) != 0) { where = "balance"; return false; }
     }
     return true;
 }
@@ -456,11 +456,10 @@ void s5()
     };
     auto corp = [&](std::vector<entity_id> assets) {
         const entity_id c = w.create_entity();
-        corporation_component cc;
-        cc.name = "Test Co"; cc.is_player = true;
-        cc.starting_capital = 10000.0f; cc.balance = 10000.0f;
-        cc.assets = assets;
-        w.corporations[c] = cc;
+        nation_component cc{};
+        cc.name = "Test Co";        cc.treasury = 10000.0f;
+        cc.state_assets = assets;
+        w.nations[c] = cc;
         return c;
     };
     const entity_id Pa = building(steel_id, 0.5f);

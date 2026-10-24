@@ -74,19 +74,19 @@ fixture make_fixture()
 {
     fixture f;
     f.a = f.w.create_entity();
-    corporation_component ca;
+    nation_component ca{};
     ca.name = "Corp A";
-    f.w.corporations[f.a] = ca;
+    f.w.nations[f.a] = ca;
 
     f.b = f.w.create_entity();
-    corporation_component cb;
+    nation_component cb{};
     cb.name = "Corp B";
-    f.w.corporations[f.b] = cb;
+    f.w.nations[f.b] = cb;
 
     f.c = f.w.create_entity();
-    corporation_component cc;
+    nation_component cc{};
     cc.name = "Corp C";
-    f.w.corporations[f.c] = cc;
+    f.w.nations[f.c] = cc;
 
     return f;
 }

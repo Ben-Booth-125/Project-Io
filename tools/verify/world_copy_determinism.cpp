@@ -233,7 +233,7 @@ std::vector<order_row> audit_world_orders(const world& a, const world& b)
     rows.push_back(audit_order("land_use", a.land_use, b.land_use));
     rows.push_back(audit_order("nations", a.nations, b.nations));
     rows.push_back(audit_order("tile_to_nation", a.tile_to_nation, b.tile_to_nation));
-    rows.push_back(audit_order("corporations", a.corporations, b.corporations));
+    rows.push_back(audit_order("gen_charters", a.gen_charters, b.gen_charters)); // BL-1407: corporations retired
     rows.push_back(audit_order("body_tile_index", a.body_tile_index, b.body_tile_index));
     rows.push_back(audit_order("body_reach_cost", a.body_reach_cost, b.body_reach_cost));
     rows.push_back(audit_order("body_market_index", a.body_market_index, b.body_market_index));
