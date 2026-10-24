@@ -3391,6 +3391,9 @@ std::vector<entity_id> generate_corporations(
                 seed_starting_military(w, corp_id, military_occupied_tiles);
     }
 
+    // BL-1404: the legacy roster's specialists make their nations majors too
+    // (this path is off the campaign; harnesses still lay it).
+    mark_majors_from_champions(w);
     if (chain != nullptr)
         invalidate_logistics_caches(w); // the reach legs warmed them (chain_reach)
     return corp_ids;
@@ -3407,6 +3410,10 @@ int remove_specialist_roster(world& w)
         if (!kv.second.is_background)
             gone.push_back(kv.first);
     std::sort(gone.begin(), gone.end());
+    // BL-1404: the roster's champions go, so its majors do (the next charter
+    // marks them again). Keyed writes: order-free.
+    for (auto& [nid, nc] : w.nations)
+        nc.is_major = false;
     if (gone.empty())
         return 0;
 
@@ -7320,6 +7327,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
     if (report != nullptr)
         *report = std::move(rep);
+    // BL-1404: majors are a saved fact, set where the champions are chartered.
+    mark_majors_from_champions(w);
     invalidate_logistics_caches(w); // the reach legs warmed them (chain_reach)
     return chartered;
 }
@@ -7888,16 +7897,22 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         return it == points_of.end() ? std::int64_t{0} : it->second;
     };
 
-    // The majors: nation -> its specialists, ascending corp id.
+    // The majors: nation -> its specialists, ascending corp id. BL-1404: a
+    // major is the saved fact `is_major` (set where the walk chartered its
+    // champion), so a DEMOTED nation's specialist no longer makes it one.
     const auto read_majors = [&]() {
         std::map<entity_id, std::vector<entity_id>> m;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.is_major)
+                m[nid];
         std::vector<entity_id> corps;
         for (const auto& kv : w.corporations)
             if (!kv.second.is_background && kv.second.home_nation != null_entity)
                 corps.push_back(kv.first);
         std::sort(corps.begin(), corps.end());
         for (const entity_id c : corps)
-            m[w.corporations.at(c).home_nation].push_back(c);
+            if (const auto it = m.find(w.corporations.at(c).home_nation); it != m.end())
+                it->second.push_back(c);
         return m;
     };
     std::map<entity_id, std::vector<entity_id>> majors = read_majors();
@@ -8102,6 +8117,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                 std::sort(charter.specialists.begin(), charter.specialists.end());
 
                 arm_corporation(w, corp);   // a champion opens armed, as every rival does
+                w.nations.at(n).is_major = true; // BL-1404: the minor is RAISED
                 majors[n].push_back(corp);
                 out.records.push_back(rec);
                 landed = true;
@@ -8111,7 +8127,14 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         invalidate_logistics_caches(w);
     }
 
-    // --- TOO MANY: the richest champion buys the poorest major's specialist ----
+    // --- TOO MANY: the poorest surplus major is DEMOTED -------------------------
+    // BL-1404 (NATION_GENERATION.md § The nation count is a target, decided
+    // 2026-10-23, NR-1065): the major simply becomes a minor. Its ground and
+    // every building on it stay its own; nothing is bought and no money moves.
+    // Its specialist stays a corporation of that nation (the fold empties it).
+    // "Poorest" is the same industry-point measure, ties to the HIGHER nation
+    // id; the richest (ties to the lower id) only receives the provisional seat
+    // when the seat stood in the demoted nation — the player is a major.
     while (static_cast<int>(majors.size()) > major_target && majors.size() >= 2)
     {
         entity_id richest = null_entity, poorest = null_entity;
@@ -8125,59 +8148,42 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         }
         if (richest == poorest)
             break;   // unreachable with two or more majors; stated anyway
-        const entity_id buyer = majors.at(richest).front();
-        for (const entity_id sold : majors.at(poorest))
+        const std::vector<entity_id>& demoted = majors.at(poorest);
+        major_reconciliation_record rec;
+        rec.kind          = static_cast<std::uint8_t>(lapse_event_kind::major_demoted);
+        rec.nation        = poorest;
+        rec.corp          = demoted.empty() ? null_entity : demoted.front();
+        rec.region        = demoted.empty() ? -1 : w.corporations.at(demoted.front()).origin_region;
+        rec.nation_points = pts(poorest);
+        for (const charter_record& cr : charter.charters)
+            if (rec.corp != null_entity && cr.corp == rec.corp)
+            {
+                rec.centre       = cr.centre;
+                rec.price_points = cr.price;
+            }
+        w.nations.at(poorest).is_major = false;
+
+        // THE SEAT FOLLOWS THE MAJORS: a provisional seat in the demoted nation
+        // moves to the richest major's champion, which opens unarmed (BL-1154);
+        // the old seat is now a rival and opens armed, as every rival does.
+        const std::vector<entity_id>& to = majors.at(richest);
+        if (!to.empty()
+            && std::find(demoted.begin(), demoted.end(), w.player_entity) != demoted.end())
         {
-            const corporation_component& sc = w.corporations.at(sold);
-            major_reconciliation_record rec;
-            rec.kind          = static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out);
-            rec.nation        = poorest;
-            rec.buyer_nation  = richest;
-            rec.corp          = sold;
-            rec.buyer_corp    = buyer;
-            rec.region        = sc.origin_region;
-            rec.nation_points = pts(poorest);
-            // AT THAT SPECIALIST'S CHARTER PRICE, in credits at the real rate:
-            // its points price bought its charter capital, so the price in
-            // credits is that capital. From the buyer to the seller nation's
-            // treasury — a transfer, never a mint.
-            const float price = sc.starting_capital;
-            rec.credit_price  = price;
-            const int32_t origin = sc.origin_region;
-            charter_record* sold_row  = nullptr;
-            charter_record* buyer_row = nullptr;
-            for (charter_record& cr : charter.charters)
-            {
-                if (cr.corp == sold)  sold_row  = &cr;
-                if (cr.corp == buyer) buyer_row = &cr;
-            }
-            rec.centre       = sold_row != nullptr ? sold_row->centre : null_entity;
-            rec.price_points = sold_row != nullptr ? sold_row->price : 0;
-
-            major_absorb_specialist(w, buyer, sold);
-            w.corporations.at(buyer).balance -= price;
-            w.nations.at(poorest).treasury    += price;
-            rec.credits_moved = price;
-
-            // The rows: the sold firm's names no erased id, but still counts
-            // against its region when the charters are dated; the buyer's
-            // holdings now include its ground.
-            if (sold_row != nullptr)
-            {
-                if (buyer_row != nullptr)
-                    buyer_row->holdings.insert(buyer_row->holdings.end(),
-                                               sold_row->holdings.begin(), sold_row->holdings.end());
-                sold_row->absorbed_into   = buyer;
-                sold_row->absorbed_origin = origin;
-                sold_row->corp            = null_entity;
-            }
-            charter.specialists.erase(
-                std::remove(charter.specialists.begin(), charter.specialists.end(), sold),
-                charter.specialists.end());
-            if (charter.player == sold)
-                charter.player = buyer;
-            out.records.push_back(rec);
+            const entity_id old_seat = w.player_entity;
+            const entity_id new_seat = to.front();
+            w.corporations.at(old_seat).is_player = false;
+            w.corporations.at(new_seat).is_player = true;
+            w.player_entity = new_seat;
+            if (charter.player == old_seat)
+                charter.player = new_seat;
+            disarm_corporation(w, new_seat);
+            arm_corporation(w, old_seat);
+            rec.buyer_nation = richest;   // the seat's new nation, for the report
+            rec.buyer_corp   = new_seat;
+            invalidate_logistics_caches(w);
         }
+        out.records.push_back(rec);
         majors.erase(poorest);
     }
 

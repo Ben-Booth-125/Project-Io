@@ -549,7 +549,8 @@ void run_save_rows(const recipe_registry& reg)
               "the exact-net section carries exactly the one inexact history");
         constexpr std::size_t k_version_offset = sizeof(uint32_t);
         {
-            std::string pre = xb.substr(0, xb.size() - sec);
+            // BL-1404: less the v55 majors' section that follows the nets.
+            std::string pre = xb.substr(0, xb.size() - world_save_major_section_bytes(x) - sec);
             const uint32_t v = k_world_save_version_pre_net;
             std::memcpy(pre.data() + k_version_offset, &v, sizeof v);
             world back;
@@ -559,9 +560,10 @@ void run_save_rows(const recipe_registry& reg)
                   "the predecessor's prefix still reads, each net as its f32 slot");
         }
         {
-            std::string bad = xb; // the stream's last 8 bytes are this net
+            std::string bad = xb; // the last 8 bytes before the v55 majors' section are this net
             const double wrong = exact + 1.0;
-            std::memcpy(bad.data() + bad.size() - sizeof wrong, &wrong, sizeof wrong);
+            std::memcpy(bad.data() + bad.size() - world_save_major_section_bytes(x) - sizeof wrong,
+                        &wrong, sizeof wrong);
             world sentinel = build_fixture(reg).w;
             const std::string before = returns_image(sentinel);
             std::istringstream in(bad, std::ios::binary);

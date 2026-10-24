@@ -326,7 +326,7 @@ struct rail_handover_report
     int along_the_line  = 0; ///< of them, owned by the owner nearest along the line (not the ground's)
     int unowned         = 0; ///< tiles no owner could reach (no owner on the body at all)
     int stations        = 0; ///< stations stood up
-    int station_nations = 0; ///< of them, a major's
+    int station_nations = 0; ///< of them, a nation's (BL-1404: the ground's, a minor's too)
     std::vector<std::pair<entity_id, int>> per_owner_tiles; ///< ascending owner id
 };
 

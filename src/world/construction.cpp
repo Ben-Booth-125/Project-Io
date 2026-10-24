@@ -418,7 +418,7 @@ construction_result lay_track(world& w, const recipe_registry& reg, entity_id na
                               entity_id tile)
 {
     const auto nit = w.nations.find(nation);
-    if (nit == w.nations.end() || champion_of(w, nation) == null_entity)
+    if (nit == w.nations.end() || !is_major_nation(w, nation)) // BL-1404: the saved fact
         return construction_result::no_corp; // a major's state industry lays track
     const auto tit = w.tiles.find(tile);
     if (tit == w.tiles.end())

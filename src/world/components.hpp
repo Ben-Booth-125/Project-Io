@@ -2322,6 +2322,16 @@ struct nation_component
     /// every building on the nation's ground loses output (nation_tax.hpp).
     /// SERIALISED in the v52 trailing section.
     float discontent = 0.0f;
+
+    /// BL-1404 — MAJORS ARE A SAVED FACT (NATION_GENERATION.md § The nation
+    /// count is a target; GLOSSARY.md § Major nation). Set by generation where
+    /// a champion is chartered (`mark_majors_from_champions`, after the charter
+    /// walk), raised by `reconcile_majors`' TOO FEW branch and cleared by its
+    /// TOO MANY branch (the poorest surplus major is DEMOTED and keeps its ground
+    /// and buildings). `is_major_nation` reads this, never the corporations — so
+    /// a major stays a major once its champion is folded away. SERIALISED in the
+    /// v55 trailing section; a v54 stream derives it from the champions.
+    bool is_major = false;
 };
 
 // ---------------------------------------------------------------------------

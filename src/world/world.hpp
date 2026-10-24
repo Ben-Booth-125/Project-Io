@@ -1370,8 +1370,15 @@ entity_id player_actor(const world& w);
 /// (GLOSSARY.md § Major nation).
 entity_id champion_of(const world& w, entity_id nation);
 
-/// True iff @p nation holds a champion — a MAJOR nation.
+/// True iff @p nation is a MAJOR nation — BL-1404: the saved fact
+/// `nation_component::is_major`, no longer read off the corporations.
 bool is_major_nation(const world& w, entity_id nation);
+
+/// BL-1404: sets every nation's `is_major` to whether it is home to a
+/// non-background corporation (today's champion rule). Run where a roster is
+/// chartered (the charter walk, the legacy roster) and on a v54 load; never
+/// after `reconcile_majors`, whose demotions it would undo.
+void mark_majors_from_champions(world& w);
 
 /// The player's nation: the home nation of the player's corporation (the
 /// player plays a major and operates its champion). Null with no player.

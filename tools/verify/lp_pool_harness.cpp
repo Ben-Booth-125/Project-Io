@@ -637,7 +637,8 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         // BL-1335 (v52): and less the tax section after that (count + 9 bytes a
         // nation whose tier or Discontent moved).
         // BL-1337 (v54): and less the exact-net section after THAT.
-        const std::size_t tax_tail = world_save_tax_section_bytes(c) + world_save_net_section_bytes(c);
+        const std::size_t tax_tail = world_save_tax_section_bytes(c) + world_save_net_section_bytes(c)
+                                   + world_save_major_section_bytes(c); // BL-1404 (v55): the majors, last
         std::string b49 = b51.substr(0, b51.size() - (4 + 4 + 12) - 4 - tax_tail);
         const std::uint32_t v49 = k_world_save_version_pre_lp;
         std::memcpy(&b49[4], &v49, 4);

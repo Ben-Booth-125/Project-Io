@@ -87,7 +87,7 @@ void w_tile_v(std::ostream& o, const tile_component& t, uint32_t version)
     w_f32(o, t.hazard_level);
     w_f32(o, t.habitability);
     w_f32(o, t.substrate_density);
-    if (version >= world_save_version)
+    if (version > k_world_save_version_pre_road_edges) // BL-1404: v53 and later
         w_u16(o, t.road_edges); // BL-1340 (v53): a tier per hex side, two bits each
     else
         w_u8(o, max_road_tier(t)); // the pre-v53 shape: one tier a tile
@@ -111,7 +111,7 @@ bool r_tile_v(std::istream& i, tile_component& t, uint32_t version,
           && r_f32(i, t.hazard_level) && r_f32(i, t.habitability)
           && r_f32(i, t.substrate_density)))
         return false;
-    if (version >= world_save_version)
+    if (version > k_world_save_version_pre_road_edges) // BL-1404: v53 and later
     {
         if (!r_u16(i, t.road_edges)) // BL-1340 (v53)
             return false;
@@ -1341,7 +1341,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // AT AN OLDER VERSION - which `write_world_snapshot_pre_road_edges` does, to give
     // BL-1340's migration a real v52 stream to read - must end before it, exactly as
     // the comment above says. Unconditional, it appended bytes no reader would eat.
-    if (version == world_save_version)
+    // BL-1404: v54 and later (the majors' v55 section follows it).
+    if (version > k_world_save_version_pre_net)
     {
         std::vector<entity_id> inexact;
         for (const auto& [cid, cc] : w.corporations)
@@ -1362,6 +1363,31 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_f64(out, q.net);
         }
     }
+
+    // BL-1404 (world_save_version 55): THE MAJORS, a saved fact. Every nation
+    // whose `is_major` is set, ascending id, as (u32 count, count x id). A world
+    // with no major writes one empty count. A v54 (and older) stream ends before
+    // it, and is read with the majors derived from its champions.
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> majors;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.is_major)
+                majors.push_back(nid);
+        std::sort(majors.begin(), majors.end());
+        w_u32(out, static_cast<uint32_t>(majors.size()));
+        for (const entity_id nid : majors)
+            w_id(out, nid);
+    }
+}
+
+std::size_t world_save_major_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.is_major)
+            n += 4;
+    return n;
 }
 
 std::size_t world_save_net_section_bytes(const world& w)
@@ -1425,7 +1451,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_space
             && version != k_world_save_version_pre_tax
             && version != k_world_save_version_pre_road_edges // BL-1340: v52, migrated
-            && version != k_world_save_version_pre_net))      // BL-1337: v53, nets as f32
+            && version != k_world_save_version_pre_net        // BL-1337: v53, nets as f32
+            && version != k_world_save_version_pre_major))    // BL-1404: v54, majors derived
         return false; // mismatched version -- refuse rather than misread
 
     // Everything below builds into `s`, and `w` is not touched until the last
@@ -1468,7 +1495,7 @@ bool read_world_snapshot(world& w, std::istream& in)
             return r_tile_v(i, t, version, &legacy_road);
         }))
         return false;
-    if (version < world_save_version)
+    if (version <= k_world_save_version_pre_road_edges) // BL-1404: v52 and older
         migrate_legacy_roads(s, legacy_road);
     // THE MIRROR INVARIANT, ON LOAD (LOGISTICS.md § 4). Two bits a side can only hold
     // 0-3, so a tier is in range by construction; what a stream can still carry is two
@@ -1892,7 +1919,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // figures, each of which rounds to the f32 slot its record already carried
     // (the writer wrote that slot from this very double). Refused whole
     // otherwise. A v52 (and older) stream ends before it: every net is its slot.
-    if (version == world_save_version)
+    if (version > k_world_save_version_pre_net) // BL-1404: v54 and v55 carry it
     {
         uint32_t ccount = 0;
         if (!r_u32(in, ccount) || ccount > s.corporations.size())
@@ -1922,6 +1949,30 @@ bool read_world_snapshot(world& w, std::istream& in)
             }
         }
     }
+
+    // BL-1404 (v55): the majors. Untrusted: each names a nation in the stream,
+    // strictly ascending, never null. Refused whole otherwise. A v54 (and older)
+    // stream ends before it and predates the saved fact: its majors are DERIVED
+    // from its champions, the rule `is_major_nation` read before this version.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid))
+                return false;
+            if (nid == null_entity || (k > 0 && nid <= prev) || s.nations.count(nid) == 0)
+                return false;
+            prev = nid;
+            s.nations.at(nid).is_major = true;
+        }
+    }
+    else
+        mark_majors_from_champions(s);
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

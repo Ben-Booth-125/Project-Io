@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -268,6 +269,23 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, nid);
             fnv1a_u32(h, static_cast<uint32_t>(nations.at(nid).tax_tier));
             fnv1a_f32(h, nations.at(nid).discontent);
+        }
+    }
+
+    // BL-1404: the majors, a saved fact — sparse and sorted, folded only when
+    // any nation is one, so a world with no major hashes exactly as before.
+    {
+        std::vector<entity_id> majors;
+        for (const auto& [nid, nc] : nations)
+            if (nc.is_major)
+                majors.push_back(nid);
+        std::sort(majors.begin(), majors.end());
+        if (!majors.empty())
+        {
+            fnv1a_u32(h, 0x3A70u);
+            fnv1a_u32(h, static_cast<uint32_t>(majors.size()));
+            for (const entity_id nid : majors)
+                fnv1a_u32(h, nid);
         }
     }
 
@@ -653,7 +671,21 @@ entity_id champion_of(const world& w, entity_id nation)
 
 bool is_major_nation(const world& w, entity_id nation)
 {
-    return champion_of(w, nation) != null_entity;
+    // BL-1404: majors are a saved fact.
+    const auto it = w.nations.find(nation);
+    return it != w.nations.end() && it->second.is_major;
+}
+
+void mark_majors_from_champions(world& w)
+{
+    // BL-1404: a pure function of the roster; the per-nation write is keyed, so
+    // the unordered walks cannot reach the result.
+    std::unordered_set<entity_id> homes;
+    for (const auto& [cid, cc] : w.corporations)
+        if (!cc.is_background && cc.home_nation != null_entity)
+            homes.insert(cc.home_nation);
+    for (auto& [nid, nc] : w.nations)
+        nc.is_major = homes.count(nid) != 0;
 }
 
 entity_id player_nation(const world& w)

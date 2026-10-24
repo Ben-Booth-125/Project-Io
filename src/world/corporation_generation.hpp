@@ -399,7 +399,7 @@ void date_chartered_firms(world& w, charter_spend_report& report,
 struct major_reconciliation_record
 {
     /// `lapse_event_kind` as its wire byte: `champion_chartered`,
-    /// `state_charter` or `champion_bought_out`.
+    /// `state_charter` or (BL-1404) `major_demoted`.
     std::uint8_t kind          = 0;
     entity_id    nation        = null_entity; ///< the minor raised / the major that sold
     entity_id    buyer_nation  = null_entity; ///< buy-out only: the richest major
@@ -433,8 +433,8 @@ struct major_reconciliation_report
 
 /// BL-1278 lane C (NATION_GENERATION.md § The nation count is a target; Ben,
 /// 2026-10-10/11) — THE MAJORS RECONCILED AFTER THE SEARCH'S WINNER IS APPLIED.
-/// A MAJOR is a nation home to a non-background corporation (GLOSSARY.md
-/// § Major nation). With @p major_target 0 (unset) this returns at once and
+/// A MAJOR is a nation whose saved `is_major` is set (BL-1404; GLOSSARY.md
+/// § Major nation), marked where the walk chartered its champion. With @p major_target 0 (unset) this returns at once and
 /// mutates nothing. Otherwise, on the homeworld's nations:
 ///
 ///  * TOO FEW — the RICHEST CHAMPIONLESS MINOR (most `region::industry_points`
@@ -459,17 +459,14 @@ struct major_reconciliation_report
 ///    firms hold every one — a THIRD pass founds the champion by consolidating
 ///    ALL those firms into it (holdings, units, cash, opening stock; rung
 ///    `consolidated`), recorded in the same state-charter event.
-///  * TOO MANY — a BUY-OUT: the RICHEST MAJOR's champion (same measure, ties to
-///    the lower nation id; its lowest-id specialist) buys the POOREST MAJOR's
-///    specialist whole (ties to the HIGHER nation id, so the two never
-///    coincide) at that specialist's charter price in credits at the real rate
-///    (its charter capital): its holdings, units, balance and opening stock
-///    pass to the buyer, the price moves from the buyer's balance to the seller
-///    nation's treasury, and the seller corporation is gone (its charter row is
-///    kept, `corp` null, `absorbed_into` the buyer). A buyer left holding the
-///    provisional seat is disarmed (BL-1154). The seller becomes a minor. A
-///    GENERATION EVENT, never a `corp_command` verb: no AI grant covers an
-///    acquisition.
+///  * TOO MANY — a DEMOTION (BL-1404; NATION_GENERATION.md, decided 2026-10-23,
+///    NR-1065): the POOREST MAJOR (same measure, ties to the HIGHER nation id)
+///    is set `is_major = false` and keeps its ground, its buildings and its
+///    specialist (the fold empties it); nothing is bought and no money moves. A
+///    provisional seat standing in the demoted nation moves to the RICHEST
+///    major's champion (ties to the lower id), which is disarmed (BL-1154); the
+///    old seat is armed as a rival. A GENERATION EVENT (`major_demoted`).
+///    The buy-out this replaced (`champion_bought_out`) is no longer emitted.
 ///
 /// Each correction is one record, which `finish_campaign_world` writes into the
 /// Industrialisation record as a history event dated in its closing round.

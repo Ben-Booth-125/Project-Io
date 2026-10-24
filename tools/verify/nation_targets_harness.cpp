@@ -128,7 +128,8 @@ bool is_major_reconciliation(const lapse_event& e)
     // buy-out. Each is one correction of one major.
     const auto k = static_cast<lapse_event_kind>(e.kind);
     return k == lapse_event_kind::champion_chartered || k == lapse_event_kind::state_charter
-        || k == lapse_event_kind::champion_bought_out;
+        || k == lapse_event_kind::champion_bought_out
+        || k == lapse_event_kind::major_demoted; // BL-1404: the poorest surplus major demoted
 }
 
 struct reading
@@ -215,16 +216,17 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
         if (t != w.tiles.end() && t->second.body == home->id) ++r.total;
     }
 
-    // MAJORS: nations home to a non-background corporation (the player's
-    // champion included — the player is a major nation).
-    std::set<entity_id> majors;
+    // MAJORS: BL-1404 — the saved fact `is_major_nation` (the player's nation
+    // included — the player is a major nation). Before BL-1404 this read the
+    // nations home to a non-background corporation; a DEMOTED major keeps its
+    // specialist until the fold empties it, so that reading no longer names
+    // the majors. With no major target nothing is demoted and the two agree.
     for (const auto& kv : w.corporations)
         if (!kv.second.is_background && kv.second.home_nation != null_entity)
-        {
             ++r.chartered;
-            majors.insert(kv.second.home_nation);
-        }
-    r.majors = static_cast<int>(majors.size());
+    for (const auto& kv : w.nations)
+        if (is_major_nation(w, kv.first))
+            ++r.majors;
 
     for (const auto& c : rep.carve_competitors) r.planned_specs += c.planned_specialists;
 
