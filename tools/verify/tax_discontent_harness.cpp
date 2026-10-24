@@ -491,7 +491,8 @@ void t6_save(const app_start_world& out)
 
     // Bad values refuse whole and leave the target untouched. The FIRST row of
     // the section is ids.front(): id (4) then tier (1) then discontent (4).
-    const std::size_t net_tail = world_save_net_section_bytes(c); // the v54 net section after the tax floats
+    // The v54 net section and the v55 majors section (BL-1404) follow the tax floats.
+    const std::size_t net_tail = world_save_net_section_bytes(c) + world_save_major_section_bytes(c);
     const std::size_t row0 = b52.size() - tail - net_tail + 4;
     const auto refuse = [&](const char* what, auto patch) {
         std::string bad = b52;

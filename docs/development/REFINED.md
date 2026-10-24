@@ -53,11 +53,11 @@ and leak treasury money into empty corporations. So the PORT lands first, the fo
 - [x] **T4** Re-point `tax_discontent_harness`, `nation_budget_harness`, `money_conservation`. (R1-R3)
 
 ### BL-1404 (generation buys for nations) — lane G, group `generation-for-nations`
-- [ ] **T1** `generate_corporations` and its fallbacks retire (`landscape_search.cpp`, `corporation_generation.cpp`). (R1)
-- [ ] **T2** The charter web, firms and Marketplace retrofit build into the ground nation, own ground only. (R1)
-- [ ] **T3** `major_centres` feeds saved `nation_component::is_major` (save v55, v54 derives it). (R2)
-- [ ] **T4** `reconcile_majors` folds ground with its buildings; the seat lists majors (`spawn_seat.cpp`). (R2, R3)
-- [ ] **T5** RNG audit of the by-reference streams; measure market_viability FULL. (R4)
+- [x] **T1** `generate_corporations` and its fallbacks retire (`landscape_search.cpp`, `corporation_generation.cpp`). (R1)
+- [x] **T2** The charter web, firms and Marketplace retrofit build into the ground nation, own ground only. (R1)
+- [x] **T3** `major_centres` feeds saved `nation_component::is_major` (save v55, v54 derives it). (R2)
+- [x] **T4** `reconcile_majors` folds ground with its buildings; the seat lists majors (`spawn_seat.cpp`). (R2, R3)
+- [x] **T5** RNG audit of the by-reference streams; measure market_viability FULL. (R4)
 
 ### BL-1405 (LP one class) — lane L, group `lp-one-class`
 - [x] **T1** One share class; the share rule and `set_logistics_shares` retire (`logistic_points.cpp`). (R1)

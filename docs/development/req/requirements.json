@@ -7538,47 +7538,47 @@
    "difficulty": 5,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1404 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-24",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fold_census on fresh worlds, 16 seeds"
      ],
      "requirement": "A generated world holds no corporation records and every building is its ground nation's.",
-     "notes": null
+     "notes": "SCOPED (2026-10-24): generation still charters the specialists as the seat's handle until BL-1407; the fold leaves no corporation-owned building (fold_census 21/0, seeds 0/28/46, on the integrated tree bc3d3517). Stations now go to their ground nation at the source (seed 0: 0 re-homed by the fold, was 1). The legacy 8-corp path no longer runs on the campaign; a budget that charters no specialist lays an unchartered world (none of the 16 library seeds hits it)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_targets_harness, save_roundtrip"
      ],
      "requirement": "The major count target is still always hit, and is_major round-trips the save.",
-     "notes": null
+     "notes": "nation_targets --natural: all 16 seeds identical before/after on total, majors, planned, chartered and polities; the grid 576 checks, 0 failures. is_major is saved (world_save_version 55, a trailing majors section; a v54 stream derives it from the champions) - save_roundtrip P21 rows pass; the hash folds the majors only when any is set. Too many majors demotes the poorest (NR-1065), keeping its ground."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: seat_clean_slate"
      ],
      "requirement": "The seat lists major nations and the player entity is a nation.",
-     "notes": null
+     "notes": "The seat still lists champions as handles (the seat screen shows them as nations, BL-1406); the player entity becoming the nation is BL-1407's."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: market_viability"
      ],
      "requirement": "market_viability's five gates are measured and reported on the new world (FULL, par_seeds).",
-     "notes": null
+     "notes": "market_viability FULL on the integrated tree (BL-1403/1404/1405): G1 92.9 G1t50 85.8 G1b 4.6 G2 95.8 G3 100.0, all pass; the lane alone moved G2 95.3 -> 95.5 and nothing else. history_sim_harness 145/2 identical before and after (R3a2/R3a3 red on its base)."
     }
    ]
   },
