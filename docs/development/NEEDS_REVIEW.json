@@ -684,6 +684,24 @@
     "tools/verify/nation_floor_probe.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1070",
+   "title": "NOVEL WORK (BL-1406): a verify-only staging call verify.fold_world, seven retired verify scripts deleted, and a golden blessed under a retired lens",
+   "raised": "2026-10-24",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-1406 lane (UI and protocol as nation)",
+   "what": "(1) A new verify-only STAGING call, verify.fold_world, runs fold_to_ground on the --verify world (whose builder does not go through finish_campaign_world), and verify.buildings() lists nation buildings once folded. The standing rules record dated scoped exceptions for what the verify API may reveal or stage (road_admits, find_water_crossing, stage_road); this is a fifth of that family, raised here rather than assumed. (2) Seven verify scripts for retired surfaces (Corporation / Company lenses, acquisitions, company ledger, stance table) were deleted and ~15 re-pointed to the Nations lens; .claude/skills/verifier-visual/SKILL.md still names the deleted ones - a skill edit, which is yours to approve. (3) The icon_silhouettes_overview golden was blessed with the retired Corporation lens on screen, so it now differs; the golden policy says no bulk re-bless and --bless never creates - a single re-bless needs your go (BL-1408).",
+   "why_it_matters": "(1) widens what verify scripts may do to the world; (2) and (3) are your gates on skills and goldens.",
+   "options": null,
+   "recommendation": "(1) grant, verify-only and behind --verify like its siblings; (2) approve trimming the deleted names from SKILL.md; (3) re-bless the one golden at BL-1408.",
+   "files": [
+    "src/core/verify_api.cpp",
+    ".claude/skills/verifier-visual/SKILL.md",
+    "scripts/verify/"
+   ],
+   "resolution": null
   }
  ]
 }

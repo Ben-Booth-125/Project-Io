@@ -7611,7 +7611,7 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "in-flight",
    "promoted_from": "backlog.json BL-1406 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
    "resolved": null,
@@ -7625,16 +7625,16 @@
       "live: Ben's click"
      ],
      "requirement": "The seat screen, header and lenses read as the nation; no corporation surface remains.",
-     "notes": null
+     "notes": "Built and captured (lane 8fcfe1cb, merged 033dd6d0): the app builds; nation_seat_ui.lua asserts pass on a folded world (header TREASURY, the Nation overview draws, Construct greyed on another nation's tile); lens_strip, lens_strip_glyphs, default_lens, header, corp_dashboard, lens_legend, lens_selection_paths pass. lens_structure_pivot / lens_one_tier / convoys_ledger / shell_pass fail on paths the lane did not touch (judged pre-existing, not proven against base). PENDING BEN'S LIVE CLICK: (1) header TREASURY, NET, runway hover; (2) rail slot 1 Nation overview, its control, segment hovers; (3) slots 5 and 9 inert, L / Shift+L never lands on a corporation lens; (4) own tile vs foreign tile: Construct enabled vs greyed, the placement ghost red off own ground; (5) a road row on unowned ground: 'No nation holds this tile'; (6) Dispatch Survey, Hire at a base, a Trades-tab press, a research queue press; (7) the seat screen list and briefing; (8) the profile card and resting Selection band show the nation."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: agent protocol harness"
      ],
      "requirement": "The wire refuses as_corp, buy_corporation and lobby; ACTIONS.json matches the verbs.",
-     "notes": null
+     "notes": "agent_seam_harness 22/0 on the merged tree (033dd6d0); a session acts as its nation (the seat corporation's id is accepted and redirected to the nation once folded); buy_corporation and the firm-only verbs refused; ACTIONS.json updated and re-rendered (153 entries; set_logistics_shares kept retired at the merge)."
     }
    ]
   },

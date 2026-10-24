@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*47 entries — 30 open, 17 resolved.*
+*48 entries — 31 open, 17 resolved.*
 
 ---
 
@@ -277,6 +277,17 @@ On the folded world (BL-1402), seed 46's 4 majors place NO production building i
 > **Recommendation:** Let BL-1409 measure the 400-tick treasury trajectory across the 16 seeds before any change.
 
 *Files: `tools/verify/nation_ai_builds.cpp`, `tools/verify/nation_floor_probe.cpp`*
+
+### NR-1070 — NOVEL WORK (BL-1406): a verify-only staging call verify.fold_world, seven retired verify scripts deleted, and a golden blessed under a retired lens
+*novel-work · raised 2026-10-24 · from BL-1406 lane (UI and protocol as nation)*
+
+(1) A new verify-only STAGING call, verify.fold_world, runs fold_to_ground on the --verify world (whose builder does not go through finish_campaign_world), and verify.buildings() lists nation buildings once folded. The standing rules record dated scoped exceptions for what the verify API may reveal or stage (road_admits, find_water_crossing, stage_road); this is a fifth of that family, raised here rather than assumed. (2) Seven verify scripts for retired surfaces (Corporation / Company lenses, acquisitions, company ledger, stance table) were deleted and ~15 re-pointed to the Nations lens; .claude/skills/verifier-visual/SKILL.md still names the deleted ones - a skill edit, which is yours to approve. (3) The icon_silhouettes_overview golden was blessed with the retired Corporation lens on screen, so it now differs; the golden policy says no bulk re-bless and --bless never creates - a single re-bless needs your go (BL-1408).
+
+**Why it matters.** (1) widens what verify scripts may do to the world; (2) and (3) are your gates on skills and goldens.
+
+> **Recommendation:** (1) grant, verify-only and behind --verify like its siblings; (2) approve trimming the deleted names from SKILL.md; (3) re-bless the one golden at BL-1408.
+
+*Files: `src/core/verify_api.cpp`, `.claude/skills/verifier-visual/SKILL.md`, `scripts/verify/`*
 
 ---
 
