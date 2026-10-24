@@ -18,7 +18,9 @@
 //     its source's threshold distance along that source's network, then the
 //     reach falls linearly to zero over the fade length. Its COVERAGE is the
 //     best reach any of its host nation's sources gives it. Off a network a step
-//     costs `lp_offnet_step`, so points reach only a few tiles beyond it.
+//     is impassable (Ben, 2026-10-24: the network is the roads and the rail), so
+//     points reach no tile a road or line does not lead to. `lp_offnet_step`
+//     survives only as the market-attraction leg's price basis (NR-1050).
 //   * PRODUCTION CONSUMES THEM. Each producing building (extraction site,
 //     processing facility: complete, not idled) NEEDS `lp_need_per_run` points
 //     per unit of its run (labour assigned x workforce target). Its claim on the

@@ -46,7 +46,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` — the **Logistics** lens | Planetary: the player nation's roads coloured green → yellow by supplied over requested + a ring on every source + two numbers on every tile of the nation (supplied over requested) + key. No ground tint. |
+| `throughput` — the **Logistics** lens | Planetary: the player nation's roads coloured green → yellow by supplied over requested + a ring on every source + two numbers on every road tile of the nation (supplied over requested) + key. No ground tint. |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 | `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
@@ -107,7 +107,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
-| **Logistics** | — | — | roads coloured by supplied over requested + source ring + per-tile numbers + key |
+| **Logistics** | — | — | roads coloured by supplied over requested + source ring + numbers on road tiles + key |
 
 **Per-lens rung notes.** Resource, Population, Industry and Continent
 are **Planetary-only** — their unit of meaning (a tile, a deposit, a
@@ -929,12 +929,11 @@ it along the chains of `LOGISTICS.md` § How a tile's points get to it:
   ladder — only its colour is the lens's. Roads that are not the player nation's keep their
   ordinary colour.
 
-**Two numbers on every tile, stacked** (Ben, 2026-10-24). Wherever the rung gives the text
-room (a drawn radius of **20 px** or more), each tile of the player's nation carries
-**supplied** above **requested**, both LP/tick. On a **road** tile they are the routed flow
-above — the pair the road's colour is the ratio of. On **any other** tile they are the points
-**reaching** it — every qualifying source of the nation, its reach there × the points it made
-this tick (`lp_points_reaching`) — over the **need of the buildings on that tile**. Below
+**Two numbers on every road tile, stacked** (Ben, 2026-10-24). Wherever the rung gives the text
+room (a drawn radius of **20 px** or more), each **road** tile of the player's nation carries
+**supplied** above **requested**, both LP/tick: the routed flow above — the pair the road's colour
+is the ratio of. **A tile off the roads carries no numbers** (Ben, 2026-10-24: the network is the
+roads and the rail); its hover card still explains it. Below
 20 px the digits do not fit and the road colour carries the read alone.
 
 **The hover card** over the player's own ground shows the same pair stacked — *Supplied N

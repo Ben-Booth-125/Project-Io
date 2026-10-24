@@ -2106,12 +2106,10 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                     state.lp_granted[i]   = fit != flow.end() ? fit->second.granted   : 0.0f;
                     state.lp_requested[i] = fit != flow.end() ? fit->second.requested : 0.0f;
                 }
-                else
-                {
-                    const auto nit2 = own_need.find(tid);
-                    state.lp_supplied[i]  = state.lp_reaching[i];
-                    state.lp_requested[i] = nit2 != own_need.end() ? nit2->second : 0.0f;
-                }
+                // Ben, 2026-10-24: POINTS ARE SHOWN ON ROAD TILES ONLY - the network is
+                // the roads (and the rail), so a tile off them carries no numbers;
+                // its hover card still explains it.
+                (void)own_need;
             }
             // BL-1353: the ground card's WHY for the tile under the pointer. The card
             // holds a const world, so it is read here, off the memo the loop above

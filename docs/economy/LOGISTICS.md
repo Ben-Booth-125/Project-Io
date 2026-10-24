@@ -707,8 +707,10 @@ into passive and active. What follows replaces the bifold model, the city genera
   points reach **full strength** out to a threshold along its own network and then **fade to zero at
   double that distance**, so a nation needs several sources to cover its ground. The threshold is
   the **road tier's**, which is what makes an upgrade worth paying for: **Track 6 tiles, Road 8,
-  Highway 10** at full strength, nothing left by 12, 16 and 20. Off the networks, points reach a few
-  tiles to supply armies (military detail later).
+  Highway 10** at full strength, nothing left by 12, 16 and 20. **The network is the roads and the
+  rail (Ben, 2026-10-24):** a hub's points travel only along roaded edges and never step off them,
+  so no tile a road or a line does not lead to is reached. Off the networks, only units are
+  supplied (NR-1050).
 - **A port stretches fifty tiles over water (Ben, 2026-10-21).** A port's points reach **full
   strength across 50 water tiles** and fade to zero at double, 100 — the road's rule, at sea's
   scale. Water is where points travel furthest: a port carries the chain to a coast a road could
