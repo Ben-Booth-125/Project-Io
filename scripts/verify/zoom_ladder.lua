@@ -40,7 +40,7 @@ end
 
 -- The same ladder under a lens, since the 0.45 attenuation compounds with whatever
 -- the base pass is already doing.
-verify.set_overlay("corporation")
+verify.set_overlay("nations") -- BL-1406: the Corporation lens retired
 for i, z in ipairs({ 3.5, 7.0 }) do
     verify.center_tile(s.unit.col, s.unit.row, z)
     verify.frames(4)

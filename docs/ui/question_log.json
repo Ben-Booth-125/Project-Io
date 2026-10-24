@@ -204,80 +204,22 @@
    ],
    "status": "drafted"
   },
-  "acquisitions_ledger_field": {
-   "surface": "Acquisitions ledger - the Purchasable / Possible groups",
-   "answers": "What can I buy now, and what am I saving for?",
-   "because": "Ben's wording, 2026-08-29, and it settles the surface rather than describing it: the question names BOTH groups, which is what makes the Possible group a goal rather than a tease. FINANCE.md gives ownership a price and a verb, and until this surface existed neither was readable anywhere - buy_corporation could be issued by the scorer and by the wire, and by no press a player could find. It earns its space on the menus-are-broad-ledgers test: an overview across the whole field of firms, never a targeted action on one. The two groups are the load-bearing part and were kept after measurement rather than assumed - Purchasable carries the Buy press, Possible carries a price and deliberately NO press, and that contrast is the only way a player sees what the next rung costs. The surface states the size of the field it draws, which is the clause that had to be re-measured: at the time this was settled the buyable field was one to three firms of eighty-eight, because ownership class was overwhelmingly closed. BL-678 (companies are open) retired closure for companies, and the same twelve-seed sweep now reads 81.6 public firms per seed - 35.8 Purchasable and 45.8 Possible, with 4.8 still closed. So the count on the face stops excusing a short list and starts doing the work the question asks of it: telling the player how much of the world is in reach today against how much is worth saving for.",
-   "backlog_item": [
-    "BL-628",
-    "BL-658",
-    "BL-678"
-   ],
-   "files": [
-    "src/ui/acquisitions_ledger.cpp",
-    "src/ui/nav_pane.cpp",
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "status": "settled"
-  },
-  "acquisitions_ledger_profitability": {
-   "surface": "Acquisitions ledger - Profitability fold-out (full-canvas)",
-   "answers": "Who is making money, and what would owning them cost?",
-   "because": "BL-626 made every corporation file a quarterly return as world state, and BL-631 made ownership class decide who may read it - but neither put a single filed figure on screen where a player could compare firms. This is that surface: one row per corporation, sortable on every column, exact where the firm files and a dash where it does not, no bands (FINANCE.md section Disclosure; Ben 2026-08-26 retired the banded read). It earns a FULL-CANVAS takeover rather than a place in the column because of the measurement that also shrank the groups above it: 85.4 firms per seed file a return they do not disclose, so the table is ~88 rows over seven columns while the buyable field is ~1.6 rows. That inversion is the whole argument for the split - the column holds what you can act on, the takeover holds what you can read.",
-   "backlog_item": [
-    "BL-627"
-   ],
-   "files": [
-    "src/ui/acquisitions_ledger.cpp",
-    "src/ui/detail_level.hpp"
-   ],
-   "status": "settled"
-  },
   "corporation_dashboard": {
-   "surface": "Corporation ledger",
-   "answers": "How well am I doing?",
-   "because": "ONE card, Balance: earnings against stacked expenses, and nothing else. The surface shipped with four roll-ups and three of them were answered better elsewhere — Production and Workforce by the Construction ledger's Buildings tab, which holds the estate AND the per-building levers; Trade by the Market and Convoys ledgers. What is left that only this surface can answer is how well the corporation is doing, and the honest answer to that today is money (Ben, 2026-08-29). The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the whole of the quarter's arithmetic: earnings on the left, every outflow corp_budget::net() subtracts stacked on the right, each segment naming itself and its figure on hover. Interest is absent while the corp is solvent and present once it is in debt, so the segment count itself reads the solvency boundary. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain — one chart, one arithmetic, two surfaces that cannot disagree. \"Balance\" is a sub-header inside the Corporation ledger, not a competing surface name, and its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29) rather than an oversight to clean up. Research points, score, ranking and market cap are deferred by name until core gameplay is established; several have no store behind them at all. BL-1215 (refunds flow shown) adds one EARNINGS segment and one line: a refund the quarterly return booked (BL-1206, the seat's cancelled construction) is cash in that is not earnings, so it stacks beside Income as its own named segment and is named again under the net rather than folded into it - otherwise the header's return-based net and this card's operating net disagree with no visible reason.",
+   "surface": "Nation overview (rail slot 1; formerly the Corporation ledger)",
+   "answers": "How well is my nation doing?",
+   "because": "ONE card, Balance: the quarter's earnings against its stacked expenses, about the player's NATION (re-subjected, BL-1406; Ben, 2026-10-23 - the corporation is retired and a building's money is its nation's treasury's, ledgers/corporation.md § Slot 1). The verdict line reads '+X/qtr, treasury Y'; the chart is the nation's own row of the state ledger - Income (its buildings' sales onto the shelf) and Taxes (the tier's share of its buildings' wages, back to the treasury) on the left, Inputs, Maintenance and Wages on the right. There is no Interest, Levies or Subsidies segment for a nation: it never runs into debt, the levy retired, and no nation pays another's industry. The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the quarter's whole arithmetic. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain. Its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29), and wider now both read the one treasury.",
    "backlog_item": [
     "BL-081",
     "BL-214",
     "BL-343",
-    "BL-691"
+    "BL-691",
+    "BL-1406"
    ],
    "files": [
     "src/ui/corporation_dashboard.cpp",
     "src/ui/charts.cpp"
    ],
    "status": "settled"
-  },
-  "corporation_panel": {
-   "surface": "Corporation ledger — the stance groups and the row action strip",
-   "answers": "Who am I standing with, who am I standing against, and which way does the hostility run?",
-   "because": "BL-448 (corp stance) landed a stance data model with zero UI — the BL-350 lesson (a complete seam with no press) this surface exists to avoid — and this ledger is still its only host. The shape is three collapsing groups, Friends / Hostile / Neutral, each carrying its count and each stating its emptiness in words when it has no rows: Friends is normally empty at campaign start, and a section that simply vanished would read as a missing feature rather than as an answered question. A hostile row also says WHICH DIRECTION the hostility runs, because hostility is directed (RELATIONS.md § 1 Stance) and a row that only says 'hostile' has thrown away the half of the fact the player acts on — whether they declared, or are the one being interdicted. `is_hostile` is asked once per direction and never collapsed with `are_friends`, per that section's third invariant. The four transition presses (Declare Hostile with its confirm, Offer / Accept Friendship, Return to Neutral) live in the row's own action strip, opened by a disclosure arrow, and draw at the strip's full width — the arrangement that lets them exist at all in a ~324 px column, where a fixed 220 px in-row column clipped 'Declare Hostile' to 'De...'. There is no discovery gate: RELATIONS.md § 1 Stance overturns NR-350 — 'A declaration against the player is SIGNALLED' (Ben, 2026-08-22) — so a declaration groups and reads immediately rather than waiting on contact.",
-   "backlog_item": [
-    "BL-639",
-    "BL-449",
-    "BL-448"
-   ],
-   "files": [
-    "src/ui/corporation_panel.cpp"
-   ],
-   "status": "drafted"
-  },
-  "corporation_panel_standing": {
-   "surface": "Corporation ledger — the firm's name and its Capital figure",
-   "answers": "Which firm is this, and what is it worth?",
-   "because": "The row carries two fields, and the first of them is the one this surface had never managed to show. NAME: the population is the named corporate field — corporations, plus the player's own row — and background firms (BL-365, background firms) are excluded, because a background firm exists to fill a body's production gap and is not a party anyone can stand toward. Listing them put eighty-odd rows in front of the handful that are, and left the firm's name so little width it collapsed to a single letter. A diplomacy surface whose rows cannot be told apart answers nothing, so the name gets every pixel the other field does not need. CAPITAL: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), exact always for the player's own row — a corporation always reads its own books. The dash means 'this firm does not file', never 'you have not earned this', and says so on hover. The bands are retired and are not reintroduced. REACH AND SHARE ARE GONE. Both were public and both printed exactly, but at this column width they cost the name, and neither is a stance fact: reach is a count of bodies and share is a clearing-income ratio, both of them standing figures that belong with the profitability read (BL-627, profitability ledger). What the row deliberately still does NOT carry is any operational quantity — production rates, stockpile levels, recipes and workforce dials stay private. An open book tells you what a firm earned, never how it operates.",
-   "backlog_item": [
-    "BL-639",
-    "BL-633",
-    "BL-262",
-    "BL-631"
-   ],
-   "files": [
-    "src/ui/corporation_panel.cpp",
-    "src/world/standing.cpp"
-   ],
-   "status": "drafted"
   },
   "decision_feed": {
    "surface": "AI decision feed",
@@ -371,13 +313,14 @@
   },
   "header_panel": {
    "surface": "Header",
-   "answers": "Am I solvent, and what is the date?",
-   "because": "The two facts that condition every other decision, needed at a glance without opening anything. Runway (BL-073) is here rather than in the ledger precisely because it is a warning, not an analysis. The middle figure reads CARGO (BL-1269): with no corporation holding a stockpile under the shelf economy (BL-1265), the only goods the player owns are its trades' cargo in transit, valued at the price where they land.",
+   "answers": "Is my nation solvent, and which way is its treasury moving?",
+   "because": "The facts that condition every other decision, needed at a glance without opening anything. Re-subjected to the NATION (BL-1406; Ben, 2026-10-23: the player IS its nation): the first figure is the player nation's TREASURY, not a corporation's balance, and its NET is the nation's own row of the state ledger (the treasury as the tick's funding gate opened it, against the treasury as the budget settled it). A nation never runs into debt, so the figure has no negative state and the '[in debt]' flag retired with the balance it flagged. Runway (BL-177) stays here rather than in a ledger because it is a warning, not an analysis: treasury over the quarterly loss, shown only while burning, and its tooltip says what happens at the end - a losing building idles, the nation does not borrow. The middle figure reads CARGO (BL-1269): the goods the player owns are its trades' cargo in transit, valued at the price where they land.",
    "backlog_item": [
     "BL-073",
     "BL-171",
     "BL-177",
-    "BL-1269"
+    "BL-1269",
+    "BL-1406"
    ],
    "files": [
     "src/ui/header_panel.cpp"
@@ -496,11 +439,12 @@
   },
   "profile_panel": {
    "surface": "Profile panel",
-   "answers": "Who am I in this world?",
-   "because": "Identity is carried by emblem and colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else.",
+   "answers": "Which nation am I?",
+   "because": "Identity is carried by emblem and colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else. Re-subjected to the NATION (BL-1406; PROFILE.md § Contents): the card names the player's nation, its emblem shape keyed by the nation and its colour the nation's identity colour - the one the Nations lens and the border band read - and the former 'Parent:' line retired with the corporation.",
    "backlog_item": [
     "BL-090",
-    "BL-091"
+    "BL-091",
+    "BL-1406"
    ],
    "files": [
     "src/ui/profile_panel.cpp"
@@ -672,18 +616,6 @@
    ],
    "status": "drafted"
   },
-  "company_lens": {
-   "surface": "Company lens — background-firm holdings on the Planetary canvas",
-   "answers": "Who else is operating on this ground, besides the rivals I actually compete with?",
-   "because": "It earns its space by taking a question OFF another surface rather than adding one. Until 2026-08-28 the Corporation lens drew every non-player firm, so it answered two questions at once and therefore neither: measured on the home body, 373 background-firm buildings across 80 companies against 33 rival buildings across 7 corporations, an 11:1 ratio in which the rivals were invisible inside their own lens. Splitting the population gives each lens one question. The pair is also the cheapest possible addition to learn — drawn identically, differing only in which firms they admit, so a player who can read one can read the other with no new vocabulary. Ben settled the words on the same day: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md).",
-   "status": "settled",
-   "backlog_item": "BL-663",
-   "files": [
-    "src/ui/ui_state.hpp",
-    "src/ui/overlay.cpp",
-    "src/ui/body_surface_canvas.cpp"
-   ]
-  },
   "lens_region_selection": {
    "surface": "Deposit and plate selection — the Resource and Continent lenses' hover highlight and click-through",
    "answers": "This region the lens has drawn — what is it, and where do I go to find out more about it?",
@@ -694,20 +626,6 @@
     "src/ui/ui_state.hpp",
     "src/ui/body_surface_canvas.cpp",
     "scripts/verify/lens_selection_paths.lua"
-   ]
-  },
-  "company_ledger": {
-   "surface": "Company ledger — the fold-out surface a Company-lens click opens (PLACEHOLDER)",
-   "answers": "I clicked this background firm's holding — what firm is that, and is it one of the corporations I compete with?",
-   "because": "It earns its space by being the only thing on the other end of a click that would otherwise go nowhere. Ben, 2026-08-28: \"clicking will take you to a relevant ledger. (Different types for either, make a placeholder if needed).\" The corporation half of that ruling already had a destination — the all-corporations table — while the company half had no surface of any kind, so the Company lens drew a population the player could look at and never open. The surface is DELIBERATELY THIN and says so on its own face: it answers none of the five axes a designed ledger answers (docs/ui/ledgers/README.md — top question, sub-views, lens on open, data sources, close semantics), prints only facts already public about any firm (name, registration, holdings, and capital where the firm files), and invents no figure where the world has none. Its justification is therefore provisional: it earns space today as the click's landing point, and must earn it properly when the ledger batch designs it.",
-   "status": "drafted",
-   "backlog_item": "BL-666",
-   "files": [
-    "src/ui/company_ledger.hpp",
-    "src/ui/company_ledger.cpp",
-    "src/ui/ui_state.hpp",
-    "src/ui/nav_pane.cpp",
-    "src/core/app.cpp"
    ]
   },
   "construction_buildings_view": {
@@ -874,14 +792,15 @@
   "seat_canvas": {
    "surface": "Nation selection screen (Begin, before play)",
    "answers": "Which nation am I?",
-   "because": "THE PLAYER PICKS A MAJOR NATION (Ben, 2026-10-10; CONCEPT.md § Player identity; STARTUP.md § The seat). This overturns the corporation canvas at the grain of the pick: the player is a major nation operating its champion, so choosing who you are is choosing a nation, and the rows are the MAJORS ONLY - a nation holding a champion - because a minor cannot be played and majors and seats are one-to-one, so the list is exactly the major target's count. It is shaped for up to six humans each taking one major and seats one (NR-1025): nothing in it assumes a single row is taken. THE CARD EARNS MORE ROOM THAN THE FIRM CARD DID because it answers a bigger question in seven parts, each one a fact the player could not otherwise weigh before committing: (1) the nation's territory, lit on the map in its own colour, so where it stands is read by pointing at a row; (2) population and GDP (NATIONS.md § GDP: the value of production on its tiles at its markets' prices, read off the last cleared quarter, never stored) - how much it makes and for how many; (3) treasury and budget weights - what the state holds and where it already spends (no debt line: nations open with real credits); (4) the champion - the firm card below, unchanged in content, because the player operates it directly; (5) resource profile and deposits - what lies under its ground; (6) neighbours, each with its derived reading both ways and any grudge - who resents it, because no nation-to-nation stance is declared before play and the Era -1 grudge record is what seeded the readings (BL-898); (7) HISTORY (BL-1295) - the pattern tags its realms carried (rose and fell, colonised, revolution, survived civil war, world war; GENERATION_STRATEGY.md § History patterns), a short timeline of its line's key events read off the lapse records (foundings, secessions, subjection, closing-round absorptions, champion charters, the revolution line 'Taken by revolution; formerly <old>'), and a link that opens the History ledger's Ages view FILTERED to the nation - its realm, the realms folded into it and the line it broke from lit, every other realm dimmed. The card and the ledger read one lineage (ui::nation_lineage), so they cannot disagree about which realms are the nation's. The link is a toggle (the toggle rule) and moves nothing. Everything is read from what the generation report and the world already carry. THE SELECTED NATION KEEPS ITS FULL CARD (Ben, 2026-10-15, live click: the card vanished for the selected row, inverted): pressing a row puts Confirm and Back at the head of the pane and the briefing prose below the card, so the nation being chosen is the one shown in full. The briefing reads at the nation's grain where it names the realm and the champion's where it names the charter; Confirm issues take_seat naming the MAJOR, which seats its champion through the command seam, validated as an untrusted input (a minor, a corporation id, or an id naming nothing is refused whole and moves nothing). PRIOR GROUND, kept where the ruling above does not contradict it: THE SEAT IS AN IDENTITY, NOT AN ADDRESS (Ben, 2026-09-17, NR-885): the player is a corporation, so choosing one is becoming it, and a random draw assigned an identity nobody chose. Ben reversed the 2026-08-26 retirement of the selection screen on 2026-09-09 (\"it's time to reverse that ruling\") and designed the surface on 2026-09-24. It comes AFTER the firms and the settle, which is what makes a seat worth weighing: the retired pre-settle stage had no moved balances to show. A RANKED LIST BESIDE A MAP: every specialist in static-score order, with the ones below the viability floor visibly marked and still pickable, so a player can knowingly take a hard seat; the map is the home body and highlights the hovered row's HQ, works and home market catchment, so where a firm stands is read by pointing at it rather than by reading coordinates. THE CARD IS FOUR LINES AND NO MORE - industry and goods; HQ and home market with that market's prices for the firm's goods and inputs; cash, debt and assets; nation and its stance - because those are what an opening position is made of; the landscape score is the list's order, not a line, and trailing figures and rivals are left off. PICKING TAKES TWO PRESSES: a briefing in prose (who you are, what you make, where you sell, what you owe, whose law, and for a marked firm why the floor marked it), then Confirm or Back, because choosing who you are is a deliberate act. The pick is a game act (take_seat), reproducible from (seed, pick).",
+   "because": "THE PLAYER PICKS A MAJOR NATION (Ben, 2026-10-10; CONCEPT.md § Player identity; STARTUP.md § The seat). This overturns the corporation canvas at the grain of the pick: the player is a major nation operating its champion, so choosing who you are is choosing a nation, and the rows are the MAJORS ONLY - a nation holding a champion - because a minor cannot be played and majors and seats are one-to-one, so the list is exactly the major target's count. It is shaped for up to six humans each taking one major and seats one (NR-1025): nothing in it assumes a single row is taken. THE CARD EARNS MORE ROOM THAN THE FIRM CARD DID because it answers a bigger question in seven parts, each one a fact the player could not otherwise weigh before committing: (1) the nation's territory, lit on the map in its own colour, so where it stands is read by pointing at a row; (2) population and GDP (NATIONS.md § GDP: the value of production on its tiles at its markets' prices, read off the last cleared quarter, never stored) - how much it makes and for how many; (3) treasury and budget weights - what the state holds and where it already spends (no debt line: nations open with real credits); (4) - the champion's firm card - RETIRED with the champion (BL-1406; Ben, 2026-10-23): the player governs the nation and builds every building on its ground, so the list shows NATIONS (name, marked where the viability floor marked it, and treasury) and the card drops its champion section; (5) resource profile and deposits - what lies under its ground; (6) neighbours, each with its derived reading both ways and any grudge - who resents it, because no nation-to-nation stance is declared before play and the Era -1 grudge record is what seeded the readings (BL-898); (7) HISTORY (BL-1295) - the pattern tags its realms carried (rose and fell, colonised, revolution, survived civil war, world war; GENERATION_STRATEGY.md § History patterns), a short timeline of its line's key events read off the lapse records (foundings, secessions, subjection, closing-round absorptions, champion charters, the revolution line 'Taken by revolution; formerly <old>'), and a link that opens the History ledger's Ages view FILTERED to the nation - its realm, the realms folded into it and the line it broke from lit, every other realm dimmed. The card and the ledger read one lineage (ui::nation_lineage), so they cannot disagree about which realms are the nation's. The link is a toggle (the toggle rule) and moves nothing. Everything is read from what the generation report and the world already carry. THE SELECTED NATION KEEPS ITS FULL CARD (Ben, 2026-10-15, live click: the card vanished for the selected row, inverted): pressing a row puts Confirm and Back at the head of the pane and the briefing prose below the card, so the nation being chosen is the one shown in full. The briefing reads at the nation's grain where it names the realm and the champion's where it names the charter; Confirm issues take_seat naming the MAJOR, which seats its champion through the command seam, validated as an untrusted input (a minor, a corporation id, or an id naming nothing is refused whole and moves nothing). PRIOR GROUND, kept where the ruling above does not contradict it: THE SEAT IS AN IDENTITY, NOT AN ADDRESS (Ben, 2026-09-17, NR-885): the player is a corporation, so choosing one is becoming it, and a random draw assigned an identity nobody chose. Ben reversed the 2026-08-26 retirement of the selection screen on 2026-09-09 (\"it's time to reverse that ruling\") and designed the surface on 2026-09-24. It comes AFTER the firms and the settle, which is what makes a seat worth weighing: the retired pre-settle stage had no moved balances to show. A RANKED LIST BESIDE A MAP: every specialist in static-score order, with the ones below the viability floor visibly marked and still pickable, so a player can knowingly take a hard seat; the map is the home body and highlights the hovered row's HQ, works and home market catchment, so where a firm stands is read by pointing at it rather than by reading coordinates. THE CARD IS FOUR LINES AND NO MORE - industry and goods; HQ and home market with that market's prices for the firm's goods and inputs; cash, debt and assets; nation and its stance - because those are what an opening position is made of; the landscape score is the list's order, not a line, and trailing figures and rivals are left off. PICKING TAKES TWO PRESSES: a briefing in prose (who you are, what you make, where you sell, what you owe, whose law, and for a marked firm why the floor marked it), then Confirm or Back, because choosing who you are is a deliberate act. The pick is a game act (take_seat), reproducible from (seed, pick). BL-1406: the list rows are nations - the Champion and Industry columns retired; take_seat still names the champion under the hood until BL-1407 deletes the corporation type.",
    "backlog_item": [
     "BL-1295",
     "BL-1281",
     "BL-1076",
     "BL-630",
     "BL-1020",
-    "BL-1073"
+    "BL-1073",
+    "BL-1406"
    ],
    "files": [
     "src/ui/seat_screen.cpp",
@@ -958,20 +877,6 @@
     "src/world/world.hpp"
    ],
    "status": "drafted"
-  },
-  "owner_multi_select": {
-   "surface": "Owner multi-select — the Corporation and Company lenses' picked owner set, owned-grey fill, checklist key and shift-click picker",
-   "answers": "Where do I, and the one or two rivals (or firms) I am sizing up, hold ground on this body — against everyone else, who simply 'holds something here'?",
-   "because": "Buildings no longer carry an owner colour on the canvas (RENDERING.md § Installations), so the Corporation and Company lenses became the only place ownership is read at a glance — and with every owner tinted at once they answered 'who owns what' with a map of every colour at once, which answers nothing. A picked set keeps the comparison the player is actually making in colour and folds every other owner into one owned-grey, which still says 'someone holds this' without competing. Ben, 2026-10-08 (the sprint 51 visibility pass). The key copies the Resource lens's search-and-checklist shape so there is no new vocabulary, rows exist only for owners with ground on the body, the Corporation set defaults to the player ('where am I, against everyone'), and shift-click makes the map itself the picker while a plain click keeps its BL-664 meaning. It costs no new screen space: the key fills the one lens chrome region the lens already owned.",
-   "status": "drafted",
-   "backlog_item": "BL-1240",
-   "files": [
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/ui_state.hpp",
-    "src/ui/presentation.hpp",
-    "src/core/verify_api.cpp",
-    "scripts/verify/owner_multi_select.lua"
-   ]
   },
   "planetary_landforms_rivers": {
    "surface": "Baked landform relief and carved rivers (Planetary canvas ground) -- mountain as massif and ridge, canyon as a cut between paired rims, crater as a raised-rim bowl, rift as a dark fissure; rivers as curved courses widening downstream",

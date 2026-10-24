@@ -33,6 +33,7 @@
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
 #include "world/trade.hpp"           // building_trade_points — a trade building's method line (BL-1321)
+#include "player_side.hpp"          // BL-1406: is_player_side
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
@@ -208,11 +209,9 @@ void draw_survey_section(const world& w, ui_state& ui, entity_id body_id)
         {
             const float cost = survey_cost(w, body_id);
             const int   eta  = survey_eta_days(w, body_id);
-            float balance = 0.0f;
-            const auto pit = w.corporations.find(w.player_entity);
-            if (pit != w.corporations.end())
-                balance = pit->second.balance;
-            const bool affordable = balance >= cost;
+            // BL-1406: what the player's actor may commit — its nation's
+            // uncommitted treasury once folded (the payer app.cpp names).
+            const bool affordable = purse_room_of(w, player_actor(w)) >= cost;
 
             ImGui::BeginDisabled(!affordable);
             if (ImGui::Button("Dispatch Survey"))
@@ -496,7 +495,11 @@ void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
         {
             // The owning corp's emblem (player or rival — ownership is public,
             // BL-068). Falls back to the plain square if the owner won't resolve.
-            const entity_id owner = owner_corp_of(w, id);
+            // BL-1406: the owner is a corporation or a NATION (building_owner_of);
+            // the player's nation wears the player's emblem, as the profile does.
+            entity_id owner = building_owner_of(w, id).id;
+            if (owner != null_entity && owner == player_actor(w))
+                owner = w.player_entity;
             if (owner != null_entity)
                 icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(owner),
                                    palette::corp_identity_colour(owner, w.player_entity));
@@ -665,7 +668,9 @@ recipe_switch_result method_grid_press(world& w, const recipe_registry& reg, ent
     const auto bit = w.buildings.find(id);
     if (bit == w.buildings.end())
         return recipe_switch_result::invalid;
-    const recipe_switch_result r = try_switch_recipe(w, reg, w.player_entity, bit->second, recipe);
+    // BL-1406: the player acts as its nation once folded (try_switch_recipe
+    // takes a nation switching one of its own buildings).
+    const recipe_switch_result r = try_switch_recipe(w, reg, player_actor(w), bit->second, recipe);
     s_switch_refused_building = (r == recipe_switch_result::applied) ? null_entity : id;
     s_switch_refused_result   = r;
     return r;
@@ -1365,8 +1370,8 @@ void draw_unit_roster_page(const world& w, const unit_component& u)
     ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Owner");
-    const auto cit = w.corporations.find(u.owner);
-    ImGui::Text("%s", cit != w.corporations.end() ? cit->second.name.c_str() : "\xe2\x80\x94");
+    const char* owner_name = owner_display_name(w, u.owner); // BL-1406: a nation's unit
+    ImGui::Text("%s", owner_name != nullptr ? owner_name : "\xe2\x80\x94");
 }
 
 void draw_unit_page(const world& w, const recipe_registry& reg, entity_id id, unit_page_kind kind)
@@ -1488,7 +1493,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         // read straight off unit_component::owner rather than through
         // is_player_owned (which walks corp.assets and would always miss a
         // unit). A rival's unit is intel-only: every press below is disabled.
-        const bool owned = (uit->second.owner == w.player_entity);
+        const bool owned = is_player_side(w, uit->second.owner); // BL-1406: the nation's unit
 
         if (tile_icon_button("##unit_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
             focus_on_entity(w, ui, sel);
@@ -1753,10 +1758,10 @@ void draw_battle_side(const world& w, const char* label, entity_id corp,
                       const std::vector<entity_id>& units, int strength_permille,
                       bool show_units)
 {
-    const auto cit = w.corporations.find(corp);
+    const char* side_name = owner_display_name(w, corp); // BL-1406: a nation's side
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", label);
     ImGui::SameLine();
-    ImGui::TextUnformatted(cit != w.corporations.end() ? cit->second.name.c_str() : "Unknown");
+    ImGui::TextUnformatted(side_name != nullptr ? side_name : "Unknown");
 
     // The aggregate first: it is the number that answers "am I winning".
     ImGui::ProgressBar(std::clamp(strength_permille / 1000.0f, 0.0f, 1.0f),
@@ -1799,7 +1804,9 @@ void draw_battle_selection(world& w, ui_state& ui)
     // being rendered as an empty card here.
     const active_battle& b = *selected_battle(w, ui);
 
-    const entity_id player = w.player_entity;
+    // BL-1406: the player's side is its nation once folded (units re-owned).
+    const entity_id player = is_player_side(w, b.attacker) ? b.attacker
+                           : is_player_side(w, b.defender) ? b.defender : w.player_entity;
     const bool mine = (b.attacker == player || b.defender == player);
     // The spectator god view lifts the redaction in the UI ONLY (BL-408) — the
     // same pair-test every other read-site uses, never a world-side change.
@@ -2118,7 +2125,7 @@ std::vector<production_stack> tile_stacks(const world& w, entity_id tile, bool g
         const building_component& b = w.buildings.at(id);
         production_stack key;
         key.type  = b.type;
-        key.owner = owner_corp_of(w, id);
+        key.owner = building_owner_of(w, id).id; // BL-1406: a nation, once folded
         key.open  = god || is_player_owned(w, id);
         if (key.open)
         {
@@ -2345,9 +2352,9 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
             std::string t;
             if (!mine)
             {
-                const auto cit = w.corporations.find(st.owner);
+                const char* on = owner_display_name(w, st.owner); // BL-1406
                 t = std::string("Owned by ")
-                  + (cit != w.corporations.end() ? cit->second.name : std::string("an unknown firm"))
+                  + (on != nullptr ? std::string(on) : std::string("another nation"))
                   + ". ";
             }
             cells.push_back(construction_cell(
@@ -2495,7 +2502,7 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             // The figure `market_trade_points` sums for this building: its
             // (owner, body) labour scalar this tick, 1 where the tick has none.
             float contention = 1.0f;
-            const entity_id corp = owner_corp_of(w, bid);
+            const entity_id corp = building_owner_of(w, bid).id; // BL-1406: a nation owns it once folded
             if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
                 if (const auto cit = report.workforce_contention.find({corp, tit->second.body});
                     cit != report.workforce_contention.end())
@@ -3375,33 +3382,38 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         //    construction anywhere.
         // ON WATER THE LIST IS ONE TYPE LONG (BL-785): a port, and only on water
         // this nation owns.
+        //
+        // BL-1406: every probe names the player's ACTOR (its nation once folded),
+        // so the own-ground gate (NATIONS.md § Own ground) and the tech gate are
+        // asked here exactly as construct_nation will ask them — the button is
+        // never enabled on ground the press would be refused on.
+        const entity_id actor = player_actor(w);
         bool any_placeable = false;
         if (water)
         {
-            const bool owned = w.tile_to_nation.count(sel) != 0;
-            any_placeable = owned
-                            && placement_rules::can_place_in_world(
-                                   w, sel, building_type::port, resource_type::iron_ore,
-                                   ui.max_logistics_reach).ok();
+            any_placeable = placement_rules::can_place_in_world(
+                                w, sel, building_type::port, resource_type::iron_ore,
+                                ui.max_logistics_reach, actor).ok();
         }
         else
         for (const resource_type er : placement_rules::k_extractable)
             if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
                 placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er,
-                                                   ui.max_logistics_reach).ok())
+                                                   ui.max_logistics_reach, actor).ok())
             { any_placeable = true; break; }
         // BL-1198: a Well needs no deposit, so the loop above cannot see it.
         if (!any_placeable && !water
             && placement_rules::is_well_site(w, sel, resource_type::water)
             && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
-                                                   resource_type::water, ui.max_logistics_reach).ok())
+                                                   resource_type::water, ui.max_logistics_reach,
+                                                   actor).ok())
             any_placeable = true;
         // BL-1199: nor a Fishing Wharf (coastal, no produce deposit).
         if (!any_placeable && !water
             && placement_rules::is_wharf_site(w, sel, resource_type::agricultural_produce)
             && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
                                                    resource_type::agricultural_produce,
-                                                   ui.max_logistics_reach).ok())
+                                                   ui.max_logistics_reach, actor).ok())
             any_placeable = true;
         if (!any_placeable && !water)
         {
@@ -3413,13 +3425,13 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
                                            building_type::military_base,
                                            building_type::research_institute})
                 if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore,
-                                                       ui.max_logistics_reach).ok())
+                                                       ui.max_logistics_reach, actor).ok())
                 { any_placeable = true; break; }
         }
 
         bool building_underway = false;
-        if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
-            for (entity_id bid : pit->second.assets)
+        if (const std::vector<entity_id>* mine = assets_of(w, actor); mine != nullptr)
+            for (entity_id bid : *mine)
                 if (const auto bit = w.buildings.find(bid);
                     bit != w.buildings.end() && bit->second.ticks_remaining > 0)
                 { building_underway = true; break; }
@@ -4012,11 +4024,13 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
     ImGui::Separator();
 
-    // Player balance — the affordability context for every Build button below.
+    // The player's money — the affordability context for every Build button below.
+    // BL-1406: its nation's treasury once folded (HEADER.md § Contents).
+    const entity_id actor = player_actor(w);
     float balance = 0.0f;
-    if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
-        balance = pit->second.balance;
-    ImGui::TextDisabled("Balance: %.0f cr", static_cast<double>(balance));
+    if (const float* p = purse_of(w, actor); p != nullptr)
+        balance = *p;
+    ImGui::TextDisabled("Treasury: %.0f cr", static_cast<double>(balance));
 
     // Last construction outcome (set by app after executing a request).
     if (!ui.construction.last_message.empty())
@@ -4143,7 +4157,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // `refined_copper` retired with the per-corp gates, NR-1022), so this
     // branch removes nothing until the effect pass gives a node an unlock.
     cands.erase(std::remove_if(cands.begin(), cands.end(),
-                               [&w, &reg, tile_id](const candidate& c)
+                               [&w, &reg, tile_id, actor](const candidate& c)
                                {
                                    if (!reg.building_available(c.type))
                                        return true;
@@ -4155,7 +4169,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                                        if (const recipe* rc = reg.get_recipe(c.recipe);
                                            rc != nullptr && !recipe_runs_at_tile(w, *rc, tile_id))
                                            return true;
-                                   return !recipe_unlocked(w, reg, w.player_entity, c.recipe);
+                                   return !recipe_unlocked(w, reg, actor, c.recipe);
                                }),
                 cands.end());
 
@@ -4185,7 +4199,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         // button that construct_building would then refuse.
         c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
                                                   ui.max_logistics_reach,
-                                                  w.player_entity,
+                                                  actor, // BL-1406: own ground + tech
                                                   reg.placement_gate_for(c.type, c.recipe));
         // BL-328 pre-commit warning, on BL-1342's corrected mirror: the market's
         // persistent stock, the capacity row and the fair-price ceiling, exactly
@@ -4679,19 +4693,16 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             if (bc.tile == tile_id && bc.type == building_type::military_base
                 && bc.ticks_remaining <= 0 && !bc.decommissioned)
             {
-                const auto cit = w.corporations.find(w.player_entity);
-                if (cit != w.corporations.end()
-                    && std::find(cit->second.assets.begin(), cit->second.assets.end(), bid)
-                           != cit->second.assets.end())
-                {
+                // BL-1406: the base must be the player ACTOR's (its nation's once
+                // folded) — `owner_holds` reads either owner's asset list.
+                if (owner_holds(w, player_actor(w), bid))
                     has_muster_base = true;
-                }
                 break;
             }
         }
         const auto& table = unit_roster_table();
         const auto  avail = has_muster_base
-            ? available_rows(w, w.player_entity, campaign_roster_band_for(reg.era()))
+            ? available_rows(w, player_actor(w), campaign_roster_band_for(reg.era()))
             : std::vector<const roster_row*>{};
         if (!avail.empty())
         {
@@ -4767,7 +4778,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             // crossing. The refusal is therefore the ABSENCE of a target, which is
             // why there is no refusal sentence in this row any more.
             const std::vector<road_target> targets =
-                road_crossing_targets(w, tile_id, rt.level, w.player_entity);
+                road_crossing_targets(w, tile_id, rt.level, actor); // BL-1406: as the nation
 
             // Same affordability defect as the building path: place_road gates on
             // build_cost PLUS materials priced at the local market, so gating on
@@ -4868,12 +4879,20 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                 // may cross into but never be built out of (BL-1357). A player reading it
                 // would upgrade the tier, or look for an unroaded side, and neither can
                 // ever work there.
-                switch (ui::road_crossing_refusal(w, tile_id, rt.level, w.player_entity))
+                switch (ui::road_crossing_refusal(w, tile_id, rt.level, actor))
                 {
                     case placement_rules::placement_reason::foreign_ground:
-                        why = "Another nation holds this tile. A road may cross INTO their "
+                        // BL-1406: the rule refuses ground that is not the player's
+                        // nation's - ANOTHER nation's, or ground no nation holds
+                        // (BL-1399, NATIONS.md § Own ground) - so the sentence says
+                        // which, rather than naming a nation that is not there.
+                        why = (w.tile_to_nation.count(tile_id) != 0)
+                            ? "Another nation holds this tile. A road may cross INTO their "
                               "ground, but never be built out of it - so build from your "
-                              "own side of the border.";
+                              "own side of the border."
+                            : "No nation holds this tile. A road may cross INTO unowned "
+                              "ground, but never be built out of it - so build from your "
+                              "own ground.";
                         break;
                     case placement_rules::placement_reason::no_road_to_extend:
                         why = "A road is laid from a road: this tile carries none, so there "

@@ -14,11 +14,30 @@ namespace ui {
 
 namespace {
 
-/// The player corporation's running balance, or 0 if it has no component yet.
-float player_balance(const world& w)
+/// BL-1406 (HEADER.md § Contents): the player's money is its NATION's treasury
+/// once the world is folded — `purse_of(player_actor)` answers either owner, so
+/// an unfolded world (a fixture) still reads the seat corporation's balance.
+float player_treasury(const world& w)
 {
-    const auto it = w.corporations.find(w.player_entity);
-    return (it != w.corporations.end()) ? it->second.balance : 0.0f;
+    const float* p = purse_of(w, player_actor(w));
+    return p != nullptr ? *p : 0.0f;
+}
+
+/// The last economy tick's net change to the player nation's treasury, read from
+/// the nation's own row of the state ledger (`world::state_ledger`: the treasury
+/// as the funding gate opened the tick, and as the budget settled it). False when
+/// the nation holds no row this tick — no state industry ran — so the caller falls
+/// back to the treasury series.
+bool ledger_net(const world& w, float& net)
+{
+    const entity_id nation = player_nation(w);
+    if (nation == null_entity || !world_is_folded(w))
+        return false;
+    const auto it = w.state_ledger.find(nation);
+    if (it == w.state_ledger.end())
+        return false;
+    net = it->second.treasury_close - it->second.treasury_open;
+    return true;
 }
 
 } // namespace
@@ -27,16 +46,19 @@ float player_balance(const world& w)
 // header strip's CARGO figure and the ledger's Cargo Value use one valuation.
 float player_cargo_value(const world& w)
 {
-    // BL-1265/BL-1269: no corporation holds a stockpile any more — what it makes
-    // lands on a market's shelf and is sold there (MARKETS.md § The shelf
-    // economy). The goods a corporation still OWNS are its trades' cargo in
-    // transit, bought at the source and sold on landing (TRADE.md § A trade), so
-    // that is what this values: each in-flight convoy's cargo at its destination
-    // market's current price — the price it will land into.
+    // BL-1265/BL-1269: no owner holds a stockpile any more — what it makes lands
+    // on a market's shelf and is sold there (MARKETS.md § The shelf economy). The
+    // goods the player still OWNS are its trades' cargo in transit, bought at the
+    // source and sold on landing (TRADE.md § A trade), so that is what this
+    // values: each in-flight convoy's cargo at its destination market's current
+    // price — the price it will land into. BL-1406: the convoy's owner is the
+    // player's ACTOR (its nation once folded); the seat corporation's id is kept
+    // for a convoy dispatched before the fold.
+    const entity_id actor = player_actor(w);
     float value = 0.0f;
     for (const convoy_component& c : w.convoys)
     {
-        if (c.corp != w.player_entity || c.cargo_qty <= 0.0f)
+        if ((c.corp != actor && c.corp != w.player_entity) || c.cargo_qty <= 0.0f)
             continue;
         const auto mit = w.markets.find(c.dest_market);
         if (mit == w.markets.end())
@@ -77,101 +99,80 @@ void draw_header_panel(const world& w,
     // start Y centres the whole row.
     ImGui::SetCursorPosY((header_panel_height - ImGui::GetFrameHeight()) * 0.5f);
 
-    const float balance   = player_balance(w);
+    // BL-1406: the TREASURY of the player's nation (HEADER.md § Contents). A
+    // nation never runs into debt, so the figure has no negative state and the
+    // old `[in debt]` flag retires with the corporation balance it flagged.
+    const float treasury  = player_treasury(w);
     const float valuation = player_cargo_value(w);
 
-    // Last-tick net change: the most recent balance step (newest minus previous).
+    // Last-tick net change: the nation's own state-ledger row (close less open);
+    // with no row this tick, the most recent step of the treasury series.
     float net = 0.0f;
-    if (balance_history.size() >= 2)
+    if (!ledger_net(w, net) && balance_history.size() >= 2)
         net = balance_history.back() - balance_history[balance_history.size() - 2];
 
     // Guaranteed-fit strip (LAYOUT.md container vocabulary): the strip never wraps
-    // to a second line. The three balance/cargo/net figures are bounded-length
+    // to a second line. The three treasury/cargo/net figures are bounded-length
     // (fmt::credits/rate abbreviate to a handful of characters) and always drawn in
-    // full; the decorative extras — the in-debt flag and the sparkline — are the
-    // genuine last resort to drop first when the available width is too narrow to
-    // hold everything, so a load-bearing number is never silently clipped.
-    const bool         in_debt      = balance < 0.0f;
-    const std::string  debt_text    = "[in debt - interest accruing]";
-    const ImVec2       item_spacing = ImGui::GetStyle().ItemSpacing;
-    const float        spark_width  = 96.0f;
+    // full; the sparkline is the genuine last resort to drop when the available
+    // width is too narrow, so a load-bearing number is never silently clipped.
+    const ImVec2 item_spacing = ImGui::GetStyle().ItemSpacing;
+    const float  spark_width  = 96.0f;
 
-    // BL-177 — the runway read: "how long until underwater". NET says the player
-    // is losing money; it does not say how much cushion is left, which is the
-    // half of the goal that lets them act before bankruptcy rather than discover
-    // it. BL-171 removed the old runway deliberately, so this re-homes it rather
-    // than reverting: it sits in the header beside the figures it is derived
-    // from, and is load-bearing (measured into used_width, never dropped).
-    //
-    // Deliberately NOT an "infinite quarters" reading when profitable — a runway
-    // only exists while burning. Growing/flat states say so in words.
-    // Shown only while it MEANS something — burning cash, or already under. When
-    // the balance is growing there is no runway to run out, and a "growing"
-    // reading would be noise competing with NET for scarce header width. This is
-    // also why it is not an "infinite quarters" reading: that number would be a
-    // lie dressed as a figure.
-    // BL-577: this tick's contract income (budget_result::subsidies) — the
-    // SAME line the Balance ledger's new "Contract income" line reads
-    // (balance_ledger.cpp). The runway math itself needs no separate term:
-    // `net` is a plain balance delta, so a contract payment already moved it.
-    // What the math CANNOT say on its own is that one-off "steady burn"
-    // premise is wrong for a tick a contract paid out — a single lump sum
-    // reading as a rosy (or merely less bad) quarter would mislead the
-    // "assumes the burn holds steady" reader, so the tooltip names it.
+    // BL-177 — the runway read: how long the treasury lasts at the current burn.
+    // Shown only while it MEANS something — burning cash. A growing treasury shows
+    // nothing rather than a lying "infinite quarters" figure. When the treasury
+    // runs out a losing building idles (NATIONS.md § What a nation owns); the
+    // nation does not borrow, so there is no "already underwater" state.
+    // BL-577: this tick's contract income, named in the tooltip because a one-off
+    // payment breaks the "assumes the burn holds steady" premise.
     float subsidies = 0.0f;
-    if (const auto bit = report.budgets.find(w.player_entity); bit != report.budgets.end())
+    if (const auto bit = report.budgets.find(player_actor(w)); bit != report.budgets.end())
         subsidies = bit->second.subsidies;
 
     std::string runway_text;
     std::string runway_tip;
     bool        runway_urgent = false;
-    const bool  runway_meaningful = (balance < 0.0f) || (net < 0.0f);
-    if (balance < 0.0f)
+    const bool  runway_meaningful = net < 0.0f;
+    if (runway_meaningful)
     {
-        runway_text   = "in debt";
-        runway_urgent = true;
-        runway_tip    = "Already underwater - interest accrues each quarter.\n"
-                        "Runway resumes once the balance is positive again.";
-    }
-    else if (net < 0.0f)
-    {
-        const int quarters = static_cast<int>(balance / -net);
+        const int quarters = static_cast<int>(std::max(0.0f, treasury) / -net);
         char      buf[32];
         std::snprintf(buf, sizeof(buf), "%dq", quarters);
         runway_text = buf;
         // Under two years of cushion is the point it needs acting on.
         runway_urgent = quarters < 8;
-        char tip[256];
+        char tip[320];
         if (subsidies > 0.0f)
             std::snprintf(tip, sizeof(tip),
-                          "About %d quarters of cushion: balance divided by the current\n"
+                          "About %d quarters of cushion: treasury divided by the current\n"
                           "quarterly loss. Assumes the burn holds steady - it moves as\n"
                           "prices, wages and upkeep change. Includes Cr %.0f of contract\n"
-                          "income this quarter - a one-off payment, not a steady rate.",
+                          "income this quarter - a one-off payment, not a steady rate.\n"
+                          "When the treasury runs out, a losing building idles.",
                           quarters, static_cast<double>(subsidies));
         else
             std::snprintf(tip, sizeof(tip),
-                          "About %d quarters of cushion: balance divided by the current\n"
+                          "About %d quarters of cushion: treasury divided by the current\n"
                           "quarterly loss. Assumes the burn holds steady - it moves as\n"
-                          "prices, wages and upkeep change.", quarters);
+                          "prices, wages and upkeep change.\n"
+                          "When the treasury runs out, a losing building idles.", quarters);
         runway_tip = tip;
     }
 
-    float used_width = ImGui::CalcTextSize("BALANCE").x + item_spacing.x +
-                       ImGui::CalcTextSize(fmt::credits(balance).c_str()).x + item_spacing.x +
-                       ImGui::CalcTextSize("   |   STOCKPILE").x + item_spacing.x +
+    float used_width = ImGui::CalcTextSize("TREASURY").x + item_spacing.x +
+                       ImGui::CalcTextSize(fmt::credits(treasury).c_str()).x + item_spacing.x +
+                       ImGui::CalcTextSize("   |   CARGO").x + item_spacing.x +
                        ImGui::CalcTextSize(fmt::credits(valuation).c_str()).x + item_spacing.x +
                        ImGui::CalcTextSize("   |   NET").x + item_spacing.x +
                        ImGui::CalcTextSize(fmt::rate(net, "qtr").c_str()).x;
 
-    const float available   = ImGui::GetContentRegionAvail().x;
-    bool        show_debt   = in_debt;
-    bool        show_spark  = balance_history.size() >= 2;
+    const float available  = ImGui::GetContentRegionAvail().x;
+    bool        show_spark = balance_history.size() >= 2;
 
-    // BL-177 runway fit, resolved BEFORE the decorative drops because the runway
-    // is load-bearing and they are not. Container 4 (LAYOUT.md) forbids silently
-    // truncating a header figure, so this degrades in three honest steps rather
-    // than letting the value run off the edge:
+    // BL-177 runway fit, resolved BEFORE the decorative drop because the runway
+    // is load-bearing and the sparkline is not. Container 4 (LAYOUT.md) forbids
+    // silently truncating a header figure, so this degrades in three honest steps:
     //   full   "   |   RUNWAY  12q"   - label and value
     //   value  "   |   12q"           - label dropped, value kept (tooltip explains)
     //   none                          - folded into the NET tooltip instead
@@ -197,41 +198,23 @@ void draw_header_panel(const world& w,
         }
     }
 
-    if (show_debt && used_width + item_spacing.x + ImGui::CalcTextSize(debt_text.c_str()).x > available)
-        show_debt = false; // drop the debt flag first — the red number already carries the signal
-    else if (show_debt)
-        used_width += item_spacing.x + ImGui::CalcTextSize(debt_text.c_str()).x;
-
     if (show_spark && used_width + item_spacing.x + spark_width > available)
-        show_spark = false; // drop the sparkline next if still too tight
+        show_spark = false; // the sparkline is the last decorative element to drop
 
-    // --- Balance (negatives flagged red, per the economy-panel convention) ---
-    ImGui::TextDisabled("BALANCE");
+    // --- Treasury ---
+    ImGui::TextDisabled("TREASURY");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Your nation's treasury. A nation never runs into debt.");
     ImGui::SameLine();
     {
         // The figures draw through fit_text (BL-215): the drop ladder above runs
         // first, so elision is the genuine last resort container 4 permits.
-        const ImU32 col = in_debt ? palette::negative : palette::positive;
-        ImGui::PushStyleColor(ImGuiCol_Text, col);
-        fit_text(text_box::header_strip, "header.balance", fmt::credits(balance).c_str(),
+        // A nation's treasury is never negative; an unfolded fixture's seat
+        // corporation balance can be, and is not shown in the positive colour.
+        ImGui::PushStyleColor(ImGuiCol_Text, treasury < 0.0f ? palette::negative : palette::positive);
+        fit_text(text_box::header_strip, "header.treasury", fmt::credits(treasury).c_str(),
                  ImGui::GetContentRegionAvail().x);
         ImGui::PopStyleColor();
-    }
-
-    // BL-073: explicit in-debt affordance — a negative balance is now self-
-    // accelerating (interest accrues each quarter), so flag it plainly rather than
-    // relying on the red number alone.
-    if (show_debt)
-    {
-        ImGui::SameLine();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "%s", debt_text.c_str());
-    }
-    else if (in_debt)
-    {
-        ImGui::SameLine();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "[in debt]");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", debt_text.c_str());
     }
 
     // --- Cargo in transit, valued where it lands ---
@@ -243,7 +226,7 @@ void draw_header_panel(const world& w,
     fit_text(text_box::header_strip, "header.cargo", fmt::credits(valuation).c_str(),
              ImGui::GetContentRegionAvail().x);
 
-    // --- Last-tick net + a sparkline of recent balances ---
+    // --- Last-tick net + a sparkline of recent treasuries ---
     ImGui::SameLine();
     ImGui::TextDisabled("   |   NET");
     ImGui::SameLine();
@@ -259,7 +242,7 @@ void draw_header_panel(const world& w,
     if (runway_meaningful && !show_runway && ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", runway_tip.c_str());
 
-    // --- BL-177: runway — how long the balance lasts at the current burn ---
+    // --- BL-177: runway — how long the treasury lasts at the current burn ---
     if (show_runway)
     {
         ImGui::SameLine();

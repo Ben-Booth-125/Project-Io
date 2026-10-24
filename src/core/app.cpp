@@ -17,12 +17,9 @@
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
 #include "ui/generation_wait.hpp" // BL-1072: the one wait surface
-#include "ui/acquisitions_ledger.hpp" // nav slot 5, the Acquisitions ledger + its profitability fold-out
-#include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
-#include "ui/corporation_panel.hpp"     // all-corporations table, restored to slot 8 (NR-012)
 #include "ui/convoys_ledger.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
@@ -1542,8 +1539,59 @@ std::vector<app::seat_major> app::seat_majors() const
     return out;
 }
 
-corp_command_result app::player_command(const corp_command& cmd, entity_id* out_building)
+namespace {
+
+/// BL-1406: the verbs a NATION ACTING AS ITSELF (`corp == as_nation`) takes
+/// through apply_corp_command — the state door's building verbs plus the
+/// owner-generic shared bodies (corp_command.cpp `nation_self_shared_verb`).
+/// Mirrored here, not widened: a verb outside this set keeps the seat
+/// corporation as its actor, so nothing the seam does not already admit for a
+/// nation is sent as one.
+bool nation_self_verb(corp_verb v)
 {
+    switch (v)
+    {
+        case corp_verb::build:
+        case corp_verb::demolish:
+        case corp_verb::set_recipe:
+        case corp_verb::set_workforce:
+        case corp_verb::set_workforce_auto:
+        case corp_verb::idle:
+        case corp_verb::resume:
+        case corp_verb::hire_unit:
+        case corp_verb::march_unit:
+        case corp_verb::halt_unit:
+        case corp_verb::place_road:
+        case corp_verb::set_trade:
+        case corp_verb::clear_trade:
+        case corp_verb::set_trade_reserve:
+        case corp_verb::queue_research:
+        case corp_verb::unqueue_research:
+        case corp_verb::clear_research:
+            return true;
+        default:
+            return false;
+    }
+}
+
+} // namespace
+
+corp_command_result app::player_command(const corp_command& in, entity_id* out_building)
+{
+    // BL-1406 (Ben, 2026-10-23: the player IS its nation): once the world is
+    // folded a press the UI filed as the seat (`corp == player_entity`, no
+    // nation named) acts AS THE NATION — `corp == as_nation == player_nation`,
+    // the actor the seam pays from the treasury and holds every building, unit
+    // and trade under. A command that already names a nation (the champion door:
+    // rail, the share rule, the tax tier) is left as it was.
+    corp_command cmd = in;
+    if (cmd.as_nation == null_entity && cmd.corp == m_world.player_entity
+        && nation_self_verb(cmd.verb) && world_is_folded(m_world))
+        if (const entity_id pn = player_nation(m_world); pn != null_entity)
+        {
+            cmd.corp      = pn;
+            cmd.as_nation = pn;
+        }
     const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, out_building);
     m_play_log.command(m_world, cmd, r, m_sim_loop.day_tick(), "player");
     return r;
@@ -1607,7 +1655,14 @@ void app::finish_seat(bool picked)
     m_balance_history.clear();
     m_income_history.clear();
     m_expenditure_history.clear();
-    if (const auto cit = m_world.corporations.find(m_world.player_entity);
+    // BL-1406: once folded the player's money is its nation's treasury, which
+    // files no corporation returns -- the series opens at today's treasury.
+    if (world_is_folded(m_world))
+    {
+        if (const float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
+            ui::push_capped(m_balance_history, *p);
+    }
+    else if (const auto cit = m_world.corporations.find(m_world.player_entity);
         cit != m_world.corporations.end())
     {
         for (const quarterly_return& q : cit->second.returns)
@@ -1828,7 +1883,13 @@ void app::finish_new_game()
         m_income_history.clear();
         m_expenditure_history.clear();
         const auto pit = m_world.corporations.find(m_world.player_entity);
-        if (pit != m_world.corporations.end())
+        if (world_is_folded(m_world))
+        {
+            // BL-1406: the nation's treasury files no corporation returns.
+            if (const float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
+                ui::push_capped(m_balance_history, *p);
+        }
+        else if (pit != m_world.corporations.end())
         {
             const std::vector<quarterly_return>& rs = pit->second.returns;
             ui::push_capped(m_balance_history,
@@ -2177,8 +2238,6 @@ void app::setup_presentation(const world_params& params)
     // from the strip. (Reverses BL-013's Corporation-default.) Single-select with a
     // null state — re-clicking the active lens clears back here. See LENSES.md.
     m_ui.overlay = overlay_mode::none;
-    // Owner-lens picks are keyed by corp id, and ids restart in a new world.
-    m_ui.reset_lens_owners();
 
     // The survey day counter restarts with the view (the survey STATES are
     // world state: `init_survey_states`, run once by whoever built the world).
@@ -2479,7 +2538,8 @@ bool app::load_game_from(const std::string& path)
     m_building_rank_hist.assign(env.building_rank_hist.begin(), env.building_rank_hist.end());
 
     m_ui.primary_level     = env.primary_level;
-    m_ui.overlay           = env.overlay;
+    // BL-1406: a save holding a retired lens (Corporation, Company) opens plain.
+    m_ui.overlay           = overlay_is_retired(env.overlay) ? overlay_mode::none : env.overlay;
     m_ui.active_body       = env.active_body;
     m_ui.selected_entity   = env.selected_entity;
     m_ui.selected_province = env.selected_province;
@@ -2492,9 +2552,6 @@ bool app::load_game_from(const std::string& path)
     m_ui.planetary_zoom    = env.planetary_zoom;
     m_ui.planetary_pan_x   = env.planetary_pan_x;
     m_ui.planetary_pan_y   = env.planetary_pan_y;
-    // Owner-lens picks are per session and keyed by corp id: a loaded world
-    // reuses ids, so a carried pick would name a different corporation.
-    m_ui.reset_lens_owners();
 
     // App-side transients that describe the world just replaced. Left alone
     // they would keep drawing the PREVIOUS campaign's numbers until the next
@@ -2833,35 +2890,18 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
-    // Acquisitions ledger — nav slot 5, and the Company lens's click
-    // destination. Which firms can be bought outright and at what price, plus
-    // the full-canvas profitability fold-out over every corporation's filed
-    // return. Every ledger here is guarded by its own open flag and at most one
-    // is set.
-    ui::draw_acquisitions_ledger(m_world, m_registry, m_ui,
-                                 m_ui.show_acquisitions_ledger);
+    // BL-1406: the Acquisitions ledger (slot 5), the Company ledger and the
+    // corporation stance table (slot 9) retired with the firms (Ben, 2026-10-23).
     // NO CONTRACTS LEDGER, AND NO MERCENARY CONTRACT AT ALL (BL-693, then
     // NR-731 on 2026-08-30). The SELL side of CONTRACTS.md is gone to the
     // world layer: records, passes, serialisation and comms traffic. What is
     // left of the word "contract" here is PROCUREMENT, the BUY side, which is
     // live and untouched.
-    // Company ledger (BL-666) — where a Company-lens click lands. Drawn with the
-    // rail ledgers because it occupies the same fold-out column, but it has no
-    // rail slot: only a canvas click opens it. A declared placeholder for now.
-    ui::draw_company_ledger(m_world, m_ui, m_ui.show_company_ledger);
-    // Corporation dashboard (BL-248) — nav slot 1, MENU.md's long-named surface.
-    // Replaces the all-corporations balance table that used to occupy this slot: a
-    // comparison table is not "the player corporation at a glance", and the Economy
-    // panel's Corps view already carries it.
+    // The Nation overview (BL-248; re-subjected to the nation by BL-1406) — nav
+    // slot 1: how well the player's nation is doing, read off its treasury.
     ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_ui,
                                    m_ui.show_corporation_panel);
 
-    // The displaced table itself, restored (NR-012). BL-248 deleted it as a duplicate
-    // of a second aggregate view; Ben did not intend a deletion, so it is back
-    // and reachable from nav slot 8 until its real home is chosen. Deleting a file
-    // because a similar view exists is the call that was wrong here — dormant beats
-    // deleted, since intent is not recoverable from a diff.
-    ui::draw_corporation_panel(m_world, m_last_corp_standings, m_ui, m_ui.show_corporations_table);
 
     // Research ledger (BL-1276) — nav slot 4 / F9: the mode strip, the seat's
     // nation and its queue with each entry's arrival. draw_tech_tree_panel
@@ -3158,7 +3198,9 @@ void app::render()
     // mutable world. See survey_system.hpp / SOLAR.md § Survey.
     if (m_ui.pending_survey_dispatch != null_entity)
     {
-        const survey_dispatch_result sr = dispatch_survey(m_world, m_ui.pending_survey_dispatch);
+        // BL-1406: the player's actor pays — its nation's treasury once folded.
+        const survey_dispatch_result sr = dispatch_survey(m_world, m_ui.pending_survey_dispatch,
+                                                          player_actor(m_world));
         m_play_log.direct(m_world, "survey", survey_dispatch_result_name(sr), m_sim_loop.day_tick(),
                           null_entity, m_ui.pending_survey_dispatch, -1, -1, 0);
         m_ui.pending_survey_dispatch = null_entity; // consume the request

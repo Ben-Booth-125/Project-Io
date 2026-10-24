@@ -1079,136 +1079,7 @@ void draw_resource_key(const world& w, ui_state& state)
                 full ? "Full: six at most" : "Split tile = several here");
 }
 
-/// Key for the Corporation and Company lenses (BL-1240, owner multi-select;
-/// LENSES.md § Corporation lens). The Resource lens's checklist shape: a header
-/// with the picked count, a search box, and one row per owner of the lens's kind
-/// holding ground on the active body — identity swatch filled when picked, empty
-/// when not. A checkbox press toggles the owner in or out of the lens's own set
-/// (`ui_state::lens_corps` / `lens_companies`). An owner with nothing on this body
-/// earns no row; its pick, if any, stands and is counted in the header.
-void draw_owner_key(const world& w, ui_state& state,
-                    const std::unordered_map<entity_id, entity_id>& tile_to_corp)
-{
-    const bool background = (state.overlay == overlay_mode::company);
-
-    // Owners of the admitted kind with ground here, with their tile count.
-    // tile_to_corp is already scoped to the active body.
-    std::unordered_map<entity_id, int> held;
-    for (const auto& [tile, corp] : tile_to_corp)
-    {
-        const auto cit = w.corporations.find(corp);
-        if (cit != w.corporations.end() && cit->second.is_background == background)
-            ++held[corp];
-    }
-    std::vector<entity_id> present;
-    present.reserve(held.size());
-    for (const auto& [corp, n] : held)
-        present.push_back(corp);
-    // The player first, then by name, then by id — never the map's walk order.
-    std::sort(present.begin(), present.end(), [&](entity_id a, entity_id b) {
-        const bool pa = (a == w.player_entity), pb = (b == w.player_entity);
-        if (pa != pb)
-            return pa;
-        const std::string& na = w.corporations.at(a).name;
-        const std::string& nb = w.corporations.at(b).name;
-        return na != nb ? na < nb : a < b;
-    });
-
-    const auto matches = [&](entity_id corp) {
-        const char* q = state.lens_owner_filter(background);
-        if (q[0] == '\0')
-            return true;
-        std::string name   = w.corporations.at(corp).name;
-        std::string needle = q;
-        for (char& ch : name)   ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        for (char& ch : needle) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        return name.find(needle) != std::string::npos;
-    };
-    std::vector<entity_id> rows;
-    for (const entity_id corp : present)
-        if (matches(corp))
-            rows.push_back(corp);
-
-    const float pad    = 8.0f;
-    const float line_h = ImGui::GetTextLineHeight();
-    const float row_h  = ImGui::GetFrameHeightWithSpacing();
-    const float head_h = line_h + 4.0f;
-    const float note_h = line_h + 2.0f;
-    const float want_h = pad + head_h + kLensComboH + 4.0f
-                       + static_cast<float>(std::max<std::size_t>(rows.size(), 1)) * row_h
-                       + note_h + pad;
-
-    ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    const ui::shell_rect r = open_lens_chrome(dl, state, want_h, "##lens_key_blocker");
-    const float x  = r.x + pad;
-    const float bw = r.w - 2.0f * pad;
-    float       y  = r.y + pad * 0.5f;
-
-    char head[64];
-    std::snprintf(head, sizeof head, "%s  (%d picked)",
-                  background ? "Companies" : "Corporations",
-                  static_cast<int>(state.lens_owner_set(background).size()));
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), head); // fit-exempt: legend box sized to its measured entries (container 2)
-    y += head_h;
-
-    const float note_y = r.y + r.h - pad * 0.5f - note_h;
-    const float list_h = std::max(0.0f, note_y - y);
-
-    ImGui::SetNextWindowPos({x, y}, ImGuiCond_Always);
-    ImGui::SetNextWindowSize({bw, list_h}, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.0f);
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav    | ImGuiWindowFlags_NoScrollbar |
-        ImGuiWindowFlags_NoSavedSettings;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
-    ImGui::Begin("##lens_key_owner_list", nullptr, flags);
-    ImGui::SetNextItemWidth(bw);
-    ImGui::InputTextWithHint(background ? "##lens_company_search" : "##lens_corp_search",
-                             background ? "Search companies" : "Search corporations",
-                             state.lens_owner_filter(background),
-                             sizeof state.lens_corps_filter); // both filters are char[32]
-    ImGui::Dummy({bw, 2.0f});
-    ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - 4.0f)}, false,
-                      ImGuiWindowFlags_NoBackground);
-    if (rows.empty())
-        ImGui::TextDisabled("%s", present.empty()
-                                      ? (background ? "No companies on this body"
-                                                    : "No corporations on this body")
-                                      : "No match");
-    for (const entity_id corp : rows)
-    {
-        const bool on = state.lens_owner_picked(corp, background);
-        ImGui::PushID(static_cast<int>(corp));
-        bool v = on;
-        if (ImGui::Checkbox("##on", &v))
-            state.toggle_lens_owner(corp, background);
-        ImGui::SameLine();
-        const ImVec2 c   = ImGui::GetCursorScreenPos();
-        ImDrawList*  wdl = ImGui::GetWindowDrawList();
-        const float  sy  = c.y + (ImGui::GetFrameHeight() - 10.0f) * 0.5f;
-        const ImU32  col = palette::corp_identity_colour(corp, w.player_entity);
-        if (on)
-            wdl->AddRectFilled({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, col);
-        else
-            wdl->AddRect({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, col);
-        ImGui::Dummy({14.0f, ImGui::GetFrameHeight()});
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        const std::string& name = w.corporations.at(corp).name;
-        if (on)
-            ImGui::TextUnformatted(name.c_str());
-        else
-            ImGui::TextDisabled("%s", name.c_str());
-        ImGui::PopID();
-    }
-    ImGui::EndChild();
-    ImGui::End();
-    ImGui::PopStyleVar();
-
-    dl->AddText({x, note_y}, IM_COL32(170, 175, 185, 255), // fit-exempt: legend box sized to its measured entries (container 2)
-                "Grey = unpicked owner. Shift-click to pick");
-}
+// BL-1406: the owner key (BL-1240) retired with the Corporation and Company lenses.
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
 /// the selected good's name and its current price ratio (or an "untraded" note when
@@ -1845,6 +1716,7 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
                                       int grid_w = 0,
                                       const ImVec2* pointer = nullptr)
 {
+    (void)tile_to_corp; // BL-1406: its only reader, the owner lenses' tile group, retired
     if (out_id != nullptr)
         *out_id = null_entity;
     if (tile == null_entity)
@@ -1945,49 +1817,7 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
             *out_id = static_cast<entity_id>(pid) + 1u; // synthetic; +1 keeps 0 = none
         return structure_kind::plate;
     }
-    case overlay_mode::corporation:
-    case overlay_mode::company:
-    {
-        // THE OWNER'S TILE GROUP — every tile it holds on this body, lit and
-        // selected as one (Ben, 2026-08-28: "hovering one tile displays an
-        // outline around all company buildings for that corporation/company").
-        //
-        // THIS CASE WAS DELIBERATELY ABSENT UNTIL BL-665, and the reason it was
-        // absent is worth keeping because it was MEASURED, not reasoned: the
-        // structure is exactly the set of tiles carrying that owner's buildings,
-        // so every tile in it also carries a MARKER — and a marker outranked a
-        // structure, so an area pivot here could never fire. The first draft of
-        // this switch included it and the check reported `tile` on empty ground
-        // and `building` on owned ground, never `corporation`. The lens resolved
-        // through the marker instead, as a hand-wired special case in the click
-        // handler.
-        //
-        // BL-664 removed the marker's precedence under a lens, which dissolves
-        // the objection: the area resolver is now reachable on owned ground
-        // whether or not a glyph sits on it, and the special case is deleted.
-        //
-        // Keyed to the TINT (compute_tile_fill), because the selection grain
-        // follows the drawing: Corporation admits corporations proper — the
-        // player and its rivals — and Company admits BL-365 background firms,
-        // neither showing the other's. A tile no firm of the admitted kind holds
-        // answers none, and is inert.
-        const auto oit = tile_to_corp.find(tile);
-        if (oit == tile_to_corp.end())
-            return structure_kind::none;
-        const auto cit = w.corporations.find(oit->second);
-        if (cit == w.corporations.end())
-            return structure_kind::none;
-        const bool want_background = (state.overlay == overlay_mode::company);
-        if (cit->second.is_background != want_background)
-            return structure_kind::none;
-        if (out_id != nullptr)
-            *out_id = oit->second;
-        // Distinct KINDS for the two, not one kind and a lookup at the routing
-        // site: they are different words since the 2026-08-28 split and Ben
-        // ruled they reach different destinations, so the difference belongs in
-        // the answer rather than being re-derived by every caller.
-        return want_background ? structure_kind::company : structure_kind::corporation;
-    }
+    // BL-1406: the Corporation / Company owner groups retired with their lenses.
     default:
         return structure_kind::none;
     }
@@ -2317,10 +2147,10 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     std::unordered_set<entity_id> operated_markets;
     entity_id centre         = null_entity;
     entity_id centre_building = null_entity;
-    const auto pit = w.corporations.find(w.player_entity);
-    if (pit != w.corporations.end())
+    // BL-1406: the player's buildings are its nation's once folded (`assets_of`).
+    if (const std::vector<entity_id>* mine = assets_of(w, player_actor(w)); mine != nullptr)
     {
-        for (const entity_id bid : pit->second.assets)
+        for (const entity_id bid : *mine)
         {
             const auto bld = w.buildings.find(bid);
             if (bld == w.buildings.end()) continue;
@@ -2380,9 +2210,10 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     };
     static std::map<std::uint32_t, cached_lane> s_lanes;
     std::map<std::uint32_t, cached_lane> live;
+    const entity_id me_lanes = player_actor(w); // BL-1406: convoys re-owned to the nation
     for (const auto& cv : w.convoys)
     {
-        if (cv.corp != w.player_entity) continue;
+        if (cv.corp != me_lanes && cv.corp != w.player_entity) continue;
         // BL-458: the endpoint resolution, the A* lookup and the lo->hi orientation
         // flip used to live inline here. They are now convoy_route_tiles
         // (world/logistics.hpp), because interdiction has to ask the SAME question
@@ -2631,6 +2462,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     tile_to_corp[bld_it->second.tile] = corp_id;
             }
         }
+        // BL-1406: a NATION's own buildings (`state_assets`) are owned ground too —
+        // once the world is folded every building is a nation's, so without this
+        // the index (and the player-identity accent it gates) would be empty. The
+        // map's value is the OWNER id: a corporation or a nation (one allocator).
+        for (const auto& [nation_id, nation] : w.nations)
+        {
+            for (entity_id bld_id : nation.state_assets)
+            {
+                const auto bld_it = w.buildings.find(bld_id);
+                if (bld_it == w.buildings.end())
+                    continue;
+                const auto tile_it = w.tiles.find(bld_it->second.tile);
+                if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
+                    tile_to_corp.emplace(bld_it->second.tile, nation_id);
+            }
+        }
 
         // Unit groups per province (BL-575). A unit's command grain is the
         // province (BL-511's march_unit retarget), so units sharing a province
@@ -2727,8 +2574,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // Identity colour for a corporation: delegates to the shared palette source of
     // truth (BL-090) so the marker pass, the Corporation lens, the identity card,
     // the Selection header, and the corp emblem tags all agree.
+    // BL-1406: the player's own ground is its NATION's once folded
+    // (`player_actor`); it takes the player identity colour like the seat did.
+    const entity_id player_owner = player_actor(w);
     auto corp_identity = [&](entity_id corp_id) -> ImU32 {
-        return palette::corp_identity_colour(corp_id, w.player_entity);
+        return palette::corp_identity_colour(corp_id == player_owner ? w.player_entity : corp_id,
+                                             w.player_entity);
     };
 
     // Resource lens (BL-019): always single-resource. The lens fills the whole
@@ -2782,7 +2633,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (state.construction.road_arm_tile != null_entity)
         road_arm_targets = road_crossing_targets(w, state.construction.road_arm_tile,
                                                  state.construction.road_arm_tier,
-                                                 w.player_entity); // BL-1357: whose border is it
+                                                 player_actor(w)); // BL-1357/BL-1406: whose border is it
     state.construction_ui.road_arm_tile = state.construction.road_arm_tile;
     state.construction_ui.road_arm_tier = state.construction.road_arm_tier;
     state.construction_ui.road_drawn    = 0;
@@ -2825,7 +2676,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         for (const auto& cv : w.convoys)
         {
-            if (cv.corp != w.player_entity)
+            if (cv.corp != player_owner && cv.corp != w.player_entity) // BL-1406
                 continue;
             entity_id src_body = null_entity;
             entity_id dst_body = null_entity;
@@ -2948,7 +2799,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         for (const trade_route& route : w.trade_routes)
         {
-            if (route.corp != w.player_entity)
+            if (route.corp != player_owner && route.corp != w.player_entity) // BL-1406
                 continue;
             entity_id other = null_entity;
             if (route.body_a == state.active_body)      other = route.body_b;
@@ -2970,7 +2821,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         for (const trade_route& route : w.trade_routes)
         {
-            if (route.corp != w.player_entity)
+            if (route.corp != player_owner && route.corp != w.player_entity) // BL-1406
                 continue;
             entity_id other = null_entity;
             if (route.body_a == state.active_body)      other = route.body_b;
@@ -3578,20 +3429,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // is hoisted out of the draw loop into this lambda and run one pass ahead over
     // the visible row band plus a one-row margin. The derivation itself is
     // unchanged, line for line — only where it runs moved.
-    // A BL-365 background firm — a "company" rather than a "corporation" since
-    // Ben's 2026-08-28 terminology ruling. Looked up rather than cached because
-    // the corporation set is small and this runs only under two lenses.
-    const auto is_background_firm = [&w](entity_id corp) -> bool
-    {
-        const auto it = w.corporations.find(corp);
-        return it != w.corporations.end() && it->second.is_background;
-    };
-
-    // BL-1240: the Corporation lens's picked set defaults to the player, applied
-    // once per session (ui_state cannot know the player id when it is built).
-    state.seed_lens_corps(w.player_entity);
-    // A dissolved owner drops out of both sets rather than lingering in the count.
-    state.prune_lens_owners([&w](entity_id id) { return w.corporations.count(id) > 0; });
 
     // A tile's catchment market, memoised per frame on the raster: the Market and
     // Scarcity fills key on it, and the hovered-catchment wash asks again for the
@@ -3626,8 +3463,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             || (tile_flags[static_cast<std::size_t>(tile.grid_y) * gw + tile.grid_x] & 2u) != 0;
         const auto   corp_it    = maybe_owned ? tile_to_corp.find(id) : tile_to_corp.end();
         const bool   has_owner  = corp_it != tile_to_corp.end();
-        const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
-                                            : IM_COL32(255, 255, 255, 255);
         // BL-596: EVERY tile starts from its terrain colour, built or not. A built
         // tile used to be swapped wholesale for an owner-tinted plate; Ben, 2026-08-24:
         // "Remove building background. Buildings should be drawn over the hex, not
@@ -3643,41 +3478,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // colour at a shared corner. The national read is the border band now —
         // always-on chrome, composited per tile AFTER the blend.
         ImU32 fill = terrain_colour(tile.substrate, tile.cover, tile.cover_density);
-        // Corporation lens: tint a tile that carries a corporate building with its
-        // owning corp's colour (a direct replacement of the terrain hue). Tiles
-        // with no corporate building keep their terrain hue — no nation underlay.
-        //
-        // NARROWED to corporations proper (Ben, 2026-08-28): the player and its
-        // rivals, never a BL-365 background firm. The two are different words now
-        // (GLOSSARY.md), and a lens that mixed them answered neither question —
-        // "who are my rivals here" drowned in the background firms that outnumber
-        // them. Those get their own lens immediately below, drawn identically.
-        //
-        // OWNER MULTI-SELECT (BL-1240): only a PICKED owner takes its colour; an
-        // unpicked owner of the admitted kind takes the one owned-grey, so "someone
-        // holds this" survives without every rival shouting at once.
-        if (state.overlay == overlay_mode::corporation)
-        {
-            if (has_owner && !is_background_firm(corp_it->second))
-                fill = state.lens_owner_picked(corp_it->second, false) ? owner_col
-                                                                       : palette::owned_grey;
-        }
-        // Company lens: the exact mirror — background firms only, same per-corp
-        // identity tint and owned-grey, so the two lenses are read the same way and
-        // differ only in which population of firms they admit (and in the default).
-        else if (state.overlay == overlay_mode::company)
-        {
-            if (has_owner && is_background_firm(corp_it->second))
-                fill = state.lens_owner_picked(corp_it->second, true) ? owner_col
-                                                                      : palette::owned_grey;
-        }
-        // Resource lens (BL-1182): a toggled set of goods. A tile carrying one takes
-        // its identity colour SOLID; every other tile takes a white wash that keeps a
-        // ghost of its terrain (Ben, 2026-10-04: "the white wash should still exist ...
-        // push up the contrast"). A split tile's wedges draw over
-        // this in the tile loop; the fill here is its first good, which is also what a
-        // coarse-LOD rect shows. Intensity lives in tile detail, not the lens.
-        else if (state.overlay == overlay_mode::resource)
+        // BL-1406: the Corporation and Company lens fills retired with the firms;
+        // "who owns what" is the Nations lens below.
+        if (state.overlay == overlay_mode::resource)
         {
             resource_type on_tile[ui_state::k_lens_resource_cap];
             if (lens_resources_on_tile(state, tile, on_tile) > 0)
@@ -3856,7 +3659,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // accent: a subtle wash at the plain default plus an outline under every
         // lens (drawn in the border pass), so "these tiles are mine" reads without
         // the player having to pick the Corporation lens.
-        const bool is_player_tile = has_owner && corp_it->second == w.player_entity;
+        const bool is_player_tile = has_owner && (corp_it->second == player_owner
+                                                  || corp_it->second == w.player_entity);
         // Plain-default wash: tint the player's own tiles with the player identity
         // colour when no lens is active. Suppressed under any lens — the outline
         // carries identity there, so the wash never fights a lens fill.
@@ -3958,21 +3762,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const auto lens_wash_of = [&](entity_id id, const tile_component& tile) -> ImU32
     {
         const overlay_mode ov = state.overlay;
-        if (ov == overlay_mode::corporation || ov == overlay_mode::company)
-        {
-            const bool maybe_owned = !raster_ok
-                || (tile_flags[static_cast<std::size_t>(tile.grid_y) * gw + tile.grid_x] & 2u) != 0;
-            const auto corp_it = maybe_owned ? tile_to_corp.find(id) : tile_to_corp.end();
-            if (corp_it == tile_to_corp.end())
-                return 0u;
-            const bool want_bg = (ov == overlay_mode::company);
-            if (is_background_firm(corp_it->second) != want_bg)
-                return 0u;
-            const ImU32 c = state.lens_owner_picked(corp_it->second, want_bg)
-                                ? corp_identity(corp_it->second)
-                                : palette::owned_grey;
-            return with_alpha(c, k_lens_wash_categorical);
-        }
         if (ov == overlay_mode::resource)
         {
             resource_type on_tile[ui_state::k_lens_resource_cap];
@@ -5130,7 +4919,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // ahead so a tile's neighbours' colours are in hand for the blend. The
         // three scalars the rest of the loop still needs are recomputed here:
         // they are map lookups, not the colour derivation.
-        const bool is_player_tile = has_owner && corp_it->second == w.player_entity;
+        const bool is_player_tile = has_owner && (corp_it->second == player_owner
+                                                  || corp_it->second == w.player_entity);
         const bool selected       = (id == state.selected_entity);
         const bool surveyed = survey_tile_visible(body.survey, gw, gh, t_col, t_row);
         const bool revealed = surveyed || god_view_lift;
@@ -5446,29 +5236,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (!revealed)
                 continue;
 
-            // Owner multi-select rim (BL-1240): ground held by an UNPICKED owner of
-            // the lens's kind takes owned_grey AND a dark inset rim. The grey alone
-            // is a value, and some terrain sits at that value (urban, regolith,
-            // metallic); the rim is the colour-independent channel that says "held,
-            // not picked" whatever the ground beside it. Skipped under coarse_fill,
-            // where a hex is a few pixels and a rim would be the whole tile.
-            if (!coarse_fill && has_owner
-                && (state.overlay == overlay_mode::corporation
-                    || state.overlay == overlay_mode::company))
-            {
-                const bool want_bg = (state.overlay == overlay_mode::company);
-                const auto oit     = w.corporations.find(corp_it->second);
-                if (oit != w.corporations.end()
-                    && oit->second.is_background == want_bg
-                    && !state.lens_owner_picked(corp_it->second, want_bg))
-                {
-                    const float lw = std::max(1.0f, draw_r * 0.10f);
-                    ImVec2 rim[6];
-                    hex_verts_fast(rim, cx, cy, std::max(1.0f, draw_r - lw * 0.5f));
-                    dl->AddPolyline(rim, 6, IM_COL32(18, 20, 26, 200),
-                                    ImDrawFlags_Closed, lw);
-                }
-            }
+            // BL-1406: the owner multi-select rim (BL-1240) retired with its lenses.
 
             // Resource lens deposit outline (Ben, 2026-10-04: "push up the contrast").
             // Pale identities (silica, sand, rare earth) sit close to the white wash, so
@@ -5504,6 +5272,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     }
                 }
             }
+
 
             // BL-603: the hovered STRUCTURE lights whole. Ben, 2026-08-24 — "the
             // entire market gets highlighted on mouse over". One frame behind, as
@@ -5588,8 +5357,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // against terrain and value fills. Rival tiles carry no ring.
             if (is_player_tile)
             {
-                const ImU32 ring = (state.overlay == overlay_mode::corporation)
-                    ? palette::selection : corp_identity(w.player_entity);
+                const ImU32 ring = corp_identity(w.player_entity);
                 dl->AddPolyline(verts, 6, ring, ImDrawFlags_Closed, 2.0f);
             }
 
@@ -5684,8 +5452,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     {
                         if (const active_battle* b = first_battle_in(w, pid))
                         {
-                            const bool mine = (b->attacker == w.player_entity
-                                            || b->defender == w.player_entity);
+                            const bool mine = (b->attacker == player_owner
+                                            || b->defender == player_owner
+                                            || b->attacker == w.player_entity
+                                            || b->defender == w.player_entity); // BL-1406
                             const ImU32 col = mine ? IM_COL32(255, 120, 90, 235)
                                                    : IM_COL32(190, 170, 160, 190);
                             icons::battle(dl, {cx, cy}, std::max(3.0f, draw_r * 0.42f), col);
@@ -6091,7 +5861,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     std::vector<const trade_flow_pass*> tf_passes;
     if (state.overlay == overlay_mode::trade_flow)
         for (const trade_flow_pass& p : w.player_trade_flow)
-            if (p.corp == w.player_entity && p.corp != null_entity)
+            if ((p.corp == w.player_entity || p.corp == player_owner) && p.corp != null_entity) // BL-1406
                 tf_passes.push_back(&p);
     if (state.overlay == overlay_mode::trade_flow && !tf_passes.empty())
     {
@@ -6278,7 +6048,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // construct_building refuses it (BL-071).
         const placement_rules::placement_result pr = placement_rules::can_place_in_world(
             w, hovered_tile, state.construction.type, state.construction.target,
-            state.max_logistics_reach, null_entity,
+            // BL-1406: the player's actor is named, so the own-ground gate (NATIONS.md
+            // § Own ground) and the tech gate turn the ghost red before the click.
+            state.max_logistics_reach, player_actor(w),
             reg.placement_gate_for(state.construction.type, state.construction.pending_recipe));
         const ImU32 ghost_col = pr ? palette::positive : palette::negative;
 
@@ -6323,8 +6095,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     v_key_start = dl->VtxBuffer.Size;
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(w, state);
-    else if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
-        draw_owner_key(w, state, tile_to_corp);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
@@ -6615,31 +6385,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // armed for the next try rather than silently cancelling on a stray
         // miss.
         //
-        // OWNER MULTI-SELECT (BL-1240): under the Corporation or Company lens, a
-        // SHIFT-click on ground an owner of the lens's kind holds toggles that owner
-        // in or out of the picked set — the map itself is a picker — and touches no
-        // selection. A plain click, or a shift-click on ground no admitted owner
-        // holds, takes the ordinary resolution below, unchanged.
-        entity_id    shift_pick_owner = null_entity;
-        const bool   owner_lens = (state.overlay == overlay_mode::corporation
-                                   || state.overlay == overlay_mode::company);
-        if (owner_lens && ImGui::GetIO().KeyShift)
-        {
-            entity_id owner = null_entity;
-            const structure_kind k =
-                lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &owner);
-            // The border band outranks the ground under every lens (BL-601): a
-            // shift-click ON a border still selects the nation. The zones are
-            // registered in ground space, so ask with the ground-space cursor,
-            // as the hover label does.
-            structure_kind band_kind = structure_kind::nation;
-            const bool on_band =
-                resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
-                                      &band_kind) != null_entity;
-            if (!on_band
-                && (k == structure_kind::corporation || k == structure_kind::company))
-                shift_pick_owner = owner;
-        }
+        // BL-1406: the owner lenses' shift-click picker (BL-1240) retired with them.
 
         // BL-1370: THE SECOND PRESS. While a road row is armed this click's whole
         // job is to name the neighbour the crossing runs to, exactly as march-pick
@@ -6667,11 +6413,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                         ? w.provinces.province_of(hovered_tile) : 0u;
             if (march_prov != 0)
                 state.pending_march_dest_province = march_prov;
-        }
-        else if (shift_pick_owner != null_entity && !state.construction.active)
-        {
-            state.toggle_lens_owner(shift_pick_owner,
-                                    state.overlay == overlay_mode::company);
         }
         else if (!state.construction.active)
         {
@@ -6900,16 +6641,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.selection_cycle_tile = null_entity;
                 state.clear_battle_selection();
                 state.clear_lens_region_selection();
-                // AND THE OWNER SURFACES GO WITH IT. A ledger whose whole subject
-                // is one named firm cannot outlive the selection that named it:
-                // leaving the Company ledger open on firm X after the player has
-                // cleared the band is the same failure NR-697 recorded, just in
-                // the column instead of the band. The tile build ledger is the
-                // precedent -- app.cpp actively closes it once the selection stops
-                // being a tile, rather than letting it sit there.
-                state.selected_company             = null_entity;
-                state.selected_corporation_dossier = null_entity;
-                state.show_company_ledger          = false;
             }
             else if (structure_hit != null_entity)
             {
@@ -6935,68 +6666,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     close_all_panels(state);
                     state.show_market_ledger = true;
                 }
-                else if (struct_kind == structure_kind::corporation)
-                {
-                    // BL-666. This used to open the BALANCE ledger, which is the
-                    // PLAYER'S OWN BOOKS — so clicking a rival's ground showed you
-                    // your own accounts (NR-700). Wrong in the way that is hardest
-                    // to catch in a capture: not empty, not broken, just not about
-                    // the thing that was pressed.
-                    //
-                    // The corporations table is the surface that IS about a named
-                    // firm, and it already highlights its row from the dossier
-                    // field, so this aims it rather than inventing a route.
-                    //
-                    // THE FLAG IS `show_corporations_table`, NOT
-                    // `show_corporation_panel`, and the two are named the wrong way
-                    // round: `show_corporation_panel` drives
-                    // `draw_corporation_dashboard` (nav slot 1, THE PLAYER'S OWN
-                    // corporation at a glance), while `show_corporations_table`
-                    // drives `draw_corporation_panel` (nav slot 8, the
-                    // all-corporations table). The first draft of this line took the
-                    // flag whose name matched the function it wanted and reproduced
-                    // NR-700 one surface over — a rival's ground opening the
-                    // player's own dashboard. Read app.cpp:1981-1989 before touching
-                    // either flag.
-                    state.selected_corporation_dossier = structure_hit;
-                    state.selected_company             = null_entity;
-                    close_all_panels(state);
-                    state.show_corporations_table = true;
-                }
-                else if (struct_kind == structure_kind::company)
-                {
-                    // A DIFFERENT DESTINATION, not the same one with a flag (Ben,
-                    // 2026-08-28: "Different types for either, make a placeholder
-                    // if needed"). A corporation is a rival the player competes
-                    // with; a company is a background firm. Routing both to the
-                    // corporations table would re-merge the distinction the
-                    // 2026-08-28 terminology split just drew.
-                    //
-                    // `selected_company` rather than reading `selected_entity`
-                    // back: the ledger's subject must survive the player selecting
-                    // something else, which a live-selection read would not.
-                    state.selected_company             = structure_hit;
-                    state.selected_corporation_dossier = null_entity;
-                    close_all_panels(state);
-                    // THE COMPANY LENS'S DESTINATION, since BL-675. The
-                    // placeholder this replaces was BL-666's, and it was always
-                    // meant to be replaced: a corporation press asks "how is this
-                    // rival doing", a company press asks "can I buy this". So a
-                    // background firm lands on the Acquisitions ledger.
-                    //
-                    // The firm is carried across as the ledger's FOCUS, never a
-                    // filter. The buyable field is a mean of 81.6 firms on the
-                    // shipped spawn (measured, acquisition_viability § C), and
-                    // filtering it to one would answer a question nobody asked.
-                    // A clicked firm may well not be in the field at all — most
-                    // background firms are `closed` and cannot be priced — so the
-                    // highlight can go unmatched, and the ledger says on its own
-                    // face how many of the world's firms file. An unmatched
-                    // highlight is the honest outcome; inventing a row for an
-                    // unpriceable firm would be worse.
-                    state.acquisitions_focus_corp  = structure_hit;
-                    state.show_acquisitions_ledger = true;
-                }
+                // BL-1406: the corporation and company destinations (the stance
+                // table, the Acquisitions ledger) retired with the firms.
             }
             else
             {

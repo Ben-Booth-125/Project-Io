@@ -90,14 +90,16 @@ void draw_convoys_ledger(const world& w, ui_state& s, bool& open)
         return;
     }
 
-    const entity_id corp = w.player_entity;
+    // BL-1406: convoys are re-owned to the nation at the fold (`player_actor`); the
+    // seat corporation's id still names one dispatched before it.
+    const entity_id corp = player_actor(w);
 
     // Sorted by soonest arrival, then by id — "what lands next" is the reading
     // order the question implies, and the id tiebreak keeps it stable frame to
     // frame (world::convoys is dispatch-ordered, which is neither).
     std::vector<const convoy_component*> rows;
     for (const convoy_component& c : w.convoys)
-        if (c.corp == corp && !c.arrived)
+        if ((c.corp == corp || c.corp == w.player_entity) && !c.arrived)
             rows.push_back(&c);
     std::sort(rows.begin(), rows.end(),
               [](const convoy_component* a, const convoy_component* b) {
@@ -171,7 +173,9 @@ void draw_convoys_ledger(const world& w, ui_state& s, bool& open)
         if (ImGui::SmallButton(c.held ? "Release" : "Hold"))
         {
             corp_command cmd;
-            cmd.corp  = corp;
+            // Filed as the seat: app::player_command re-points the actor to the
+            // nation only for the verbs the seam admits a nation on (BL-1406).
+            cmd.corp  = w.player_entity;
             cmd.verb  = corp_verb::hold_convoy;
             cmd.order = c.id;
             s.pending_order_commands.push_back(cmd);

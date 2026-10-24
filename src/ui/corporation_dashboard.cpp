@@ -36,7 +36,7 @@ void balance_body(const corp_rollups& r, float chart_h)
         return;
     }
 
-    const balance_columns c = build_balance_columns(r.budget, r.refunds);
+    const balance_columns c = build_balance_columns(r.budget, r.refunds, r.tax_income);
 
     const ImVec2 p  = ImGui::GetCursorScreenPos();
     const float  cw = ImGui::GetContentRegionAvail().x;
@@ -54,7 +54,7 @@ void balance_body(const corp_rollups& r, float chart_h)
     ImGui::SetCursorScreenPos(p);
     ImGui::Dummy({cw, chart_h});
 
-    ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
+    ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.net()));
 
     // BL-1215: the refund is named on its own line rather than folded into the
     // net above. It is cash credited back (the seat's cancelled construction,
@@ -104,7 +104,7 @@ std::size_t corp_card_count()
     return 1;
 }
 
-balance_columns build_balance_columns(const corp_budget& b, float refunds)
+balance_columns build_balance_columns(const corp_budget& b, float refunds, float tax_income)
 {
     balance_columns c;
 
@@ -121,6 +121,12 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds)
         c.earnings[c.earning_count++] =
             {refunds, IM_COL32(150, 215, 170, 255), "Refunds",
              "Cancelled construction credited back - not earnings"};
+    // BL-1406: a NATION's tax is an inflow — the tier's share of its buildings'
+    // wages, back to the treasury (NATIONS.md § 2; corporation.md § Slot 1).
+    if (tax_income > 0.0f)
+        c.earnings[c.earning_count++] =
+            {tax_income, IM_COL32(185, 150, 120, 255), "Taxes",
+             "Your tax tier's share of your buildings' wages, back to the treasury"};
 
     // Expenses — every outflow `corp_budget::net()` subtracts, each its OWN
     // segment. Levies and force upkeep are not folded into maintenance or wages
@@ -158,6 +164,27 @@ corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
 
     corp_rollups r;
 
+    // BL-1406 (corporation.md § Slot 1): the NATION's overview, once the world is
+    // folded. Its money is the treasury, and its quarter is its own row of the
+    // state ledger (`world::state_ledger`): sales, the inputs and upkeep goods it
+    // bought, maintenance, wages, and the tax that returns to the treasury.
+    if (const auto nit = w.nations.find(corp); nit != w.nations.end())
+    {
+        r.nation  = true;
+        r.balance = nit->second.treasury;
+        if (const auto lit = w.state_ledger.find(corp); lit != w.state_ledger.end())
+        {
+            const world::state_tick_ledger& led = lit->second;
+            r.budget.income      = led.income;
+            r.budget.expenditure = led.expenditure;
+            r.budget.maintenance = led.maintenance;
+            r.budget.wages       = led.wages;
+            r.tax_income         = led.taxes;
+            r.budget_measured    = true;
+        }
+        return r;
+    }
+
     const auto cit = w.corporations.find(corp);
     if (cit == w.corporations.end())
         return r;
@@ -182,25 +209,30 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
     if (!open)
         return;
 
-    const entity_id corp = w.player_entity;
-    const auto      cit  = w.corporations.find(corp);
-    const char*     name = (cit == w.corporations.end()) ? "Corporation" : cit->second.name.c_str();
+    // BL-1406: the player's NATION (its actor once folded) — the Nation overview.
+    const entity_id corp = player_actor(w);
+    const char*     name = "Nation";
+    if (const auto nit = w.nations.find(corp); nit != w.nations.end())
+        name = nit->second.name.c_str();
+    else if (const auto cit = w.corporations.find(corp); cit != w.corporations.end())
+        name = cit->second.name.c_str();
 
     const corp_rollups r = derive_corp_rollups(w, reg, report, corp);
 
-    // The card's verdict: the quarter's net and the balance it moved.
+    // The card's verdict: the quarter's net and the treasury it moved.
+    const char* purse = r.nation ? "treasury" : "balance";
     char verdict[128];
     if (r.budget_measured)
-        std::snprintf(verdict, sizeof verdict, "%+.1f/qtr, balance %.0f",
-                      static_cast<double>(r.budget.net()), static_cast<double>(r.balance));
+        std::snprintf(verdict, sizeof verdict, "%+.1f/qtr, %s %.0f",
+                      static_cast<double>(r.net()), purse, static_cast<double>(r.balance));
     else
-        std::snprintf(verdict, sizeof verdict, "balance %.0f (no quarter measured yet)",
-                      static_cast<double>(r.balance));
+        std::snprintf(verdict, sizeof verdict, "%s %.0f (no quarter measured yet)",
+                      purse, static_cast<double>(r.balance));
     const ImU32 verdict_col =
-        (r.budget_measured && r.budget.net() < 0.0f) ? palette::negative : palette::positive;
+        (r.budget_measured && r.net() < 0.0f) ? palette::negative : palette::positive;
 
     // ── The resting column: the card, and its chart under it ──
-    if (ui::foldout_begin("Corporation"))
+    if (ui::foldout_begin("Nation overview"))
     {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", name);
         ImGui::Separator();

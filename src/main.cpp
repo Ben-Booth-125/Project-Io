@@ -979,7 +979,7 @@ int main(int argc, char* argv[])
                 auto a_owner = std::make_unique<app>(); // heap: seven ~180 KB app locals overflowed the 1 MB Debug stack (2026-10-14)
                 app& a = *a_owner;
                 if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
-                return a.run_verify(positional(i, "scripts/verify/corporation_lens.lua"), bless);
+                return a.run_verify(positional(i, "scripts/verify/lens_modes.lua"), bless); // BL-1406: corporation_lens.lua retired with its lens
             }
         }
 

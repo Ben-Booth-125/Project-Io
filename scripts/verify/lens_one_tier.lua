@@ -95,8 +95,9 @@ end
 -- asserted only where the subject is an entity the API can name.
 -- ---------------------------------------------------------------------------
 
-local structure_lenses = { "corporation", "company", "resource", "market",
-                           "scarcity", "continent" }
+-- BL-1406: the Corporation and Company lenses retired with the firms; the owner
+-- grain is the Nations lens's ("whose ground is this").
+local structure_lenses = { "nations", "resource", "market", "scarcity", "continent" }
 
 for _, lens in ipairs(structure_lenses) do
     verify.set_overlay(lens)
@@ -106,14 +107,14 @@ for _, lens in ipairs(structure_lenses) do
 end
 
 -- The positive half, where the subject has a name. The player's own building sits
--- on the player's own ground, so the Corporation lens must answer with a
--- corporation — the case that could never fire before BL-664, because the
--- building's marker covered the whole hex.
-verify.set_overlay("corporation")
-local corp_press = press(built_col, built_row)
-verify.expect(corp_press.selection_kind == "corporation",
-              "Corporation lens: a press on an owned BUILT tile resolves to the corporation")
-verify.capture("one_tier_corp_press")
+-- on the player's own ground, so the Nations lens must answer with the NATION -
+-- the building's marker covers the whole hex, and still does not outrank the lens.
+verify.set_overlay("nations")
+local nation_press = press(built_col, built_row)
+verify.expect(nation_press.selection_kind == "nation",
+              "Nations lens: a press on an owned BUILT tile resolves to the nation (got " ..
+              tostring(nation_press.selection_kind) .. ")")
+verify.capture("one_tier_nation_press")
 
 -- ---------------------------------------------------------------------------
 -- BL-664 R2 — a lens with no structure grain surfaces nothing at all.
@@ -138,7 +139,7 @@ for _, lens in ipairs({ "population", "industry" }) do
 
     -- Seed a real selection under a lens that HAS one, so the press below is
     -- proving the band cleared rather than finding it already empty.
-    verify.set_overlay("corporation")
+    verify.set_overlay("nations")
     press(built_col, built_row)
     verify.set_overlay(lens)
 
@@ -157,7 +158,7 @@ verify.expect(tp.hovered_structure_kind == "ground",
 verify.expect(tp.hover_card == true,
               "throughput lens: the ground raises a hover card")
 verify.capture("one_tier_throughput_ground_card")
-verify.set_overlay("corporation")
+verify.set_overlay("nations")
 press(built_col, built_row)
 verify.set_overlay("throughput")
 local tpp = press(built_col, built_row)
@@ -176,7 +177,7 @@ verify.capture("one_tier_inert_population")
 -- untouched and a second press on a built tile advances off the building.
 -- ---------------------------------------------------------------------------
 
-verify.set_overlay("corporation")
+verify.set_overlay("nations")
 local first  = press(built_col, built_row)
 local second = press(built_col, built_row)
 verify.expect(first.selection_kind == second.selection_kind,
@@ -192,89 +193,22 @@ verify.expect(n2.selection_kind ~= n1.selection_kind,
               "no lens: the repeat-click cycle still advances off the building")
 
 -- ---------------------------------------------------------------------------
--- BL-664 R4 / BL-665 R1, R2 — the owner's tile group, and unowned ground.
+-- BL-664 R4 — the owner's ground, under the Nations lens (BL-1406: the
+-- Corporation / Company tile-group rows retired with those lenses, and with
+-- them BL-665's corporation/company split and BL-666's two destinations).
 -- ---------------------------------------------------------------------------
 
-verify.set_overlay("corporation")
+verify.set_overlay("nations")
 local owned_hover = dwell(built_col, built_row)
-verify.expect(owned_hover.hovered_structure_kind == "corporation",
-              "Corporation lens: hovering owned ground lights a corporation group")
-verify.capture("one_tier_corp_group_hover")
-
-local bare_hover = dwell(bare_col, bare_row)
-verify.expect(bare_hover.hovered_structure_kind == "none",
-              "Corporation lens: ground held by nobody lights nothing")
-
--- R4: and pressing that same nobody's ground clears the band, rather than
--- falling through to the tile the way a no-lens press would.
-press(built_col, built_row)
-local cleared = press(bare_col, bare_row)
-verify.expect(cleared.has_selection == false,
-              "Corporation lens: a press on unowned ground clears the band to resting")
-verify.capture("one_tier_inert_press_cleared")
-
--- The Company lens is the exact mirror, and the pair is what proves the split is
--- real: a corporation's tiles are not a company's group. The player's own ground
--- carries a corporation, so under the Company lens it must answer NOTHING.
+verify.expect(owned_hover.hovered_structure_kind == "nation",
+              "Nations lens: hovering the player's own ground lights its nation (got " ..
+              tostring(owned_hover.hovered_structure_kind) .. ")")
+verify.capture("one_tier_nation_hover")
+-- A retired owner-lens name arms nothing at all.
 verify.set_overlay("company")
-local company_on_corp = dwell(built_col, built_row)
-verify.expect(company_on_corp.hovered_structure_kind ~= "corporation",
-              "Company lens: a corporation's ground is not a company group")
+verify.frames(1)
+verify.expect(verify.overlay_name() == "none", "the retired Company lens name arms nothing")
 
--- ---------------------------------------------------------------------------
--- BL-666 — the two destinations, which are different surfaces.
--- ---------------------------------------------------------------------------
-
-verify.set_overlay("corporation")
-local corp_dest = press(built_col, built_row)
--- "corporations" (the all-corporations table), NOT "corporation" (the player's
--- own dashboard). The two flags are named the wrong way round in ui_state, this
--- assertion is the thing that catches it, and the first cut of this check could
--- not tell them apart — it asserted "corporation" and passed while the press was
--- opening the player's own books.
-verify.expect(corp_dest.open_panel == "corporations",
-              "a corporation press opens the corporations TABLE, not the player's own dashboard")
-verify.capture("one_tier_corp_destination")
-
--- A background firm's ground, if this world has one on this body. Companies are
--- generated content rather than a guarantee, so the row is CONDITIONAL — and it
--- says so, because a check that silently skips reads exactly like a check that
--- passed.
-verify.set_overlay("company")
-local company_col, company_row = nil, nil
-for _, b in ipairs(verify.buildings()) do
-    if not b.player and b.body == home_body then
-        verify.center_tile(b.x, b.y, 8)
-        local h = dwell(b.x, b.y)
-        if h.hovered_structure_kind == "company" then
-            company_col, company_row = b.x, b.y
-            break
-        end
-    end
-end
-
-if company_col ~= nil then
-    local company_dest = press(company_col, company_row)
-    -- The expected destination MOVED, and this assertion is updated rather than
-    -- relaxed. BL-666 routed a company press to a placeholder that said on its
-    -- face it was a stand-in for the ledger batch to design; BL-675 designed it,
-    -- and a background firm now lands on the Acquisitions ledger — "can I buy
-    -- this" being the question a player actually has about one.
-    --
-    -- Still asserted against a NAMED surface, not against "anything but the
-    -- corporations table". The original point of the check was that a company
-    -- and a corporation reach DIFFERENT destinations (the 2026-08-28
-    -- terminology split), and a negative assertion would pass on any wrong
-    -- surface at all, including the placeholder this replaces.
-    verify.expect(company_dest.open_panel == "acquisitions",
-                  "a company press opens the Acquisitions ledger, not the corporations table")
-    verify.capture("one_tier_company_destination")
-else
-    verify.log_buildings()
-    verify.expect(false,
-                  "NO BACKGROUND FIRM FOUND ON THIS BODY - the company destination is unproven, "
-                  .. "not passing. Re-aim the probe or say why this world has none.")
-end
 
 verify.set_overlay("none")
 verify.clear_selection()

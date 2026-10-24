@@ -269,12 +269,15 @@ void record_histories(const world& w, const recipe_registry& reg,
 {
     // Record player balance, income, and expenditure for the header sparkline and
     // the Budget ledger's profit chart (BL-063).  All three are capped at plot_history_cap.
+    // BL-1406: the player's money is its nation's treasury once folded —
+    // `purse_of(player_actor)` reads either owner, and the cash flows are keyed
+    // by the same owner id.
     {
-        const auto cit = w.corporations.find(w.player_entity);
-        ui::push_capped(h.balance,
-            cit != w.corporations.end() ? cit->second.balance : 0.0f);
+        const entity_id actor = player_actor(w);
+        const float*    purse = purse_of(w, actor);
+        ui::push_capped(h.balance, purse != nullptr ? *purse : 0.0f);
 
-        const auto fit = flows.find(w.player_entity);
+        const auto fit = flows.find(actor);
         ui::push_capped(h.income,
             fit != flows.end() ? fit->second.income : 0.0f);
         ui::push_capped(h.expenditure,

@@ -24,7 +24,13 @@ void draw_selection_band(world& w, const recipe_registry& reg,
     // at that, back to looking at yourself" — remains representable.
     entity_id sel = ui.selected_entity;
     if (sel == null_entity || selection_kind_of(w, sel) == selection_kind::none)
-        sel = w.player_entity; // the player corp exists before the first frame
+    {
+        // BL-1406 (SELECTION.md § Resting state): the band rests on the player's
+        // NATION, through the same builder a nation selection uses; the seat
+        // corporation only where no nation resolves (a bare fixture).
+        const entity_id pn = player_nation(w);
+        sel = (pn != null_entity) ? pn : w.player_entity;
+    }
 
     // A DEPOSIT or PLATE selection reaches here with `selected_entity` null and is
     // substituted above like any other empty selection — harmlessly, because

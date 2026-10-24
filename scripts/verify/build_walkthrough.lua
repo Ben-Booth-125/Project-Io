@@ -15,7 +15,7 @@ verify.capture("walk_01_launch")
 
 -- Step 2 — "WHO IS WHO". The only current way to see ownership is to manually
 -- pick the Corporation lens from the strip. Player vs. rival tint appears.
-verify.set_overlay("corporation")
+verify.set_overlay("nations") -- BL-1406: the Corporation lens retired
 verify.capture("walk_02_corp_lens")
 
 -- Frame the player's holdings for the remaining steps.

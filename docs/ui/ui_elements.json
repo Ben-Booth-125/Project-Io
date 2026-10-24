@@ -377,26 +377,7 @@
    "interesting_question": "n/a — narrowly-scoped, single-body chrome.",
    "resolution": "n/a",
    "checks": [
-    "corporate_reach",
     "player_presence"
-   ]
-  },
-  {
-   "id": "UI-020",
-   "name": "Corporate borders (reach rings)",
-   "kind": "sub-element",
-   "parent": "UI-013",
-   "source": [
-    "docs/ui/LENSES.md § Corporation lens § Corporate reach (BL-182)",
-    "docs/ui/PLANETARY.md § Layers"
-   ],
-   "summary": "Retired from the canvas: the reach ring went with BL-329 (corp-reach circle) and the HQ star with Ben's 2026-10-10 ruling. Under the Corporation lens an owner reads by its tile tint alone; influence_range is stored, not drawn.",
-   "interesting_question": "The ring is described explicitly as 'render-only chrome — it gates nothing' — so a rival's visible reach ring implies no mechanical range restriction exists yet. Does that visual promise a rule the game does not enforce?",
-   "resolution": "Named, not resolved: LENSES.md states the full gameplay mechanic (range that gates operations, multi-HQ via advancement) 'stays deferred in docs/development/backlog.json (BL-182)' — the render shipped ahead of the mechanic on purpose.",
-   "checks": [
-    "corp_lens_border",
-    "corporate_reach",
-    "border_band"
    ]
   },
   {
@@ -545,30 +526,12 @@
     "src/ui/ui_state.hpp",
     "src/ui/overlay.cpp"
    ],
-   "summary": "The full set of 13 overlay_mode data layers the player can arm over the Planetary canvas, one active at a time; the lens also decides which entity a click/hover resolves to and which ledger it routes to.",
+   "summary": "The overlay_mode family of data layers the player can arm over the canvases, one active at a time; the lens also decides which entity a click/hover resolves to and which ledger it routes to. The Corporation and Company lenses retired with the firms (BL-1406): their enum slots survive only for old saves, never drawn and skipped by the cycle; 'who owns what' is the Nations lens.",
    "interesting_question": "The campaign deliberately opens with no lens armed ('a click only updates the Selection element and never re-skins the canvas'), reversing an earlier Corporation-default — why prefer an unskinned canvas at session start over a helpful default?",
    "resolution": "Recorded as a reversal from playtesting, not a first design: LENSES.md notes this 'reverses BL-013's Corporation-default, 2026-06-30' with no further rationale text quoted beyond the player choosing a lens deliberately.",
    "checks": [
     "lens_modes",
     "default_lens",
-    "lens_strip_and_fields"
-   ]
-  },
-  {
-   "id": "UI-030",
-   "name": "Corporation lens",
-   "kind": "sub-element",
-   "parent": "UI-029",
-   "source": [
-    "docs/ui/LENSES.md § Corporation lens"
-   ],
-   "summary": "Tints tiles by owning corporation (a tile is owned iff a corp holds a building on it); player gets a white border, rivals a hashed identity colour; no HQ star or reach ring (both retired from the canvas).",
-   "interesting_question": "There is 'no influence radius and no nation-domination heuristic' — ownership is literally the building tile only. Does that make corporate 'territory' read thinner than the Country lens's contiguous nation fields right beside it on the same strip?",
-   "resolution": "Explicit, current-iteration scope: LENSES.md states 'only the literal building tile counts as owned' in this iteration, with no stated plan to add an influence radius beyond the separate BL-182 reach-ring layer.",
-   "checks": [
-    "corporation_lens",
-    "corp_lens_border",
-    "lens_modes",
     "lens_strip_and_fields"
    ]
   },
@@ -918,23 +881,25 @@
    "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
    "checks": [
     "header",
-    "shell_pass"
+    "shell_pass",
+    "nation_seat_ui"
    ]
   },
   {
    "id": "UI-052",
-   "name": "Balance figure",
+   "name": "Treasury figure",
    "kind": "sub-element",
    "parent": "UI-051",
    "source": [
     "docs/ui/HEADER.md § Contents"
    ],
-   "summary": "The player corporation's running treasury balance, negatives flagged red.",
-   "interesting_question": "n/a — a direct read of corporation_component.balance.",
+   "summary": "The player NATION's treasury (BL-1406; HEADER.md § Contents: re-subjected from the retired corporation balance). A nation never runs into debt, so the figure has no negative state.",
+   "interesting_question": "n/a — a direct read of the player nation's treasury (purse_of(player_actor)).",
    "resolution": "n/a",
    "checks": [
     "header",
-    "debt_interest"
+    "debt_interest",
+    "nation_seat_ui"
    ]
   },
   {
@@ -976,25 +941,10 @@
    "source": [
     "docs/ui/HEADER.md § Contents (Runway row)"
    ],
-   "summary": "Balance ÷ quarterly loss, shown only while it means something (burning cash or already in debt); urgency-coloured red under 8 quarters or when in debt.",
+   "summary": "Treasury ÷ quarterly loss, shown only while burning (the nation's net, read off its state-ledger row, below zero); urgency-coloured red under 8 quarters. A nation never runs into debt, so there is no 'already in debt' state; when the treasury runs out a losing building idles.",
    "interesting_question": "The doc calls this figure 'load-bearing, not decorative' and states it degrades through the fit ladder but 'the fact is never simply lost' — folded into the Net tooltip as the last resort. Does a tooltip-only fallback still count as the fact staying visible?",
    "resolution": "The doc's own stance: HEADER.md treats a hover-reachable fact as sufficient to satisfy 'never simply lost' — the degradation ladder's floor is 'folded into the NET figure's tooltip,' explicitly accepted as the worst acceptable case.",
    "checks": []
-  },
-  {
-   "id": "UI-056",
-   "name": "Debt flag",
-   "kind": "sub-element",
-   "parent": "UI-051",
-   "source": [
-    "docs/ui/HEADER.md § Contents ([in debt] flag row)"
-   ],
-   "summary": "A worded flag beside a negative balance noting interest is self-accelerating; compacts from full text to '[in debt]' + tooltip under width pressure.",
-   "interesting_question": "n/a — a straightforward degradation-ladder element.",
-   "resolution": "n/a",
-   "checks": [
-    "debt_interest"
-   ]
   },
   {
    "id": "UI-057",
@@ -1015,14 +965,14 @@
   },
   {
    "id": "UI-058",
-   "name": "Corp emblem",
+   "name": "Nation emblem",
    "kind": "sub-element",
    "parent": "UI-057",
    "source": [
     "docs/ui/PROFILE.md § Contents",
     "docs/ui/ICONS.md § Corp emblem"
    ],
-   "summary": "A deterministic geometric shape (one of six primitives) + the corp's identity colour, shared across the identity card, Selection header, canvas building tags, and rival hover cards since BL-090.",
+   "summary": "A deterministic geometric shape (one of six primitives) keyed by the player's NATION, in the nation's identity colour (BL-1406; PROFILE.md § Contents) — the colour the Nations lens and the border band read. The selection header's building emblem shows the player's emblem on the nation's own buildings.",
    "interesting_question": "n/a — a clean, already-unified identity token across surfaces.",
    "resolution": "n/a",
    "checks": [
@@ -1332,43 +1282,6 @@
     "processing_management_ux",
     "v009_batch",
     "air_gate"
-   ]
-  },
-  {
-   "id": "UI-078",
-   "name": "Corporation ledger (rail slot 8, Diplomacy)",
-   "kind": "ledger",
-   "parent": null,
-   "source": [
-    "docs/ui/ledgers/corporation.md",
-    "docs/ui/MENU.md",
-    "docs/politics/RELATIONS.md § 1 Stance",
-    "src/ui/corporation_panel.cpp",
-    "src/ui/nav_pane.cpp"
-   ],
-   "summary": "Rail slot 8. The named corporate field grouped by stance - three collapsing groups (Friends / Hostile / Neutral), each with a count and an explicit empty state. Rows carry the firm's name and its Capital figure; a hostile row also says which direction the hostility runs. Background firms are excluded, so the list is the parties the player can actually stand toward. The four stance verbs live in each row's action strip, opened by a disclosure arrow.",
-   "interesting_question": "The slot is named Diplomacy and the surface is one list. Is a stance-grouped roster the whole of diplomacy, or the corp-grain half of a surface that also has a nation-grain half?",
-   "resolution": "Open. What is settled is the corp grain: this ledger is the only host for the corp stance verbs, and grouping by stance is what makes it a diplomacy read rather than a ranking. Nation-grain relations (stance, treaties, lobbying) have no surface here and are not claimed by it.",
-   "checks": [
-    "diplomacy_groups",
-    "corp_disclosure"
-   ]
-  },
-  {
-   "id": "UI-079",
-   "name": "Stance groups and the row action strip",
-   "kind": "view",
-   "parent": "UI-078",
-   "source": [
-    "docs/ui/ledgers/corporation.md § Slot 1 — the Nation overview",
-    "docs/politics/RELATIONS.md § 1 Stance"
-   ],
-   "summary": "The ledger's single view: rows filed under Friends / Hostile / Neutral by the stance tables, in a sorted entity-id walk within each group. A row expands to its action strip, which carries Declare Hostile (with an inline confirm), Offer / Accept Friendship and Return to Neutral at the strip's full width. A press that changes stance moves the row between groups on the next frame.",
-   "interesting_question": "n/a — see UI-078 for the parent open question.",
-   "resolution": "n/a",
-   "checks": [
-    "diplomacy_groups",
-    "corp_disclosure"
    ]
   },
   {
@@ -1693,7 +1606,7 @@
   },
   {
    "id": "UI-100",
-   "name": "Corporation ledger",
+   "name": "Nation overview",
    "kind": "ledger",
    "parent": null,
    "source": [
@@ -1702,11 +1615,12 @@
     "src/ui/charts.cpp",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "Rail slot 1: \"how well am I doing?\", answered by one card - Balance. A verdict line over a two-column chart, earnings against expenses stacked by flow, with the quarter's net beneath it. Distinct from the Corporations table (UI-078), which ranks the field of rivals.",
+   "summary": "Rail slot 1: \"how well is my nation doing?\", answered by one card - Balance (BL-1406: re-subjected from the Corporation ledger). A verdict line ('+X/qtr, treasury Y') over a two-column chart, the nation's earnings (sales, taxes) against its expenses (inputs, maintenance, wages) off its state-ledger row, with the quarter's net beneath it.",
    "interesting_question": "A roll-up is a summary of surfaces that already exist. What does it add beyond a shorter walk to them?",
    "resolution": "For three of the four original roll-ups the answer turned out to be nothing, so they went (BL-691): Production and Workforce are answered better by the Construction ledger's Buildings tab, Trade by the Market and Convoys ledgers. What survives is the read no other surface gives at this grain - the whole quarter's money as ONE picture, earnings against every outflow, where a per-ledger visit gives one flow at a time.",
    "checks": [
-    "corp_dashboard"
+    "corp_dashboard",
+    "nation_seat_ui"
    ]
   },
   {
@@ -1976,7 +1890,7 @@
    "source": [
     "docs/ui/STARTUP.md § The seat"
    ],
-   "summary": "The pre-play screen that answers which nation am I: a list of the MAJOR nations only (each holding one champion; rows ordered by the champion's static landscape score, a champion below the viability floor marked and its nation still pickable) beside a map of the home body lighting the shown nation's territory with its champion's HQ, works and home market, and the seven-part nation card below the map. A press opens the nation's briefing; Confirm issues take_seat naming the major and seats its champion; Back changes nothing. Shaped for up to six humans, seats one.",
+   "summary": "The pre-play screen that answers which nation am I: a list of the MAJOR nations only (name, marked where the viability floor marked it, and treasury - BL-1406: the Champion and Industry columns and the card's champion section retired with the champion) beside a map of the home body lighting the shown nation's territory, and the nation card below the map. A press opens the nation's briefing; Confirm issues take_seat naming the major (which still seats its champion under the hood until BL-1407); Back changes nothing. Shaped for up to six humans, seats one.",
    "interesting_question": "The card shows neighbours' readings as derived sentiment because no nation-to-nation stance table exists before play - is the derived Trust a faithful enough stand-in for the \"stances and grudges\" the design names?",
    "resolution": "Open: the derived reading is what the world carries at the seat; a declared nation stance would be new state, which the screen may not add.",
    "checks": [

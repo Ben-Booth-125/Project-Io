@@ -84,7 +84,7 @@ verify.capture("hover_card_market_structure")
 
 -- One capture per structure lens, because "a different hover card for each lens"
 -- is a claim about five frames, not one.
-for _, lens in ipairs({ "corporation", "company", "continent", "resource" }) do
+for _, lens in ipairs({ "nations", "continent", "resource" }) do -- BL-1406: the owner lenses retired
     verify.set_overlay(lens)
     verify.center_tile(built_col, built_row, 8)
     local q = verify.tile_screen(built_col, built_row)

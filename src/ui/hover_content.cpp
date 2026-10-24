@@ -54,22 +54,7 @@ void hover_terrain_header(const tile_component& tile)
 // prices, a plate's collision record. Those are per-lens content designs, and
 // guessing at them here would bake in five shapes nobody chose.
 
-// Corporation / Company: the OWNER the pointer resolved through.
-void hover_structure_owner(const world& w, entity_id corp, bool background)
-{
-    const auto it = w.corporations.find(corp);
-    if (it == w.corporations.end())
-    {
-        ImGui::TextDisabled(background ? "Company" : "Corporation");
-        return;
-    }
-    ImGui::TextUnformatted(it->second.name.c_str());
-    ImGui::TextDisabled(background ? "Background company" : "Corporation");
-    // SHORT BY MEASUREMENT, not by taste: the first cut read "Click for the
-    // corporations table" and the card clipped it to "...corporations ta". The card
-    // is a fixed-width popup, so an action hint has to fit rather than trail off.
-    ImGui::TextDisabled(background ? "Click: company ledger" : "Click: corporations table");
-}
+// BL-1406: the Corporation / Company owner card retired with those lenses.
 
 // Market / Scarcity: the CATCHMENT, which is what both lenses tint.
 void hover_structure_market(const world& w, entity_id market, bool scarcity)
@@ -320,12 +305,6 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
     // is left alone below.
     switch (ui.hovered_structure_kind)
     {
-    case structure_kind::corporation:
-        hover_structure_owner(w, ui.hovered_structure, /*background=*/false);
-        return;
-    case structure_kind::company:
-        hover_structure_owner(w, ui.hovered_structure, /*background=*/true);
-        return;
     case structure_kind::market:
         hover_structure_market(w, ui.hovered_structure,
                                ui.overlay == overlay_mode::scarcity);

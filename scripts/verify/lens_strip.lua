@@ -11,10 +11,12 @@
 
 verify.goto_surface("home")
 
--- Corporation lens active (the campaign-start default): the first strip glyph is
--- highlighted, the rest dim. Captures the full curated strip order.
-verify.set_overlay("corporation")
-verify.capture("lens_strip_corporation")
+-- BL-1406: the Corporation and Company lenses retired with the firms; "who owns
+-- what" is the Nations lens (LENSES.md § Corporation and Company lenses - retired).
+-- The Resource lens active: the first strip glyph is highlighted, the rest dim.
+-- Captures the full curated strip order.
+verify.set_overlay("resource")
+verify.capture("lens_strip_resource")
 
 -- Switching to Population highlights only that glyph (single-select). This was
 -- Production until BL-604 retired that lens; the check is about the highlight

@@ -61,6 +61,15 @@ struct corp_rollups
     /// True when the last economy report carried no budget breakdown — the card
     /// says so rather than charting zeroes as though they were measured.
     bool budget_measured = false;
+
+    /// BL-1406: the subject is a NATION (the Nation overview): `balance` is its
+    /// treasury and `budget` its state-ledger row. `tax_income` is the tax that
+    /// returned to the treasury — an inflow for a nation, never a firm's outflow.
+    bool  nation     = false;
+    float tax_income = 0.0f;
+
+    /// The quarter's net: the budget's, plus a nation's tax income.
+    float net() const { return budget.net() + tax_income; }
 };
 
 /// The Balance card's two columns: what came in, and what went out.
@@ -78,7 +87,7 @@ struct balance_columns
 {
     /// Income, plus national subsidies when a nation paid any this quarter, plus
     /// refunds when the quarter's return booked any (BL-1215).
-    charts::stack_segment earnings[3]{};
+    charts::stack_segment earnings[4]{}; // BL-1406: + a nation's Taxes
     std::size_t           earning_count = 0;
 
     /// Every outflow `corp_budget::net()` subtracts, each its own segment.
@@ -98,7 +107,8 @@ struct balance_columns
 /// Build the Balance card's columns from a measured quarter. Pure. @p refunds is
 /// the quarter's return's `refunds` (BL-1215), drawn as its own earnings segment
 /// when positive and absent otherwise.
-balance_columns build_balance_columns(const corp_budget& b, float refunds = 0.0f);
+balance_columns build_balance_columns(const corp_budget& b, float refunds = 0.0f,
+                                      float tax_income = 0.0f);
 
 /// How many cards the ledger draws. One; exposed so a check can assert that
 /// rather than trusting a comment.

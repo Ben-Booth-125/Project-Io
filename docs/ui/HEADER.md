@@ -40,8 +40,6 @@ fixed order:
    - value-only — `   |   12q` (label dropped, tooltip explains);
    - none — **folded into the NET figure's tooltip**, so the fact survives even when the strip
      cannot draw it.
-2. **Debt flag** — the worded `[in debt - interest accruing]` drops next (the red number already
-   carries the signal), compacting to `[in debt]` + tooltip.
 2. **Sparkline** — the last decorative element to drop.
 The three money figures (Treasury / Cargo / Net) are bounded-length (`fmt::credits` /
 `fmt::rate` abbreviate) and always drawn in full.

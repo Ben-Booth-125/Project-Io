@@ -57,26 +57,16 @@ bool nav_slot_centre(int slot, float& out_x, float& out_y)
 void close_all_panels(ui_state& state)
 {
     state.show_corporation_panel = false;
-    state.show_corporations_table = false;
     state.show_balance_ledger    = false;
     state.show_market_ledger     = false;
     state.show_convoys_ledger    = false; // Convoys ledger (BL-689), slot 7
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
     state.show_generation_ledger = false;
-    // BL-666: the two OWNER-SURFACE SUBJECTS clear with the panels they aim.
-    // Both are "which firm is this surface about", and a subject that outlives
-    // its surface is worse than no subject at all: the dossier field takes strict
-    // priority over `selected_entity` in the corporations table's row highlight,
-    // so a stale one pins the highlight to a firm the player has moved off and
-    // makes a row click read as doing nothing.
-    state.selected_company             = null_entity;
-    state.selected_corporation_dossier = null_entity;
-    state.show_company_ledger    = false; // Company ledger (BL-666) — same shape: a column
-                                          // occupant reached by a canvas click, no rail slot
+    // BL-1406: the Company ledger, the corporations table and the Acquisitions
+    // ledger retired with the firms; their flags and subjects went with them.
     state.show_decision_feed     = false; // AI decision feed (BL-407)
     state.show_strategy_readout  = false; // Strategy readout (BL-411)
-    state.show_acquisitions_ledger = false; // Acquisitions ledger (slot 5)
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
     // column occupant (draw_tech_tree_menu), so it must yield to every other
     // ledger the same way they yield to it — its canvas takeover closes with it.
@@ -85,19 +75,13 @@ void close_all_panels(ui_state& state)
 
 bool any_panel_open(const ui_state& state)
 {
-    return state.show_corporation_panel || state.show_corporations_table ||
+    return state.show_corporation_panel ||
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_convoys_ledger ||
            state.show_construction_panel ||
            state.show_tile_ledger       ||
            state.show_generation_ledger || state.show_tech_tree ||
-           state.show_decision_feed     || state.show_strategy_readout ||
-           state.show_acquisitions_ledger ||
-           // Company ledger (BL-666). Counted here even though it has no rail
-           // slot, because its only consumer asks "does something already own
-           // the fold-out column?" — and it does. Leaving it out would let the
-           // tile build ledger draw over it.
-           state.show_company_ledger;
+           state.show_decision_feed     || state.show_strategy_readout;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -256,7 +240,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_corporation_panel = !was_open;
             }
-            slot_tooltip("Corporation overview", "Your corporation at a glance - balance, holdings, alerts.", false);
+            slot_tooltip("Nation overview", "How well your nation is doing - its treasury, what it earns and what it spends.", false);
             break;
         case 2: // Budget (BL-028)
             if (ImGui::Selectable(id, state.show_balance_ledger, 0, {slot_size, slot_size})) {
@@ -291,14 +275,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
                          "Which technologies your nation can reach, and when your plan arrives.",
                          false);
             break;
-        case 5: // Acquisitions ledger — inserted above Market (Ben, 2026-08-29)
-            if (ImGui::Selectable(id, state.show_acquisitions_ledger, 0, {slot_size, slot_size})) {
-                const bool was_open = state.show_acquisitions_ledger;
-                close_all_panels(state);
-                state.show_acquisitions_ledger = !was_open;
-            }
-            slot_tooltip("Acquisitions",
-                         "Which firms you can buy outright, and what they cost.", false);
+        // BL-1406: slot 5 held the Acquisitions ledger, which retired with the
+        // buyout (Ben, 2026-10-23; MENU.md § Slot 5). The slot keeps its place so
+        // nothing below renumbers; it is disabled and draws no glyph.
+        case 5:
+            ImGui::BeginDisabled();
+            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
+            ImGui::EndDisabled();
+            slot_tooltip("Acquisitions (retired)",
+                         "Ground and what stands on it change hands only by conquest.", false);
             break;
         case 6: // Market Ledger (BL-027)
             if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size})) {
@@ -352,13 +337,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // verbs. The financial half it used to carry moved to the Acquisitions
         // ledger's profitability fold-out, which is why this could stop being a
         // balance table at all.
-        case 9: // Diplomacy — the stance-grouped corporations list (BL-674)
-            if (ImGui::Selectable(id, state.show_corporations_table, 0, {slot_size, slot_size})) {
-                const bool was_open = state.show_corporations_table;
-                close_all_panels(state);
-                state.show_corporations_table = !was_open;
-            }
-            slot_tooltip("Diplomacy", "Where you stand with each corporation - friends, hostiles, and the rest.", false);
+        // BL-1406: the corporation stance table retired with the corporation
+        // (ledgers/corporation.md § Slot 8, retired); Diplomacy is reserved again.
+        case 9:
+            ImGui::BeginDisabled();
+            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
+            ImGui::EndDisabled();
+            slot_tooltip("Diplomacy", "Where your nation stands with the others.", true);
             break;
         case 10: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
@@ -429,7 +414,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // it deliberately does NOT clone slot 1's solid corporation seal or
         // slot 6's market bars, the two it sits between and would be confused
         // with at rail radius.
-        case 5: icons::acquisition(dl, centre, r, lit(state.show_acquisitions_ledger)); break;
+        case 5: break; // retired (BL-1406): no surface, no glyph
         case 6: icons::market(dl, centre, r, lit(state.show_market_ledger));           break;
         // Slot 7 draws `icons::convoy` — the same rightward chevron the canvases
         // already use to mark cargo in transit, so the rail slot and the thing it
@@ -439,10 +424,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // slot 8's dim strategy pennant at rail radius.
         case 7: icons::convoy(dl, centre, r, lit(state.show_convoys_ledger));          break;
         case 8: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
-        // Slot 9 is live only because it provisionally hosts the corporations table
-        // (NR-012); the subject it is NAMED for is still unbuilt, so the glyph lights
-        // like any other live slot rather than staying dim.
-        case 9: icons::diplomacy(dl, centre, r, lit(state.show_corporations_table)); break;
+        case 9: icons::diplomacy(dl, centre, r, dim); break;  // Diplomacy (reserved, BL-1406)
         case 10: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         // The plate glyph: this ledger's subject is the generated ground itself,
         // and the Continent lens already teaches that shape as "how the surface

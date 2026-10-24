@@ -185,13 +185,12 @@ verify.frames(1)
 -- Slot 7 (Corp. Strategy) is the one reserved slot: it has no panel to open, so
 -- it appears in the rail captures above and nowhere here. That absence is the
 -- accurate record, not a gap.
-ledger("corporation",        "shell_20_slot01_corporation")
+ledger("corporation",        "shell_20_slot01_nation_overview")
 ledger("balance",            "shell_21_slot02_budget")
 ledger("construction",       "shell_22_slot03_construction")
 ledger("tech_tree",          "shell_23_slot04_research")
-ledger("acquisitions",       "shell_24_slot05_acquisitions")
+-- slot 5 (Acquisitions) and slot 9 (Diplomacy) carry no surface since BL-1406
 ledger("market",             "shell_25_slot06_market")
-ledger("corporations_table", "shell_26_slot08_diplomacy_corps")
 ledger("tile",               "shell_27_slot09_history")
 ledger("generation_ledger",  "shell_28_slot10_generation")
 ledger("decisions",          "shell_29_slot11_ai_decisions")

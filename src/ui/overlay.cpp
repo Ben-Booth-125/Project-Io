@@ -20,7 +20,6 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
     {
         case overlay_mode::supply:      icons::supply     (dl, centre, r, colour); break;
         case overlay_mode::market:      icons::market     (dl, centre, r, colour); break;
-        case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
         case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
         case overlay_mode::population:  icons::population (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
@@ -31,7 +30,6 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::reach:         icons::reach(dl, centre, r, colour); break;
         case overlay_mode::supply_routes: icons::supply_routes(dl, centre, r, colour); break;
         case overlay_mode::throughput:    icons::throughput(dl, centre, r, colour); break;
-        case overlay_mode::company:       icons::company(dl, centre, r, colour); break;
         case overlay_mode::trade_flow:    icons::trade_flow(dl, centre, r, colour); break;
         // The shield the retired Country lens wore: the glyph meant "national
         // territory" then and means it again (BL-1323).
@@ -48,7 +46,6 @@ const char* overlay_mode_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply routes";
         case overlay_mode::market:      return "Market catchment boundaries";
-        case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
         case overlay_mode::scarcity:    return "Market scarcity";
@@ -60,7 +57,6 @@ const char* overlay_mode_name(overlay_mode m)
         // taglines"). The quantity it was explaining does not exist any more either:
         // active LP was the retired per-anchor model (BL-1352).
         case overlay_mode::throughput:    return "Logistic Points";
-        case overlay_mode::company:       return "Company holdings (background firms)";
         case overlay_mode::trade_flow:    return "Trade flow (your shipments and refusals)";
         case overlay_mode::nations:       return "Nations (whole territory)";
         default:                        return "None";
@@ -73,7 +69,6 @@ const char* overlay_mode_short_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply";
         case overlay_mode::market:      return "Market";
-        case overlay_mode::corporation: return "Corp";
         case overlay_mode::resource:    return "Resource";
         case overlay_mode::population:  return "Population";
         case overlay_mode::scarcity:    return "Scarcity";
@@ -82,7 +77,6 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
         case overlay_mode::throughput:    return "Throughput";
-        case overlay_mode::company:       return "Company";
         case overlay_mode::trade_flow:    return "Trade flow";
         case overlay_mode::nations:       return "Nations";
         default:                        return "None";
@@ -91,7 +85,8 @@ const char* overlay_mode_short_name(overlay_mode m)
 
 void toggle_overlay(ui_state& ui, overlay_mode m)
 {
-    ui.overlay = (ui.overlay == m) ? overlay_mode::none : m;
+    // BL-1406: a retired slot is never armed, whatever asks for it.
+    ui.overlay = (ui.overlay == m || overlay_is_retired(m)) ? overlay_mode::none : m;
 }
 
 void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
@@ -118,7 +113,6 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     // adding one here is part of adding a lens — the same duty ACTIONS.json
     // carries for its press.
     static constexpr overlay_mode planetary_modes[] = {
-        overlay_mode::corporation, overlay_mode::company,
         overlay_mode::resource,    overlay_mode::market,
         overlay_mode::scarcity,    overlay_mode::industry,
         overlay_mode::population,  overlay_mode::continent,

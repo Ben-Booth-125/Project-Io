@@ -20,10 +20,16 @@ verify.set_overlay("none")
 verify.frames(2)
 verify.capture("lens_glyphs_planetary")
 
-verify.set_overlay("company")
+-- BL-1406: the Corporation and Company lenses retired with the firms; "who owns
+-- what" is the Nations lens (LENSES.md § Corporation and Company lenses - retired).
+verify.set_overlay("nations")
 verify.frames(2)
-verify.expect(verify.overlay_name() == "company", "Company lens armed")
-verify.capture("lens_glyphs_planetary_company")
+verify.expect(verify.overlay_name() == "nations", "Nations lens armed")
+verify.capture("lens_glyphs_planetary_nations")
+-- A retired lens name arms nothing (the slot is kept only for old saves).
+verify.set_overlay("corporation")
+verify.frames(1)
+verify.expect(verify.overlay_name() == "none", "the retired Corporation lens arms nothing")
 
 verify.set_overlay("trade_flow")
 verify.frames(2)
