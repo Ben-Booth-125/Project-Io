@@ -518,8 +518,8 @@
    "design": "SPRINT 57 ITEM 2. Rulings: docs/GLOSSARY.md (Corporation, Company, Own ground ...), docs/CONCEPT.md § Player identity, docs/politics/NATIONS.md § What a nation owns / § Own ground, docs/ai/AI_OPPONENT.md § 11 last entry (Ben, 2026-10-23). corp_ai's actor becomes an ai_actor view over a nation (money = uncommitted treasury, buildings = state_assets, focus = nation focus, an owner-keyed books map for trade purse and returns). Every non-player nation acts; the champion state-industry branch (:1341, :3705) retires; player_nation skipped, spectating override kept. Sorted ids for every walk; the cadence stagger and personality jitter move with the actor set (digest movement expected). New harness nation_ai_builds: majors and minors build, the player's nation never does, nothing lands on foreign ground."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 57,
    "written": "2026-10-23",
    "parked": false,
@@ -703,6 +703,30 @@
    ],
    "title": "Sprint 57's one re-bless: digests and market_viability floors, with the movers attributed",
    "design": "SPRINT 57 ITEM 9. Every item before this moves the world; the wave re-blesses ONCE (DELIVERY.md § The digest re-bless is one act per WAVE), on Ben's go, with each mover attributed. Rail fade 8 -> 20 (NR-1056, 693be258) is in this wave too. Finish with the ruling-check skill against tools/session/rulings/sprint-57.json."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 57,
+   "written": "2026-10-24",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (BL-1402 gate, 2026-10-24)",
+   "requires": [
+    "BL-1402"
+   ],
+   "id": "BL-1409",
+   "short_name": "WHOLE_ECONOMY_NATION_FINDS_NO_BUILD",
+   "category": "AI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "tools/verify/nation_ai_builds.cpp"
+   ],
+   "title": "A nation that owns its whole economy finds no build on a thin world, and its treasury falls",
+   "design": "SPRINT 57, found at BL-1402's gate. On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. THE WORK: measure first (which candidates fail placement and why - reach, needs_road, own ground at the nation's edge?; whether 'materials not obtainable' reads the nation's own shelves now that every producer is the nation's), and read the treasury trajectory over market_viability's 400 ticks on the 16 seeds; then decide with Ben whether anything is wrong. Never retune to make R1 pass. Pairs with BL-1403 (the tax returns a share of wages, which slows the fall)."
   }
  ]
 }

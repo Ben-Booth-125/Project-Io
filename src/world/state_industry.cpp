@@ -7,6 +7,7 @@
 #include "market_clearing.hpp" // market_for_tile
 #include "recipe_registry.hpp"
 #include "world.hpp"
+#include "trade.hpp"           // BL-1402: trade_reserve_of (the fold moves the reserve home)
 #include "logistics.hpp"       // BL-1255: tile_touches_track, invalidate_logistics_caches
 #include "logistic_points.hpp" // BL-1398: lp_source_network (a network node)
 #include <set>
@@ -1244,5 +1245,221 @@ void print_rail_handover(const rail_handover_report& r)
                 "along the line, %d unowned), %d stations (%d a major's)\n",
                 r.links_laid, r.links, r.links_merged, r.links_broken, r.track_tiles, r.to_nations,
                 r.to_firms, r.along_the_line, r.unowned, r.stations, r.station_nations);
+    std::fflush(stdout);
+}
+
+// ---------------------------------------------------------------------------
+// BL-1402 -- THE FOLD TO GROUND (Ben, 2026-10-23; see the header)
+// ---------------------------------------------------------------------------
+fold_report fold_to_ground(world& w)
+{
+    fold_report out;
+
+    std::vector<entity_id> corp_ids;
+    corp_ids.reserve(w.corporations.size());
+    for (const auto& kv : w.corporations)
+        corp_ids.push_back(kv.first);
+    std::sort(corp_ids.begin(), corp_ids.end());
+    out.corporations = static_cast<int>(corp_ids.size());
+
+    const auto ground_of = [&w](entity_id tile) -> entity_id {
+        const auto tn = w.tile_to_nation.find(tile);
+        return tn != w.tile_to_nation.end() ? tn->second : null_entity;
+    };
+    const auto home_of = [&w](entity_id corp) -> entity_id {
+        const auto cit = w.corporations.find(corp);
+        if (cit == w.corporations.end())
+            return null_entity;
+        return w.nations.count(cit->second.home_nation) != 0 ? cit->second.home_nation : null_entity;
+    };
+
+    bool touched_logistics = false;
+    for (const entity_id cid : corp_ids)
+    {
+        corporation_component& cc = w.corporations.at(cid);
+
+        // The buildings, in the corporation's own asset order: each to the nation
+        // whose ground it stands on. Ground no nation owns keeps nothing.
+        const std::vector<entity_id> assets = cc.assets; // copy: demolish edits cc.assets
+        for (const entity_id bid : assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const entity_id ground = ground_of(bit->second.tile);
+            if (ground == null_entity)
+            {
+                if (building_affects_logistics(bit->second.type))
+                    touched_logistics = true;
+                if (demolish_building(w, cid, bid))
+                {
+                    ++out.on_unowned;
+                    ++out.firm_on_unowned;
+                }
+                continue;
+            }
+            w.nations.at(ground).state_assets.push_back(bid);
+            ++out.buildings_folded;
+            ++out.firm_folded;
+        }
+        cc.assets.clear();
+        cc.hq_building     = null_entity;
+        cc.influence_range = 0.0f;
+
+        // The money: a positive balance moves home, the trade reserve with it.
+        const entity_id home = home_of(cid);
+        if (cc.balance > 0.0f)
+        {
+            if (home != null_entity)
+            {
+                w.nations.at(home).treasury += cc.balance;
+                out.balance_moved += cc.balance;
+            }
+            else
+                out.balance_stranded += cc.balance;
+        }
+        else if (cc.balance < 0.0f)
+            out.debt_forgiven -= cc.balance;
+        cc.balance = 0.0f;
+        // The trade reserve is NOT carried: the nation's reserve has no save path
+        // until BL-1407, and a reserve that vanished on load would spend as auto.
+        // Generation leaves every reserve at 0, so nothing is lost here; it is
+        // counted in case a fixture set one.
+        out.reserve_dropped += cc.trade_reserve;
+        cc.trade_reserve = 0.0f;
+        cc.trade_points  = 0.0f;
+    }
+
+    // GROUND CARRIES ITS BUILDINGS (NATIONS.md § Own ground): a building a NATION
+    // already held off its own ground (the rail handover gave stations by who owns
+    // the track) passes to the nation whose ground it stands on, or is demolished on
+    // ground no nation holds. Nations ascending, each list in stored order.
+    {
+        std::vector<entity_id> nation_ids;
+        for (const auto& kv : w.nations)
+            nation_ids.push_back(kv.first);
+        std::sort(nation_ids.begin(), nation_ids.end());
+        for (const entity_id nid : nation_ids)
+        {
+            const std::vector<entity_id> held = w.nations.at(nid).state_assets; // copy: edited below
+            for (const entity_id bid : held)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                const entity_id ground = ground_of(bit->second.tile);
+                if (ground == nid)
+                    continue;
+                if (building_affects_logistics(bit->second.type))
+                    touched_logistics = true;
+                if (ground == null_entity)
+                {
+                    if (demolish_building(w, nid, bid))
+                        ++out.on_unowned;
+                    continue;
+                }
+                std::vector<entity_id>& from = w.nations.at(nid).state_assets;
+                from.erase(std::find(from.begin(), from.end(), bid));
+                w.nations.at(ground).state_assets.push_back(bid);
+                ++out.rehomed;
+            }
+        }
+    }
+
+    // Everything else a corporation owned passes to its home nation, walked in a
+    // fixed order (units by id; the vectors in their stored order).
+    {
+        std::vector<entity_id> unit_ids;
+        for (const auto& [uid, u] : w.units)
+            if (w.corporations.count(u.owner) != 0)
+                unit_ids.push_back(uid);
+        std::sort(unit_ids.begin(), unit_ids.end());
+        for (const entity_id uid : unit_ids)
+        {
+            unit_component& u = w.units.at(uid);
+            // A unit follows its muster base (which went to ITS ground's nation),
+            // else its corporation's home nation, so a unit never points at
+            // another nation's base.
+            entity_id to = home_of(u.owner);
+            if (u.muster_base != null_entity)
+                if (const entity_id base_owner = owner_nation_of(w, u.muster_base); base_owner != null_entity)
+                    to = base_owner;
+            if (to == null_entity)
+                continue;
+            u.owner = to;
+            ++out.units_reowned;
+        }
+    }
+    for (auto& [tile, owner] : w.rail_track) // std::map: ascending tile
+    {
+        if (w.corporations.count(owner) == 0)
+            continue;
+        const entity_id ground = ground_of(tile);
+        owner = ground != null_entity ? ground : home_of(owner);
+        ++out.rail_reowned;
+        touched_logistics = true;
+    }
+    for (standing_trade& t : w.trades)
+        if (w.corporations.count(t.owner) != 0)
+            if (const entity_id home = home_of(t.owner); home != null_entity)
+            {
+                t.owner = home;
+                ++out.trades_reowned;
+            }
+    for (convoy_component& c : w.convoys)
+        if (w.corporations.count(c.corp) != 0)
+            if (const entity_id home = home_of(c.corp); home != null_entity)
+            {
+                c.corp = home;
+                ++out.convoys_reowned;
+            }
+    for (trade_route& r : w.trade_routes)
+        if (w.corporations.count(r.corp) != 0)
+            if (const entity_id home = home_of(r.corp); home != null_entity)
+            {
+                r.corp = home;
+                ++out.routes_reowned;
+            }
+    // Two corporations of one nation may each have run the same body pair: one
+    // route per (pair, owner), the counts summed and the latest traffic kept, in
+    // the vector's stored order.
+    {
+        std::vector<trade_route> merged;
+        for (const trade_route& r : w.trade_routes)
+        {
+            const auto same = [&](const trade_route& m) {
+                return m.corp == r.corp && ((m.body_a == r.body_a && m.body_b == r.body_b)
+                                            || (m.body_a == r.body_b && m.body_b == r.body_a));
+            };
+            const auto it = std::find_if(merged.begin(), merged.end(), same);
+            if (it == merged.end())
+            {
+                merged.push_back(r);
+                continue;
+            }
+            it->convoy_count += r.convoy_count;
+            it->last_tick = std::max(it->last_tick, r.last_tick);
+            ++out.routes_merged;
+        }
+        w.trade_routes = std::move(merged);
+    }
+    out.contracts_cleared = static_cast<int>(w.procurement_quotes.size() + w.procurement_contracts.size());
+    w.procurement_quotes.clear();
+    w.procurement_contracts.clear();
+
+    if (touched_logistics || out.buildings_folded > 0)
+        invalidate_logistics_caches(w);
+    return out;
+}
+
+void print_fold(const fold_report& r)
+{
+    std::printf("[fold] %d corporations: %d buildings to their ground nation, %d re-homed to their ground, %d on unowned ground "
+                "demolished; %.1f moved to treasuries, %.1f debt forgiven, %.1f stranded; units %d, "
+                "track %d, trades %d, convoys %d, routes %d re-owned; %d procurement records cleared\n",
+                r.corporations, r.buildings_folded, r.rehomed, r.on_unowned, static_cast<double>(r.balance_moved),
+                static_cast<double>(r.debt_forgiven), static_cast<double>(r.balance_stranded),
+                r.units_reowned, r.rail_reowned, r.trades_reowned, r.convoys_reowned, r.routes_reowned,
+                r.contracts_cleared);
     std::fflush(stdout);
 }

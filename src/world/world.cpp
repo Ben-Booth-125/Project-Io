@@ -495,10 +495,15 @@ entity_id owner_corp_of(const world& w, entity_id building)
 bool is_player_owned(const world& w, entity_id building)
 {
     const entity_id corp = owner_corp_of(w, building);
-    if (corp == null_entity)
-        return false;
-    const auto it = w.corporations.find(corp);
-    return it != w.corporations.end() && it->second.is_player;
+    if (corp != null_entity)
+    {
+        const auto it = w.corporations.find(corp);
+        return it != w.corporations.end() && it->second.is_player;
+    }
+    // BL-1402 (Ben, 2026-10-23): the player IS its nation, so a building its
+    // nation owns is the player's.
+    const entity_id pn = player_nation(w);
+    return pn != null_entity && owner_nation_of(w, building) == pn;
 }
 
 building_owner building_owner_of(const world& w, entity_id building)
@@ -532,6 +537,15 @@ entity_id owner_nation_of(const world& w, entity_id building)
 }
 
 const std::vector<entity_id>* assets_of(const world& w, entity_id owner)
+{
+    if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+        return &cit->second.assets;
+    if (const auto nit = w.nations.find(owner); nit != w.nations.end())
+        return &nit->second.state_assets;
+    return nullptr;
+}
+
+std::vector<entity_id>* assets_of(world& w, entity_id owner)
 {
     if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
         return &cit->second.assets;
@@ -602,6 +616,23 @@ bool owner_holds(const world& w, entity_id owner, entity_id building)
     return a != nullptr && std::find(a->begin(), a->end(), building) != a->end();
 }
 
+bool world_is_folded(const world& w)
+{
+    for (const auto& [cid, cc] : w.corporations)
+        if (!cc.assets.empty())
+            return false;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.state_assets.empty())
+            return true;
+    return false;
+}
+
+entity_id player_actor(const world& w)
+{
+    const entity_id pn = player_nation(w);
+    return (pn != null_entity && world_is_folded(w)) ? pn : w.player_entity;
+}
+
 entity_id champion_of(const world& w, entity_id nation)
 {
     if (nation == null_entity)
@@ -644,18 +675,24 @@ namespace {
 /// True if the player corporation owns a building on `body`.
 bool player_present_on(const world& w, entity_id body)
 {
-    const auto cit = w.corporations.find(w.player_entity);
-    if (cit == w.corporations.end())
+    // BL-1402: the seat's own holdings and its nation's (the player IS its nation).
+    const auto on_body = [&](const std::vector<entity_id>& assets) {
+        for (const entity_id bld : assets)
+        {
+            const auto bit = w.buildings.find(bld);
+            if (bit == w.buildings.end())
+                continue;
+            const auto tit = w.tiles.find(bit->second.tile);
+            if (tit != w.tiles.end() && tit->second.body == body)
+                return true;
+        }
         return false;
-    for (const entity_id bld : cit->second.assets)
-    {
-        const auto bit = w.buildings.find(bld);
-        if (bit == w.buildings.end())
-            continue;
-        const auto tit = w.tiles.find(bit->second.tile);
-        if (tit != w.tiles.end() && tit->second.body == body)
-            return true;
-    }
+    };
+    if (const auto cit = w.corporations.find(w.player_entity);
+        cit != w.corporations.end() && on_body(cit->second.assets))
+        return true;
+    if (const auto nit = w.nations.find(player_nation(w)); nit != w.nations.end())
+        return on_body(nit->second.state_assets);
     return false;
 }
 
@@ -664,7 +701,7 @@ bool player_lane_active_on(const world& w, entity_id body)
 {
     for (const auto& cv : w.convoys)
     {
-        if (cv.corp != w.player_entity)
+        if (cv.corp != w.player_entity && cv.corp != player_nation(w)) // BL-1402: or its nation's
             continue;
         if (body_of_market(w, cv.source_market) == body ||
             body_of_market(w, cv.dest_market) == body)

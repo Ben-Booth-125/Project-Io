@@ -7415,7 +7415,7 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "complete",
+   "status": "in-flight",
    "promoted_from": "backlog.json BL-1401 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
    "resolved": "2026-10-24",
@@ -7423,12 +7423,12 @@
    "rows": [
     {
      "id": "R1",
-     "status": "complete",
+     "status": "failed",
      "verification": [
       "headless: nation_ai_builds"
      ],
      "requirement": "Every non-player nation, majors and minors, issues builds through the scorer.",
-     "notes": "nation_ai_builds on main ab3fe595, seeds 0/28/46: majors and minors each placed buildings they own (seed 0: 2/5 majors, 9/35 minors; 28: 1/1, 8/19; 46: 2/4, 7/35); every post-generation nation building on its owner's ground."
+     "notes": "nation_ai_builds on main ab3fe595, seeds 0/28/46: majors and minors each placed buildings they own (seed 0: 2/5 majors, 9/35 minors; 28: 1/1, 8/19; 46: 2/4, 7/35); every post-generation nation building on its owner's ground. REGRESSED 2026-10-24: On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409."
     },
     {
      "id": "R2",
@@ -7456,38 +7456,38 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1402 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-24",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fold_census"
      ],
      "requirement": "After the fold no building is owned by a firm and none stands on foreign or unowned ground.",
-     "notes": null
+     "notes": "fold_census F1a-F1c, seeds 0/28/46 on the SHIPPED mirror (probe): no corporation owns a building, none stands off its owner's ground (the rail-handover station is re-homed), no unit/trade/convoy/route/track is a corporation's, every mustered unit belongs to its base's owner."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fold_census, money_conservation"
      ],
      "requirement": "Money is conserved across the fold: the sum of balances plus treasuries before equals treasuries after.",
-     "notes": null
+     "notes": "fold_census F2: every treasury right after the fold equals its own before plus its firms' positive balances, recomputed in float in the fold's order - exact; nothing forgiven or stranded on the three seeds; no treasury negative."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: save_roundtrip"
      ],
      "requirement": "The world saves and loads identically after the fold.",
-     "notes": null
+     "notes": "fold_census F3/F4: a second fold moves nothing; the folded start round-trips the save with an equal state_hash; save_roundtrip OK; world_determinism ALL PASS."
     }
    ]
   },

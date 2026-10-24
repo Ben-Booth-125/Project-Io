@@ -1933,7 +1933,8 @@ bool read_world_snapshot(world& w, std::istream& in)
         for (const standing_trade& t : s.trades)
         {
             if (++per_owner[t.owner] > 64) return false; // max_trades_per_corp
-            if (s.corporations.count(t.owner) == 0) return false;
+            // BL-1402: a trade's owner is a corporation or, since the fold, a nation.
+            if (s.corporations.count(t.owner) == 0 && s.nations.count(t.owner) == 0) return false;
             if (t.from_market == t.to_market) return false;
             if (s.markets.count(t.from_market) == 0 || s.markets.count(t.to_market) == 0) return false;
             if (t.id >= s.next_trade_id || !ids.insert(t.id).second) return false;

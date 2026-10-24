@@ -2424,15 +2424,21 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
 void seed_starting_military(world& w, entity_id corp_id,
                              std::unordered_set<entity_id>& occupied_tiles)
 {
-    const corporation_component& cc = w.corporations.at(corp_id);
-    const auto nation_it = w.nations.find(cc.home_nation);
+    // BL-1402: the owner is a corporation (anchored on its HQ) or, once the fold
+    // has run, a nation (anchored on its capital) - the same opening force.
+    const auto nation_it = w.nations.find(owner_home_nation(w, corp_id));
     if (nation_it == w.nations.end() || nation_it->second.tiles.empty())
         return;
 
     entity_id hq_tile = null_entity;
-    const auto hq_bld_it = w.buildings.find(cc.hq_building);
-    if (hq_bld_it != w.buildings.end())
-        hq_tile = hq_bld_it->second.tile;
+    if (const auto cit = w.corporations.find(corp_id); cit != w.corporations.end())
+    {
+        const auto hq_bld_it = w.buildings.find(cit->second.hq_building);
+        if (hq_bld_it != w.buildings.end())
+            hq_tile = hq_bld_it->second.tile;
+    }
+    else
+        hq_tile = nation_it->second.capital_tile;
 
     // Nearest unoccupied, can_place-valid tile to the HQ (falling back to the
     // nation's first such tile if there is no HQ to anchor on) — narratively
@@ -2491,9 +2497,10 @@ void seed_starting_military(world& w, entity_id corp_id,
 
     const entity_id base_id =
         author_building(w, best_tid, building_type::military_base, occupied_tiles);
-    // The base must appear in the corp's own asset list to be treated as
+    // The base must appear in the owner's own asset list to be treated as
     // owned by the economy/UI.
-    w.corporations[corp_id].assets.push_back(base_id);
+    if (std::vector<entity_id>* owned = assets_of(w, corp_id); owned != nullptr)
+        owned->push_back(base_id);
 
     // One basic unit, seeded on the same tile as the base. Roster index 0 is
     // the cheapest/first roster row — a deterministic starting choice, not a
@@ -2520,10 +2527,10 @@ void seed_starting_military(world& w, entity_id corp_id,
 
 bool corporation_has_opening_force(const world& w, entity_id corp)
 {
-    const auto it = w.corporations.find(corp);
-    if (it == w.corporations.end())
+    const std::vector<entity_id>* owned = assets_of(w, corp); // BL-1402: any owner
+    if (owned == nullptr)
         return false;
-    for (const entity_id bid : it->second.assets)
+    for (const entity_id bid : *owned)
     {
         const auto b = w.buildings.find(bid);
         if (b != w.buildings.end() && b->second.type == building_type::military_base)
@@ -2551,8 +2558,10 @@ void arm_rivals(world& w)
 
 void arm_corporation(world& w, entity_id corp)
 {
+    // BL-1402: a nation (the seat's, after the fold) is armed like a champion.
     const auto it = w.corporations.find(corp);
-    if (it == w.corporations.end() || it->second.is_background
+    const bool nation = it == w.corporations.end() && w.nations.count(corp) != 0;
+    if ((!nation && (it == w.corporations.end() || it->second.is_background))
         || corporation_has_opening_force(w, corp))
         return;
     std::unordered_set<entity_id> occupied;
@@ -2567,6 +2576,27 @@ float seat_clean_slate(world& w, entity_id corp)
     const auto cit = w.corporations.find(corp);
     if (cit == w.corporations.end())
         return 0.0f;
+    // BL-1402: after the fold the seat's sites are its nation's, refunded to its
+    // treasury (a nation's quarterly return is BL-1407's, so no refund booking).
+    const entity_id owner = seat_owner_of(w, corp);
+    if (owner != corp)
+    {
+        std::vector<entity_id> nsites;
+        for (const entity_id bid : *assets_of(w, owner))
+            if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
+                nsites.push_back(bid);
+        std::sort(nsites.begin(), nsites.end());
+        float nrefund = 0.0f;
+        for (const entity_id bid : nsites)
+        {
+            const float paid = std::max(0.0f, w.buildings.at(bid).construction_paid);
+            if (demolish_building(w, owner, bid))
+                nrefund += paid;
+        }
+        if (nrefund > 0.0f)
+            w.nations.at(owner).treasury += nrefund;
+        return nrefund;
+    }
     std::vector<entity_id> sites;
     for (const entity_id bid : cit->second.assets)
         if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
@@ -2622,30 +2652,56 @@ int seat_release_dial_idled(world& w, entity_id corp)
     return released;
 }
 
+/// BL-1402: who a seat's force belongs to - the champion while it still holds
+/// buildings (a world the fold has not run on), its nation once the fold has
+/// passed them on. A non-corporation is its own owner.
+entity_id seat_owner_of(const world& w, entity_id corp)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return corp;
+    // The world's state, never this one corporation's emptiness: an unfolded
+    // specialist may hold nothing yet (cold review).
+    if (world_is_folded(w) && w.nations.count(cit->second.home_nation) != 0)
+        return cit->second.home_nation;
+    return corp;
+}
+
 void move_seat_force(world& w, entity_id previous, entity_id corp)
 {
-    if (previous == corp)
+    // Same corporation: nothing moves, unless the world is folded - then the
+    // nation holds the opening forces its other specialists were armed with
+    // before the fold, and the seat still opens unarmed (cold review).
+    if (previous == corp && !world_is_folded(w))
         return;
-    disarm_corporation(w, corp);
-    if (previous != null_entity)
-        arm_corporation(w, previous);
+    // BL-1154: the seat opens unarmed, whichever seat it is - re-subjected to the
+    // seat's NATION once the fold has run (BL-1402). Compared as OWNERS: two
+    // specialists of one nation are one seat once folded, so the nation is
+    // disarmed and never re-armed for the seat it now is.
+    const entity_id seat_owner = seat_owner_of(w, corp);
+    const entity_id prev_owner = previous != null_entity ? seat_owner_of(w, previous) : null_entity;
+    disarm_corporation(w, seat_owner);
+    if (prev_owner != null_entity && prev_owner != seat_owner)
+        arm_corporation(w, prev_owner);
 }
 
 void disarm_corporation(world& w, entity_id corp)
 {
-    auto it = w.corporations.find(corp);
-    if (it == w.corporations.end())
+    std::vector<entity_id>* owned = assets_of(w, corp); // BL-1402: any owner
+    if (owned == nullptr)
         return;
     // Its units first (ascending id, so the erase order is fixed), then its
-    // military bases with their stockpiles, out of its asset list too.
+    // military bases with their stockpiles, out of its asset list too. A NATION's
+    // garrisons (BL-571: no muster base) are not the opening force and stay.
+    const bool nation = w.corporations.find(corp) == w.corporations.end();
     std::vector<entity_id> units;
     for (const auto& [uid, uc] : w.units)
-        if (uc.owner == corp)
+        if (uc.owner == corp && (!nation || uc.muster_base != null_entity))
             units.push_back(uid);
     std::sort(units.begin(), units.end());
     for (const entity_id uid : units)
         w.units.erase(uid);
-    std::vector<entity_id>& assets = it->second.assets;
+    std::vector<entity_id>& assets = *owned;
     std::vector<entity_id> kept;
     kept.reserve(assets.size());
     for (const entity_id bid : assets)

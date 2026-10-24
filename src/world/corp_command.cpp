@@ -1067,6 +1067,12 @@ void run_firm_exits(world& w, const firm_exit_params& p,
     if (!(p.consecutive_quarters > 0) || !(p.balance_floor < 0.0f)
         || !std::isfinite(p.balance_floor))
         return;
+    // BL-1402: firm exit RETIRED with the corporations (FINANCE.md, Ben
+    // 2026-10-23). On a folded world no corporation holds anything to wind up,
+    // and the empty records are the seat's and the champions' handles (the
+    // major/minor reading) until BL-1407 deletes the type - so nothing is erased.
+    if (world_is_folded(w))
+        return;
 
     // Scan first, wind up after: the wind-up mutates w.corporations, and the
     // trigger must read one consistent snapshot of the field. Sorted ids.
@@ -1700,11 +1706,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             t.from_market = cmd.subject;
             t.to_market   = cmd.counterparty;
             t.points      = cmd.quantity;
-            // TODO(BL-1402 lane T): `trade_is_valid` and `price_trade_leg` still
-            // admit a CORPORATION owner only, so a nation acting as itself is
-            // refused here (rejected_invalid, nothing mutated) until lane T
-            // makes trade.cpp / supply_system.cpp owner-generic. The routing is
-            // in place: nothing in this body needs changing when they do.
+            // BL-1402: `trade_is_valid` and `price_trade_leg` accept any owner, so
+            // a nation acting as itself sets a trade through this same body.
             if (!(t.points <= max_trade_points) || !trade_is_valid(w, reg, t))
                 return corp_command_result::rejected_invalid;
             // NR-1018: reach runs from market centre to market centre — a leg
@@ -1760,10 +1763,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (!std::isfinite(cmd.quantity) || !(cmd.quantity >= 0.0f)
                 || !(cmd.quantity <= max_trade_points))
                 return corp_command_result::rejected_invalid;
-            // TODO(BL-1402 lane T): a nation has no `trade_reserve` field yet
-            // (it would be a new persistent field: components + world_save, lane
-            // T's and the save lane's), so a nation acting as itself is refused
-            // whole here, nothing mutated, until lane T gives the nation one.
+            // BL-1402: a NATION's reserve is refused whole, nothing mutated, until
+            // BL-1407 gives `nation_component::trade_reserve` its save path - a
+            // reserve that vanished on load would silently spend as auto (cold
+            // review). A corporation's is written as before.
             const auto rcit = w.corporations.find(cmd.corp);
             if (rcit == w.corporations.end())
                 return corp_command_result::rejected_invalid;

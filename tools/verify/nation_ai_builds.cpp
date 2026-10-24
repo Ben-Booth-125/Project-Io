@@ -30,9 +30,11 @@
 #include "scripting/lua_state.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/corp_ai.hpp" // corp_verb_label, corp_decision_reason_label (diagnostic)
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/spawn_seat.hpp"
+#include "world/state_industry.hpp" // state_uncommitted_treasury (diagnostic)
 #include "world/survey_system.hpp"
 #include "world/world.hpp"
 
@@ -119,6 +121,8 @@ void run_seed(lua_state& lua, std::uint32_t seed)
 
     std::set<entity_id> player_added;                    // R2
     std::map<entity_id, int> production_added;           // R1, per nation
+    std::vector<extraction_trace_row> trace;             // DIAGNOSTIC (BL-1402)
+    corp_extraction_trace_sink() = &trace;
     for (int live = 1; live <= k_live_ticks; ++live)
     {
         const int day = live * 90;
@@ -158,6 +162,45 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     std::printf("  non-player nations: %d major (%d built, %d production buildings), "
                 "%d minor (%d built, %d production buildings)\n",
                 majors, major_built, major_n, minors, minor_built, minor_n);
+    // DIAGNOSTIC (BL-1402): what each major DECIDED in the ring's window (the last
+    // 256 decisions world-wide), so a seed whose majors place nothing reads as
+    // "decided nothing" or "decided and the build did not land".
+    {
+        std::map<entity_id, std::map<std::string, int>> dec;
+        for (const corp_decision& d : w.ai_decisions.entries)
+            if (w.nations.count(d.corp) && is_major_nation(w, d.corp) && d.tick >= k_app_validation_ticks)
+                ++dec[d.corp][std::string(corp_verb_label(d.command.verb)) + "/"
+                              + corp_decision_reason_label(d.reason)];
+        for (const auto& [nid, m] : dec)
+        {
+            std::printf("  major %llu decided:", static_cast<unsigned long long>(nid));
+            for (const auto& [k, n] : m) std::printf(" %s=%d", k.c_str(), n);
+            std::printf("\n");
+        }
+        if (dec.empty())
+            std::printf("  no major decision in the seated window survives in the ring\n");
+        corp_extraction_trace_sink() = nullptr;
+        std::map<entity_id, std::map<int, int>> by;
+        for (const extraction_trace_row& r : trace)
+            if (w.nations.count(r.corp) && is_major_nation(w, r.corp))
+                ++by[r.corp][static_cast<int>(r.outcome)];
+        for (const auto& [nid, m] : by)
+        {
+            std::printf("  major %llu extraction candidates (placement/net<=0/materials/veto_listed/"
+                        "veto_dead/veto_ratio/emitted/no_chain):", static_cast<unsigned long long>(nid));
+            for (int o = 0; o < static_cast<int>(extraction_trace_outcome::count); ++o)
+                std::printf(" %d", m.count(o) ? m.at(o) : 0);
+            std::printf("\n");
+        }
+        for (const entity_id n : nations)
+            if (n != pn && is_major_nation(w, n))
+                std::printf("  major %llu at the end: treasury %.1f, uncommitted %.1f, floor %.1f, "
+                            "%zu buildings\n", static_cast<unsigned long long>(n),
+                            static_cast<double>(w.nations.at(n).treasury),
+                            static_cast<double>(state_uncommitted_treasury(w, n)),
+                            static_cast<double>(corp_reserve_floor(w, reg, n)),
+                            w.nations.at(n).state_assets.size());
+    }
     check(major_built >= 1, "R1", fmt("at least one major nation placed a production building it owns "
                                       "(%d of %d majors)", major_built, majors));
     check(minor_built >= 1, "R1", fmt("at least one minor nation placed a production building it owns "

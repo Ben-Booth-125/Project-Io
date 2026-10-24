@@ -2902,10 +2902,17 @@ void app::render()
     if (m_ui.construction.pending_tile != null_entity)
     {
         entity_id built = null_entity;
-        const construction_result r = construct_building(
-            m_world, m_registry, m_world.player_entity,
-            m_ui.construction.pending_tile, m_ui.construction.pending_type,
-            m_ui.construction.pending_target, built, m_ui.construction.pending_recipe);
+        // BL-1402: once the world is folded the player builds AS ITS NATION
+        // (construct_nation, paid from the treasury); before, as the seat corp.
+        const entity_id actor = player_actor(m_world);
+        const construction_result r = actor != m_world.player_entity
+            ? construct_nation(m_world, m_registry, actor, m_ui.construction.pending_tile,
+                               m_ui.construction.pending_type, m_ui.construction.pending_target,
+                               m_ui.construction.pending_recipe, built)
+            : construct_building(
+                  m_world, m_registry, m_world.player_entity,
+                  m_ui.construction.pending_tile, m_ui.construction.pending_type,
+                  m_ui.construction.pending_target, built, m_ui.construction.pending_recipe);
         m_play_log.direct(m_world, "build", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_tile, built,
                           static_cast<int>(m_ui.construction.pending_type),
@@ -3006,7 +3013,7 @@ void app::render()
     if (m_ui.construction.pending_road_tile != null_entity)
     {
         const construction_result r = place_road(
-            m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile,
+            m_world, m_registry, player_actor(m_world), m_ui.construction.pending_road_tile, // BL-1402
             m_ui.construction.pending_road_tier, m_ui.construction.pending_road_side);
         m_play_log.direct(m_world, "place_road", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_road_tile, null_entity, -1, -1,
@@ -3125,7 +3132,7 @@ void app::render()
     if (m_ui.construction.pending_demolish != null_entity)
     {
         const entity_id doomed = m_ui.construction.pending_demolish;
-        const bool      razed  = demolish_building(m_world, m_world.player_entity, doomed);
+        const bool      razed  = demolish_building(m_world, player_actor(m_world), doomed); // BL-1402
         m_play_log.direct(m_world, "demolish", razed ? "applied" : "refused", m_sim_loop.day_tick(),
                           null_entity, doomed, -1, -1, 0);
         if (razed)

@@ -54,6 +54,18 @@ bool centre_near_tile(const world& w, const tile_component& tc, int radius)
     return false;
 }
 
+/// BL-1402 (Ben, 2026-10-23; NATIONS.md § What a nation owns): the holdings a
+/// seat is read over. A champion that still holds buildings (a world the fold has
+/// not run on) is read as before; once the fold has passed them to its nation, the
+/// seat IS that nation and is read over the nation's own buildings.
+const std::vector<entity_id>& seat_holdings(const world& w, const corporation_component& cc)
+{
+    if (world_is_folded(w))
+        if (const auto nit = w.nations.find(cc.home_nation); nit != w.nations.end())
+            return nit->second.state_assets;
+    return cc.assets;
+}
+
 } // namespace
 
 double seat_landscape_score(const world& w, const landscape_score& landscape,
@@ -78,7 +90,7 @@ double seat_landscape_score(const world& w, const landscape_score& landscape,
     double sum    = 0.0;
     int    sited  = 0;
     int    scored = 0;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : seat_holdings(w, cit->second))
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -150,15 +162,19 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
         // kept for the seat card. `returns` is oldest-first and rolling-capped,
         // so the window is its tail; a corp that has filed fewer is read over
         // everything it has, the same accommodation the acquisition price makes.
-        c.balance = cc.balance;
-        c.solvent = (cc.balance > 0.0f);
-        const std::size_t filed = cc.returns.size();
+        // BL-1402: after the fold the seat's money is its nation's treasury.
+        const bool folded = world_is_folded(w) && w.nations.count(cc.home_nation) != 0;
+        c.balance = folded ? w.nations.at(cc.home_nation).treasury : cc.balance;
+        c.solvent = (c.balance > 0.0f);
+        // A folded seat's money is its nation's; the corporation's own returns
+        // describe holdings it no longer has, so the card reads none (BL-1402).
+        const std::size_t filed = folded ? 0 : cc.returns.size();
         const std::size_t take  = std::min(filed, k_spawn_trailing_quarters);
         for (std::size_t i = filed - take; i < filed; ++i)
             c.trailing_net += static_cast<float>(cc.returns[i].net - cc.returns[i].refunds); // BL-1206: a refund is not earnings
         c.quarters_read = static_cast<int>(take);
 
-        for (const entity_id bid : cc.assets)
+        for (const entity_id bid : seat_holdings(w, cc))
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())

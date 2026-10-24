@@ -1324,6 +1324,7 @@ entity_id owner_nation_of(const world& w, entity_id building);
 /// The asset list of @p owner — a corporation's `assets` or a nation's
 /// `state_assets` — or null when @p owner is neither.
 const std::vector<entity_id>* assets_of(const world& w, entity_id owner);
+std::vector<entity_id>*       assets_of(world& w, entity_id owner); ///< BL-1402: the writable twin
 
 /// Every economic owner in one ascending-id list: every corporation and every
 /// nation holding state industry, interleaved by id. The visit order of every per-owner
@@ -1352,6 +1353,16 @@ float purse_room_of(const world& w, entity_id owner);
 /// True when @p owner holds @p building (corporation `assets` or nation
 /// `state_assets`). The owner-generic `owns`.
 bool owner_holds(const world& w, entity_id owner, entity_id building);
+
+/// BL-1402: true once the fold to ground has run on @p w - no corporation holds a
+/// building and some nation does. Until BL-1407 deletes the corporation type, the
+/// paths that must treat "the seat" as its nation ask this, never a single
+/// corporation's emptiness (an unfolded specialist may hold nothing yet).
+bool world_is_folded(const world& w);
+
+/// BL-1402: the entity the player ACTS as - its nation once the world is folded
+/// (Ben, 2026-10-23: the player is its nation), else the seat corporation.
+entity_id player_actor(const world& w);
 
 /// A nation's CHAMPION: the player's corporation when it is a specialist of
 /// this nation (the seat is the champion), else the lowest-id specialist

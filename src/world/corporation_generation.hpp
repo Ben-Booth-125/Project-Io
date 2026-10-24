@@ -190,6 +190,9 @@ int remove_specialist_roster(world& w);
 /// with their ids. Accepted (BL-1154 review, 2026-10-02).
 bool corporation_has_opening_force(const world& w, entity_id corp);
 void move_seat_force(world& w, entity_id previous, entity_id corp);
+/// BL-1402: who a seat's force and clean slate act on - @p corp while it still
+/// holds buildings, its home nation once the fold has passed them on.
+entity_id seat_owner_of(const world& w, entity_id corp);
 
 /// BL-1206 — THE SEAT OPENS WITH A CLEAN SLATE OF CONSTRUCTION (Ben, 2026-10-07;
 /// CORPORATION_GENERATION.md § The spawn shortlist, and the seat, step 5). Every

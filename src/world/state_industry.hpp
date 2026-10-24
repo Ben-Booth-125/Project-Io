@@ -270,6 +270,48 @@ state_node_fund_report fund_state_nodes_from_firms(world& w, const recipe_regist
 /// Print the step's one `[node_fund]` log line.
 void print_state_node_fund(const state_node_fund_report& r);
 
+/// BL-1402 -- what the fold to ground did.
+struct fold_report
+{
+    int   corporations       = 0;    ///< corporations walked (ascending id)
+    int   buildings_folded   = 0;    ///< buildings that joined their ground nation's state_assets
+    int   on_unowned         = 0;    ///< buildings on ground no nation owns: demolished (Own ground)
+    int   rehomed            = 0;    ///< nation buildings off their owner's ground, passed to the ground's nation
+    int   firm_folded        = 0;    ///< of buildings_folded, those a corporation held (all of them)
+    int   firm_on_unowned    = 0;    ///< of on_unowned, those a corporation held
+    int   routes_merged      = 0;    ///< duplicate (body pair, nation) routes merged after re-owning
+    float reserve_dropped    = 0.0f; ///< trade reserves not carried (0 on a generated start; see the body)
+    int   units_reowned      = 0;    ///< units passed to their corporation's home nation
+    int   rail_reowned       = 0;    ///< track tiles passed to their ground nation
+    int   trades_reowned     = 0;    ///< standing trades passed to the owner's home nation
+    int   convoys_reowned    = 0;    ///< convoys in flight passed likewise
+    int   routes_reowned     = 0;    ///< trade routes passed likewise
+    int   contracts_cleared  = 0;    ///< procurement quotes and contracts retired (CONTRACTS.md)
+    float balance_moved      = 0.0f; ///< credits moved from balances into home treasuries
+    float debt_forgiven      = 0.0f; ///< negative balances not carried: a nation never runs into debt
+    float balance_stranded   = 0.0f; ///< credits of corporations with no home nation (moved nowhere)
+};
+
+/// BL-1402 THE FOLD TO GROUND (Ben, 2026-10-23; NATIONS.md § What a nation owns,
+/// § Own ground). Every corporation's every building leaves its `assets` and joins
+/// the `state_assets` of the nation whose ground it stands on, walked in (corp
+/// id, asset order) -- the order the funding gate later spends in. A building on
+/// ground no nation owns is demolished (a nation builds only on its own ground).
+/// Each corporation's positive balance moves into its HOME nation's treasury (a
+/// transfer; a negative one is forgiven and reported, since a nation never runs
+/// into debt), its trade reserve with it. Its units, standing trades, convoys in
+/// flight and trade routes pass to its home nation; its track to the track's ground
+/// nation. Its HQ and border are cleared. Procurement quotes and contracts are
+/// cleared (named-supplier procurement is retired). The corporation records stay,
+/// empty -- the seat's handle until BL-1407 deletes the type. Idempotent: a second
+/// fold moves nothing. Deterministic: sorted walks only. Runs at the end of the
+/// campaign finish, after the rail handover and the Logistic Point seeding (both
+/// may stand corporation-owned nodes) and before the opening reserve.
+fold_report fold_to_ground(world& w);
+
+/// Print the step's one `[fold]` log line.
+void print_fold(const fold_report& r);
+
 
 /// BL-1255 -- what the rail handover did at the fold.
 struct rail_handover_report

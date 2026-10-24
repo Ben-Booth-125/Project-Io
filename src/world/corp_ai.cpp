@@ -3467,8 +3467,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const float required_floor =
                 (c.bucket == corp_priority_bucket::nice_to_have) ? nice_to_have_floor : floor_;
             const float spent_now = (c.cmd.as_nation != null_entity) ? state_spent : committed;
+            // BL-1402 fix: the FLOOR is read against money BEFORE this tick's
+            // operating costs, as a corporation's balance is - a nation's
+            // treasury, not its uncommitted part, which has already set those
+            // costs aside, so reading the floor against it counted them twice
+            // and, once the fold gave a nation every building, starved its
+            // builds. The uncommitted part stays the hard cap: a build never
+            // spends what this tick's running needs.
+            const float floor_money = actor.is_nation
+                ? w.nations.at(actor.id).treasury : actor_money(w, actor);
+            const bool over_room = actor.is_nation
+                && actor_money(w, actor) - spent_now - c.spend < 0.0f;
             if (c.spend > 0.0f &&
-                actor_money(w, actor) - spent_now - c.spend <= required_floor)
+                (floor_money - spent_now - c.spend <= required_floor || over_room))
             {
                 forgo(c); // could not afford it — foregone in the strongest sense
 

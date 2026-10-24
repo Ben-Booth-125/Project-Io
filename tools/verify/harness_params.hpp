@@ -124,12 +124,14 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 #include "world/finish_campaign_world.hpp"  // BL-1085: the band, the search params
 #include "world/landscape_search.hpp"
 #include "world/stockpile_budget.hpp"     // BL-1042: the shipped path's charter budget
+#include "world/state_industry.hpp"       // BL-1402: fold_to_ground, fold_report (the probe)
 #include "world/world.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
+#include <tuple>
 #include <vector>
 
 /// BL-1032 — a charter budget handed to the search, for an instrument that
@@ -176,6 +178,25 @@ struct harness_charter_input
     /// route exists) -- the BEFORE reading of the haulage shift on one build.
     /// Held back too whenever the state handover is, which it follows.
     bool skip_rail_handover = false;
+    /// BL-1402: hold back the fold to ground (corporations keep their buildings) --
+    /// for an instrument that reads the world just before it. Held back too whenever
+    /// the rail handover is, which it follows. False is the shipped sequence.
+    bool skip_fold = false;
+    /// BL-1402: when set, the mirror records what the SHIPPED fold saw - the
+    /// corporations' holdings and money just before it, every treasury just
+    /// after it, and its report - so fold_census checks the sequence that ships.
+    struct fold_probe* probe = nullptr;
+};
+
+/// BL-1402 -- what fold_census reads of the shipped fold (see harness_charter_input).
+struct fold_probe
+{
+    bool ran = false;
+    std::vector<entity_id> held_before;                     ///< every building a corporation held, sorted
+    std::vector<std::pair<entity_id, float>> treasury_before; ///< (nation, treasury), ascending nation
+    std::vector<std::tuple<entity_id, entity_id, float>> balances; ///< (corp, home, balance), ascending corp
+    std::vector<std::pair<entity_id, float>> treasury_after;  ///< (nation, treasury) right after the fold
+    fold_report report;
 };
 
 struct shipped_landscape
@@ -320,12 +341,36 @@ inline shipped_landscape apply_shipped_landscape(
     if (!charter.skip_rail_handover && !charter.skip_state_handover)
     {
         out.lp = seed_logistics_sources(w);
+        // BL-1402: finish_campaign_world's fold to ground, verbatim, right after it.
+        if (!charter.skip_fold)
+        {
+            if (fold_probe* fp = charter.probe)
+            {
+                for (const auto& [cid, cc] : w.corporations)
+                    fp->held_before.insert(fp->held_before.end(), cc.assets.begin(), cc.assets.end());
+                std::sort(fp->held_before.begin(), fp->held_before.end());
+                for (const auto& [nid, nc] : w.nations) fp->treasury_before.emplace_back(nid, nc.treasury);
+                std::sort(fp->treasury_before.begin(), fp->treasury_before.end());
+                for (const auto& [cid, cc] : w.corporations) fp->balances.emplace_back(cid, cc.home_nation, cc.balance);
+                std::sort(fp->balances.begin(), fp->balances.end());
+            }
+            const fold_report fr = fold_to_ground(w);
+            print_fold(fr);
+            if (fold_probe* fp = charter.probe)
+            {
+                fp->report = fr;
+                fp->ran = true;
+                for (const auto& [nid, nc] : w.nations) fp->treasury_after.emplace_back(nid, nc.treasury);
+                std::sort(fp->treasury_after.begin(), fp->treasury_after.end());
+            }
+        }
         // BL-1382 economy follow-up: finish_campaign_world's state reserve and
         // the seeding's reading at the gate, verbatim, right after it.
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
-        // BL-1398: the firms on a short nation's ground fund its opening node bill.
-        print_state_node_fund(fund_state_nodes_from_firms(w, reg));
+        // BL-1398's firm top-up retired with the fold (finish_campaign_world).
+        if (charter.skip_fold)
+            print_state_node_fund(fund_state_nodes_from_firms(w, reg));
         lp_seed_read_at_gate(w, reg, out.lp);
         print_lp_seed_report(out.lp);
     }

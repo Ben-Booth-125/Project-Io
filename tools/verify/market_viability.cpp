@@ -60,6 +60,13 @@
 //      firms at the handoff (corporations, seat included). Pooled = sum / sum.
 //      TARGET: pooled >= 70%. (A firm that appears after the handoff is not in
 //      the cohort; the total count at the end is printed beside it.)
+//      BL-1402 (Ben, 2026-10-23: corporations retired): on a FOLDED world there
+//      are no firms to outlive the play, so the cohort is the BUILDINGS standing
+//      at the handoff and G3 reads how many still stand at the last tick - the
+//      same "does the economy at the handoff survive the play" question, asked
+//      of what the nations own (decided on Ben's behalf, NR-1068).
+//   G2 on a folded world adds each nation's state-ledger income (its buildings'
+//      sales) to the corporations' filed income - the field's whole sales.
 //   G4 (reported, no target):
 //      seat    the seated corp's OPERATING net (income - expenditure -
 //              maintenance - wages - levies - upkeep; interest excluded, as
@@ -470,6 +477,13 @@ double field_income(const world& w)
     {
         (void)cid;
         if (!cc.returns.empty()) s += cc.returns.back().income;
+    }
+    // BL-1402: a nation's buildings' sales this tick (the state pass's ledger),
+    // in ascending nation id (std::map) so the double sum is fixed.
+    for (const auto& [nid, led] : w.state_ledger)
+    {
+        (void)nid;
+        s += led.income;
     }
     return s;
 }
@@ -1333,7 +1347,11 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     if (r.seat == null_entity && r.fail.empty()) r.fail = "no corporation seated";
 
     std::set<entity_id> cohort;
-    for (const auto& [cid, cc] : w.corporations) { (void)cc; cohort.insert(cid); }
+    const bool folded_cohort = world_is_folded(w); // BL-1402: buildings, not firms
+    if (folded_cohort)
+        for (const auto& [bid, b] : w.buildings) { (void)b; cohort.insert(bid); }
+    else
+        for (const auto& [cid, cc] : w.corporations) { (void)cc; cohort.insert(cid); }
     r.firms_handoff = static_cast<int>(cohort.size());
     const std::map<entity_id, int> heads0 = centre_heads(w);
     r.centres_handoff = static_cast<int>(heads0.size());
@@ -1517,8 +1535,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         else if (rec.gone) ++r.g5_removed;
     }
     for (const entity_id c : cohort)
-        if (w.corporations.count(c)) ++r.firms_survived;
-    r.firms_end = static_cast<int>(w.corporations.size());
+        if (folded_cohort ? w.buildings.count(c) != 0 : w.corporations.count(c) != 0) ++r.firms_survived;
+    r.firms_end = static_cast<int>(folded_cohort ? w.buildings.size() : w.corporations.size());
     {
         const std::map<entity_id, int> heads1 = centre_heads(w);
         r.centres_end = static_cast<int>(heads1.size());

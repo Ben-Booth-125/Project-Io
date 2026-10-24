@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*45 entries — 28 open, 17 resolved.*
+*47 entries — 30 open, 17 resolved.*
 
 ---
 
@@ -257,6 +257,26 @@ The 2026-10-11 reconciliation folded the poorest major's SPECIALISTS into the ri
 **Why it matters.** (1) decides whether a high tax tier is a strong lever or a free one; (2) decides whether a broke nation can keep importing.
 
 *Files: `src/world/budget_system.cpp`, `src/world/supply_system.cpp`, `src/world/nation_tax.hpp`*
+
+### NR-1068 — BL-1402 (fold to ground): market_viability's G2/G3 re-pointed, and the seat's clean slate now covers its whole nation
+*decision · raised 2026-10-24 · from BL-1402 build + cold review, main session*
+
+(1) G2 (field income) summed each corporation's filed income; after the fold every corporation earns nothing and G2 read 0.0. It now adds each nation's state-ledger income (its buildings' sales) - the same 'whole field's sales' quantity. (2) G3 (firms alive at the last tick / at the handoff) has no subject on a folded world. Re-pointed to BUILDINGS alive at the last tick / at the handoff, target unchanged at 70% - the closest question ('does the handoff economy survive the play'); the alternative of nations alive is vacuous (a nation only dies by conquest). (3) Firm exit is inert on a folded world: it would erase the empty champion records the major/minor reading still keys on until BL-1407. (4) BL-1206's seat clean slate (the seat's unfinished settle builds cancelled and refunded) now cancels the seat NATION's unfinished builds, its own AI's settle sites included - the ruling re-subjected to 'the seat is the nation'. (5) A nation's trade reserve is not carried by the fold and a nation cannot set one until BL-1407 saves the field (generation leaves every reserve at 0).
+
+**Why it matters.** (1)-(2) change what two merge gates measure; (4) decides how much construction the player's nation opens without.
+
+*Files: `tools/verify/market_viability.cpp`, `src/world/corporation_generation.cpp`, `src/world/corp_command.cpp`*
+
+### NR-1069 — After the fold, nations' treasuries fall during play, and on seed 46 the majors stop building
+*question · raised 2026-10-24 · from BL-1402 gate, main session*
+
+On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. market_viability FULL on the folded world still passes every gate: G1 92.9, G1t50 85.4 (target 85), G1b 4.6, G2 95.3, G3 100.0 (buildings alive, NR-1068). BL-1403 (tax from wages, no levy) is not applied yet; its wage tax returns 10% of wages at tier III, which slows the fall.
+
+**Why it matters.** A nation that pays every wage and input from one treasury, and whose treasury drains, idles its buildings one by one under the never-debt rule - the folded economy's long-run health is the question BL-1409 measures.
+
+> **Recommendation:** Let BL-1409 measure the 400-tick treasury trajectory across the 16 seeds before any change.
+
+*Files: `tools/verify/nation_ai_builds.cpp`, `tools/verify/nation_floor_probe.cpp`*
 
 ---
 

@@ -400,6 +400,13 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // stands enough logistics hubs that every producing building is reached and
     // every pool meets its need. After the rail handover (stations are sources).
     out.lp = seed_logistics_sources(w);
+    // BL-1402 -- THE FOLD TO GROUND (Ben, 2026-10-23; NATIONS.md § What a nation owns):
+    // every corporation's buildings pass to the nation whose ground they stand on,
+    // balances to home treasuries, units, track, trades and convoys with them. After
+    // the rail handover and the Logistic Point seeding (both may stand a firm's node)
+    // and before the opening reserve, so the bill and the settle read a world in which
+    // every building is a nation's.
+    print_fold(fold_to_ground(w));
     // BL-1382 economy follow-up (NATION_GENERATION.md § Pass 7, Ben 2026-10-19:
     // no major leaves generation on a zero treasury) -- THE FOUNDINGS KEEP THE
     // SETTLE AND A YEAR OF THE STATE BILL, counted from the opening (BL-1386:
@@ -409,10 +416,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // printed coverage is what the first tick runs.
     out.reserve = reserve_state_first_tick(w, reg, out.state);
     print_state_reserve(out.reserve);
-    // BL-1398 (NATION_GENERATION.md § Pass 7, Ben 2026-10-22: no capital starts dark):
-    // a nation still short of its opening node bill is funded by the firms on its
-    // ground - a transfer, capped by what they hold - before the reading at the gate.
-    print_state_node_fund(fund_state_nodes_from_firms(w, reg));
+    // BL-1398's firm top-up (fund_state_nodes_from_firms) RETIRED with BL-1402: the
+    // fold above moved every firm's balance into its home treasury, so the opening node
+    // bill is paid from the nation's whole treasury and "no capital starts dark" stands
+    // (LOGISTICS.md, Ben 2026-10-23).
     lp_seed_read_at_gate(w, reg, out.lp);
     print_lp_seed_report(out.lp);
     // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS
