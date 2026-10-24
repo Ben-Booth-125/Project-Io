@@ -44,12 +44,17 @@ void check(bool ok, const char* label)
     if (!ok) ++g_failures;
 }
 
-/// Sorted non-player corp ids — the set corp_ai indexes its cadence over.
+/// Sorted non-player actor ids (corps, and since BL-1401 every nation but the
+/// player's) — the set corp_ai indexes its cadence over.
 std::vector<entity_id> rival_ids(const world& w)
 {
     std::vector<entity_id> ids;
     for (const auto& [id, cc] : w.corporations)
         if (!cc.is_player && id != w.player_entity) ids.push_back(id);
+    // BL-1401: every nation but the player's is an actor on the same cadence.
+    const entity_id pn = player_nation(w);
+    for (const auto& [id, nc] : w.nations)
+        if (id != pn) ids.push_back(id);
     std::sort(ids.begin(), ids.end());
     return ids;
 }
@@ -84,7 +89,7 @@ int main()
     const int k = std::max(1, p.cadence_k);
 
     const std::vector<entity_id> rivals = rival_ids(w);
-    std::printf("  %zu rival corps, cadence_k = %d\n", rivals.size(), k);
+    std::printf("  %zu rival actors (corps and non-player nations), cadence_k = %d\n", rivals.size(), k);
     check(rivals.size() >= static_cast<std::size_t>(k),
           "C0 the generated world has at least cadence_k rivals, so every slot is occupied");
 
@@ -112,6 +117,8 @@ int main()
               "C2 every rival is evaluated at least once within cadence_k ticks on the APP's schedule");
         check(!seen.count(w.player_entity),
               "C2b the player corp is never evaluated on a played schedule");
+        check(player_nation(w) == null_entity || !seen.count(player_nation(w)),
+              "C2c the player's nation is never evaluated on a played schedule (BL-1401)");
     }
 
     // C3 — the record is per tick and exactly the due set: each tick evaluates

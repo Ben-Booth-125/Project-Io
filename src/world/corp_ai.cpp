@@ -16,7 +16,7 @@
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
-#include "state_industry.hpp"  // BL-1296: state_runs (state dials stay strategic)
+#include "state_industry.hpp"  // state_uncommitted_treasury (BL-1401: a nation actor's money)
 #include "trade.hpp"           // BL-1267: rank_trade_routes, corp_trade_markets (the shared route estimate)
 #include "unit_roster.hpp"
 #include "world.hpp"
@@ -496,11 +496,12 @@ float corp_personality_jitter(entity_id corp, uint64_t personality_seed)
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
                          entity_id corp, const corp_ai_params& p)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1401: the actor may be a nation (its state_assets are its buildings).
+    const std::vector<entity_id>* assets = assets_of(w, corp);
+    if (assets == nullptr)
         return p.floor_constant;
     float wage_bill = 0.0f;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : *assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -656,11 +657,12 @@ standing_index corp_standing_index(const world& w, const recipe_registry& reg,
 float corp_should_have_buffer(const world& w, const recipe_registry& reg,
                               const economy_report& report, entity_id corp)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1401: the actor may be a nation (its state_assets are its buildings).
+    const std::vector<entity_id>* assets = assets_of(w, corp);
+    if (assets == nullptr)
         return 0.0f;
     float buffer = 0.0f;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : *assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -827,13 +829,121 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
 }
 
 namespace {
-std::vector<entity_id> sorted_corp_ids(const world& w)
+// ---------------------------------------------------------------------------
+// BL-1401 — the actor the scorer runs (AI_OPPONENT.md § 11, "Every AI nation
+// builds its own economy", Ben 2026-10-23; NATIONS.md § What a nation owns)
+// ---------------------------------------------------------------------------
+// The scorer's actor is EITHER a corporation or a nation, read through one view
+// so no scorer read names the kind it is reading. Every corporation still acts
+// (they are folded away by BL-1402); every nation acts beside them, majors and
+// minors alike, through the as_nation verbs (cmd.corp == cmd.as_nation == the
+// nation), paid from its uncommitted treasury and building only on its own
+// ground. The player's nation is the player's: skipped exactly as the player's
+// corp is, and lifted by the same spectate override.
+struct ai_actor
+{
+    entity_id id          = null_entity;
+    bool      is_nation   = false;
+    /// The nation whose ground it builds on and whose tree it reads: a corp's
+    /// home nation, or the nation itself.
+    entity_id home_nation = null_entity;
+    /// Its buildings: a corporation's `assets`, a nation's `state_assets`.
+    const std::vector<entity_id>* assets = nullptr;
+    /// Its specialist premise: a corporation's focus, or the nation's
+    /// economic_focus read onto the same three values (the enums mirror).
+    industrial_focus focus = industrial_focus::extraction;
+    /// The human seat: the player's corp, or the player's nation.
+    bool      is_player   = false;
+    /// A corporation's HQ (the muster-base anchor); null for a nation.
+    entity_id hq_building = null_entity;
+};
+
+/// BL-1401: the scorer's per-actor books, keyed by owner — the trade purse and
+/// reserve the trade candidates read. A corporation's come from its record; a
+/// nation holds none yet (trade.cpp makes points for corporations only), so its
+/// books read zero and it proposes no trade. NOT SERIALISED and not persistent:
+/// rebuilt from the world on every read, so there is nothing to save.
+struct ai_books
+{
+    float trade_points  = 0.0f;
+    float trade_reserve = 0.0f;
+};
+
+industrial_focus focus_of_nation(economic_focus f)
+{
+    switch (f)
+    {
+        case economic_focus::extraction: return industrial_focus::extraction;
+        case economic_focus::processing: return industrial_focus::processing;
+        case economic_focus::trade:      return industrial_focus::trade;
+    }
+    return industrial_focus::extraction;
+}
+
+/// The view of @p id as an actor, or false when it is neither a corporation nor
+/// a nation. Pointers into the world's maps: valid for the evaluation (nothing
+/// in the scorer adds or removes a corporation or a nation).
+bool make_actor(const world& w, entity_id id, ai_actor& out)
+{
+    out = ai_actor{};
+    out.id = id;
+    if (const auto cit = w.corporations.find(id); cit != w.corporations.end())
+    {
+        const corporation_component& cc = cit->second;
+        out.home_nation = cc.home_nation;
+        out.assets      = &cc.assets;
+        out.focus       = cc.focus;
+        out.is_player   = cc.is_player || id == w.player_entity;
+        out.hq_building = cc.hq_building;
+        return true;
+    }
+    if (const auto nit = w.nations.find(id); nit != w.nations.end())
+    {
+        out.is_nation   = true;
+        out.home_nation = id;
+        out.assets      = &nit->second.state_assets;
+        out.focus       = focus_of_nation(nit->second.focus);
+        out.is_player   = id == player_nation(w);
+        return true;
+    }
+    return false;
+}
+
+/// What the actor may spend now: a corporation's balance, a nation's
+/// uncommitted treasury (state_industry.hpp).
+float actor_money(const world& w, const ai_actor& a)
+{
+    if (a.is_nation)
+        return state_uncommitted_treasury(w, a.id);
+    const auto cit = w.corporations.find(a.id);
+    return cit != w.corporations.end() ? cit->second.balance : 0.0f;
+}
+
+ai_books actor_books(const world& w, const ai_actor& a)
+{
+    ai_books b;
+    if (const auto cit = w.corporations.find(a.id); cit != w.corporations.end())
+    {
+        b.trade_points  = cit->second.trade_points;
+        b.trade_reserve = cit->second.trade_reserve;
+    }
+    return b;
+}
+
+/// The actor set, ascending id: every corporation and every nation. Sorted, so
+/// the visit order and the cadence index are functions of the ids alone. The
+/// player's corp and nation are IN the set (they are skipped by the guard, not
+/// by the set), so a spectated run changes who acts, never when the rest do.
+std::vector<entity_id> sorted_actor_ids(const world& w)
 {
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size());
+    ids.reserve(w.corporations.size() + w.nations.size());
     for (const auto& kv : w.corporations)
         ids.push_back(kv.first);
+    for (const auto& kv : w.nations)
+        ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
     return ids;
 }
 
@@ -847,7 +957,18 @@ struct extraction_site
     entity_id     tile;
     float         suitability;
     resource_type target;
+    /// BL-1401: the nation whose ground the tile is — the only actor that may
+    /// build there (NATIONS.md § Own ground). Never null in a ranked list.
+    entity_id     nation = null_entity;
 };
+
+/// BL-1401: the ranked sites, per nation (ascending id). Each nation's list is
+/// the BL-711 per-resource top-K over ITS OWN tiles only, so the shared cut is
+/// never spent on ground the actor's door refuses (BL-1399's own-ground rule):
+/// a global top-K put every actor's few candidates on whichever nation held the
+/// world's richest deposits, and every other actor's builds were refused at the
+/// seam. Ground no nation holds offers nothing to anyone.
+using ranked_site_map = std::map<entity_id, std::vector<extraction_site>>;
 
 /// The O(tiles) half of the build-candidate scan, hoisted out of the per-corp
 /// loop (BL-253): `run_corp_strategic_step` used to walk every tile for every
@@ -936,9 +1057,9 @@ std::array<float, resource_count> input_demand_weights(const world& w,
 /// list's authoring order - registering a new extractable appends, it does not
 /// reshuffle. Within a bucket the comparator is the one the global sort used,
 /// tile-id tie-break included.
-std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_registry& reg,
-                                                   int top_k_per_resource,
-                                                   const std::array<float, resource_count>& demand_weight)
+ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg,
+                                      int top_k_per_resource,
+                                      const std::array<float, resource_count>& demand_weight)
 {
     std::vector<extraction_site> sites;
     sites.reserve(w.tiles.size() / 2); // most land tiles carry some deposit
@@ -948,6 +1069,7 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_
         entity_id tile;
         float     unmet;        ///< Uncovered water bid at the tile's own market (see below).
         float     habitability; ///< Secondary key: where people can live.
+        entity_id nation;       ///< BL-1401: whose ground (the per-nation K).
     };
     std::vector<well_candidate> wells;
     // Tiles already holding a water extraction site. A Well's stack cap is 1
@@ -1015,6 +1137,11 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_
     {
         if (placement_rules::is_water_tile(tc.substrate))
             continue;
+        // BL-1401 (own ground): a tile no nation holds is no actor's to build on.
+        const auto tn = w.tile_to_nation.find(tid);
+        if (tn == w.tile_to_nation.end() || tn->second == null_entity)
+            continue;
+        const entity_id tile_nation = tn->second;
         if (tc.body != memo_body)
         {
             const auto bit = w.bodies.find(tc.body);
@@ -1050,7 +1177,7 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_
             const float       rich = tc.resource_deposit[ri];
             if (rich <= 0.0f)
                 continue;
-            sites.push_back({tid, rich * affinity * demand_weight[ri], rt});
+            sites.push_back({tid, rich * affinity * demand_weight[ri], rt, tile_nation});
         }
 
         // BL-1198 (water where people live): a Well is a candidate on any land
@@ -1065,7 +1192,7 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_
             && water_site_tiles.count(tid) == 0
             && placement_rules::is_fresh_water_adjacent(w, tid))
             if (const float uncovered = uncovered_water(tid); uncovered > 0.0f)
-                wells.push_back({tid, uncovered, tc.habitability});
+                wells.push_back({tid, uncovered, tc.habitability, tile_nation});
     }
     // PARTIAL SORT within each bucket, not a full one (the 2026-08-12 reason,
     // unchanged): only the first K survive, and `std::partial_sort` orders
@@ -1082,22 +1209,27 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_
     // One pass to bucket, then K out of each. Bucketing by the target's own
     // index rather than by a search per resource keeps this O(sites), which
     // matters: the ancient band offers ~36,700 (tile, resource) pairs and this
-    // runs once per tick.
-    std::array<std::vector<extraction_site>, resource_count> by_target;
+    // runs once per tick. BL-1401: the buckets are per (nation, resource), so
+    // every nation keeps K of each resource on its own ground.
+    std::map<entity_id, std::array<std::vector<extraction_site>, resource_count>> by_target;
     for (const extraction_site& s : sites)
-        by_target[static_cast<std::size_t>(s.target)].push_back(s);
+        by_target[s.nation][static_cast<std::size_t>(s.target)].push_back(s);
 
-    std::vector<extraction_site> out;
-    for (std::size_t r = 0; r < resource_count; ++r)
+    ranked_site_map out;
+    for (auto& [nation, buckets] : by_target) // ascending nation id
     {
-        std::vector<extraction_site>& bucket = by_target[r];
-        const std::size_t keep = std::min(bucket.size(), k);
-        if (keep == 0)
-            continue;
-        std::partial_sort(bucket.begin(), bucket.begin() + static_cast<std::ptrdiff_t>(keep),
-                          bucket.end(), cmp);
-        out.insert(out.end(), bucket.begin(),
-                   bucket.begin() + static_cast<std::ptrdiff_t>(keep));
+        std::vector<extraction_site>& list = out[nation];
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            std::vector<extraction_site>& bucket = buckets[r];
+            const std::size_t keep = std::min(bucket.size(), k);
+            if (keep == 0)
+                continue;
+            std::partial_sort(bucket.begin(), bucket.begin() + static_cast<std::ptrdiff_t>(keep),
+                              bucket.end(), cmp);
+            list.insert(list.end(), bucket.begin(),
+                        bucket.begin() + static_cast<std::ptrdiff_t>(keep));
+        }
     }
     // BL-1198: the Well bucket, K of its own, appended last so every deposit
     // bucket keeps the order it had. Ranked by the UNCOVERED water bid at the
@@ -1116,16 +1248,18 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_
             return a.tile < b.tile;
         });
         const province_ceiling_scope ceiling_memo(w);
-        std::size_t kept = 0;
+        // BL-1401: K Wells per nation, each nation's from its own ground.
+        std::map<entity_id, std::size_t> kept;
         for (const well_candidate& c : wells)
         {
-            if (kept >= k)
-                break;
+            std::size_t& n = kept[c.nation];
+            if (n >= k)
+                continue;
             if (!placement_rules::can_place_in_world(w, c.tile, building_type::extraction_site,
                                                      resource_type::water))
                 continue;
-            out.push_back({c.tile, c.unmet, resource_type::water});
-            ++kept;
+            out[c.nation].push_back({c.tile, c.unmet, resource_type::water, c.nation});
+            ++n;
         }
     }
     return out;
@@ -1150,15 +1284,17 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const cor
     // `world::player_entity` survives only as a camera/ledger anchor.
     // Not a corporation at all: an existence check, not an ownership one, so
     // it binds in both modes.
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1401: a NATION is an actor too (every nation but the player's), on the
+    // same cadence over the same sorted actor set.
+    ai_actor actor;
+    if (!make_actor(w, corp, actor))
         return false;
     // The prohibition itself — same shape as the guard in
     // run_corp_strategic_step below, so the two read as one rule.
-    if (!p.spectating && (cit->second.is_player || corp == w.player_entity))
+    if (!p.spectating && actor.is_player)
         return false;
 
-    const std::vector<entity_id> corp_ids = sorted_corp_ids(w);
+    const std::vector<entity_id> corp_ids = sorted_actor_ids(w);
     const auto it = std::lower_bound(corp_ids.begin(), corp_ids.end(), corp);
     if (it == corp_ids.end() || *it != corp)
         return false;
@@ -1171,9 +1307,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                              economy_report& report, int tick,
                              const corp_ai_params& p)
 {
-    // Sorted corp ids: the deterministic visit order AND the stable per-corp
-    // index the cadence stagger keys on.
-    const std::vector<entity_id> corp_ids = sorted_corp_ids(w);
+    // Sorted actor ids: the deterministic visit order AND the stable per-actor
+    // index the cadence stagger keys on. BL-1401: every corporation and every
+    // nation (sorted_actor_ids), so the stagger moved with the actor set.
+    const std::vector<entity_id> corp_ids = sorted_actor_ids(w);
 
     const int k = std::max(1, p.cadence_k);
 
@@ -1185,8 +1322,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // standing in the world), so they are computed once per tick alongside the
     // site ranking they feed, not once per due corp — the same BL-253 hoist.
     const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
-    const std::vector<extraction_site> ranked_sites =
+    // BL-1401: ranked per nation, so each actor reads the list of its own ground.
+    const ranked_site_map ranked_by_nation =
         rank_extraction_sites(w, reg, p.top_k_sites_per_resource, demand_weight);
+    static const std::vector<extraction_site> no_sites;
 
     // BL-1187 (build only what runs): the reach context every processor
     // decision below asks "is this input obtainable here?" of — build, recipe
@@ -1218,8 +1357,25 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
-        const entity_id              corp = corp_ids[index];
-        const corporation_component& cc   = w.corporations.at(corp);
+        const entity_id corp = corp_ids[index];
+        // BL-1401 (AI_OPPONENT.md § 11, Ben 2026-10-23): the actor is a
+        // corporation or a nation, and every read below goes through the view.
+        ai_actor actor;
+        if (!make_actor(w, corp, actor))
+            continue;
+        // The nation a nation's every command is issued for (cmd.corp ==
+        // cmd.as_nation == the nation, BL-1399's door); null for a corporation.
+        const entity_id act_nation = actor.is_nation ? corp : null_entity;
+        // Own ground (NATIONS.md § Own ground): the ranked sites of the actor's
+        // own nation only, never a list another nation's ground fills.
+        const auto rs_it = ranked_by_nation.find(actor.home_nation);
+        const std::vector<extraction_site>& ranked_sites =
+            rs_it != ranked_by_nation.end() ? rs_it->second : no_sites;
+        const auto on_own_ground = [&](entity_id tile) {
+            const auto tn = w.tile_to_nation.find(tile);
+            return actor.home_nation != null_entity && tn != w.tile_to_nation.end()
+                && tn->second == actor.home_nation;
+        };
 
         // NEVER act on the player corp — no strategic command, no cooldown
         // bookkeeping, nothing (io-standing-rules.md). This is the guard that
@@ -1234,7 +1390,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // demand out of the economy. The prohibition still holds in full for a
         // PLAYED session: `spectating` defaults false and no gameplay path
         // sets it (app.cpp passes the session's own spectator flag).
-        if (!p.spectating && (cc.is_player || corp == w.player_entity))
+        // BL-1401: the player's NATION is the player's exactly as its corp is —
+        // never built for in a seated session (NATIONS.md § What a nation owns,
+        // "the player's economy grows only by the player's builds").
+        if (!p.spectating && actor.is_player)
             continue;
 
         // Staggered cadence (Victoria-3 tick-task idea): due this tick?
@@ -1256,7 +1415,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // always allowed, never a chain ("not admitted: any chain for the player's nation").
         lp_reach_memo lp_memo;
         const entity_id lp_player_nation = player_nation(w);
-        const bool lp_may_source = corp != w.player_entity && !cc.is_player
+        const bool lp_may_source = !actor.is_player
             && (lp_player_nation == null_entity || champion_of(w, lp_player_nation) != corp);
         // The hubs a rival build on @p tile needs, or unreachable. A hub tile must pass
         // the build verb's OWN door (construct_for: logistics reach from COMPLETED
@@ -1332,32 +1491,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             input_reach_invalidate(*reach_ctx);
         standing_ctx.reset(); // BL-1183: likewise the standing construction draw
 
-        // BL-1296 (AI_OPPONENT.md § 11, the 2026-10-11 grant): the nation whose
-        // STATE industry this evaluation also dials — this corp's home nation,
-        // when this corp is its champion and it holds any. Null otherwise. The
-        // player's corp never reaches here in a played session, so the player's
-        // nation's state industry is never scored.
-        entity_id state_nation = null_entity;
-        if (cc.home_nation != null_entity && champion_of(w, cc.home_nation) == corp)
-            if (const auto sn = w.nations.find(cc.home_nation);
-                sn != w.nations.end() && !sn->second.state_assets.empty())
-                state_nation = cc.home_nation;
-
-        // This corp is evaluating: tick down its buildings' dial cooldowns
-        // (and its nation's state buildings', which it dials too).
-        for (const entity_id bid : cc.assets)
+        // BL-1401: the champion's state-industry branch (BL-1296) RETIRED. A
+        // champion no longer dials its nation's buildings: the nation is its own
+        // actor in this same walk, and dials them itself.
+        //
+        // This actor is evaluating: tick down its buildings' dial cooldowns.
+        for (const entity_id bid : *actor.assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit != w.buildings.end() && bit->second.ai_cooldown > 0)
                 --bit->second.ai_cooldown;
         }
-        if (state_nation != null_entity)
-            for (const entity_id bid : w.nations.at(state_nation).state_assets)
-            {
-                const auto bit = w.buildings.find(bid);
-                if (bit != w.buildings.end() && bit->second.ai_cooldown > 0)
-                    --bit->second.ai_cooldown;
-            }
 
         const float jitter  = corp_personality_jitter(corp, p.personality_seed);
         const float floor_  = corp_reserve_floor(w, reg, corp, p);
@@ -1403,7 +1547,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         };
         std::vector<held_mine>                              held_mines;
         std::map<std::pair<entity_id, std::size_t>, float> refused_draw;
-        const bool chain_start_eligible = !(cc.is_player || corp == w.player_entity);
+        const bool chain_start_eligible = !actor.is_player;
 
         // ---- Build candidates: surveyed, deposit-bearing tiles, top-M ------
         // Site ranking is precomputed once per tick above (BL-253); only the
@@ -1591,7 +1735,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.needs_source  = src.hubs > 0;
                     c.chain_hubs    = src.hubs;
                     const float all = capex + src.capex;
-                    c.score  = (net / all) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                    c.score  = (net / all) * focus_weight(actor.focus, corp_verb::build) * jitter * glut;
                     c.spend  = all;
                 }
                 c.reason = corp_decision_reason::best_build;
@@ -1636,15 +1780,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // the same single walk that finds the tiles.
             std::vector<entity_id> own_tiles;
             std::vector<entity_id> tiles_with_processor;
-            own_tiles.reserve(cc.assets.size());
-            for (const entity_id bid : cc.assets)
+            own_tiles.reserve(actor.assets->size());
+            for (const entity_id bid : *actor.assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit == w.buildings.end())
                     continue;
-                own_tiles.push_back(bit->second.tile);
                 if (bit->second.type == building_type::processing_facility)
                     tiles_with_processor.push_back(bit->second.tile);
+                // BL-1401 (own ground): a building that stands abroad (a
+                // corporation's, from generation) offers no site — the door
+                // refuses any build off the actor's own nation's tiles.
+                if (on_own_ground(bit->second.tile))
+                    own_tiles.push_back(bit->second.tile);
             }
             // Sorted + deduped so the candidate order is a function of the world,
             // not of insertion history — the same determinism contract
@@ -1922,7 +2070,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.needs_source  = src.hubs > 0;
                         c.chain_hubs    = src.hubs;
                         const float all = capex + src.capex;
-                        c.score  = (net / all) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                        c.score  = (net / all) * focus_weight(actor.focus, corp_verb::build) * jitter * glut;
                         c.spend  = all;
                     }
                     c.reason = corp_decision_reason::best_build;
@@ -2162,14 +2310,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         }
 
         // ---- Dial candidates: per owned, operating, off-cooldown building --
-        // BL-1296 (AI_OPPONENT.md § 11, the 2026-10-11 grant): the same
-        // per-building decisions are taken over the corp's own buildings
-        // and, for a rival major's CHAMPION, over its nation's state
-        // buildings — the same estimators, the same verbs, issued with
-        // `as_nation` so the seam pays them from the treasury. In a played
-        // session the player's nation is never reached: its champion is the
-        // player's corp, which the guard at the top of this loop skips (only
-        // spectate — no human seat — lifts that guard, for both books alike).
+        // The same per-building decisions over the actor's own buildings. A
+        // NATION's are issued with `as_nation` so the seam pays them from the
+        // treasury (BL-1296's door). BL-1401: a nation dials its own buildings
+        // as its own actor — the champion no longer dials them for it — and the
+        // player's nation is never reached in a played session (the guard at
+        // the top of this loop; only spectate lifts it).
         const auto emit_dials = [&](const std::vector<entity_id>& dial_assets,
                                     entity_id dial_nation) {
         for (const entity_id bid : dial_assets)
@@ -2356,7 +2502,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // settle, a spectate session), the economy tick's stepped solver is
             // the only writer of the player's workforce, and the seam refuses
             // set_workforce for it.
-            if (corp != w.player_entity &&
+            if (!actor.is_player &&
                 (b.type == building_type::extraction_site ||
                  b.type == building_type::processing_facility))
             {
@@ -2467,11 +2613,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // one, above.
                     if (rc.group != cur_rc->group)
                         continue;
-                    // BL-1296: a state building stays state industry — the seam
-                    // refuses a retool onto a recipe the state does not run.
-                    if (dial_nation != null_entity
-                        && !state_runs(reg, building_type::processing_facility, rid))
-                        continue;
+                    // BL-1401: no strategic-sector limit on a nation's retool —
+                    // BL-1399 retired it at the seam (Ben, 2026-10-23), so the
+                    // scorer no longer predicts a refusal that cannot happen.
                     if (rid == b.recipe)
                         continue; // the incumbent is best_m's starting point
                     if (!recipe_runs_at_tile(w, rc, b.tile))
@@ -2515,11 +2659,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
         };
-        emit_dials(cc.assets, null_entity);
-        if (state_nation != null_entity)
-            emit_dials(w.nations.at(state_nation).state_assets, state_nation);
+        emit_dials(*actor.assets, act_nation);
 
         // ---- Survey candidates: paid discovery, bodies sorted ---------------
+        // BL-1401: a corporation's verb. The nation's door carries no survey
+        // (corp_command.cpp apply_state_command), and the grant admits no verb
+        // that exists only because the actor is now a nation.
+        if (!actor.is_nation)
         {
             std::vector<entity_id> body_ids;
             for (const auto& [id, b] : w.bodies)
@@ -2534,7 +2680,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     continue;
                 const float area  = static_cast<float>(b.grid_width * b.grid_height);
                 const float score = (area / cost) * 0.05f *
-                                    focus_weight(cc.focus, corp_verb::survey) * jitter;
+                                    focus_weight(actor.focus, corp_verb::survey) * jitter;
                 if (score <= 0.0f)
                     continue;
                 candidate c;
@@ -2557,7 +2703,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // deliberately simple candidate — no market/glut forecasting, since
         // the base produces nothing and has no market footprint — that fires
         // only while the corp holds no completed base of its own, so it never
-        // competes with real economic builds once satisfied.
+        // competes with real economic builds once satisfied. BL-1401: a
+        // corporation's only — a nation raises force by the muster
+        // (MILITARY.md), and its door carries no hire.
+        if (!actor.is_nation)
         {
             // Gate on ANY base — complete or still under construction — not
             // just a completed one. The first cut of this check required
@@ -2566,7 +2715,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // corp's one in-flight base never counted as "having" one; caught
             // by this same golden collapsing to hundreds of builds/seed.
             bool has_or_building_base = false;
-            for (const entity_id bid : cc.assets)
+            for (const entity_id bid : *actor.assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit != w.buildings.end() && bit->second.type == building_type::military_base
@@ -2579,11 +2728,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (!has_or_building_base)
             {
                 entity_id hq_tile = null_entity;
-                const auto hqb = w.buildings.find(cc.hq_building);
+                const auto hqb = w.buildings.find(actor.hq_building);
                 if (hqb != w.buildings.end())
                     hq_tile = hqb->second.tile;
 
-                const auto nation_it = w.nations.find(cc.home_nation);
+                const auto nation_it = w.nations.find(actor.home_nation);
                 entity_id  best_tile = null_entity;
                 long long  best_dist2 = std::numeric_limits<long long>::max();
                 if (nation_it != w.nations.end())
@@ -2709,11 +2858,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // carry the Marketplace's own upkeep is no site: a Marketplace makes no
         // points on a tick its upkeep goes unmet.
         // One at a time: none while another of its trade buildings is still
-        // under construction. Never the player's corp.
-        if (!(cc.is_player || corp == w.player_entity))
+        // under construction. Never the player's corp. BL-1401: a corporation's
+        // only for now — trade.cpp makes trade points for corporations alone, so
+        // a nation's Marketplace would carry no trade of its own (owed with the
+        // nation's trade books).
+        if (!actor.is_player && !actor.is_nation)
         {
             bool building_one = false;
-            for (const entity_id bid : cc.assets)
+            for (const entity_id bid : *actor.assets)
             {
                 const auto bit = w.buildings.find(bid);
                 if (bit != w.buildings.end() && is_trade_building(bit->second.type)
@@ -2723,7 +2875,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     break;
                 }
             }
-            const auto nation_it = w.nations.find(cc.home_nation);
+            const auto nation_it = w.nations.find(actor.home_nation);
             if (!building_one && nation_it != w.nations.end())
             {
                 const std::vector<entity_id> trading = corp_trade_markets(w, corp);
@@ -2850,7 +3002,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.cmd.verb = corp_verb::build;
                     c.cmd.tile = best_tile;
                     c.cmd.type = building_type::planetary_marketplace;
-                    c.score  = (best_net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter;
+                    c.score  = (best_net / capex) * focus_weight(actor.focus, corp_verb::build) * jitter;
                     c.spend  = capex;
                     c.reason = corp_decision_reason::best_build;
                     c.bucket = bucket_for_reason(c.reason);
@@ -2873,6 +3025,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // Widening the AI-agency exception list to include hiring is a
         // deliberate call (2026-08-08, recorded in io-standing-rules.md) —
         // rival corps raise units through the exact seam the player uses.
+        // BL-1401: a corporation's only (the nation's door carries no hire).
+        if (!actor.is_nation)
         {
             // BL-325 S2: hire moves onto the base. A corp with no COMPLETED
             // military_base of its own has no muster tile at all — it must
@@ -2881,7 +3035,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // type, no special-casing needed here beyond finding it).
             const entity_id muster_tile = [&]() -> entity_id
             {
-                for (const entity_id bid : cc.assets)
+                for (const entity_id bid : *actor.assets)
                 {
                     const auto bit = w.buildings.find(bid);
                     if (bit != w.buildings.end() && bit->second.type == building_type::military_base
@@ -2957,8 +3111,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // "nothing for the player's corp", and widening it to the spectated
         // seat is a call this code does not make). Reads and the logistics
         // caches only — no world write inside the BL-1205 stretch.
+        // BL-1401: read off the actor's books; a nation's are empty (see ai_books).
+        const ai_books books = actor_books(w, actor);
         const bool trade_eligible =
-            !(cc.is_player || corp == w.player_entity) && cc.trade_points > 0.0f;
+            !actor.is_player && !actor.is_nation && books.trade_points > 0.0f;
         if (trade_eligible)
         {
             const trade_params& tp = reg.trade();
@@ -3015,7 +3171,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // or cleared when the excess covers it. Must-Have, as an unpin is:
             // it returns points the share rule says belong to auto.
             {
-                const float excess = pinned_points - p.trade_pin_share * cc.trade_points;
+                const float excess = pinned_points - p.trade_pin_share * books.trade_points;
                 if (excess > 1e-4f && !mine.empty())
                 {
                     const standing_trade& t = mine.back();
@@ -3048,7 +3204,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // `spend` is one tick's outlay at the landed cost, under the
             // solvency gate.
             const std::vector<entity_id> trade_reach = corp_trade_markets(w, corp);
-            const float pin_room = p.trade_pin_share * cc.trade_points - pinned_points;
+            const float pin_room = p.trade_pin_share * books.trade_points - pinned_points;
             // A full book (`max_trades_per_corp`) would refuse every pin: none
             // is proposed then (cold review).
             if (!trade_reach.empty() && pin_room > 1e-4f && mine.size() < max_trades_per_corp)
@@ -3104,15 +3260,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                && "BL-1205: the candidate stretch must not add or remove buildings while its scope is open");
 #endif
         candidate_scope.reset(); // the world is written from here on (BL-1205)
+        // BL-1401: a nation issues every command for itself — as_nation names it,
+        // so the seam takes its door (apply_state_command) and the treasury pays.
+        if (actor.is_nation)
+            for (candidate& cand : cands)
+                cand.cmd.as_nation = corp;
         if (cands.empty() && !trade_eligible)
             continue;
         std::sort(cands.begin(), cands.end(), candidate_before);
 
         // ---- Greedy selection under the action budget + solvency gate -------
         int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0, dispatches = 0;
-        // BL-1296: the state industry's dials have their own `max_dials`, so a
-        // champion's own book and its nation's are each dialled as fully as a
-        // corporation's book alone was — neither starves the other.
+        // BL-1296: a nation's dials count against their own `max_dials`.
+        // BL-1401: the champion branch is gone, so an actor's dials are all of
+        // one book; the split counter stays so either book dials as fully.
         int   state_dials = 0;
         float state_spent = 0.0f; // BL-1296: this evaluation's treasury spend
 
@@ -3131,7 +3292,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // afford, and the line would ration all of them against each other.
         // The player corp never reaches this loop (the guard at the top), so it
         // is never a claimant; accepted, NR-569c.
-        const entity_id home_nation = cc.home_nation;
+        const entity_id home_nation = actor.home_nation;
         bool            claimed     = false;
 
         // The decision log's runner-up (NR-232, 2026-08-14). It used to be
@@ -3223,7 +3384,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 for (const standing_trade& t : w.trades)
                     if (t.owner == corp)
                         manual += t.points;
-                const float held_reserve = w.corporations.at(corp).trade_reserve;
+                const float held_reserve = actor_books(w, actor).trade_reserve;
                 if (!(std::fabs(manual - held_reserve) > 1e-4f) || !(manual <= max_trade_points))
                     break;
                 candidate rc;
@@ -3298,21 +3459,16 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // BL-1296 fix round: a STATE command's spend is the treasury's,
             // gated against what the treasury has uncommitted (less what this
             // evaluation already spent from it) — never the corp's balance.
-            if (c.cmd.as_nation != null_entity)
-            {
-                if (c.spend > 0.0f
-                    && state_uncommitted_treasury(w, c.cmd.as_nation) - state_spent - c.spend < 0.0f)
-                {
-                    forgo(c);
-                    continue;
-                }
-            }
-            else
+            // BL-1401: one gate for either actor, through the view — the money
+            // (actor_money: balance | uncommitted treasury) less this
+            // evaluation's spend, above the same bucket-aware floor, which a
+            // nation computes over its own buildings (corp_reserve_floor).
             {
             const float required_floor =
                 (c.bucket == corp_priority_bucket::nice_to_have) ? nice_to_have_floor : floor_;
+            const float spent_now = (c.cmd.as_nation != null_entity) ? state_spent : committed;
             if (c.spend > 0.0f &&
-                w.corporations.at(corp).balance - committed - c.spend <= required_floor)
+                actor_money(w, actor) - spent_now - c.spend <= required_floor)
             {
                 forgo(c); // could not afford it — foregone in the strongest sense
 
@@ -3335,7 +3491,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
                 continue;
             }
-            } // BL-1296: the corporation's own solvency gate
+            } // the solvency gate (BL-1296, BL-1401)
 
             // Resolve the log's body tag BEFORE the command mutates the world —
             // a demolish erases its subject from w.buildings, so resolving

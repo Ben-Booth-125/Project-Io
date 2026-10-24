@@ -525,8 +525,12 @@ construction_result place_road(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id tile, std::uint8_t tier,
                                std::uint8_t side)
 {
+    // BL-1401 (AI_OPPONENT.md § 11, Ben 2026-10-23): the payer may be a NATION laying a
+    // road for itself — the corporation's verb, issued by and for the nation, paid from
+    // its uncommitted treasury. The crossing rules below already ask the actor's nation.
     const auto corp_it = w.corporations.find(corp);
-    if (corp_it == w.corporations.end())
+    const auto nation_it = (corp_it == w.corporations.end()) ? w.nations.find(corp) : w.nations.end();
+    if (corp_it == w.corporations.end() && nation_it == w.nations.end())
         return construction_result::no_corp;
 
     const auto tile_it = w.tiles.find(tile);
@@ -556,7 +560,6 @@ construction_result place_road(world& w, const recipe_registry& reg,
         return construction_result::invalid_tile;
     }
 
-    corporation_component& cc = corp_it->second;
     const road_economics&  re = reg.road_econ(tier);
 
     // Material cost priced from the tile's local market, mirroring construct_building — but
@@ -581,7 +584,9 @@ construction_result place_road(world& w, const recipe_registry& reg,
     }
 
     const float total_cost = re.build_cost + material_cost;
-    if (cc.balance < total_cost)
+    const float funds = (corp_it != w.corporations.end()) ? corp_it->second.balance
+                                                          : state_uncommitted_treasury(w, corp);
+    if (funds < total_cost)
         return construction_result::insufficient_funds;
 
     // Commit: raise the EDGE to the chosen road tier (both halves — BL-1340), THEN debit,
@@ -591,7 +596,10 @@ construction_result place_road(world& w, const recipe_registry& reg,
     // exactly the identity (review of 0831de6d).
     if (!lay_road_edge(w, tile, chosen, tier)) // BL-172: 1=Track, 2=Road, 3=Highway
         return construction_result::invalid_tile;
-    cc.balance -= total_cost;
+    if (corp_it != w.corporations.end())
+        corp_it->second.balance -= total_cost;
+    else
+        nation_it->second.treasury -= total_cost; // instant, as a corporation's debit is
     invalidate_logistics_caches(w);
 
     return construction_result::placed;

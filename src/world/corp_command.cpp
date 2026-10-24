@@ -826,6 +826,13 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_invalid;
             return map_construction(lay_track(w, reg, nation, cmd.tile));
         }
+        case corp_verb::place_road:
+            // BL-1401 (AI_OPPONENT.md § 11, Ben 2026-10-23): a nation lays a road for
+            // itself — the corporation's verb, issued by and for the nation, paid from its
+            // treasury. place_road's own crossing rules ask the nation's ground (one
+            // crossing into foreign ground, none from it).
+            return map_construction(place_road(w, reg, nation, cmd.tile, cmd.road_tier,
+                                               cmd.road_side));
         case corp_verb::build:
         {
             if (cmd.type == building_type::railway_station

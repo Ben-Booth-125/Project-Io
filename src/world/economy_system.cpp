@@ -3021,23 +3021,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         for (const entity_id owner : corp_ids)
         {
             // BL-1296 (AI_OPPONENT.md § 11, the 2026-10-11 grant): a rival
-            // major's STATE buildings take the same reflexes its champion's
-            // buildings take, logged under the champion (`corp` below). Never
-            // the player's nation's — its champion is the player's corp — and
-            // never a nation with no champion (a minor holds only its network nodes).
-            entity_id corp = owner;
+            // nation's buildings take the same reflexes a corporation's take.
+            // BL-1401 (§ 11, Ben 2026-10-23): read off the NATION itself, not its
+            // champion, so a minor's buildings take them too, and logged under
+            // the nation (`corp` below is the acting owner). Never the player's
+            // nation's — the player's economy is the player's.
+            const entity_id corp = owner;
+            const bool nation_owner = w.corporations.find(owner) == w.corporations.end();
             if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
             {
                 if (cit->second.is_player)
                     continue; // never auto-act on the player's own corp
             }
-            else
-            {
-                corp = champion_of(w, owner);
-                const auto ch = w.corporations.find(corp);
-                if (ch == w.corporations.end() || ch->second.is_player || corp == w.player_entity)
-                    continue; // the player's state industry is the player's
-            }
+            else if (owner == player_nation(w))
+                continue; // the player's nation's buildings are the player's
 
             for (const entity_id bid : *assets_of(w, owner))
             {
@@ -3135,7 +3132,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         }
                         // BL-1296 fix round: a state plant's rescue retool adds
                         // its new inputs to this tick's bill — funded, or not taken.
-                        if (best_i >= 0 && owner != corp)
+                        if (best_i >= 0 && nation_owner)
                         {
                             building_component after = b;
                             after.recipe = reg.recipe_id(reg.recipe_at(building_type::processing_facility, best_i).name);

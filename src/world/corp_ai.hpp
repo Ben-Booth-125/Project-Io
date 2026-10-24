@@ -462,6 +462,10 @@ float corp_personality_jitter(entity_id corp, uint64_t personality_seed);
 /// the session has no human seat and the player corp is due on its own cadence
 /// slot like any other. Do not read the unconditional form into this: for a
 /// played session the answer is still always false.
+///
+/// BL-1401 (AI_OPPONENT.md § 11, Ben 2026-10-23): `corp` may name a NATION. The
+/// actor set is every corporation and every nation, ascending id; the player's
+/// nation is false exactly as the player's corp is (spectate lifts both).
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
                              const corp_ai_params& p = {});
 
@@ -479,6 +483,16 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// Admitting the player corp does not perturb the others. The cadence keys on
 /// a corp's index in the SORTED FULL corp set, which already contains the
 /// player — so a spectated run changes who acts, never when the rest do.
+///
+/// BL-1401 (AI_OPPONENT.md § 11, "Every AI nation builds its own economy", Ben
+/// 2026-10-23): the actor set is every corporation PLUS every nation, majors and
+/// minors alike, read through one actor view (money, buildings, focus, home
+/// nation). A nation issues every command for itself (cmd.corp == cmd.as_nation
+/// == the nation), paid from its uncommitted treasury, and every build candidate
+/// is drawn from the actor's own nation's ground. The player's nation is skipped
+/// as the player's corp is; spectate lifts both. A nation proposes builds, roads,
+/// anchors and dials — not surveys, hires, Marketplaces or trades, whose doors or
+/// books are a corporation's (the champion's state-industry branch is retired).
 ///
 /// BUDGET CLAIMS (BL-537 / Sprint N3 T5). Besides commands, the step emits
 /// `economy_report::budget_claims`: when a due corp's top-scoring survey is
