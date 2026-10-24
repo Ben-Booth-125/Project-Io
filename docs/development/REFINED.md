@@ -24,10 +24,10 @@ disjoint files; BL-1404 owns `world_save.cpp` until BL-1407. Wave 3 is serial.
 - [x] **T4** `tools/verify/nation_actor_seam.cpp`, registered. (R1-R3)
 
 ### BL-1401 (nation AI actor) — Delivery Full, group `nation-ai-actor`
-- [ ] **T1** `ai_actor` view: treasury, `state_assets`, nation focus, owner-keyed books (`corp_ai.{hpp,cpp}`). (R1)
-- [ ] **T2** Every non-player nation acts; champion state branch retires; player skipped, spectate kept. (R1, R2)
-- [ ] **T3** Sorted walks; stagger and jitter keyed on the new actor set. (R3)
-- [ ] **T4** `tools/verify/nation_ai_builds.cpp`. (R1, R2)
+- [x] **T1** `ai_actor` view: treasury, `state_assets`, nation focus, owner-keyed books (`corp_ai.{hpp,cpp}`). (R1)
+- [x] **T2** Every non-player nation acts; champion state branch retires; player skipped, spectate kept. (R1, R2)
+- [x] **T3** Sorted walks; stagger and jitter keyed on the new actor set. (R3)
+- [x] **T4** `tools/verify/nation_ai_builds.cpp`. (R1, R2)
 
 ### BL-1402 (fold to ground) — Delivery Full, group `fold-to-ground`
 An audit (2026-10-24) found twelve subsystems that walk corporations only; folding first would freeze

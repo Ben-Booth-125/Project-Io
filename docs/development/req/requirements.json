@@ -7415,38 +7415,38 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1401 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-24",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_ai_builds"
      ],
      "requirement": "Every non-player nation, majors and minors, issues builds through the scorer.",
-     "notes": null
+     "notes": "nation_ai_builds on main ab3fe595, seeds 0/28/46: majors and minors each placed buildings they own (seed 0: 2/5 majors, 9/35 minors; 28: 1/1, 8/19; 46: 2/4, 7/35); every post-generation nation building on its owner's ground."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_ai_builds"
      ],
      "requirement": "The player's nation is never built for in a seated session.",
-     "notes": null
+     "notes": "nation_ai_builds: the player's nation gained no building and no logged decision on any seed; cadence_schedule C2c: the player's nation is never evaluated in a seated session."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism"
      ],
      "requirement": "Same seed, same world: two runs are byte-identical.",
-     "notes": null
+     "notes": "world_determinism ALL PASS on the integrated tree; same seed twice gives an identical state_hash. Cadence stagger moved with the actor set, as expected. market_viability FULL integrated (with ports E and T): G1 94.6, G1t50 89.2, G1b 3.7, G2 162.5, G3 95.9, all pass."
     }
    ]
   },
