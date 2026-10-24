@@ -1019,6 +1019,9 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   § A shipment).
 - **Throughput is a lens**, extending Reach. The Reach lens shows a binary field; throughput is
   that field with a magnitude, so it is a small step from an existing surface rather than a new one.
+  **It reads in absolute points (Ben, 2026-10-24):** the points reaching each tile, what a
+  tile's buildings consumed, and the nation's pool generated beside what it consumed — never a
+  share (`docs/ui/LENSES.md` § Throughput lens).
 - **Allocation under contention is order-independent** — a deterministic priority rule over a
   sorted set, never first-come by iteration order.
 - **Active lands first (Ben, 2026-08-24, the Sprint 18 design form)** — the priced march is the

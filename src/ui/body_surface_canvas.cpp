@@ -1313,12 +1313,21 @@ void draw_industry_key(ImDrawList* dl, const ui_state& state)
 /// rather than two unrelated blues.
 constexpr ImU32 k_throughput_hue = IM_COL32(80, 200, 255, 255);
 
+/// THE ABSOLUTE SCALE the Throughput field is keyed to (Ben, 2026-10-24: "absolute
+/// numbers rather than a percentage"; LENSES.md § Throughput lens). LP/tick reaching
+/// a tile, linear from 0 (navy) to this figure (the logistics cyan), saturating above
+/// it. 240 is two hubs at full strength (lp_source_points: hub 120, station 150, port
+/// 120), so one hub's full reach sits mid-ramp and the overlap of two reads as full -
+/// fixed, so the same colour means the same points on every body and every tick.
+constexpr float k_lp_lens_scale = 240.0f;
+
 /// The Throughput lens's FIELD ramp (BL-606): deep navy where throughput is
 /// furthest away, the logistics cyan at an anchor. Sequential, not diverging —
 /// capacity has a single good direction. @p t is 1 at an anchor and 0 at the
 /// body's furthest reachable ground (or anywhere unreachable).
 ImU32 throughput_field_colour(float t)
 {
+    // (Since 2026-10-24 @p t is the tile's absolute LP/tick over k_lp_lens_scale.)
     t = std::clamp(t, 0.0f, 1.0f);
     return lerp_colour(IM_COL32(16, 24, 42, 255), k_throughput_hue, t);
 }
@@ -1353,9 +1362,13 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
 
     const float mark_d = 11.0f; // anchor swatch diameter
     const bool  have   = !state.lp_anchors.empty() && state.lp_anchor_max > 0.0f;
-    const float body_h = have
+    // A nation with NO connected source still gets the ramp and its arithmetic
+    // (Ben, 2026-10-24: "it is not clear whether logistics works as intended"):
+    // "Generated 0" beside what production needs is the answer, not a blank key.
+    const float body_h = state.lp_player_known
         ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 6.0f
-              + std::max(line_h, mark_d) + 4.0f + line_h + pad
+              + (have ? std::max(line_h, mark_d) : line_h) + 4.0f
+              + 4.0f * (line_h + 2.0f) + pad
         : pad + line_h + 6.0f + line_h + 4.0f + line_h + pad;
 
     float x, y, bar_w;
@@ -1370,17 +1383,16 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Logistic Points"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + (have ? 4.0f : 6.0f);
 
-    if (!have)
+    if (!state.lp_player_known)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), // fit-exempt: legend box sized to its measured entries (container 2)
-                    state.lp_player_known ? "Your nation makes none" : "No nation to show");
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No nation to show"); // fit-exempt: legend box sized to its measured entries (container 2)
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), // fit-exempt: legend box sized to its measured entries (container 2)
-                    state.lp_player_known ? "on this body." : "from this seat.");
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "from this seat."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
-    // Bar 1 - THE COVERAGE RAMP, which is what the per-tile numbers are.
+    // Bar 1 - THE POINTS RAMP, absolute (k_lp_lens_scale), which is what the
+    // per-tile numbers are.
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
@@ -1391,26 +1403,51 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     }
     y += bar_h + 2.0f;
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const ImVec2 nts = ImGui::CalcTextSize("100 served");
-    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), "100 served"); // fit-exempt: legend box sized to its measured entries (container 2)
+    char top[32];
+    std::snprintf(top, sizeof top, "%.0f+ LP/tick", static_cast<double>(k_lp_lens_scale));
+    const ImVec2 nts = ImGui::CalcTextSize(top);
+    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), top); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
 
     // Row 2 - the SOURCE MARK, carrying the points that source makes. BL-1352: these
     // are hubs, stations and ports, never cities; BL-1353: and only your nation's.
-    const float mr = mark_d * 0.5f;
-    dl->AddCircle({x + mr + 1.0f, y + mr}, mr, IM_COL32(10, 18, 30, 220), 18, 4.0f);
-    dl->AddCircle({x + mr + 1.0f, y + mr}, mr, throughput_anchor_colour(1.0f), 18, 2.0f);
-    char per[48];
-    std::snprintf(per, sizeof per, "source: %.0f pts/tick", state.lp_anchor_max);
-    dl->AddText({x + mark_d + 8.0f, y + (mark_d - line_h) * 0.5f}, // fit-exempt: legend box sized to its measured entries (container 2)
-                IM_COL32(235, 235, 235, 255), per);
-    y += std::max(line_h, mark_d) + 4.0f;
+    if (have)
+    {
+        const float mr = mark_d * 0.5f;
+        dl->AddCircle({x + mr + 1.0f, y + mr}, mr, IM_COL32(10, 18, 30, 220), 18, 4.0f);
+        dl->AddCircle({x + mr + 1.0f, y + mr}, mr, throughput_anchor_colour(1.0f), 18, 2.0f);
+        char per[48];
+        std::snprintf(per, sizeof per, "source: %.0f pts/tick", state.lp_anchor_max);
+        dl->AddText({x + mark_d + 8.0f, y + (mark_d - line_h) * 0.5f}, // fit-exempt: legend box sized to its measured entries (container 2)
+                    IM_COL32(235, 235, 235, 255), per);
+        y += std::max(line_h, mark_d) + 4.0f;
+    }
+    else
+    {
+        dl->AddText({x, y}, IM_COL32(235, 200, 120, 255), "No connected source here"); // fit-exempt: legend box sized to its measured entries (container 2)
+        y += line_h + 4.0f;
+    }
 
-    // And the nation's own arithmetic: made, by how many, against what its ground asks.
-    char totals[80];
-    std::snprintf(totals, sizeof totals, "your %d source(s) make %.0f, ground asks %.0f",
-                  state.lp_player_sources, state.lp_player_pool, state.lp_player_claim);
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), totals); // fit-exempt: legend box sized to its measured entries (container 2)
+    // And the nation's own arithmetic, ABSOLUTE (Ben, 2026-10-24): what its sources
+    // GENERATED, what its buildings CONSUMED and on what, and what production NEEDS.
+    const float used = state.lp_player_prod + state.lp_player_march + state.lp_player_shipping;
+    char line[96];
+    std::snprintf(line, sizeof line, "Generated %.0f /tick, %d source(s)",
+                  static_cast<double>(state.lp_player_pool), state.lp_player_sources);
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), line); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 2.0f;
+    std::snprintf(line, sizeof line, "Consumed %.0f /tick, %.0f unused",
+                  static_cast<double>(used),
+                  static_cast<double>(std::max(0.0f, state.lp_player_pool - used)));
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), line); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 2.0f;
+    std::snprintf(line, sizeof line, "  production %.0f of %.0f needed",
+                  static_cast<double>(state.lp_player_prod), static_cast<double>(state.lp_player_need));
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), line); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 2.0f;
+    std::snprintf(line, sizeof line, "  marches %.0f, shipments %.0f",
+                  static_cast<double>(state.lp_player_march), static_cast<double>(state.lp_player_shipping));
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), line); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// Legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
@@ -1784,12 +1821,12 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
         // the field the fill reads means the card can never light ground the lens
         // left blank. The click path treats this kind as no answer.
         const auto tit = w.tiles.find(tile);
-        if (tit == w.tiles.end() || state.lp_coverage_gw <= 0)
+        if (tit == w.tiles.end() || state.lp_reaching_gw <= 0)
             return structure_kind::none;
         const std::size_t idx =
-            static_cast<std::size_t>(tit->second.grid_y) * static_cast<std::size_t>(state.lp_coverage_gw)
+            static_cast<std::size_t>(tit->second.grid_y) * static_cast<std::size_t>(state.lp_reaching_gw)
             + static_cast<std::size_t>(tit->second.grid_x);
-        if (idx >= state.lp_coverage.size() || state.lp_coverage[idx] < 0.0f)
+        if (idx >= state.lp_reaching.size() || state.lp_reaching[idx] < 0.0f)
             return structure_kind::none;
         if (out_id != nullptr)
             *out_id = tile;
@@ -1891,15 +1928,24 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_anchor_max   = 0.0f;
     state.lp_reach_max    = 0.0f;
     state.lp_reach_p90    = 0.0f;
-    state.lp_coverage.clear();
-    state.lp_coverage_gw  = 0;
-    state.lp_coverage_gh  = 0;
-    state.lp_player_pool    = 0.0f;
-    state.lp_player_claim   = 0.0f;
-    state.lp_player_sources = 0;
-    state.lp_player_known   = false;
-    state.lp_hover_tile     = null_entity;
-    state.lp_hover_reached  = false;
+    state.lp_reaching.clear();
+    state.lp_reaching_gw  = 0;
+    state.lp_reaching_gh  = 0;
+    state.lp_player_pool     = 0.0f;
+    state.lp_player_claim    = 0.0f;
+    state.lp_player_need     = 0.0f;
+    state.lp_player_prod     = 0.0f;
+    state.lp_player_march    = 0.0f;
+    state.lp_player_shipping = 0.0f;
+    state.lp_player_sources  = 0;
+    state.lp_player_known    = false;
+    state.lp_hover_tile      = null_entity;
+    state.lp_hover_reached   = false;
+    state.lp_hover_reaching  = 0.0f;
+    state.lp_hover_sources   = 0;
+    state.lp_hover_consumed  = 0.0f;
+    state.lp_hover_need      = 0.0f;
+    state.lp_hover_consumers = 0;
 
     // Off by default in every sense: no lens, no work. The lens is the only reader,
     // and the pools must not be built when nobody is looking at them — LP is a rate,
@@ -1981,9 +2027,9 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
         {
             state.lp_player_known = true;
             const int gw = bit->second.grid_width, gh = bit->second.grid_height;
-            state.lp_coverage_gw = gw;
-            state.lp_coverage_gh = gh;
-            state.lp_coverage.assign(static_cast<std::size_t>(std::max(0, gw))
+            state.lp_reaching_gw = gw;
+            state.lp_reaching_gh = gh;
+            state.lp_reaching.assign(static_cast<std::size_t>(std::max(0, gw))
                                          * static_cast<std::size_t>(std::max(0, gh)), -1.0f);
             // One memo for the whole field: `lp_coverage_at` builds each of the host
             // nation's sources' own field once (BL-1356 routes per source) and answers
@@ -1992,7 +2038,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             // one per tile.
             lp_reach_memo memo;
             const std::vector<entity_id>& raster = body_tile_grid(w, state.active_body);
-            for (std::size_t i = 0; i < raster.size() && i < state.lp_coverage.size(); ++i)
+            for (std::size_t i = 0; i < raster.size() && i < state.lp_reaching.size(); ++i)
             {
                 const entity_id tid = raster[i];
                 if (tid == null_entity)
@@ -2000,7 +2046,9 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 const auto nit = w.tile_to_nation.find(tid);
                 if (nit == w.tile_to_nation.end() || nit->second != pn)
                     continue; // somebody else's ground: not this lens's subject
-                state.lp_coverage[i] = lp_coverage_at(w, memo, tid);
+                // ABSOLUTE POINTS (Ben, 2026-10-24): what reaches this tile from the
+                // nation's qualifying sources, in LP/tick - not the share of a request.
+                state.lp_reaching[i] = lp_points_reaching(w, memo, lp, tid);
             }
             // BL-1353: the ground card's WHY for the tile under the pointer. The card
             // holds a const world, so it is read here, off the memo the loop above
@@ -2010,7 +2058,20 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 && state.hovered_structure != null_entity)
             {
                 lp_coverage_why why;
-                state.lp_hover_coverage = lp_coverage_at(w, memo, state.hovered_structure, &why);
+                (void)lp_coverage_at(w, memo, state.hovered_structure, &why);
+                state.lp_hover_reaching =
+                    lp_points_reaching(w, memo, lp, state.hovered_structure, &state.lp_hover_sources);
+                // What the tile's buildings CONSUMED this tick (their granted claims)
+                // against what they need at their run - the resolve's own rows.
+                for (const lp_building_row& br : lp.buildings)
+                {
+                    const auto bit2 = w.buildings.find(br.building);
+                    if (bit2 == w.buildings.end() || bit2->second.tile != state.hovered_structure)
+                        continue;
+                    state.lp_hover_consumed += br.granted;
+                    state.lp_hover_need     += br.need;
+                    ++state.lp_hover_consumers;
+                }
                 state.lp_hover_reached  = why.reached;
                 state.lp_hover_network  = static_cast<int>(why.network);
                 state.lp_hover_distance = why.distance;
@@ -2026,9 +2087,21 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             for (const lp_nation_row& r : lp.nations)
                 if (r.nation == pn)
                 {
-                    state.lp_player_pool  = r.pool;
-                    state.lp_player_claim = r.claim[0] + r.claim[1] + r.claim[2];
+                    // GENERATED and CONSUMED, both absolute (Ben, 2026-10-24): the pool
+                    // its connected sources made, and what production, the marches and
+                    // the shipments actually drew from it this tick.
+                    state.lp_player_pool     = r.pool;
+                    state.lp_player_claim    = r.claim[0] + r.claim[1] + r.claim[2];
+                    state.lp_player_prod     = r.granted[0] + r.granted[1] + r.granted[2];
+                    state.lp_player_march    = r.march_granted;
+                    state.lp_player_shipping = r.trade_drawn;
                 }
+            // What the nation's producers NEED at their run, whatever reaches them: the
+            // claim is need x cover, so on uncovered ground it reads 0 and hides the
+            // very shortfall the key is there to show.
+            for (const lp_building_row& br : lp.buildings)
+                if (br.nation == pn)
+                    state.lp_player_need += br.need;
             for (const lp_source_row& src : lp.sources)
                 if (src.nation == pn && src.connected) // BL-1356: only those feeding the pool
                     ++state.lp_player_sources;
@@ -2944,30 +3017,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (const int ri = raster_index_of(a.tile); ri >= 0)
                     tile_flags[static_cast<std::size_t>(ri)] |= 16u;
     }
-    // The Throughput field's reach cost, read off the active body's raster once a
-    // frame instead of three hash lookups a tile (`tile_reach_cost`'s own path:
-    // tile -> body -> grid index). Same three-way contract: -1 not computed, inf
-    // unreachable, else the cost. A tile here is always the active body's, at its
-    // raster position, so the index is the one tile_reach_cost derives.
-    const std::vector<float>* reach_cost_raster = nullptr;
-    if (state.overlay == overlay_mode::throughput)
-    {
-        const auto rit = w.body_reach_cost.find(state.active_body);
-        if (rit != w.body_reach_cost.end() && !rit->second.empty())
-            reach_cost_raster = &rit->second;
-    }
-    // By raster position, so the lens wash on the bake never touches the tile
-    // record (a cache miss a tile at the widest rung).
-    const auto reach_cost_rc = [&](int col, int row) -> float {
-        if (!reach_cost_raster || col < 0 || row < 0)
-            return -1.0f;
-        const std::size_t idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
-                              + static_cast<std::size_t>(col);
-        return idx < reach_cost_raster->size() ? (*reach_cost_raster)[idx] : -1.0f;
-    };
-    const auto reach_cost_of = [&](const tile_component& t) -> float {
-        return reach_cost_rc(t.grid_x, t.grid_y);
-    };
     const auto vision_rc = [&](int col, int row) -> float {
         if (state.overlay == overlay_mode::resource)
             return 1.0f;
@@ -3583,21 +3632,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // give this tile, in [0,1], which is what decides whether a building here can
         // run at full rate.
         //
-        // No normalisation and no curve: coverage IS a fraction, so the ramp is spread
-        // over the thing itself rather than over a cost whose distribution had to be
-        // argued about. Ground this nation does not hold carries -1 and is left bare -
+        // ABSOLUTE SINCE 2026-10-24 (Ben: "absolute numbers rather than a percentage"):
+        // the field is the LP/tick reaching the tile, on the fixed k_lp_lens_scale,
+        // linear - so a colour means the same points everywhere. Ground this nation
+        // does not hold carries -1 and is left bare -
         // the lens is the player's own network, and a neighbour's ground is not a
         // value of zero, it is not the subject.
-        else if (state.overlay == overlay_mode::throughput && !state.lp_coverage.empty())
+        else if (state.overlay == overlay_mode::throughput && !state.lp_reaching.empty())
         {
             const int cx_ = tile.grid_x, cy_ = tile.grid_y;
-            if (cx_ >= 0 && cx_ < state.lp_coverage_gw && cy_ >= 0 && cy_ < state.lp_coverage_gh)
+            if (cx_ >= 0 && cx_ < state.lp_reaching_gw && cy_ >= 0 && cy_ < state.lp_reaching_gh)
             {
-                const float cov = state.lp_coverage[
-                    static_cast<std::size_t>(cy_) * static_cast<std::size_t>(state.lp_coverage_gw)
+                const float cov = state.lp_reaching[
+                    static_cast<std::size_t>(cy_) * static_cast<std::size_t>(state.lp_reaching_gw)
                     + static_cast<std::size_t>(cx_)];
                 if (cov >= 0.0f)
-                    fill = lerp_colour(fill, throughput_field_colour(std::clamp(cov, 0.0f, 1.0f)), 0.72f);
+                    fill = lerp_colour(fill, throughput_field_colour(
+                                                 std::clamp(cov / k_lp_lens_scale, 0.0f, 1.0f)), 0.72f);
             }
         }
         // Continent lens (BL-226): tint each tile by the tectonic plate that owns
@@ -3728,14 +3779,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // on_bake is surveyed by definition, and the fog is the wash list after this.
     // The Throughput wash from a reach cost (lens_wash_of's Throughput case; the
     // tile loop calls it by raster position, without the tile record).
-    const auto throughput_wash_of = [&](float rc) -> ImU32 {
-        if (rc < 0.0f)
+    // (Ben, 2026-10-24) It reads the ABSOLUTE points field, LP/tick reaching the
+    // tile (`ui_state::lp_reaching`), on the fixed k_lp_lens_scale - the same field
+    // compute_tile_fill and the per-tile numbers read. It used to shade the REACH
+    // COST here while the fill path shaded coverage, so the baked ground and the
+    // numbers on it answered two different questions. -1 (not the player's ground)
+    // stays bare.
+    const auto lp_reaching_rc = [&](int col, int row) -> float {
+        if (state.lp_reaching.empty() || col < 0 || row < 0
+            || col >= state.lp_reaching_gw || row >= state.lp_reaching_gh)
+            return -1.0f;
+        return state.lp_reaching[static_cast<std::size_t>(row)
+                                 * static_cast<std::size_t>(state.lp_reaching_gw)
+                                 + static_cast<std::size_t>(col)];
+    };
+    const auto throughput_wash_of = [&](float pts) -> ImU32 {
+        if (pts < 0.0f)
             return 0u;
-        const float denom = (state.lp_reach_p90 > 0.0f) ? state.lp_reach_p90
-                                                        : state.lp_reach_max;
-        const float t = std::isinf(rc)
-            ? 0.0f
-            : 1.0f - std::sqrt(std::clamp(rc / denom, 0.0f, 1.0f));
+        const float t = std::clamp(pts / k_lp_lens_scale, 0.0f, 1.0f);
         return with_alpha(throughput_field_colour(t), k_lens_wash_sequential);
     };
     const auto lens_wash_of = [&](entity_id id, const tile_component& tile) -> ImU32
@@ -3788,8 +3849,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             return with_alpha(IM_COL32(210, 150, 70, 255),
                               k_lens_wash_sequential * (0.15f + 0.6f * t) / 0.75f);
         }
-        if (ov == overlay_mode::throughput && state.lp_reach_max > 0.0f)
-            return throughput_wash_of(reach_cost_of(tile));
+        if (ov == overlay_mode::throughput)
+            return throughput_wash_of(lp_reaching_rc(tile.grid_x, tile.grid_y));
         if (ov == overlay_mode::continent && plates)
         {
             const int idx = tile.grid_x + tile.grid_y * gw;
@@ -5066,8 +5127,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                  ? lens_wc
                                  : (lens_wc_done = true,
                                     lens_wc = state.overlay == overlay_mode::throughput
-                                        ? (state.lp_reach_max > 0.0f
-                                               ? throughput_wash_of(reach_cost_rc(t_col, t_row)) : 0u)
+                                        ? throughput_wash_of(lp_reaching_rc(t_col, t_row))
                                         : lens_wash_of(id, tile_of()));
                              (lc & IM_COL32_A_MASK) != 0u)
                     {
@@ -5751,40 +5811,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // --- BL-1353: A NUMBER ON EVERY TILE, under the Throughput lens ------------
     //
     // Ben, 2026-10-16: "give a number to each tile, so we can see exactly how many
-    // points we have." The number is the tile's COVERAGE as a percentage - how much
-    // of a building's need this ground can be served - because that is the quantity
-    // the model actually holds per tile (lp_coverage_at); the POINTS themselves are a
-    // nation's pool and a building's grant, and the key carries both of those. A
-    // player reading "62" here knows a works on this tile runs at 62% for want of
-    // logistics, which is the question the lens exists to answer.
+    // points we have." The number is the LOGISTIC POINTS REACHING the tile, in
+    // LP/tick (Ben, 2026-10-24: "absolute numbers rather than a percentage") - every
+    // qualifying source of the player nation, its reach here x what it made this
+    // tick (lp_points_reaching). What the tile's buildings CONSUMED is on its hover
+    // card, and the nation's generated / consumed totals are in the key.
     //
     // ONLY WHERE THE TEXT FITS. Below a drawn radius of 18 px three glyphs do not fit
     // in a hex and the map turns into a smear of digits, so the numbers appear as the
     // camera comes in and the colour field carries the read before that. Same
     // vertical culling and horizontal wrap as every settlement label above, and the
     // same shadow, so a number over pale ground stays legible.
-    if (state.overlay == overlay_mode::throughput && !state.lp_coverage.empty()
+    if (state.overlay == overlay_mode::throughput && !state.lp_reaching.empty()
         && hit_r >= 18.0f && raster_ok)
     {
         const float visible_top    = grid_area_origin.y - hit_r;
         const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
-        for (int row = 0; row < state.lp_coverage_gh; ++row)
-            for (int col = 0; col < state.lp_coverage_gw; ++col)
+        for (int row = 0; row < state.lp_reaching_gh; ++row)
+            for (int col = 0; col < state.lp_reaching_gw; ++col)
             {
                 const std::size_t ci = static_cast<std::size_t>(row)
-                                     * static_cast<std::size_t>(state.lp_coverage_gw)
+                                     * static_cast<std::size_t>(state.lp_reaching_gw)
                                      + static_cast<std::size_t>(col);
-                if (ci >= state.lp_coverage.size())
+                if (ci >= state.lp_reaching.size())
                     continue;
-                const float cov = state.lp_coverage[ci];
+                const float cov = state.lp_reaching[ci];
                 if (cov < 0.0f)
                     continue; // not the player's ground: not this lens's subject
                 const ImVec2 sc = to_screen(hex_local_centre(col, row, hex_size));
                 if (sc.y < visible_top || sc.y > visible_bottom)
                     continue;
-                char num[8];
+                char num[12];
                 std::snprintf(num, sizeof num, "%d",
-                              static_cast<int>(std::lround(std::clamp(cov, 0.0f, 1.0f) * 100.0f)));
+                              static_cast<int>(std::lround(std::clamp(cov, 0.0f, 99999.0f))));
                 const ImVec2 ts = ImGui::CalcTextSize(num);
                 const int k_min = (period_px > 0.0f)
                     ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;

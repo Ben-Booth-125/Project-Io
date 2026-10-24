@@ -120,17 +120,19 @@ ledger("construction", "ledger_03_construction")
 -- drives the presses.
 ledger("tech_tree", "ledger_04_research")
 
--- Slot 5 — the Acquisitions ledger retired with the buyout (BL-1406): no surface.
+-- The Acquisitions slot (old 5) retired with the buyout (BL-1406) and left the
+-- rail (Ben, 2026-10-24); every slot below moved up one. Capture names keep
+-- their old numbers so a run compares against earlier runs.
 
 -- ===========================================================================
--- Slot 6 — Market ledger (UI-080..083)
+-- Slot 5 — Market ledger (UI-080..083)
 -- ===========================================================================
 for i, v in ipairs({ "prices", "sell_orders", "convoys" }) do
     ledger("market", string.format("ledger_06_market_%d_%s", i - 1, v), "market", i - 1)
 end
 foot("market", "market", "ledger_06_market_0_prices_foot", "market", 0)
 
--- Slot 8/9 — the all-corporations table retired with the corporation (BL-1406).
+-- Slot 8 (Diplomacy) — the all-corporations table retired with the corporation (BL-1406).
 
 -- ===========================================================================
 -- Slot 9 — History (UI-084..087)
@@ -170,7 +172,7 @@ ledger("generation_ledger", "ledger_10_generation_body")
 foot("generation_ledger", "generation_ledger", "ledger_10_generation_body_foot")
 
 -- ===========================================================================
--- Slots 11 / 12 — the observability tail (UI-106/107)
+-- Slots 11 / 12 (Generation is 10) — the observability tail (UI-106/107)
 -- ===========================================================================
 ledger("decisions", "ledger_11_decisions_all")
 ledger("strategy",  "ledger_12_strategy_all")
@@ -185,7 +187,7 @@ verify.strategy_filter(0)
 
 -- Contracts held a fourteenth slot and three sub-views here (offers / active /
 -- history). The mercenary contract is retired and the ledger is deleted, so the
--- sweep ends at slot 13, the last of the developer tail (BL-693).
+-- sweep ends at slot 12, the last of the developer tail (BL-693).
 
 close_all()
 verify.frames(1)

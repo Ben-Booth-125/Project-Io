@@ -401,6 +401,19 @@ struct lp_coverage_why
 float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile,
                      lp_coverage_why* why = nullptr);
 
+/// The Logistic Points REACHING @p tile this tick (Ben, 2026-10-24: the Throughput
+/// lens reads absolute points, LENSES.md § Throughput lens): every running source of
+/// the nation whose ground the tile is that QUALIFIES for it - its own reach touches
+/// the tile and it is connected to the capital, `lp_route_to`'s test - contributing
+/// its reach there x the points it made this tick (`lp_source_row::made`, read off
+/// @p t). Every qualifying source counts, not only the ones routing tops a request up
+/// from: this is what is available at the tile, not what a request drew. 0 on
+/// nobody's ground. A derived READ for the lens - pure, summed in ascending building
+/// id, never serialised, never read by the simulation.
+/// @param sources_out Optional; receives how many sources contributed.
+float lp_points_reaching(world& w, lp_reach_memo& memo, const lp_tick& t, entity_id tile,
+                         int* sources_out = nullptr);
+
 /// Validate a share rule as the value that lands (each finite, in [0,1], summing
 /// to 1 within 1e-4). The seam rejects anything else whole.
 bool lp_share_rule_valid(const std::array<float, lp_class_count>& share);

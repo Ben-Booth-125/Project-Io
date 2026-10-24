@@ -1527,6 +1527,24 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // whether anything is selected. The ASSERTION half of a live check: a capture
     // shows a card, this proves the click chose the subject the script meant.
     // Ids, not contents; no tile data crosses the seam.
+    // The Throughput lens's KEY figures (Ben, 2026-10-24: the lens reads absolute
+    // points, generated and consumed): the player nation's figures exactly as the key
+    // prints them. A nation total, never a tile's - the standing rule on tile data is
+    // untouched. Zeros (and known=false) off the lens: update_body_throughput clears them.
+    v.set_function("throughput_key", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["known"]      = m_ui.lp_player_known;
+        out["sources"]    = m_ui.lp_player_sources;
+        out["generated"]  = m_ui.lp_player_pool;
+        out["asked"]      = m_ui.lp_player_claim;
+        out["needed"]     = m_ui.lp_player_need;
+        out["production"] = m_ui.lp_player_prod;
+        out["marches"]    = m_ui.lp_player_march;
+        out["shipments"]  = m_ui.lp_player_shipping;
+        out["consumed"]   = m_ui.lp_player_prod + m_ui.lp_player_march + m_ui.lp_player_shipping;
+        return out;
+    });
+
     v.set_function("pointer_target", [this]() {
         sol::state& st = m_lua.state();
         sol::table  out = st.create_table();
@@ -2739,7 +2757,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (name == "construction")      m_ui.show_construction_panel = open;
         else if (name == "tile")         m_ui.show_tile_ledger = open;
         else if (name == "market")       m_ui.show_market_ledger = open;
-        // Convoys ledger (BL-689) — nav slot 7. Opening it through the rail arms
+        // Convoys ledger (BL-689) — nav slot 6. Opening it through the rail arms
         // `supply_routes`; this hook deliberately does NOT, so a script can
         // capture the ledger against whatever lens it chose. A check that wants
         // the pairing asserts it through the rail press instead.

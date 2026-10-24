@@ -145,9 +145,9 @@ The header answers "can I afford this, and which way is it trending?" without op
 
 A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, 56 px), below the profile. Cannot move, resize, or collapse. The rail is narrow; the profile keeps its own (wider) `profile_panel_width` above it rather than matching the rail.
 
-- Holds a vertical strip of **thirteen square icon slots** — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip.
+- Holds a vertical strip of **twelve square icon slots** — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent. An active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
-- **Ten slots are live** (`nav_pane.cpp`): the curated slots carry Nation overview, Budget, Construction, Market Ledger, Convoys and History, and Research hosts the tech-tree viewer as a **provisional occupant**; the tail carries Generation Ledger, AI decisions and Strategy readout. **Acquisitions retired** with the buyout and **Diplomacy's corporations table retired** with the corporation (Ben, 2026-10-23); Diplomacy and Corp. Strategy are reserved, disabled with a dimmed glyph. Full slot semantics in `MENU.md`.
+- **Ten slots are live** (`nav_pane.cpp`): the curated slots carry Nation overview, Budget, Construction, Market Ledger, Convoys and History, and Research hosts the tech-tree viewer as a **provisional occupant**; the tail carries Generation Ledger, AI decisions and Strategy readout. **Acquisitions retired** with the buyout (Ben, 2026-10-23) and its slot left the rail, every later slot moving up one (Ben, 2026-10-24); **Diplomacy's corporations table retired** with the corporation (Ben, 2026-10-23); Diplomacy and Corp. Strategy are reserved, disabled with a dimmed glyph. Full slot semantics in `MENU.md`.
 
 ---
 

@@ -180,23 +180,24 @@ verify.set_overlay("none")
 verify.frames(1)
 
 -- ===========================================================================
--- 6. The thirteen nav-rail ledgers, one capture each
+-- 6. The twelve nav-rail slots' ledgers, one capture each
 -- ===========================================================================
--- Slot 7 (Corp. Strategy) is the one reserved slot: it has no panel to open, so
+-- Slots 7 (Corp. Strategy) and 8 (Diplomacy) are the reserved slots: it has no panel to open, so
 -- it appears in the rail captures above and nowhere here. That absence is the
 -- accurate record, not a gap.
 ledger("corporation",        "shell_20_slot01_nation_overview")
 ledger("balance",            "shell_21_slot02_budget")
 ledger("construction",       "shell_22_slot03_construction")
 ledger("tech_tree",          "shell_23_slot04_research")
--- slot 5 (Acquisitions) and slot 9 (Diplomacy) carry no surface since BL-1406
-ledger("market",             "shell_25_slot06_market")
+-- the Acquisitions slot retired and left the rail (Ben, 2026-10-24), so Market
+-- is slot 5 and everything below moved up one; Convoys (6) has its own check
+ledger("market",             "shell_25_slot05_market")
 ledger("tile",               "shell_27_slot09_history")
 ledger("generation_ledger",  "shell_28_slot10_generation")
 ledger("decisions",          "shell_29_slot11_ai_decisions")
 ledger("strategy",           "shell_30_slot12_strategy")
 
--- Slot 13 is the last one. Contracts held a fourteenth slot and three captures
+-- Slot 12 is the last one. Contracts held a fourteenth slot and three captures
 -- here (offers / active / history); the mercenary contract is retired and the
 -- ledger is deleted, so the pass ends at the developer tail (BL-693).
 

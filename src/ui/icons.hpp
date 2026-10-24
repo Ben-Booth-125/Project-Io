@@ -378,7 +378,7 @@ void landform_span(ImDrawList* dl, ImVec2 from, ImVec2 mid, float amp, float thi
                    terrain_landform lf, ImU32 colour);
 
 /// Draw the History nav-rail glyph — an hourglass (a down-triangle over an
-/// up-triangle meeting at a waist) — in @p colour. Slot 9 previously drew the
+/// up-triangle meeting at a waist) — in @p colour. The History slot previously drew the
 /// same @ref ledger glyph as the Budget slot, so the two were indistinguishable;
 /// the joined pair is unmistakably "time" and collides with neither the hollow
 /// scarcity down-triangle nor the filled production up-triangle, because it is
@@ -421,7 +421,7 @@ void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// Reads as "counts compared": the axis anchor keeps it distinct from the
 /// supply route lines and the resource strata (both anchorless), and the
 /// horizontal orientation keeps it clear of the market lens's vertical bars.
-/// Nav rail slot 12, the Strategy readout ledger (BL-411). See ICONS.md
+/// Nav rail slot 11, the Strategy readout ledger (BL-411). See ICONS.md
 /// § Nav-rail affordances.
 ///
 /// @param dl     Draw list to render into.
@@ -476,7 +476,8 @@ void contract(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// and a target, and a symmetric pair would say "merger", which the model does
 /// not have.
 ///
-/// Nav rail slot 5, the Acquisitions ledger. See ICONS.md § Nav-rail affordances.
+/// Drew nav rail slot 5, the Acquisitions ledger; the slot retired (Ben,
+/// 2026-10-24) and this glyph has no caller. See ICONS.md § Nav-rail affordances.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.

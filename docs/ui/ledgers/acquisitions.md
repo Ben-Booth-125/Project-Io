@@ -3,8 +3,8 @@
 > **Retired whole (Ben, 2026-10-23).** The Acquisitions ledger listed the firms the player could
 > buy outright and their prices. The buyout, the ownership class and the firms themselves are
 > retired (`docs/GLOSSARY.md` § Buyout, § Ownership class, § Company); ground and what stands on
-> it change hands only by conquest (`docs/politics/NATIONS.md` § Own ground). Rail slot 5 has no
-> Acquisitions surface, and its second door, the Company lens, retired with it
+> it change hands only by conquest (`docs/politics/NATIONS.md` § Own ground). Its rail slot left the
+> rail and every later slot moved up one (Ben, 2026-10-24), so Market is slot 5; and its second door, the Company lens, retired with it
 > (`../LENSES.md` § Corporation and Company lenses — retired). **Everything below is the record
 > of a retired design, not authority**; do not design against it.
 

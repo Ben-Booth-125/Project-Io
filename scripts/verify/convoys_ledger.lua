@@ -1,9 +1,10 @@
--- The Convoys ledger (BL-689): rail slot 7, one flat view, arms supply_routes.
+-- The Convoys ledger (BL-689): rail slot 6, one flat view, arms supply_routes.
 --
 -- IT PRESSES THE RAIL SLOT rather than calling show_panel, and that is the point
 -- of the check. `shell_pass` opens ledgers BY NAME, so it cannot see a
 -- slot->surface mapping that has silently shifted (NR-716) — and this change
--- renumbered seven slots. Pressing slot 7 and requiring the Convoys ledger to be
+-- renumbered seven slots (and retiring slot 5, Ben 2026-10-24, renumbered eight
+-- more). Pressing slot 6 and requiring the Convoys ledger to be
 -- what opens is the only form of the assertion that exercises the mapping.
 
 -- The open fold-out surface, by the name pointer_target reports.
@@ -21,15 +22,15 @@ verify.set_overlay("market")
 verify.frames(2)
 verify.expect(verify.overlay_name() == "market", "precondition: the market lens is armed")
 
--- 1. SLOT 7 OPENS CONVOYS. The rail geometry comes from the slot as DRAWN, so a
+-- 1. SLOT 6 OPENS CONVOYS. The rail geometry comes from the slot as DRAWN, so a
 --    renumber moves the click with it and the assertion still means what it says.
-local x, y = verify.nav_slot(7)
-verify.expect(x ~= nil, "nav rail slot 7 exists and was drawn")
+local x, y = verify.nav_slot(6)
+verify.expect(x ~= nil, "nav rail slot 6 exists and was drawn")
 if x ~= nil then
     verify.click(x, y)
     verify.frames(2)
     verify.expect(open_panel() == "convoys",
-        "pressing rail slot 7 opens the Convoys ledger (opened: " ..
+        "pressing rail slot 6 opens the Convoys ledger (opened: " ..
         tostring(open_panel()) .. ")")
 
     -- 2. IT ARMS `supply_routes` ON OPEN (convoys.md § 3). This is the pairing a
@@ -45,22 +46,23 @@ if x ~= nil then
     verify.click(x, y)
     verify.frames(2)
     verify.expect(open_panel() ~= "convoys",
-        "pressing slot 7 again closes the Convoys ledger")
+        "pressing slot 6 again closes the Convoys ledger")
 end
 
--- 4. MARKET KEEPS SLOT 6, AND THE SHIFTED SLOTS LAND WHERE MENU.md SAYS. The
+-- 4. MARKET IS SLOT 5, AND THE SHIFTED SLOTS LAND WHERE MENU.md SAYS. The
 --    renumber is the risk this file exists to cover, so the neighbours are
 --    checked by press too, not just the new slot.
 -- Slot 14 (Contracts) is absent because the slot is: the mercenary contract is
 -- retired and its ledger deleted, and because Contracts was APPENDED below the
 -- developer tail rather than inserted, its removal renumbers nothing — every
 -- slot below is unchanged, which is what this map now asserts (BL-693).
--- BL-1406: slots 5 (Acquisitions) and 9 (Diplomacy) carry no surface now - the
--- buyout and the corporation stance table retired with the firms - so they open
--- nothing and are not in this map; every slot keeps its number.
-local expected = { [3] = "construction", [6] = "market",
-                   [10] = "tile", [11] = "generation_ledger",
-                   [12] = "decisions", [13] = "strategy" }
+-- Slot 5 (Acquisitions) RETIRED and everything below moved up one (Ben,
+-- 2026-10-24: "retire rail slot 5, and move everything up"). Diplomacy (8) is
+-- reserved again since BL-1406 and Corp. Strategy (7) always was, so they open
+-- nothing and are not in this map.
+local expected = { [3] = "construction", [5] = "market",
+                   [9] = "tile", [10] = "generation_ledger",
+                   [11] = "decisions", [12] = "strategy" }
 for slot, want in pairs(expected) do
     local sx, sy = verify.nav_slot(slot)
     verify.expect(sx ~= nil, "nav rail slot " .. slot .. " was drawn")

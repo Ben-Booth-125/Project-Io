@@ -1,7 +1,7 @@
 # Market — design Q&A
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `nav rail slot 6 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv` · Owning items: `BL-453` (convoys ledger), `BL-1269` (trade UI)
+> Menu slot: `nav rail slot 5 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv` · Owning items: `BL-453` (convoys ledger), `BL-1269` (trade UI)
 > Host: shell fold-out column — **380 px at 1280, 384 px at 1920** (`shell_column_width` is `0.20 * disp_x` clamped to [380, 460], so it is effectively fixed across the common range; what resolution changes is the column's HEIGHT, and all of it).
 
 ## 1. Top question — the one thing this answers at first glance
@@ -155,7 +155,7 @@ The nation presence row reads `nation_colour(entity_id)` and the set of nations 
 `markets.csv` leads with `market_id, market_label, body_id, …`, so each market row is distinct and a Power BI join on body does not fan out. Read the fixture for its row and market counts rather than pasting a figure (see `_critic_notes.md` for why a pasted fixture figure is a liability). `stockpiles.csv` is near-empty by design — the economy drains pools to market each tick — so it is not a market-ledger input, just noted so it isn't mistaken for one.
 
 ## 5. Close / toggle semantics
-Nav-rail slot-6 icon toggles the ledger open/closed. Re-clicking the **currently-active sub-view tab** (Goods / Trades) **closes the ledger** — `nav_button` takes `&open`; it does not collapse to an overview. Switching *between* tabs just changes view. The Body / Market selectors are cross-cutting and **never** trigger the close (toggle-exempt); Remove and the add form are in-view presses. Opening the ledger closes whichever other ledger held the column (accordion, `close_all_panels`).
+Nav-rail slot-5 icon toggles the ledger open/closed. Re-clicking the **currently-active sub-view tab** (Goods / Trades) **closes the ledger** — `nav_button` takes `&open`; it does not collapse to an overview. Switching *between* tabs just changes view. The Body / Market selectors are cross-cutting and **never** trigger the close (toggle-exempt); Remove and the add form are in-view presses. Opening the ledger closes whichever other ledger held the column (accordion, `close_all_panels`).
 
 ## Open questions for Ben
 - **Default market when none picked.** The ledger falls back to `home_body`'s **first market by ascending entity id**. On a multi-market body, is "first market" the right default landing, or should Prices open on the **highest-turnover** market (more informative first glance)?

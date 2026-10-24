@@ -2,7 +2,7 @@
 
 > **Working design doc** for the ledger pass. Ben, 2026-08-29: *"I think we can make convoys into
 > a ledger of its own."* · Source: currently `src/ui/market_ledger.cpp` (the Convoys view) ·
-> Menu slot: `rail slot 7 "Convoys"`, directly after Market (Ben, 2026-08-29) ·
+> Menu slot: `rail slot 6 "Convoys"`, directly after Market (Ben, 2026-08-29) ·
 > Host: shell fold-out column, ~380 px at 1280 and 384 px at 1920 (`shell_column_width`).
 > Authority for the mechanism: [`SUPPLY.md`](../../economy/SUPPLY.md). This doc is the surface.
 

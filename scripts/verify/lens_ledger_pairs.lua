@@ -78,14 +78,14 @@ local function pair(slot, label, want, shot, disarms)
     end
 end
 
--- Slot 6, Market ledger -> the price/catchment wash. Ben, 2026-08-30.
-pair(6, "market ledger", "market", "lenspair_market", true)
+-- Slot 5, Market ledger -> the price/catchment wash. Ben, 2026-08-30.
+pair(5, "market ledger", "market", "lenspair_market", true)
 
--- Slot 7, Convoys ledger -> the lane overlay. Landed with BL-689 and, for the
+-- Slot 6, Convoys ledger -> the lane overlay. Landed with BL-689 and, for the
 -- reason in this file's header, has never been asserted until now.
-pair(7, "convoys ledger", "supply_routes", "lenspair_convoys", true)
+pair(6, "convoys ledger", "supply_routes", "lenspair_convoys", true)
 
--- Slot 10, History -> the Continent lens, but ON ENTERING THE TECTONICS VIEW
+-- Slot 9, History -> the Continent lens, but ON ENTERING THE TECTONICS VIEW
 -- rather than on opening the ledger (Ben's ruling on NR-742). A different rule
 -- from the two above, so it gets its own assertions rather than pair()'s.
 --
@@ -94,9 +94,9 @@ pair(7, "convoys ledger", "supply_routes", "lenspair_convoys", true)
 -- on Story. Three properties are checked, and the third is the one that makes
 -- "on entering" mean something.
 local function tectonics_pair()
-    local x, y = verify.nav_slot(10)
+    local x, y = verify.nav_slot(9)
     if x == nil then
-        print("FAIL history: rail slot 10 has no centre"); fails = fails + 1; return
+        print("FAIL history: rail slot 9 has no centre"); fails = fails + 1; return
     end
 
     -- 1. Opening History on a NON-Tectonics view must arm nothing.
