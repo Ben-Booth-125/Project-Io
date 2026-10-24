@@ -396,6 +396,24 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // earned with the rail running.
     out.rail = hand_over_rail(w);
     print_rail_handover(out.rail);
+    // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS
+    // (PRODUCTION.md § A building needs a road; LOGISTICS.md § 4, "Generation roads every
+    // building site"). Generation roaded the sites it had laid by its tail; everything
+    // between that point and here stamps more -- the winner's charters, the state
+    // handover's transfers (same tiles, so free), the rail stations.
+    // THE NETWORK IS THE ROADS AND THE RAIL (Ben, 2026-10-24): BEFORE THE SEEDING, and
+    // joining every site to its own nation's capital network over its own ground. The
+    // seeding covers only what a road reaches, so a site roaded after it (the order this
+    // call used to run in) was counted unconnectable: 128 of 360 consumers on seed 0.
+    out.site_roads = lay_site_roads_every_body(w);
+    std::printf("[site roads] finish: %d site tile(s), %d unroaded -> %d joined, "
+                "%d unreachable, %d rejoined to their capital's network, %d cut off by "
+                "water (%d crossing(s))\n",
+                out.site_roads.sites, out.site_roads.sites_roadless,
+                out.site_roads.sites_joined, out.site_roads.sites_failed,
+                out.site_roads.sites_rejoined, out.site_roads.sites_cut_off,
+                out.site_roads.crossings_laid);
+    std::fflush(stdout);
     // BL-1309 -- THE LOGISTIC POINT SOURCES (LOGISTICS.md § Logistic Points,
     // "One pool"): production consumes its host nation's points, so the fold
     // stands enough logistics hubs that every producing building is reached and
@@ -423,39 +441,23 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // (LOGISTICS.md, Ben 2026-10-23).
     lp_seed_read_at_gate(w, reg, out.lp);
     print_lp_seed_report(out.lp);
-    // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS
-    // (PRODUCTION.md § A building needs a road; LOGISTICS.md § 4, "Generation roads every
-    // building site"). Generation roaded the sites it had laid by its tail; everything
-    // between that point and here stamps more -- the winner's charters, the state
-    // handover's transfers (same tiles, so free), the rail stations and the LP hubs. The
-    // rule binds the generated world as it binds play, so the last stamper is followed by
-    // the pass. BEFORE THE SETTLE: the twelve econ ticks are played on a world the rule
-    // already holds for, and a hub laid here is on the network for the first of them.
-    // Idempotent and cheap on an already-roaded world (one map walk, no A*).
+    // BL-1347, the SECOND site-road call: the seeding above stood hubs and ports, and a
+    // port it landed on an island coast may carry no road yet. Idempotent: every site the
+    // pre-seeding call joined is skipped. Before the settle, so the twelve econ ticks
+    // play on a world the rule already holds for.
     {
-        std::vector<entity_id> bodies;
-        for (const auto& [bid, bc] : w.bodies)
-        {
-            (void)bc;
-            bodies.push_back(bid);
-        }
-        std::sort(bodies.begin(), bodies.end()); // deterministic: bodies is unordered
-        for (const entity_id b : bodies)
-        {
-            const site_road_stats s = lay_site_roads(w, b);
-            out.site_roads.sites          += s.sites;
-            out.site_roads.sites_roadless += s.sites_roadless;
-            out.site_roads.sites_joined   += s.sites_joined;
-            out.site_roads.sites_failed   += s.sites_failed;
-            out.site_roads.crossings_laid += s.crossings_laid;
-            out.site_roads.long_crossing  += s.long_crossing;
-            out.site_roads.half_crossings_refused += s.half_crossings_refused;
-        }
-        std::printf("[site roads] finish: %d site tile(s), %d unroaded -> %d joined, "
-                    "%d unreachable (%d crossing(s))\n",
-                    out.site_roads.sites, out.site_roads.sites_roadless,
-                    out.site_roads.sites_joined, out.site_roads.sites_failed,
-                    out.site_roads.crossings_laid);
+        const site_road_stats s = lay_site_roads_every_body(w);
+        out.site_roads.sites_roadless += s.sites_roadless;
+        out.site_roads.sites_joined   += s.sites_joined;
+        out.site_roads.sites_failed   += s.sites_failed;
+        out.site_roads.crossings_laid += s.crossings_laid;
+        out.site_roads.long_crossing  += s.long_crossing;
+        out.site_roads.half_crossings_refused += s.half_crossings_refused;
+        out.site_roads.sites_rejoined += s.sites_rejoined;
+        out.site_roads.sites_cut_off  += s.sites_cut_off;
+        std::printf("[site roads] after seeding: %d unroaded -> %d joined, %d unreachable "
+                    "(%d crossing(s))\n",
+                    s.sites_roadless, s.sites_joined, s.sites_failed, s.crossings_laid);
         std::fflush(stdout);
     }
     out.ms_search = ms_between(t_search, fin_clock::now());

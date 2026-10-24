@@ -431,6 +431,14 @@ struct site_road_stats
     int crossings_laid = 0; ///< crossings written, summed over the routes laid
     int long_crossing  = 0; ///< routes refused by the bridge cap alone
     int half_crossings_refused = 0; ///< BL-1376: crossings a terminal water run cost a route
+    /// Ben, 2026-10-24 (the network is the roads and the rail): sites joined to their OWN
+    /// nation's road network -- the own-ground road component holding its capital -- by an
+    /// own-ground Track. `sites_rejoined` counts those that already carried a road, but on
+    /// a fragment the capital's network does not reach; `sites_cut_off` those with no
+    /// own dry-ground route to it at all (an island: the LP seeding's sea bridge serves
+    /// them), counted, never forced.
+    int sites_rejoined = 0;
+    int sites_cut_off  = 0;
     long long walks    = 0; ///< world flood-field count when the pass ended (its cost)
     /// Road edges in the world by tier (Track / Road / Highway), counted once each
     /// (`count_road_edges`), as the pass FOUND them and as it LEFT them. The measurement
@@ -441,8 +449,14 @@ struct site_road_stats
 };
 
 /// Lay a Track from the network to every building tile on @p body that carries no road
-/// edge. Call AFTER everything that stamps a generated building. Idempotent.
+/// edge, and join every building tile to its own nation's capital network over its own
+/// dry ground (Ben, 2026-10-24). Call AFTER everything that stamps a generated building
+/// and BEFORE `seed_logistics_sources`, which covers only what a road reaches. Idempotent.
 site_road_stats lay_site_roads(world& w, entity_id body);
+
+/// `lay_site_roads` on every body, ascending body id, the stats summed (edge counts too).
+/// The one call `finish_campaign_world` and its harness mirror make (Ben, 2026-10-24).
+site_road_stats lay_site_roads_every_body(world& w);
 
 /// Undo every raise @p trace recorded, last first: the road field as `lay_market_roads`
 /// found it. Drops the logistics caches. For instruments reading the pre-pass network

@@ -276,6 +276,18 @@ play: the road pass lays a crossing to every site it stamps, so the 1960 world c
 the rule would have refused. The alternative — exempting what generation laid — would have made the
 opening world the one place the rule does not hold.
 
+**A site's road joins its own nation's network, before the sources are seeded (Ben, 2026-10-24).**
+Logistic Points travel only along roaded edges (§ Logistic Points), so a road that touches a site
+serves it only if it belongs to the network the nation's points are laid out on: the road
+component, over the nation's own dry ground, that holds its capital. Generation joins each site to
+the nearest tile of that component by a Track laid over the nation's own dry ground — never across
+a neighbour's tiles, never over water, and reusing the roads that already shorten the way. A site
+already roaded but stranded on a fragment the capital's network does not reach is joined the same
+way. The join runs after the last stamper and before the Logistic Point seeding, because the
+seeding covers only what a road reaches. A site with no own dry-ground route to its capital —
+ground the sea or a neighbour cuts off — is counted, not forced: it keeps the nearest-road rule
+above, and the seeding's sea bridge or a later road serves it.
+
 **Pathfinding is unchanged in shape.** A* still walks 4-cardinal neighbours over the body grid and
 still derives the hex side of each step (`hex_side_for_offset`), the two diagonal sides the
 cardinal walk skips carrying no road a step can use — the same geometry the river discount has
