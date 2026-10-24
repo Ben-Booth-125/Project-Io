@@ -221,6 +221,15 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                     for (const entity_id mid : mids)
                     {
                         const market_component& mc = w.markets.at(mid);
+                        // NR-1072 (Ben, 2026-10-24): a nation buys its network
+                        // upkeep only from its OWN markets - those whose centre
+                        // stands on its ground - never the fullest shelf in the
+                        // world, which drained every trade building's market.
+                        {
+                            const auto cn = w.tile_to_nation.find(mc.centre_tile);
+                            if (cn == w.tile_to_nation.end() || cn->second != nid)
+                                continue;
+                        }
                         if (!(mc.base_price[ri] > 0.0f))
                             continue; // untradeable there: no price basis
                         // BL-1172: the same fair-price ceiling every goods

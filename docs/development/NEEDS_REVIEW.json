@@ -726,7 +726,7 @@
    "title": "Network upkeep bills 2-4x the world's stone and timber, so trade buildings starve and auto trade stops by tick 4",
    "raised": "2026-10-24",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben's live click (trade from the start) + diagnosis lane, 2026-10-24",
    "what": "Ben asked for Marketplaces and automatic trade from the start. Generation places them (17 Marketplaces, 11 Ports on seed 0). Two causes stopped the trade: (1) FIXED - the fold discarded the opening stock (c404a607), so shelves opened empty; now 81 then 36 auto shipments go out on ticks 2-3. (2) OPEN - network upkeep (BL-643, the logistics_maintenance line; scripts/economy.lua network_upkeep) bills ~2383 stone and ~1191 timber a tick on seed 0 (3402 highway + 2480 road edges, 130 hubs; seed 1 3065/1532, seed 28 1356/678, seed 46 2346/1173) against ~640 stone / ~580 timber dug. Each nation buys from the largest shelf anywhere, after the clear, so the trade buildings' own upkeep (coal 0.25 / timber 0.15 / stone 0.15 a Marketplace) finds empty shelves and they make no trade points. The fold made it bite: the firms' cash now sits in treasuries, so the maintenance line can afford the whole bill (before, timber drew 5-46 a tick; now 100-1043). It was already partly true before the sprint: pre-fold seed 0 also starved stone by tick 4 and haulage read 0 convoys there - the old 868 came from seeds 1 and 2. Not the cause: no producer idled, Logistic Points fully granted, network code unchanged.",
    "why_it_matters": "Trade - one of the two pillars - stops in the first year on every measured seed, and the logistics network looks broken while the money flows elsewhere.",
@@ -742,7 +742,7 @@
     "src/world/network_upkeep.cpp",
     "tools/verify/trade_pass_probe.cpp"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-24: A and B - network upkeep re-rated to what the world produces (every rate a tenth of the first cut: seed 0 bills ~37% of stone and ~20% of timber dug, in-band) and a nation buys it only from its own markets. Measured: trade runs every tick on seeds 0/28/46 (134-186 points a tick on seed 0); haulage_measure --far-trade 898 / 851 convoys (pre-sprint 868 / 1042), PASS; nation_ai_builds ALL PASS (seed 46 majors build again, BL-1409's headline); market_viability FULL G1 95.6 G1t50 84.6 (0.4 under its 85 target - recorded, not tuned for; in-band calibration rule, Ben 2026-10-13) G1b 2.4 G2 163.0 G3 100.0."
   }
  ]
 }

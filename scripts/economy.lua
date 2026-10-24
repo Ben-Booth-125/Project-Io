@@ -1064,15 +1064,23 @@ economy = {
     -- per quarter; retune by playtest against demand_census. The loader
     -- rejects a non-finite or negative value by key; an absent key (or table)
     -- keeps the zero default, which derives no draw at all.
+    -- NR-1072 (Ben, 2026-10-24): RE-RATED TO WHAT THE WORLD PRODUCES. Summed
+    -- over a world the first-cut rates billed 2-4x the stone and timber dug
+    -- (seed 0: 2383 stone / 1191 timber a tick against ~640 / ~580), so the
+    -- network bought every shelf dry and every Marketplace and Port starved of
+    -- its own upkeep. Every rate is a TENTH of the first cut: seed 0's bill is
+    -- then ~37% of the stone and ~20% of the timber dug - a real demand, not a
+    -- drain (in-band calibration, logged). A nation buys only from its own
+    -- markets (network_upkeep.cpp).
     network_upkeep = {
-        stone_track    = 0.05,  -- stone per Track tile per quarter
-        stone_road     = 0.15,  -- ...per Road tile
-        stone_highway  = 0.40,  -- ...per Highway tile
-        timber_track   = 0.025, -- timber per Track tile per quarter
-        timber_road    = 0.075, -- ...per Road tile
-        timber_highway = 0.20,  -- ...per Highway tile
-        stone_hub      = 5.0,   -- stone per active port / inland hub per quarter
-        timber_hub     = 2.5,   -- timber per active port / inland hub per quarter
+        stone_track    = 0.005,  -- stone per Track tile per quarter
+        stone_road     = 0.015,  -- ...per Road tile
+        stone_highway  = 0.040,  -- ...per Highway tile
+        timber_track   = 0.0025, -- timber per Track tile per quarter
+        timber_road    = 0.0075, -- ...per Road tile
+        timber_highway = 0.020,  -- ...per Highway tile
+        stone_hub      = 0.5,    -- stone per active port / inland hub per quarter
+        timber_hub     = 0.25,   -- timber per active port / inland hub per quarter
     },
 
     -- BL-1273: the research dials (RESEARCH.md § What is open; the conversion is

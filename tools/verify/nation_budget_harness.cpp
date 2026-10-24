@@ -1546,7 +1546,14 @@ int main()
             // tile on UNCLAIMED ground, an under-construction hub, and a
             // decommissioned hub — none of them may move the bill.
             for (int x = 0; x < 4; ++x)
-                add_tile(s.f.w, s.body_a, x, 0, /*road=*/1, s.f.nation_a);
+            {
+                const entity_id t = add_tile(s.f.w, s.body_a, x, 0, /*road=*/1, s.f.nation_a);
+                // NR-1072 (Ben, 2026-10-24): a nation buys its network upkeep only
+                // from its OWN markets, so the fixture's market is centred on the
+                // nation's ground, as a real one is.
+                if (x == 0)
+                    s.f.w.markets.at(s.market).centre_tile = t;
+            }
             const entity_id hw = add_tile(s.f.w, s.body_a, 0, 1, /*road=*/3, s.f.nation_a);
             (void)hw;
             const entity_id port_tile = add_tile(s.f.w, s.body_a, 1, 1, /*road=*/0, s.f.nation_a);

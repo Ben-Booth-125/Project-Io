@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*50 entries — 33 open, 17 resolved.*
+*50 entries — 32 open, 18 resolved.*
 
 ---
 
@@ -300,22 +300,6 @@ On the folded world (BL-1402), seed 46's 4 majors place NO production building i
 
 *Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/spawn_seat.cpp`*
 
-### NR-1072 — Network upkeep bills 2-4x the world's stone and timber, so trade buildings starve and auto trade stops by tick 4
-*question · raised 2026-10-24 · from Ben's live click (trade from the start) + diagnosis lane, 2026-10-24*
-
-Ben asked for Marketplaces and automatic trade from the start. Generation places them (17 Marketplaces, 11 Ports on seed 0). Two causes stopped the trade: (1) FIXED - the fold discarded the opening stock (c404a607), so shelves opened empty; now 81 then 36 auto shipments go out on ticks 2-3. (2) OPEN - network upkeep (BL-643, the logistics_maintenance line; scripts/economy.lua network_upkeep) bills ~2383 stone and ~1191 timber a tick on seed 0 (3402 highway + 2480 road edges, 130 hubs; seed 1 3065/1532, seed 28 1356/678, seed 46 2346/1173) against ~640 stone / ~580 timber dug. Each nation buys from the largest shelf anywhere, after the clear, so the trade buildings' own upkeep (coal 0.25 / timber 0.15 / stone 0.15 a Marketplace) finds empty shelves and they make no trade points. The fold made it bite: the firms' cash now sits in treasuries, so the maintenance line can afford the whole bill (before, timber drew 5-46 a tick; now 100-1043). It was already partly true before the sprint: pre-fold seed 0 also starved stone by tick 4 and haulage read 0 convoys there - the old 868 came from seeds 1 and 2. Not the cause: no producer idled, Logistic Points fully granted, network code unchanged.
-
-**Why it matters.** Trade - one of the two pillars - stops in the first year on every measured seed, and the logistics network looks broken while the money flows elsewhere.
-
-- A) Re-rate network upkeep down to what the world produces (a constant retune: the 'tens per quarter' figure holds per nation but sums to 2-4x supply).
-- B) A nation buys its network upkeep only from its OWN markets, not the largest shelf in the world (a draw rule).
-- C) Serve trade-building upkeep before network upkeep (an order of service).
-- D) Accept it: trade stops until supply catches up.
-
-> **Recommendation:** A and B together: the rate is an authored first cut ('retune by playtest'), and buying repairs from the far side of the world is the part that drains every trade shelf.
-
-*Files: `scripts/economy.lua`, `src/world/network_upkeep.cpp`, `tools/verify/trade_pass_probe.cpp`*
-
 ---
 
 ## Resolved
@@ -475,4 +459,22 @@ Your 2026-10-18 rule says no tile of a nation may hold more points than its capi
 **Why it matters.** Decides whether the census gate is the routing reading (built; passes on all 16 seeds) or the field reading (fails wherever rail runs).
 
 > **RESOLVED.** Ben, 2026-10-23 (the logistics funding form): the routing reading. a) as built.
+
+### NR-1072 — Network upkeep bills 2-4x the world's stone and timber, so trade buildings starve and auto trade stops by tick 4
+*question · raised 2026-10-24 · from Ben's live click (trade from the start) + diagnosis lane, 2026-10-24*
+
+Ben asked for Marketplaces and automatic trade from the start. Generation places them (17 Marketplaces, 11 Ports on seed 0). Two causes stopped the trade: (1) FIXED - the fold discarded the opening stock (c404a607), so shelves opened empty; now 81 then 36 auto shipments go out on ticks 2-3. (2) OPEN - network upkeep (BL-643, the logistics_maintenance line; scripts/economy.lua network_upkeep) bills ~2383 stone and ~1191 timber a tick on seed 0 (3402 highway + 2480 road edges, 130 hubs; seed 1 3065/1532, seed 28 1356/678, seed 46 2346/1173) against ~640 stone / ~580 timber dug. Each nation buys from the largest shelf anywhere, after the clear, so the trade buildings' own upkeep (coal 0.25 / timber 0.15 / stone 0.15 a Marketplace) finds empty shelves and they make no trade points. The fold made it bite: the firms' cash now sits in treasuries, so the maintenance line can afford the whole bill (before, timber drew 5-46 a tick; now 100-1043). It was already partly true before the sprint: pre-fold seed 0 also starved stone by tick 4 and haulage read 0 convoys there - the old 868 came from seeds 1 and 2. Not the cause: no producer idled, Logistic Points fully granted, network code unchanged.
+
+**Why it matters.** Trade - one of the two pillars - stops in the first year on every measured seed, and the logistics network looks broken while the money flows elsewhere.
+
+- A) Re-rate network upkeep down to what the world produces (a constant retune: the 'tens per quarter' figure holds per nation but sums to 2-4x supply).
+- B) A nation buys its network upkeep only from its OWN markets, not the largest shelf in the world (a draw rule).
+- C) Serve trade-building upkeep before network upkeep (an order of service).
+- D) Accept it: trade stops until supply catches up.
+
+> **Recommendation:** A and B together: the rate is an authored first cut ('retune by playtest'), and buying repairs from the far side of the world is the part that drains every trade shelf.
+
+> **RESOLVED.** Ben, 2026-10-24: A and B - network upkeep re-rated to what the world produces (every rate a tenth of the first cut: seed 0 bills ~37% of stone and ~20% of timber dug, in-band) and a nation buys it only from its own markets. Measured: trade runs every tick on seeds 0/28/46 (134-186 points a tick on seed 0); haulage_measure --far-trade 898 / 851 convoys (pre-sprint 868 / 1042), PASS; nation_ai_builds ALL PASS (seed 46 majors build again, BL-1409's headline); market_viability FULL G1 95.6 G1t50 84.6 (0.4 under its 85 target - recorded, not tuned for; in-band calibration rule, Ben 2026-10-13) G1b 2.4 G2 163.0 G3 100.0.
+
+*Files: `scripts/economy.lua`, `src/world/network_upkeep.cpp`, `tools/verify/trade_pass_probe.cpp`*
 

@@ -495,6 +495,11 @@ bill is **geography, never population** — network size is derived from the wor
 channel scales exactly as MARKETS.md § Demand channels property 1 demands. The purchase is the
 state-purchase shape (NATIONS.md § A budget): bought off the market's shelf at its posted price,
 under the fair-price ceiling, and the goods **consumed** — repairs go into the roadbed.
+**A nation buys its repairs only from its own markets** — those whose centre stands on its ground —
+**and the rates are sized to what the world produces** (Ben, 2026-10-24, NR-1072): summed over a
+world, the bill is a fraction of the stone and timber dug, so the network is a real demand on the
+quarry and the sawmill without emptying the shelves the Marketplaces and Ports draw their own upkeep
+from.
 Unlike the space programme's lumps the claim is **pro-rata** (rule 3): upkeep is continuous, so
 half the repair budget buys half the materials, and an underfunded quarter is a reported partial
 fill, never a banked lump. Consistent with the binary ruling above, an unfunded draw degrades
