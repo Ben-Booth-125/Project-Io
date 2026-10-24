@@ -5,7 +5,7 @@
 
 namespace ui {
 
-/// Draws the Convoys ledger — nav rail slot 7, directly after Market.
+/// Draws the Convoys ledger — nav rail slot 6, directly after Market.
 ///
 /// "What is on its way, and what is it costing me?" One row per convoy of the
 /// player's corp in flight: cargo and quantity, origin -> destination, a progress

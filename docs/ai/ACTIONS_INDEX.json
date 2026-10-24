@@ -83,15 +83,15 @@
   ],
   [
    "gameplay.set_trade",
-   "The 'Trades' tab of the Market Ledger (nav rail slot 6 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades)."
+   "The 'Trades' tab of the Market Ledger (nav rail slot 5 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades)."
   ],
   [
    "gameplay.clear_trade",
-   "The 'Trades' tab of the Market Ledger (nav rail slot 6 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades)."
+   "The 'Trades' tab of the Market Ledger (nav rail slot 5 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades)."
   ],
   [
    "gameplay.set_trade_reserve",
-   "The 'Trades' tab of the Market Ledger (nav rail slot 6 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades). The 'Trade points' section heads the tab."
+   "The 'Trades' tab of the Market Ledger (nav rail slot 5 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades). The 'Trade points' section heads the tab."
   ],
   [
    "gameplay.hold_convoy",
@@ -351,11 +351,11 @@
   ],
   [
    "ledger.nav_market",
-   "Nav rail, slot 6 (Market Ledger icon)"
+   "Nav rail, slot 5 (Market Ledger icon)"
   ],
   [
    "ledger.nav_convoys",
-   "Nav rail, slot 7 (Convoys icon), directly after Market"
+   "Nav rail, slot 6 (Convoys icon), directly after Market"
   ],
   [
    "ledger.selection_body_goto_surface",
@@ -547,7 +547,7 @@
   ],
   [
    "gameplay.buy_corporation",
-   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): the buyout, the ownership class and the firms are retired; ground and what stands on it change hands only by conquest (docs/politics/NATIONS.md § Own ground). The Acquisitions ledger (rail slot 5) and the Company lens that reached it retired with it). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
+   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): the buyout, the ownership class and the firms are retired; ground and what stands on it change hands only by conquest (docs/politics/NATIONS.md § Own ground). The Acquisitions ledger (rail slot 5, whose slot then left the rail, Ben 2026-10-24) and the Company lens that reached it retired with it). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.take_seat",

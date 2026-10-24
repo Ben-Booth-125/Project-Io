@@ -105,3 +105,60 @@ verify.expect(card.lp_uses <= card.lp_need + 0.001,
 print("[throughput_lens] tile card logistics: makes " .. tostring(card.lp_makes)
       .. ", uses " .. tostring(card.lp_uses) .. " of " .. tostring(card.lp_need)
       .. ", rivals hidden " .. tostring(card.lp_rivals_hidden))
+
+-- T5 - ABSOLUTE POINTS, GENERATED AND CONSUMED (Ben, 2026-10-24: "the logistics lens
+-- should show absolute numbers rather than a percentage. It should also show both the
+-- amount generated, and the amount consumed"). The key's figures are the player
+-- nation's own, read off the tick's resolve; what it consumed can never exceed what
+-- it generated, and production is never granted more than it asked. Stepped first so
+-- the report carries a real resolve (shipments draw only in a stepped tick).
+verify.clear_selection()
+verify.econ_step(4)
+verify.frames(2)
+local k = verify.throughput_key()
+print(string.format("[throughput_lens] key: generated %.1f by %d source(s); consumed %.1f "
+      .. "(production %.1f of %.1f asked, %.1f needed; marches %.1f, shipments %.1f)",
+      k.generated, k.sources, k.consumed, k.production, k.asked, k.needed, k.marches, k.shipments))
+verify.expect(k.known, "T5: the key has the player's nation to show")
+verify.expect(k.generated > 0, "T5: the player nation generates Logistic Points ("
+              .. tostring(k.generated) .. ")")
+verify.expect(k.consumed <= k.generated + 0.5,
+              "T5: consumed (" .. tostring(k.consumed) .. ") never exceeds generated ("
+              .. tostring(k.generated) .. ")")
+verify.expect(k.production <= k.asked + 0.5,
+              "T5: production is granted no more than it asked")
+verify.expect(k.asked <= k.needed + 0.5,
+              "T5: what production asks never exceeds what it needs (" .. tostring(k.needed) .. ")")
+frame_tile(sx, sy, 9)
+local pt = verify.tile_screen(sx, sy)
+if pt.ok then
+  verify.mouse(pt.x, pt.y)
+  verify.frames(40)
+end
+shot("throughput_lens_absolute_card")
+
+-- T6 - THE SAME FIGURES WITH A CONNECTED SOURCE STAGED, so the numbers have something
+-- to show whatever the generated world gives the seat. A logistics hub beside the
+-- source framed above joins it to the chain; the key must then generate, every
+-- consumed figure stays inside what was generated, and the hover card over the hub's
+-- ground reads absolute points both ways (captured: throughput_lens_staged_card).
+local hub = verify.stage_building(sx, sy - 1, "logistics_hub")
+verify.expect(hub ~= 0, "T6: a logistics hub stages beside the source")
+-- One tick, so the report's resolve (what the lens reads) includes the staged hub.
+verify.econ_step(1)
+verify.frames(3)
+local k6 = verify.throughput_key()
+print(string.format("[throughput_lens] staged: generated %.1f by %d source(s); consumed %.1f "
+      .. "(production %.1f of %.1f asked)", k6.generated, k6.sources, k6.consumed,
+      k6.production, k6.asked))
+verify.expect(k6.generated > 0, "T6: with a connected hub the player nation generates points ("
+              .. tostring(k6.generated) .. ")")
+verify.expect(k6.consumed <= k6.generated + 0.5, "T6: consumed never exceeds generated")
+verify.expect(k6.production <= k6.asked + 0.5, "T6: production is granted no more than it asked")
+frame_tile(sx, sy, 9)
+local pt6 = verify.tile_screen(sx, sy - 1)
+if pt6.ok then
+  verify.mouse(pt6.x, pt6.y)
+  verify.frames(40)
+end
+verify.capture("throughput_lens_staged_card")

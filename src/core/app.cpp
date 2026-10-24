@@ -2783,7 +2783,7 @@ void app::render()
     // game state), rather than inventing a second haulage model that could
     // disagree with the one that actually bills the player.
     ui::draw_market_ledger(m_world, m_registry, m_ui, m_market_history, m_ui.show_market_ledger);
-    // Convoys ledger (BL-689) — nav slot 7, directly after Market. Was the Market
+    // Convoys ledger (BL-689) — nav slot 6, directly after Market. Was the Market
     // ledger's third tab until the Goods flattening deleted that strip; it left
     // rather than being re-homed because a convoy is cargo in transit and belongs
     // to SUPPLY.md, not to the doc that owns clearing and the order book.
@@ -2798,8 +2798,8 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
-    // BL-1406: the Acquisitions ledger (slot 5), the Company ledger and the
-    // corporation stance table (slot 9) retired with the firms (Ben, 2026-10-23).
+    // BL-1406: the Acquisitions ledger (old slot 5, retired 2026-10-24), the Company ledger
+    // and the corporation stance table (Diplomacy, now slot 8) retired with the firms (Ben, 2026-10-23).
     // NO CONTRACTS LEDGER, AND NO MERCENARY CONTRACT AT ALL (BL-693, then
     // NR-731 on 2026-08-30). The SELL side of CONTRACTS.md is gone to the
     // world layer: records, passes, serialisation and comms traffic. What is

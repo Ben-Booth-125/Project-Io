@@ -981,6 +981,44 @@ float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile, lp_coverage_
     return r.cover;
 }
 
+float lp_points_reaching(world& w, lp_reach_memo& memo, const lp_tick& t, entity_id tile,
+                         int* sources_out)
+{
+    if (sources_out != nullptr)
+        *sources_out = 0;
+    const auto tit = w.tiles.find(tile);
+    const auto nit = w.tile_to_nation.find(tile);
+    if (tit == w.tiles.end() || nit == w.tile_to_nation.end())
+        return 0.0f;
+    const entity_id nation = nit->second;
+    const entity_id body   = tit->second.body;
+    const entity_id centre = chain_anchor(w, nation, body);
+    float sum = 0.0f;
+    int   n   = 0;
+    // Ascending building id (memo_sources' order), so the float sum is replay-exact.
+    for (const lp_source_ref& s : memo_sources(w, memo, nation, body))
+    {
+        const auto& f   = memo_field(w, memo, s, body);
+        const auto  dit = f.find(tile);
+        if (dit == f.end())
+            continue;
+        const float r = lp_reach(s.network, dit->second);
+        if (!(r > 0.0f) || !memo_connected(w, memo, nation, s, body, centre))
+            continue;
+        // `t.sources` is ascending building id: a binary search, not a walk.
+        const auto sit = std::lower_bound(
+            t.sources.begin(), t.sources.end(), s.building,
+            [](const lp_source_row& row, entity_id id) { return row.building < id; });
+        if (sit == t.sources.end() || sit->building != s.building)
+            continue; // not in this tick's resolve: it made nothing this tick
+        sum += r * sit->made;
+        ++n;
+    }
+    if (sources_out != nullptr)
+        *sources_out = n;
+    return sum;
+}
+
 // ---------------------------------------------------------------------------
 // Generation
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ namespace ui {
 /// Draw the left navigation pane.
 ///
 /// A fixed, full-height **icon rail** at the left edge of the window holding a
-/// vertical strip of ten square icon slots. Each slot will eventually open one of
+/// vertical strip of twelve square icon slots. Each slot will eventually open one of
 /// the game's menus or ledgers; the slot shows a vector glyph (see
 /// ui::icons) rather than a worded label, with the menu name in a hover tooltip.
 /// For Layer 2 only one slot is wired — the Tile Ledger — and it toggles

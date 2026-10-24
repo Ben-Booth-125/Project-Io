@@ -595,7 +595,7 @@ struct ui_state
     bool convoys_ledger_was_open = false;
     bool tile_ledger_was_open    = false;
 
-    /// Whether the Convoys ledger is open (BL-689). Nav-rail slot 7, directly
+    /// Whether the Convoys ledger is open (BL-689). Nav-rail slot 6, directly
     /// after Market. It was the Market ledger's third tab until the Goods
     /// flattening deleted that strip, and it left rather than being re-homed
     /// because it was never a market question: a convoy is cargo in transit and
@@ -609,7 +609,7 @@ struct ui_state
     // aimed row retired with the company and the corporation (Ben, 2026-10-23).
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
-    // BL-1406: the Acquisitions ledger (rail slot 5) and every flag that drove it
+    // BL-1406: the Acquisitions ledger (rail slot 5, itself retired 2026-10-24) and every flag that drove it
     // retired with the buyout (docs/ui/ledgers/acquisitions.md). None of it was
     // ever serialised, so removing it does not move the save envelope.
 
@@ -925,7 +925,7 @@ struct ui_state
     int  budget_wage_tier = 2;
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
-    // BL-1406: the corporation stance table (rail slot 9, Diplomacy) retired with
+    // BL-1406: the corporation stance table (rail slot 8 now, Diplomacy) retired with
     // the corporation (docs/ui/ledgers/corporation.md § Slot 8, retired).
 
     /// F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
@@ -944,7 +944,7 @@ struct ui_state
     /// management relocated here from the Construction/Building panel).
     ///
     /// There is no view 2. Convoys held it (BL-453) until BL-689 gave it rail
-    /// slot 7 and its own ledger; the draw clamps a stale 2 back to 0 so a save
+    /// slot 6 (7 until 2026-10-24) and its own ledger; the draw clamps a stale 2 back to 0 so a save
     /// or a verify hook carrying the old index lands on Goods rather than on
     /// nothing. View 1 becomes TRADES in a later slice (BL-687), which waits on
     /// an exchange record the world does not keep yet.
@@ -1323,26 +1323,34 @@ struct ui_state
     // LENSES.md argued a per-tile points figure could not vary, because every anchor
     // made the same authored rate and every tile had a finite reach cost. BL-1309
     // overtook that: points are made by hubs, stations and ports, they fade with
-    // distance along their own network, and `lp_coverage_at` is already a per-tile
-    // function. So the field below is the COVERAGE - how much of a building's need
-    // this ground can be served, in [0,1] - and the number drawn on a tile is that
-    // coverage as a percentage.
+    // distance along their own network. ABSOLUTE POINTS, NOT A SHARE (Ben,
+    // 2026-10-24: "the logistics lens should show absolute numbers rather than a
+    // percentage. It should also show both the amount generated, and the amount
+    // consumed"). So the field below is the LOGISTIC POINTS REACHING each tile from
+    // its nation's qualifying sources (`lp_points_reaching`), and the number drawn on
+    // a tile is that figure in LP/tick.
     //
-    /// Coverage per cell of the active body, row-major (y * gw + x), for the PLAYER'S
-    /// OWN NATION's ground only; -1 means "not this nation's" and is drawn as bare
-    /// ground. Empty when the lens is off. Derived view state on the same footing as
-    /// the anchors above: rebuilt from the tick's own resolve, never serialised, never
-    /// in state_hash, never read back by the simulation.
-    std::vector<float> lp_coverage;
-    int lp_coverage_gw = 0, lp_coverage_gh = 0;
+    /// LP/tick reaching each cell of the active body, row-major (y * gw + x), for the
+    /// PLAYER'S OWN NATION's ground only; -1 means "not this nation's" and is drawn as
+    /// bare ground. Empty when the lens is off. Derived view state on the same footing
+    /// as the anchors above: rebuilt from the tick's own resolve, never serialised,
+    /// never in state_hash, never read back by the simulation.
+    std::vector<float> lp_reaching;
+    int lp_reaching_gw = 0, lp_reaching_gh = 0;
 
-    /// The player nation's own figures for the key: the pool its sources make this
-    /// tick, how many sources made it, and what its ground is asking for. The numbers
-    /// a player can act on - everything else on the body is somebody else's business.
-    float lp_player_pool   = 0.0f;
-    float lp_player_claim  = 0.0f;
-    int   lp_player_sources = 0;
-    bool  lp_player_known   = false; ///< false when the player has no nation to show
+    /// The player nation's own figures for the key, all in LP/tick: what its connected
+    /// sources GENERATED (the pool), how many sources made it, and what its buildings
+    /// CONSUMED - production's grants, the marches' grants and what shipments drew -
+    /// beside what production asked for. The numbers a player can act on - everything
+    /// else on the body is somebody else's business.
+    float lp_player_pool     = 0.0f; ///< generated this tick
+    float lp_player_claim    = 0.0f; ///< production's claim (need x cover)
+    float lp_player_need     = 0.0f; ///< production's need at its run, cover aside
+    float lp_player_prod     = 0.0f; ///< consumed by production (granted)
+    float lp_player_march    = 0.0f; ///< consumed by marches (granted)
+    float lp_player_shipping = 0.0f; ///< consumed by shipments (drawn)
+    int   lp_player_sources  = 0;
+    bool  lp_player_known    = false; ///< false when the player has no nation to show
 
     /// BL-1353: the WHY behind the hovered tile's figure, for the Throughput ground
     /// card (SELECTION.md: Throughput takes a hover read, and still no selection).
@@ -1351,7 +1359,11 @@ struct ui_state
     /// `lp_hover_network` is an lp_network as an int (0 road, 1 rail, 2 sea), kept
     /// plain so this header does not pull in the resolver.
     entity_id lp_hover_tile     = null_entity;
-    float     lp_hover_coverage = 0.0f;
+    float     lp_hover_reaching = 0.0f; ///< LP/tick reaching the tile (lp_points_reaching)
+    int       lp_hover_sources  = 0;    ///< how many sources that came from
+    float     lp_hover_consumed = 0.0f; ///< LP/tick the tile's buildings were granted
+    float     lp_hover_need     = 0.0f; ///< LP/tick those buildings need at their run
+    int       lp_hover_consumers = 0;   ///< producing buildings on the tile
     bool      lp_hover_reached  = false;
     int       lp_hover_network  = 0;
     float     lp_hover_distance = 0.0f;

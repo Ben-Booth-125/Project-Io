@@ -15,7 +15,7 @@ The **navigation pane** is a fixed, full-height **icon rail** pinned to the left
 
 ## Structure
 
-- A vertical strip of **thirteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **ten curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the ten, **six carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, History; **Acquisitions** retired with the buyout and **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Corp. Strategy and Diplomacy are reserved** — disabled, but each carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
+- A vertical strip of **twelve square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **nine curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the nine, **six carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, History; **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23). **Acquisitions** retired with the buyout (Ben, 2026-10-23), and its slot is not on the rail: every slot after it moved up one (Ben, 2026-10-24). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Corp. Strategy and Diplomacy are reserved** — disabled, but each carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (the toggle rule, `.claude/rules/io-standing-rules.md`), or open another slot (accordion, `close_all_panels`).
@@ -29,24 +29,25 @@ this — default their open-state to closed.
 
 ### The tail — developer / observability slots
 
-Slots 11–13 sit after the curated player slots and never displace them; the tail is where surfaces that are **not player systems** live, and new ones go there rather than interleaving. Each is a live slot with its own glyph and tooltip, toggling like any other:
+Slots 10–12 sit after the curated player slots and never displace them; the tail is where surfaces that are **not player systems** live, and new ones go there rather than interleaving. Each is a live slot with its own glyph and tooltip, toggling like any other:
 
 | # | Slot | Surface |
 |---|---|---|
-| 11 | **Generation Ledger** (`icons::continent`) | why a tile generated as it did — the per-pass derivation and the body's histograms (BL-303, generation ledger; `../generation/GENERATION_LEDGER.md`) |
-| 12 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each AI nation decided and how close the call was (BL-407, decision feed) |
-| 13 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per nation over the recent run (BL-411, emergent strategy readout) |
+| 10 | **Generation Ledger** (`icons::continent`) | why a tile generated as it did — the per-pass derivation and the body's histograms (BL-303, generation ledger; `../generation/GENERATION_LEDGER.md`) |
+| 11 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each AI nation decided and how close the call was (BL-407, decision feed) |
+| 12 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per nation over the recent run (BL-411, emergent strategy readout) |
 
-Slot 12 borrows the pennant glyph slot 8 draws dim, because its subject is exactly the strategic decision that slot is reserved for; slot 13 has its own glyph because two *lit* slots must not share a silhouette.
+Slot 11 borrows the pennant glyph slot 7 draws dim, because its subject is exactly the strategic decision that slot is reserved for; slot 12 has its own glyph because two *lit* slots must not share a silhouette.
 
 ### Appending versus inserting
 
-The tail is the foot of the rail: **slot 13 is the last slot, and nothing sits below it.**
+The tail is the foot of the rail: **slot 12 is the last slot, and nothing sits below it.**
 
 Where a new surface goes is nonetheless a real decision, and the rail has both routes.
 **Insertion** puts a surface among the curated slots at the point the curated sequence would
-put it — Acquisitions (§ Menu set and ordering, slot 5) was inserted above Market on Ben's
-call (2026-08-29), because buying a firm read before the market it was priced from (the ledger has since retired).
+put it — Acquisitions was inserted above Market on Ben's call (2026-08-29), because buying a
+firm read before the market it was priced from. The ledger has since retired, and its slot with
+it (Ben, 2026-10-24).
 **Appending** puts it below the developer tail, outside both the curated set and the tail.
 
 The rule is the subject, not the convenience: a surface whose subject is one of the curated
@@ -90,8 +91,8 @@ each slot's position in the SYSTEMS.md tier list, so the curation is auditable.
 | 2 | **Budget** | 2 | Budget ([A4]) |
 | 3 | **Construction** | 3 | Infrastructure |
 | 4 | **Research** *(provisionally hosts the tech-tree mock)* | 7 | Research |
-| 5 | **Acquisitions** *(retired, Ben 2026-10-23)* | 2 | — the buyout retired; no surface |
-| 6 | **Market Ledger** | 1 | Trade ([A4]) |
+| 5 | **Market Ledger** | 1 | Trade ([A4]) |
+| 6 | **Convoys** | — | Supply (`SUPPLY.md`; added 2026-08-29, see below) |
 | 7 | **Corp. Strategy** *(reserved)* | 8 | Policy |
 | 8 | **Diplomacy** *(reserved)* | 9 | Diplomacy |
 | 9 | **History** | 6 | Environment |
@@ -108,9 +109,13 @@ Notes on the mapping:
   Nation overview dashboard (slot 1) rather than a rail subject of its own. The rail scales
   with *systems that have a broad surface*, per the menus-are-broad-ledgers rule.
 
-- **Slot 5 — Acquisitions, retired (Ben, 2026-10-23).** It listed which firms could be bought
-  outright and at what price (Ben, 2026-08-29). The buyout and the firms are retired
-  (`../GLOSSARY.md` § Buyout), so the slot has no surface; see `ledgers/acquisitions.md`.
+- **Acquisitions — retired, and off the rail (Ben, 2026-10-23; 2026-10-24).** It sat at slot 5
+  and listed which firms could be bought outright and at what price (Ben, 2026-08-29). The
+  buyout and the firms are retired (`../GLOSSARY.md` § Buyout). The slot first stayed inert so
+  nothing renumbered; Ben then retired it — *"we can retire rail slot 5, and move everything
+  up"* (2026-10-24) — so Market is 5 and every later slot moved up one. Nothing persists a slot
+  index (a save carries no UI state), so the renumber reaches no save. See
+  `ledgers/acquisitions.md`.
 - **Slot 1 — Nation overview (formerly the Corporation ledger; BL-248, corporation dashboard;
   BL-691, corp: how am I doing).** Its question is **"how well am I doing?"**, asked of the
   player's own nation (re-subjected, Ben, 2026-10-23), and it holds **one card, Balance**, folded
@@ -155,7 +160,7 @@ Notes on the mapping:
   corporation stance surface it hosted retired with the corporation (Ben, 2026-10-23;
   `ledgers/corporation.md` § Slot 8). Both follow the *ledgers-start-closed* convention above.
 - **Scope-widening names (settled by Q&A 2026-06-15).**
-  — **Convoys** (slot 7): **cargo in transit** — one row per convoy in flight, its route, its ETA
+  — **Convoys** (slot 6): **cargo in transit** — one row per convoy in flight, its route, its ETA
     in qtr and the haulage it has cost. Added 2026-08-29 on Ben's call, lifted out of the Market
     Ledger where it had been a third tab. It was never a market question: `MARKETS.md` owns
     clearing and the order book, and a convoy is `SUPPLY.md`'s subject — *Logistics is the road,
@@ -168,10 +173,10 @@ Notes on the mapping:
     (sales, input purchases, maintenance, wages) **plus budget allocation** across research /
     military / workforce contracts, not just the running treasury. Same money-loop data as the
     [A4] "Balance Ledger", wider remit.
-  — **Corp. Strategy** (slot 8): a **standing-strategy** surface — the player's "laws" / pre-set
+  — **Corp. Strategy** (slot 7): a **standing-strategy** surface — the player's "laws" / pre-set
     options, with **wage levels** and **military posture** the archetypal levers, and possibly a
     goal / quest system later. Scope deliberately left **open** beyond the standing-rules core.
-  — **History** (slot 10): **generation history**, not a live event log (BL-211, player-facing
+  — **History** (slot 9): **generation history**, not a live event log (BL-211, player-facing
     history ledger). It surfaces the **procedural generation as a number-crunch** — the world as
     generated — in two views, **Story / Chain**: the body's dated biography, and the generation
     stage charts (one fold per chain stage, under the wizard's three round tabs). The charts come

@@ -99,8 +99,17 @@ void hover_structure_ground(const ui_state& ui)
 {
     static constexpr const char* k_net[lp_network_count] = { "Road", "Rail", "Sea" };
 
-    ImGui::Text("Logistic Points: %.0f%%",
-                static_cast<double>(ui.lp_hover_coverage) * 100.0);
+    // ABSOLUTE POINTS, BOTH WAYS (Ben, 2026-10-24: "show both the amount generated,
+    // and the amount consumed"). What reaches this tile from the nation's sources, and
+    // what the tile's buildings actually drew this tick against what they need.
+    ImGui::Text("Reaching: %.0f LP/tick", static_cast<double>(ui.lp_hover_reaching));
+    if (ui.lp_hover_sources > 0)
+        ImGui::TextDisabled("from %d source(s)", ui.lp_hover_sources);
+    if (ui.lp_hover_consumers > 0)
+        ImGui::Text("Consumed: %.0f of %.0f", static_cast<double>(ui.lp_hover_consumed),
+                    static_cast<double>(ui.lp_hover_need));
+    else
+        ImGui::Text("Consumed: none here");
     const int n = ui.lp_hover_network;
     if (!ui.lp_hover_reached || n < 0 || n >= static_cast<int>(lp_network_count))
     {

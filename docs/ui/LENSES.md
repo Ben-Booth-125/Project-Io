@@ -395,19 +395,19 @@ slots are not in it.
 
 | Rail slot | Ledger | Arms | The shared question |
 |---|---|---|---|
-| 6 | Market | `market` | Which market is this ground in, and what does it pay? |
-| 7 | Convoys | `supply_routes` | What is moving, and along which lanes? |
-| 10 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
+| 5 | Market | `market` | Which market is this ground in, and what does it pay? |
+| 6 | Convoys | `supply_routes` | What is moving, and along which lanes? |
+| 9 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
 
 **There are two arming rules, and which one a slot uses follows from how many questions
 its ledger answers.**
 
-**Fixed on open** (slots 6 and 7). Every tab gets the same lens, because the ledger
+**Fixed on open** (slots 5 and 6). Every tab gets the same lens, because the ledger
 answers one question on every tab. That a strip can arm only one lens is a real
 constraint rather than a simplification — it is why Convoys left the Market ledger at
 all (`convoys.md` § 3).
 
-**On entering a sub-view** (slot 10, Ben 2026-08-30). History answers four questions and
+**On entering a sub-view** (slot 9, Ben 2026-08-30). History answers four questions and
 only **Tectonics** has a map twin, so a fixed arm would hand the Continent lens to a
 player who opened on Story to read a deep-time biography. The lens is armed on the
 **edge** — the frame the view starts being drawn — which covers both routes in: pressing
@@ -888,23 +888,48 @@ player's own nation's network and points, and nothing else. A rival's sources an
 are not drawn — not shaded zero, but left bare, because a neighbour's logistics is not a
 value of zero, it is not the subject.
 
-- The **field** is the **coverage** each of that nation's tiles gets from its own sources
-  — how much of a building's need this ground can be served, in `[0,1]`, which is what
-  decides whether a works here runs at full rate. It is the per-tile quantity
-  `LOGISTICS.md`'s one-pool model holds (`lp_coverage_at`), read with one memo per look
-  so a nation's three network fields are built once and every tile answered from them.
-- **Every tile carries that number**, as a percentage, wherever the rung gives the text
-  room: "a number to each tile, so we can see exactly how many points we have". Below a
-  drawn radius of 18 px the digits do not fit in a hex and the colour field carries the
-  read alone.
+**Absolute points, generated and consumed (Ben, 2026-10-24).** *"The logistics lens
+should show absolute numbers rather than a percentage. It should also show both the amount
+generated, and the amount consumed."* A share of a request cannot say whether the points
+exist, and generated beside consumed is how a player sees that the pool is being drawn on.
+Every figure the lens shows is in **Logistic Points per tick**.
+
+- The **field** is the **points reaching** each of that nation's tiles: every running
+  source of the nation that qualifies for the tile — its own reach touches it and it is on
+  the chain back to the capital (`LOGISTICS.md` § How a tile's points get to it) —
+  contributes its reach there × the points it made this tick, summed
+  (`lp_points_reaching`). It counts every qualifying source, not only the ones a request
+  was topped up from: it is what is *available* on that ground. It is a read of the one
+  pool, not a budget the tile owns — the pool is the nation's (`LOGISTICS.md`, "Routing
+  does not give a source its own budget").
+- **The tint is keyed to a fixed absolute scale**: linear from **0** (deep navy) to
+  **240 LP/tick** (the logistics cyan), saturating above. 240 is two hubs at full
+  strength, so one hub's full reach sits mid-ramp. Fixed, so a colour means the same
+  points on every body and every tick.
+- **Every tile carries that number**, in LP/tick, wherever the rung gives the text room:
+  "a number to each tile, so we can see exactly how many points we have". Below a drawn
+  radius of 18 px the digits do not fit in a hex and the colour field carries the read
+  alone.
+- The **hover card** over the player's own ground gives the tile both ways: the points
+  **reaching** it and from how many sources, and the points its buildings **consumed**
+  this tick (their granted claims) against what they **need** at their run. Then the why:
+  the network that reaches it best, its cost to the nearest source, and full reach or
+  fade (`TOOLTIP.md` § Ground).
 - The **marks** are that nation's **sources** — each running logistics hub, railway
   station and port with the points it actually makes, upkeep folded in, read off the
   economy step's own resolve. **A city is not a source** (`LOGISTICS.md` § Logistic
   Points, "Cities make none"), nor is one on ground no nation holds, nor one on a
   neighbour's.
-- The **key** carries that nation's arithmetic: what its sources make this tick, how many
-  made it, and what its ground is asking for. No tagline — the lens is named for what it
-  shows.
+- The **key** carries that nation's arithmetic, absolute: what its connected sources
+  **generated** this tick and how many; what its buildings **consumed** — production's
+  grants, the marches' grants and what shipments drew — with what is left **unused**; and
+  what production **needs** at its run, whatever reaches it — a nation with no connected
+  source still shows its ramp and its arithmetic, with *No connected source here*, so
+  "generated 0 against a need" reads as the shortfall it is. No tagline — the lens is
+  named for what it shows.
+- **Visibility.** Only the player's own nation, in full. Another nation's ground is not
+  shaded, numbered or hovered (`DISCOVERY.md` § Competitor visibility), so the key and
+  the card are always the player nation's.
 
 **What this replaced, and why the old argument expired.** The field was the *reach cost*
 — the weighted distance to the nearest supply anchor — and the reasoning for that was
@@ -929,10 +954,13 @@ behind `overlay_mode::throughput` in
 **Colour.** Two deliberately different sequential ramps, because the lens shows
 two things and one ramp cannot separate them.
 
-- **Field:** deep navy (furthest) → the logistics cyan (at an anchor), composited
-  at `0.72`. The cost is normalised against the field's **90th percentile** and
-  then **square-root compressed**. Unreachable ground, and everything past p90,
-  takes the cold end. Owned by BL-669 (throughput ramp).
+- **Field:** deep navy (0 LP/tick) → the logistics cyan (240 LP/tick and above),
+  linear, on the fixed scale above — composited at `0.72` on the vector fill and at the
+  sequential wash strength on the baked ground, both reading the one points field.
+
+  *The reach-cost ramp below is the record of what the field used to shade.* It was
+  normalised against the cost field's **90th percentile** and **square-root
+  compressed**; owned by BL-669 (throughput ramp).
 
   **Both halves are measured** — `tools/verify/throughput_field_census.cpp` is the
   instrument, and it should be re-run whenever the anchor set moves, because this
@@ -969,10 +997,12 @@ completed port, as public as the building glyph beside it.
 
 **Legend.** A fixed-height gradient key (§ Legend placement) on the **foreground**
 draw list with an opaque fill, so it is readable over the Selection band. It
-carries the field ramp (`far` → `at anchor`), the anchor ring drawn exactly as the
-map draws it beside the per-anchor rate, and the body's anchor count and total
-LP/tick. A body with no anchor, or an authored rate of zero, says so rather than
-drawing a scale over nothing.
+carries the field ramp (`0` → `240+ LP/tick`), the source ring drawn exactly as the
+map draws it beside the largest source's rate, and four lines of the player nation's
+arithmetic: *Generated N /tick, K source(s)* · *Consumed M /tick, U unused* ·
+*production P of N needed* · *marches X, shipments Y*. A nation with no connected
+source on the body keeps the ramp and the arithmetic, and the source row reads *No
+connected source here*. A seat with no nation says so instead.
 
 **Determinism.** The pools are rebuilt **every frame** by `update_body_throughput`
 (`body_surface_canvas.hpp`) — non-const, for the same reason `update_body_vision`

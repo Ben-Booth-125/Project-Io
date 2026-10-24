@@ -989,7 +989,7 @@
     "docs/ui/LAYOUT.md § Navigation pane",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "A fixed 56px-wide, full-height icon rail of nine square slots (five live, four reserved-dimmed), each toggling a fold-out ledger open/closed, accordion-style.",
+   "summary": "A fixed 56px-wide, full-height icon rail of twelve square slots (ten live, two reserved-dimmed: Corp. Strategy 7, Diplomacy 8), each toggling a fold-out ledger open/closed, accordion-style. The retired Acquisitions slot left the rail and every later slot moved up one (Ben, 2026-10-24).",
    "interesting_question": "The doc states a standalone buildings-overview ledger was dropped as a rail slot because it 'proved more good-to-know than goal-driving' — what is the actual test the doc applies to decide any future slot?",
    "resolution": "Stated as an explicit test: MENU.md § Menus are broad ledgers gives it directly — 'is this a broad overview, or a targeted action? Broad → a ledger with a slot. Targeted → the Selection element / a popup, no slot.'",
    "checks": [
@@ -1291,10 +1291,10 @@
    "parent": null,
    "source": [
     "docs/ui/ledgers/market.md",
-    "docs/ui/MENU.md (slot 6)",
+    "docs/ui/MENU.md (slot 5)",
     "src/ui/market_ledger.cpp"
    ],
-   "summary": "Rail slot 6: the Goods table (one row per traded good with an inline 8-quarter graph) and the Trades tab, under Body and Market selectors and the market's top section (nation list + Sold here / Traded in / Traded out).",
+   "summary": "Rail slot 5: the Goods table (one row per traded good with an inline 8-quarter graph) and the Trades tab, under Body and Market selectors and the market's top section (nation list + Sold here / Traded in / Traded out).",
    "interesting_question": "The mock CSV exporter emits one row per market_component with no market_id/region column, so a body with 5 markets (Kepler) produces a 5x-inflated join in the Power BI mock — does that gap only affect the design mockup, or could the same ambiguity affect any future per-market export?",
    "resolution": "Named narrowly as an export-only gap, not a live-code bug: market.md states 'the gap is export-only, for the Power BI mock... Fix: add a market_id (and human region label...) column to the exporter' — the live in-app ledger reads w.markets directly and is unaffected.",
    "checks": [
@@ -1770,10 +1770,10 @@
    "parent": null,
    "source": [
     "docs/ui/ledgers/convoys.md",
-    "docs/ui/MENU.md (slot 7)",
+    "docs/ui/MENU.md (slot 6)",
     "src/ui/convoys_ledger.cpp"
    ],
-   "summary": "Rail slot 7: one flat view listing every convoy of the player's corp in flight, soonest arrival first — cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in qtr, and the haul cost already paid, with a Hold/Release press per row. No Body/Market selectors. Arms supply_routes on open.",
+   "summary": "Rail slot 6: one flat view listing every convoy of the player's corp in flight, soonest arrival first — cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in qtr, and the haul cost already paid, with a Hold/Release press per row. No Body/Market selectors. Arms supply_routes on open.",
    "interesting_question": "A row read 'Agricultural Produce x0' — a convoy in flight with a haul cost paid, a progress bar running and an apparently empty hold. Can dispatch legitimately commit an empty convoy, or had the ledger revealed a supply-layer bug?",
    "resolution": "Neither: it was a formatting defect in the row, established by measurement rather than argument (tools/verify/convoy_cargo_census.cpp). Both dispatch paths forbid an empty convoy by construction and the census found 1669 dispatches with zero empty holds — but cargo_qty is a float printed with \"x%.0f\", and 4.6% of real convoys carry less than half a unit (measured minimum 0.0097 against a median of 5.62), so every one of them rendered as x0. The quantity is now tiered against that measured distribution with an explicit <0.01 floor, and the no-empty-hold invariant is asserted by the census harness.",
    "checks": [

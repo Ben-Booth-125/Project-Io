@@ -7,8 +7,9 @@
 -- nothing at all. At 1920x1080 the identical layout was fine, which is why no
 -- capture could have caught it and why this check takes both resolutions.
 --
--- The rail is back to thirteen (retiring the mercenary contract took the
--- fourteenth slot with it, BL-693), so nothing is currently near the floor. The
+-- The rail is down to twelve (retiring the mercenary contract took the
+-- fourteenth slot with it, BL-693; the inert Acquisitions slot 5 retired on
+-- Ben's call, 2026-10-24), so nothing is currently near the floor. The
 -- check is not thereby redundant: it is the ONLY instrument that sees a slot
 -- drawn off-screen, and `shell_pass` opens ledgers BY NAME so it cannot see a
 -- bad renumber either (NR-716). Update RAIL_SLOTS below whenever the rail changes.
@@ -21,7 +22,7 @@ verify.frames(2)
 
 -- The rail's own slot count. Kept here rather than read from the code so that
 -- ADDING a slot without widening the rail's budget fails this check loudly.
-local RAIL_SLOTS = 13
+local RAIL_SLOTS = 12
 
 for _, res in ipairs({ {1280, 720}, {1920, 1080} }) do
     local w, h = res[1], res[2]
@@ -42,6 +43,10 @@ for _, res in ipairs({ {1280, 720}, {1920, 1080} }) do
         end
     end
 
+    -- And no slot past the last: a retired slot that comes back as a blank
+    -- would pass the count above only if this also holds.
+    verify.expect(verify.nav_slot(RAIL_SLOTS + 1) == nil,
+        string.format("%dx%d: no slot %d is drawn", w, h, RAIL_SLOTS + 1))
     verify.expect(drawn == RAIL_SLOTS,
         string.format("%dx%d: all %d rail slots drawn (%d)", w, h, RAIL_SLOTS, drawn))
     verify.expect(offscreen == 0,

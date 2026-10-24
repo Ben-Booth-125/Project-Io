@@ -59,4 +59,4 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 - Clean, well-surfaced overlaps: standing orders belong to the Market ledger (where they live), not
   Construction; the History ledger carries no market section. **Convoys belonged to neither** — it
   is cargo in transit, `SUPPLY.md`'s subject rather than `MARKETS.md`'s, and it is a rail ledger of
-  its own ([convoys.md](convoys.md), rail slot 7).
+  its own ([convoys.md](convoys.md), rail slot 6).
