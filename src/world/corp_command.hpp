@@ -140,7 +140,7 @@ enum class corp_verb : uint8_t
     // API) route it here. The seam itself validates the WORLD half: `corp`
     // exists and is a specialist. DELIBERATELY NOT in corp_ai.cpp's candidate
     // list — no rival picks anyone's seat.
-    take_seat,         ///< `corp` becomes the player's corporation: `is_player` / `world::player_entity` re-point onto it. `corp` must be a SPECIALIST (not a background firm). Pre-play only — the in-play hosts refuse it.
+    take_seat,         ///< BL-1407: `corp` (== `as_nation`) is a MAJOR NATION and becomes the player: `world::player_entity` re-points onto it. A minor is refused. Pre-play only — the in-play hosts refuse it.
     // --- BL-1266: trade joins the seam (2026-10-10) ---
     // Appended AFTER take_seat, same append-only rule. TRADE.md § A trade and
     // § Auto and reserved trade. The player's, and a rival's under the

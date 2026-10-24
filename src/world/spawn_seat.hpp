@@ -11,7 +11,11 @@
 // The spawn shortlist, and the seat (BL-630)
 // ---------------------------------------------------------------------------
 //
-// Which corporation the player runs is PICKED on the selection canvas at Begin
+// BL-1407: the seat is a MAJOR NATION (the player IS its nation; CONCEPT.md
+// § Player identity). The steps below read "specialist" where they were written
+// for the retired corporation seat; the pool is now the majors.
+//
+// Which nation the player is, is PICKED on the selection canvas at Begin
 // (BL-1076; Ben 2026-09-09, designed 2026-09-24) from the ranking below; the
 // weighted DRAW (Ben, 2026-08-26) survives for the paths with no player to ask.
 // Authority: docs/generation/CORPORATION_GENERATION.md § The spawn shortlist,
@@ -96,12 +100,13 @@ struct spawn_seat_params
     int population_radius = 4;
 };
 
-/// One specialist's spawn record — every number the floor, the order and the
-/// draw read, kept whether or not the corp cleared, so a sweep can say WHY and
-/// a seat card can show what the player is weighing.
+/// One MAJOR NATION's spawn record (BL-1407: the seat is a nation) — every
+/// number the floor, the order and the draw read, kept whether or not the
+/// nation cleared, so a sweep can say WHY and a seat card can show what the
+/// player is weighing.
 struct spawn_seat_candidate
 {
-    entity_id corp = null_entity;
+    entity_id nation = null_entity;
 
     // --- THE GATE AND THE ORDER --------------------------------------------
 
@@ -121,7 +126,7 @@ struct spawn_seat_candidate
 
     // --- INFORMATION for the seat card; NEVER the gate ---------------------
 
-    /// Closing `corporation_component::balance` at the end of the settle.
+    /// The nation's closing treasury at the end of the settle (BL-1407).
     float balance = 0.0f;
     /// True when `balance > 0`. Recorded, not gated on.
     bool  solvent = false;
@@ -149,8 +154,8 @@ struct spawn_seat_candidate
 /// the flat-binary serialisation seam, exactly as `generation_report` does.
 struct spawn_seat_result
 {
-    /// The corporation now flagged `is_player`, equal to `w.player_entity`.
-    /// `null_entity` only when the world holds no specialist at all.
+    /// The nation now seated, equal to `w.player_entity` (BL-1407).
+    /// `null_entity` only when the world holds no major at all.
     entity_id seated = null_entity;
 
     /// THE FLOOR WENT UNMET — no specialist stands on ground with a non-zero
@@ -161,7 +166,7 @@ struct spawn_seat_result
     /// takes). False on an ordinary world.
     bool floor_unmet = false;
 
-    int specialist_count = 0;
+    int major_count      = 0; ///< BL-1407: the majors offered (the seat's pool)
     int shortlist_size   = 0;
 
     /// Every specialist, RANKED: static landscape score descending, entity id
@@ -185,7 +190,7 @@ struct spawn_seat_result
 ///
 /// @param holdings_scored  Optional out: holdings that stood in a scored market.
 double seat_landscape_score(const world& w, const landscape_score& landscape,
-                            entity_id corp, int* holdings_scored = nullptr);
+                            entity_id nation, int* holdings_scored = nullptr);
 
 /// Shortlist the viable specialists, rank them, draw one weighted against
 /// @p seed, and re-point `is_player` / `world::player_entity` onto it.
@@ -235,11 +240,11 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
 /// nothing. The same seed and the same ranking give the same corp.
 entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed);
 
-/// Re-point `is_player` / `world::player_entity` onto @p corp, clearing every
-/// other `is_player` flag first (world.hpp's one-flag invariant), and move the
-/// opening force with the seat (BL-1154, `move_seat_force`): @p corp is
-/// disarmed and the corporation it leaves is armed — new entity ids, at Begin,
-/// after the settle. Returns false and mutates NOTHING when @p corp is not a
-/// corporation of @p w. The pick path (`corp_verb::take_seat`) applies the
-/// same rule through the same function.
-bool repoint_player(world& w, entity_id corp);
+/// Re-point `world::player_entity` onto NATION @p nation (BL-1407: the player
+/// IS its nation), clean its slate of unfinished construction
+/// (`seat_clean_slate`) and move the opening force with the seat (BL-1154,
+/// `move_seat_force`): @p nation is disarmed and the nation it leaves is armed —
+/// new entity ids, at Begin, after the settle. Returns false and mutates NOTHING
+/// when @p nation is not a nation of @p w. The pick path (`corp_verb::take_seat`)
+/// applies the same rule through the same function.
+bool repoint_player(world& w, entity_id nation);

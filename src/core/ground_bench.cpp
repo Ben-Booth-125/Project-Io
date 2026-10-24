@@ -297,9 +297,9 @@ void app::bench_ground_frame()
             // (construct_building, the interactive path's seam): the first
             // valid unoccupied tile of the home body for an iron extraction
             // site, funds topped up.
-            const auto cit = m_world.corporations.find(m_world.player_entity);
-            if (cit != m_world.corporations.end())
-                cit->second.balance = std::max(cit->second.balance, 1.0e6f);
+            // BL-1407: the player IS its nation; its treasury is topped up.
+            if (float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
+                *p = std::max(*p, 1.0e6f);
             std::unordered_set<entity_id> occupied;
             for (const auto& [bid, bc] : m_world.buildings)
                 occupied.insert(bc.tile);
@@ -314,8 +314,8 @@ void app::bench_ground_frame()
                                                          m_registry.construction().max_logistics_reach))
                     continue;
                 entity_id built = null_entity;
-                if (construct_building(m_world, m_registry, m_world.player_entity, tid,
-                                       building_type::extraction_site, resource_type::iron_ore, built)
+                if (construct_nation(m_world, m_registry, player_actor(m_world), tid,
+                                     building_type::extraction_site, resource_type::iron_ore, no_recipe, built)
                     == construction_result::placed)
                 {
                     placed = built;

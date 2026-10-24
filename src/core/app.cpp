@@ -1438,12 +1438,13 @@ void app::frame_launch_view()
     // Consumed by body_surface_canvas on its next draw; a later focus_on_surface
     // (deliberate navigation) cancels it via planetary_center_pending.
     {
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        if (pit != m_world.corporations.end())
+        // BL-1407: the player IS its nation; its holdings are the nation's own.
+        const auto pit = m_world.nations.find(player_nation(m_world));
+        if (pit != m_world.nations.end())
         {
             long long sum_col = 0, sum_row = 0;
             int n = 0;
-            for (entity_id bld_id : pit->second.assets)
+            for (entity_id bld_id : pit->second.state_assets)
             {
                 const auto bit = m_world.buildings.find(bld_id);
                 if (bit == m_world.buildings.end())
@@ -1473,16 +1474,13 @@ void app::frame_launch_view()
     // draw_tile_selection). Derived entirely from world state — no tutorial flag,
     // no timer, nothing persisted, and nothing that can go stale or lie.
     {
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        if (pit != m_world.corporations.end())
+        // BL-1407: the seat is a nation, so its capital tile stands where the
+        // retired HQ did.
+        if (const auto pit = m_world.nations.find(player_nation(m_world)); pit != m_world.nations.end())
         {
-            const auto hq = m_world.buildings.find(pit->second.hq_building);
-            if (hq != m_world.buildings.end())
-            {
-                const auto tit = m_world.tiles.find(hq->second.tile);
-                if (tit != m_world.tiles.end() && tit->second.body == m_launch_body)
-                    m_ui.selected_entity = hq->second.tile;
-            }
+            const auto tit = m_world.tiles.find(pit->second.capital_tile);
+            if (tit != m_world.tiles.end() && tit->second.body == m_launch_body)
+                m_ui.selected_entity = pit->second.capital_tile;
         }
     }
 
@@ -1505,9 +1503,9 @@ void app::open_seat_screen()
     m_seat_result = rank_spawn_candidates(m_world, m_landscape_winner_score);
     m_seat_ui     = seat_screen_state{};
     m_screen      = app_screen::choosing_seat;
-    std::printf("[seat] the nation selection screen: %d majors (%d specialists, %d above the floor)%s\n",
+    std::printf("[seat] the nation selection screen: %d majors (%d ranked, %d above the floor)%s\n",
                 static_cast<int>(seat_majors().size()),
-                m_seat_result.specialist_count, m_seat_result.shortlist_size,
+                m_seat_result.major_count, m_seat_result.shortlist_size,
                 m_seat_result.floor_unmet ? " (FLOOR UNMET: every firm is marked)" : "");
     std::fflush(stdout);
 }
@@ -1519,79 +1517,29 @@ std::vector<app::seat_major> app::seat_majors() const
     // ranking already lists every specialist in static-score order, so a walk
     // of it in order meets each major at its champion -- the rows come out in
     // the champions' rank order, and a nation met twice keeps its first.
+    // BL-1407: the ranking IS over the majors (the seat is a nation), so each
+    // candidate is one row, in rank order; the seat a pick takes is the nation.
     std::vector<seat_major> out;
     for (std::size_t i = 0; i < m_seat_result.candidates.size(); ++i)
     {
-        const entity_id corp = m_seat_result.candidates[i].corp;
-        const auto      cit  = m_world.corporations.find(corp);
-        if (cit == m_world.corporations.end() || cit->second.is_background)
-            continue;
-        const entity_id nation = cit->second.home_nation;
+        const entity_id nation = m_seat_result.candidates[i].nation;
         if (nation == null_entity || m_world.nations.find(nation) == m_world.nations.end())
             continue;
-        bool seen = false;
-        for (const seat_major& m : out)
-            if (m.nation == nation) { seen = true; break; }
-        if (seen)
-            continue;
-        out.push_back({nation, corp, static_cast<int>(i)});
+        out.push_back({nation, nation, static_cast<int>(i)});
     }
     return out;
 }
 
-namespace {
-
-/// BL-1406: the verbs a NATION ACTING AS ITSELF (`corp == as_nation`) takes
-/// through apply_corp_command — the state door's building verbs plus the
-/// owner-generic shared bodies (corp_command.cpp `nation_self_shared_verb`).
-/// Mirrored here, not widened: a verb outside this set keeps the seat
-/// corporation as its actor, so nothing the seam does not already admit for a
-/// nation is sent as one.
-bool nation_self_verb(corp_verb v)
-{
-    switch (v)
-    {
-        case corp_verb::build:
-        case corp_verb::demolish:
-        case corp_verb::set_recipe:
-        case corp_verb::set_workforce:
-        case corp_verb::set_workforce_auto:
-        case corp_verb::idle:
-        case corp_verb::resume:
-        case corp_verb::hire_unit:
-        case corp_verb::march_unit:
-        case corp_verb::halt_unit:
-        case corp_verb::place_road:
-        case corp_verb::set_trade:
-        case corp_verb::clear_trade:
-        case corp_verb::set_trade_reserve:
-        case corp_verb::queue_research:
-        case corp_verb::unqueue_research:
-        case corp_verb::clear_research:
-            return true;
-        default:
-            return false;
-    }
-}
-
-} // namespace
-
 corp_command_result app::player_command(const corp_command& in, entity_id* out_building)
 {
-    // BL-1406 (Ben, 2026-10-23: the player IS its nation): once the world is
-    // folded a press the UI filed as the seat (`corp == player_entity`, no
-    // nation named) acts AS THE NATION — `corp == as_nation == player_nation`,
-    // the actor the seam pays from the treasury and holds every building, unit
-    // and trade under. A command that already names a nation (the champion door:
-    // rail, the share rule, the tax tier) is left as it was.
+    // BL-1407 (Ben, 2026-10-23: the player IS its nation): every press the UI
+    // files as the seat acts AS THE NATION — `corp == as_nation ==
+    // player_entity`, the actor the seam pays from the treasury and holds every
+    // building, unit, convoy and trade under (disband, withdraw and hold-convoy
+    // included). A command that already names the nation is left as it was.
     corp_command cmd = in;
-    if (cmd.as_nation == null_entity && cmd.corp == m_world.player_entity
-        && nation_self_verb(cmd.verb) && world_is_folded(m_world))
-        if (const entity_id pn = player_nation(m_world); pn != null_entity)
-        {
-            cmd.corp      = pn;
-            cmd.as_nation = pn;
-        }
+    if (cmd.corp == m_world.player_entity && player_nation(m_world) != null_entity)
+        cmd.as_nation = cmd.corp;
     const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, out_building);
     m_play_log.command(m_world, cmd, r, m_sim_loop.day_tick(), "player");
     return r;
@@ -1601,8 +1549,7 @@ void app::open_play_log(const std::string& loaded_from)
 {
     // A seated session only: --verify never allows it, and a spectated session
     // has nobody whose play there is to compare (AI_OPPONENT.md § 10i).
-    if (!m_play_log_allowed || m_ui.spectating
-        || m_world.corporations.find(m_world.player_entity) == m_world.corporations.end())
+    if (!m_play_log_allowed || m_ui.spectating || player_nation(m_world) == null_entity)
         return;
     m_play_log.open(m_world, m_last_econ_report, m_active_world_params.seed,
                     static_cast<int>(m_active_world_params.epoch_year), m_sim_loop.day_tick(),
@@ -1613,31 +1560,31 @@ corp_command_result app::take_seat_pick(entity_id nation)
 {
     // THE PICK IS A GAME ACT (Ben, 2026-09-24): it goes through the command
     // seam as `corp_verb::take_seat`, the same record an agent issues. BL-1281
-    // (Ben, 2026-10-10): the pick NAMES A MAJOR NATION and seats its champion.
-    // This is the PRE-PLAY host, so it owns the phase half of the validation
-    // and the one the seam cannot do -- the nation must be one the screen
-    // OFFERS, a major of this world. AN UNTRUSTED INPUT (io-standing-rules.md,
-    // AI-facing seam): a minor, a corporation id, or an id naming nothing is
-    // rejected whole, and everything is checked before anything moves.
+    // (Ben, 2026-10-10): the pick NAMES A MAJOR NATION; BL-1407: and that nation
+    // IS the seat (the player is its nation). This is the PRE-PLAY host, so it
+    // owns the phase half of the validation and the one the seam cannot do --
+    // the nation must be one the screen OFFERS, a major of this world. AN
+    // UNTRUSTED INPUT (io-standing-rules.md, AI-facing seam): a minor, a
+    // non-nation id, or an id naming nothing is rejected whole, and everything
+    // is checked before anything moves.
     if (nation == null_entity || m_world.nations.find(nation) == m_world.nations.end())
         return corp_command_result::rejected_invalid;
-    entity_id champion = null_entity;
+    bool offered = false;
     for (const seat_major& m : seat_majors())
         if (m.nation == nation)
-            champion = m.champion;
-    if (champion == null_entity) // a minor nation: it holds no champion, and cannot be played
+            offered = true;
+    if (!offered) // a minor nation cannot be played
         return corp_command_result::rejected_invalid;
-    if (m_world.corporations.find(champion) == m_world.corporations.end())
-        return corp_command_result::rejected_no_corp;
 
     corp_command cmd;
-    cmd.tick = static_cast<int>(m_world.current_econ_tick);
-    cmd.corp = champion;
-    cmd.verb = corp_verb::take_seat;
+    cmd.tick      = static_cast<int>(m_world.current_econ_tick);
+    cmd.corp      = nation;
+    cmd.as_nation = nation;
+    cmd.verb      = corp_verb::take_seat;
     const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
     if (r != corp_command_result::applied)
         return r;
-    m_seat_result.seated = champion;
+    m_seat_result.seated = nation;
     m_seat_picked_nation = nation;
     finish_seat(/*picked=*/true);
     return r;
@@ -1646,57 +1593,36 @@ corp_command_result app::take_seat_pick(entity_id nation)
 void app::finish_seat(bool picked)
 {
     // The player-scoped history caches were filled through the validation run
-    // against whichever corp the GENERATOR provisionally flagged, so at this
-    // instant they belong to somebody else. Rebuild the balance series from the
-    // seated corp's own filed returns (BL-626 made those world state, which is
-    // exactly what lets this be a rebuild rather than a loss) and drop the two
-    // flow series, which have no per-quarter record to rebuild from and would
-    // otherwise chart a stranger's money.
+    // against whichever nation the GENERATOR provisionally named, so at this
+    // instant they belong to somebody else. BL-1407: the player's money is its
+    // nation's treasury; the series opens at today's treasury.
     m_balance_history.clear();
     m_income_history.clear();
     m_expenditure_history.clear();
-    // BL-1406: once folded the player's money is its nation's treasury, which
-    // files no corporation returns -- the series opens at today's treasury.
-    if (world_is_folded(m_world))
-    {
-        if (const float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
-            ui::push_capped(m_balance_history, *p);
-    }
-    else if (const auto cit = m_world.corporations.find(m_world.player_entity);
-        cit != m_world.corporations.end())
-    {
-        for (const quarterly_return& q : cit->second.returns)
-            ui::push_capped(m_balance_history, q.balance);
-        if (m_balance_history.empty())
-            ui::push_capped(m_balance_history, cit->second.balance);
-    }
+    if (const float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
+        ui::push_capped(m_balance_history, *p);
 
     // Printed alongside the other start_new_game phase lines. AN UNMET FLOOR IS
     // SAID OUT LOUD (CORPORATION_GENERATION.md: "a viability signal to be read,
-    // not a failure to be hidden") — nothing here patches a corp to make the
-    // shortlist non-empty. The static score is what gated; the balance and the
-    // trailing net are printed beside it as the information they now are.
+    // not a failure to be hidden") — nothing here patches a seat to make the
+    // shortlist non-empty. The static score is what gated; the treasury is
+    // printed beside it as the information it is.
     const char* name = "(none)";
-    if (const auto cit = m_world.corporations.find(m_seat_result.seated);
-        cit != m_world.corporations.end())
-        name = cit->second.name.c_str();
-    // THE ONE-is_player INVARIANT (world.hpp), stated where it binds (BL-1044):
-    // counted, not assumed. The one path that can break it — a charter walk
-    // whose affording centres all failed to place a specialist — is said out
-    // loud here and never patched.
-    int players = 0;
-    for (const auto& kv : m_world.corporations)
-        if (kv.second.is_player)
-            ++players;
-    // BL-1076: say HOW the seat was taken. A pick names its firm id so a log
+    if (const auto nit = m_world.nations.find(m_seat_result.seated); nit != m_world.nations.end())
+        name = nit->second.name.c_str();
+    // BL-1407: THE SEAT IS ONE MAJOR NATION, stated where it binds: counted, not
+    // assumed. A world whose charter walk chartered no champion has no major to
+    // seat, and that is said out loud here and never patched.
+    const bool seated_major = is_major_nation(m_world, m_world.player_entity);
+    // BL-1076: say HOW the seat was taken. A pick names its nation id so a log
     // reader can re-issue it (`--seat <id>`); a draw names why nobody was asked.
     // The ranking the canvas offers, in its order, so a log reader (and
-    // tools/verify/seat_pick_check.js) can name another firm to pick.
+    // tools/verify/seat_pick_check.js) can name another nation to pick.
     for (const spawn_seat_candidate& c : m_seat_result.candidates)
-        std::printf("[seat] ranked %u landscape %.4f%s\n", static_cast<unsigned>(c.corp),
+        std::printf("[seat] ranked %u landscape %.4f%s\n", static_cast<unsigned>(c.nation),
                     c.landscape, c.shortlisted ? "" : "  (below the floor)");
-    // BL-1281: the MAJORS the selection screen offers, each with the champion
-    // a pick of it seats -- the ids `--seat <nation-id>` takes.
+    // BL-1281: the MAJORS the selection screen offers -- the ids `--seat
+    // <nation-id>` takes. BL-1407: the "champion" a pick seats is the nation.
     for (const seat_major& m : seat_majors())
         std::printf("[seat] major %u champion %u\n", static_cast<unsigned>(m.nation),
                     static_cast<unsigned>(m.champion));
@@ -1707,18 +1633,17 @@ void app::finish_seat(bool picked)
     else
         std::printf("[seat] drawn %u — %s\n", static_cast<unsigned>(m_seat_result.seated),
                     m_seat_drawn_because ? m_seat_drawn_because : "no player to ask");
-    std::printf("[start_new_game] seat: %s — shortlist %d of %d specialists; is_player on %d "
-                "corporation(s)%s%s\n",
-                name, m_seat_result.shortlist_size, m_seat_result.specialist_count, players,
+    std::printf("[start_new_game] seat: %s — shortlist %d of %d majors%s%s\n",
+                name, m_seat_result.shortlist_size, m_seat_result.major_count,
                 m_seat_result.floor_unmet
-                    ? (picked ? "   <-- VIABILITY FLOOR UNMET (every firm marked; the pick stands)"
+                    ? (picked ? "   <-- VIABILITY FLOOR UNMET (every major marked; the pick stands)"
                               : "   <-- VIABILITY FLOOR UNMET (no seat on scored ground; lowest id seated)")
                     : "",
-                players != 1 ? "   <-- ONE-is_player INVARIANT BROKEN (world.hpp)" : "");
+                seated_major ? "" : "   <-- NO MAJOR SEATED (world.hpp, player_entity)");
     for (const spawn_seat_candidate& c : m_seat_result.candidates)
-        if (c.corp == m_seat_result.seated)
+        if (c.nation == m_seat_result.seated)
             std::printf("[start_new_game] seat card: landscape %.4f (%d of %d holdings on "
-                        "scored ground)  balance %.0f cr  trailing net %.0f cr over %d "
+                        "scored ground)  treasury %.0f cr  trailing net %.0f cr over %d "
                         "quarter(s)  [information, not the gate]\n",
                         c.landscape, c.holdings_scored, c.holdings,
                         static_cast<double>(c.balance), static_cast<double>(c.trailing_net),
@@ -1882,26 +1807,9 @@ void app::finish_new_game()
         m_balance_history.clear();
         m_income_history.clear();
         m_expenditure_history.clear();
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        if (world_is_folded(m_world))
-        {
-            // BL-1406: the nation's treasury files no corporation returns.
-            if (const float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
-                ui::push_capped(m_balance_history, *p);
-        }
-        else if (pit != m_world.corporations.end())
-        {
-            const std::vector<quarterly_return>& rs = pit->second.returns;
-            ui::push_capped(m_balance_history,
-                            rs.empty() ? pit->second.balance
-                                       : static_cast<float>(rs.front().balance - rs.front().net));
-            for (const quarterly_return& r : rs)
-            {
-                ui::push_capped(m_balance_history, r.balance);
-                ui::push_capped(m_income_history, r.income);
-                ui::push_capped(m_expenditure_history, r.expenditure);
-            }
-        }
+        // BL-1407: the player's money is its nation's treasury.
+        if (const float* p = purse_of(m_world, player_actor(m_world)); p != nullptr)
+            ui::push_capped(m_balance_history, *p);
     }
 
     // Rebase the clock one last time. sim_loop measures from construction, so without
@@ -2944,15 +2852,11 @@ void app::render()
         entity_id built = null_entity;
         // BL-1402: once the world is folded the player builds AS ITS NATION
         // (construct_nation, paid from the treasury); before, as the seat corp.
-        const entity_id actor = player_actor(m_world);
-        const construction_result r = actor != m_world.player_entity
-            ? construct_nation(m_world, m_registry, actor, m_ui.construction.pending_tile,
-                               m_ui.construction.pending_type, m_ui.construction.pending_target,
-                               m_ui.construction.pending_recipe, built)
-            : construct_building(
-                  m_world, m_registry, m_world.player_entity,
-                  m_ui.construction.pending_tile, m_ui.construction.pending_type,
-                  m_ui.construction.pending_target, built, m_ui.construction.pending_recipe);
+        // BL-1407: the player IS its nation, so every build is the nation's own.
+        const construction_result r =
+            construct_nation(m_world, m_registry, player_actor(m_world), m_ui.construction.pending_tile,
+                             m_ui.construction.pending_type, m_ui.construction.pending_target,
+                             m_ui.construction.pending_recipe, built);
         m_play_log.direct(m_world, "build", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_tile, built,
                           static_cast<int>(m_ui.construction.pending_type),

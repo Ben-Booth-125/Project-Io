@@ -715,11 +715,8 @@ void legend(ImDrawList* dl, ImVec2 origin, float k)
 
 entity_id research_player_nation(const world& w)
 {
-    const auto it = w.corporations.find(w.player_entity);
-    if (it == w.corporations.end())
-        return null_entity;
-    const entity_id n = it->second.home_nation;
-    return w.nations.find(n) != w.nations.end() ? n : null_entity;
+    // BL-1407: the player IS its nation.
+    return player_nation(w);
 }
 
 // ---------------------------------------------------------------------------

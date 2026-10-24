@@ -743,6 +743,14 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::queue_research:
         case corp_verb::unqueue_research:
         case corp_verb::clear_research:
+        // BL-1407: the player IS its nation, so every verb the player sends is
+        // sent as the nation. Each body below is keyed on the actor alone.
+        case corp_verb::survey:
+        case corp_verb::hold_convoy:
+        case corp_verb::disband_unit:
+        case corp_verb::withdraw_from_battle:
+        case corp_verb::raze_centre:
+        case corp_verb::take_seat:
             return true;
         default:
             return false;
@@ -1740,14 +1748,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (!std::isfinite(cmd.quantity) || !(cmd.quantity >= 0.0f)
                 || !(cmd.quantity <= max_trade_points))
                 return corp_command_result::rejected_invalid;
-            // BL-1402: a NATION's reserve is refused whole, nothing mutated, until
-            // BL-1407 gives `nation_component::trade_reserve` its save path - a
-            // reserve that vanished on load would silently spend as auto (cold
-            // review). A corporation's is written as before.
-            const auto rcit = w.corporations.find(cmd.corp);
-            if (rcit == w.corporations.end())
+            // BL-1407: the actor's own reserve — a nation's
+            // (`nation_component::trade_reserve`, serialised in the v56 stream)
+            // or, while the type survives, a corporation's.
+            float* reserve = trade_reserve_of(w, cmd.corp);
+            if (reserve == nullptr)
                 return corp_command_result::rejected_invalid;
-            rcit->second.trade_reserve = cmd.quantity;
+            *reserve = cmd.quantity;
             return corp_command_result::applied;
         }
 
@@ -2195,23 +2202,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::take_seat:
         {
-            // BL-1076, STARTUP.md § The seat: the player chooses the corporation
-            // they are. `corp` (already proven to exist above) is the firm; no
-            // other field is read. THE WORLD HALF of the validation — the phase
-            // half (pre-play only) is the host's, see the enum's note.
+            // BL-1076, STARTUP.md § The seat: the player chooses the NATION it
+            // is (BL-1407; CONCEPT.md § Player identity). `corp` (already proven
+            // to be a nation acting as itself above) is the nation; no other
+            // field is read. THE WORLD HALF of the validation — the phase half
+            // (pre-play only) is the host's, see the enum's note.
             //
-            // A background firm is the world's furniture, never a seat
-            // (spawn_seat.cpp § the specialist pool): refused whole, nothing
-            // touched. A pick of the corp the generator provisionally flagged is
-            // legitimate and applies as a no-op re-point — the provisional flag
-            // is not a seat anybody chose.
-            if (w.corporations.at(cmd.corp).is_background)
+            // A MINOR is never a seat (GLOSSARY.md § Major nation): refused
+            // whole, nothing touched. A pick of the nation the generator
+            // provisionally named is legitimate and re-points in place.
+            if (!is_major_nation(w, cmd.corp))
                 return corp_command_result::rejected_invalid;
             const entity_id previous = w.player_entity;
-            for (auto& [id, cc] : w.corporations)
-                cc.is_player = false;
-            w.corporations.at(cmd.corp).is_player = true;
-            w.player_entity                        = cmd.corp;
+            w.player_entity          = cmd.corp;
             // BL-1206: the clean slate of construction, the same rule as the
             // draw (`seat_clean_slate`), before the force moves.
             seat_clean_slate(w, cmd.corp);

@@ -2424,13 +2424,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // (NATIONS.md § State industry, "Who runs it"), so the same stepped dial
     // reaches the player's STATE buildings too — the player's own, not a rival's.
     std::vector<std::pair<entity_id, const std::vector<entity_id>*>> auto_solve_sets;
-    if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
-    {
-        auto_solve_sets.emplace_back(w.player_entity, &pit->second.assets);
-        if (const auto pn = w.nations.find(pit->second.home_nation);
-            pn != w.nations.end() && !pn->second.state_assets.empty())
-            auto_solve_sets.emplace_back(pn->first, &pn->second.state_assets);
-    }
+    // BL-1407: the player IS its nation; its buildings are the nation's own.
+    if (const auto pn = w.nations.find(player_nation(w));
+        pn != w.nations.end() && !pn->second.state_assets.empty())
+        auto_solve_sets.emplace_back(pn->first, &pn->second.state_assets);
     for (const auto& [solve_owner, solve_assets] : auto_solve_sets)
     {
         for (const entity_id building_id : *solve_assets)
@@ -2447,7 +2444,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             // corporation's, but a raise is taken only when the uncommitted
             // treasury funds what it adds to this tick's bill (committed then);
             // otherwise the target the gate funded stands.
-            const bool state_set = (solve_owner != w.player_entity);
+            const bool state_set = w.nations.count(solve_owner) != 0; // BL-1407: always, a nation
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue;

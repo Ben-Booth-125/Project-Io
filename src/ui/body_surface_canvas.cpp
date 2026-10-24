@@ -1942,11 +1942,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             continue;
         if (state.lp_player_known)
         {
-            entity_id pn2 = null_entity;
-            if (const auto cit2 = w.corporations.find(w.player_entity); cit2 != w.corporations.end())
-                pn2 = cit2->second.home_nation;
-            else if (w.nations.find(w.player_entity) != w.nations.end())
-                pn2 = w.player_entity;
+            const entity_id pn2 = player_nation(w); // BL-1407: the player IS its nation
             if (src.nation != pn2)
                 continue;
         }
@@ -1979,11 +1975,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     // has nobody to be player-facing for and draws no field at all rather than
     // quietly falling back to everybody's.
     {
-        entity_id pn = null_entity;
-        if (const auto cit = w.corporations.find(w.player_entity); cit != w.corporations.end())
-            pn = cit->second.home_nation;
-        else if (w.nations.find(w.player_entity) != w.nations.end())
-            pn = w.player_entity;
+        const entity_id pn = player_nation(w); // BL-1407: the player IS its nation
         const auto bit = w.bodies.find(state.active_body);
         if (pn != null_entity && bit != w.bodies.end())
         {

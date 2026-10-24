@@ -175,6 +175,12 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::lay_track:
         case corp_verb::set_logistics_shares:
         case corp_verb::set_tax_tier:
+        // BL-1407: every player verb is sent as the nation, these included.
+        case corp_verb::survey:
+        case corp_verb::hold_convoy:
+        case corp_verb::disband_unit:
+        case corp_verb::withdraw_from_battle:
+        case corp_verb::raze_centre:
             return true;
         default:
             return false;
@@ -247,9 +253,6 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // BL-1406: a session that names its NATION reads its own view — the
         // session corporation's blackboard, which carries the nation's book
         // (state buildings, treasury) while the corporation type survives.
-        if (!s.as_any && corp != null_entity && corp != s.actor
-            && corp == session_nation(w, s.actor) && w.corporations.count(s.actor) != 0)
-            corp = s.actor;
         // BL-397: reads are gated by the same session actor as writes.
         // The blackboard is a corp's PRIVATE view — cash, pools, recipes —
         // and this opcode used to export whichever corp the line named.
@@ -442,7 +445,8 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // a verb the seam admits for no nation (a firm's verb) is refused whole,
         // before the seam, mutating nothing. An unfolded world (a fixture) keeps
         // the corporation actor it always had.
-        if (!s.as_any && world_is_folded(w))
+        // BL-1407: the player IS its nation, so this holds on every world.
+        if (!s.as_any)
         {
             if (!wire_nation_verb(cmd.verb) || snation == null_entity)
             {
@@ -566,18 +570,22 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // Ascending id, for the same reason BODIES sorts: a play transcript
         // is a replay artifact, and two runs of the same seed must agree
         // byte-for-byte or a trace corpus records the allocator's mood.
-        std::vector<entity_id> corp_ids;
-        corp_ids.reserve(w.corporations.size());
-        for (const auto& [id, corp] : w.corporations) corp_ids.push_back(id);
-        std::sort(corp_ids.begin(), corp_ids.end());
+        // BL-1407: the actors are NATIONS (the player IS its nation; the
+        // corporation is retired). The row keeps its shape — `home_nation` is
+        // the nation itself — so a client reading the old fields still parses.
+        std::vector<entity_id> nation_ids;
+        nation_ids.reserve(w.nations.size());
+        for (const auto& [id, nc] : w.nations) nation_ids.push_back(id);
+        std::sort(nation_ids.begin(), nation_ids.end());
         std::ostringstream rows;
-        for (const entity_id id : corp_ids)
+        for (const entity_id id : nation_ids)
         {
-            const corporation_component& corp = w.corporations.at(id);
+            const nation_component& nc = w.nations.at(id);
             rows << "{\"id\":" << static_cast<long>(id)
-                 << ",\"name\":\"" << corp.name << "\""
-                 << ",\"is_player\":" << (corp.is_player ? "true" : "false")
-                 << ",\"home_nation\":" << static_cast<long>(corp.home_nation)
+                 << ",\"name\":\"" << nc.name << "\""
+                 << ",\"is_player\":" << (id == w.player_entity ? "true" : "false")
+                 << ",\"home_nation\":" << static_cast<long>(id)
+                 << ",\"is_major\":" << (nc.is_major ? "true" : "false")
                  << "}" << '\n';
         }
         out += rows.str();

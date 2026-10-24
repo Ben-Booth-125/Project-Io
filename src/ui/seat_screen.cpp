@@ -124,14 +124,16 @@ struct firm_goods
 /// year no record spans, or whose ground no realm held, keeps the sentence
 /// short of the realm clause rather than inventing one.
 std::string seat_origin_sentence(const world& w, const generation_report& rep,
-                                 const corporation_component& cc, const std::string& city,
-                                 const nation_component* nat)
+                                 int32_t origin_region, int32_t founded_year,
+                                 const std::string& city, const nation_component* nat)
 {
+    // BL-1407: read at the NATION's grain — the region under its capital, at
+    // the opening year (the seat is a nation; the champion's charter retired).
     const settlement_state* ss = w.gen_settlement.get();
-    if (ss == nullptr || cc.origin_region < 0
-        || static_cast<std::size_t>(cc.origin_region) >= ss->regions.size())
+    if (ss == nullptr || origin_region < 0
+        || static_cast<std::size_t>(origin_region) >= ss->regions.size())
         return {};
-    const std::string& region = ss->regions[static_cast<std::size_t>(cc.origin_region)].name;
+    const std::string& region = ss->regions[static_cast<std::size_t>(origin_region)].name;
 
     // The record whose span holds the year: the cradle's, latest first. The
     // cradle's three records are kept in that order so the tenure walk below
@@ -146,7 +148,7 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
         {
             const era_timelapse* t = order[j];
             if (t->changes.empty()) continue;
-            if (cc.founded_year >= t->start_year && cc.founded_year <= t->start_year + t->years)
+            if (founded_year >= t->start_year && founded_year <= t->start_year + t->years)
             {
                 at = j;
                 break;
@@ -163,7 +165,7 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
     // The holder of the origin region at the year -- the record's own slice,
     // the fold every reader of a record uses -- and the year it took it: the
     // last change of that region's owner at or before the year.
-    const std::size_t origin      = static_cast<std::size_t>(cc.origin_region);
+    const std::size_t origin      = static_cast<std::size_t>(origin_region);
     const auto        taken_since = [origin](const era_timelapse& t, int32_t year) {
         int32_t  since = t.start_year;
         uint16_t prev  = owner_none;
@@ -180,11 +182,11 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
     int32_t     since = 0;
     if (rec != nullptr)
     {
-        const std::vector<uint16_t> slice  = owner_slice_at(*rec, cc.founded_year);
+        const std::vector<uint16_t> slice  = owner_slice_at(*rec, founded_year);
         const uint16_t              owner  = origin < slice.size() ? slice[origin] : owner_none;
         if (owner != owner_none)
         {
-            since = taken_since(*rec, cc.founded_year);
+            since = taken_since(*rec, founded_year);
             // "SINCE" IS TENURE, NOT THE RECORD'S OPENING (Ben, 2026-09-25,
             // NR-939; STARTUP.md § The seat). A region held from before a
             // record opens changes AT its opening, so while `since` sits on the
@@ -215,7 +217,7 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
         }
     }
 
-    std::string s = "Chartered from " + city + "'s industry, in " + region;
+    std::string s = "Governed from " + city + ", in " + region;
     if (nat != nullptr) s += ", under " + nat->name;
     // An UNDATED firm (`founded_year` 0: an origin the walk stamped, a year no
     // finish dated -- a fixture, or a save from before the pairing) keeps the
@@ -226,20 +228,20 @@ std::string seat_origin_sentence(const world& w, const generation_report& rep,
     // its founding realm's coined name (BL-1089), so on ground the nation's own
     // realm held the full form names it twice; the sentence then says "its own
     // realm". The full form stays for ground some other realm held.
-    if (cc.founded_year != 0 && !realm.empty() && nat != nullptr && realm == nat->name)
+    if (founded_year != 0 && !realm.empty() && nat != nullptr && realm == nat->name)
         s += ", its own realm since " + ui::lapse_year_label(since);
-    else if (cc.founded_year != 0 && !realm.empty())
+    else if (founded_year != 0 && !realm.empty())
         s += ", the realm of " + realm + " since " + ui::lapse_year_label(since);
-    else if (cc.founded_year != 0)
-        s += ", in " + ui::lapse_year_label(cc.founded_year);
+    else if (founded_year != 0)
+        s += ", in " + ui::lapse_year_label(founded_year);
     s += ".";
     return s;
 }
 
-firm_goods goods_of(const world& w, const recipe_registry& reg, const corporation_component& cc)
+firm_goods goods_of(const world& w, const recipe_registry& reg, const std::vector<entity_id>& assets)
 {
     firm_goods g;
-    for (const entity_id bid : cc.assets)
+    for (const entity_id bid : assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -302,11 +304,12 @@ std::string price_list(const market_component* m, const std::array<bool, resourc
     return s.empty() ? std::string("none") : s;
 }
 
-entity_id hq_tile_of(const world& w, const corporation_component& cc)
+entity_id hq_tile_of(const world& w, const nation_component& nc)
 {
-    if (const auto hb = w.buildings.find(cc.hq_building); hb != w.buildings.end())
-        return hb->second.tile;
-    for (const entity_id bid : cc.assets) // no HQ recorded: the first sited holding
+    // BL-1407: the seat is a nation, so its capital stands where the HQ did.
+    if (w.tiles.find(nc.capital_tile) != w.tiles.end())
+        return nc.capital_tile;
+    for (const entity_id bid : nc.state_assets) // no capital recorded: the first sited holding
         if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
             return bit->second.tile;
     return null_entity;
@@ -548,9 +551,8 @@ void app::draw_seat_screen()
         {
             const seat_major& m = majors[static_cast<std::size_t>(i)];
             const spawn_seat_candidate& c = cands[static_cast<std::size_t>(m.candidate)];
-            const auto cit = m_world.corporations.find(m.champion);
             const auto nit = m_world.nations.find(m.nation);
-            if (cit == m_world.corporations.end() || nit == m_world.nations.end())
+            if (nit == m_world.nations.end())
                 continue;
             const bool marked = !c.shortlisted;
 
@@ -598,13 +600,10 @@ void app::draw_seat_screen()
     ImGui::BeginChild("##seat_right", {right_w, body_h});
     const seat_major&           sm  = majors[static_cast<std::size_t>(shown)];
     const spawn_seat_candidate& sc  = cands[static_cast<std::size_t>(sm.candidate)];
-    const auto                  scit = m_world.corporations.find(sm.champion);
-    const corporation_component* scc =
-        scit != m_world.corporations.end() ? &scit->second : nullptr;
     const nation_component* nat = nullptr;
     if (const auto nit = m_world.nations.find(sm.nation); nit != m_world.nations.end())
         nat = &nit->second;
-    const entity_id hq_tile = scc ? hq_tile_of(m_world, *scc) : null_entity;
+    const entity_id hq_tile = nat ? hq_tile_of(m_world, *nat) : null_entity;
     entity_id body = null_entity;
     if (const auto t = m_world.tiles.find(hq_tile); t != m_world.tiles.end())
         body = t->second.body;
@@ -755,10 +754,10 @@ void app::draw_seat_screen()
         for (const seat_major& m : majors)
         {
             if (m.nation == sm.nation) continue;
-            const auto cit = m_world.corporations.find(m.champion);
-            if (cit == m_world.corporations.end()) continue;
+            const auto nit = m_world.nations.find(m.nation);
+            if (nit == m_world.nations.end()) continue;
             ImVec2 p;
-            if (at(hq_tile_of(m_world, cit->second), p))
+            if (at(hq_tile_of(m_world, nit->second), p))
                 dl->AddCircleFilled(p, std::max(2.0f, cell * 0.9f), IM_COL32(200, 204, 214, 110), 10);
         }
         if (home_market != null_entity)
@@ -768,17 +767,17 @@ void app::draw_seat_screen()
                 if (at(mit->second.centre_tile, p))
                     ui::icons::market(dl, p, std::max(4.0f, cell * 2.2f), ui::palette::settlement);
             }
-        if (scc)
+        if (nat)
         {
             // The HQ first, then the works OVER it: a firm's holdings cluster
             // within a few tiles of its HQ, and a glyph drawn last hid them.
             ImVec2 hp;
             if (at(hq_tile, hp))
                 ui::icons::hq(dl, hp, std::max(5.0f, cell * 2.0f), ui::palette::hover);
-            for (const entity_id bid : scc->assets)
+            for (const entity_id bid : nat->state_assets)
             {
                 const auto bit = m_world.buildings.find(bid);
-                if (bit == m_world.buildings.end() || bid == scc->hq_building) continue;
+                if (bit == m_world.buildings.end()) continue;
                 ImVec2 p;
                 if (!at(bit->second.tile, p)) continue;
                 const float h = std::max(2.5f, cell * 0.8f);
@@ -791,7 +790,7 @@ void app::draw_seat_screen()
     }
 
     ImGui::Dummy({1.0f, 4.0f});
-    if (!scc || !nat)
+    if (!nat)
     {
         ImGui::EndChild();
         ImGui::End();
@@ -1077,7 +1076,15 @@ void app::draw_seat_screen()
                     static_cast<double>(nat->treasury));
         // BL-1099 / R22: one sentence of origin, at the champion's grain where
         // it names the charter and the nation's where it names the realm.
-        if (const std::string origin = seat_origin_sentence(m_world, m_generation_report, *scc, city, nat);
+        int32_t origin_region = -1;
+        if (const settlement_state* oss = m_world.gen_settlement.get(); oss != nullptr)
+            if (const auto ct = m_world.tiles.find(nat->capital_tile); ct != m_world.tiles.end())
+                if (const auto ob = m_world.bodies.find(ct->second.body); ob != m_world.bodies.end())
+                    origin_region = nearest_region(*oss, ct->second.grid_x, ct->second.grid_y,
+                                                   ob->second.grid_width);
+        if (const std::string origin = seat_origin_sentence(
+                m_world, m_generation_report, origin_region,
+                static_cast<int32_t>(m_active_world_params.epoch_year), city, nat);
             !origin.empty())
             ImGui::TextUnformatted(origin.c_str());
         if (!sc.shortlisted)

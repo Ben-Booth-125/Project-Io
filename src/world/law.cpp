@@ -74,11 +74,9 @@ entity_id choose_levy_author(const world& w)
 {
     // 1. The player corp's home nation — the seeded law should bind the player,
     //    so the laws surface reads "whose law, what it costs me" non-vacuously.
-    const auto pit = w.corporations.find(w.player_entity);
-    if (pit != w.corporations.end() &&
-        pit->second.home_nation != null_entity &&
-        w.nations.find(pit->second.home_nation) != w.nations.end())
-        return pit->second.home_nation;
+    //    BL-1407: the player IS its nation.
+    if (const entity_id pn = player_nation(w); pn != null_entity)
+        return pn;
 
     // 2. Largest territory, ties to the lowest entity id. The scan is over an
     //    unordered_map but the (tiles, id) ordering criterion is total, so the

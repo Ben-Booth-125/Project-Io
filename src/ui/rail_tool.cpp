@@ -52,13 +52,8 @@ bool touches_track(const world& w, entity_id tile, entity_id owner, bool self)
 
 entity_id rail_player_nation(const world& w)
 {
-    const auto it = w.corporations.find(w.player_entity);
-    if (it == w.corporations.end())
-        return null_entity;
-    const entity_id n = it->second.home_nation;
-    if (w.nations.find(n) == w.nations.end() || champion_of(w, n) != w.player_entity)
-        return null_entity;
-    return n;
+    // BL-1407: the player IS its nation.
+    return player_nation(w);
 }
 
 bool rail_tiles_adjacent(const world& w, entity_id a, entity_id b)

@@ -70,6 +70,7 @@
 #include "world/world_gen_config.hpp"
 #include "scripting/lua_state.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -155,6 +156,7 @@ struct reading
     bool     closing_ran     = false;
     bool     handoff_invalid = false;
     std::string handoff_violation;
+    std::string major_ids;       ///< BL-1407: the majors by nation id, ascending (identity, not just a count)
     double   build_s         = 0;
     double   finish_s        = 0;
     bool     ok              = false;
@@ -224,9 +226,16 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
     for (const auto& kv : w.corporations)
         if (!kv.second.is_background && kv.second.home_nation != null_entity)
             ++r.chartered;
-    for (const auto& kv : w.nations)
-        if (is_major_nation(w, kv.first))
-            ++r.majors;
+    {
+        std::vector<entity_id> ids;
+        for (const auto& kv : w.nations)
+            if (is_major_nation(w, kv.first))
+                ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        r.majors = static_cast<int>(ids.size());
+        for (const entity_id id : ids)
+            r.major_ids += (r.major_ids.empty() ? "" : ",") + std::to_string(id);
+    }
 
     for (const auto& c : rep.carve_competitors) r.planned_specs += c.planned_specialists;
 
@@ -343,9 +352,9 @@ int main(int argc, char** argv)
         {
             const reading r = build_and_read(dl, seed, 0, 0);
             if (!r.ok) continue;
-            std::printf("%-6u %6d %7d %8lld %10d %9d %8.1f %8.1f%s%s%s\n", r.seed, r.total, r.majors,
+            std::printf("%-6u %6d %7d %8lld %10d %9d %8.1f %8.1f  majors=[%s]%s%s%s\n", r.seed, r.total, r.majors,
                         static_cast<long long>(r.planned_specs), r.chartered, r.polities, r.build_s,
-                        r.finish_s, r.empty_nations > 0 ? "  (tileless nations present)" : "",
+                        r.finish_s, r.major_ids.c_str(), r.empty_nations > 0 ? "  (tileless nations present)" : "",
                         r.handoff_invalid ? "  HANDOFF VIOLATION: " : "",
                         r.handoff_invalid ? r.handoff_violation.c_str() : "");
             std::fflush(stdout);

@@ -259,7 +259,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         // corporation, so a roster can come back EMPTY — no specialist, no seat.
         // Reported, and handled downstream as the no-specialist world is (the
         // seat path seats nobody rather than a null id).
-        if (w.corporations.count(w.player_entity) == 0)
+        if (w.nations.count(w.player_entity) == 0) // BL-1407: the seat names a nation
         {
             w.player_entity = null_entity;
             std::printf("[landscape_apply] no specialist chartered (placement %08X): the roster "

@@ -45,6 +45,38 @@
 namespace {
 
 // ---------------------------------------------------------------------------
+// BL-1407 — the generation's PROVISIONAL seat
+// ---------------------------------------------------------------------------
+// The player IS its nation (CONCEPT.md § Player identity), so
+// `world::player_entity` names a NATION. Generation still draws a provisional
+// specialist (the draw keeps every RNG stream where it was) and flags it
+// `is_player`; the world's seat is that specialist's home nation. The Begin
+// seat (`repoint_player`) re-points the nation and never reads the flag.
+
+/// The provisional seat's corporation: the lowest-id corporation flagged
+/// `is_player`, or null.
+entity_id provisional_seat_corp(const world& w)
+{
+    entity_id best = null_entity;
+    for (const auto& [cid, cc] : w.corporations)
+        if (cc.is_player && (best == null_entity || cid < best))
+            best = cid;
+    return best;
+}
+
+/// Flag @p corp as the provisional seat (every other flag cleared; keyed writes,
+/// order-free) and point `player_entity` at its home nation. Null clears both.
+void set_provisional_seat(world& w, entity_id corp)
+{
+    for (auto& [cid, cc] : w.corporations)
+        cc.is_player = (cid == corp);
+    const auto cit = w.corporations.find(corp);
+    w.player_entity = (cit != w.corporations.end() && w.nations.count(cit->second.home_nation) != 0)
+                          ? cit->second.home_nation
+                          : null_entity;
+}
+
+// ---------------------------------------------------------------------------
 // Pass 1 helpers — nation assignment
 // ---------------------------------------------------------------------------
 
@@ -2545,7 +2577,7 @@ void arm_rivals(world& w)
     // order on every machine; occupancy from every building standing.
     std::map<entity_id, bool> rivals;
     for (const auto& [cid, cc] : w.corporations)
-        if (!cc.is_background && cid != w.player_entity)
+        if (!cc.is_background && !cc.is_player) // BL-1407: the provisional seat
             rivals[cid] = true;
     std::unordered_set<entity_id> occupied;
     occupied.reserve(w.buildings.size() * 2);
@@ -2571,34 +2603,17 @@ void arm_corporation(world& w, entity_id corp)
     seed_starting_military(w, corp, occupied);
 }
 
-float seat_clean_slate(world& w, entity_id corp)
+float seat_clean_slate(world& w, entity_id nation)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1407: the seat is a NATION (the player IS its nation). Its unfinished
+    // sites are cancelled in ascending building id and what each had been
+    // charged is refunded to the treasury, booked on the nation's next
+    // quarterly return (FINANCE.md § The quarterly return).
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
         return 0.0f;
-    // BL-1402: after the fold the seat's sites are its nation's, refunded to its
-    // treasury (a nation's quarterly return is BL-1407's, so no refund booking).
-    const entity_id owner = seat_owner_of(w, corp);
-    if (owner != corp)
-    {
-        std::vector<entity_id> nsites;
-        for (const entity_id bid : *assets_of(w, owner))
-            if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
-                nsites.push_back(bid);
-        std::sort(nsites.begin(), nsites.end());
-        float nrefund = 0.0f;
-        for (const entity_id bid : nsites)
-        {
-            const float paid = std::max(0.0f, w.buildings.at(bid).construction_paid);
-            if (demolish_building(w, owner, bid))
-                nrefund += paid;
-        }
-        if (nrefund > 0.0f)
-            w.nations.at(owner).treasury += nrefund;
-        return nrefund;
-    }
     std::vector<entity_id> sites;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : nit->second.state_assets)
         if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
             sites.push_back(bid);
     std::sort(sites.begin(), sites.end());
@@ -2606,29 +2621,24 @@ float seat_clean_slate(world& w, entity_id corp)
     for (const entity_id bid : sites)
     {
         // What run_construction charged this site and nothing else: never an
-        // estimate, so the refund cannot exceed what the firm paid in.
+        // estimate, so the refund cannot exceed what the nation paid in.
         const float paid = std::max(0.0f, w.buildings.at(bid).construction_paid);
-        if (demolish_building(w, corp, bid))
+        if (demolish_building(w, nation, bid))
             refund += paid;
     }
     if (refund > 0.0f)
-    {
-        corporation_component& cc = w.corporations.at(corp);
-        if (cc.refund_unbooked == 0.0f)
-            cc.refund_opening = cc.balance; // the exact pre-refund balance
-        cc.balance         += refund;
-        cc.refund_unbooked += refund;
-    }
+        w.nations.at(nation).treasury += refund;
     return refund;
 }
 
-int seat_release_dial_idled(world& w, entity_id corp)
+int seat_release_dial_idled(world& w, entity_id nation)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    // BL-1407: the seat's nation's own buildings (the player IS its nation).
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
         return 0;
     int released = 0;
-    for (const entity_id bid : cit->second.assets) // per-building write: order-free
+    for (const entity_id bid : nit->second.state_assets) // per-building write: order-free
     {
         const auto b = w.buildings.find(bid);
         if (b == w.buildings.end() || !dial_idled(b->second))
@@ -2636,53 +2646,19 @@ int seat_release_dial_idled(world& w, entity_id corp)
         b->second.workforce_auto = true;
         ++released;
     }
-    // BL-1296: the seat runs its nation's state industry too, and the scorer
-    // stops acting on that as well — so the same release reaches the nation's
-    // dial-idled state buildings when the seat is its champion.
-    if (const auto nit = w.nations.find(cit->second.home_nation);
-        nit != w.nations.end() && champion_of(w, nit->first) == corp)
-        for (const entity_id bid : nit->second.state_assets)
-        {
-            const auto b = w.buildings.find(bid);
-            if (b == w.buildings.end() || !dial_idled(b->second))
-                continue;
-            b->second.workforce_auto = true;
-            ++released;
-        }
     return released;
 }
 
-/// BL-1402: who a seat's force belongs to - the champion while it still holds
-/// buildings (a world the fold has not run on), its nation once the fold has
-/// passed them on. A non-corporation is its own owner.
-entity_id seat_owner_of(const world& w, entity_id corp)
+void move_seat_force(world& w, entity_id previous, entity_id nation)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
-        return corp;
-    // The world's state, never this one corporation's emptiness: an unfolded
-    // specialist may hold nothing yet (cold review).
-    if (world_is_folded(w) && w.nations.count(cit->second.home_nation) != 0)
-        return cit->second.home_nation;
-    return corp;
-}
-
-void move_seat_force(world& w, entity_id previous, entity_id corp)
-{
-    // Same corporation: nothing moves, unless the world is folded - then the
-    // nation holds the opening forces its other specialists were armed with
-    // before the fold, and the seat still opens unarmed (cold review).
-    if (previous == corp && !world_is_folded(w))
-        return;
-    // BL-1154: the seat opens unarmed, whichever seat it is - re-subjected to the
-    // seat's NATION once the fold has run (BL-1402). Compared as OWNERS: two
-    // specialists of one nation are one seat once folded, so the nation is
-    // disarmed and never re-armed for the seat it now is.
-    const entity_id seat_owner = seat_owner_of(w, corp);
-    const entity_id prev_owner = previous != null_entity ? seat_owner_of(w, previous) : null_entity;
-    disarm_corporation(w, seat_owner);
-    if (prev_owner != null_entity && prev_owner != seat_owner)
-        arm_corporation(w, prev_owner);
+    // BL-1154 / BL-1407: the seat opens unarmed, whichever NATION it is, and
+    // the nation it leaves takes the opening force every rival has. A nation's
+    // garrisons (no muster base) are not the opening force and stay. The same
+    // nation re-seated is still disarmed: generation armed every rival before
+    // the pick, so the seat's own opening force goes.
+    disarm_corporation(w, nation);
+    if (previous != null_entity && previous != nation && w.nations.count(previous) != 0)
+        arm_corporation(w, previous);
 }
 
 void disarm_corporation(world& w, entity_id corp)
@@ -3314,8 +3290,7 @@ std::vector<entity_id> generate_corporations(
             const int player_idx = pick_player(player_rng);
 
             const entity_id player_corp_id = corp_ids[static_cast<std::size_t>(player_idx)];
-            w.corporations[player_corp_id].is_player = true;
-            w.player_entity = player_corp_id;
+            set_provisional_seat(w, player_corp_id); // BL-1407: player_entity is its nation
 
             // BL-305: which ledger row the player ends up as is only decided here,
             // after every row is already published — so it is a separate field
@@ -3383,11 +3358,12 @@ std::vector<entity_id> generate_corporations(
         for (const auto& [bld_id, bc] : w.buildings)
             military_occupied_tiles.insert(bc.tile);
 
-        if (params.seed_starting_force && w.corporations.count(w.player_entity) != 0)
-            seed_starting_military(w, w.player_entity, military_occupied_tiles);
+        const entity_id seat_corp = provisional_seat_corp(w); // BL-1407
+        if (params.seed_starting_force && seat_corp != null_entity)
+            seed_starting_military(w, seat_corp, military_occupied_tiles);
 
         for (entity_id corp_id : corp_ids)
-            if (corp_id != w.player_entity)
+            if (corp_id != seat_corp)
                 seed_starting_military(w, corp_id, military_occupied_tiles);
     }
 
@@ -3447,7 +3423,7 @@ int remove_specialist_roster(world& w)
 
         w.corp_embargo_conditions.erase(cid);
 
-        if (w.player_entity == cid)
+        if (cc.is_player) // BL-1407: the provisional seat goes with its corporation
             w.player_entity = null_entity;
         w.corporations.erase(cid);
     }
@@ -4318,8 +4294,9 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
         }
         return any && (corp.focus != industrial_focus::processing || proc);
     };
-    const auto seat = w.corporations.find(w.player_entity);
-    if (seat != w.corporations.end() && !seat->second.is_background && !qualifies(w.player_entity))
+    const entity_id seat_corp = provisional_seat_corp(w); // BL-1407
+    const auto seat = w.corporations.find(seat_corp);
+    if (seat != w.corporations.end() && !seat->second.is_background && !qualifies(seat_corp))
     {
         std::vector<entity_id> pool;
         for (const entity_id cid : ids)
@@ -4330,16 +4307,20 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
         {
             std::mt19937 player_rng(seed ^ 0xF0E1D2C3u);
             std::uniform_int_distribution<int> pick(0, static_cast<int>(pool.size()) - 1);
-            repoint_player(w, pool[static_cast<std::size_t>(pick(player_rng))]);
+            // BL-1407: the provisional seat moves corporation (the Begin seat,
+            // `repoint_player`, takes nations); its force moves with it.
+            const entity_id next = pool[static_cast<std::size_t>(pick(player_rng))];
+            set_provisional_seat(w, next);
+            if (next != seat_corp)
+            {
+                disarm_corporation(w, next);
+                arm_corporation(w, seat_corp);
+            }
         }
         else
-        {
-            for (auto& [cid, corp] : w.corporations)
-                corp.is_player = false;
-            w.player_entity = null_entity;
-        }
+            set_provisional_seat(w, null_entity);
     }
-    out.seat = w.player_entity;
+    out.seat = provisional_seat_corp(w);
 
     invalidate_logistics_caches(w);
     return out;
@@ -7301,8 +7282,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         checkpoint_rng pick(seed ^ k_charter_salt_player, 0u);
         const entity_id seat = rep.specialists[static_cast<std::size_t>(
             pick.index(static_cast<int>(rep.specialists.size())))];
-        w.corporations.at(seat).is_player = true;
-        w.player_entity = seat;
+        set_provisional_seat(w, seat); // BL-1407: player_entity is its nation
         rep.player = seat;
     }
 
@@ -7541,7 +7521,7 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
     std::map<entity_id, std::map<entity_id, int>> holdings; // market -> corp -> buildings
     for (const entity_id cid : corp_ids)
     {
-        if (cid == w.player_entity)
+        if (w.corporations.at(cid).is_player) // BL-1407: the provisional seat
             continue; // never added for the seat (TRADE.md § Trade in generation)
         for (const entity_id bid : w.corporations.at(cid).assets)
         {
@@ -7729,13 +7709,11 @@ void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
 
     // The seat the walk drew provisionally (the player picks at Begin) follows
     // the firm that now holds the ground.
-    if (w.player_entity == seller)
-    {
-        w.player_entity = buyer;
-        w.corporations.at(buyer).is_player = true;
-    }
+    const bool seat_moves = w.corporations.at(seller).is_player; // BL-1407
     w.corporations.erase(seller);
-    if (w.player_entity == buyer)
+    if (seat_moves)
+        set_provisional_seat(w, buyer);
+    if (w.corporations.at(buyer).is_player)
         disarm_corporation(w, buyer);   // BL-1154: the seat opens unarmed
     invalidate_logistics_caches(w);     // a port or hub changed hands
 }
@@ -8168,13 +8146,12 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         // the old seat is now a rival and opens armed, as every rival does.
         const std::vector<entity_id>& to = majors.at(richest);
         if (!to.empty()
-            && std::find(demoted.begin(), demoted.end(), w.player_entity) != demoted.end())
+            && std::find(demoted.begin(), demoted.end(), provisional_seat_corp(w)) != demoted.end())
         {
-            const entity_id old_seat = w.player_entity;
+            // BL-1407: the provisional seat is a corporation; player_entity its nation.
+            const entity_id old_seat = provisional_seat_corp(w);
             const entity_id new_seat = to.front();
-            w.corporations.at(old_seat).is_player = false;
-            w.corporations.at(new_seat).is_player = true;
-            w.player_entity = new_seat;
+            set_provisional_seat(w, new_seat);
             if (charter.player == old_seat)
                 charter.player = new_seat;
             disarm_corporation(w, new_seat);

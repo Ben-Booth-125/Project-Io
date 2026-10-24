@@ -206,24 +206,27 @@ scene make_scene()
         s.w.buildings[s.bld] = b;
     }
 
+    // BL-1407: the seat is a NATION (the player IS its nation), holding the
+    // site on its own ground and paying from its treasury.
     s.corp = s.w.create_entity();
     {
-        corporation_component cc;
-        cc.name             = "Session Actor Co";
-        cc.is_player        = true; // the seat the agent occupies, as in the live app
-        cc.starting_capital = 1000.0f;
-        cc.balance          = 1000.0f;
-        cc.assets.push_back(s.bld);
-        s.w.corporations[s.corp] = cc;
+        nation_component nc;
+        nc.name     = "Session Actor";
+        nc.is_major = true; // the seat the agent occupies, as in the live app
+        nc.treasury = 1000.0f;
+        nc.tiles.push_back(s.tile);
+        nc.state_assets.push_back(s.bld);
+        s.w.nations[s.corp] = nc;
+        s.w.tile_to_nation[s.tile] = s.corp;
     }
     s.w.player_entity = s.corp;
 
     s.other = s.w.create_entity();
     {
-        corporation_component cc;
-        cc.name    = "Bystander Holdings";
-        cc.balance = 0.0f;
-        s.w.corporations[s.other] = cc;
+        nation_component nc;
+        nc.name     = "Bystander";
+        nc.treasury = 0.0f;
+        s.w.nations[s.other] = nc;
     }
 
     // BL-1265/1266: the sell order this scene used to carry its float-valued
@@ -412,7 +415,7 @@ int main()
                   && r.rx.find("OK tick=2") != std::string::npos
                   && r.rx.find("OK tick=3") != std::string::npos,
               "R1.5 each TICK resolves with its boundary's OK line");
-        check(count_of(r.rx, "END") == 1 && r.rx.find("Session Actor Co") != std::string::npos,
+        check(count_of(r.rx, "END") == 1 && r.rx.find("Session Actor") != std::string::npos,
               "R1.6 the CORPS read answered immediately, rows then END");
         // Arrival order is application order, and every command landed on a
         // boundary: the transcript tags must read 0, 1, 1, 2 in verb order
@@ -442,9 +445,10 @@ int main()
         const auto apply = [&](corp_verb verb, int tick, float qty = 0.0f,
                                float floor = 0.0f, int wf = 100) {
             corp_command cmd;
-            cmd.tick = tick;
-            cmd.corp = s.corp;
-            cmd.verb = verb;
+            cmd.tick      = tick;
+            cmd.corp      = s.corp;
+            cmd.as_nation = s.corp; // BL-1407: the player acts as its nation
+            cmd.verb      = verb;
             switch (verb)
             {
                 case corp_verb::set_workforce:
@@ -580,7 +584,7 @@ int main()
         // BL-1266: the float rows ride set_trade_reserve, which APPLIES a 0 or
         // -0 reserve and ignores floor_price — so only the protocol layer stands
         // between 1e-60 / -1e-60 / floor_price=1e300|1e-60 and an applied command.
-        check(s.w.corporations.at(s.corp).trade_reserve == 0.0f && s.w.trades.empty(),
+        check(s.w.nations.at(s.corp).trade_reserve == 0.0f && s.w.trades.empty(),
               "R2.7 no trade reserve or trade set from the NaN / overflow / underflow values");
     }
 

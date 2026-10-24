@@ -263,9 +263,10 @@ struct world
 
     // --- well-known entities ---
 
-    /// The player's corporation entity. Set by world construction; used by
-    /// budget and unit ownership in later layers. No component is attached
-    /// yet — the ID alone is sufficient until the budget layer is reached.
+    /// The player's NATION (BL-1407; CONCEPT.md § Player identity, Ben
+    /// 2026-10-23: the player IS its nation). A major nation's id, chosen by the
+    /// seat (`repoint_player`, `corp_verb::take_seat`); null with nobody seated.
+    /// Every player verb is sent as this nation (`corp == as_nation`).
     entity_id player_entity = null_entity;
 
     /// The system's central star (a body entity of type body_type::star). Drawn
@@ -1360,14 +1361,12 @@ bool owner_holds(const world& w, entity_id owner, entity_id building);
 /// corporation's emptiness (an unfolded specialist may hold nothing yet).
 bool world_is_folded(const world& w);
 
-/// BL-1402: the entity the player ACTS as - its nation once the world is folded
-/// (Ben, 2026-10-23: the player is its nation), else the seat corporation.
+/// BL-1402 / BL-1407: the entity the player ACTS as - its nation, which
+/// `world::player_entity` names (Ben, 2026-10-23: the player is its nation).
 entity_id player_actor(const world& w);
 
-/// A nation's CHAMPION: the player's corporation when it is a specialist of
-/// this nation (the seat is the champion), else the lowest-id specialist
-/// (non-background corporation) whose home nation it is; null for a minor
-/// (GLOSSARY.md § Major nation).
+/// A nation's CHAMPION: the lowest-id specialist (non-background
+/// corporation) whose home nation it is; null for a minor.
 entity_id champion_of(const world& w, entity_id nation);
 
 /// True iff @p nation is a MAJOR nation — BL-1404: the saved fact
@@ -1380,8 +1379,8 @@ bool is_major_nation(const world& w, entity_id nation);
 /// after `reconcile_majors`, whose demotions it would undo.
 void mark_majors_from_champions(world& w);
 
-/// The player's nation: the home nation of the player's corporation (the
-/// player plays a major and operates its champion). Null with no player.
+/// The player's nation: `world::player_entity` when it names a nation (BL-1407:
+/// the player IS its nation). Null with no player.
 entity_id player_nation(const world& w);
 
 /// Resolve the body a market entity sits on. Collapses market-level identity to

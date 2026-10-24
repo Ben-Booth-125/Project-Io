@@ -512,14 +512,8 @@ entity_id owner_corp_of(const world& w, entity_id building)
 
 bool is_player_owned(const world& w, entity_id building)
 {
-    const entity_id corp = owner_corp_of(w, building);
-    if (corp != null_entity)
-    {
-        const auto it = w.corporations.find(corp);
-        return it != w.corporations.end() && it->second.is_player;
-    }
-    // BL-1402 (Ben, 2026-10-23): the player IS its nation, so a building its
-    // nation owns is the player's.
+    // BL-1407 (Ben, 2026-10-23): the player IS its nation, and `player_entity`
+    // names it — a building is the player's exactly when its nation owns it.
     const entity_id pn = player_nation(w);
     return pn != null_entity && owner_nation_of(w, building) == pn;
 }
@@ -647,21 +641,16 @@ bool world_is_folded(const world& w)
 
 entity_id player_actor(const world& w)
 {
-    const entity_id pn = player_nation(w);
-    return (pn != null_entity && world_is_folded(w)) ? pn : w.player_entity;
+    // BL-1407: the player acts as its nation, which `player_entity` names.
+    return w.player_entity;
 }
 
 entity_id champion_of(const world& w, entity_id nation)
 {
     if (nation == null_entity)
         return null_entity;
-    // The seat IS its nation's champion (the player plays a major and operates
-    // its champion — CONCEPT.md § Player identity), so a seated specialist is
-    // named first; otherwise the lowest-id specialist at home.
-    if (const auto pit = w.corporations.find(w.player_entity);
-        pit != w.corporations.end() && !pit->second.is_background
-        && pit->second.home_nation == nation)
-        return w.player_entity;
+    // The lowest-id specialist at home (BL-1407: the seat is a nation now, so
+    // no corporation is named first for it).
     entity_id best = null_entity;
     for (const auto& [cid, cc] : w.corporations)
         if (!cc.is_background && cc.home_nation == nation && (best == null_entity || cid < best))
@@ -690,8 +679,9 @@ void mark_majors_from_champions(world& w)
 
 entity_id player_nation(const world& w)
 {
-    const auto cit = w.corporations.find(w.player_entity);
-    return cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+    // BL-1407 (CONCEPT.md § Player identity): `player_entity` IS the player's
+    // nation. Null with no player, or when it names nothing that is a nation.
+    return w.nations.find(w.player_entity) != w.nations.end() ? w.player_entity : null_entity;
 }
 
 entity_id body_of_market(const world& w, entity_id market)
@@ -704,27 +694,22 @@ entity_id body_of_market(const world& w, entity_id market)
 
 namespace {
 
-/// True if the player corporation owns a building on `body`.
+/// True if the player's nation owns a building on `body` (BL-1407: the player
+/// IS its nation).
 bool player_present_on(const world& w, entity_id body)
 {
-    // BL-1402: the seat's own holdings and its nation's (the player IS its nation).
-    const auto on_body = [&](const std::vector<entity_id>& assets) {
-        for (const entity_id bld : assets)
-        {
-            const auto bit = w.buildings.find(bld);
-            if (bit == w.buildings.end())
-                continue;
-            const auto tit = w.tiles.find(bit->second.tile);
-            if (tit != w.tiles.end() && tit->second.body == body)
-                return true;
-        }
+    const auto nit = w.nations.find(player_nation(w));
+    if (nit == w.nations.end())
         return false;
-    };
-    if (const auto cit = w.corporations.find(w.player_entity);
-        cit != w.corporations.end() && on_body(cit->second.assets))
-        return true;
-    if (const auto nit = w.nations.find(player_nation(w)); nit != w.nations.end())
-        return on_body(nit->second.state_assets);
+    for (const entity_id bld : nit->second.state_assets)
+    {
+        const auto bit = w.buildings.find(bld);
+        if (bit == w.buildings.end())
+            continue;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit != w.tiles.end() && tit->second.body == body)
+            return true;
+    }
     return false;
 }
 
@@ -733,7 +718,7 @@ bool player_lane_active_on(const world& w, entity_id body)
 {
     for (const auto& cv : w.convoys)
     {
-        if (cv.corp != w.player_entity && cv.corp != player_nation(w)) // BL-1402: or its nation's
+        if (cv.corp != w.player_entity) // BL-1407: the player's nation's convoys
             continue;
         if (body_of_market(w, cv.source_market) == body ||
             body_of_market(w, cv.dest_market) == body)

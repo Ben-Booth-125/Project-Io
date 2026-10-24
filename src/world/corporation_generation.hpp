@@ -188,28 +188,27 @@ int remove_specialist_roster(world& w);
 /// world as it stands, and a unit, both with NEW entity ids; it never hired in
 /// the settle (it was the provisional player). The seat's own units and bases go
 /// with their ids. Accepted (BL-1154 review, 2026-10-02).
+/// BL-1407: the seat is a NATION — @p previous and @p nation in
+/// `move_seat_force` are nation ids, and the seat's own nation is disarmed even
+/// when it is re-seated (its rivals' forces were laid before the pick).
 bool corporation_has_opening_force(const world& w, entity_id corp);
-void move_seat_force(world& w, entity_id previous, entity_id corp);
-/// BL-1402: who a seat's force and clean slate act on - @p corp while it still
-/// holds buildings, its home nation once the fold has passed them on.
-entity_id seat_owner_of(const world& w, entity_id corp);
+void move_seat_force(world& w, entity_id previous, entity_id nation);
 
 /// BL-1206 — THE SEAT OPENS WITH A CLEAN SLATE OF CONSTRUCTION (Ben, 2026-10-07;
 /// CORPORATION_GENERATION.md § The spawn shortlist, and the seat, step 5). Every
-/// building of @p corp still under construction (`ticks_remaining > 0`) is
-/// cancelled — removed through `demolish_building`, so no building, stockpile or
-/// asset entry survives — in ASCENDING building id, and what each had been
-/// charged so far (`building_component::construction_paid`, the site's own
-/// record of every credit run_construction took for it) is refunded to the
-/// corporation's balance. Finished buildings stay. The refund is booked on the
-/// corporation's next quarterly return as `refunds` (FINANCE.md § The quarterly
-/// return) through `corporation_component::refund_unbooked`.
+/// building of NATION @p nation (BL-1407: the seat is a nation) still under
+/// construction (`ticks_remaining > 0`) is cancelled — removed through
+/// `demolish_building`, so no building, stockpile or asset entry survives — in
+/// ASCENDING building id, and what each had been charged so far
+/// (`building_component::construction_paid`, the site's own record of every
+/// credit run_construction took for it) is refunded to the treasury. Finished
+/// buildings stay.
 ///
 /// Called by both ways a seat is taken — the draw (`repoint_player`) and the
 /// pick (`corp_verb::take_seat`) — BEFORE `move_seat_force`, so a muster base
 /// still under construction is refunded rather than disarmed unpaid.
 /// Deterministic and draw-free. Returns the credits refunded.
-float seat_clean_slate(world& w, entity_id corp);
+float seat_clean_slate(world& w, entity_id nation);
 
 /// NR-986 — AT THE HANDOFF THE SEAT'S DIAL-IDLED PLANTS RETURN TO AUTO (Ben,
 /// 2026-10-09; AI_OPPONENT.md). The scorer stops acting on the corporation the
@@ -220,10 +219,9 @@ float seat_clean_slate(world& w, entity_id corp);
 /// target on the next economy step). Called by both ways a seat is taken at the
 /// handoff — the draw (`seat_player_corporation`) and the pick
 /// (`corp_verb::take_seat`) — and NOT by generation's provisional re-point.
-/// BL-1296: the seat's nation's dial-idled STATE buildings are released the
-/// same way when the seat is that nation's champion (it runs them now).
-/// Deterministic and draw-free. Returns the number of plants released.
-int seat_release_dial_idled(world& w, entity_id corp);
+/// BL-1407: @p nation is the seat's NATION; its own dial-idled buildings are
+/// the ones released. Deterministic and draw-free. Returns the plants released.
+int seat_release_dial_idled(world& w, entity_id nation);
 void arm_rivals(world& w);
 void arm_corporation(world& w, entity_id corp);
 void disarm_corporation(world& w, entity_id corp);

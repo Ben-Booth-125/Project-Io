@@ -54,27 +54,22 @@ bool centre_near_tile(const world& w, const tile_component& tc, int radius)
     return false;
 }
 
-/// BL-1402 (Ben, 2026-10-23; NATIONS.md § What a nation owns): the holdings a
-/// seat is read over. A champion that still holds buildings (a world the fold has
-/// not run on) is read as before; once the fold has passed them to its nation, the
-/// seat IS that nation and is read over the nation's own buildings.
-const std::vector<entity_id>& seat_holdings(const world& w, const corporation_component& cc)
+/// BL-1407 (Ben, 2026-10-23; NATIONS.md § What a nation owns): the holdings a
+/// seat is read over — the seat IS a nation, so its own buildings.
+const std::vector<entity_id>& seat_holdings(const nation_component& nc)
 {
-    if (world_is_folded(w))
-        if (const auto nit = w.nations.find(cc.home_nation); nit != w.nations.end())
-            return nit->second.state_assets;
-    return cc.assets;
+    return nc.state_assets;
 }
 
 } // namespace
 
 double seat_landscape_score(const world& w, const landscape_score& landscape,
-                            entity_id corp, int* holdings_scored)
+                            entity_id nation, int* holdings_scored)
 {
     if (holdings_scored)
         *holdings_scored = 0;
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end())
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
         return 0.0;
 
     // Market id -> its per-market viability. Built from the score's own
@@ -90,7 +85,7 @@ double seat_landscape_score(const world& w, const landscape_score& landscape,
     double sum    = 0.0;
     int    sited  = 0;
     int    scored = 0;
-    for (const entity_id bid : seat_holdings(w, cit->second))
+    for (const entity_id bid : seat_holdings(nit->second))
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -118,34 +113,31 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
 {
     spawn_seat_result out;
 
-    // --- the specialist pool ------------------------------------------------
+    // --- the major pool -------------------------------------------------------
     //
-    // Specialist == NOT a background firm. `generate_background_firms` (BL-365)
-    // adds the mundane industry that saturates the market; those are the world's
-    // furniture, never the player's seat. Sorted by entity id because
-    // `w.corporations` is an unordered_map and an unsorted walk would hand the
-    // same seed a different seat run to run — the BL-406 lesson.
-    std::vector<entity_id> specialists;
-    for (const auto& [id, cc] : w.corporations)
-        if (!cc.is_background)
-            specialists.push_back(id);
-    std::sort(specialists.begin(), specialists.end());
+    // BL-1407 (CONCEPT.md § Player identity; STARTUP.md § The seat): the player
+    // IS a MAJOR NATION, so the seat is chosen over the majors (the saved fact
+    // `is_major_nation`). A minor is never a seat. Sorted by entity id because
+    // `w.nations` is an unordered map and an unsorted walk would hand the same
+    // seed a different seat run to run — the BL-406 lesson.
+    std::vector<entity_id> majors;
+    for (const auto& [id, nc] : w.nations)
+        if (nc.is_major)
+            majors.push_back(id);
+    std::sort(majors.begin(), majors.end());
 
-    out.specialist_count = static_cast<int>(specialists.size());
-    if (specialists.empty())
+    out.major_count = static_cast<int>(majors.size());
+    if (majors.empty())
         return out; // Nothing to seat. Caller keeps whatever the generator picked.
 
     // --- read the floor, and the two weights' inputs -------------------------
-    out.candidates.reserve(specialists.size());
-    for (const entity_id id : specialists)
+    out.candidates.reserve(majors.size());
+    for (const entity_id id : majors)
     {
-        const auto cit = w.corporations.find(id);
-        if (cit == w.corporations.end())
-            continue;
-        const corporation_component& cc = cit->second;
+        const nation_component& nc = w.nations.at(id);
 
         spawn_seat_candidate c;
-        c.corp    = id;
+        c.nation  = id;
 
         // THE FLOOR (BL-1020, Ben 2026-09-16, NR-881). The static landscape
         // score phase 6 computed, read at this seat's holdings: does this corp
@@ -157,24 +149,15 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
         c.landscape   = seat_landscape_score(w, landscape, id, &c.holdings_scored);
         c.shortlisted = (c.landscape > 0.0);
 
-        // INFORMATION, NOT THE GATE. The settle's closing balance and the
-        // trailing net over the last k_spawn_trailing_quarters FILED returns,
-        // kept for the seat card. `returns` is oldest-first and rolling-capped,
-        // so the window is its tail; a corp that has filed fewer is read over
-        // everything it has, the same accommodation the acquisition price makes.
-        // BL-1402: after the fold the seat's money is its nation's treasury.
-        const bool folded = world_is_folded(w) && w.nations.count(cc.home_nation) != 0;
-        c.balance = folded ? w.nations.at(cc.home_nation).treasury : cc.balance;
+        // INFORMATION, NOT THE GATE. The settle's closing treasury, kept for
+        // the seat card (BL-1407: the seat's money is its nation's). The
+        // trailing net over the nation's filed returns is read once the nation
+        // files them; until then the card reads none.
+        c.balance = nc.treasury;
         c.solvent = (c.balance > 0.0f);
-        // A folded seat's money is its nation's; the corporation's own returns
-        // describe holdings it no longer has, so the card reads none (BL-1402).
-        const std::size_t filed = folded ? 0 : cc.returns.size();
-        const std::size_t take  = std::min(filed, k_spawn_trailing_quarters);
-        for (std::size_t i = filed - take; i < filed; ++i)
-            c.trailing_net += static_cast<float>(cc.returns[i].net - cc.returns[i].refunds); // BL-1206: a refund is not earnings
-        c.quarters_read = static_cast<int>(take);
+        c.quarters_read = 0;
 
-        for (const entity_id bid : seat_holdings(w, cc))
+        for (const entity_id bid : seat_holdings(nc))
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -230,7 +213,7 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
                      {
                          if (a.landscape != b.landscape)
                              return a.landscape > b.landscape;
-                         return a.corp < b.corp;
+                         return a.nation < b.nation;
                      });
 
     // AN UNMET FLOOR STANDS (recorded here so a ranking read by the selection
@@ -263,7 +246,7 @@ entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed)
             cursor -= c.weight;
             if (cursor <= 0.0f)
             {
-                chosen = c.corp;
+                chosen = c.nation;
                 break;
             }
         }
@@ -273,7 +256,7 @@ entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed)
         if (chosen == null_entity)
             for (const spawn_seat_candidate& c : ranked.candidates)
                 if (c.shortlisted)
-                    chosen = c.corp;
+                    chosen = c.nation;
     }
     else
     {
@@ -285,30 +268,28 @@ entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed)
         // stopped deciding anything with BL-1020, and a fallback that read it
         // would bring the retired gate back through the side door.
         if (!ranked.candidates.empty())
-            chosen = ranked.candidates.front().corp;
+            chosen = ranked.candidates.front().nation;
     }
     return chosen;
 }
 
-bool repoint_player(world& w, entity_id corp)
+bool repoint_player(world& w, entity_id nation)
 {
-    if (corp == null_entity || w.corporations.find(corp) == w.corporations.end())
+    // BL-1407: the seat is a NATION (the player IS its nation).
+    if (nation == null_entity || w.nations.find(nation) == w.nations.end())
         return false;
     const entity_id previous = w.player_entity;
-    for (auto& [id, cc] : w.corporations)
-        cc.is_player = false;
-    w.corporations[corp].is_player = true;
-    w.player_entity                = corp;
+    w.player_entity          = nation;
     // BL-1206 (Ben, 2026-10-07): the seat opens with a clean slate of
     // construction — its unfinished settle builds cancelled and refunded. Before
     // the force moves, so an unfinished muster base is refunded, not disarmed.
-    seat_clean_slate(w, corp);
+    seat_clean_slate(w, nation);
     // BL-1154 (Ben, 2026-10-01, NR-963 A): THE SEAT OPENS UNARMED, WHICHEVER
-    // CORPORATION IT IS. Rivals were armed at chartering and the generation-time
+    // NATION IT IS. Rivals were armed at chartering and the generation-time
     // pick was not; when the seat moves, the new seat's opening force goes and
-    // the corporation it leaves takes the one every rival has. Deterministic and
+    // the nation it leaves takes the one every rival has. Deterministic and
     // draw-free: the seeding is a nearest-valid-tile search.
-    move_seat_force(w, previous, corp);   // the rule the pick path shares
+    move_seat_force(w, previous, nation);   // the rule the pick path shares
     return true;
 }
 
