@@ -134,13 +134,19 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
                 *current_rung(ui).zoom /= zoom_step;
             break;
 
+        // BL-1406: the cycle steps over a retired slot (overlay_is_retired) —
+        // the slot survives only so a saved integer keeps its meaning.
         case canvas_command::lens_next:
-            ui.overlay = static_cast<overlay_mode>(
-                (static_cast<int>(ui.overlay) + 1) % overlay_mode_count);
+            do
+                ui.overlay = static_cast<overlay_mode>(
+                    (static_cast<int>(ui.overlay) + 1) % overlay_mode_count);
+            while (overlay_is_retired(ui.overlay));
             break;
         case canvas_command::lens_prev:
-            ui.overlay = static_cast<overlay_mode>(
-                (static_cast<int>(ui.overlay) + overlay_mode_count - 1) % overlay_mode_count);
+            do
+                ui.overlay = static_cast<overlay_mode>(
+                    (static_cast<int>(ui.overlay) + overlay_mode_count - 1) % overlay_mode_count);
+            while (overlay_is_retired(ui.overlay));
             break;
         case canvas_command::lens_clear:
             ui.overlay = overlay_mode::none;

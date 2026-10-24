@@ -311,9 +311,10 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // stale routes fade to grey. Always-on (independent of lens), primary view only.
     if (apply_view)
     {
+        const entity_id me = player_actor(w); // BL-1406: routes re-owned to the nation
         for (const auto& r : w.trade_routes)
         {
-            if (r.corp != w.player_entity)
+            if (r.corp != me && r.corp != w.player_entity)
                 continue;
             if (w.bodies.find(r.body_a) == w.bodies.end() ||
                 w.bodies.find(r.body_b) == w.bodies.end())

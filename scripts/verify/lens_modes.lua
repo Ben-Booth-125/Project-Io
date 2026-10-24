@@ -1,14 +1,10 @@
 -- Demo capture: each map-lens overlay over the Planetary canvas (Kepler).
 verify.goto_surface("home")
 
-verify.set_overlay("corporation")
-verify.capture("lens_corporation")
-
--- The Company lens (2026-08-28) is the Corporation lens's mirror: background
--- firms only, drawn identically. Captured next to it deliberately — the pair is
--- only right if the two pictures are DISJOINT, which one capture cannot show.
-verify.set_overlay("company")
-verify.capture("lens_company")
+-- BL-1406: the Corporation and Company lenses retired with the firms; "who owns
+-- what" is the Nations lens (LENSES.md § Corporation and Company lenses - retired).
+verify.set_overlay("nations")
+verify.capture("lens_nations")
 
 verify.set_overlay("scarcity")
 verify.capture("lens_scarcity")
@@ -40,20 +36,22 @@ verify.capture("lens_resource_iron_ore")
 -- so the toggle does not travel when the body opens upward. Press it and capture both
 -- states -- the press is the thing a capture alone cannot prove.
 verify.window(1280, 720)
-verify.set_overlay("corporation")
-verify.capture("lens_chrome_corporation_collapsed")
+-- BL-1406: the owner key retired with its lenses; the Resource key is the
+-- collapsible dropdown this exercises now.
+verify.set_overlay("resource")
+verify.capture("lens_chrome_resource_collapsed")
 
 -- The header bar is the full width of the right chrome column, its foot on the
 -- minimap's top edge. Aim at the middle of that bar rather than at the caret glyph.
 local mini = { w = 363, h = 280 }   -- minimap_rect at 1280x720 (BL-1314: +27 wide); see shell_metrics.cpp
 verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
 verify.frames(2)
-verify.capture("lens_chrome_corporation_expanded")
+verify.capture("lens_chrome_resource_expanded")
 
 -- Toggle rule: a second press on the same spot closes it again.
 verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
 verify.frames(2)
-verify.capture("lens_chrome_corporation_reclosed")
+verify.capture("lens_chrome_resource_reclosed")
 
 -- ---------------------------------------------------------------------------
 -- BL-1250: every lens WASHES the baked ground (LENSES.md § A lens washes the
@@ -103,7 +101,7 @@ verify.expect(best ~= nil, "a built region on the home body to frame")
 print(string.format("[lens_modes] wash framing (%d,%d), %d buildings within 5 tiles",
                     best and best.x or -1, best and best.y or -1, best_n))
 
-local wash_lenses = { "none", "corporation", "company", "market", "continent", "resource",
+local wash_lenses = { "none", "nations", "market", "continent", "resource",
                       "population", "scarcity", "industry", "throughput", "supply",
                       "reach", "supply_routes", "trade_flow" }
 verify.set_lens_resource("iron_ore")

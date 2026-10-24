@@ -283,7 +283,10 @@ std::string corp_display_name(const world& w, entity_id id)
     const auto it = w.corporations.find(id);
     if (it != w.corporations.end() && !it->second.name.empty())
         return it->second.name;
-    return "Corp #" + std::to_string(id);
+    // BL-1406: after the fold an owner is a NATION (trades re-owned to it).
+    if (const auto nit = w.nations.find(id); nit != w.nations.end() && !nit->second.name.empty())
+        return nit->second.name;
+    return "Owner #" + std::to_string(id);
 }
 
 /// The name a corporation is drawn under IN A CELL — its first word.
@@ -339,10 +342,12 @@ std::string counterparty_label(const world& w, entity_id id, bool& is_market)
 /// carries its body. No second notion of "operating".
 bool player_operates_on_body(const world& w, entity_id body)
 {
-    const auto cit = w.corporations.find(w.player_entity);
-    if (cit == w.corporations.end())
+    // BL-1406: the player's buildings are its NATION's once folded (`assets_of`
+    // reads a corporation's `assets` or a nation's `state_assets`).
+    const std::vector<entity_id>* mine = assets_of(w, player_actor(w));
+    if (mine == nullptr)
         return false;
-    for (const entity_id bid : cit->second.assets)
+    for (const entity_id bid : *mine)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
@@ -369,13 +374,13 @@ float trade_capacity(const recipe_registry& reg, std::size_t r)
 std::vector<trade_row_record> collect_trades(const world& w, const recipe_registry& reg,
                                              entity_id mid, bool mine_only)
 {
-    const entity_id player = w.player_entity;
+    const entity_id player = player_actor(w); // BL-1406: trades re-owned to the nation
     std::vector<trade_row_record> out;
     for (const standing_trade& t : w.trades)
     {
         if (t.from_market != mid && t.to_market != mid)
             continue;
-        if (mine_only && t.owner != player)
+        if (mine_only && t.owner != player && t.owner != w.player_entity)
             continue;
         trade_row_record r;
         r.trade_id    = t.id;
@@ -389,7 +394,7 @@ std::vector<trade_row_record> collect_trades(const world& w, const recipe_regist
         r.to_name     = market_city_name(w, t.to_market);
         r.points      = t.points;
         r.units       = t.points * trade_capacity(reg, static_cast<std::size_t>(t.resource));
-        r.mine        = (t.owner == player);
+        r.mine        = (t.owner == player || t.owner == w.player_entity);
         out.push_back(std::move(r));
     }
     return out;
@@ -400,15 +405,17 @@ trade_points_record collect_trade_points(const world& w)
 {
     trade_points_record p;
     p.drawn = true;
-    const auto cit = w.corporations.find(w.player_entity);
-    if (cit == w.corporations.end())
+    // BL-1406: the player's points are its ACTOR's — its nation's once folded —
+    // read through the owner-generic accessors trade.hpp keeps for either owner.
+    const entity_id actor = player_actor(w);
+    if (assets_of(w, actor) == nullptr)
         return p;
-    p.made         = cit->second.trade_points;
-    p.reserve      = cit->second.trade_reserve;
+    p.made         = trade_points_of(w, actor);
+    p.reserve      = trade_reserve_of(w, actor);
     p.reserve_used = std::min(p.reserve, p.made);
     p.auto_points  = std::max(0.0f, p.made - p.reserve_used);
     for (const standing_trade& t : w.trades)
-        if (t.owner == w.player_entity)
+        if (t.owner == actor || t.owner == w.player_entity)
         {
             p.manual_asked += t.points;
             ++p.manual_count;
@@ -440,8 +447,8 @@ std::vector<potential_trade_record> derive_potential_trades(
 {
     std::vector<potential_trade_record> out;
 
-    const entity_id corp = w.player_entity;
-    if (w.corporations.find(corp) == w.corporations.end())
+    const entity_id corp = player_actor(w); // BL-1406: the routes the NATION would rank
+    if (assets_of(w, corp) == nullptr)
         return out;
     if (w.markets.find(here_mid) == w.markets.end())
         return out;
@@ -1052,9 +1059,8 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     // shut a lane outright (a Launchpad gates a space leg; a Port a sea one), and
     // both are presses — they land between econ ticks, so a key of tick alone would
     // leave the derivation stale for the rest of the quarter.
-    const auto pcit = w.corporations.find(corp);
-    const std::size_t assets =
-        (pcit != w.corporations.end()) ? pcit->second.assets.size() : 0;
+    const std::vector<entity_id>* owned = assets_of(w, player_actor(w)); // BL-1406
+    const std::size_t assets = (owned != nullptr) ? owned->size() : 0;
 
     if (g_cache_market != mid || g_cache_tick != w.current_econ_tick
         || g_cache_markets != w.markets.size() || g_cache_assets != assets

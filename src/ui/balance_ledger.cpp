@@ -216,24 +216,30 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
         return;
     }
 
-    // Player-only budget (BL-142): pinned to the player's own corp. Rival treasuries
-    // stay private per the competitor-visibility rule (BL-068).
-    const auto cit = w.corporations.find(w.player_entity);
-    if (cit == w.corporations.end())
+    // Player-only budget (BL-142): pinned to the player's own books. Rival treasuries
+    // stay private per the competitor-visibility rule (BL-068). BL-1406: the books
+    // are the player's NATION's once folded (`player_actor`): its name, its buildings.
+    const entity_id actor = player_actor(w);
+    const std::vector<entity_id>* owned = assets_of(w, actor);
+    std::string actor_name;
+    if (const auto nit = w.nations.find(actor); nit != w.nations.end())
+        actor_name = nit->second.name;
+    else if (const auto cit = w.corporations.find(actor); cit != w.corporations.end())
+        actor_name = cit->second.name;
+    if (owned == nullptr)
     {
-        ImGui::TextDisabled("No corporation data.");
+        ImGui::TextDisabled("No nation data.");
         ui::foldout_end();
         return;
     }
-    const corporation_component& cc = cit->second;
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float content_w = ImGui::GetContentRegionAvail().x;
 
     // --- Corp name header (centred). ---
     {
-        const ImVec2 ts = ImGui::CalcTextSize(cc.name.c_str());
+        const ImVec2 ts = ImGui::CalcTextSize(actor_name.c_str());
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (content_w - ts.x) * 0.5f));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", cc.name.c_str());
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", actor_name.c_str());
     }
     ImGui::Spacing();
 
@@ -374,10 +380,13 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
 
     // --- Assets. ---
     ImGui::SeparatorText("Assets");
-    ImGui::Text("Buildings Owned : %d", static_cast<int>(cc.assets.size()));
+    ImGui::Text("Buildings Owned : %d", static_cast<int>(owned->size()));
 
+    // BL-1406: a nation's income is its own state-ledger row (sales onto the shelf).
     float income    = 0.0f;
-    if (const auto bit = report.budgets.find(w.player_entity); bit != report.budgets.end())
+    if (const auto lit = w.state_ledger.find(actor); lit != w.state_ledger.end())
+        income = lit->second.income;
+    else if (const auto bit = report.budgets.find(actor); bit != report.budgets.end())
     {
         income    = bit->second.income;
     }

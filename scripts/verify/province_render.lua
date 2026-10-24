@@ -80,11 +80,8 @@ verify.capture("province_lens_industry")
 verify.set_overlay("market")       -- no reduction needed (catchment is coarser)
 verify.capture("province_lens_market")
 
-verify.set_overlay("corporation")  -- REFUSES (sparse: built tiles are outside the blend)
-verify.capture("province_lens_corporation")
-
-verify.set_overlay("company")      -- REFUSES, same sparsity as corporation (2026-08-28 split)
-verify.capture("province_lens_company")
+verify.set_overlay("nations")      -- BL-1406: the owner read since the Corporation/Company lenses retired
+verify.capture("province_lens_nations")
 
 verify.set_overlay("population")   -- N/A: a per-tile dot mark, not a fill
 verify.capture("province_lens_population")

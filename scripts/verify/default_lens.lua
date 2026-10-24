@@ -25,9 +25,10 @@ verify.capture("default_lens_warmup")
 -- present with no glyph highlighted.
 verify.capture("default_lens_plain")
 
--- D2: the strip still works — explicitly pick the Corporation lens.
-verify.set_overlay("corporation")
-verify.capture("default_lens_corporation_picked")
+-- D2: the strip still works — explicitly pick the Nations lens (BL-1406: the
+-- Corporation lens retired).
+verify.set_overlay("nations")
+verify.capture("default_lens_nations_picked")
 
 -- Back to none — re-confirms the plain canvas is a reachable state.
 verify.set_overlay("none")

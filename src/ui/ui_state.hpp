@@ -41,7 +41,13 @@ enum class overlay_mode
     // national border band in body_surface_canvas.cpp, drawn like roads. The
     // selection route it owned (hovered tile → owning nation → Nation ledger)
     // moved onto the band itself: click the border, get the nation.
-    corporation,///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
+    // BL-1406 (Ben, 2026-10-23): the Corporation lens RETIRED with the
+    // corporation (LENSES.md § Corporation and Company lenses — retired). The
+    // slot is KEPT because the save's view bindings hold the enum's integer:
+    // deleting it would re-point every later lens in an old save. A retired
+    // slot is never drawn, never on the strip and skipped by the cycle
+    // (`overlay_is_retired`); a save that held it loads as `none`.
+    retired_corporation_, ///< RETIRED (BL-1406). Never a live lens.
     resource,    ///< Single-resource deposit lens: flat fill over the contiguous deposit. See LENSES.md § Resource lens.
     population,  ///< Per-tile habitability tint (dark → liveable green). See LENSES.md § Population lens.
     // Opportunity and Production were `overlay_mode` values here (BL-604, Ben
@@ -64,7 +70,8 @@ enum class overlay_mode
     // only way to see the latter. Appended at the end rather than beside
     // `corporation` because the value is serialised in the save's view bindings —
     // inserting mid-enum would silently re-point a saved lens.
-    company,       ///< Background-firm holdings, drawn exactly as the Corporation lens draws corporations. See LENSES.md § Company lens.
+    // BL-1406: RETIRED with the company, slot kept for the same save reason.
+    retired_company_,  ///< RETIRED (BL-1406). Never a live lens.
     trade_flow,    ///< The player's dispatcher: market-to-market shipment arrows + a marker per short market coloured by why the surplus did not go. BL-1222. See LENSES.md § Trade-flow lens.
     // The Nations lens (BL-1323, Ben 2026-10-14) is a NEW value, appended, never
     // a revival of the retired `country` above: the save's view bindings hold
@@ -74,6 +81,14 @@ enum class overlay_mode
     nations,       ///< Each nation-owned tile filled in its nation's identity colour. BL-1323.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
+
+/// BL-1406: true for a lens slot kept only so a saved integer keeps its meaning.
+/// A retired slot is never drawn; the cycle steps over it and a load maps it to
+/// `overlay_mode::none`.
+constexpr bool overlay_is_retired(overlay_mode m)
+{
+    return m == overlay_mode::retired_corporation_ || m == overlay_mode::retired_company_;
+}
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas
 /// draw pass. Hit-test priority (highest first): unit > building > tile. (No
@@ -105,12 +120,7 @@ enum class structure_kind : uint8_t
     none,        ///< No structure under the pointer, or the lens has none.
     nation,      ///< A generated nation, selected by its national border band.
     market,      ///< A market and its whole catchment (Market and Scarcity lenses).
-    corporation, ///< A corporation's holdings on the active body (Corporation lens).
-    // A COMPANY IS ITS OWN KIND, not a corporation with a flag (BL-665). The two
-    // are different words since the 2026-08-28 split (GLOSSARY.md) and Ben ruled
-    // they reach different destinations, so the difference belongs in the answer
-    // the resolver gives rather than being re-derived by every routing site.
-    company,     ///< A background firm's holdings on the active body (Company lens).
+    // BL-1406: the corporation and company structures retired with their lenses.
     // The two NON-ENTITY structures (Ben, 2026-08-28, choosing option A). Both
     // are regions the lens already draws and the player could not select: a
     // deposit is every tile carrying the lens's resource, a plate is a Voronoi
@@ -310,7 +320,7 @@ struct ui_grid_col
 /// Where the Construction ledger's own controls landed on screen this frame, so a
 /// verify script can press the REAL control rather than a computed guess.
 ///
-/// PUBLISHED RATHER THAN RE-DERIVED, for the same reason `acquisitions_buy_x` is:
+/// PUBLISHED RATHER THAN RE-DERIVED, for the same reason `planetary_center_screen` is:
 /// the surface that drew the thing is the only honest source for where it landed,
 /// and a script re-deriving a row's y from `shell_column_width` plus a guessed line
 /// count would be asserting against its own arithmetic. Every field is rewritten
@@ -540,82 +550,8 @@ struct ui_state
     std::vector<resource_type> lens_resources{ resource_type::iron_ore };
     /// The Resource lens legend's search box text (filters its goods checklist).
     char lens_resource_filter[32] = {};
-    // --- Owner multi-select (BL-1240; LENSES.md § Corporation lens, Owner multi-select) ---
-    // The Corporation and Company lenses draw a PICKED SET of owners: a picked owner's
-    // ground takes its identity colour, an unpicked owner's takes palette::owned_grey.
-    // Two sets, so flipping between the lenses keeps each one's picks. UI state only —
-    // per session, never saved — and keyed by corp id, so it survives a body switch.
-    // The Corporation set defaults to the player; the player id is not known when
-    // ui_state is built, so the canvas seeds it (`seed_lens_corps`) once per seated
-    // player — a seat taken after the first frame still gets its default.
-    std::vector<entity_id> lens_corps;            ///< Picked corporations (player + rivals), in pick order.
-    entity_id              lens_corps_seed = null_entity; ///< The player the default was last applied for.
-    std::vector<entity_id> lens_companies;        ///< Picked background firms; default empty.
-    char                   lens_corps_filter[32]     = {}; ///< Corporation checklist's search box text.
-    char                   lens_companies_filter[32] = {}; ///< Company checklist's search box text.
-    /// The search box a lens's checklist reads — one per lens, like the sets.
-    char* lens_owner_filter(bool background) { return background ? lens_companies_filter : lens_corps_filter; }
-    /// Forget every pick, the seed and both searches. Called when a world is
-    /// replaced (new game, load): corp ids restart at 1, so a pick carried over
-    /// would silently name a different corporation in the new world.
-    void reset_lens_owners()
-    {
-        lens_corps.clear();
-        lens_companies.clear();
-        lens_corps_seed          = null_entity;
-        lens_corps_filter[0]     = '\0';
-        lens_companies_filter[0] = '\0';
-    }
-    /// Drop every pick whose corporation no longer exists (`alive(id)` false) —
-    /// a dissolved owner would otherwise sit in the header count with no row.
-    template <typename Alive>
-    void prune_lens_owners(Alive&& alive)
-    {
-        const auto prune = [&](std::vector<entity_id>& v) {
-            std::size_t keep = 0;
-            for (std::size_t i = 0; i < v.size(); ++i)
-                if (alive(v[i]))
-                    v[keep++] = v[i];
-            v.resize(keep);
-        };
-        prune(lens_corps);
-        prune(lens_companies);
-    }
-    /// Apply the Corporation set's default (the player) once per seated player; a
-    /// player who then unpicks themselves stays unpicked. A new seat REPLACES the
-    /// previous seat's default — the old corp was the default, not a pick.
-    void seed_lens_corps(entity_id player)
-    {
-        if (player == null_entity || player == lens_corps_seed)
-            return;
-        if (lens_corps_seed != null_entity && lens_owner_picked(lens_corps_seed, false))
-            toggle_lens_owner(lens_corps_seed, false);
-        lens_corps_seed = player;
-        if (!lens_owner_picked(player, false))
-            lens_corps.push_back(player);
-    }
-    /// The set a lens reads: companies for a background firm, corporations otherwise.
-    std::vector<entity_id>&       lens_owner_set(bool background)       { return background ? lens_companies : lens_corps; }
-    const std::vector<entity_id>& lens_owner_set(bool background) const { return background ? lens_companies : lens_corps; }
-    bool lens_owner_picked(entity_id corp, bool background) const
-    {
-        for (const entity_id id : lens_owner_set(background))
-            if (id == corp)
-                return true;
-        return false;
-    }
-    /// Toggle @p corp in or out of its lens's set (checklist row or shift-click).
-    void toggle_lens_owner(entity_id corp, bool background)
-    {
-        std::vector<entity_id>& v = lens_owner_set(background);
-        for (auto it = v.begin(); it != v.end(); ++it)
-            if (*it == corp)
-            {
-                v.erase(it);
-                return;
-            }
-        v.push_back(corp);
-    }
+    // BL-1406: the owner multi-select (BL-1240) retired with the Corporation and
+    // Company lenses it served (LENSES.md § Corporation and Company lenses — retired).
     /// Is the lens legend expanded? BL-533 (Ben, 2026-08-22) re-homed every
     /// legend into the right chrome column above the minimap and made it a
     /// dropdown that is COLLAPSED BY DEFAULT — so a lens switch no longer
@@ -669,155 +605,19 @@ struct ui_state
     /// give it that, since opening the Market ledger armed the price wash.
     bool show_convoys_ledger = false;
 
-    /// Whether the Company ledger is open (BL-666). A column occupant with NO
-    /// nav-rail slot: a company is not a population the player
-    /// browses, it is the thing under the cursor when a Company-lens holding is
-    /// clicked, so the only way in is that click. Closed by close_all_panels
-    /// like every other tenant of the fold-out column.
-    ///
-    /// The surface it opens is a declared PLACEHOLDER — it answers none of the
-    /// five axes a real ledger design answers (docs/ui/ledgers/README.md) and
-    /// says so on its face. It exists because Ben's 2026-08-28 ruling on the
-    /// corporation/company split requires the two lenses to land somewhere
-    /// DIFFERENT on click, and the company half had no destination at all.
-    bool show_company_ledger = false;
-
-    /// Which background firm the Company ledger is about — the click's payload,
-    /// held apart from `selected_entity` because the two answer different
-    /// questions: `selected_entity` stays the clicked HOLDING (a building, what
-    /// the Selection band inspects), while this names the FIRM behind it.
-    /// Collapsing them would make the ledger reinterpret a building id as a corp
-    /// id every frame. null_entity => the ledger draws its empty state rather
-    /// than vanishing, so a stale click reads as "nothing here", not as a bug.
-    entity_id selected_company = null_entity;
-
-    /// Which corporation the all-corporations table should aim its row at
-    /// (BL-666, the Corporation-lens half of the same ruling). Kept distinct
-    /// from `selected_company` for the same reason the two lenses are distinct
-    /// words: a corporation is the player or a rival, a company is a background
-    /// firm, and the two never share a destination. Written by the canvas click,
-    /// read by the corporations table; null_entity => the table aims at no row
-    /// in particular and lists as it always has.
-    entity_id selected_corporation_dossier = null_entity;
+    // BL-1406: the Company ledger, its firm payload and the corporations table's
+    // aimed row retired with the company and the corporation (Ben, 2026-10-23).
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
-    // ── The Acquisitions ledger ───────────────────────────────────────────
-    //
-    // Nav-rail slot 5, inserted ABOVE Market (Ben, 2026-08-29), which pushes
-    // every slot from Market down by one. Two doors reach the same surface:
-    // this rail slot, and the Company lens's click destination (a background
-    // firm's holdings resolve through to the firm, and the firm's question is
-    // "can I buy it").
-    //
-    // MEASURED BEFORE IT WAS LAID OUT, AND THE NUMBER HAS SINCE MOVED BY FIFTY
-    // TIMES. Over a TWELVE-seed sweep of the shipped spawn
-    // (`tools/verify/acquisition_viability.cpp` § C), 88 corporations per seed
-    // now yield a BUYABLE FIELD of a mean 81.6 firms — Purchasable 35.8,
-    // Possible 45.8, neither group empty on any seed. It was 1.6 when this
-    // surface was designed, because ownership class was overwhelmingly `closed`
-    // at a mean of 84.8 per seed; retiring closure for background firms took
-    // that to 4.8. Filing has never been the binding gate — public-but-unfiled
-    // is zero on every seed.
-    //
-    // The layout was built for the one-row case and was NOT padded to look
-    // busier. It needed no change to hold eighty, which is the payoff for
-    // having measured the field rather than assumed it.
-    /// Whether the Acquisitions ledger is open. Toggled by nav-rail slot 5 and
-    /// opened by a Company-lens click.
-    bool show_acquisitions_ledger = false;
-
-    /// Which of the two groups are expanded. Both open at rest: with a mean of
-    /// two rows in the whole field, a collapsed group hides the entire answer.
-    bool acquisitions_purchasable_open = true;
-    bool acquisitions_possible_open    = true;
-
-    /// The corporation a Company-lens click aimed at, or `null_entity`. The
-    /// ledger highlights its row so the click lands somewhere visible rather
-    /// than merely opening a list. Never a filter — the field is two rows long
-    /// and filtering it to one would answer a question nobody asked.
-    entity_id acquisitions_focus_corp = null_entity;
-
-    /// Where the FIRST Purchasable row's Buy button actually is, in screen
-    /// pixels, published by the ledger each frame it draws one; `x < 0` means
-    /// there is none. `acquisitions_buy_corp` names the firm that button buys.
-    ///
-    /// PUBLISHED RATHER THAN RE-DERIVED, for the same reason
-    /// `planetary_center_screen` is: the ledger is the only honest source for
-    /// "the screen point that is this press". A verify script computing it from
-    /// `shell_column_width` plus a guessed line count would be asserting against
-    /// its own arithmetic, and would silently start clicking empty column the
-    /// first time a line of prose was added above the table. VIEW state, not
-    /// serialised, rewritten every frame.
-    float     acquisitions_buy_x    = -1.0f;
-    float     acquisitions_buy_y    = -1.0f;
-    entity_id acquisitions_buy_corp = null_entity;
+    // BL-1406: the Acquisitions ledger (rail slot 5) and every flag that drove it
+    // retired with the buyout (docs/ui/ledgers/acquisitions.md). None of it was
+    // ever serialised, so removing it does not move the save envelope.
 
     /// Where the Construction ledger's tabs, type-group headers, building rows and
     /// the building card's open-in-ledger button landed this frame. Same reasoning
-    /// as `acquisitions_buy_x` above; see `construction_controls`.
+    /// as `planetary_center_screen`: the surface that drew it is the honest source.
     construction_controls construction_ui;
 
-    /// The profitability fold-out's sort: column index, and direction. VIEW
-    /// state, not serialised. -1 is "unsorted" — filed order, which is the
-    /// sorted-`entity_id` walk `apply_budget` itself writes in, so the resting
-    /// order is deterministic rather than an unordered map's layout.
-    int  acquisitions_sort_column    = -1;
-    bool acquisitions_sort_ascending = true;
-
-    /// The profitability fold-out's three CROSS-CUTTING SELECTORS (BL-680,
-    /// profitability filters): end resource, input resource, body. All three
-    /// are supply-chain questions — "who makes the thing I need", "who competes
-    /// with me for the input I buy", "who is within reach" — and they combine
-    /// as AND.
-    ///
-    /// They are SELECTORS, NOT VIEWS, so the toggle rule does not bind them,
-    /// exactly as it does not bind the Market ledger's Body and Market combos:
-    /// a selector switches a target rather than expressing an active state, and
-    /// re-picking the current value is a no-op rather than an undo.
-    ///
-    /// Held here rather than in a function-local static for the same reason the
-    /// sort above is: the shell's windows carry `NoSavedSettings`, so ImGui
-    /// forgets everything the moment the takeover closes, and a filter that
-    /// silently reset on every close would read as the surface losing the
-    /// player's question. VIEW state, not serialised.
-    ///
-    /// `-1` / `null_entity` is "every" in each case — the absence of a filter,
-    /// never a value that could be confused with resource index 0.
-    int       acquisitions_filter_end   = -1;
-    int       acquisitions_filter_input = -1;
-    entity_id acquisitions_filter_body  = null_entity;
-
-    /// Where the three filter combos are drawn, and where each one's first real
-    /// option lands once its popup is open, in screen pixels. Index 0 = end
-    /// resource, 1 = input resource, 2 = body. `x < 0` means not drawn this
-    /// frame (the fold-out is closed, or the table had no rows to filter).
-    ///
-    /// PUBLISHED RATHER THAN RE-DERIVED, for the same reason
-    /// `acquisitions_buy_x` is: the surface that drew the control is the only
-    /// honest source for where it landed. A verify script that computed a combo
-    /// centre from the canvas rect plus a guessed line count would be asserting
-    /// against its own arithmetic, and would start clicking empty canvas the
-    /// first time a line of prose moved above it. The OPTION position is
-    /// published separately because a combo popup is its own window: clicking
-    /// the combo only opens it, and selecting a value needs a second real
-    /// press on a real item. VIEW state, rewritten every frame.
-    float acquisitions_filter_x[3]     = { -1.0f, -1.0f, -1.0f };
-    float acquisitions_filter_y[3]     = { -1.0f, -1.0f, -1.0f };
-    float acquisitions_filter_opt_x[3] = { -1.0f, -1.0f, -1.0f };
-    float acquisitions_filter_opt_y[3] = { -1.0f, -1.0f, -1.0f };
-
-    /// The corporations the profitability table ACTUALLY DREW this frame, in
-    /// draw order — after the disclosure listing rule and after all three
-    /// filters.
-    ///
-    /// Published because the alternative is worse: a verify script that
-    /// re-applied the filter rule to an unfiltered row set would be asserting
-    /// against its own arithmetic, and would keep passing if the surface stopped
-    /// filtering altogether. This is the surface reporting what it put on
-    /// screen, which is the only thing worth checking. Empty when the fold-out
-    /// is closed, or when a filter combination excluded every row. VIEW state,
-    /// not serialised, rewritten every frame.
-    std::vector<entity_id> acquisitions_profit_shown;
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary
     // contract — the SELL side of CONTRACTS.md — is retired, so the ledger, its
@@ -1125,15 +925,8 @@ struct ui_state
     int  budget_wage_tier = 2;
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
-    /// Whether the all-corporations balance table is open (corporation_panel.cpp).
-    ///
-    /// PROVISIONAL HOME. This table used to occupy nav slot 1, and was deleted by
-    /// BL-248 as a duplicate of a second aggregate view. Ben restored it
-    /// (NEEDS_REVIEW NR-012, 2026-08-01) — the deletion was not intended — and parked
-    /// it on slot 8 (Diplomacy) so it is reachable while its real home is chosen.
-    /// Slot 8 is otherwise unbuilt, so
-    /// nothing is displaced; when Diplomacy is actually designed this occupant moves.
-    bool show_corporations_table = false;
+    // BL-1406: the corporation stance table (rail slot 9, Diplomacy) retired with
+    // the corporation (docs/ui/ledgers/corporation.md § Slot 8, retired).
 
     /// F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
     /// (BL-310, 2026-08-06 — the slot was a hard-disabled placeholder before).

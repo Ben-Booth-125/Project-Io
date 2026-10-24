@@ -13,7 +13,7 @@
 -- Structures resolve at two grains here (SELECTION.md § Lens-driven hover &
 -- selection resolution, and § The lens names the ledger the selection drives):
 --   market / scarcity  -> the catchment      -> Market ledger, aimed at it
---   corporation        -> the corp's holdings-> Balance ledger  (marker-resolved)
+--   (corporation / company retired with the firms, BL-1406; ownership is the Nations lens)
 --   resource           -> the DEPOSIT        -> Market ledger for that resource   (BL-659)
 --   continent          -> the PLATE          -> History ledger                    (BL-660)
 -- The last two are non-entity structures and travel in their own ui_state fields
@@ -86,8 +86,7 @@ verify.expect(mk.open_panel == "market",
               "market lens: the press opens the Market ledger (got " ..
               tostring(mk.open_panel) .. ")")
 hover_then_select("scarcity",    "path_scarcity")
-hover_then_select("corporation", "path_corporation")
-hover_then_select("company",     "path_company")
+hover_then_select("nations",     "path_nations") -- BL-1406: replaces the owner lenses
 hover_then_select("continent",   "path_continent")
 
 -- Population draws at tile grain and has no structure, which is a real answer

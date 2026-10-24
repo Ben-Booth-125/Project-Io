@@ -32,9 +32,12 @@ verify.frames(2)
 -- right edge on the screen edge, and NOTHING drawn over the canvas or the
 -- bottom panels. The count belongs in the header on purpose — a collapsed
 -- legend that does not say how much it hides gives no reason to open it.
-verify.set_overlay("corporation")
+-- BL-1406: the Corporation and Company lenses retired with the firms; "who owns
+-- what" is the Nations lens (LENSES.md § Corporation and Company lenses - retired).
+-- The Resource key is the collapsible checklist this exercises now.
+verify.set_overlay("resource")
 verify.frames(2)
-verify.capture("legend_corporation_collapsed")
+verify.capture("legend_resource_collapsed")
 
 -- ---------------------------------------------------------------------------
 -- L2 / L3 — the press lands, and the body scrolls rather than overrunning.
@@ -60,14 +63,14 @@ local header_y = ceiling_y + 16          -- inside the header band (now the full
 verify.hover(header_x, header_y, 2)
 verify.click(header_x, header_y)
 verify.frames(2)
-verify.capture("legend_corporation_expanded")
+verify.capture("legend_resource_expanded")
 
 -- Re-press closes it again. This is the standing toggle rule: a control whose
 -- active state is visible undoes itself on a second press.
 verify.hover(header_x, header_y, 2)
 verify.click(header_x, header_y)
 verify.frames(2)
-verify.capture("legend_corporation_recollapsed")
+verify.capture("legend_resource_recollapsed")
 
 -- ---------------------------------------------------------------------------
 -- The other legend-bearing lenses use the SAME box, so a regression in one is

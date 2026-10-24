@@ -118,13 +118,14 @@ for _, b in ipairs(verify.buildings()) do
     if p.ok and p.y < 440 and p.x > 70 and p.x < 920 then bt = { col = b.x, row = b.y }; break end
 end
 verify.expect(bt ~= nil, "found a building on screen to press")
-local c = bt and pivot_at(bt.col, bt.row, "corporation", "corporation") or {}
-verify.expect(c.selection_kind == "corporation",
-              "corporation lens: a press selects the CORPORATION (got " ..
-              tostring(c.selection_kind) .. ")")
-verify.expect(c.open_panel == "balance",
-              "corporation lens: the press opens the Budget ledger (got " ..
-              tostring(c.open_panel) .. ")")
+-- BL-1406: the Corporation lens retired with the corporation, so P2 asks the
+-- question it now has: the retired name arms no lens, and a press on the building
+-- resolves as on the plain map.
+verify.set_overlay("corporation")
+verify.frames(1)
+verify.expect(verify.overlay_name() == "none",
+              "the retired corporation lens name arms nothing (got " ..
+              tostring(verify.overlay_name()) .. ")")
 
 -- P3 — the control: a tile-grain lens still selects the tile
 local t = pivot("population", "population")

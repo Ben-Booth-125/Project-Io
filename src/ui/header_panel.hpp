@@ -14,11 +14,11 @@ namespace ui {
 /// (top-left) and the time column (top-right). It is the player's glanceable
 /// financial dashboard — always visible, never opened or closed. It surfaces the
 /// three figures the player needs without opening a ledger (see docs/ui/HEADER.md):
-///   - the player corporation's running **balance** (negatives flagged red);
-///   - an **estimated stockpile valuation** — the player's `(corp, body)` pools
-///     summed at each body's market price;
-///   - the **last-tick net** change as a coloured per-quarter figure plus a
-///     sparkline of recent balances.
+///   - the player NATION's **treasury** (BL-1406; a nation never runs into debt);
+///   - the **cargo** valuation — the player's trades' goods in transit, at the
+///     price where they land;
+///   - the **last-tick net** change (the nation's state-ledger row) as a coloured
+///     per-quarter figure plus a sparkline of recent treasuries, and the runway.
 ///
 /// Detail lives in the ledgers; this stays a summary surface.
 ///

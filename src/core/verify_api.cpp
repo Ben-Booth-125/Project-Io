@@ -28,7 +28,7 @@
 #include "ui/construction_panel.hpp"
 #include "ui/selection_panel.hpp"
 #include "ui/corporation_dashboard.hpp"
-#include "ui/corporation_panel.hpp"
+// BL-1406: ui/corporation_panel.hpp retired with the corporation stance table.
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
 #include "ui/nav_pane.hpp"
@@ -102,10 +102,8 @@ overlay_mode overlay_from_name(const std::string& s)
     // An alias that silently answers a question nobody can ask any more is worse
     // than an error, so the name now takes the unknown-name fallback like any
     // other typo, and the scripts that used it are retired or re-pointed.
-    if (s == "corporation") return overlay_mode::corporation;
-    // Background firms — a "company" as distinct from a "corporation" since Ben's
-    // 2026-08-28 terminology ruling (GLOSSARY.md).
-    if (s == "company")     return overlay_mode::company;
+    // "corporation" / "company" ARE GONE (BL-1406, Ben 2026-10-23), by the same
+    // rule: both lenses retired with the firms, so the names take the fallback.
     if (s == "resource")    return overlay_mode::resource;
     if (s == "population")  return overlay_mode::population;
     // "opportunity" and "production" were names here until BL-604 retired both
@@ -133,8 +131,6 @@ const char* overlay_script_name(overlay_mode m)
     {
         case overlay_mode::supply:        return "supply";
         case overlay_mode::market:        return "market";
-        case overlay_mode::corporation:   return "corporation";
-        case overlay_mode::company:       return "company";
         case overlay_mode::resource:      return "resource";
         case overlay_mode::population:    return "population";
         case overlay_mode::scarcity:      return "scarcity";
@@ -1047,30 +1043,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return true;
     });
     v.set_function("clear_lens_resources", [this]() { m_ui.lens_resources.clear(); });
-    // Owner multi-select (BL-1240): toggle one corporation or background firm in or
-    // out of its lens's picked set, as the checklist row does. The set is chosen by
-    // the corp's own kind, so the call needs no lens argument. Returns false
-    // (nothing changed) for an id that is not a corporation.
-    v.set_function("toggle_lens_owner", [this](unsigned id) -> bool {
-        const auto it = m_world.corporations.find(static_cast<entity_id>(id));
-        if (it == m_world.corporations.end())
-            return false;
-        m_ui.seed_lens_corps(m_world.player_entity); // the default lands first
-        m_ui.prune_lens_owners([this](entity_id c) { return m_world.corporations.count(c) > 0; });
-        m_ui.toggle_lens_owner(it->first, it->second.is_background);
-        return true;
-    });
-    // The picked set for "corporation" or "company", in pick order, so a script can
-    // assert what a checklist press or a shift-click actually did.
-    v.set_function("lens_owner_picks", [this](const std::string& kind) {
-        m_ui.seed_lens_corps(m_world.player_entity);
-        m_ui.prune_lens_owners([this](entity_id c) { return m_world.corporations.count(c) > 0; });
-        sol::table out = m_lua.state().create_table();
-        int i = 1;
-        for (const entity_id id : m_ui.lens_owner_set(kind == "company"))
-            out[i++] = static_cast<unsigned>(id);
-        return out;
-    });
+    // BL-1406: the owner multi-select's readers retired with the Corporation and
+    // Company lenses (LENSES.md § Corporation and Company lenses — retired).
     // A SHIFT-held left click on Planetary tile (col, row), through the real input
     // path — the owner lenses' map picker. Same centring caveat as click_tile (the
     // view moves). Shift goes down on the settle frame before the press, because
@@ -1602,8 +1576,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             {
             case structure_kind::nation:      k = "nation";      break;
             case structure_kind::market:      k = "market";      break;
-            case structure_kind::corporation: k = "corporation"; break;
-            case structure_kind::company:     k = "company";     break;
             case structure_kind::deposit:     k = "deposit";     break;
             case structure_kind::plate:       k = "plate";       break;
             case structure_kind::ground:      k = "ground";      break;
@@ -1637,18 +1609,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const char* panel = "none";
             if (m_ui.show_market_ledger)           panel = "market";
             else if (m_ui.show_balance_ledger)     panel = "balance";
-            // TWO SURFACES, TWO NAMES. `show_corporation_panel` is the player's
-            // own dashboard and `show_corporations_table` is the all-corporations
-            // table; before BL-666 only the first had a name here, so a check
-            // asserting "corporation" passed for EITHER — which is exactly how the
-            // first cut of the corporation destination shipped green while opening
-            // the player's own books (the review barrier's finding, 2026-08-28).
+            // `show_corporation_panel` is the Nation overview (rail slot 1); the
+            // all-corporations table it was once confused with retired (BL-1406).
             else if (m_ui.show_corporation_panel)  panel = "corporation";
-            else if (m_ui.show_corporations_table) panel = "corporations";
             else if (m_ui.show_construction_panel) panel = "construction";
             else if (m_ui.show_tile_ledger)        panel = "tile";
-            else if (m_ui.show_company_ledger)      panel = "company";
-            else if (m_ui.show_acquisitions_ledger) panel = "acquisitions";
             // Convoys (BL-689), and the three tail surfaces that had no name here
             // at all. The gap mattered the moment BL-689 renumbered seven slots:
             // a slot->surface check can only assert what this chain can name, so
@@ -1692,6 +1657,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // window is hang-declared mid-script (see the run header above).
             SDL_PumpEvents();
         }
+    });
+
+    // BL-1406: FOLD THE VERIFY WORLD TO GROUND, as every campaign start does
+    // (finish_campaign_world -> fold_to_ground). The --verify world is laid
+    // unsearched and is NOT folded, so without this no capture can show the
+    // surfaces as they read in play - the player acting as its NATION (header
+    // treasury, Nation overview, own-ground gates). A staging call: it runs the
+    // world's own fold, verbatim, and reports what it did plus who the player
+    // now acts as. Verify-only, bound behind --verify.
+    v.set_function("fold_world", [this]() {
+        const fold_report r = fold_to_ground(m_world);
+        print_fold(r);
+        sol::table out = m_lua.state().create_table();
+        out["buildings_folded"] = r.buildings_folded;
+        out["units_reowned"]    = r.units_reowned;
+        out["folded"]           = world_is_folded(m_world);
+        out["actor"]            = static_cast<unsigned int>(player_actor(m_world));
+        out["nation"]           = static_cast<unsigned int>(player_nation(m_world));
+        const float* purse      = purse_of(m_world, player_actor(m_world));
+        out["treasury"]         = purse != nullptr ? static_cast<double>(*purse) : 0.0;
+        m_ground.touch(); // ownership moved: the ground's owner washes re-bake
+        return out;
     });
 
     // Open/close a ledger panel by name, so a script can put a surface on screen
@@ -2777,11 +2764,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // the research panel (BL-1276), F9 / slot 4
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
-        else if (name == "acquisitions") m_ui.show_acquisitions_ledger = open; // Acquisitions ledger, nav slot 5
-        // Nav slot 8's all-corporations table. It had no name here, so the one
-        // rail slot whose panel a script could not open was also the only one
-        // with no capture — green-but-blind by omission rather than by design.
-        else if (name == "corporations_table") m_ui.show_corporations_table = open;
         // The in-session system menu (the header-corner popup, time_panel.cpp).
         // `show_menu` sounds like this and is not: it re-enters the LAUNCH screen.
         // The popup that holds save/load/options/quit had no hook at all, so the
@@ -2856,57 +2838,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // The rows the Corporations ledger actually DREW last frame, in draw order, with
-    // each control's screen position and a FRESH read of the stance tables.
-    //
-    // The stance fields are re-read here from `stance.hpp` rather than copied out of
-    // the panel's own decision, so a script comparing `group` against them is
-    // cross-checking two independent reads and not restating one. `is_hostile` is
-    // asked once per direction and `are_friends` separately — the two are never
-    // collapsed (RELATIONS.md § 1 Stance, invariant 3).
-    //
-    // The positions are what make a press-based assertion honest: a control laid out
-    // past the fold-out column's clip rect is invisible to `expect_no_clipping`
-    // (NR-663), so a script aims `verify.click` at the rect the panel reported and
-    // requires the world to change. ImGui's hit-test rejects a press outside the clip
-    // rect, so a clipped control fails the assertion instead of passing a screenshot.
-    v.set_function("corp_panel_rows", [this]() {
-        sol::table out = m_lua.state().create_table();
-        const entity_id player = m_world.player_entity;
-        int i = 1;
-        for (const ui::corp_panel_row& r : ui::corporation_panel_last_rows())
-        {
-            sol::table row = m_lua.state().create_table();
-            row["corp"]          = static_cast<unsigned int>(r.corp);
-            row["name"]          = r.name;
-            row["is_player"]     = r.is_player;
-            row["is_background"] = r.is_background;
-            row["expanded"]      = r.expanded;
-
-            switch (r.group)
-            {
-                case ui::corp_stance_group::friends: row["group"] = std::string("friends"); break;
-                case ui::corp_stance_group::hostile: row["group"] = std::string("hostile"); break;
-                case ui::corp_stance_group::neutral: row["group"] = std::string("neutral"); break;
-            }
-
-            const bool self = (r.corp == player) || (player == null_entity);
-            row["hostile_out"] = self ? false : is_hostile(m_world, player, r.corp);
-            row["hostile_in"]  = self ? false : is_hostile(m_world, r.corp, player);
-            row["friends"]     = self ? false : are_friends(m_world, player, r.corp);
-
-            row["x"] = r.x;                 row["y"] = r.y;
-            row["caret_x"] = r.caret_x;     row["caret_y"] = r.caret_y;
-            row["declare_x"] = r.declare_x; row["declare_y"] = r.declare_y;
-            row["confirm_x"] = r.confirm_x; row["confirm_y"] = r.confirm_y;
-            row["offer_x"] = r.offer_x;     row["offer_y"] = r.offer_y;
-            row["accept_x"] = r.accept_x;   row["accept_y"] = r.accept_y;
-            row["neutral_x"] = r.neutral_x; row["neutral_y"] = r.neutral_y;
-
-            out[i++] = row;
-        }
-        return out;
-    });
+    // BL-1406: `corp_panel_rows` retired with the corporation stance table.
 
     // Park the AI decision feed's filters (BL-407 R2) so a capture can show a
     // FILTERED list — the resting state is "all", and a filter that only ever
@@ -3020,13 +2952,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "gen_cover")          m_ui.gen_cover_open          = open;
         else if (name == "gen_landform")       m_ui.gen_landform_open       = open;
         else if (name == "construction_queue") m_ui.construction.queue_open = open;
-        else if (name == "acq_purchasable")    m_ui.acquisitions_purchasable_open = open;
-        else if (name == "acq_possible")       m_ui.acquisitions_possible_open    = open;
         else
             std::printf("verify.section: unknown section '%s'. Known: gen_profile, "
                         "gen_thresholds, gen_bands, gen_substrate, gen_cover, "
-                        "gen_landform, construction_queue, acq_purchasable, "
-                        "acq_possible.\n", name.c_str());
+                        "gen_landform, construction_queue.\n", name.c_str());
     });
 
     // Park a fold-out ledger's SCROLL at a fraction of its extent (0 = top,
@@ -3059,7 +2988,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const char* target = nullptr;
         if (name == "tile" || name == "history") target = "Tile Ledger";
         else if (name == "balance")              target = "Balance Ledger";
-        else if (name == "corporation")          target = "Corporations";
+        else if (name == "corporation")          target = "Nation overview"; // BL-1406: slot 1
         // "Building" until 2026-08-30, and no window has EVER had that name —
         // construction_panel.cpp calls `foldout_begin("Construction")`. A third
         // instance of the same silence, found only because half 2 of the fix
@@ -3068,9 +2997,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // The tile's building list scrolls in its own child (BL-1255: the rail
         // rows sit at the road ladder's foot and inside Infrastructure).
         else if (name == "build_list")           target = "##build_list";
-        else if (name == "acquisitions")         target = "Acquisitions";
         else if (name == "generation_ledger")    target = "Generation Ledger";
-        else if (name == "corporations_table")   target = "Corporations";
         else if (name == "decisions")            target = "AI decisions";
         else if (name == "strategy")             target = "Strategy readout";
         // The Market ledger's Goods table scrolls in its own child (BL-686), so
@@ -3102,7 +3029,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             ++m_verify_failures;
             SDL_Log("verify.scroll_panel FAIL: unknown panel '%s' - the request "
                     "reached no scroller. Known: tile, history, market, balance, "
-                    "corporation, construction, acquisitions, "
+                    "corporation, construction, "
                     "generation_ledger, convoys, wizard.", name.c_str());
             ui::foldout_request_scroll("", 0.0f);
             return;
@@ -3140,7 +3067,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (n == "history_chain")    s = detail_surface::history_chain;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
-        else if (n == "acquisitions_profit") s = detail_surface::acquisitions_profit;
         if (s == detail_surface::none) ui::fold(m_ui);
         else                           ui::expand(m_ui, s, key.value_or(0));
     });
@@ -4139,93 +4065,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return "rejected_invalid";
     });
 
-    // The Acquisitions ledger's buyable field, as the LEDGER COMPUTES IT.
-    //
-    // Why a reader rather than pixel assertions: `expect_no_clipping` is vacuous
-    // on this class of surface (NR-663 — table cells and `SmallButton` labels are
-    // not instrumented, so it reported zero records over frames carrying six
-    // visibly clipped strings), and a capture cannot say whether an unfiled firm
-    // was excluded or merely scrolled past. So the script asserts the SET, and
-    // looks at the capture for the layout.
-    //
-    // Every gate here mirrors `apply_corp_command`'s own, in its order, and the
-    // price comes from `corp_acquisition_price` — the same construction the
-    // ledger uses, so the two cannot report different fields. Read-only: it
-    // mutates nothing and exists only behind `--verify`.
-    //
-    // `firms`/`public_filed` come back on every row so a script can assert the
-    // EXCLUSION (no unfiled firm listed) without needing a second call.
-    v.set_function("acquisitions_field", [this]() {
-        sol::table out = m_lua.state().create_table();
-
-        float balance = 0.0f;
-        if (const auto pit = m_world.corporations.find(m_world.player_entity);
-            pit != m_world.corporations.end())
-            balance = pit->second.balance;
-
-        std::vector<entity_id> ids;
-        ids.reserve(m_world.corporations.size());
-        for (const auto& kv : m_world.corporations)
-            ids.push_back(kv.first);
-        std::sort(ids.begin(), ids.end());
-
-        const float k = m_registry.acquisition().multiple;
-        int corps = 0, public_held = 0, public_filed = 0, listed = 0;
-
-        sol::table rows = m_lua.state().create_table();
-        for (const entity_id id : ids)
-        {
-            const corporation_component& cc = m_world.corporations.at(id);
-            ++corps;
-            if (id == m_world.player_entity || cc.is_player)
-                continue;
-            if (cc.ownership_class != ownership_class::publicly_held)
-                continue;
-            ++public_held;
-            if (cc.returns.empty())
-                continue;   // never filed — cannot be priced, so never listed
-            ++public_filed;
-            const float price = corp_acquisition_price(cc, k);
-            if (!std::isfinite(price))
-                continue;
-
-            sol::table row = m_lua.state().create_table();
-            row["corp"]  = static_cast<unsigned int>(id);
-            row["name"]  = cc.name;
-            row["price"] = price;
-            row["filed"] = static_cast<int>(cc.returns.size());
-            // The group the ledger puts this row in — the seam's own solvency
-            // test, not a restatement of it.
-            row["group"] = std::string(balance >= price ? "purchasable" : "possible");
-            rows[++listed] = row;
-        }
-
-        out["balance"]      = balance;
-        out["corps"]        = corps;
-        out["public_held"]  = public_held;
-        out["public_filed"] = public_filed;
-        out["listed"]       = listed;
-        out["rows"]         = rows;
-        return out;
-    });
-
-    // Where the Acquisitions ledger's first Buy button IS, so a script can
-    // click the REAL control instead of a computed guess. Same reasoning as
-    // `tile_screen`: the surface that drew the thing is the only honest source
-    // for where it landed, and a script re-deriving it from the column width
-    // would be asserting against its own arithmetic. `ok` is false when the
-    // ledger is closed or the Purchasable group is empty — which, on a measured
-    // mean of 1.0 purchasable firms, is a real outcome and not an error.
-    v.set_function("acquisitions_buy_button", [this]() {
-        sol::state& st = m_lua.state();
-        sol::table out = st.create_table();
-        out["ok"]   = (m_ui.acquisitions_buy_x >= 0.0f);
-        out["x"]    = m_ui.acquisitions_buy_x;
-        out["y"]    = m_ui.acquisitions_buy_y;
-        out["corp"] = static_cast<unsigned int>(m_ui.acquisitions_buy_corp);
-        return out;
-    });
-
     // The Buildings view's ROSTER, exactly as the surface computes it: one row per
     // named building type the player owns at least one of, with its count, its summed
     // per-quarter net, whether it is the expanded group, and its members' entity ids.
@@ -4264,7 +4103,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     // Where the Construction ledger's own controls landed this frame, so a check can
-    // press the REAL control. Same reasoning as `acquisitions_buy_button`; the fields
+    // press the REAL control. Same reasoning as `tile_screen`; the fields
     // are documented on `ui_state::construction_controls`. `open_ledger_ok` being
     // FALSE on a rival building's card is an assertion in its own right — the
     // Buildings view is the player's estate, so the button must not be there.
@@ -5658,208 +5497,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // The PROFITABILITY table's row set, as the fold-out lists it (BL-679).
-    //
-    // Separate from `acquisitions_field` because the two answer different
-    // questions and now hold different populations: the field is what may be
-    // BOUGHT (public, filed, priceable), the profitability table is what may be
-    // READ (`discloses()` — the firm's own books, or a public firm's). A script
-    // that asserted one against the other would be checking a coincidence.
-    //
-    // The listing rule mirrors the ledger's own and nothing more: a row exists
-    // iff `discloses()`. Every field comes back populated or flagged absent, so
-    // a script can assert the whole of Ben's 2026-08-29 ruling — that a listed
-    // row carries every figure and an unlisted firm carries none — without
-    // reading pixels, which `expect_no_clipping` has already proved it cannot do
-    // on this class of surface (NR-663).
-    //
-    // `undisclosed` is the count deliberately NOT listed, so the exclusion can be
-    // asserted as a positive number rather than inferred from a short list.
-    v.set_function("acquisitions_profit", [this]() {
-        sol::table out = m_lua.state().create_table();
-
-        std::vector<entity_id> ids;
-        ids.reserve(m_world.corporations.size());
-        for (const auto& kv : m_world.corporations)
-            ids.push_back(kv.first);
-        std::sort(ids.begin(), ids.end());
-
-        const float k = m_registry.acquisition().multiple;
-        int corps = 0, listed = 0, undisclosed = 0;
-
-        sol::table rows = m_lua.state().create_table();
-        for (const entity_id id : ids)
-        {
-            const corporation_component& cc = m_world.corporations.at(id);
-            ++corps;
-
-            const bool is_player = cc.is_player || id == m_world.player_entity;
-            const bool discloses =
-                is_player || cc.ownership_class == ownership_class::publicly_held;
-            if (!discloses)
-            {
-                ++undisclosed;
-                continue;
-            }
-
-            // The holdings walk, in the same shape the ledger's own uses: the
-            // modal output, the modal processing input, and the body set.
-            std::array<int, resource_count> out_tally{};
-            std::array<int, resource_count> in_tally{};
-            std::vector<entity_id> bodies;
-            std::vector<entity_id> assets = cc.assets;
-            std::sort(assets.begin(), assets.end());
-            for (const entity_id bid : assets)
-            {
-                const auto bit = m_world.buildings.find(bid);
-                if (bit == m_world.buildings.end())
-                    continue;
-                const building_component& b = bit->second;
-                if (const auto tit = m_world.tiles.find(b.tile); tit != m_world.tiles.end())
-                    bodies.push_back(tit->second.body);
-
-                if (b.type == building_type::extraction_site)
-                {
-                    ++out_tally[static_cast<std::size_t>(b.target_resource)];
-                }
-                else if (b.type == building_type::processing_facility)
-                {
-                    if (b.recipe == no_recipe)
-                        continue;
-                    const recipe* rc = m_registry.get_recipe(b.recipe);
-                    if (rc == nullptr)
-                        continue;
-                    ++out_tally[static_cast<std::size_t>(primary_output_resource(*rc))];
-                    std::size_t best = resource_count;
-                    float best_v = 0.0f;
-                    for (std::size_t i = 0; i < resource_count; ++i)
-                        if (rc->inputs[i] > best_v) { best_v = rc->inputs[i]; best = i; }
-                    if (best < resource_count)
-                        ++in_tally[best];
-                }
-            }
-            std::sort(bodies.begin(), bodies.end());
-            bodies.erase(std::unique(bodies.begin(), bodies.end()), bodies.end());
-
-            const auto modal = [](const std::array<int, resource_count>& t,
-                                  bool& found, int& out_idx)
-            {
-                int best_n = 0;
-                std::size_t best_i = 0;
-                for (std::size_t i = 0; i < resource_count; ++i)
-                    if (t[i] > best_n) { best_n = t[i]; best_i = i; }
-                found = best_n > 0;
-                out_idx = found ? static_cast<int>(best_i) : -1;
-            };
-            bool has_end = false, has_input = false;
-            int  end_i = -1, in_i = -1;
-            modal(out_tally, has_end,   end_i);
-            modal(in_tally,  has_input, in_i);
-
-            sol::table row = m_lua.state().create_table();
-            row["corp"]      = static_cast<unsigned int>(id);
-            row["name"]      = cc.name;
-            row["is_player"] = is_player;
-            row["class"]     = std::string(
-                cc.ownership_class == ownership_class::publicly_held  ? "public"
-              : cc.ownership_class == ownership_class::privately_held ? "private"
-                                                                      : "closed");
-            row["has_end"]   = has_end;
-            row["has_input"] = has_input;
-            // -1 where absent, so a script never confuses "no input" with
-            // resource index 0, which is a good like any other.
-            row["end_res"]   = end_i;
-            row["input_res"] = in_i;
-            row["end_name"]   = std::string(
-                has_end ? ui::resource_name(static_cast<resource_type>(end_i)) : "");
-            row["input_name"] = std::string(
-                has_input ? ui::resource_name(static_cast<resource_type>(in_i)) : "");
-
-            sol::table bt = m_lua.state().create_table();
-            for (std::size_t i = 0; i < bodies.size(); ++i)
-                bt[i + 1] = static_cast<unsigned int>(bodies[i]);
-            row["bodies"] = bt;
-
-            row["has_profit"] = !cc.returns.empty();
-            row["profit"]     = cc.returns.empty() ? 0.0f : cc.returns.back().net;
-
-            bool  has_price = false;
-            float price     = 0.0f;
-            if (!is_player && cc.ownership_class == ownership_class::publicly_held
-                && !cc.returns.empty())
-            {
-                const float p = corp_acquisition_price(cc, k);
-                if (std::isfinite(p)) { price = p; has_price = true; }
-            }
-            row["has_price"] = has_price;
-            row["price"]     = price;
-
-            rows[++listed] = row;
-        }
-
-        // The live filter state, so a script asserts against what the surface is
-        // ACTUALLY showing rather than against what it asked for two frames ago.
-        out["filter_end"]   = m_ui.acquisitions_filter_end;
-        out["filter_input"] = m_ui.acquisitions_filter_input;
-        out["filter_body"]  = static_cast<unsigned int>(m_ui.acquisitions_filter_body);
-
-        // WHAT THE TABLE ACTUALLY DREW last frame, after the listing rule and
-        // all three filters — the surface's own output, not a restatement of
-        // its rules. `rows` above is the unfiltered disclosed set, so a script
-        // can compare the two and see exactly what the filter removed.
-        sol::table shown = m_lua.state().create_table();
-        for (std::size_t i = 0; i < m_ui.acquisitions_profit_shown.size(); ++i)
-            shown[i + 1] = static_cast<unsigned int>(m_ui.acquisitions_profit_shown[i]);
-        out["shown"]       = shown;
-        out["shown_count"] = static_cast<int>(m_ui.acquisitions_profit_shown.size());
-        out["corps"]        = corps;
-        out["listed"]       = listed;
-        out["undisclosed"]  = undisclosed;
-        out["rows"]         = rows;
-        return out;
-    });
-
-    // Where the profitability fold-out's three filter combos are, and where each
-    // one's first real option lands once open. Index 1 = end resource, 2 = input
-    // resource, 3 = body (Lua's 1-based, matching the script that reads it).
-    //
-    // Same reasoning as `acquisitions_buy_button`: the surface that drew the
-    // control is the only honest source for where it landed. `opt_ok` is false
-    // until the combo has been clicked open, because a popup that is not on
-    // screen has no position — so the two-press sequence a script must run
-    // (click the combo, re-read, click the option) is the one a player runs.
-    v.set_function("acquisitions_filter_control", [this](int slot) {
-        sol::state& st = m_lua.state();
-        sol::table out = st.create_table();
-        const int i = slot - 1;
-        if (i < 0 || i > 2)
-        {
-            out["ok"] = false;
-            out["opt_ok"] = false;
-            return out;
-        }
-        out["ok"]     = (m_ui.acquisitions_filter_x[i] >= 0.0f);
-        out["x"]      = m_ui.acquisitions_filter_x[i];
-        out["y"]      = m_ui.acquisitions_filter_y[i];
-        out["opt_ok"] = (m_ui.acquisitions_filter_opt_x[i] >= 0.0f);
-        out["opt_x"]  = m_ui.acquisitions_filter_opt_x[i];
-        out["opt_y"]  = m_ui.acquisitions_filter_opt_y[i];
-        return out;
-    });
-
-    // Set one profitability filter directly, so a script can sweep EVERY option
-    // exhaustively rather than only the one the popup happens to draw first.
-    //
-    // This does not replace the click path and is not allowed to: the two-press
-    // click above is what proves the control is reachable, and this only proves
-    // the filtering rule holds across the whole option set. `slot` as above;
-    // `value` is a resource index, a body entity id, or -1 for "every".
-    v.set_function("set_acquisitions_filter", [this](int slot, int value) {
-        if (slot == 1)      m_ui.acquisitions_filter_end   = value;
-        else if (slot == 2) m_ui.acquisitions_filter_input = value;
-        else if (slot == 3) m_ui.acquisitions_filter_body  =
-            (value < 0) ? null_entity : static_cast<entity_id>(value);
-    });
+    // BL-1406: the Acquisitions ledger's readers (field, buy button, profitability
+    // table and its filters) retired with the buyout.
 
     // Where every unit stands, as ids only — the read half NR-345 also names.
     // Without it a script can inject a click but cannot find a unit to click at,
@@ -5967,16 +5606,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         sol::state& st  = m_lua.state();
         sol::table  out = st.create_table();
 
+        // BL-1406: the Nation overview's subject is the player's actor (its nation).
         const ui::corp_rollups r = ui::derive_corp_rollups(
-            m_world, m_registry, m_last_econ_report, m_world.player_entity);
+            m_world, m_registry, m_last_econ_report, player_actor(m_world));
 
         out["cards"]    = static_cast<int>(ui::corp_card_count());
         out["measured"] = r.budget_measured;
         out["balance"]  = static_cast<double>(r.balance);
-        out["net"]      = static_cast<double>(r.budget.net());
+        out["net"]      = static_cast<double>(r.net());
         out["refunds"]  = static_cast<double>(r.refunds); // BL-1215
+        out["nation"]   = r.nation;                       // BL-1406
 
-        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds);
+        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds, r.tax_income);
         const auto emit = [&st](const ui::charts::stack_segment* segs, std::size_t n) {
             sol::table t = st.create_table();
             for (std::size_t i = 0; i < n; ++i)
@@ -6390,16 +6031,33 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (const auto& [cid, c] : m_world.corporations)
             sorted_corp_ids.push_back(cid);
         std::sort(sorted_corp_ids.begin(), sorted_corp_ids.end());
-        for (entity_id corp_id : sorted_corp_ids)
+        // BL-1406: then every NATION's own buildings (`state_assets`), ascending
+        // id - after the fold every building is a nation's, and `player` is the
+        // player's nation. `corp` names the owner either way (one allocator).
+        // Only once FOLDED, so an unfolded verify world lists exactly the rows it
+        // always did and no existing script's "first rival row" moves.
+        std::vector<entity_id> sorted_owner_ids = sorted_corp_ids;
+        if (world_is_folded(m_world))
         {
-            const auto& corp   = m_world.corporations.at(corp_id);
-            const bool  player = (corp_id == m_world.player_entity);
+            std::vector<entity_id> nation_ids;
+            for (const auto& [nid, n] : m_world.nations)
+                if (!n.state_assets.empty())
+                    nation_ids.push_back(nid);
+            std::sort(nation_ids.begin(), nation_ids.end());
+            sorted_owner_ids.insert(sorted_owner_ids.end(), nation_ids.begin(), nation_ids.end());
+        }
+        const entity_id player_owner = player_actor(m_world);
+        for (entity_id corp_id : sorted_owner_ids)
+        {
+            const std::vector<entity_id>* owned = assets_of(m_world, corp_id);
+            if (owned == nullptr)
+                continue;
+            const bool  player = (corp_id == m_world.player_entity || corp_id == player_owner);
             // BL-365 `is_background`: a "company" rather than a "corporation"
-            // since Ben's 2026-08-28 split. Exposed so a script can ASSERT the
-            // two lenses are disjoint, which is the property that makes the pair
-            // correct and which no single capture can show.
-            const bool  background = corp.is_background;
-            for (entity_id bld_id : corp.assets)
+            // since Ben's 2026-08-28 split. A nation is neither.
+            const auto  cit        = m_world.corporations.find(corp_id);
+            const bool  background = cit != m_world.corporations.end() && cit->second.is_background;
+            for (entity_id bld_id : *owned)
             {
                 const auto bld_it = m_world.buildings.find(bld_id);
                 if (bld_it == m_world.buildings.end())

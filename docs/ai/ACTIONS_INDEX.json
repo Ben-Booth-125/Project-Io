@@ -206,22 +206,6 @@
    "Minimap lens strip, Planetary rung, last slot (the shield glyph, icons::country)."
   ],
   [
-   "lens.company",
-   "Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square."
-  ],
-  [
-   "lens.corporation",
-   "Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)"
-  ],
-  [
-   "lens.owner_toggle",
-   "The Corporation or Company lens's key in the lens chrome region — the minimap's header, top right: a header with the picked count, a search box, and a checklist of the owners of that lens's kind holding ground on the active body, each row with its identity swatch (filled when picked, empty when not)."
-  ],
-  [
-   "lens.owner_shift_pick",
-   "The Planetary canvas under the Corporation or Company lens: any tile an owner of that lens's kind holds."
-  ],
-  [
    "lens.good_selector",
    "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only."
   ],
@@ -274,26 +258,6 @@
    "Minimap lens strip, Planetary rung, slot 10 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens."
   ],
   [
-   "ledger.nav_acquisitions",
-   "Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)"
-  ],
-  [
-   "ledger.acquisitions_buy",
-   "Acquisitions ledger, a Purchasable row's 'Buy' press"
-  ],
-  [
-   "ledger.acquisitions_group",
-   "Acquisitions ledger, the 'Purchasable' and 'Possible' group headers"
-  ],
-  [
-   "ledger.acquisitions_profitability",
-   "Acquisitions ledger, the 'Profitability' row's full-canvas control"
-  ],
-  [
-   "ledger.acquisitions_profitability_sort",
-   "Acquisitions ledger, Profitability fold-out, the table's column headers"
-  ],
-  [
    "ledger.budget_tax_tier",
    "Balance Ledger (Budget), 'Taxes' tier control, with the nation's Discontent beside it. Also the command seam (--serve / MCP `issue_command` verb `set_tax_tier` with `nation`; the verify API's `corp_command{verb=set_tax_tier, as_nation=...}`)."
   ],
@@ -319,15 +283,11 @@
   ],
   [
    "ledger.corp_card_expand",
-   "Corporation ledger, the Balance card's title row"
+   "Nation overview (rail slot 1), the Balance card's title row"
   ],
   [
    "ledger.corp_balance_segment_hover",
-   "Corporation ledger, a segment of the Balance card's expense column"
-  ],
-  [
-   "ledger.corps_table_row_select",
-   "All-corporations balance table (nav slot 8)"
+   "Nation overview (rail slot 1), a segment of the Balance card's columns"
   ],
   [
    "ledger.nav_generation",
@@ -383,11 +343,7 @@
   ],
   [
    "ledger.nav_corporation",
-   "Nav rail, slot 1 (Corporation overview icon)"
-  ],
-  [
-   "ledger.nav_corporations_table",
-   "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)"
+   "Nav rail, slot 1 (Nation overview; the corporation glyph)"
   ],
   [
    "ledger.nav_history",
@@ -547,19 +503,19 @@
   ],
   [
    "gameplay.declare_hostile",
-   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Declare Hostile keeps an INLINE confirm inside the strip (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either)."
+   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.offer_friendship",
-   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group."
+   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.accept_friendship",
-   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown only in the strip of a row carrying a pending offer FROM that firm TO the player."
+   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.return_to_neutral",
-   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown in the strip whenever the row is currently in the Hostile or Friends group."
+   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.march_unit",
@@ -591,11 +547,11 @@
   ],
   [
    "gameplay.buy_corporation",
-   "The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is LARGE — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield a mean of 81.6 buyable firms, 35.8 of them Purchasable at the moment of reading. A company is publicly_held by construction (BL-678, companies are open); only a corporation can class private or closed and be unpriceable, which is a mean of 5.2 per seed. A mean of 10.6 firms per seed price at exactly ZERO, which is not a bargain - the price floor caught a firm whose debts exceed its book value, and buy_corporation transfers that debt at face value."
+   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): the buyout, the ownership class and the firms are retired; ground and what stands on it change hands only by conquest (docs/politics/NATIONS.md § Own ground). The Acquisitions ledger (rail slot 5) and the Company lens that reached it retired with it). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.take_seat",
-   "The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, the champion's firm card, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS and which champion they operate - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one."
+   "The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS (it still names the nation's champion under the hood until BL-1407 deletes the corporation type) - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one. BL-1406: the list shows NATIONS - name (marked 'below the floor' where the viability floor marked it) and treasury; the Champion and Industry columns and the card's champion section retired with the champion (STARTUP.md § The seat)."
   ],
   [
    "gameplay.queue_research",
@@ -640,10 +596,6 @@
   [
    "canvas.border_band_select",
    "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's border is a hard edge only (Ben, 2026-10-10): an inset stroke in its muted identity colour on its own side of every boundary it holds, with no wash inside the territory."
-  ],
-  [
-   "ledger.company_open",
-   "The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open)."
   ],
   [
    "ledger.construction_queue_toggle",

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*165 entries — 38 gameplay · 25 canvas · 20 lens · 49 ledger · 33 chrome.*
+*153 entries — 38 gameplay · 25 canvas · 16 lens · 41 ledger · 33 chrome.*
 
 ---
 
@@ -39,6 +39,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | `order` | `uint32 (procurement_quote id)` | The live quote to convert into a contract. Reuses the command's `order` field, shared with remove_sell_order and cancel_contract. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - `order` is non-zero and names a quote still in world.procurement_quotes (rejected_invalid otherwise — a quote already accepted has been erased, so accepting twice fails here).
 - You are that quote's buyer (rejected_not_owner otherwise).
 - Your balance covers the deposit — quantity x unit_price x deposit_fraction (rejected_funds otherwise).
@@ -59,6 +60,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. Forwarded through the seam since BL-388 (2026-08-13): the built facility carries exactly the recipe named. A recipe on any non-processing type, or an id the registry does not resolve, is rejected_invalid — stated-but-wrong is refused, never silently coerced. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The tile entity exists (rejected_invalid otherwise).
 - A stated recipe (anything but no_recipe) requires type = processing_facility AND an id the recipe registry resolves (rejected_invalid otherwise, checked before placement — BL-388).
@@ -68,6 +70,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market, times the tile's site multiplier (landform x reach x stack, rounded to whole ticks — a hard site draws more; PRODUCTION.md § Construction site time) (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short.
 - A processing recipe — stated, or the default a recipe-less processor is seeded with — must run on the tile body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body (atmosphere none or thin), propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; construction_result::wrong_air). The ledger never offers a row this refuses.
 - BL-1296 (state industry): with `as_nation` set (wire key `nation=`) the verb acts on that NATION's state buildings instead of the corporation's own, paid from its treasury — see gameplay.state_industry_command for the preconditions that then apply (the acting corporation must be the nation's champion; the building must be the nation's; money is the treasury's uncommitted part).
+- BL-1406 (NATIONS.md § Own ground): the press and the canvas ghost ask placement with the player's NATION named, so the Construct button is enabled, a row's Build press offered and the ghost green only on the nation's own ground; ground another nation holds, or ground no nation holds, refuses (not_own_ground -> rejected_placement). Any building type a nation may build is built AS the nation - the state door's strategic-recipe rule no longer narrows a nation acting as itself.
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply OFF ITS SHELF (the market's persistent inventory, only at or under the fair-price ceiling, with construction capacity in the row as one more material that stretches but never pauses). Scarce materials stretch the ETA and a total shortage pauses it, and both readings NAME THE GOOD since BL-1342 - 'Building... ~9 qtrs (short of Steel)', 'Paused - no Steel at the market', 'Paused - Steel is priced above the build ceiling' - on the queue row, the tile card's stack row and the expanded site card alike, each of which is now ONE LINE in the same grid with the sentence on its hover card (BL-1365). The site's own card and its stack button carry a PROGRESS BAR of the capex already paid. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and an invalid row keeps its disabled Build press with the reason-coded text on its hover card ('Cannot build on water', 'A port must sit on the coast', ...).
 
@@ -84,6 +87,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `order` | `uint32 (procurement_contract id)` | The in-flight contract to terminate. Reuses the command's `order` field. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - `order` is non-zero and names a contract still in world.procurement_contracts (rejected_invalid otherwise).
 - You are that contract's buyer (rejected_not_owner otherwise).
 
@@ -100,6 +104,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `building` | `entity_id` | The selected building to remove. Must be owned by the acting corporation. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The building entity exists (rejected_invalid otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
@@ -119,6 +124,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `unit_type` | `uint16 (index into unit_roster_table())` | Which roster row to raise. Validated against the LIVE availability list, not a caller's cached one. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `unit_type` is a valid index into unit_roster_table() (rejected_invalid otherwise).
 - That row is currently available to this corporation under the campaign roster band — re-checked against available_rows() at apply time, so a stale list is refused (rejected_invalid otherwise).
 - `tile` names a real tile (rejected_invalid otherwise).
@@ -138,6 +144,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `building` | `entity_id` | The building to idle. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The building is not already idled (rejected_state — a no-op in current state).
@@ -158,6 +165,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `road_tier` | `uint8 [1, 3]` | 1 = Track, 2 = Road, 3 = Highway. Higher tiers cost more and cut the crossing's traversal cost further. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The tile entity exists (rejected_invalid otherwise).
 - `road_side` is 0-5 or 255; any other value rejects the command whole, mutating nothing (the untrusted-seam rule).
@@ -166,6 +174,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - From the UI this is never a refusal the player meets as text: the armed canvas offers only the sides can_place_road admits, so an illegal crossing has nothing to press - and where it admits NOTHING the press never arms at all, because it is muted (BL-1379). The seam is unaffected: it may still issue a command the gate then rejects.
 - With no side named (seam only), a tile whose every crossing already stands at or above the tier is refused rather than quietly given a second crossing on a fresh side.
 - The balance covers the tier's build cost plus materials priced at the tile's local market (rejected_funds; the row disables Build with 'Can't afford').
+- BL-1406: a road is never built OUT of ground that is not the player's nation's. The row's muted explainer says which: 'Another nation holds this tile' for foreign ground, 'No nation holds this tile' for unowned ground (both are the rules' foreign_ground refusal).
 
 **Expected output.** INSTANT, unlike building construction: on execution the CROSSING rises to the tier - both halves, `road_side` of the tile and the facing side of the neighbour, so the two always agree - the full cost is debited ONCE, and the world's A* cost cache is invalidated so freight dispatch immediately sees the lower cost of that step. The UI disarms on the same press, so one aim lays one crossing; another crossing out of the same tile is another two presses. The discount belongs to the edge, not to either tile (BL-1340), and it is the same price in both directions, unlike a river's. A crossing over WATER is a bridge and is paid at its road tier's price rather than the sea leg's, so it beats the water it spans (Ben, 2026-10-17). A road is an edge mutation, not a building - it occupies no build slot. Rejected attempts change nothing and cost nothing.
 
@@ -205,6 +214,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `subject` | `entity_id` | NOT READ. Documented as 'the body the contract would fulfil at', and this entry previously said the seam resolves the body from the supplier's capacity so the field is 'context rather than a constraint'. That understated it: `cmd.subject` appears nowhere in request_quote's implementation. Passing a garbage id is indistinguishable from passing the right one. Send it for readability if you like; it has no effect, and you cannot choose which of a multi-body supplier's bodies fulfils. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - `counterparty` names a real corporation, and is not the acting corporation — no self-contracting (rejected_invalid otherwise).
 - Quantity is strictly positive (rejected_invalid otherwise).
 - The supplier holds a completed building that can produce the good (rejected_no_capacity otherwise).
@@ -227,6 +237,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `building` | `entity_id` | The idled building to restart. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The building is currently idled (rejected_state otherwise — resuming a running building is a no-op).
@@ -246,6 +257,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `recipe` | `uint16 recipe id` | The recipe to run, from the building type's recipe list. In practice only processing facilities have multiple; extraction is fixed to its target resource. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The recipe is valid for the building's type, and in the ACTIVE recipe's own group - a cross-group retool is refused outright, so it is never offered (rejected_invalid otherwise).
@@ -268,6 +280,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `workforce` | `int [0, 200]` | Internal staffing target, 0-200; shown to the player as target/2 % of full employment (Ben, 2026-10-13: 100 % is the label for full employment). |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The acting corporation is NOT the player's (rejected_invalid otherwise - the game sets the player's workforce, PRODUCTION.md § Workforce target and the auto-solver).
 - The corporation owns the building (rejected_not_owner otherwise).
@@ -289,6 +302,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `building` | `entity_id` | The building handed back to the auto-solver. Carried in the command's `subject`. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The acting corporation is NOT the player's (rejected_invalid otherwise).
 - `subject` names a real building (rejected_invalid otherwise).
@@ -311,6 +325,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `verb args` | `as the underlying verb` | subject / workforce / recipe exactly as the corporation verb reads them; build reads tile, type (must be 2, processing_facility) and recipe (must be NAMED and strategic). |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - Wire: `nation` parses as an entity id (rejected_invalid otherwise); unless the session runs `--as any`, it must equal the session corporation's home nation (rejected_not_owner otherwise) — actor authority reaches the session's nation and no other.
 - The nation exists (rejected_invalid) and the acting corporation is its CHAMPION — the seated corporation for the player's nation, else the nation's lowest-id specialist (rejected_not_owner).
 - The verb is one of the seven building verbs (rejected_invalid otherwise — no survey, trade, unit or stance verb acts for a state).
@@ -333,6 +348,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `nation` | `entity_id (wire key `nation`; corp_command::as_nation)` | The nation laying (and paying for) the track: the seat's home nation. Omitted = the corporation's own book, which lays no track (rejected_invalid). |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).
 - `corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): the player's nation lays track; no rival does (no AI_OPPONENT.md § 11 grant covers rail).
 - The tile exists (rejected_invalid), is land, carries no track yet, and is the nation's own ground (rejected_placement).
@@ -367,6 +383,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `nation` | `entity_id (wire key `nation`)` | The seat's home nation; a station is state industry and is never built on a corporation's own book (rejected_invalid). |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - As gameplay.lay_track's wire, seat and champion rules (rejected_invalid / rejected_not_owner); no recipe is named (rejected_invalid).
 - The tile is the nation's own ground, a CITY (a population centre) touching track, and holds no station yet (rejected_placement), plus the ordinary era and reach gates.
 - Its whole capex fits the treasury's uncommitted part (rejected_funds).
@@ -385,10 +402,12 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `body` | `entity_id` | The body to survey. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - The acting corporation exists (rejected_no_corp otherwise).
 - The body exists and is not the star (rejected_invalid otherwise).
 - The body's survey phase is 'hidden' — a survey already in transit, scanning, or completed is refused (rejected_state).
 - The balance covers the survey cost (rejected_funds; the UI disables the button and prints 'Insufficient funds.').
+- BL-1406: the app's Dispatch Survey press is paid by the player's NATION (dispatch_survey's payer = player_actor) and enabled against the treasury's uncommitted part; only the wire verb is refused.
 
 **Expected output.** Enqueued on press; the app debits the FULL cost up front and arms the schedule. DURATIVE over days, not quarters: phase runs in_transit ('En route - ETA N d') then scanning region-by-region ('Surveying k/N - ETA N d') then surveyed. Each completed region reveals that region's tiles and deposit bands — the geographic fog lifts progressively, so partial results arrive before completion. Nothing is produced; the entire payoff is information. Rejected attempts change nothing.
 
@@ -399,6 +418,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Press.** None. Over the command seam or --serve the verb is still ACCEPTED AS A NUMBER and REJECTED (rejected_invalid), mutating nothing. To move goods between markets use gameplay.set_trade (a standing route the trade pass ships every tick). gameplay.hold_convoy still stops or releases a trade's shipment in transit.
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - None can be met: every call is rejected (rejected_invalid), for every corporation, and mutates nothing.
 
 **Expected output.** rejected_invalid, always. BL-1266, 2026-10-10: trade is the only way goods move between markets (TRADE.md); a convoy is now the SHIPMENT of a trade, created by the trade pass, never dispatched on its own. The market Selection card's Dispatch convoy form is gone; the card's Trade section carries a "Trades" door onto the Market Ledger's Trades tab instead
@@ -418,6 +438,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `trade_id` | `uint32 (0 = add)` | Carried in `order`. 0 adds a new trade; nonzero names one of the caller's own trades to change in place. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The trade is well-formed (`trade_is_valid`; rejected_invalid otherwise): two distinct existing markets, a good trade carries (capacity > 0, not a grid good), finite points > 0 and <= 1e6.
 - When changing (nonzero order): the id names one of the caller's OWN trades. Another corporation's trade and a nonexistent one both answer rejected_invalid — no existence oracle (BL-397).
@@ -437,6 +458,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `trade_id` | `uint32 > 0` | Which trade to erase, by its stable `standing_trade::id` (carried in `order`) — never reused, unaffected by the erase of any other trade. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The id is nonzero and names one of the caller's OWN trades (rejected_invalid otherwise; another corporation's trade and a nonexistent one answer alike — BL-397, no existence oracle).
 
@@ -453,6 +475,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `points` | `float >= 0` | Trade points held back each tick for the corporation's MANUAL trades, carried in `quantity`. 0 = everything is auto. Finite, >= 0 and <= 1e6; refused whole otherwise. Any value in range is legal: it is clamped at use to what the corporation makes that tick. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The value is finite, >= 0 and <= max_trade_points (1e6) (rejected_invalid otherwise).
 
@@ -469,79 +492,59 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `convoy` | `uint32 convoy id` | Which convoy to stop or release, by its stable `convoy_component::id` — NOT its index in world::convoys, which an arrival re-points by erasing from the middle of the vector. THIS IS A TRANSIENT SUBJECT, the dictionary's first: unlike a sell_order id or a building entity, a convoy id is valid for only a handful of ticks. It is minted at dispatch and gone the moment the cargo lands, and ids are never reused, so a command composed against a convoy that has since arrived is refused rather than silently re-aimed at whichever convoy inherited its slot. An agent must read the live convoy list and act on it in the same tick; a convoy id carried across a long deliberation is worthless. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - The acting corporation exists (rejected_no_corp otherwise).
 - `convoy` is nonzero and names a convoy in the ACTING CORP'S OWN fleet (rejected_invalid otherwise). Another corp's convoy and a nonexistent one are deliberately indistinguishable — both answer rejected_invalid, for the same reason remove_sell_order collapses its two cases (BL-397): convoy ids are one global monotonic sequence, so a distinguishable rejection would let an id sweep map every rival's cargo in flight, precisely the intelligence the BL-068 competitor-visibility rule keeps private.
 - The convoy has not already arrived (rejected_state otherwise — there is nothing left to hold).
+- BL-1406: KNOWN GAP - in the app the press is still filed as the seat corporation, but the fold re-owned the convoy / unit / battle side to the nation, so the seam refuses it until the verb admits a nation acting as itself (world-side work, after BL-1407).
 
 **Expected output.** The convoy's `held` flag flips. A held convoy is SKIPPED by advance_convoys — it stops dead on its lane rather than slowing, makes no progress, does not arrive, and costs nothing further, because the haul was paid once at dispatch. Issuing the verb again releases it and it resumes from exactly the progress it stopped at, at its original speed. This is a TOGGLE, and it is deliberately NOT a cancel: the cargo left the source pool at dispatch, so a cancel would have to invent a return leg or mint the goods back at the source. Neither exists and no verb offers one. A rejected command mutates nothing.
 
 **Reason to select.** Stop a delivery that has stopped being the right one — the destination market's price collapsed, the stock turns out to be wanted at the source, a better destination appeared — without losing the cargo. The honest limit, and the thing to weigh before dispatching rather than after: holding does NOT bring the goods back. The stock is out of the pool either way; hold only stops it arriving somewhere you no longer want it, and buys time to decide. Release when the reason passes.
 
-### `gameplay.declare_hostile` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Declare Hostile keeps an INLINE confirm inside the strip (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).
+### `gameplay.declare_hostile` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
 
-**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Declare Hostile'. The strip then asks to confirm: click 'Declare' to apply, 'Cancel' to back out. There is NO discovery gate — every named corporation is listed and actionable (RELATIONS.md § 1 Stance: a declaration against the player is signalled).
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `counterparty` | `entity_id` | The corporation being declared hostile. May not be yourself. |
+**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
 **Valid when:**
-- counterparty names a real, distinct corporation (rejected_invalid otherwise).
-- Not already hostile toward counterparty (rejected_state otherwise).
+- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
 
-**Expected output.** A directed row is inserted into world.corp_hostile_pairs (corp -> counterparty only; the reverse direction is unaffected — hostility is unilateral by design, an ambush the target does not have to agree to). Any existing friendship row between the two is dissolved atomically, and any pending friendship offer in either direction is withdrawn. A rejected declaration mutates nothing.
+**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
 
-**Reason to select.** The predicate everything military-adjacent waits on (BL-315). Declaring hostile does not itself trigger any engagement — it only makes one legal later — but it also dissolves friendship on contact, so it is the one press that can undo a standing relationship as a side effect.
+**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
-### `gameplay.offer_friendship` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group.
+### `gameplay.offer_friendship` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
 
-**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Offer Friendship'. The strip then reads 'Offer sent' until the target accepts, declines, or either party moves to hostile.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `counterparty` | `entity_id` | The corporation being offered friendship. May not be yourself. |
+**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
 **Valid when:**
-- counterparty names a real, distinct corporation (rejected_invalid otherwise).
-- Not already friends with counterparty (rejected_state otherwise).
-- Not currently hostile toward counterparty — return_to_neutral first (rejected_state otherwise).
-- No offer already pending in this direction (rejected_state otherwise; not a re-send).
+- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
 
-**Expected output.** A pending offer (corp -> counterparty) is inserted into world.corp_friend_offers. Friendship is NOT yet in effect — offer_friendship alone changes nothing about is_hostile/are_friends until the target calls accept_friendship. A rejected offer mutates nothing.
+**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
 
-**Reason to select.** Friendship is deliberately the one stance that cannot be imposed — it requires both a genuine offer and a genuine accept, so a friendly row is always evidence both corps chose it, unlike hostility which is unilateral.
+**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
-### `gameplay.accept_friendship` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown only in the strip of a row carrying a pending offer FROM that firm TO the player.
+### `gameplay.accept_friendship` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
 
-**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Accept Friendship' — a row with an incoming offer shows it in place of 'Offer Friendship'. The row moves into the Friends group.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `counterparty` | `entity_id` | The corporation whose offer is being accepted (the offerer). The acting corp is cmd.corp, the acceptor. |
+**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
 **Valid when:**
-- counterparty names a real, distinct corporation (rejected_invalid otherwise).
-- A pending offer exists in the direction counterparty -> corp (rejected_state otherwise — there is nothing to accept).
+- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
 
-**Expected output.** The pending offer (counterparty -> corp) is erased, and a symmetric row is inserted into world.corp_friend_pairs under the canonicalised (min id, max id) key — both parties now read are_friends() true toward each other. A rejected accept mutates nothing.
+**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
 
-**Reason to select.** The only way friendship becomes real. An offer alone (offer_friendship) is not a stance change by itself; this verb is the second half of the two-party handshake the model requires.
+**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
-### `gameplay.return_to_neutral` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown in the strip whenever the row is currently in the Hostile or Friends group.
+### `gameplay.return_to_neutral` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
 
-**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Return to Neutral'. The row moves back into the Neutral group.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `counterparty` | `entity_id` | The corporation being returned to neutral standing. May not be yourself. |
+**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
 **Valid when:**
-- counterparty names a real, distinct corporation (rejected_invalid otherwise).
-- At least one of: the corp's own directed hostility toward counterparty, a shared friendship row, or a pending offer in either direction currently exists (rejected_state otherwise — nothing to clear).
+- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
 
-**Expected output.** Unilateral and asymmetric on hostility: clears ONLY the acting corp's own directed hostility toward counterparty (the reverse direction, if counterparty is separately hostile toward the corp, is untouched — that is counterparty's own row to release). Clears the shared friendship row if one exists (either party may dissolve a friendship) and any pending offer between the two in either direction. A rejected call mutates nothing.
+**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
 
-**Reason to select.** The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally.
+**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
 ### `gameplay.march_unit` — The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
@@ -553,6 +556,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `province` | `uint32 (province::id)` | The DESTINATION PROVINCE (BL-511, 2026-08-21 — this replaced a destination tile; the verb kept its value 21 because the enum is serialised and append-only, only the field it reads changed). A province id is NOT an entity_id: it is derived from (body rank | block raster index | component index), so it lives in its own uint32 domain. The default is `no_province` (0xFFFFFFFF) and an omitted field is rejected — id 0 is a REAL province (the first block of the first body), so it cannot serve as an absent-value sentinel. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `subject` names a real unit (rejected_invalid otherwise).
 - That unit is owned by the acting corporation (rejected_not_owner otherwise).
 - `province` is a province in the world's built partition — checked with province_partition::find, which is the authoritative domain test. Any uint32 that is not a built province, including the `no_province` default, is rejected (rejected_invalid otherwise). A wire range gate proves the value FITS; it does not prove it EXISTS, and both checks run.
@@ -575,6 +579,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `subject` | `entity_id` | The unit whose standing movement order is to be cleared. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `subject` names a real unit (rejected_invalid otherwise).
 - That unit is owned by the acting corporation (rejected_not_owner otherwise).
 - That unit currently holds a live order — order.dest is not null (rejected_state otherwise). Halting an already-halted unit is a no-op and is reported as such rather than answering applied.
@@ -592,8 +597,10 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `subject` | `entity_id` | The unit to erase. Irreversible. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - `subject` names a real unit (rejected_invalid otherwise) — including a unit already disbanded, which is simply gone.
 - That unit is owned by the acting corporation (rejected_not_owner otherwise).
+- BL-1406: KNOWN GAP - in the app the press is still filed as the seat corporation, but the fold re-owned the convoy / unit / battle side to the nation, so the seam refuses it until the verb admits a nation acting as itself (world-side work, after BL-1407).
 
 **Expected output.** The unit entity is erased from world.units outright. NO REFUND — neither the credit hire cost nor the gated resource draw comes back; manpower walks away (BL-470). Nothing else is touched.
 
@@ -609,10 +616,12 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `counterparty` | `entity_id` | WHICH fight to leave. A corp can be in more than one battle in one province, because a third corp arriving opens its OWN battles against each existing participant rather than joining theirs. Pass null_entity to mean 'the first, in sorted order' — deterministic, but it is not a choice you made. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - A battle exists in `province` (rejected_state otherwise).
 - The acting corporation is a PARTICIPANT in it — attacker or defender (rejected_state otherwise). A third party cannot order someone else's force off the field.
 - That battle is still in progress; a concluded one is erased at the end of the tick it ended (rejected_state otherwise).
 - `counterparty`, when not null_entity, names the opposing corp in that battle (rejected_state otherwise).
+- BL-1406: KNOWN GAP - in the app the press is still filed as the seat corporation, but the fold re-owned the convoy / unit / battle side to the nation, so the seam refuses it until the verb admits a nation acting as itself (world-side work, after BL-1407).
 
 **Expected output.** The withdrawal is RECORDED, not applied. It is honoured at the START of the next tick's battle pass, before that tick's round batch — which is what makes the window a real window rather than a same-instant escape. When honoured, the resolver's three-term cost (a flat base, plus a term per round already fought, plus a pursuit term scaled by how far behind the withdrawing side is) reduces that side's strength, the loss is distributed across its units proportional to count with the remainder by ascending unit id, and the side that stayed holds the field. A rejection mutates nothing at all.
 
@@ -627,6 +636,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `subject` | `entity_id` | The population centre to raze. Demotes to the razed tier (BL-624, razed settlement tier) — population zeroed and the razed state set, but the entity, its name, its tile and the urban ground it stamped (BL-612) all persist. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
 - `subject` names a real population centre with a tile record (rejected_invalid otherwise).
 - `subject` is not already razed (rejected_state — a ruin cannot be razed again).
 - OCCUPATION: the acting corp owns at least one unit positioned on the centre's body (rejected_state otherwise) — the deliberate-destruction act is only reachable with military presence, per POPULATION.md § Growth, decline and razing.
@@ -635,26 +645,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The strongest act against a settlement: passive decline only shrinks (scale floors at 1), and razing knocks it to the razed tier. An occupier razes to null the centre's economy without deleting the province's capture anchor — rare by design, because occupying is almost always worth more than ash, and the ruin re-settles cheaply if conditions return.
 
-### `gameplay.buy_corporation` — The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is LARGE — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield a mean of 81.6 buyable firms, 35.8 of them Purchasable at the moment of reading. A company is publicly_held by construction (BL-678, companies are open); only a corporation can class private or closed and be unpriceable, which is a mean of 5.2 per seed. A mean of 10.6 firms per seed price at exactly ZERO, which is not a bargain - the price floor caught a firm whose debts exceed its book value, and buy_corporation transfers that debt at face value.
+### `gameplay.buy_corporation` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): the buyout, the ownership class and the firms are retired; ground and what stands on it change hands only by conquest (docs/politics/NATIONS.md § Own ground). The Acquisitions ledger (rail slot 5) and the Company lens that reached it retired with it). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
 
-**Press.** Open the Acquisitions ledger (nav rail slot 5, or click a background firm's holdings under the Company lens) and press 'Buy' on a row in the Purchasable group. Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `counterparty` | `entity_id` | The corporation to buy OUTRIGHT. Never a fractional stake — there is no equity relation, no share count and no controlling-holder threshold anywhere in the model, so this verb moves a whole firm in one step or not at all. |
+**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. There is no way to buy a holding; take ground by conquest.
 
 **Valid when:**
-- `counterparty` names a real corporation, is not null, and is not the acting corp itself (rejected_invalid otherwise). An id that FITS entity_id's domain but names nothing is still refused — fitting is not existing.
-- The target is not the player's corporation, by either `is_player` or `world::player_entity` (rejected_state otherwise).
-- The target's `ownership_class` is PUBLIC. A private or closed firm has no filed return to price it from and no negotiation verb yet (rejected_state otherwise).
-- The target has actually filed at least one quarterly return — a public firm that has never reached apply_budget cannot be priced from an empty ledger (rejected_state otherwise).
-- The acting corp's balance covers the price, under the solvency gate every spend takes (rejected_funds otherwise). A price that computes non-finite from a corrupt filed return is refused outright (rejected_invalid) rather than spent.
+- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
 
-**Expected output.** The price is `max(0, book_value + k_acquisition_multiple x trailing_net + balance)` — book_value from the target's LAST filed return (historical cost, as disclosed), trailing_net the mean `net` over its last 8 filed quarters (fewer if younger), balance its live signed cash, and k authored in scripts/economy.lua. Nothing clamps the profit term, so a chronically loss-making firm prices BELOW its book value; the only floor is zero, and the price is a SINK (a public firm's sellers are a diffuse shareholder base, not a modelled actor). On success the target's holdings, (corp, market) goods pools (each keeping its market), balance and filed returns transfer to the acquirer and the target is DISSOLVED — the only verb in the game that erases an actor. hq_building / influence_range recompute over the merged holding set (the buyer's home body is kept); units re-point to the new owner through their recorded muster_base; convoys in flight, trade routes, accepted procurement contracts and mercenary contracts transfer; open market orders and live procurement quotes are CANCELLED rather than reassigned, because an order is a promise made by a party that no longer exists; live battles naming the target end; and its sentiment rows, stance rows and embargo predicate are dropped (technology is its nation's, not the firm's, so none transfers or drops). An `equity_taken` sentiment factor is emitted against the acquirer, observed by every surviving corporation.
+**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): the buyout, the ownership class and the firms are retired; ground and what stands on it change hands only by conquest (docs/politics/NATIONS.md § Own ground). The Acquisitions ledger (rail slot 5) and the Company lens that reached it retired with it.
 
-**Reason to select.** Buy a whole competitor rather than out-build it: its holdings, stock, cash and production arrive in one step, priced off a record it published itself. A firm whose filed returns read badly is cheap by exactly the amount the ledger says it is losing — so the verb rewards reading the Profitability ledger before anyone else does. Note that a firm earning through mercenary or procurement contracts reads as less profitable than it is (a filed return sees the money loop only), so it prices below what it is worth.
+**Reason to select.** Never. There is no way to buy a holding; take ground by conquest.
 
-### `gameplay.take_seat` — The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, the champion's firm card, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS and which champion they operate - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one.
+### `gameplay.take_seat` — The nation selection screen at Begin (STARTUP.md § The seat; Ben, 2026-10-10): the list of the MAJOR nations only (a nation holding a champion; majors and seats are one-to-one, so the rows are the major target's count) beside a map of the home body, the seven-part nation card (territory lit on the map, population and GDP, treasury and budget weights, resource profile and deposits, neighbours with their reading and grudges, and history: pattern tags, a short timeline, and a link into the History ledger filtered to the nation), a nation's briefing, and its Confirm press. The ONE pre-play entry in this dictionary: the wizard's rounds have none (NR-804), but the pick is a game act (Ben, 2026-09-24) - it decides which nation the player IS (it still names the nation's champion under the hood until BL-1407 deletes the corporation type) - so an agent must be able to make it. It is a corp_verb (29) on the champion, but the seat is taken ONCE, BEFORE PLAY: the in-play agent hosts (--serve's COMMAND and the live --host-agent seam) refuse it with rejected_state, and an agent makes the pick at launch with `--seat <nation-id>` (every new-campaign path, --autostart included). The screen is shaped for up to six humans and seats one (NR-1025). NOTE FOR A PLANNER: the list order is the champions' static landscape score (the ground the champion's holdings stand on), and a major whose champion sits below the viability floor is MARKED but offered; a marked major is a harder opening, never an illegal one. BL-1406: the list shows NATIONS - name (marked 'below the floor' where the viability floor marked it) and treasury; the Champion and Industry columns and the card's champion section retired with the champion (STARTUP.md § The seat).
 
 **Press.** Hover a row to point the map at that nation (its territory lit, its champion's HQ, works and home market drawn) and read its card; press the row to open its briefing - the full card stays shown for the selected nation, with Confirm and Back heading the pane and the briefing prose below the card (Ben, 2026-10-15); press Confirm. Back (or pressing the same row again) closes the briefing with nothing changed. On the card, "Open its history in the History ledger" opens the History ledger's Ages view filtered to the nation; pressed again ("Close its history") it closes the ledger - it reads the record and moves nothing. At launch: `ProjectIo --seat <nation-id>` (the nation's entity id, as the `[seat] major <nation> champion <corp>` log lines print it).
 
@@ -681,6 +683,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `order` | `uint32` | The node: its INDEX in io::dg::nodes - store order of docs/economy/tech/digitisation_tree.json, generated into src/world/digitisation_tree_data.hpp, where each row carries its index. 0..159. The MCP server refuses anything else before the wire; the seam range-checks it again (rejected_invalid). |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
 - The node is not already held (rejected_state) and not already queued (a shift-click on a queued node is the unqueue toggle, gameplay.unqueue_research, not this verb).
@@ -699,6 +702,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `order` | `uint32` | The queued node to take off: its INDEX in io::dg::nodes (0..159, as queue_research). The sentinel 4294967295 (`unqueue_last`; -1 at the MCP server, which is also its default) means the LAST entry instead - what 'Remove last' sends. Any other value outside the tree is rejected_invalid. |
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
 - The named node is queued, or (for the last-entry sentinel) the queue is not empty (rejected_state otherwise; nothing touched).
@@ -712,6 +716,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Press.** Click 'Clear' under the queue.
 
 **Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
 - The queue is not empty (rejected_state; the button is disabled).
@@ -953,7 +958,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The pointer is over the primary canvas, not over the minimap inset or any ImGui panel (panels capture the mouse).
 - An entity is under the cursor (empty space is a different press — see canvas.deselect).
 
-**Expected output.** selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned. A single click never navigates. BATTLE GRAIN (BL-469): when a live battle stands in the clicked tile's province the Selection element shows the BATTLE instead — the phase word, per-unit strength bars for both sides, and the withdrawal price with its base / per-round / pursuit terms separated, plus the 'Break off' press (see gameplay.withdraw_from_battle). Which battle, when several stand in one province: the acting corp's own first, then sorted (province, attacker, defender) order. REPEAT-CLICK CYCLE, NO LENS ONLY (Ben 2026-08-21; cut to FOUR rungs by BL-598 and confined to the plain canvas by BL-664): clicking the same spot again walks BATTLE > UNIT > BUILDING > TILE, skipping any rung with nothing on it. The FIRST click on a built hex selects the TILE (BL-1312 round 2), so a repeat click is what reaches the building rung; the tile card's own building buttons reach any building in one press. On bare ground with no unit, no building and no battle exactly one rung is live, so a repeat click re-selects the same tile. UNDER A LENS a repeat press re-resolves to the same structure — one tier, and it does not move. A LENS PRESS MAY ALSO OPEN A LEDGER, because the lens that resolves the structure also routes it: Corporation opens the corporations table aimed at that firm, Company the Company ledger, Resource and Market and Scarcity the Market ledger, Continent the History ledger.
+**Expected output.** selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned. A single click never navigates. BATTLE GRAIN (BL-469): when a live battle stands in the clicked tile's province the Selection element shows the BATTLE instead — the phase word, per-unit strength bars for both sides, and the withdrawal price with its base / per-round / pursuit terms separated, plus the 'Break off' press (see gameplay.withdraw_from_battle). Which battle, when several stand in one province: the acting corp's own first, then sorted (province, attacker, defender) order. REPEAT-CLICK CYCLE, NO LENS ONLY (Ben 2026-08-21; cut to FOUR rungs by BL-598 and confined to the plain canvas by BL-664): clicking the same spot again walks BATTLE > UNIT > BUILDING > TILE, skipping any rung with nothing on it. The FIRST click on a built hex selects the TILE (BL-1312 round 2), so a repeat click is what reaches the building rung; the tile card's own building buttons reach any building in one press. On bare ground with no unit, no building and no battle exactly one rung is live, so a repeat click re-selects the same tile. UNDER A LENS a repeat press re-resolves to the same structure — one tier, and it does not move. A LENS PRESS MAY ALSO OPEN A LEDGER, because the lens that resolves the structure also routes it: Resource and Market and Scarcity open the Market ledger, Continent the History ledger (the Corporation and Company lenses, which routed to the corporations table and the Company ledger, retired with the firms - BL-1406).
 
 **Reason to select.** Inspect a thing and surface its one primary move — Dispatch Survey on an unsurveyed body, a tile's building grid and Construct door — without losing your current framing.
 
@@ -1102,68 +1107,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Every tile a nation owns (world::tile_to_nation) is filled in that nation's identity colour (palette::nation_colour) — the one pinned per-world table the national border band, the seat map and every nation swatch also read. Unowned ground and open ocean take no fill. No two bordering nations share a similar colour: at Begin and on load a deterministic pass re-slots the smaller of any two bordering nations closer than palette::nation_min_colour_distance (CIE76 delta-E 20). The national border band is suppressed under this lens like every lens; the plain map keeps it. The key lists each nation holding ground on the active body with its swatch. SELECTION: a press anywhere on a nation's territory selects that nation (structure_kind::nation — the same selection a press on its border band makes on the plain map); a press on unowned ground or ocean selects nothing.
 
 **Reason to select.** Whose ground is this, all of it at once — the map-wide answer the border band gives one edge at a time. Use it to read the political map before expanding, trading across a border, or choosing whom to court.
-
-### `lens.company` — Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square.
-
-**Press.** Single left-click on the Company (briefcase) glyph in the lens strip, or cycle with L / Shift+L until Company is active.
-
-**Valid when:**
-- The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas, and its glyph is on the Planetary strip only.
-- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
-
-**Expected output.** On the Planetary canvas, every tile holding a BACKGROUND FIRM's building is filled by its owner, drawn identically to lens.corporation and admitting the opposite population: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md, Ben 2026-08-28). The two lenses are disjoint — no firm appears under both. The fill follows the lens's own PICKED SET (BL-1240): a picked firm's tiles take its identity colour; an unpicked firm's tiles take the owned-grey. No seat draws an HQ marker (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs'). The set DEFAULTS TO EMPTY (the player owns no company), so the lens opens with every firm's ground in grey — which already answers 'where do background firms operate' — and the player picks the firms to name with lens.owner_toggle or lens.owner_shift_pick. Its set is separate from the Corporation lens's, so flipping between the two keeps each one's picks. The key is the owner checklist ('Companies (n picked)', search box, a row per firm holding ground on the active body). Measured on the home body at generation: 373 background-firm buildings across 80 companies, against 33 rival buildings across 7 corporations, so this lens is much the busier of the pair. National borders are NOT drawn while any lens is active (2026-08-28).
-
-**Reason to select.** See the commercial population the Corporation lens deliberately excludes — who is operating here besides your actual rivals.
-
-### `lens.corporation` — Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)
-
-**Press.** Single left-click on the Corporation glyph in the lens bar under the minimap inset.
-
-**Valid when:**
-- The lens bar is always present on the minimap chrome, so the press is always available.
-- The lens only re-skins the Planetary canvas; selecting it while on Solar or Circumplanetary changes nothing visible until the player descends to a body surface.
-- If Corporation is already the active lens, this same press clears it instead (see lens.clear).
-
-**Expected output.** On the Planetary canvas, every tile holding a corporate building is filled by its owner (the literal building tile only — no influence radius), and the fill follows a PICKED SET of owners (BL-1240, owner multi-select): a picked corporation's tiles take its identity colour, an unpicked corporation's tiles take one neutral owned-grey, the same for every unpicked owner and distinct from unowned ground. The set defaults to the player alone, so opening the lens shows your holdings in colour and every rival's in grey; add rivals with lens.owner_toggle (the checklist key) or lens.owner_shift_pick (shift-click on their ground). The player's tiles additionally get a thin white border. No HQ star draws for any corporation, the player included (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs') - an owner reads by its tile tint alone. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. The key in the lens chrome region (top right, above the minimap) is the owner checklist: header 'Corporations (n picked)', a search box, one swatch row per corporation holding ground on the active body. Hovering owned ground lights that owner's whole tile group whether picked or not. A plain click on owned ground selects that corporation (the corporations table opens aimed at it); ground no corporation holds answers nothing under this lens (BL-664). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill. Only CORPORATIONS (player and rivals) are admitted — background firms have their own lens (lens.company). National borders are NOT drawn while any lens is active (2026-08-28). The picked set is UI state: per session, not saved, and it survives a body switch.
-
-**Reason to select.** Who owns what: where is my footprint, and how does it sit against the one or two rivals I am sizing up? Pick the rivals to compare and leave the rest grey, to find uncontested ground or read a rival's holdings before competing.
-
-### `lens.owner_toggle` — The Corporation or Company lens's key in the lens chrome region — the minimap's header, top right: a header with the picked count, a search box, and a checklist of the owners of that lens's kind holding ground on the active body, each row with its identity swatch (filled when picked, empty when not).
-
-**Press.** Type in the search box to filter the checklist by owner name; tick or untick a row's checkbox to pick or unpick that owner.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `owner` | `corporation name (Corporation lens) or company name (Company lens), holding ground on this body` | The owner to add to or remove from the active lens's picked set. |
-
-**Valid when:**
-- The Corporation or Company lens must be active — the checklist only exists inside its chrome.
-- Only owners of the active lens's kind with at least one building on the active body are listed; an owner with nothing on the body earns no row (its pick, if any, stands and is still counted in the header).
-- No cap: identity colours are per owner, not per slot.
-- A toggle under the toggle rule: ticking a checked row unticks it.
-
-**Expected output.** The map re-draws at once: the owner's tiles switch between its identity colour (picked) and the owned-grey (unpicked), the row's swatch fills or empties, and the header count '(n picked)' updates. No selection changes.
-
-**Reason to select.** Name the owners you are comparing — your own holdings against one or two rivals or firms — while everyone else stays a grey 'someone holds this'.
-
-### `lens.owner_shift_pick` — The Planetary canvas under the Corporation or Company lens: any tile an owner of that lens's kind holds.
-
-**Press.** Shift + left-click on the owned tile.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `tile` | `Planetary tile (col,row) holding a building of an owner the active lens admits` | The ground whose owner is toggled — the owner the lens resolves for that tile, the same one hovering it lights. |
-
-**Valid when:**
-- The Corporation or Company lens must be active.
-- The tile must be held by an owner of the lens's kind (a corporation under Corporation, a background firm under Company); a shift-click on any other ground behaves as a plain click.
-- Not on a national border band — the band outranks the ground under every lens, so a shift-click there behaves as a plain click and selects the nation.
-- Not in construction placement or march-picking mode — those gestures outrank it.
-- A toggle: shift-clicking a picked owner's ground unpicks it.
-
-**Expected output.** The tile's owner is added to or removed from the active lens's picked set — exactly as ticking its checklist row — and the map re-draws its ground in colour or owned-grey. The selection, the Selection band and every ledger are untouched. A PLAIN click is unchanged: it selects the owner and opens its surface (lens.corporation / lens.company).
-
-**Reason to select.** Use the map itself as the picker: hover finds whose ground this is (the whole group lights), shift-click adds that owner to the comparison without leaving the canvas.
 
 ### `lens.good_selector` — The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only.
 
@@ -1356,70 +1299,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ## Ledgers & panels — opening and steering the information surfaces
 
-### `ledger.nav_acquisitions` — Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)
-
-**Press.** Click the paired-squares glyph in the left icon rail, above the Market Ledger
-
-**Valid when:**
-- In-game
-
-**Expected output.** Toggles the Acquisitions ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the player's balance, the size of the buyable field ('N of M firms file and can be priced'), and two collapsing groups over that field: Purchasable (priced at or below the balance, each row carrying a Buy press) and Possible (priced, beyond the balance today, no press). Beneath them sits the Profitability fold-out's door.
-
-**Reason to select.** The only surface that prices another corporation, and therefore the only place a whole-firm buyout can be planned rather than merely issued. Expect a LONG list: measured over twelve seeds, a mean of 81.6 firms of eighty-eight are buyable - 35.8 Purchasable and 45.8 Possible. Companies are open by construction (BL-678, companies are open), so ownership class excludes only the handful of rivals that class private or closed, mean 5.2. The field is the world's commercial population, so rank it before reading it rather than reading it whole.
-
-### `ledger.acquisitions_buy` — Acquisitions ledger, a Purchasable row's 'Buy' press
-
-**Press.** Click 'Buy' on a row in the Purchasable group
-
-**Valid when:**
-- The Acquisitions ledger is open
-- The row is in the PURCHASABLE group - i.e. its price is at or below the player corporation's balance. A Possible row carries no press at all, rather than a disabled one
-
-**Expected output.** Enqueues gameplay.buy_corporation against that firm onto the deferred command queue, drained on the next frame through the same apply_corp_command seam an agent's COMMAND uses - so the press and the wire are one code path. On success the firm is DISSOLVED and its holdings, stock, cash and filed returns transfer; the field line and both groups redraw one firm shorter. See gameplay.buy_corporation for the price formula and the full transfer/cancel/drop disposition.
-
-**Reason to select.** Take a whole competitor in one step at a price read off a record it published itself. WATCH THE ZERO PRICE: because the price's cash term is signed, a deeply indebted firm's negative balance cancels its book value and the floor hands it over for nothing - and the dissolution rule then moves that debt to you at face value. Five of twelve measured seeds priced their one buyable firm at exactly 0 for this reason. The row says so on hover; a free firm is not a cheap firm.
-
-### `ledger.acquisitions_group` — Acquisitions ledger, the 'Purchasable' and 'Possible' group headers
-
-**Press.** Click a group header to collapse it; click again to expand
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `group` | `enum` | 'Purchasable' (priced within the balance, carries the Buy presses) or 'Possible' (priced, beyond the balance today, no press) |
-
-**Valid when:**
-- The Acquisitions ledger is open
-
-**Expected output.** Collapses or expands that group. Both are EXPANDED at rest, against the usual instinct, because the whole field averages under two rows - a collapsed group would hide the entire answer. Each header carries its own row count, so an empty group reads as '(0)' rather than as a surface that failed to populate.
-
-**Reason to select.** Purely a reading convenience; it changes nothing about the world. There is rarely enough content here to need it.
-
-### `ledger.acquisitions_profitability` — Acquisitions ledger, the 'Profitability' row's full-canvas control
-
-**Press.** Click the chevron in the Profitability row's right-hand gutter
-
-**Valid when:**
-- The Acquisitions ledger is open
-
-**Expected output.** Opens a full-canvas takeover over the canvas region (the nav rail, header, clock, comms dock and Selection band all survive it, and the Acquisitions column stays visible beside it) holding ONE ROW PER CORPORATION with seven columns: Firm, Type, End resource, Input resource, Profit/qtr, Price, Ownership. Exact figures where the firm files and a DASH where it does not, with no bands anywhere - a dash always means 'this firm does not file', never 'you have not earned this'. Closed by the return control top-left, or by Esc.
-
-**Reason to select.** The widest financial read in the game and the one an acquisition should be planned from: it is where a firm that prices below what it is worth becomes visible. Note the shape of the data before reading it - roughly 85 of 88 firms per seed file a return in world state that they do NOT disclose, so most rows carry a name, an ownership class and five dashes. Sorting by Ownership brings the readable firms to the top and is the fastest way through it.
-
-### `ledger.acquisitions_profitability_sort` — Acquisitions ledger, Profitability fold-out, the table's column headers
-
-**Press.** Click a column header to sort ascending; click again to reverse
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `column` | `enum` | 'Firm', 'Type', 'End resource', 'Input resource', 'Profit/qtr', 'Price' or 'Ownership' |
-
-**Valid when:**
-- The Profitability fold-out is open
-
-**Expected output.** Re-sorts every row. An UNDISCLOSED cell sorts as ABSENT rather than as zero, in either direction - a dash is not a small number, and letting dashes sort among the real values would make the ordering lie. Ties keep the resting order, which is ascending corporation id (the same sorted walk apply_budget files returns in), so the sort is deterministic rather than an unordered map's layout. The choice survives closing and reopening the fold-out.
-
-**Reason to select.** Sort by Price to find the cheapest firm, by Profit/qtr to find the one whose filed return understates it, or by Ownership to collapse the ~85 undisclosed rows out of the way in one press.
-
 ### `ledger.budget_tax_tier` — Balance Ledger (Budget), 'Taxes' tier control, with the nation's Discontent beside it. Also the command seam (--serve / MCP `issue_command` verb `set_tax_tier` with `nation`; the verify API's `corp_command{verb=set_tax_tier, as_nation=...}`).
 
 **Press.** UI: click '-' / '+' to step, or a Roman numeral I-V to set, the tier; the press issues corp_verb 38 (`set_tax_tier`) with `corp` = the seat, `nation` = the seat's home nation and `order` = the tier. Seam: issue the same command directly.
@@ -1430,6 +1309,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 | `tier` | `uint 1-5 (wire key `order`)` | The tax tier I-V. The rate each tier takes of home firms' quarterly operating profit is a dial (economy.tax: I 0%, II 5%, III 10%, IV 15%, V 20%). |
 
 **Valid when:**
+- BL-1406 (the player IS its nation): on the wire the session may name its nation as the actor (corp=<nation> nation=<nation>); the session corporation id is re-pointed to its nation once the world is folded. The seat check is unchanged: only the player's own nation may set its tier.
 - Balance Ledger is open (UI). Under spectate the row is shown but not pressable: the seat's nation is scored like any nation.
 - Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).
 - `corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): an AI nation's tier is set by its own tax scorer, never through this verb.
@@ -1518,43 +1398,28 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way, what does it cost, and what could I put on this tile?'
 
-### `ledger.corp_card_expand` — Corporation ledger, the Balance card's title row
+### `ledger.corp_card_expand` — Nation overview (rail slot 1), the Balance card's title row
 
 **Press.** Click the full-canvas control on the Balance card's title row
 
 **Valid when:**
-- Corporation ledger is open
+- The Nation overview is open
 
 **Expected output.** Gives the Balance card the canvas region: the same two-column chart (earnings against stacked expenses) at screen size, with the ledger column still visible beside it. Only one thing can be expanded at a time. Clicking the return control top-left (or pressing Esc) folds it back. There is no expand-in-place control on this card - it already shows its chart at rest, so the gutter's left slot is empty.
 
 **Reason to select.** The column chart is legible at rest; the takeover is for reading the segment proportions and hovering individual flows with room to work.
 
-### `ledger.corp_balance_segment_hover` — Corporation ledger, a segment of the Balance card's expense column
+### `ledger.corp_balance_segment_hover` — Nation overview (rail slot 1), a segment of the Balance card's columns
 
 **Press.** Hover a segment of the stacked Expenses column
 
 **Valid when:**
-- Corporation ledger is open
-- At least one economy quarter has been measured
+- The Nation overview is open
+- At least one economy quarter has been measured (the nation has a state-ledger row this tick)
 
-**Expected output.** Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative. The Earnings column hovers the same way: Income, Subsidies when a nation paid any, and Refunds when the quarter's return booked one (BL-1215 - construction cancelled when a seat was taken, credited back at what it had paid); a 'Refunds: +N (not earnings)' line under the net names it too, and the net excludes it.
+**Expected output.** Names that flow and its figure for the quarter. For the player's NATION (BL-1406): Earnings are Income (its buildings' sales onto the shelf) and Taxes (the tier's share of its buildings' wages, back to the treasury); Expenses are Inputs, Maintenance and Wages. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat. There is no Interest, Levies or Subsidies segment for a nation: it never runs into debt, the levy retired, and no nation pays another's industry. (On an unfolded world the card still reads the seat corporation's quarterly budget, as before.)
 
 **Reason to select.** The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on.
-
-### `ledger.corps_table_row_select` — All-corporations balance table (nav slot 8)
-
-**Press.** Click a corporation's row
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `corporation` | `entity` | Which corporation to select |
-
-**Valid when:**
-- Corporations table is open
-
-**Expected output.** Sets that corporation as the current selection: the Selection band at the bottom fills with its detail (name, home nation; corporations are non-spatial, so its go-to routes to a ledger). The table stays open - selection does not close ledgers.
-
-**Reason to select.** The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'.
 
 ### `ledger.nav_generation` — Nav rail, slot 10 (plate/continent glyph)
 
@@ -1736,27 +1601,16 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?"
 
-### `ledger.nav_corporation` — Nav rail, slot 1 (Corporation overview icon)
+### `ledger.nav_corporation` — Nav rail, slot 1 (Nation overview; the corporation glyph)
 
-**Press.** Click the corporation glyph on the left icon rail
+**Press.** Click the slot-1 glyph on the left icon rail
 
 **Valid when:**
 - In-game (the rail is permanent chrome)
 
-**Expected output.** Toggles the Corporation ledger open in the fold-out column. Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows ONE card, Balance: a verdict line ('+X/qtr, balance Y') over a two-column chart - the quarter's earnings against its expenses stacked by flow - and the quarter's net beneath it. Production and Workforce are answered by the Construction ledger's Buildings tab, Trade by the Market and Convoys ledgers.
+**Expected output.** Toggles the Nation overview open in the fold-out column (window 'Nation overview'). Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows ONE card, Balance, about the player's NATION (BL-1406; ledgers/corporation.md § Slot 1): a verdict line ('+X/qtr, treasury Y') over a two-column chart - the quarter's earnings (sales, and the tax that returns to the treasury) against its expenses stacked by flow (inputs, maintenance, wages) - read off the nation's own row of the state ledger, and the quarter's net beneath it. Production and Workforce are answered by the Construction ledger's Buildings tab, Trade by the Market and Convoys ledgers.
 
-**Reason to select.** Answers 'how well am I doing?' - the money read, which is the honest answer to that question today.
-
-### `ledger.nav_corporations_table` — Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)
-
-**Press.** Click the diplomacy glyph on the left icon rail
-
-**Valid when:**
-- In-game
-
-**Expected output.** Toggles the all-corporations balance table open in the fold-out column; re-click closes; opening closes any other ledger. Open, it lists every corporation with its balance side by side (player row highlighted). Diplomacy itself is not built; this table is the slot's provisional occupant. Since BL-666 the table is also the destination of a Corporation-lens canvas press, which aims its highlighted row at the pressed firm via selected_corporation_dossier.
-
-**Reason to select.** Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game.
+**Reason to select.** Answers 'how well is my nation doing?' - the treasury and the quarter's money, which is the honest answer to that question today.
 
 ### `ledger.nav_history` — Nav rail, slot 9 (History icon)
 
@@ -1941,23 +1795,6 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** The view switches between the all-corporations comparison and one corporation's full profile. The selection persists across selection changes elsewhere in the game - clicking a tile does not clear it.
 
 **Reason to select.** The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window.
-
-### `ledger.company_open` — The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open).
-
-**Press.** Activate the Company lens, then single left-click any tile held by a background firm on the Planetary surface. There is no menu route and no keyboard route.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `company` | `entity_id` | The background firm owning the pressed tile, resolved as the lens's tile-group structure (BL-665). Travels in ui_state::selected_company so the ledger keeps its subject when the selection moves on. |
-
-**Valid when:**
-- The app is in-game with the Planetary surface primary.
-- The Company lens is the active lens — under any other lens the same press resolves to something else.
-- The pressed tile is held by a corporation with is_background set. Ground held by nobody, or by a corporation proper, is INERT under this lens: no card, no selection, and the Selection band clears to resting (BL-664 rule 3).
-
-**Expected output.** The Company ledger opens in the fold-out column naming that firm, and every other ledger closes. It is a DECLARED PLACEHOLDER (BL-666) and says so on its face: the firm's name, that it is a background company rather than a corporation, its registration nation, its holdings on the active body, its reach in bodies, and capital only where the firm files a return. No rail slot and no close button — it closes when another ledger opens, or when a press on inert ground clears the selection that named it (NR-702).
-
-**Reason to select.** Answers 'who is this firm I keep seeing on the map?' for the background firms that make up most of the economy and had no surface of any kind before. A corporation is a rival and reaches the corporations table; a company is a market participant and reaches this.
 
 ### `ledger.construction_queue_toggle` — Construction ledger, Construction view, the 'Queue - N cr / qtr' collapsing header
 

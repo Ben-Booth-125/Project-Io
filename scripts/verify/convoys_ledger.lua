@@ -55,8 +55,11 @@ end
 -- retired and its ledger deleted, and because Contracts was APPENDED below the
 -- developer tail rather than inserted, its removal renumbers nothing — every
 -- slot below is unchanged, which is what this map now asserts (BL-693).
-local expected = { [3] = "construction", [5] = "acquisitions", [6] = "market",
-                   [9] = "corporations", [10] = "tile", [11] = "generation_ledger",
+-- BL-1406: slots 5 (Acquisitions) and 9 (Diplomacy) carry no surface now - the
+-- buyout and the corporation stance table retired with the firms - so they open
+-- nothing and are not in this map; every slot keeps its number.
+local expected = { [3] = "construction", [6] = "market",
+                   [10] = "tile", [11] = "generation_ledger",
                    [12] = "decisions", [13] = "strategy" }
 for slot, want in pairs(expected) do
     local sx, sy = verify.nav_slot(slot)

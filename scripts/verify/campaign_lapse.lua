@@ -20,7 +20,7 @@ verify.god_view(true)
 
 verify.goto_surface("home")
 verify.clear_selection()
-verify.set_overlay("corporation")
+verify.set_overlay("nations") -- BL-1406: the Corporation lens retired
 -- 0.8 frames the whole main continent (probed 2026-09-01; higher zoom = closer).
 verify.set_zoom(0.8)
 verify.frames(2)

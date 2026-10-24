@@ -84,7 +84,7 @@ local function foot(panel, scroll_key, name, view_key, view)
 end
 
 -- ===========================================================================
--- Slot 1 — Corporation ledger (UI-100)
+-- Slot 1 — Nation overview (UI-100; the Corporation ledger re-subjected, BL-1406)
 -- ===========================================================================
 -- ONE card since BL-691, Balance, which shows its chart AT REST — so the resting
 -- frame is no longer a verdict line with nothing under it. The takeover is still
@@ -120,10 +120,7 @@ ledger("construction", "ledger_03_construction")
 -- drives the presses.
 ledger("tech_tree", "ledger_04_research")
 
--- ===========================================================================
--- Slot 5 — Acquisitions ledger
--- ===========================================================================
-ledger("acquisitions", "ledger_05_acquisitions")
+-- Slot 5 — the Acquisitions ledger retired with the buyout (BL-1406): no surface.
 
 -- ===========================================================================
 -- Slot 6 — Market ledger (UI-080..083)
@@ -133,14 +130,7 @@ for i, v in ipairs({ "prices", "sell_orders", "convoys" }) do
 end
 foot("market", "market", "ledger_06_market_0_prices_foot", "market", 0)
 
--- ===========================================================================
--- Slot 8 — the all-corporations table (UI-078/079)
--- ===========================================================================
--- Head and foot: the footer row (`Corporations: N`) is below the fold at 720p
--- with forty firms in the world, and the footer is the only thing on the surface
--- that says how long the list is.
-ledger("corporations_table", "ledger_08_corps_table_head")
-foot("corporations_table", "corporation", "ledger_08_corps_table_foot")
+-- Slot 8/9 — the all-corporations table retired with the corporation (BL-1406).
 
 -- ===========================================================================
 -- Slot 9 — History (UI-084..087)

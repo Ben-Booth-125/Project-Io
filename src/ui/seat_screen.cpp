@@ -483,9 +483,13 @@ void app::draw_seat_screen()
     int majors_clear = 0;
     for (const seat_major& m : majors)
         if (cands[static_cast<std::size_t>(m.candidate)].shortlisted) ++majors_clear;
-    ImGui::Text("%d major nations, each holding one champion. Taking a nation is governing it and "
-                "operating its champion. Ranked by the ground the champion stands on: %d clear the "
-                "viability floor; the marked ones do not, and you may still take one.",
+    // BL-1406 (STARTUP.md § The seat): the list is of NATIONS. Picking one is
+    // becoming it - governing it and building every building on its ground. The
+    // champion it still names under the hood (take_seat seats it until BL-1407
+    // deletes the corporation type) is not shown.
+    ImGui::Text("%d major nations. Taking a nation is governing it: you build every building on its "
+                "ground. Ranked by its ground: %d clear the viability floor; the marked ones do not, "
+                "and you may still take one.",
                 static_cast<int>(majors.size()), majors_clear);
     // BL-1089: THE NATION COUNT EXPLAINS THE MERGES (NATION_GENERATION.md
     // § Pass 2d), read off the saved report's fold record.
@@ -513,7 +517,7 @@ void app::draw_seat_screen()
     ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::text_secondary);
     ImGui::TextUnformatted("or take no nation: open the world with nobody seated and watch every "
-                           "corporation and nation play itself.");
+                           "nation play itself.");
     ImGui::PopStyleColor();
     ImGui::Dummy({1.0f, 6.0f});
 
@@ -532,13 +536,12 @@ void app::draw_seat_screen()
 
     // --- the list of majors ----------------------------------------------
     ImGui::BeginChild("##seat_list", {list_w, body_h}, ImGuiChildFlags_Borders);
-    if (ImGui::BeginTable("##seat_rows", 4,
+    if (ImGui::BeginTable("##seat_rows", 3,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
     {
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 22.0f);
-        ImGui::TableSetupColumn("Nation", ImGuiTableColumnFlags_WidthStretch, 2.0f);
-        ImGui::TableSetupColumn("Champion", ImGuiTableColumnFlags_WidthStretch, 2.4f);
-        ImGui::TableSetupColumn("Industry", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("Nation", ImGuiTableColumnFlags_WidthStretch, 2.6f);
+        ImGui::TableSetupColumn("Treasury", ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableHeadersRow();
 
         for (int i = 0; i < static_cast<int>(majors.size()); ++i)
@@ -573,10 +576,8 @@ void app::draw_seat_screen()
                                                       ui::palette::nation_colour(m.nation));
             ImGui::Dummy({lh - 2.0f, lh});
             ImGui::SameLine();
-            ImGui::TextUnformatted(nit->second.name.c_str());
-            ImGui::TableSetColumnIndex(2);
             if (marked) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 150, 158, 255));
-            ImGui::TextUnformatted(cit->second.name.c_str());
+            ImGui::TextUnformatted(nit->second.name.c_str());
             if (marked)
             {
                 ImGui::PopStyleColor();
@@ -584,8 +585,8 @@ void app::draw_seat_screen()
                 ImGui::TextUnformatted("below the floor");
                 ImGui::PopStyleColor();
             }
-            ImGui::TableSetColumnIndex(3);
-            ImGui::TextUnformatted(focus_word(cit->second.focus));
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.0f cr", static_cast<double>(nit->second.treasury));
         }
         ImGui::EndTable();
     }
@@ -798,16 +799,8 @@ void app::draw_seat_screen()
     }
 
     // --- facts both the card and the briefing read ---------------------
-    const firm_goods goods = goods_of(m_world, m_registry, *scc);
-    const market_component* hm = nullptr;
-    if (const auto mit = m_world.markets.find(home_market); mit != m_world.markets.end())
-        hm = &mit->second;
     const std::string city = home_market != null_entity ? ui::market_city_name(m_world, home_market)
                                                         : std::string("no market");
-    const float cash = std::max(0.0f, scc->balance);
-    const float debt = std::max(0.0f, -scc->balance);
-    const float book = scc->returns.empty() ? -1.0f : scc->returns.back().book_value;
-    const sentiment_value read = sentiment_toward(m_world.sentiment, sm.nation, sm.champion);
 
     // --- BL-1089: WHICH REALM THE NATION IS, and the region under the city --
     // Read off the saved report's fold record (NATION_GENERATION.md § Pass 2d).
@@ -877,8 +870,6 @@ void app::draw_seat_screen()
         }
     }
 
-    const bool draws_any = std::any_of(goods.draws.begin(), goods.draws.end(), [](bool b) { return b; });
-
     // The card / briefing scrolls inside the rest of the pane.
     ImGui::BeginChild("##seat_card", {0.0f, 0.0f}, ImGuiChildFlags_None);
     ui::foldout_scroll_child("##seat_card"); // verify.scroll_panel("seat_card", ...)
@@ -916,7 +907,8 @@ void app::draw_seat_screen()
     {
         // --- THE NATION CARD: seven parts (STARTUP.md § The seat) ------------
         // Its question: which nation am I? Two columns: the nation's own facts
-        // on the left, its champion and its history on the right.
+        // on the left, its history on the right (the champion line retired with
+        // the champion, Ben 2026-10-23 - BL-1406).
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
         ImGui::Text("%s, a major nation: %s %s state, %s on its borders.", nat->name.c_str(),
                     nat->politics == ideology::isolationist ? "an" : "a",
@@ -1018,26 +1010,6 @@ void app::draw_seat_screen()
             ImGui::TableSetColumnIndex(1);
             ImGui::PushTextWrapPos(0.0f);
 
-            // (4) the champion -- the firm card, unchanged in content
-            card_heading("Champion");
-            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
-            ImGui::Text("%s%s", scc->name.c_str(), sc.shortlisted ? "" : "   (below the viability floor)");
-            ImGui::PopStyleColor();
-            ImGui::Text("Industry: %s. Makes %s%s%s.", focus_word(scc->focus),
-                        goods_list(goods.makes).c_str(), draws_any ? "; draws " : "",
-                        draws_any ? goods_list(goods.draws).c_str() : "");
-            ImGui::Text("HQ and home market: %s%s. Prices there: %s%s%s.", city.c_str(), city_region.c_str(),
-                        price_list(hm, goods.makes).c_str(), draws_any ? "; inputs " : "",
-                        draws_any ? price_list(hm, goods.draws).c_str() : "");
-            if (book >= 0.0f)
-                ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings (book value %.0f cr).",
-                            static_cast<double>(cash), static_cast<double>(debt), sc.holdings,
-                            static_cast<double>(book));
-            else
-                ImGui::Text("Cash %.0f cr, debt %.0f cr, assets %d holdings.",
-                            static_cast<double>(cash), static_cast<double>(debt), sc.holdings);
-            ImGui::Text("Its nation's stance toward it: Access %+.2f, Trust %+.2f.",
-                        static_cast<double>(read.access), static_cast<double>(read.trust));
 
             // (7) history (BL-1295)
             card_heading("History");
@@ -1099,31 +1071,10 @@ void app::draw_seat_screen()
         ImGui::PushTextWrapPos(0.0f);
         // The nation's grain first: whose realm this is, and whose law.
         ImGui::Text("You are %s, %s %s state, %s on its borders, with %.0f cr in its treasury. You "
-                    "govern it, and you operate its champion, %s.", nat->name.c_str(),
+                    "govern it, and you build every building on its ground.", nat->name.c_str(),
                     nat->politics == ideology::isolationist ? "an" : "a",
                     politics_word(nat->politics), posture_word(nat->posture),
-                    static_cast<double>(nat->treasury), scc->name.c_str());
-        const std::string makes = goods_list(goods.makes, 6);
-        ImGui::Text("%s is %s corporation with %d works. It makes %s.",
-                    scc->name.c_str(), scc->focus == industrial_focus::extraction
-                        ? "an extraction" : scc->focus == industrial_focus::processing
-                        ? "a processing" : "a trade",
-                    goods.works, makes.c_str());
-        if (draws_any)
-            ImGui::Text("It sells at %s's market, where its goods fetch %s, and buys %s "
-                        "there at %s.", city.c_str(), price_list(hm, goods.makes).c_str(),
-                        goods_list(goods.draws).c_str(), price_list(hm, goods.draws).c_str());
-        else
-            ImGui::Text("It sells at %s's market, where its goods fetch %s.", city.c_str(),
-                        price_list(hm, goods.makes).c_str());
-        if (debt > 0.0f)
-            ImGui::Text("It owes %.0f cr. While the balance stays below zero the debt compounds "
-                        "at %.1f%% a quarter.", static_cast<double>(debt),
-                        static_cast<double>(k_debt_interest_per_quarter * 100.0f));
-        else
-            ImGui::Text("It owes nothing, and holds %.0f cr in cash.", static_cast<double>(cash));
-        ImGui::Text("Your nation reads it at Access %+.2f, Trust %+.2f.",
-                    static_cast<double>(read.access), static_cast<double>(read.trust));
+                    static_cast<double>(nat->treasury));
         // BL-1099 / R22: one sentence of origin, at the champion's grain where
         // it names the charter and the nation's where it names the realm.
         if (const std::string origin = seat_origin_sentence(m_world, m_generation_report, *scc, city, nat);
@@ -1133,14 +1084,14 @@ void app::draw_seat_screen()
         {
             ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::pinned);
             if (sc.holdings_scored == 0)
-                ImGui::Text("The floor marked this champion: none of its %d holdings stands in a market "
+                ImGui::Text("The floor marked this nation: none of the %d holdings on its ground stands in a market "
                             "the landscape scored, so none stands where a chain closes and a "
-                            "resource sits inside the pin band. You may still take its nation.",
+                            "resource sits inside the pin band. You may still take it.",
                             sc.holdings);
             else
-                ImGui::Text("The floor marked this champion: %d of its %d holdings stand in scored "
+                ImGui::Text("The floor marked this nation: %d of the %d holdings on its ground stand in scored "
                             "markets, but in none of them does a chain close with a resource "
-                            "inside the pin band. You may still take its nation.",
+                            "inside the pin band. You may still take it.",
                             sc.holdings_scored, sc.holdings);
             ImGui::PopStyleColor();
         }

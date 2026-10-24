@@ -4,7 +4,10 @@
 -- - processing facilities: distinct shape with dark outline
 -- Also captures a Supply-lens view to show convoy (open V chevron) markers.
 verify.goto_surface("home")
-verify.set_overlay("corporation")
+-- BL-1406: the Corporation lens retired; the plain canvas is what the tour reads
+-- (the retired name already fell back to it). The overview GOLDEN was blessed
+-- under the old lens and is owed a deliberate re-bless.
+verify.set_overlay("none")
 
 -- Close-framed tour of all buildings to inspect silhouettes and outlines
 tour_buildings(20)

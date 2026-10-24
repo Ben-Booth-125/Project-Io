@@ -129,6 +129,60 @@ double kv_getf(const std::unordered_map<std::string, std::string>& kv, const cha
 
 } // namespace
 
+namespace {
+
+/// BL-1406 (Ben, 2026-10-23: the player IS its nation): the NATION a session
+/// acts as — the session actor itself when it names a nation, else its
+/// corporation's home nation (the seat's corporation survives, empty, until
+/// BL-1407 deletes the type). Null when the actor names neither.
+entity_id session_nation(const world& w, entity_id actor)
+{
+    if (w.nations.find(actor) != w.nations.end())
+        return actor;
+    if (const auto it = w.corporations.find(actor); it != w.corporations.end())
+        return it->second.home_nation;
+    return null_entity;
+}
+
+/// BL-1406: the verbs a session may send once the world is folded — the ones the
+/// seam admits for a NATION acting as itself (`corp == as_nation`): its building
+/// verbs (the state door), the owner-generic shared bodies (force, roads,
+/// trades, research), and the seat's nation verbs (track, the share rule, the
+/// tax tier). Every other verb is a firm's (corp-to-corp stance, procurement,
+/// convoy holds, the buyout...) and is refused on the wire, whole, before the
+/// seam — the corporation it would need holds nothing after the fold.
+bool wire_nation_verb(corp_verb v)
+{
+    switch (v)
+    {
+        case corp_verb::build:
+        case corp_verb::demolish:
+        case corp_verb::set_recipe:
+        case corp_verb::set_workforce:
+        case corp_verb::set_workforce_auto:
+        case corp_verb::idle:
+        case corp_verb::resume:
+        case corp_verb::hire_unit:
+        case corp_verb::march_unit:
+        case corp_verb::halt_unit:
+        case corp_verb::place_road:
+        case corp_verb::set_trade:
+        case corp_verb::clear_trade:
+        case corp_verb::set_trade_reserve:
+        case corp_verb::queue_research:
+        case corp_verb::unqueue_research:
+        case corp_verb::clear_research:
+        case corp_verb::lay_track:
+        case corp_verb::set_logistics_shares:
+        case corp_verb::set_tax_tier:
+            return true;
+        default:
+            return false;
+    }
+}
+
+} // namespace
+
 namespace agent_protocol {
 
 const char* result_name(corp_command_result r)
@@ -189,7 +243,13 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
     else if (op == "BLACKBOARD")
     {
         const auto kv = parse_kv_tokens(iss);
-        const entity_id corp = static_cast<entity_id>(kv_get(kv, "corp", 0));
+        entity_id corp = static_cast<entity_id>(kv_get(kv, "corp", 0));
+        // BL-1406: a session that names its NATION reads its own view — the
+        // session corporation's blackboard, which carries the nation's book
+        // (state buildings, treasury) while the corporation type survives.
+        if (!s.as_any && corp != null_entity && corp != s.actor
+            && corp == session_nation(w, s.actor) && w.corporations.count(s.actor) != 0)
+            corp = s.actor;
         // BL-397: reads are gated by the same session actor as writes.
         // The blackboard is a corp's PRIVATE view — cash, pools, recipes —
         // and this opcode used to export whichever corp the line named.
@@ -334,13 +394,21 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // command may name only the session corp's own home nation (the seam
         // then requires that corp to be its champion). Refused here, before the
         // seam, on the same footing as the corp gate: nothing is mutated.
+        //
+        // BL-1406 (Ben, 2026-10-23: the player IS its nation): A SESSION ACTS AS
+        // A NATION — `corp == nation == its nation` (the seam's nation-self
+        // form), the session's nation being its actor's (`session_nation`). The
+        // session corporation's id is still admitted as the actor's NAME and,
+        // once the world is folded, re-pointed to its nation, so an agent written
+        // against the seat corporation keeps working; any other actor is refused.
+        const entity_id snation = s.as_any ? null_entity : session_nation(w, s.actor);
         bool nation_ok = true;
         if (!s.as_any && cmd.as_nation != null_entity)
-        {
-            const auto ait = w.corporations.find(s.actor);
-            nation_ok = ait != w.corporations.end() && ait->second.home_nation == cmd.as_nation;
-        }
-        if ((!s.as_any && cmd.corp != s.actor) || !nation_ok)
+            nation_ok = snation != null_entity && cmd.as_nation == snation;
+        const bool actor_ok = s.as_any || cmd.corp == s.actor
+                           || (snation != null_entity && cmd.corp == snation
+                               && cmd.as_nation == snation);
+        if (!actor_ok || !nation_ok)
         {
             if (echo)
             {
@@ -352,6 +420,54 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
             return host_op::none;
         }
 
+
+        // BL-1406: THE BUYOUT IS RETIRED (GLOSSARY.md § Buyout): ground and what
+        // stands on it change hands only by conquest. Refused whole on the wire,
+        // whatever the world, before the seam.
+        if (cmd.verb == corp_verb::buy_corporation)
+        {
+            if (echo)
+            {
+                echo->parse_ok = true;
+                echo->cmd      = cmd;
+                echo->result   = corp_command_result::rejected_invalid;
+            }
+            out += "RESULT result=rejected_invalid building=-1\n";
+            return host_op::none;
+        }
+
+        // BL-1406: once the world is folded every building, unit and trade is a
+        // nation's, so a session's command is the NATION's: the seat
+        // corporation's id is re-pointed to its nation (`corp == as_nation`), and
+        // a verb the seam admits for no nation (a firm's verb) is refused whole,
+        // before the seam, mutating nothing. An unfolded world (a fixture) keeps
+        // the corporation actor it always had.
+        if (!s.as_any && world_is_folded(w))
+        {
+            if (!wire_nation_verb(cmd.verb) || snation == null_entity)
+            {
+                if (echo)
+                {
+                    echo->parse_ok = true;
+                    echo->cmd      = cmd;
+                    echo->result   = corp_command_result::rejected_invalid;
+                }
+                out += "RESULT result=rejected_invalid building=-1\n";
+                return host_op::none;
+            }
+            // The seat's nation verbs (track, the share rule, the tax tier) must
+            // NAME the nation (`nation=`), as they always had to: one sent with
+            // none is left as sent, and the seam refuses it (rejected_invalid),
+            // so this re-pointing cannot turn a malformed line into an applied one.
+            const bool names_nation_only = cmd.verb == corp_verb::lay_track
+                                        || cmd.verb == corp_verb::set_logistics_shares
+                                        || cmd.verb == corp_verb::set_tax_tier;
+            if (!(names_nation_only && cmd.as_nation == null_entity))
+            {
+                cmd.corp      = snation;
+                cmd.as_nation = snation;
+            }
+        }
 
         // BL-1076: THE SEAT IS TAKEN BEFORE PLAY. Both hosts of this protocol
         // (--serve and the live agent seam) are IN-PLAY hosts — the seam opens

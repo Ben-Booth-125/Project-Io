@@ -38,9 +38,10 @@ end
 -- Capture the active surface under each overlay lens, for side-by-side comparison.
 --   prefix : base name; each capture is "<prefix>_<NN>_<lens>".
 --   lenses : optional list of lens names; defaults to the meaningful set
---            (plain terrain, faction territory, corporate ownership).
+--            (plain terrain, national territory - BL-1406: ownership is the
+--            Nations lens since the Corporation lens retired).
 function sweep_overlays(prefix, lenses)
-    lenses = lenses or {"none", "faction", "corporation"}
+    lenses = lenses or {"none", "nations"}
     for i, lens in ipairs(lenses) do
         verify.set_overlay(lens)
         verify.capture(string.format("%s_%02d_%s", prefix, i - 1, lens))
