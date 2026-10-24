@@ -330,6 +330,13 @@ struct corp_command
     /// resume); any other verb is `rejected_invalid`, and a building the nation
     /// does not own is `rejected_not_owner`. Appended LAST so every older field
     /// keeps its place in the record.
+    /// BL-1399 / BL-1402: `corp == as_nation` is the NATION ACTING AS ITSELF (every
+    /// minor must; no champion between). It takes the building verbs above, and
+    /// also — through the same owner-generic bodies a corporation's command runs,
+    /// paid from the treasury's uncommitted part, never into debt — hire_unit,
+    /// march_unit, halt_unit, place_road, the trade verbs (refused until trade.cpp
+    /// admits a nation owner) and, for the seat's nation only, the research
+    /// verbs. Procurement is refused to a nation (rejected_invalid).
     entity_id as_nation = null_entity;
 };
 

@@ -719,6 +719,36 @@ corp_command_result map_construction(construction_result r)
     return corp_command_result::rejected_invalid;
 }
 
+/// BL-1402 (NATIONS.md § What a nation owns): the verbs a NATION ACTING AS
+/// ITSELF (`cmd.corp == cmd.as_nation`, the nation's own id) takes through the
+/// SHARED verb bodies of `apply_corp_command` rather than the state-industry
+/// door — every one of them already keyed on "the actor" and made owner-generic
+/// here (the purse, the asset list, the home nation), so after the fold a
+/// nation's force, roads, trades and research are the same code a
+/// corporation's were. Each body validates everything before it mutates, so a
+/// refusal mutates nothing, as on the corporation path. A champion's seat acting
+/// FOR a nation (`cmd.corp` a corporation) still takes the state door, which
+/// refuses these verbs as before.
+bool nation_self_shared_verb(corp_verb v)
+{
+    switch (v)
+    {
+        case corp_verb::hire_unit:
+        case corp_verb::march_unit:
+        case corp_verb::halt_unit: // march's stop verb: a nation that may march may halt
+        case corp_verb::place_road:
+        case corp_verb::set_trade:
+        case corp_verb::clear_trade:
+        case corp_verb::set_trade_reserve:
+        case corp_verb::queue_research:
+        case corp_verb::unqueue_research:
+        case corp_verb::clear_research:
+            return true;
+        default:
+            return false;
+    }
+}
+
 /// True iff @p nation owns @p building as state industry.
 bool nation_owns(const world& w, entity_id nation, entity_id building)
 {
@@ -820,6 +850,14 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
 
     switch (cmd.verb)
     {
+        // BL-1402 (CONTRACTS.md: named-supplier procurement is RETIRED): there is
+        // no nation contract form, so a nation is refused every procurement verb,
+        // whole, mutating nothing — named here so the refusal is a decision, not
+        // the default's accident.
+        case corp_verb::request_quote:
+        case corp_verb::accept_quote:
+        case corp_verb::cancel_contract:
+            return corp_command_result::rejected_invalid;
         case corp_verb::lay_track:
         {
             if (w.tiles.find(cmd.tile) == w.tiles.end())
@@ -1156,7 +1194,11 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         return corp_command_result::rejected_no_corp;
 
     // BL-1296: a command for a nation's state industry takes its own door.
-    if (cmd.as_nation != null_entity)
+    // BL-1402: except a nation acting AS ITSELF on a verb whose body below is
+    // owner-generic (`nation_self_shared_verb`) — it falls through to that body
+    // with `cmd.corp` the nation. `nation_self` already proved the nation exists
+    // and is the actor, which is all the state door's authority check asks of it.
+    if (cmd.as_nation != null_entity && !(nation_self && nation_self_shared_verb(cmd.verb)))
         return apply_state_command(w, reg, cmd, out_building);
 
     switch (cmd.verb)
@@ -1376,11 +1418,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 // to disband a unit whose base has been demolished. Lowest id
                 // wins rather than first-found, because w.buildings is an
                 // unordered_map and "first" is not a defined answer.
+                // BL-1402: "its own" is owner-generic (`owner_holds`: a
+                // corporation's assets or a nation's state_assets).
                 for (const auto& [bid, bc] : w.buildings)
                 {
                     if (bc.tile == cmd.tile && bc.type == building_type::military_base
                         && bc.ticks_remaining <= 0 && !bc.decommissioned
-                        && owns(w, cmd.corp, bid))
+                        && owner_holds(w, cmd.corp, bid))
                     {
                         if (muster_base == null_entity || bid < muster_base)
                             muster_base = bid;
@@ -1402,13 +1446,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             const military_capability_params& mil = reg.military();
             const float hire_cost = mil.hire_base_cost
                 + mil.hire_cost_per_power * static_cast<float>(row.power_mod);
-            corporation_component& payer = w.corporations.at(cmd.corp);
-            if (payer.balance < hire_cost)
+            // BL-1402: the payer is owner-generic — a corporation's balance, or
+            // a nation's treasury admitted only up to its UNCOMMITTED part
+            // (`purse_room_of`): a nation never runs into debt. For a
+            // corporation the room IS its balance, the comparison it always made.
+            if (purse_room_of(w, cmd.corp) < hire_cost)
                 return corp_command_result::rejected_funds;
 
             if (!debit_hire_cost(w, cmd.corp, row))
                 return corp_command_result::rejected_funds;
-            payer.balance -= hire_cost;
+            *purse_of(w, cmd.corp) -= hire_cost; // the actor exists: proven at the seam's top
 
             const entity_id unit = w.create_entity();
             // BL-459: no `strength` — it was set to the same value as `count`,
@@ -1653,6 +1700,11 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             t.from_market = cmd.subject;
             t.to_market   = cmd.counterparty;
             t.points      = cmd.quantity;
+            // TODO(BL-1402 lane T): `trade_is_valid` and `price_trade_leg` still
+            // admit a CORPORATION owner only, so a nation acting as itself is
+            // refused here (rejected_invalid, nothing mutated) until lane T
+            // makes trade.cpp / supply_system.cpp owner-generic. The routing is
+            // in place: nothing in this body needs changing when they do.
             if (!(t.points <= max_trade_points) || !trade_is_valid(w, reg, t))
                 return corp_command_result::rejected_invalid;
             // NR-1018: reach runs from market centre to market centre — a leg
@@ -1708,7 +1760,14 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (!std::isfinite(cmd.quantity) || !(cmd.quantity >= 0.0f)
                 || !(cmd.quantity <= max_trade_points))
                 return corp_command_result::rejected_invalid;
-            w.corporations.at(cmd.corp).trade_reserve = cmd.quantity;
+            // TODO(BL-1402 lane T): a nation has no `trade_reserve` field yet
+            // (it would be a new persistent field: components + world_save, lane
+            // T's and the save lane's), so a nation acting as itself is refused
+            // whole here, nothing mutated, until lane T gives the nation one.
+            const auto rcit = w.corporations.find(cmd.corp);
+            if (rcit == w.corporations.end())
+                return corp_command_result::rejected_invalid;
+            rcit->second.trade_reserve = cmd.quantity;
             return corp_command_result::applied;
         }
 
@@ -1861,9 +1920,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 bool owned_by_mover = false;
                 if (dest_domain == traversal_domain::coastal_water)
                 {
-                    const auto cit = w.corporations.find(cmd.corp);
-                    const entity_id home = (cit != w.corporations.end())
-                                         ? cit->second.home_nation : null_entity;
+                    // BL-1402: owner-generic — a corporation's home nation, or
+                    // the nation itself when it marches as itself.
+                    const entity_id home = owner_home_nation(w, cmd.corp);
                     owned_by_mover = (home != null_entity)
                                   && (province_holder_for(w, cmd.province) == home);
                 }
@@ -2193,9 +2252,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // its nation's queue as the nation's operating champion; a rival
             // corporation does not plan its nation's research. Validated in
             // full before any mutation, so a refusal touches nothing.
-            if (cmd.corp != w.player_entity)
+            // BL-1402: or the seat's NATION acting as itself (cmd.corp == the
+            // player's nation) — the same seat, named as its nation. An AI
+            // nation acting as itself is refused exactly as a rival corp is.
+            const bool as_self = w.corporations.find(cmd.corp) == w.corporations.end();
+            if (as_self ? cmd.corp != player_nation(w) : cmd.corp != w.player_entity)
                 return corp_command_result::rejected_state;
-            const entity_id nation = w.corporations.at(cmd.corp).home_nation;
+            const entity_id nation = as_self ? cmd.corp : w.corporations.at(cmd.corp).home_nation;
             if (w.nations.find(nation) == w.nations.end())
                 return corp_command_result::rejected_state;
 

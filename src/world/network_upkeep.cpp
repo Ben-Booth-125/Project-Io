@@ -368,9 +368,10 @@ void settle_network_purchases(world& w,
             // and a rogue claim here would otherwise leave credits on a corp
             // with no goods drawn and no ledger row. Claw it back in the same
             // two places the pass wrote it — space_programme.cpp's defence.
-            const auto cit = w.corporations.find(t.corp);
+            // BL-1402: the payee's purse, owner-generic (`purse_of`): a nation
+            // payee gives back what the pass credited to its treasury.
             const auto nit = w.nations.find(t.nation);
-            if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+            if (float* purse = purse_of(w, t.corp)) *purse -= t.credits;
             if (nit != w.nations.end())      nit->second.treasury += t.credits;
             continue;
         }
@@ -391,9 +392,10 @@ void settle_network_purchases(world& w,
         // the same two places the pass wrote it, as space_programme.cpp does.
         (void)drawn;
         {
-            const auto cit = w.corporations.find(t.corp);
+            // BL-1402: the payee's purse, owner-generic (`purse_of`): a nation
+            // payee gives back what the pass credited to its treasury.
             const auto nit = w.nations.find(t.nation);
-            if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+            if (float* purse = purse_of(w, t.corp)) *purse -= t.credits;
             if (nit != w.nations.end())      nit->second.treasury += t.credits;
         }
     }

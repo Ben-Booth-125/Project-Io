@@ -107,7 +107,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 /// the next tick.
 ///
 /// @param w        World; mutated only on success.
-/// @param corp     Corporation demolishing — must own the building.
+/// @param corp     Owner demolishing — must own the building. BL-1402: a
+///                 corporation (its `assets`) or a NATION (its `state_assets`,
+///                 through `demolish_state_building`).
 /// @param building Building entity to remove.
 /// @return         True on success; false if the building does not exist or
 ///                 @p corp does not own it.
@@ -209,7 +211,10 @@ bool demolish_state_building(world& w, entity_id nation, entity_id building);
 ///
 /// @param w     World; mutated only on success (the edge raised, cache cleared, balance debited).
 /// @param reg   Loaded registry (per-tier road cost).
-/// @param corp  Corporation placing (and paying) — usually w.player_entity.
+/// @param corp  Owner placing (and paying) — usually w.player_entity. BL-1402: a
+///              corporation (paid from its balance) or a NATION acting as itself (paid
+///              from its uncommitted treasury, never into debt, and booked on its state
+///              ledger's construction line, as track is).
 /// @param tile  Target tile entity — one end of the crossing.
 /// @param tier  Road tier to place: 1=Track (default, = BL-147 behaviour), 2=Road, 3=Highway.
 /// @param side  Hex side of `tile` the road crosses: 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE
