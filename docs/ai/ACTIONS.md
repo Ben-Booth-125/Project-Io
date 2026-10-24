@@ -345,26 +345,16 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Cheapen the nation's long land hauls: a line between two cities with stations moves goods at a fraction of the road's cost per tile, so markets far apart overland trade where they could not.
 
-### `gameplay.set_logistics_shares` — No UI control yet. The command seam only (--serve / MCP `issue_command` verb `set_logistics_shares` with `nation`; the verify API's `corp_command{verb=set_logistics_shares, as_nation=...}`).
+### `gameplay.set_logistics_shares` — RETIRED (BL-1405, Ben 2026-10-23: after the fold every building on a nation's ground is the nation's, so a nation's Logistic Point pool serves its own buildings as ONE class; the state / champion / other split has no subject (LOGISTICS.md § Logistic Points, "One pool")). No surface issues it. The corp_verb slot `set_logistics_shares` (37) survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering); a rule stored in an old save still loads and is ignored.
 
-**Press.** Seam: issue corp_verb 37 (`set_logistics_shares`) with `corp` = the seat, `nation` = the seat's home nation, `quantity` = the state's share, `floor_price` = the champion's share (other firms get the rest), `order` 0. `order` 1 with both shares 0 clears the rule.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `nation` | `entity_id (wire key `nation`; corp_command::as_nation)` | The nation whose Logistic Points are shared: the seat's home nation. Omitted = the corporation's own book (rejected_invalid). |
-| `quantity` | `float in [0,1]` | The state industry's share of the nation's Logistic Point pool. |
-| `floor_price` | `float in [0,1]` | The champion's share. With `quantity`, at most 1; other firms (foreign ones too) get 1 - both. |
-| `order` | `uint (0 or 1)` | 0 sets the rule; 1 clears it back to the mechanical default (in proportion to need). |
+**Press.** None. Over the command seam or --serve the verb is still ACCEPTED AS A NUMBER and REJECTED (rejected_invalid), from every actor, mutating nothing. Every claim on a nation's pool is one queue: met in full while points suffice, served nearest-first when they do not.
 
 **Valid when:**
-- Wire: every field parses into its real domain (rejected_invalid otherwise); unless the session runs `--as any`, `corp` is the session corporation and `nation` its home nation (rejected_not_owner otherwise).
-- `corp` is the SEAT (world::player_entity) and the nation's CHAMPION (rejected_not_owner): no AI nation sets shares (no AI_OPPONENT.md § 11 grant covers it).
-- Both shares finite, each in [0,1], summing to at most 1 (rejected_invalid); `order` is 0 or 1 (rejected_invalid); a clear carries no share (rejected_invalid) and needs a rule set (rejected_state).
-- A rejection mutates nothing.
+- None can be met: every call is rejected (rejected_invalid), for every actor, and mutates nothing.
 
-**Expected output.** From the next tick the nation's Logistic Point pool (made by the hubs, stations and ports on its ground) is granted by class: each of state, champion and other gets its share, served to its buildings in the routed queue (inside a source's full reach first, then nearest; BL-1356); a class's unused share spills to the classes still short. Buildings short of points produce in proportion. Cleared, the classes are one queue: every claim is met while points suffice, and the nearest requests are met first when they do not.
+**Expected output.** rejected_invalid, always. BL-1405, Ben 2026-10-23: after the fold every building on a nation's ground is the nation's, so a nation's Logistic Point pool serves its own buildings as ONE class; the state / champion / other split has no subject (LOGISTICS.md § Logistic Points, "One pool")
 
-**Reason to select.** Protect the state's or the champion's production when the nation's points are short, at the expense of other (often foreign) firms on its ground.
+**Reason to select.** Never. There is nothing to share: the pool is one class.
 
 ### `gameplay.build_station` — Select a city tile (Planetary canvas click), then Construction ledger > Construction view > the tile's building list > Infrastructure fold > 'Railway Station' row > 'Build'. Also the command seam (--serve / MCP `issue_command` verb `build` with `type` 11 and `nation`).
 

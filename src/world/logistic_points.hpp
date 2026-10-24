@@ -26,15 +26,14 @@
 //     produces in proportion to need granted / need — the scalar the economy
 //     step folds into the building's labour, so half the points is half the
 //     output.
-//   * THE HOST NATION'S POOL, SHARED. Every building on a nation's ground — its
-//     state's, its champion's, every other firm's (foreign ones too) — draws on
-//     that nation's pool. With no rule set the share is MECHANICAL: every claim
-//     is granted the same fraction, min(1, pool / total claims) — in proportion
-//     to need. A nation that SETS a rule (`set_logistics_shares`, the player's
-//     verb; no AI nation sets one — no grant covers it) gives each class its
-//     share of the pool; within a class claims are granted pro rata, and a
-//     class's unused share spills, once, to the classes still short, in
-//     proportion to what they still lack.
+//   * THE HOST NATION'S POOL, ONE CLASS (BL-1405). After the fold every building
+//     on a nation's ground is the nation's, and draws on that nation's pool as one
+//     queue. The share is MECHANICAL: while points suffice every claim is met;
+//     short, claims are served in routed queue order. The state / champion /
+//     other share rule (`set_logistics_shares`, BL-1309) RETIRED with the
+//     corporations (Ben, 2026-10-23): the verb is refused and the stored rule is
+//     ignored. `lp_class` keeps its three slots for the ledger's shape only;
+//     every claim is `state`.
 //   * A building on nobody's ground has no pool: it produces nothing.
 //
 // PURE AND UNCACHED: `resolve_logistic_points` is a function of the world's
@@ -84,7 +83,8 @@
 
 class recipe_registry;
 
-/// Who on a nation's ground a building's claim is counted under.
+/// Who on a nation's ground a building's claim is counted under. BL-1405: one
+/// class - every claim is `state`; `champion` and `other` are retired slots.
 enum class lp_class : std::uint8_t
 {
     state    = 0, ///< the host nation's own state industry
@@ -162,7 +162,7 @@ struct lp_nation_row
     std::array<int,   lp_network_count> sources{};
     std::array<float, lp_class_count>   claim{};
     std::array<float, lp_class_count>   granted{};
-    bool      rule_set = false;
+    bool      rule_set = false; ///< BL-1405: the share rule retired; always false
     /// BL-1361: what production LEFT in each pot once its queue was served - the
     /// points a shipment leaving this nation's ground may draw (LOGISTICS.md § How a
     /// tile's points get to it: "a shipment draws what production left"). With a share

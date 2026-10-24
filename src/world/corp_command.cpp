@@ -1,5 +1,5 @@
 #include "corp_command.hpp"
-#include "logistic_points.hpp" // BL-1309: lp_share_rule_valid
+#include "logistic_points.hpp" // BL-1309; BL-1405 retired its one use (lp_share_rule_valid)
 
 #include "battle_system.hpp" // request_withdraw, unit_in_battle (BL-467)
 
@@ -774,6 +774,14 @@ bool nation_owns(const world& w, entity_id nation, entity_id building)
 corp_command_result apply_state_command(world& w, const recipe_registry& reg,
                                         const corp_command& cmd, entity_id* out_building)
 {
+    // BL-1405 (LOGISTICS.md § Logistic Points, "One pool"; Ben, 2026-10-23): the
+    // share rule RETIRES. After the fold every building on a nation's ground is the
+    // nation's, so its pool serves ONE class and there is nothing to share among.
+    // The verb (BL-1309's) is refused whole, from every actor, before anything is
+    // read or mutated. `nation_component::lp_shares` stays in the struct and the
+    // save stream so old saves load; the resolver ignores it.
+    if (cmd.verb == corp_verb::set_logistics_shares)
+        return corp_command_result::rejected_invalid;
     const entity_id nation = cmd.as_nation;
     if (w.nations.find(nation) == w.nations.end())
         return corp_command_result::rejected_invalid;
@@ -783,7 +791,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     if (cmd.corp != nation && champion_of(w, nation) != cmd.corp)
         return corp_command_result::rejected_not_owner;
     // The SEAT: the player acting for its own nation, whether through its champion
-    // corp or as the nation itself. Every seat-only verb (rail, the share rule, the
+    // corp or as the nation itself. Every seat-only verb (rail, the
     // tax tier) and every seat refusal (BL-1322, the workforce lock) keys on this,
     // so naming the nation as the actor can neither unlock nor dodge them.
     const bool seat = cmd.corp == w.player_entity
@@ -799,37 +807,6 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
         || (cmd.verb == corp_verb::build && cmd.type == building_type::railway_station);
     if (rail_verb && !seat)
         return corp_command_result::rejected_not_owner;
-
-    // BL-1309 (LOGISTICS.md § Logistic Points, "One pool"): the nation's share
-    // rule. The seat's alone — no grant lets an AI nation set one. Every field is
-    // validated as the value that lands before anything mutates.
-    if (cmd.verb == corp_verb::set_logistics_shares)
-    {
-        if (!seat)
-            return corp_command_result::rejected_not_owner;
-        nation_component& nc = w.nations.at(nation);
-        if (cmd.order == 1)
-        {
-            if (cmd.quantity != 0.0f || cmd.floor_price != 0.0f)
-                return corp_command_result::rejected_invalid;
-            if (!nc.lp_shares.set)
-                return corp_command_result::rejected_state;
-            nc.lp_shares = nation_component::logistics_share_rule{};
-            return corp_command_result::applied;
-        }
-        if (cmd.order != 0)
-            return corp_command_result::rejected_invalid;
-        const float st = cmd.quantity, ch = cmd.floor_price;
-        if (!std::isfinite(st) || !std::isfinite(ch) || st < 0.0f || ch < 0.0f
-            || st > 1.0f || ch > 1.0f || st + ch > 1.0f + 1e-6f)
-            return corp_command_result::rejected_invalid;
-        const std::array<float, 3> sh = {st, ch, std::max(0.0f, 1.0f - st - ch)};
-        if (!lp_share_rule_valid(sh))
-            return corp_command_result::rejected_invalid;
-        nc.lp_shares.set   = true;
-        nc.lp_shares.share = sh;
-        return corp_command_result::applied;
-    }
 
     // BL-1335 (NATIONS.md § Taxes and Discontent): the nation's tax tier. The
     // seat's alone in play — an AI nation's tier is its scorer's
@@ -1213,7 +1190,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // BL-1255: track is state industry — laid only for a nation (`as_nation`).
             return corp_command_result::rejected_invalid;
         case corp_verb::set_logistics_shares:
-            // BL-1309: a nation's act — only for a nation (`as_nation`).
+            // BL-1405: retired — refused whole on every path.
             return corp_command_result::rejected_invalid;
         case corp_verb::set_tax_tier:
             // BL-1335: a nation's act — only for a nation (`as_nation`).
