@@ -58,7 +58,7 @@ namespace {
 entity_id provisional_seat_corp(const world& w)
 {
     entity_id best = null_entity;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.gen_charters)
         if (cc.is_player && (best == null_entity || cid < best))
             best = cid;
     return best;
@@ -68,12 +68,93 @@ entity_id provisional_seat_corp(const world& w)
 /// order-free) and point `player_entity` at its home nation. Null clears both.
 void set_provisional_seat(world& w, entity_id corp)
 {
-    for (auto& [cid, cc] : w.corporations)
+    for (auto& [cid, cc] : w.gen_charters)
         cc.is_player = (cid == corp);
-    const auto cit = w.corporations.find(corp);
-    w.player_entity = (cit != w.corporations.end() && w.nations.count(cit->second.home_nation) != 0)
+    const auto cit = w.gen_charters.find(corp);
+    w.player_entity = (cit != w.gen_charters.end() && w.nations.count(cit->second.home_nation) != 0)
                           ? cit->second.home_nation
                           : null_entity;
+}
+
+/// BL-1407 (NATIONS.md § What a nation owns): a building generation places is
+/// the nation's whose GROUND it stands on, from the moment it is chartered.
+/// Appends @p bid to that nation's `state_assets` unless some nation already
+/// lists it. Ground no nation owns leaves it unowned; the charters' close
+/// demolishes it there (the fold's old rule).
+void own_by_ground(world& w, entity_id bid)
+{
+    const auto bit = w.buildings.find(bid);
+    if (bit == w.buildings.end() || owner_nation_of(w, bid) != null_entity)
+        return;
+    const auto tn = w.tile_to_nation.find(bit->second.tile);
+    if (tn == w.tile_to_nation.end())
+        return;
+    if (const auto nit = w.nations.find(tn->second); nit != w.nations.end())
+        nit->second.state_assets.push_back(bid);
+}
+
+/// BL-1407: every building of charter @p cid becomes its ground nation's
+/// (`own_by_ground`), in the charter's own index order.
+void attach_charter(world& w, entity_id cid)
+{
+    const auto cit = w.gen_charters.find(cid);
+    if (cit == w.gen_charters.end())
+        return;
+    for (const entity_id bid : cit->second.assets)
+        own_by_ground(w, bid);
+}
+
+/// BL-1407: drop @p bid from whichever nation lists it (a building generation
+/// unplaces leaves its owner's list with it).
+void release_from_owner(world& w, entity_id bid)
+{
+    for (auto& [nid, nc] : w.nations) // a building is listed by at most one nation
+    {
+        (void)nid;
+        auto it = std::find(nc.state_assets.begin(), nc.state_assets.end(), bid);
+        if (it != nc.state_assets.end())
+        {
+            nc.state_assets.erase(it);
+            return;
+        }
+    }
+}
+
+/// BL-1407: a charter's home market on @p body — `corp_home_market`'s rule over
+/// the charter's own index (its anchor's market, else its lowest-id building's
+/// there, else the body's lowest-id market).
+entity_id charter_home_market(const world& w, entity_id cid, entity_id body)
+{
+    const auto cit = w.gen_charters.find(cid);
+    if (cit == w.gen_charters.end())
+        return market_on_body(w, body);
+    const charter_holding& cc = cit->second;
+    const auto tile_on_body = [&](entity_id bid) -> entity_id {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            return null_entity;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            return null_entity;
+        return bit->second.tile;
+    };
+    if (const entity_id hq_tile = tile_on_body(cc.hq_building); hq_tile != null_entity)
+        if (const entity_id mid = market_for_tile(w, hq_tile); mid != null_entity)
+            return mid;
+    entity_id best = null_entity, best_tile = null_entity;
+    for (const entity_id bid : cc.assets)
+    {
+        const entity_id t = tile_on_body(bid);
+        if (t != null_entity && (best == null_entity || bid < best))
+        {
+            best      = bid;
+            best_tile = t;
+        }
+    }
+    if (best_tile != null_entity)
+        if (const entity_id mid = market_for_tile(w, best_tile); mid != null_entity)
+            return mid;
+    return market_on_body(w, body);
 }
 
 // ---------------------------------------------------------------------------
@@ -2152,6 +2233,7 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
     const auto bit = w.buildings.find(bid);
     if (bit != w.buildings.end())
         occupied.erase(bit->second.tile);
+    release_from_owner(w, bid); // BL-1407: out of its nation's list too
     w.buildings.erase(bid);
     w.stockpiles.erase(bid);
 }
@@ -2456,20 +2538,22 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
 void seed_starting_military(world& w, entity_id corp_id,
                              std::unordered_set<entity_id>& occupied_tiles)
 {
-    // BL-1402: the owner is a corporation (anchored on its HQ) or, once the fold
-    // has run, a nation (anchored on its capital) - the same opening force.
-    const auto nation_it = w.nations.find(owner_home_nation(w, corp_id));
-    if (nation_it == w.nations.end() || nation_it->second.tiles.empty())
-        return;
-
+    // BL-1407: the force is a NATION's. Named by a charter, it is the charter's
+    // home nation's, laid beside the charter's anchor building (the old HQ, so
+    // no base moves); named by a nation, beside its capital.
+    entity_id owner = corp_id;
     entity_id hq_tile = null_entity;
-    if (const auto cit = w.corporations.find(corp_id); cit != w.corporations.end())
+    if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
     {
+        owner = cit->second.home_nation;
         const auto hq_bld_it = w.buildings.find(cit->second.hq_building);
         if (hq_bld_it != w.buildings.end())
             hq_tile = hq_bld_it->second.tile;
     }
-    else
+    const auto nation_it = w.nations.find(owner);
+    if (nation_it == w.nations.end() || nation_it->second.tiles.empty())
+        return;
+    if (w.gen_charters.find(corp_id) == w.gen_charters.end())
         hq_tile = nation_it->second.capital_tile;
 
     // Nearest unoccupied, can_place-valid tile to the HQ (falling back to the
@@ -2529,10 +2613,8 @@ void seed_starting_military(world& w, entity_id corp_id,
 
     const entity_id base_id =
         author_building(w, best_tid, building_type::military_base, occupied_tiles);
-    // The base must appear in the owner's own asset list to be treated as
-    // owned by the economy/UI.
-    if (std::vector<entity_id>* owned = assets_of(w, corp_id); owned != nullptr)
-        owned->push_back(base_id);
+    // The base is the nation's own (BL-1407: every building is its nation's).
+    nation_it->second.state_assets.push_back(base_id);
 
     // One basic unit, seeded on the same tile as the base. Roster index 0 is
     // the cheapest/first roster row — a deterministic starting choice, not a
@@ -2547,7 +2629,7 @@ void seed_starting_military(world& w, entity_id corp_id,
     // rather than orphaning it.
     w.units[unit_id] = unit_component{
         .position = best_tid,
-        .owner    = corp_id,
+        .owner    = owner,
         .count    = starting_unit_manpower,
         .type     = 0,
         .supply_factor_permille = 1000,
@@ -2559,7 +2641,11 @@ void seed_starting_military(world& w, entity_id corp_id,
 
 bool corporation_has_opening_force(const world& w, entity_id corp)
 {
-    const std::vector<entity_id>* owned = assets_of(w, corp); // BL-1402: any owner
+    // BL-1407: a charter's force is its home nation's.
+    entity_id owner = corp;
+    if (const auto cit = w.gen_charters.find(corp); cit != w.gen_charters.end())
+        owner = cit->second.home_nation;
+    const std::vector<entity_id>* owned = assets_of(w, owner);
     if (owned == nullptr)
         return false;
     for (const entity_id bid : *owned)
@@ -2573,11 +2659,13 @@ bool corporation_has_opening_force(const world& w, entity_id corp)
 
 void arm_rivals(world& w)
 {
-    // Ascending corporation id (std::map), so the bases claim ground in one
-    // order on every machine; occupancy from every building standing.
+    // BL-1407: the opening force is a NATION's — one per rival major, laid beside
+    // its lowest-id specialist charter's anchor. Ascending charter id (std::map),
+    // so the bases claim ground in one order on every machine; occupancy from
+    // every building standing. The provisional seat's nation opens unarmed.
     std::map<entity_id, bool> rivals;
-    for (const auto& [cid, cc] : w.corporations)
-        if (!cc.is_background && !cc.is_player) // BL-1407: the provisional seat
+    for (const auto& [cid, cc] : w.gen_charters)
+        if (!cc.is_background && cc.home_nation != w.player_entity)
             rivals[cid] = true;
     std::unordered_set<entity_id> occupied;
     occupied.reserve(w.buildings.size() * 2);
@@ -2590,10 +2678,11 @@ void arm_rivals(world& w)
 
 void arm_corporation(world& w, entity_id corp)
 {
-    // BL-1402: a nation (the seat's, after the fold) is armed like a champion.
-    const auto it = w.corporations.find(corp);
-    const bool nation = it == w.corporations.end() && w.nations.count(corp) != 0;
-    if ((!nation && (it == w.corporations.end() || it->second.is_background))
+    // BL-1407: a specialist charter arms its home NATION (beside its anchor); a
+    // nation is armed beside its capital. A background charter arms nothing.
+    const auto it = w.gen_charters.find(corp);
+    const bool nation = it == w.gen_charters.end() && w.nations.count(corp) != 0;
+    if ((!nation && (it == w.gen_charters.end() || it->second.is_background))
         || corporation_has_opening_force(w, corp))
         return;
     std::unordered_set<entity_id> occupied;
@@ -2663,16 +2752,19 @@ void move_seat_force(world& w, entity_id previous, entity_id nation)
 
 void disarm_corporation(world& w, entity_id corp)
 {
-    std::vector<entity_id>* owned = assets_of(w, corp); // BL-1402: any owner
+    // BL-1407: the force is a nation's; a charter names its home nation's.
+    entity_id owner = corp;
+    if (const auto cit = w.gen_charters.find(corp); cit != w.gen_charters.end())
+        owner = cit->second.home_nation;
+    std::vector<entity_id>* owned = assets_of(w, owner);
     if (owned == nullptr)
         return;
     // Its units first (ascending id, so the erase order is fixed), then its
     // military bases with their stockpiles, out of its asset list too. A NATION's
     // garrisons (BL-571: no muster base) are not the opening force and stay.
-    const bool nation = w.corporations.find(corp) == w.corporations.end();
     std::vector<entity_id> units;
     for (const auto& [uid, uc] : w.units)
-        if (uc.owner == corp && (!nation || uc.muster_base != null_entity))
+        if (uc.owner == owner && uc.muster_base != null_entity)
             units.push_back(uid);
     std::sort(units.begin(), units.end());
     for (const entity_id uid : units)
@@ -3201,7 +3293,7 @@ std::vector<entity_id> generate_corporations(
     }
 
     // ---------------------------------------------------------------------------
-    // Assemble corporation_components and register in the world
+    // Assemble charter_holdings and register in the world
     // ---------------------------------------------------------------------------
 
     std::vector<entity_id> corp_ids;
@@ -3223,12 +3315,12 @@ std::vector<entity_id> generate_corporations(
             continue;
         }
         corp_slot.push_back(c);
-        corporation_component cc;
+        charter_holding cc;
         cc.name             = std::move(corp_names[static_cast<std::size_t>(c)]);
         cc.home_nation      = nation_ids[static_cast<std::size_t>(
                                   home_nation_idx[static_cast<std::size_t>(c)])];
         cc.focus            = corp_focuses[static_cast<std::size_t>(c)];
-        cc.ownership_class  = corp_ownership[static_cast<std::size_t>(c)];
+        (void)corp_ownership; // BL-1407: the ownership class retired; its pure derivation stays (no RNG moves)
         cc.starting_capital = corp_capitals[static_cast<std::size_t>(c)];
         cc.balance          = corp_capitals[static_cast<std::size_t>(c)]; // opens at starting capital
         cc.is_player        = false;
@@ -3249,7 +3341,8 @@ std::vector<entity_id> generate_corporations(
 
         const entity_id corp_id = w.create_entity();
         corp_ids.push_back(corp_id);
-        w.corporations[corp_id] = std::move(cc);
+        w.gen_charters[corp_id] = std::move(cc);
+        attach_charter(w, corp_id); // BL-1407: every building is its ground nation's
 
         // Starting resource stockpile (BL-116): generate a focus / wealth-shaped
         // opening stockpile and seed it on the corp's home body so build /
@@ -3382,7 +3475,7 @@ std::vector<entity_id> generate_corporations(
 int remove_specialist_roster(world& w)
 {
     std::vector<entity_id> gone;
-    for (const auto& kv : w.corporations)
+    for (const auto& kv : w.gen_charters)
         if (!kv.second.is_background)
             gone.push_back(kv.first);
     std::sort(gone.begin(), gone.end());
@@ -3393,16 +3486,29 @@ int remove_specialist_roster(world& w)
     if (gone.empty())
         return 0;
 
+    // BL-1407: the opening force a removed specialist armed is its NATION's; it
+    // goes with the roster (as the corporation's did), ascending nation id.
+    {
+        std::set<entity_id> armed;
+        for (const entity_id cid : gone)
+            armed.insert(w.gen_charters.at(cid).home_nation);
+        for (const entity_id nid : armed)
+            if (w.nations.count(nid) != 0)
+                disarm_corporation(w, nid);
+    }
+
     for (const entity_id cid : gone)
     {
-        const corporation_component& cc = w.corporations.at(cid);
+        const charter_holding& cc = w.gen_charters.at(cid);
         for (const entity_id bid : cc.assets)
         {
+            release_from_owner(w, bid); // BL-1407: out of its nation's list too
             w.buildings.erase(bid);
             w.stockpiles.erase(bid);
         }
         if (cc.hq_building != null_entity)
         {
+            release_from_owner(w, cc.hq_building);
             w.buildings.erase(cc.hq_building);   // always among the assets; stated anyway
             w.stockpiles.erase(cc.hq_building);
         }
@@ -3425,7 +3531,7 @@ int remove_specialist_roster(world& w)
 
         if (cc.is_player) // BL-1407: the provisional seat goes with its corporation
             w.player_entity = null_entity;
-        w.corporations.erase(cid);
+        w.gen_charters.erase(cid);
     }
 
     // A specialist port or inland hub was a supply anchor; the reach field that
@@ -3861,7 +3967,7 @@ std::vector<entity_id> generate_background_firms(
             // Financial profile: opened at zero here and handed its working
             // capital (BL-1173, background_working_capital) once its opening
             // stock is generated below, since the capital is priced from it.
-            corporation_component cc;
+            charter_holding cc;
             cc.name          = make_corp_name(nit->second.name, name_rng);
             cc.home_nation   = home_nid;
             cc.focus         = focus;
@@ -3884,7 +3990,6 @@ std::vector<entity_id> generate_background_firms(
             // retire.
             [[maybe_unused]] const ownership_class corporation_class =
                 ownership_from_character(nit->second.politics);
-            cc.ownership_class = ownership_class::publicly_held;
             cc.starting_capital = 0.0f;
             cc.balance          = 0.0f;
             cc.is_player     = false;
@@ -3897,7 +4002,8 @@ std::vector<entity_id> generate_background_firms(
             cc.assets          = std::move(assets);
 
             const entity_id corp_id = w.create_entity();
-            w.corporations[corp_id] = std::move(cc);
+            w.gen_charters[corp_id] = std::move(cc);
+            attach_charter(w, corp_id); // BL-1407: every building is its ground nation's
             firm_ids.push_back(corp_id);
             ++firms_this_body;
             ++firms_by_resource[gap_r];
@@ -3917,7 +4023,7 @@ std::vector<entity_id> generate_background_firms(
             // within reach — clear that good's count and mask, and only that.
             for (std::size_t g = 0; g < resource_count; ++g)
                 if (chain_misses[g] > 0
-                    && chain_firm_feeds_good(w, reg, w.corporations.at(corp_id).assets, g))
+                    && chain_firm_feeds_good(w, reg, w.gen_charters.at(corp_id).assets, g))
                 {
                     chain_misses[g] = 0;
                     chain_masked[g] = false;
@@ -3932,7 +4038,7 @@ std::vector<entity_id> generate_background_firms(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
                 // The market its stock is priced at for working capital: its
                 // home market there, else (none carved yet) the body itself.
-                const entity_id home_mkt = corp_home_market(w, corp_id, home_body);
+                const entity_id home_mkt = charter_home_market(w, corp_id, home_body);
                 const entity_id pool_key = (home_mkt != null_entity) ? home_mkt : home_body;
                 seed_opening_stock(w, corp_id, stock); // BL-1265: placed on the shelves later
 
@@ -3940,7 +4046,7 @@ std::vector<entity_id> generate_background_firms(
                 // stock it was just handed (background_working_capital, above).
                 // Set after the stock so the stock stream is drawn exactly as
                 // before; no RNG is read here.
-                corporation_component& opened = w.corporations.at(corp_id);
+                charter_holding& opened = w.gen_charters.at(corp_id);
                 opened.starting_capital = background_working_capital(w, pool_key, stock);
                 opened.balance          = opened.starting_capital;
             }
@@ -3975,7 +4081,7 @@ unplace_tally unplace_and_reseat(world& w, const std::map<entity_id, std::vector
     unplace_tally out;
     for (const auto& [cid, bids] : gone)
     {
-        corporation_component& corp = w.corporations.at(cid);
+        charter_holding& corp = w.gen_charters.at(cid);
         for (const entity_id bid : bids)
         {
             chain_unplace(w, bid, occupied);
@@ -4015,7 +4121,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
 {
     chain_roster_enforcement out;
     std::vector<entity_id> ids;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
         if (!corp.is_background)
             ids.push_back(cid);
     std::sort(ids.begin(), ids.end());
@@ -4028,7 +4134,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     // step below walks.
     std::vector<std::pair<entity_id, entity_id>> procs; // (corp, building)
     for (const entity_id cid : ids)
-        for (const entity_id bid : w.corporations.at(cid).assets)
+        for (const entity_id bid : w.gen_charters.at(cid).assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit != w.buildings.end() && bit->second.type == building_type::processing_facility
@@ -4225,7 +4331,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
                 const entity_id bid = procs[i].second;
                 building_component& b = w.buildings.at(bid);
                 const entity_id market = market_for_tile(w, b.tile);
-                const std::vector<entity_id>& own = w.corporations.at(cid).assets;
+                const std::vector<entity_id>& own = w.gen_charters.at(cid).assets;
                 const auto wit = wants.find(body_of(bid));
                 uint16_t chosen    = no_recipe;
                 int      best_tier = chain_tier_none;
@@ -4281,7 +4387,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     //    drawn again over the specialists that still qualify, with the world-gen
     //    pick's own stream (seed ^ 0xF0E1D2C3). The app's player picks later.
     const auto qualifies = [&](entity_id cid) {
-        const corporation_component& corp = w.corporations.at(cid);
+        const charter_holding& corp = w.gen_charters.at(cid);
         bool any = false, proc = false;
         for (const entity_id bid : corp.assets)
         {
@@ -4295,8 +4401,8 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
         return any && (corp.focus != industrial_focus::processing || proc);
     };
     const entity_id seat_corp = provisional_seat_corp(w); // BL-1407
-    const auto seat = w.corporations.find(seat_corp);
-    if (seat != w.corporations.end() && !seat->second.is_background && !qualifies(seat_corp))
+    const auto seat = w.gen_charters.find(seat_corp);
+    if (seat != w.gen_charters.end() && !seat->second.is_background && !qualifies(seat_corp))
     {
         std::vector<entity_id> pool;
         for (const entity_id cid : ids)
@@ -4310,8 +4416,9 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
             // BL-1407: the provisional seat moves corporation (the Begin seat,
             // `repoint_player`, takes nations); its force moves with it.
             const entity_id next = pool[static_cast<std::size_t>(pick(player_rng))];
+            const entity_id prev_nation = w.player_entity;
             set_provisional_seat(w, next);
-            if (next != seat_corp)
+            if (next != seat_corp && w.player_entity != prev_nation) // forces are nations'
             {
                 disarm_corporation(w, next);
                 arm_corporation(w, seat_corp);
@@ -4330,7 +4437,7 @@ chain_feasibility_audit audit_chain_feasibility(world& w, const recipe_registry&
 {
     chain_feasibility_audit out;
     std::unordered_set<entity_id> held;
-    for (const auto& [cid, corp] : w.corporations)
+    for (const auto& [cid, corp] : w.gen_charters)
     {
         (void)cid;
         for (const entity_id bid : corp.assets)
@@ -4506,7 +4613,7 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
     }
 
     std::map<entity_id, entity_id> owner;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.gen_charters)
         for (const entity_id a : cc.assets)
             owner.emplace(a, cid);
 
@@ -4718,7 +4825,7 @@ struct charter_centre
     /// reconciled region: a charter stays near its centre (INDUSTRIALISATION.md § 1),
     /// and the nation's nearest region can be anywhere in the nation.
     int          anchor_region_idx    = -1;
-    /// ORIGIN (BL-1099, `corporation_component::origin_region`): the settlement
+    /// ORIGIN (BL-1099, `charter_holding::origin_region`): the settlement
     /// region whose stock this centre's budget was split from -- the carve
     /// slot's own (`world::gen_carve_centres`), which is "the region of that
     /// centre" in the one sense the charter budget knows. A centre the carve
@@ -5792,8 +5899,8 @@ void publish_charter_web(generation_progress* progress, const world& w,
             continue;
         if (slot >= generation_progress::max_corp_slots)
             break;   // overflow dropped, as the tap's own bound says
-        const auto cit = w.corporations.find(cr.corp);
-        if (cit == w.corporations.end())
+        const auto cit = w.gen_charters.find(cr.corp);
+        if (cit == w.gen_charters.end())
             continue;
         for (const entity_id tile : cr.holdings)
         {
@@ -6080,11 +6187,11 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
                                           capital_params.wealth_variance, focus, capital_rng);
     std::mt19937 name_rng = charter_stream(seed, k_charter_salt_spec_name, cc.centre);
 
-    corporation_component corp;
+    charter_holding corp;
     corp.name             = make_corp_name(nc.name, name_rng);
     corp.home_nation      = cc.nation;
     corp.focus            = focus;
-    corp.ownership_class  = own;
+    (void)own; // BL-1407: the ownership class retired with the firm
     corp.starting_capital = capital;
     corp.balance          = capital;
     corp.is_player        = false;
@@ -6102,7 +6209,8 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
     const entity_id corp_id = w.create_entity();
     assets_out  = assets;
     corp.assets = std::move(assets);
-    w.corporations[corp_id] = std::move(corp);
+    w.gen_charters[corp_id] = std::move(corp);
+    attach_charter(w, corp_id); // BL-1407: every building is its ground nation's
 
     std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_spec_stock, cc.centre);
     const auto stock = generate_starting_stockpile(focus, capital, capital_params.base_capital,
@@ -7035,11 +7143,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // The company, as Pass 6 authors it: open by construction (BL-678),
             // a stockpile from the BL-116 generator, and working capital priced from
             // it (BL-1173) once the stock is generated below.
-            corporation_component corp;
+            charter_holding corp;
             corp.name             = make_corp_name(nc.name, name_rng);
             corp.home_nation      = cc.nation;
             corp.focus            = focus;
-            corp.ownership_class  = ownership_class::publicly_held;
             corp.starting_capital = 0.0f;
             corp.balance          = 0.0f;
             corp.is_player        = false;
@@ -7058,7 +7165,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             record(corp_id, cc, /*specialist=*/false, rung, assets, fp);
             rep.charters.back().good = static_cast<std::uint16_t>(gap_r);
             corp.assets = std::move(assets);
-            w.corporations[corp_id] = std::move(corp);
+            w.gen_charters[corp_id] = std::move(corp);
+            attach_charter(w, corp_id); // BL-1407: every building is its ground nation's
             ++bs.firms;
             ++bs.firms_by_resource[gap_r];
             bs.prospective.erase(gap_r); // BL-1233: its processor is placed
@@ -7072,7 +7180,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // BL-1232: the grids this power firm now serves count as powered.
             if (power_per_grid && gap_r == power_i)
             {
-                for (const entity_id a : w.corporations.at(corp_id).assets)
+                for (const entity_id a : w.gen_charters.at(corp_id).assets)
                 {
                     const building_component& ab = w.buildings.at(a);
                     if (ab.type != building_type::processing_facility)
@@ -7095,7 +7203,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // producer it may have lacked. An unrelated charter changes nothing.
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (chain_skipped[r]
-                    && chain_firm_feeds_good(w, reg, w.corporations.at(corp_id).assets, r))
+                    && chain_firm_feeds_good(w, reg, w.gen_charters.at(corp_id).assets, r))
                 {
                     chain_skipped[r] = false;
                     skipped[r]       = false;
@@ -7107,7 +7215,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
                 // The market its stock is priced at for working capital: its
                 // home market there, else (none carved yet) the body itself.
-                const entity_id home_mkt = corp_home_market(w, corp_id, home_body);
+                const entity_id home_mkt = charter_home_market(w, corp_id, home_body);
                 const entity_id pool_key = (home_mkt != null_entity) ? home_mkt : home_body;
                 seed_opening_stock(w, corp_id, stock); // BL-1265: placed on the shelves later
 
@@ -7115,7 +7223,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 // stock it was just handed (background_working_capital, above).
                 // Set after the stock so the stock stream is drawn exactly as
                 // before; no RNG is read here.
-                corporation_component& opened = w.corporations.at(corp_id);
+                charter_holding& opened = w.gen_charters.at(corp_id);
                 opened.starting_capital = background_working_capital(w, pool_key, stock);
                 opened.balance          = opened.starting_capital;
             }
@@ -7368,8 +7476,8 @@ void date_chartered_firms(world& w, charter_spend_report& report,
             r.founded_year = year;
             continue;
         }
-        const auto cit = w.corporations.find(r.corp);
-        if (cit == w.corporations.end())
+        const auto cit = w.gen_charters.find(r.corp);
+        if (cit == w.gen_charters.end())
         {
             // A charter whose corp the world no longer holds still carries a
             // year on the report row, so a reader of the report never sees an
@@ -7377,7 +7485,7 @@ void date_chartered_firms(world& w, charter_spend_report& report,
             r.founded_year = epoch_year;
             continue;
         }
-        corporation_component& c = cit->second;
+        charter_holding& c = cit->second;
         int32_t year = epoch_year;
         if (c.origin_region >= 0)
         {
@@ -7514,16 +7622,16 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
     //    the lower. Found for EVERY market with a record (bought or not), so a
     //    reading can say who the record would reach at another rate.
     std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    corp_ids.reserve(w.gen_charters.size());
+    for (const auto& kv : w.gen_charters)
         corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
     std::map<entity_id, std::map<entity_id, int>> holdings; // market -> corp -> buildings
     for (const entity_id cid : corp_ids)
     {
-        if (w.corporations.at(cid).is_player) // BL-1407: the provisional seat
+        if (w.gen_charters.at(cid).is_player) // BL-1407: the provisional seat
             continue; // never added for the seat (TRADE.md § Trade in generation)
-        for (const entity_id bid : w.corporations.at(cid).assets)
+        for (const entity_id bid : w.gen_charters.at(cid).assets)
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
@@ -7624,7 +7732,8 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
                                                      owner, gate))
                 continue;
             const entity_id bid = author_building(w, s.tile, building_type::planetary_marketplace, occupied);
-            w.corporations.at(owner).assets.push_back(bid);
+            w.gen_charters.at(owner).assets.push_back(bid);
+            own_by_ground(w, bid); // BL-1407: the Marketplace is its ground nation's
             ++placed;
             any = true;
         }
@@ -7665,14 +7774,10 @@ namespace {
 void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
 {
     {
-        corporation_component& b = w.corporations.at(buyer);
-        const corporation_component& s = w.corporations.at(seller);
+        charter_holding& b = w.gen_charters.at(buyer);
+        const charter_holding& s = w.gen_charters.at(seller);
         b.assets.insert(b.assets.end(), s.assets.begin(), s.assets.end());
         b.balance       += s.balance;
-        b.trade_reserve += s.trade_reserve;
-        b.trade_points  += s.trade_points;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            b.produced_ever[r] = b.produced_ever[r] || s.produced_ever[r];
     }
 
     // Opening stock: what is still held merges; what is on the shelves stays
@@ -7709,11 +7814,11 @@ void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
 
     // The seat the walk drew provisionally (the player picks at Begin) follows
     // the firm that now holds the ground.
-    const bool seat_moves = w.corporations.at(seller).is_player; // BL-1407
-    w.corporations.erase(seller);
+    const bool seat_moves = w.gen_charters.at(seller).is_player; // BL-1407
+    w.gen_charters.erase(seller);
     if (seat_moves)
         set_provisional_seat(w, buyer);
-    if (w.corporations.at(buyer).is_player)
+    if (w.gen_charters.at(buyer).is_player)
         disarm_corporation(w, buyer);   // BL-1154: the seat opens unarmed
     invalidate_logistics_caches(w);     // a port or hub changed hands
 }
@@ -7746,7 +7851,7 @@ entity_id consolidate_champion(world& w, charter_centre& cc, const settlement_st
                                std::vector<entity_id>& assets_out)
 {
     std::vector<entity_id> firms;
-    for (const auto& [cid, c] : w.corporations)
+    for (const auto& [cid, c] : w.gen_charters)
     {
         if (!c.is_background || c.home_nation != cc.nation)
             continue;
@@ -7787,20 +7892,20 @@ entity_id consolidate_champion(world& w, charter_centre& cc, const settlement_st
                                           capital_params.wealth_variance, focus, capital_rng);
     std::mt19937 name_rng = charter_stream(seed, k_charter_salt_spec_name, cc.centre);
 
-    corporation_component corp;
+    charter_holding corp;
     corp.name             = make_corp_name(nc.name, name_rng);
     corp.home_nation      = cc.nation;
     corp.focus            = focus;
-    corp.ownership_class  = own;
+    (void)own; // BL-1407: the ownership class retired with the firm
     corp.starting_capital = capital;
     corp.balance          = capital;
     corp.origin_region    = cc.origin_region_idx;
     const entity_id champ = w.create_entity();
-    w.corporations[champ] = std::move(corp);
+    w.gen_charters[champ] = std::move(corp);
 
     for (const entity_id f : firms)
     {
-        const int32_t origin = w.corporations.at(f).origin_region;
+        const int32_t origin = w.gen_charters.at(f).origin_region;
         major_absorb_specialist(w, champ, f);
         for (charter_record& cr : charter.charters)
             if (cr.corp == f)
@@ -7813,7 +7918,7 @@ entity_id consolidate_champion(world& w, charter_centre& cc, const settlement_st
                             charter.firms.end());
     }
 
-    corporation_component& c = w.corporations.at(champ);
+    charter_holding& c = w.gen_charters.at(champ);
     std::sort(c.assets.begin(), c.assets.end());
     const entity_id home_body = corp_home_body(w, c.assets);
     const hq_designation hq   = designate_hq(w, c.assets, home_body);
@@ -7884,12 +7989,12 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
             if (nc.is_major)
                 m[nid];
         std::vector<entity_id> corps;
-        for (const auto& kv : w.corporations)
+        for (const auto& kv : w.gen_charters)
             if (!kv.second.is_background && kv.second.home_nation != null_entity)
                 corps.push_back(kv.first);
         std::sort(corps.begin(), corps.end());
         for (const entity_id c : corps)
-            if (const auto it = m.find(w.corporations.at(c).home_nation); it != m.end())
+            if (const auto it = m.find(w.gen_charters.at(c).home_nation); it != m.end())
                 it->second.push_back(c);
         return m;
     };
@@ -8009,7 +8114,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                     continue;       // no ground here: the nation's next centre
                 }
 
-                corporation_component& champ = w.corporations.at(corp);
+                charter_holding& champ = w.gen_charters.at(corp);
                 major_reconciliation_record rec;
                 rec.nation        = n;
                 rec.corp          = corp;
@@ -8131,7 +8236,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         rec.kind          = static_cast<std::uint8_t>(lapse_event_kind::major_demoted);
         rec.nation        = poorest;
         rec.corp          = demoted.empty() ? null_entity : demoted.front();
-        rec.region        = demoted.empty() ? -1 : w.corporations.at(demoted.front()).origin_region;
+        rec.region        = demoted.empty() ? -1 : w.gen_charters.at(demoted.front()).origin_region;
         rec.nation_points = pts(poorest);
         for (const charter_record& cr : charter.charters)
             if (rec.corp != null_entity && cr.corp == rec.corp)

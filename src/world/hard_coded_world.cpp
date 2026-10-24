@@ -3149,7 +3149,7 @@ void run_tail(generation_cursor& c)
         }
         else
         {
-            for (const auto& [cid, cc] : w.corporations)
+            for (const auto& [cid, cc] : w.gen_charters) // BL-1407: the laid charters
             {
                 std::unordered_set<entity_id> nations_touched;
                 for (const entity_id bid : cc.assets)

@@ -99,6 +99,20 @@ int main()
     generation_report report;
     world w = make_hard_coded_world(no_prehistory(), &report);
     seed_genesis_history(w, report);
+    // BL-1407 stage B: generation creates no corporation, but this stage's save
+    // format still carries corporation records (the v56 stream drops them), so
+    // the fixture builds one empty record per charter to keep those rows honest.
+    for (const auto& [cid, ch] : w.gen_charters)
+    {
+        corporation_component cc;
+        cc.name             = ch.name;
+        cc.home_nation      = ch.home_nation;
+        cc.focus            = ch.focus;
+        cc.starting_capital = ch.starting_capital;
+        cc.balance          = ch.balance;
+        cc.is_background    = ch.is_background;
+        w.corporations[cid] = cc;
+    }
 
     std::printf("Generated world: %llu tiles, %llu bodies, %llu corps, %llu history entries\n\n",
                 (unsigned long long)w.tiles.size(), (unsigned long long)w.bodies.size(),
@@ -793,13 +807,20 @@ int main()
             // INTEGRATION (sprints 55 + 56): sliced off the PRE-EDGE stream, and with no
             // exact-net tail subtracted - that writer writes at v52 and the net section is
             // written only at `world_save_version`, so this stream ends before it.
-            std::string v47 = pre_edge_once.substr(0, pre_edge_once.size() - 7 * sizeof(uint32_t)
-                                                          - (world_save_tax_section_bytes(w)));
+            // BL-1407: every generated building is its nation's, so the v47 row
+            // writes a copy whose nations hold none (a v47 world had no state
+            // industry), keeping the 8-byte empty section the slice assumes.
+            world stateless = w;
+            for (auto& [nid, nc] : stateless.nations)
+                nc.state_assets.clear();
+            const std::string stateless_pre_edge = to_bytes_pre_road_edges(stateless);
+            std::string v47 = stateless_pre_edge.substr(0, stateless_pre_edge.size() - 7 * sizeof(uint32_t)
+                                                          - (world_save_tax_section_bytes(stateless)));
             const uint32_t pre = k_world_save_version_pre_state;
             std::memcpy(&v47[4], &pre, sizeof pre);
             world old;
             bool none = true;
-            for (const auto& [nid, nc] : w.nations) // the fixture holds none (8-byte section)
+            for (const auto& [nid, nc] : stateless.nations) // the copy holds none (8-byte section)
                 none = none && nc.state_assets.empty();
             none = none && from_bytes(v47, old);
             for (const auto& [nid, nc] : old.nations)

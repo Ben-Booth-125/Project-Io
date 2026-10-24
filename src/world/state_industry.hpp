@@ -290,6 +290,13 @@ struct fold_report
     float balance_moved      = 0.0f; ///< credits moved from balances into home treasuries
     float debt_forgiven      = 0.0f; ///< negative balances not carried: a nation never runs into debt
     float balance_stranded   = 0.0f; ///< credits of corporations with no home nation (moved nowhere)
+    /// BL-1407: generation creates no corporation; the fold CLOSES the charters
+    /// (`world::gen_charters`). Their buildings are already their ground nation's
+    /// — the close only orders each nation's list as the old fold appended it,
+    /// demolishes a charter building on ground no nation owns, and credits each
+    /// charter's capital to its home treasury (counted in `balance_moved` etc.).
+    int   charters_closed    = 0;    ///< charter records closed (ascending id)
+    int   charter_unowned    = 0;    ///< of on_unowned, those a charter placed
 };
 
 /// BL-1402 THE FOLD TO GROUND (Ben, 2026-10-23; NATIONS.md § What a nation owns,

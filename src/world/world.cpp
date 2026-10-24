@@ -649,9 +649,13 @@ entity_id champion_of(const world& w, entity_id nation)
 {
     if (nation == null_entity)
         return null_entity;
-    // The lowest-id specialist at home (BL-1407: the seat is a nation now, so
-    // no corporation is named first for it).
+    // The lowest-id SPECIALIST CHARTER at home (BL-1407: generation's record;
+    // no corporation exists, and once the charters close no nation has one).
     entity_id best = null_entity;
+    for (const auto& [cid, cc] : w.gen_charters)
+        if (!cc.is_background && cc.home_nation == nation && (best == null_entity || cid < best))
+            best = cid;
+    // A pre-v56 stream's corporation records (until the type is deleted).
     for (const auto& [cid, cc] : w.corporations)
         if (!cc.is_background && cc.home_nation == nation && (best == null_entity || cid < best))
             best = cid;
@@ -670,7 +674,10 @@ void mark_majors_from_champions(world& w)
     // BL-1404: a pure function of the roster; the per-nation write is keyed, so
     // the unordered walks cannot reach the result.
     std::unordered_set<entity_id> homes;
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.gen_charters) // BL-1407: the specialist charters
+        if (!cc.is_background && cc.home_nation != null_entity)
+            homes.insert(cc.home_nation);
+    for (const auto& [cid, cc] : w.corporations) // a v54 stream's specialists (the loader)
         if (!cc.is_background && cc.home_nation != null_entity)
             homes.insert(cc.home_nation);
     for (auto& [nid, nc] : w.nations)

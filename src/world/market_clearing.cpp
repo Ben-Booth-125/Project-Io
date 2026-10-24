@@ -672,10 +672,12 @@ void place_opening_stock(world& w)
     // in another puts three quarters of its stock where three quarters of its
     // works are. Ascending corp id (std::map), ascending market id within.
     // No money moves: it is the market's stock from here on.
+    // BL-1407: the opening stock is a CHARTER's (generation creates no
+    // corporation); a charter closed at the finish places nothing.
     for (const auto& [corp, held] : w.gen_opening_stock)
     {
-        const auto cit = w.corporations.find(corp);
-        if (cit == w.corporations.end())
+        const auto cit = w.gen_charters.find(corp);
+        if (cit == w.gen_charters.end())
             continue;
         std::map<entity_id, int> weight;
         for (const entity_id bid : cit->second.assets)
@@ -687,8 +689,16 @@ void place_opening_stock(world& w)
                 ++weight[mid];
         }
         if (weight.empty())
-            if (const entity_id mid = corp_hq_market(w, corp); mid != null_entity)
-                weight[mid] = 1;
+            if (const auto hb = w.buildings.find(cit->second.hq_building); hb != w.buildings.end())
+            {
+                // corp_hq_market's rule: the anchor's market, else the body's.
+                entity_id mid = market_for_tile(w, hb->second.tile);
+                if (mid == null_entity)
+                    if (const auto ht = w.tiles.find(hb->second.tile); ht != w.tiles.end())
+                        mid = market_on_body(w, ht->second.body);
+                if (mid != null_entity)
+                    weight[mid] = 1;
+            }
         int total = 0;
         for (const auto& [mid, n] : weight)
             total += n;

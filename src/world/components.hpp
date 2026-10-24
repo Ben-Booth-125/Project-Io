@@ -2111,6 +2111,42 @@ struct corporation_component
     float trade_points = 0.0f;
 };
 
+/// BL-1407 — A CHARTER'S GENERATION RECORD (CORPORATION_GENERATION.md § Design
+/// principles: "A charter is the unit the budget buys ... It owns nothing and
+/// outlives its placement only as a record"). The charter walk, the landscape
+/// search and the major reconciliation reason over charters — which centre's
+/// budget bought which buildings, of what focus, with what capital — and this is
+/// where that reasoning keeps its bookkeeping. IT OWNS NOTHING: every building a
+/// charter places is its ground nation's from the moment it is chartered
+/// (`nation_component::state_assets`, NATIONS.md § What a nation owns); `assets`
+/// here is only the charter's own index of the buildings it placed. GENERATION-
+/// TRANSIENT: held in `world::gen_charters`, never saved, never hashed, and closed
+/// (its capital credited to its home treasury, the record dropped) by
+/// `close_charters` at the finish, before the settle.
+struct charter_holding
+{
+    std::string      name;                 ///< The charter's generated name (reports only).
+    entity_id        home_nation = null_entity; ///< The nation whose centre's budget bought it.
+    industrial_focus focus       = ::industrial_focus::extraction;
+    float            starting_capital = 0.0f; ///< Pass 4's draw (kept so no RNG stream moves).
+    float            balance          = 0.0f; ///< Its capital, credited to its home treasury at the close.
+    /// The generation's PROVISIONAL seat (BL-1407): `world::player_entity` names
+    /// its home nation; the Begin seat re-points the nation and never reads this.
+    bool             is_player     = false;
+    /// A background charter (the walk's gap filler) rather than a specialist —
+    /// a specialist is what makes its home nation a major (`mark_majors_from_champions`).
+    bool             is_background = false;
+    /// The buildings this charter placed and that still stand — an INDEX, never
+    /// ownership (the ground nation owns each one).
+    std::vector<entity_id> assets;
+    /// The charter's anchor building (the old HQ), read only by generation: the
+    /// muster base is laid beside it and the opening stock reads its market.
+    entity_id        hq_building     = null_entity;
+    float            influence_range = 0.0f;
+    int32_t          founded_year    = 0;
+    int32_t          origin_region   = -1;
+};
+
 /// BL-428: how far down the production graph @p c has actually reached — the
 /// deepest good it has ever produced. 0 for a fresh corporation (it has reached
 /// the raws and nothing beyond), which is exactly what an untouched

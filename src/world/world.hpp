@@ -458,6 +458,15 @@ struct world
     /// than exactly one.
     faithful_unordered_map<entity_id, corporation_component> corporations;
 
+    /// BL-1407 — THE CHARTERS GENERATION IS REASONING OVER (`charter_holding`,
+    /// components.hpp): generation-transient, owning nothing. Generation creates
+    /// NO corporation: the walk, the search and the reconciliation keep their
+    /// charter bookkeeping here while every building is its ground nation's.
+    /// Never saved, never hashed; emptied by `close_charters` at the finish. A
+    /// faithful map, as `corporations` was, so a candidate world's copy walks it
+    /// in the source's order.
+    faithful_unordered_map<entity_id, charter_holding> gen_charters;
+
     /// The Era -1 settlement record the SPECIALIST roster pass reads (BL-977):
     /// `generate_corporations` derives each corp's focus, ownership class and
     /// home province from `settlement_state::regions` / `charter` /

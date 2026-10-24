@@ -936,10 +936,10 @@ ai_books actor_books(const world& w, const ai_actor& a)
 /// by the set), so a spectated run changes who acts, never when the rest do.
 std::vector<entity_id> sorted_actor_ids(const world& w)
 {
+    // BL-1407: the actors are the NATIONS — generation creates no corporation,
+    // so the scorer's corporation actor path is dropped.
     std::vector<entity_id> ids;
-    ids.reserve(w.corporations.size() + w.nations.size());
-    for (const auto& kv : w.corporations)
-        ids.push_back(kv.first);
+    ids.reserve(w.nations.size());
     for (const auto& kv : w.nations)
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());

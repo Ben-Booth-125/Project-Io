@@ -11,6 +11,7 @@
 #include "logistics.hpp"       // BL-1255: tile_touches_track, invalidate_logistics_caches
 #include "logistic_points.hpp" // BL-1398: lp_source_network (a network node)
 #include <set>
+#include <unordered_set>
 #include <functional>
 
 #include <algorithm>
@@ -103,15 +104,20 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         return n != null_entity && std::binary_search(nation_ids.begin(), nation_ids.end(), n);
     };
 
+    // BL-1407: every building is already its ground nation's (charters own
+    // nothing). A background charter's strategic building on a major's ground
+    // is "passed" by leaving the charter's index — it counts as the state's
+    // from here on (the foundings below, the order the close keeps) — and by
+    // moving to the end of the nation's list, where the old handover put it.
     std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    corp_ids.reserve(w.gen_charters.size());
+    for (const auto& kv : w.gen_charters)
         corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
 
     for (const entity_id cid : corp_ids)
     {
-        corporation_component& cc = w.corporations.at(cid);
+        charter_holding& cc = w.gen_charters.at(cid);
         std::vector<entity_id> keep;
         keep.reserve(cc.assets.size());
         bool lost_any = false;
@@ -144,7 +150,11 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                 keep.push_back(bid);
                 continue;
             }
-            w.nations.at(ground).state_assets.push_back(bid);
+            {
+                std::vector<entity_id>& sa = w.nations.at(ground).state_assets;
+                sa.erase(std::remove(sa.begin(), sa.end(), bid), sa.end());
+                sa.push_back(bid);
+            }
             ++out.passed;
             ++out.by_sector[static_cast<std::size_t>(sec)];
             lost_any = true;
@@ -199,9 +209,21 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         std::unique_ptr<input_reach> ir_local; // the same, reach = its own market only
         std::map<std::pair<entity_id, std::uint16_t>, bool> feasible_at; // (market, recipe)
         std::map<std::pair<entity_id, std::uint16_t>, bool> local_at;    // (market, recipe)
+        // BL-1407: "holding none" counts the STATE's buildings — those no
+        // charter's index lists (a charter's buildings are the nation's too, but
+        // the founding was always for a major the charters left without one).
+        std::unordered_set<entity_id> chartered;
+        for (const auto& [cid, cc] : w.gen_charters)
+            chartered.insert(cc.assets.begin(), cc.assets.end());
+        const auto holds_state = [&](entity_id nid) {
+            for (const entity_id bid : w.nations.at(nid).state_assets)
+                if (chartered.count(bid) == 0)
+                    return true;
+            return false;
+        };
         for (const entity_id nid : nation_ids)
         {
-            if (!w.nations.at(nid).state_assets.empty())
+            if (holds_state(nid))
                 continue;
             state_founding f;
             f.nation = nid;
@@ -285,7 +307,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                         e.timestamp = w.current_day_tick;
                         e.topic     = history_topic::agency;
                         e.body      = tit->second.body;
-                        e.corp      = champion_of(w, nid);
+                        e.corp      = nid; // BL-1407: the nation acts
                         e.event     = "State charter: " + nc.name + " founds a state " + rc.display_name
                                     + " (" + strategic_sector_name(strategic_sector_of(reg, b)) + ")"
                                     + (paid < price ? ", its treasury short of the price" : "");
@@ -306,6 +328,9 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
     // unless it already holds one; sited on the coastal tile of its own ground
     // nearest the capital (Chebyshev on the grid, ties to territory order),
     // founded standing and paid like the founding above.
+    std::unordered_set<entity_id> chartered_ports; // BL-1407: a charter's port is not the state's
+    for (const auto& [cid, cc] : w.gen_charters)
+        chartered_ports.insert(cc.assets.begin(), cc.assets.end());
     for (const entity_id nid : nation_ids)
     {
         nation_component& nc = w.nations.at(nid);
@@ -315,7 +340,8 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
         bool has_port = false;
         for (const entity_id bid : nc.state_assets)
             if (const auto bit = w.buildings.find(bid);
-                bit != w.buildings.end() && bit->second.type == building_type::port)
+                bit != w.buildings.end() && bit->second.type == building_type::port
+                && chartered_ports.count(bid) == 0)
                 has_port = true;
         if (has_port)
             continue;
@@ -354,7 +380,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
             e.timestamp = w.current_day_tick;
             e.topic     = history_topic::agency;
             e.body      = cap->second.body;
-            e.corp      = champion_of(w, nid);
+            e.corp      = nid; // BL-1407: the nation acts
             e.event     = "State charter: " + nc.name + " founds a state port at its coastal seat"
                         + std::string(paid < price ? ", its treasury short of the price" : "");
             w.history_log.push_back(std::move(e));
@@ -773,7 +799,7 @@ state_node_fund_report fund_state_nodes_from_firms(world& w, const recipe_regist
     // Every building a corporation holds, by the nation whose ground it stands on:
     // the payers, ascending corp id, each with how many it holds there.
     std::map<entity_id, std::map<entity_id, int>> held_on; // nation -> corp -> buildings
-    for (const auto& [cid, cc] : w.corporations)
+    for (const auto& [cid, cc] : w.gen_charters)
         for (const entity_id bid : cc.assets)
         {
             const auto bit = w.buildings.find(bid);
@@ -831,7 +857,7 @@ state_node_fund_report fund_state_nodes_from_firms(world& w, const recipe_regist
             const float base = need;
             for (const auto& [cid, n] : hit->second)
             {
-                float& bal = w.corporations.at(cid).balance;
+                float& bal = w.gen_charters.at(cid).balance;
                 const float share = (round == 0) ? base * static_cast<float>(n) / static_cast<float>(total)
                                                  : need;
                 const float pay = std::min({share, std::max(0.0f, bal), need});
@@ -871,17 +897,15 @@ void print_state_node_fund(const state_node_fund_report& r)
 // ---------------------------------------------------------------------------
 namespace {
 
-/// A minor's background firm: the lowest-id one homed there.
+/// A minor that a background charter served — the minors whose ground names an
+/// owner for track (BL-1407: the minor ITSELF, every building being its
+/// nation's; the old owner was its lowest-id background firm).
 std::map<entity_id, entity_id> rail_firm_of(const world& w)
 {
     std::map<entity_id, entity_id> firm_of;
-    std::vector<entity_id> ids;
-    for (const auto& [cid, cc] : w.corporations)
-        if (cc.is_background)
-            ids.push_back(cid);
-    std::sort(ids.begin(), ids.end());
-    for (const entity_id cid : ids)
-        firm_of.emplace(w.corporations.at(cid).home_nation, cid);
+    for (const auto& [cid, cc] : w.gen_charters)
+        if (cc.is_background && w.nations.count(cc.home_nation) != 0)
+            firm_of.emplace(cc.home_nation, cc.home_nation);
     return firm_of;
 }
 
@@ -1238,8 +1262,6 @@ rail_handover_report hand_over_rail(world& w)
             nit->second.state_assets.push_back(bid);
             ++out.station_nations;
         }
-        else
-            w.corporations.at(owner).assets.push_back(bid);
         ++out.stations;
     }
     invalidate_logistics_caches(w);
@@ -1262,6 +1284,109 @@ void print_rail_handover(const rail_handover_report& r)
 fold_report fold_to_ground(world& w)
 {
     fold_report out;
+
+    // BL-1407 -- THE CHARTERS CLOSE. Generation creates no corporation: every
+    // building a charter placed is already its ground nation's. What is left of
+    // the old fold is (1) a charter building on ground no nation owns is
+    // demolished; (2) each nation's list is put in the order the old fold left
+    // it -- its own (state) buildings in stored order, then every charter's
+    // buildings by charter id, each in the charter's index order -- so the
+    // funding gate spends in the order it always did; (3) each charter's
+    // positive capital is credited to its home treasury (a transfer; a negative
+    // one is forgiven, none is minted); and the records are dropped. Sorted
+    // walks only.
+    if (!w.gen_charters.empty())
+    {
+        std::vector<entity_id> charter_ids;
+        charter_ids.reserve(w.gen_charters.size());
+        for (const auto& kv : w.gen_charters)
+            charter_ids.push_back(kv.first);
+        std::sort(charter_ids.begin(), charter_ids.end());
+        out.charters_closed = static_cast<int>(charter_ids.size());
+
+        bool touched = false;
+        std::unordered_set<entity_id> chartered;
+        for (const entity_id cid : charter_ids)
+        {
+            charter_holding& ch = w.gen_charters.at(cid);
+            std::vector<entity_id> kept;
+            kept.reserve(ch.assets.size());
+            for (const entity_id bid : ch.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                if (owner_nation_of(w, bid) == null_entity)
+                {
+                    // Ground no nation owns (NATIONS.md § Own ground): demolished.
+                    if (building_affects_logistics(bit->second.type))
+                        touched = true;
+                    std::vector<entity_id> gone_units;
+                    for (const auto& [uid, u] : w.units)
+                        if (u.muster_base == bid)
+                            gone_units.push_back(uid);
+                    std::sort(gone_units.begin(), gone_units.end());
+                    for (const entity_id uid : gone_units)
+                        w.units.erase(uid);
+                    w.buildings.erase(bit);
+                    w.stockpiles.erase(bid);
+                    ++out.on_unowned;
+                    ++out.charter_unowned;
+                    continue;
+                }
+                kept.push_back(bid);
+                chartered.insert(bid);
+            }
+            ch.assets = std::move(kept);
+        }
+
+        std::vector<entity_id> nation_ids;
+        for (const auto& kv : w.nations)
+            nation_ids.push_back(kv.first);
+        std::sort(nation_ids.begin(), nation_ids.end());
+        for (const entity_id nid : nation_ids)
+        {
+            std::vector<entity_id>& sa = w.nations.at(nid).state_assets;
+            std::vector<entity_id> ordered;
+            ordered.reserve(sa.size());
+            std::unordered_set<entity_id> mine;
+            for (const entity_id bid : sa)
+            {
+                if (chartered.count(bid) == 0)
+                    ordered.push_back(bid);
+                else
+                    mine.insert(bid);
+            }
+            if (mine.empty())
+                continue;
+            for (const entity_id cid : charter_ids)
+                for (const entity_id bid : w.gen_charters.at(cid).assets)
+                    if (mine.count(bid) != 0)
+                        ordered.push_back(bid);
+            sa = std::move(ordered);
+        }
+
+        for (const entity_id cid : charter_ids)
+        {
+            const charter_holding& ch = w.gen_charters.at(cid);
+            const bool has_home = w.nations.count(ch.home_nation) != 0;
+            if (ch.balance > 0.0f)
+            {
+                if (has_home)
+                {
+                    w.nations.at(ch.home_nation).treasury += ch.balance;
+                    out.balance_moved += ch.balance;
+                }
+                else
+                    out.balance_stranded += ch.balance;
+            }
+            else if (ch.balance < 0.0f)
+                out.debt_forgiven -= ch.balance;
+        }
+        w.gen_charters.clear();
+        if (touched)
+            invalidate_logistics_caches(w);
+    }
 
     std::vector<entity_id> corp_ids;
     corp_ids.reserve(w.corporations.size());
@@ -1462,10 +1587,10 @@ fold_report fold_to_ground(world& w)
 
 void print_fold(const fold_report& r)
 {
-    std::printf("[fold] %d corporations: %d buildings to their ground nation, %d re-homed to their ground, %d on unowned ground "
+    std::printf("[fold] %d charters closed, %d corporations: %d buildings to their ground nation, %d re-homed to their ground, %d on unowned ground "
                 "demolished; %.1f moved to treasuries, %.1f debt forgiven, %.1f stranded; units %d, "
                 "track %d, trades %d, convoys %d, routes %d re-owned; %d procurement records cleared\n",
-                r.corporations, r.buildings_folded, r.rehomed, r.on_unowned, static_cast<double>(r.balance_moved),
+                r.charters_closed, r.corporations, r.buildings_folded, r.rehomed, r.on_unowned, static_cast<double>(r.balance_moved),
                 static_cast<double>(r.debt_forgiven), static_cast<double>(r.balance_stranded),
                 r.units_reowned, r.rail_reowned, r.trades_reowned, r.convoys_reowned, r.routes_reowned,
                 r.contracts_cleared);

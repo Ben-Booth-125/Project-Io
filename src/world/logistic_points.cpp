@@ -327,7 +327,8 @@ entity_id champion_memo(const world& w, resolver_input& in, entity_id nation)
     const auto it = in.champion.find(nation);
     if (it != in.champion.end())
         return it->second;
-    const entity_id c = champion_of(w, nation);
+    // BL-1407: a major is the saved fact (no champion corporation exists).
+    const entity_id c = is_major_nation(w, nation) ? nation : null_entity;
     in.champion.emplace(nation, c);
     return c;
 }
@@ -1033,8 +1034,6 @@ lp_seed_report seed_logistics_sources(world& w)
         w.stockpiles[bid] = stockpile_component{};
         if (const auto nit = w.nations.find(owner); nit != w.nations.end())
             nit->second.state_assets.push_back(bid);
-        else if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
-            cit->second.assets.push_back(bid);
         else
             return false;
         const entity_id body = w.tiles.at(tile).body;

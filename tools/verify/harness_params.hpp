@@ -264,9 +264,10 @@ inline shipped_landscape apply_shipped_landscape(
     // map walk and nothing else.
     assign_default_recipes(w, reg, "finish: before the search");
 
+    // BL-1407: generation creates no corporation; the roster is its CHARTERS.
     std::vector<entity_id> before;
-    before.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
+    before.reserve(w.gen_charters.size());
+    for (const auto& kv : w.gen_charters)
         before.push_back(kv.first);
     std::sort(before.begin(), before.end());
 
@@ -323,6 +324,20 @@ inline shipped_landscape apply_shipped_landscape(
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
     assign_default_recipes(w, reg, "finish: after the winner");
+    // BL-1407: the charters the applied candidate laid, read before the fold
+    // closes them (the records do not outlive the finish).
+    {
+        std::vector<entity_id> after;
+        after.reserve(w.gen_charters.size());
+        for (const auto& kv : w.gen_charters)
+            after.push_back(kv.first);
+        std::sort(after.begin(), after.end());
+        std::vector<entity_id> added;
+        std::set_difference(after.begin(), after.end(), before.begin(), before.end(),
+                            std::back_inserter(added));
+        for (const entity_id cid : added)
+            (w.gen_charters.at(cid).is_background ? out.firms : out.specialists).push_back(cid);
+    }
     // BL-1296: finish_campaign_world's state-industry handover, verbatim, at the
     // same point (after the second recipe pass, before any tick).
     if (!charter.skip_state_handover)
@@ -351,7 +366,7 @@ inline shipped_landscape apply_shipped_landscape(
                 std::sort(fp->held_before.begin(), fp->held_before.end());
                 for (const auto& [nid, nc] : w.nations) fp->treasury_before.emplace_back(nid, nc.treasury);
                 std::sort(fp->treasury_before.begin(), fp->treasury_before.end());
-                for (const auto& [cid, cc] : w.corporations) fp->balances.emplace_back(cid, cc.home_nation, cc.balance);
+                for (const auto& [cid, cc] : w.gen_charters) fp->balances.emplace_back(cid, cc.home_nation, cc.balance); // BL-1407: the charters' capital
                 std::sort(fp->balances.begin(), fp->balances.end());
             }
             const fold_report fr = fold_to_ground(w);
@@ -375,16 +390,6 @@ inline shipped_landscape apply_shipped_landscape(
         print_lp_seed_report(out.lp);
     }
 
-    std::vector<entity_id> after;
-    after.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
-        after.push_back(kv.first);
-    std::sort(after.begin(), after.end());
-    std::vector<entity_id> added;
-    std::set_difference(after.begin(), after.end(), before.begin(), before.end(),
-                        std::back_inserter(added));
-    for (const entity_id cid : added)
-        (w.corporations.at(cid).is_background ? out.firms : out.specialists).push_back(cid);
     return out;
 }
 

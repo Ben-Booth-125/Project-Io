@@ -223,9 +223,9 @@ reading build_and_read(const data_layer& dl, uint32_t seed, int total_target, in
     // nations home to a non-background corporation; a DEMOTED major keeps its
     // specialist until the fold empties it, so that reading no longer names
     // the majors. With no major target nothing is demoted and the two agree.
-    for (const auto& kv : w.corporations)
-        if (!kv.second.is_background && kv.second.home_nation != null_entity)
-            ++r.chartered;
+    // BL-1407: no corporation exists after the finish; the specialists the
+    // charter walk chartered are counted off its report.
+    r.chartered = static_cast<int>(fin.charter.specialists.size());
     {
         std::vector<entity_id> ids;
         for (const auto& kv : w.nations)

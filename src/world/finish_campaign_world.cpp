@@ -270,7 +270,7 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
         if (reconcile_year != 0
             && rec.kind != static_cast<std::uint8_t>(lapse_event_kind::champion_bought_out)
             && rec.kind != static_cast<std::uint8_t>(lapse_event_kind::major_demoted)) // BL-1404
-            if (const auto c = w.corporations.find(rec.corp); c != w.corporations.end())
+            if (const auto c = w.gen_charters.find(rec.corp); c != w.gen_charters.end())
             {
                 c->second.founded_year = reconcile_year;
                 for (charter_record& cr : out.charter.charters)
@@ -570,10 +570,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
             slowest    = static_cast<int>(i);
         }
     std::printf("[finish_campaign_world] searched %lld ms, settled %d ticks in %lld ms "
-                "(slowest tick %d: %lld ms; seed %u, %zu corporations)\n",
+                "(slowest tick %d: %lld ms; seed %u, %zu nations)\n",
                 static_cast<long long>(out.ms_search), k_campaign_settle_ticks,
                 static_cast<long long>(out.ms_settle), slowest,
-                static_cast<long long>(slowest_ms), params.seed, w.corporations.size());
+                static_cast<long long>(slowest_ms), params.seed, w.nations.size());
     if (slowest >= 0 && static_cast<std::size_t>(slowest) < tc.lap_ms.size())
     {
         std::printf("[finish_campaign_world] slowest tick %d by lap:", slowest);
