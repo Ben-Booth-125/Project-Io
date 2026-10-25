@@ -8,16 +8,16 @@
 
 ## Headline
 
-**109 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**111 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**51 of 109 elements can be changed without any check going red.**
+**51 of 111 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 55 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 57 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 13 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 30 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (55)
+## ASSERTED (57)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -89,6 +89,8 @@ and so is the safety net.
 | `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 45 | 0 | 3 |
 | `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 11 | 0 | 0 |
 | `UI-126` Construction Ledger > Rail rows | sub-element | `rail_construction` | 17 | 0 | 4 |
+| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites` | 16 | 0 | 1 |
+| `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 16 | 0 | 1 |
 
 ## CLIP-ONLY (13)
 
@@ -164,6 +166,7 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `border_hard_edges` (4 captures, 1 expects) — BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 - `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
 - `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md
+- `construction_sites_ties` (0 captures, 0 expects) — How often the site ledger's rows TIE on estimated net (Ben, 2026-10-25). A
 - `culture_overrun` (6 captures, 2 expects) — BL-1092 R4 -- THE 400 BCE CLAMP on an OVERRUN seed (Ben, 2026-09-24,
 - `export_mockdata` (0 captures, 0 expects) — Export live economy data to CSV for external ledger mock-ups (e.g. Power BI).
 - `fleets_and_ties` (12 captures, 13 expects) — FLEETS AND TIES (BL-1095; Ben, 2026-09-24, sprint 47 rulings R13;
@@ -181,6 +184,8 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `history_lapse_marks` (7 captures, 2 expects) — THE MARKS THAT EARN THEIR PLACE (BL-1094; Ben, 2026-09-24, sprint 47
 - `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
 - `lens_strip_glyphs` (7 captures, 3 expects) — BL-1225 (every lens on strip): every built lens sits in at least one rung row
+- `logistics_chain` (16 captures, 15 expects) — Visual verification for three rulings on the Logistics lens and the capital star
+- `logistics_unpaint_perf` (0 captures, 0 expects) — What arming the Logistics lens costs the FRAME, on the play path (Ben, 2026-10-25:
 - `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
 - `realm_identity` (11 captures, 20 expects) — A realm keeps its identity across the wizard's seams (BL-1087 colour,

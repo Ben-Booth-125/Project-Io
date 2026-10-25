@@ -107,9 +107,13 @@ std::string unit_roster_display_name(std::uint16_t type);
 /// build bar the other does not.
 ///
 /// Reads `ui_state::selected_entity` as the target tile. With no tile selected it draws
-/// **"Select a tile"** and nothing else — deliberately, not as a placeholder: a richer
-/// empty state would have to list the tiles the player COULD build on, and any ordering
-/// of that list is a recommendation (CONCEPT.md § the interface does not decide).
+/// **"Select a tile"** and nothing else: the tiles the player COULD build on are the
+/// site ledger's (construction_sites.hpp), drawn above this bar in the same view —
+/// building first, then the tile (Ben, 2026-10-25, overturning 2026-08-29's "any
+/// ordering of that list is a recommendation"; CONCEPT.md).
+///
+/// @p lp_cover is the selected tile's Logistic Point cover (`site_lp_cover`), handed to
+/// `estimate_prospective_profit` so the door and the site ledger quote one figure.
 ///
 /// Lists every building type placeable on the tile (via placement_rules) with its
 /// full construction cost as one credit total (build cost plus materials priced at
@@ -124,7 +128,8 @@ std::string unit_roster_display_name(std::uint16_t type);
 /// @param reg  Loaded registry — per-type build costs.
 /// @param ui   UI state; read for the selected tile, written by the Build action
 ///             (enqueue).
-void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui);
+void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui,
+                                   float lp_cover = 1.0f);
 
 /// The **Method** lever — the tiled recipe grid whose Switch buttons call
 /// `try_switch_recipe`. Only meaningful for a `processing_facility`; draws nothing

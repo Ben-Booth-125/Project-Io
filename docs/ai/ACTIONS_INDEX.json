@@ -282,6 +282,18 @@
    "Construction ledger, view tab strip"
   ],
   [
+   "ledger.construction_site_pick",
+   "Construction ledger, Construction view, the 'Find a site' building picker (a combo above the tile build bar)"
+  ],
+  [
+   "ledger.construction_site_sort",
+   "Construction ledger, Construction view, the site ledger's column headers (Tile, Net, Cost, Market, LP, Yield)"
+  ],
+  [
+   "ledger.construction_site_row",
+   "Construction ledger, Construction view, a site ledger row (its Tile cell; the press spans the row)"
+  ],
+  [
    "ledger.corp_card_expand",
    "Nation overview (rail slot 1), the Balance card's title row"
   ],

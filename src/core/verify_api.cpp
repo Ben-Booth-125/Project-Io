@@ -26,6 +26,7 @@
 
 #include "ui/canvas_command.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
 #include "ui/corporation_dashboard.hpp"
 // BL-1406: ui/corporation_panel.hpp retired with the corporation stance table.
@@ -1343,6 +1344,30 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // measured on the real renderer with the build's real vsync setting rather
     // than eyeballed off the HUD. Not a golden check — no captures involved.
     v.set_function("frame_reset", []() { frame_stats_instance().reset(); });
+    // The same retained window, summarised in-process for a script that prints a
+    // cost (construction_sites.lua's frame-budget line): mean and worst of the frame
+    // BUILD time (the CPU work of the UI pass) and of the whole frame.
+    v.set_function("frame_summary", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const ui::frame_stats& fs = frame_stats_instance();
+        double build_sum = 0.0, build_max = 0.0, total_sum = 0.0, total_max = 0.0;
+        for (std::size_t i = 0; i < fs.count(); ++i)
+        {
+            const ui::frame_sample& s = fs.sample(i);
+            build_sum += s.build_ms;
+            total_sum += s.total_ms;
+            build_max = std::max(build_max, static_cast<double>(s.build_ms));
+            total_max = std::max(total_max, static_cast<double>(s.total_ms));
+        }
+        const double n = fs.count() > 0 ? static_cast<double>(fs.count()) : 1.0;
+        out["frames"]     = static_cast<int>(fs.count());
+        out["build_mean"] = build_sum / n;
+        out["build_max"]  = build_max;
+        out["total_mean"] = total_sum / n;
+        out["total_max"]  = total_max;
+        return out;
+    });
     v.set_function("frame_csv", [](const std::string& out_path) {
         const ui::frame_stats& fs = frame_stats_instance();
         std::ofstream f(out_path);
@@ -4247,6 +4272,105 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["open_ledger_y"]  = c.open_ledger_y;
         out["levers_ok"]      = (c.levers_for != null_entity);
         out["levers_for"]     = static_cast<unsigned>(c.levers_for);
+        return out;
+    });
+
+    // === THE SITE FINDER (Ben, 2026-10-25): construction_sites.lua ===
+    //
+    // The building picker's options, by the names the combo shows.
+    v.set_function("site_options", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        int n = 0;
+        for (const site_option& o : ui::site_options(m_world, m_registry))
+        {
+            sol::table e = st.create_table();
+            e["name"]     = o.name;
+            e["category"] = o.category;
+            out[++n] = e;
+        }
+        return out;
+    });
+    // Choose a building exactly as picking it in the combo does (the same two fields
+    // the Selectable writes). Returns false, changing nothing, for an unknown name.
+    v.set_function("site_pick", [this](const std::string& name) -> bool {
+        for (const site_option& o : ui::site_options(m_world, m_registry))
+            if (o.name == name)
+            {
+                m_ui.site_finder.armed  = true;
+                m_ui.site_finder.choice = o;
+                return true;
+            }
+        SDL_Log("verify.site_pick: no option named '%s'", name.c_str());
+        return false;
+    });
+    v.set_function("site_clear", [this]() { m_ui.site_finder.armed = false; });
+    // THE SURFACE REPORTING WHAT IT DREW, the build_door idiom: the ledger's rows in
+    // their drawn order with the figure each sorts on, the canvas's class counts and
+    // marks, and where the picker and the visible rows landed so a check presses the
+    // REAL control. Each row is a tile the ledger already shows on screen; nothing
+    // here reads a tile the surface did not.
+    v.set_function("site_finder", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const site_finder_state& sf = m_ui.site_finder;
+        out["armed"]        = sf.armed;
+        out["live"]         = sf.live;
+        out["choice"]       = sf.armed ? sf.choice.name : std::string();
+        out["sort_col"]     = sf.sort_col;
+        out["sort_desc"]    = sf.sort_desc;
+        out["own_tiles"]    = sf.own_tiles;
+        out["unaffordable"] = sf.unaffordable;
+        out["no_lp_rows"]   = sf.no_lp_rows;
+        out["eval_ms"]      = sf.eval_ms;
+        out["evaluations"]  = sf.evaluations;
+        out["map_marks"]    = sf.map_marks;
+        out["ties_full_cover"]  = sf.ties_full_cover;
+        out["ties_profit"]      = sf.ties_profit;
+        out["ties_profit_cost"] = sf.ties_profit_cost;
+        out["covered_rows"]     = sf.covered_rows;
+        out["ties_covered"]     = sf.ties_covered;
+        out["picker_x"]     = sf.picker_x;
+        out["picker_y"]     = sf.picker_y;
+        int valid = 0, flagged = 0;
+        for (const std::uint8_t c : sf.cls)
+        {
+            if (c == 1) ++valid;
+            if (c == 2) ++flagged;
+        }
+        out["lens_valid"]   = valid;
+        out["lens_flagged"] = flagged;
+        sol::table rows = st.create_table();
+        int rn = 0;
+        for (const site_row& r : sf.rows)
+        {
+            sol::table row = st.create_table();
+            row["x"]       = r.x;
+            row["y"]       = r.y;
+            row["tile"]    = static_cast<unsigned>(r.tile);
+            row["priced"]  = r.priced;
+            row["profit"]  = r.profit;
+            row["full"]    = r.profit_full_cover;
+            row["capex"]   = r.capex;
+            row["cover"]   = r.cover;
+            row["no_lp"]   = r.no_logistics;
+            row["market"]  = r.market_name;
+            rows[++rn] = row;
+        }
+        out["rows"]   = rows;
+        out["n_rows"] = rn;
+        sol::table drawn = st.create_table();
+        int dn = 0;
+        for (const site_finder_state::drawn_row& d : sf.drawn)
+        {
+            sol::table row = st.create_table();
+            row["tile"] = static_cast<unsigned>(d.tile);
+            row["x"]    = d.x;
+            row["y"]    = d.y;
+            drawn[++dn] = row;
+        }
+        out["drawn"]   = drawn;
+        out["n_drawn"] = dn;
         return out;
     });
 

@@ -6,6 +6,7 @@
 #include <string>  // status strings (BL-095)
 
 #include "charts.hpp"          // draw_value_bar - the queue row's progress column (BL-1365)
+#include "construction_sites.hpp" // the site finder: the building-first lens and ledger (Ben, 2026-10-25)
 #include "foldout_column.hpp"  // shell fold-out column host (BL-122) + nav_button (the tab strip)
 #include "format.hpp"          // fmt::signed_delta / sign_of - the roster's profit column
 #include "hover_card.hpp"      // draw_hover_card - the SHARED hover frame (BL-1365)
@@ -1021,8 +1022,21 @@ void draw_construction_panel(world& w,
     ui.construction_ui.rail_track_x = ui.construction_ui.rail_track_y = -1.0f;   // BL-1255
     ui.construction_ui.rail_station_x = ui.construction_ui.rail_station_y = -1.0f;
 
+    // The site finder's lens describes THIS frame: it is live only while the
+    // Construction view draws it below, so a closed ledger or the other tab leaves
+    // the map plain the same frame.
+    ui.site_finder.live = false;
+    ui.site_finder.drawn.clear();
+    ui.site_finder.picker_x = ui.site_finder.picker_y = -1.0f;
+
     if (p_open && !*p_open)
+    {
+        // DISARM ON CLOSE (LENSES.md § The other direction: a ledger's lens disarms
+        // on its close edge, whatever closed it). The chosen building goes with it,
+        // so reopening the ledger does not re-skin the map unasked.
+        ui.site_finder.armed = false;
         return;
+    }
 
     // Re-hosted into the shell fold-out column (BL-122): pinned + borderless, no floating
     // spawn. The BL-082 height-cap that kept the old floating window clear of the
@@ -1056,7 +1070,18 @@ void draw_construction_panel(world& w,
             draw_queue_section(w, reg, ui);
             ImGui::Spacing();
             ImGui::Separator();
-            draw_construction_ledger_body(w, reg, ui);
+            // BUILDING FIRST (Ben, 2026-10-25): pick a building, see every tile that
+            // takes it on the map and in a ledger sorted by profit, press a row to
+            // select the tile - and the tile's Build door below places it.
+            draw_site_finder(w, reg, ui);
+            ImGui::Spacing();
+            ImGui::Separator();
+            // The door prices the selected tile at its own Logistic Point cover, the
+            // figure the site ledger used, so a row and the door agree.
+            const float door_cover = w.tiles.count(ui.selected_entity) != 0
+                                         ? site_lp_cover(w, ui.selected_entity)
+                                         : 1.0f;
+            draw_construction_ledger_body(w, reg, ui, door_cover);
         }
         else
             draw_buildings_view(w, reg, report, ui);

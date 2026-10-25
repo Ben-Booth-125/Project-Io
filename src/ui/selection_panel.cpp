@@ -3985,7 +3985,8 @@ std::string candidate_refusal(const world& w, entity_id tile_id,
 // executes.
 // Candidates sort by expected net descending on a ceiling shared across the list, so
 // the best options are the ones on screen without scrolling.
-void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui)
+void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui,
+                                   float lp_cover)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
 
@@ -3999,14 +4000,11 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     const auto tit = w.tiles.find(tile_id);
     if (tit == w.tiles.end())
     {
-        // THE EMPTY STATE IS THE ANSWER, not a placeholder (Ben, 2026-08-29).
         // Building is a TARGETED act, so with no target there is nothing to price.
-        // The tempting richer state — a list of tiles the player could build on —
-        // cannot be written without ordering it, and any ordering of that list is a
-        // recommendation, which is the surface Ben declined ("it enters the territory
-        // of telling the player what to do", CONCEPT.md). So this stays one line.
-        // Contrast the Buildings view, whose empty state CAN be improved: listing
-        // buildings the player already owns is navigation, not recommendation.
+        // The list of tiles the player could build on is the SITE LEDGER's, drawn
+        // above this bar (construction_sites.cpp): building first, then the tile
+        // (Ben, 2026-10-25, overturning the 2026-08-29 line that any ordering of
+        // that list is a recommendation; CONCEPT.md). So this stays one line.
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
         ImGui::Spacing();
         ImGui::TextDisabled("Select a tile");
@@ -4238,7 +4236,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
         c.produces = (c.type == building_type::extraction_site ||
                       c.type == building_type::processing_facility);
-        c.profit   = estimate_prospective_profit(w, reg, tile_id, c.type, c.target, c.recipe);
+        // Ben, 2026-10-25: the tile's Logistic Point cover is applied, exactly as
+        // the site ledger applies it, so the two surfaces quote one figure.
+        c.profit   = estimate_prospective_profit(w, reg, tile_id, c.type, c.target, c.recipe,
+                                                 nullptr, nullptr, lp_cover);
         c.group    = !c.pr.ok()                          ? 2
                      : (c.produces && c.profit.has_data) ? 0
                                                          : 1;
@@ -4328,7 +4329,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // — which is the honest version of the same sentence: the bar is earnings, the
     // cost lines above it are cost.
     ImGui::TextWrapped("Est. net / qtr at today's local prices - at least this, before "
-                       "auto-staffing; 50%% staffing, no labour shortage.");
+                       "auto-staffing; 50%% staffing, no labour shortage, this tile's Logistic Point cover.");
     ImGui::PopStyleColor();
 
     // ONE LINE A ROW, AND IT IS A GRID (BL-1365; construction.md § "One line a
@@ -4592,9 +4593,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             if (c.group == 0)
                 std::snprintf(nbuf, sizeof nbuf,
                               "Est. net %+d cr / qtr at today's local prices, at 50%% staffing "
-                              "with no labour shortage. The bar is that figure against the best "
-                              "row in this list.",
-                              static_cast<int>(c.profit.net()));
+                              "with no labour shortage and %d%% Logistic Point cover. The bar is "
+                              "that figure against the best row in this list.",
+                              static_cast<int>(c.profit.net()),
+                              static_cast<int>(std::lround(lp_cover * 100.0f)));
             else if (c.pr.ok() && !c.produces && c.profit.has_data)
                 std::snprintf(nbuf, sizeof nbuf,
                               "No direct revenue - upkeep %d cr / qtr. It earns through what it "

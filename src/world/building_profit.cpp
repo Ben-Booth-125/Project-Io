@@ -157,7 +157,8 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
                                             resource_type target,
                                             std::uint16_t recipe_id,
                                             const building_component* existing,
-                                            const std::array<float, resource_count>* input_unit_cost)
+                                            const std::array<float, resource_count>* input_unit_cost,
+                                            float lp_cover)
 {
     building_profit out;
 
@@ -228,7 +229,13 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     // Contention 1.0 scales to 1; the labour terms left are the assigned fraction
     // and the target scalar (economy_system.cpp § run_extraction). For the
     // default hypothetical, wt_scalar is 1 and this reduces to the old `wf`.
-    const float wf = bc.workforce_assigned * wt_scalar;
+    // Logistic Point cover (Ben, 2026-10-25): the economy step multiplies a producing
+    // building's labour by the share of its point need the pool granted
+    // (economy_system.cpp `labour_for`), so the run - output and the inputs it takes -
+    // scales by the cover while the opex above does not. 1 (the default) is the
+    // unmodelled case every pre-existing caller still gets.
+    const float cover = std::clamp(lp_cover, 0.0f, 1.0f);
+    const float wf = bc.workforce_assigned * wt_scalar * cover;
 
     if (type == building_type::extraction_site)
     {

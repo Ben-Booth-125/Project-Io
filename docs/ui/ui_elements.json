@@ -1933,6 +1933,40 @@
    "checks": [
     "rail_construction"
    ]
+  },
+  {
+   "id": "UI-127",
+   "name": "Site ledger (the site finder)",
+   "kind": "sub-element",
+   "parent": "UI-074",
+   "source": [
+    "docs/ui/ledgers/construction.md § The site ledger",
+    "src/ui/construction_sites.hpp",
+    "src/ui/construction_sites.cpp"
+   ],
+   "summary": "In the Construction view, between the queue and the tile build bar: a building picker ('Find a site') and, with a building chosen, a sortable table of every tile of the player's own ground the Build door accepts it on - Tile (the press: select and frame), Net (est. net / qtr with the tile's Logistic Point cover), Cost, Market, LP (cover, with the struck-truck flag at zero) and Yield - sorted by Net descending, ties by tile id.",
+   "interesting_question": "Many rows tie on Net where prices are per market; does the ledger want a finer price (province-level) or a second default key?",
+   "resolution": "Open - Ben's call on province-level local prices (2026-10-25); the tie share is measured by construction_sites_ties.lua.",
+   "checks": [
+    "construction_sites"
+   ]
+  },
+  {
+   "id": "UI-128",
+   "name": "Placement lens",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/LENSES.md § The placement lens",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/construction_sites.cpp"
+   ],
+   "summary": "While the site finder has a building chosen, the Planetary canvas marks the site ledger's tiles: green for a site, amber with the no-logistics flag where no Logistic Point source reaches it, every other tile dimmed. A mode of the build flow, not an overlay_mode; it composites over the strip lens and never claims the click.",
+   "interesting_question": "n/a - the map twin of the site ledger.",
+   "resolution": "n/a",
+   "checks": [
+    "construction_sites"
+   ]
   }
  ]
 }

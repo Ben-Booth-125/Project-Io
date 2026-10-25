@@ -448,6 +448,89 @@ struct construction_controls
     int          road_drawn    = 0;
 };
 
+// --- The SITE FINDER (Ben, 2026-10-25; docs/ui/ledgers/construction.md § The site
+// --- ledger; LENSES.md § The placement lens) ----------------------------------
+// BUILDING FIRST: the player picks a building in the Construction view, the
+// Planetary canvas marks every tile of the player's own ground the Build door would
+// accept it on (and flags the ones no Logistic Point source reaches), and a ledger
+// lists those tiles sorted by estimated profit. Everything here is VIEW state: the
+// choice survives a frame, the rest is recomputed from the world and never saved.
+
+/// One tile the site ledger lists - a tile the Build door accepts the chosen
+/// building on, priced exactly as the door prices it.
+struct site_row
+{
+    entity_id     tile     = null_entity;
+    int           x = 0, y = 0;    ///< Grid position (framing, and the checks).
+    bool          priced   = false; ///< `estimate_prospective_profit(...).has_data`.
+    float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
+    float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.
+    float         capex    = 0.0f;  ///< `construction_capex` - what the press charges.
+    float         flat     = 0.0f;  ///< The flat build cost x the site multiplier (the credits half).
+    float         site_mult = 1.0f; ///< `construction_site_multiplier` (landform x reach x stack).
+    entity_id     market   = null_entity;
+    std::string   market_name;
+    float         cover    = 0.0f;  ///< `lp_route_to(...).cover`, [0,1].
+    bool          lp_blocked   = false; ///< A source reaches it but has no chain to the capital.
+    bool          no_logistics = false; ///< cover == 0: no Logistic Points operate here.
+    bool          has_yield = false;
+    float         yield     = 0.0f; ///< Units of what it makes per qtr, at this cover.
+    float         deposit   = 0.0f; ///< Extraction: the tile's richness of the target.
+    float         remaining = 0.0f; ///< Extraction: the tile's reserve left.
+    bool          depositless = false; ///< A Well or a Fishing Wharf: no deposit, never tapers.
+};
+
+/// One building the finder offers - in the Build door's own vocabulary.
+struct site_option
+{
+    building_type type   = building_type::extraction_site;
+    resource_type target = resource_type::iron_ore;
+    std::uint16_t recipe = 0xFFFFu; ///< `no_recipe` unless a processing facility.
+    std::string   name;             ///< The door's row name ("Iron Mine", "Bloomery", "Port").
+    std::string   category;         ///< The door's fold ("Extraction", "Processing", ...).
+};
+
+struct site_finder_state
+{
+    // The choice (persists across frames; VIEW state, not serialised).
+    bool          armed = false;    ///< A building is chosen.
+    site_option   choice;
+
+    /// Sort column (0 tile, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield) and
+    /// direction. Default: profit, descending; every tie broken by tile id ascending.
+    int           sort_col  = 1;
+    bool          sort_desc = true;
+
+    // Published by the evaluation, rebuilt only when its key moves.
+    bool          live = false;     ///< The lens draws THIS frame (ledger on the Construction view, a building chosen).
+    entity_id     body = null_entity;
+    int           gw = 0, gh = 0;
+    /// Per grid cell (y * gw + x): 0 = not a site for this building (dimmed),
+    /// 1 = a site with Logistic Points operating, 2 = a site with none (flagged).
+    std::vector<std::uint8_t> cls;
+    std::vector<site_row>     rows; ///< In the ledger's CURRENT sort order.
+    int           own_tiles    = 0; ///< Tiles of the player's own ground on this body.
+    int           unaffordable = 0; ///< Tiles that would take it but cost more than the treasury.
+    int           no_lp_rows   = 0; ///< Rows flagged no-logistics.
+    double        eval_ms      = 0.0; ///< Wall time of the last evaluation.
+    int           evaluations  = 0;   ///< How many times the cache rebuilt (proves the cache holds).
+
+    /// THE TIE MEASUREMENT (for Ben's province-price decision): rows whose
+    /// displayed profit (whole credits) equals another row's - at full cover, at the
+    /// real cover, and with the cost as a second key.
+    int           ties_full_cover  = 0;
+    int           ties_profit      = 0;
+    int           ties_profit_cost = 0;
+    int           covered_rows     = 0; ///< Rows with cover > 0.
+    int           ties_covered     = 0; ///< Ties on net among those rows alone.
+
+    /// Where the ledger's controls landed this frame (absent: x < 0).
+    float         picker_x = -1.0f, picker_y = -1.0f;
+    struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_row> drawn;   ///< Visible rows, in drawn order.
+    int           map_marks = 0;    ///< No-logistics marks the canvas drew this frame.
+};
+
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
 // The frame contract between the SDL-side chunk cache (core/ground_layer) and
 // the Planetary canvas. app fills `ui_state::ground` each frame from the cache;
@@ -621,6 +704,10 @@ struct ui_state
     /// the building card's open-in-ledger button landed this frame. Same reasoning
     /// as `planetary_center_screen`: the surface that drew it is the honest source.
     construction_controls construction_ui;
+
+    /// The site finder (Ben, 2026-10-25): the building chosen first, the tiles that
+    /// take it, and the ledger's sort. See `site_finder_state`.
+    site_finder_state site_finder;
 
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary
