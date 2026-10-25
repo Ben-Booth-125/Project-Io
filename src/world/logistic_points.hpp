@@ -485,6 +485,9 @@ struct lp_seed_report
     /// islands so bridged (a home port, where none was connected, plus an island port).
     int   ports_placed    = 0;
     int   islands_bridged = 0;
+    /// The port link (Ben, 2026-10-25): road crossings laid to join each link's ports to
+    /// the network on their own coasts, and a linked island's stray fragments to its port.
+    int   link_crossings  = 0;
 };
 
 /// Place logistics sources at the fold so every producing building on a nation's ground is

@@ -2070,6 +2070,169 @@ void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market
 // IDEMPOTENT: a site whose tile already carries a crossing is skipped, so calling it
 // twice -- once at the tail of world generation, once after the charter web is laid --
 // does no second work and lays no second road.
+namespace {
+
+/// THE OWN-GROUND JOIN, shared by the site pass (a site to its capital's network) and the
+/// LP seeding's port link (a port's tile to the network on its own coast; Ben, 2026-10-25).
+/// One raster view of a body, with the three cell tests both readers make.
+struct own_ground_view
+{
+    const world& w;
+    std::vector<entity_id> grid; // a copy: caches move as roads are laid
+    int gw = 0, gh = 0;
+    std::size_t ncell = 0;
+    bool ok = false;
+
+    own_ground_view(world& w_, entity_id body) : w(w_)
+    {
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end())
+            return;
+        gw = bit->second.grid_width;
+        gh = bit->second.grid_height;
+        if (gw <= 0 || gh <= 0)
+            return;
+        grid  = body_tile_grid(w_, body);
+        ncell = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+        ok    = grid.size() >= ncell;
+    }
+    int cell_of(entity_id t) const
+    {
+        const auto it = w.tiles.find(t);
+        return it == w.tiles.end() ? -1 : it->second.grid_y * gw + it->second.grid_x;
+    }
+    // The four cardinal neighbours of @p c in the LP walk's order (N, E, S, W), columns
+    // wrapping; -1 off the grid.
+    void neighbours(int c, int out[4]) const
+    {
+        const int x = c % gw, y = c / gw;
+        out[0] = y > 0 ? (y - 1) * gw + x : -1;
+        out[1] = y * gw + (x + 1) % gw;
+        out[2] = y + 1 < gh ? (y + 1) * gw + x : -1;
+        out[3] = y * gw + (x + gw - 1) % gw;
+    }
+    const tile_component* at(int c) const
+    {
+        if (c < 0 || static_cast<std::size_t>(c) >= ncell) return nullptr;
+        const entity_id t = grid[static_cast<std::size_t>(c)];
+        if (t == null_entity) return nullptr;
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() ? &it->second : nullptr;
+    }
+    bool own_dry(int c, entity_id nation) const
+    {
+        const tile_component* tc = at(c);
+        return tc != nullptr && !is_water(tc->substrate)
+            && nation_of(w, grid[static_cast<std::size_t>(c)]) == nation;
+    }
+    bool wet(int c) const
+    {
+        const tile_component* tc = at(c);
+        return tc != nullptr && is_water(tc->substrate);
+    }
+    bool bridgeable(int c) const // shore water a bridge may span
+    {
+        const tile_component* tc = at(c);
+        return tc != nullptr && is_water(tc->substrate) && !is_open_ocean(tc->substrate);
+    }
+
+    /// Grow @p h from @p q along roaded edges onto @p nation's own land or water.
+    void grow(entity_id nation, std::set<int>& h, std::vector<int> q) const
+    {
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const int c = q[head];
+            const tile_component& tc = w.tiles.at(grid[static_cast<std::size_t>(c)]);
+            int nb[4];
+            neighbours(c, nb);
+            for (const int v : nb)
+            {
+                if (h.count(v) != 0 || !(own_dry(v, nation) || wet(v))) continue;
+                const int side = road_side_between(w, grid[static_cast<std::size_t>(c)],
+                                                   grid[static_cast<std::size_t>(v)]);
+                if (side < 0 || road_tier_on_side(tc, side) == 0) continue;
+                h.insert(v);
+                q.push_back(v);
+            }
+        }
+    }
+
+    /// The least-weight route from @p from to any LAND cell of @p h, over @p nation's own
+    /// dry cells and bridge runs of at most kMaxCrossingTiles shore water; foreign ground
+    /// and open ocean never. Returned @p h-end first, empty when there is none. States are
+    /// (cell, water run 0..kMaxCrossingTiles); a (cost, state) frontier: deterministic.
+    std::vector<int> route_to(entity_id nation, int from, const std::set<int>& h,
+                              std::vector<std::int64_t>& jdist,
+                              std::vector<std::int32_t>& jparent) const
+    {
+        constexpr int kRuns = kMaxCrossingTiles + 1;
+        jdist.assign(ncell * kRuns, kNoCost);
+        jparent.assign(ncell * kRuns, -1);
+        using item = std::pair<std::int64_t, int>;
+        std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+        const auto weight = [&](int c) {
+            return market_cell_weight(w.tiles.at(grid[static_cast<std::size_t>(c)]));
+        };
+        const int s0 = from * kRuns;
+        jdist[static_cast<std::size_t>(s0)] = 0;
+        pq.push({ 0, s0 });
+        int reached = -1;
+        while (!pq.empty())
+        {
+            const auto [d, s] = pq.top();
+            pq.pop();
+            if (d != jdist[static_cast<std::size_t>(s)]) continue; // stale
+            const int c = s / kRuns, run = s % kRuns;
+            if (run == 0 && h.count(c) != 0) { reached = s; break; } // home LAND
+            int nb[4];
+            neighbours(c, nb);
+            for (const int v : nb)
+            {
+                int nrun = 0;
+                if (bridgeable(v))
+                {
+                    nrun = run + 1;
+                    if (nrun > kMaxCrossingTiles) continue; // past the bridge cap
+                }
+                else if (!own_dry(v, nation))
+                    continue; // foreign ground, or open ocean
+                const int ns = v * kRuns + nrun;
+                const std::int64_t nd = d + weight(c) + weight(v);
+                std::int64_t& cur = jdist[static_cast<std::size_t>(ns)];
+                if (cur == kNoCost || nd < cur)
+                {
+                    cur = nd;
+                    jparent[static_cast<std::size_t>(ns)] = s;
+                    pq.push({ nd, ns });
+                }
+            }
+        }
+        std::vector<int> route;
+        if (reached < 0) return route;
+        for (int s = reached; s >= 0; s = jparent[static_cast<std::size_t>(s)])
+            route.push_back(s / kRuns);
+        return route;
+    }
+};
+
+/// Lay a Track along every unroaded crossing of @p route; the crossings laid.
+int lay_route_track(world& w, const own_ground_view& v, const std::vector<int>& route)
+{
+    int laid = 0;
+    for (std::size_t k = 0; k + 1 < route.size(); ++k)
+    {
+        const entity_id ta = v.grid[static_cast<std::size_t>(route[k])];
+        const entity_id tb = v.grid[static_cast<std::size_t>(route[k + 1])];
+        const int side = road_side_between(w, ta, tb);
+        if (side < 0) continue;
+        if (road_tier_on_side(w.tiles.at(ta), side) == 0 && lay_road_edge(w, ta, side, kTrack))
+            ++laid;
+    }
+    return laid;
+}
+
+} // namespace
+
 site_road_stats lay_site_roads(world& w, entity_id body)
 {
     site_road_stats st{};
@@ -2170,62 +2333,18 @@ site_road_stats lay_site_roads(world& w, entity_id body)
     // route is counted `sites_cut_off` and falls through to the nearest-road rule below,
     // so the building still has its road; the seeding bridges it by sea.
     // Deterministic: raster cells, a (cost, state) frontier, nations in a std::map.
-    const std::vector<entity_id> grid = body_tile_grid(w, body); // a copy: caches move below
-    const std::size_t ncell = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
-    const bool grid_ok = grid.size() >= ncell;
+    const own_ground_view view(w, body); // the grid is a copy: caches move below
+    const std::vector<entity_id>& grid = view.grid;
+    const bool grid_ok = view.ok;
     const auto cell_index = [&](entity_id t) -> int {
         const auto [gx, gy] = cell(t);
         return gx < 0 ? -1 : gy * gw + gx;
     };
-    // The four cardinal neighbours of @p c in the LP walk's order (N, E, S, W), columns
-    // wrapping; -1 off the grid.
-    const auto neighbours = [&](int c, int out[4]) {
-        const int x = c % gw, y = c / gw;
-        out[0] = y > 0 ? (y - 1) * gw + x : -1;
-        out[1] = y * gw + (x + 1) % gw;
-        out[2] = y + 1 < gh ? (y + 1) * gw + x : -1;
-        out[3] = y * gw + (x + gw - 1) % gw;
-    };
-    const auto tile_at_cell = [&](int c) -> const tile_component* {
-        if (c < 0 || static_cast<std::size_t>(c) >= ncell) return nullptr;
-        const entity_id t = grid[static_cast<std::size_t>(c)];
-        if (t == null_entity) return nullptr;
-        const auto it = w.tiles.find(t);
-        return it != w.tiles.end() ? &it->second : nullptr;
-    };
-    const auto own_dry = [&](int c, entity_id nation) -> bool {
-        const tile_component* tc = tile_at_cell(c);
-        return tc != nullptr && !is_water(tc->substrate)
-            && nation_of(w, grid[static_cast<std::size_t>(c)]) == nation;
-    };
-    const auto is_wet = [&](int c) -> bool {
-        const tile_component* tc = tile_at_cell(c);
-        return tc != nullptr && is_water(tc->substrate);
-    };
-    const auto bridgeable = [&](int c) -> bool { // shore water a bridge may span
-        const tile_component* tc = tile_at_cell(c);
-        return tc != nullptr && is_water(tc->substrate) && !is_open_ocean(tc->substrate);
-    };
+    const auto own_dry = [&](int c, entity_id nation) -> bool { return view.own_dry(c, nation); };
     std::map<entity_id, std::set<int>> home; // nation -> cells of its capital's network
     // Grow @p nation's home from @p seeds along roaded edges onto its own land or water.
     const auto grow_home = [&](entity_id nation, std::vector<int> q) {
-        std::set<int>& h = home[nation];
-        for (std::size_t head = 0; head < q.size(); ++head)
-        {
-            const int c = q[head];
-            const tile_component& tc = w.tiles.at(grid[static_cast<std::size_t>(c)]);
-            int nb[4];
-            neighbours(c, nb);
-            for (const int v : nb)
-            {
-                if (h.count(v) != 0 || !(own_dry(v, nation) || is_wet(v))) continue;
-                const int side = road_side_between(w, grid[static_cast<std::size_t>(c)],
-                                                   grid[static_cast<std::size_t>(v)]);
-                if (side < 0 || road_tier_on_side(tc, side) == 0) continue;
-                h.insert(v);
-                q.push_back(v);
-            }
-        }
+        view.grow(nation, home[nation], std::move(q));
     };
     // @p nation's home, built on first ask; null when it has no capital on this body.
     const auto home_of = [&](entity_id nation) -> const std::set<int>* {
@@ -2246,69 +2365,15 @@ site_road_stats lay_site_roads(world& w, entity_id body)
     };
     // The own-ground join from @p from to @p nation's home: true if a route was found and
     // laid. States are (cell, water run 0..kMaxCrossingTiles), as the market walk's.
-    constexpr int kRuns = kMaxCrossingTiles + 1;
     std::vector<std::int64_t> jdist;
     std::vector<std::int32_t> jparent;
     const auto join_home = [&](entity_id nation, int from) -> bool {
         const std::set<int>* h = home_of(nation);
         if (h == nullptr || !own_dry(from, nation)) return false;
         if (h->count(from) != 0) return true;
-        jdist.assign(ncell * kRuns, kNoCost);
-        jparent.assign(ncell * kRuns, -1);
-        using item = std::pair<std::int64_t, int>;
-        std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
-        const auto weight = [&](int c) {
-            return market_cell_weight(w.tiles.at(grid[static_cast<std::size_t>(c)]));
-        };
-        const int s0 = from * kRuns;
-        jdist[static_cast<std::size_t>(s0)] = 0;
-        pq.push({ 0, s0 });
-        int reached = -1;
-        while (!pq.empty())
-        {
-            const auto [d, s] = pq.top();
-            pq.pop();
-            if (d != jdist[static_cast<std::size_t>(s)]) continue; // stale
-            const int c = s / kRuns, run = s % kRuns;
-            if (run == 0 && h->count(c) != 0) { reached = s; break; } // home LAND
-            int nb[4];
-            neighbours(c, nb);
-            for (const int v : nb)
-            {
-                int nrun = 0;
-                if (bridgeable(v))
-                {
-                    nrun = run + 1;
-                    if (nrun > kMaxCrossingTiles) continue; // past the bridge cap
-                }
-                else if (!own_dry(v, nation))
-                    continue; // foreign ground, or open ocean
-                const int ns = v * kRuns + nrun;
-                const std::int64_t nd = d + weight(c) + weight(v);
-                std::int64_t& cur = jdist[static_cast<std::size_t>(ns)];
-                if (cur == kNoCost || nd < cur)
-                {
-                    cur = nd;
-                    jparent[static_cast<std::size_t>(ns)] = s;
-                    pq.push({ nd, ns });
-                }
-            }
-        }
-        if (reached < 0) return false;
-        std::vector<int> route; // home -> site, land at both ends
-        for (int s = reached; s >= 0; s = jparent[static_cast<std::size_t>(s)])
-            route.push_back(s / kRuns);
-        int laid = 0;
-        for (std::size_t k = 0; k + 1 < route.size(); ++k)
-        {
-            const entity_id ta = grid[static_cast<std::size_t>(route[k])];
-            const entity_id tb = grid[static_cast<std::size_t>(route[k + 1])];
-            const int side = road_side_between(w, ta, tb);
-            if (side < 0) continue;
-            if (road_tier_on_side(w.tiles.at(ta), side) == 0 && lay_road_edge(w, ta, side, kTrack))
-                ++laid;
-        }
-        st.crossings_laid += laid;
+        const std::vector<int> route = view.route_to(nation, from, *h, jdist, jparent);
+        if (route.empty()) return false; // home -> site, land at both ends
+        st.crossings_laid += lay_route_track(w, view, route);
         for (const int c : route)
             add_target(grid[static_cast<std::size_t>(c)]);
         // The route and every fragment it touched are home now.
@@ -2419,6 +2484,39 @@ site_road_stats lay_site_roads_every_body(world& w)
         }
     }
     return out;
+}
+
+bool lay_own_ground_join(world& w, entity_id nation, entity_id from, entity_id anchor,
+                         int* crossings_laid)
+{
+    const auto fit = w.tiles.find(from);
+    const auto ait = w.tiles.find(anchor);
+    if (nation == null_entity || fit == w.tiles.end() || ait == w.tiles.end()
+        || fit->second.body != ait->second.body)
+        return false;
+    const own_ground_view view(w, fit->second.body);
+    if (!view.ok)
+        return false;
+    const int fc = view.cell_of(from), ac = view.cell_of(anchor);
+    if (fc < 0 || ac < 0 || !view.own_dry(fc, nation) || !view.own_dry(ac, nation))
+        return false;
+    // The network on the anchor's ground: the anchor and every cell its roads reach over
+    // the nation's own land and the bridges onto water (a bridge is a road).
+    std::set<int> h{ac};
+    view.grow(nation, h, {ac});
+    if (h.count(fc) != 0)
+        return true; // already on it
+    std::vector<std::int64_t> jdist;
+    std::vector<std::int32_t> jparent;
+    const std::vector<int> route = view.route_to(nation, fc, h, jdist, jparent);
+    if (route.empty())
+        return false;
+    const int laid = lay_route_track(w, view, route);
+    if (crossings_laid != nullptr)
+        *crossings_laid += laid;
+    if (laid > 0)
+        invalidate_logistics_caches(w); // road_level moved: generate_roads' own contract
+    return true;
 }
 
 // ---------------------------------------------------------------------------
