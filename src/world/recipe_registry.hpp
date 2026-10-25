@@ -175,9 +175,10 @@ struct building_economics
     /// (construction.cpp). Zero = no requirement for that good.
     std::array<float, resource_count> resource_build_cost = {};
 
-    /// Economy ticks the building spends under construction before it starts
-    /// producing (playtest patch, 2026-07-06). 0 = instant (pre-existing
-    /// behaviour), authored in scripts/economy.lua as `build_duration_ticks`.
+    /// The build's duration IN QUARTERS at full rate (playtest patch, 2026-07-06).
+    /// 0 = instant. Authored in scripts/economy.lua as `build_duration_days` and held
+    /// here as days / 90 (Ben, 2026-10-24: construction is measured in days;
+    /// `construction_build_days` turns it back into the site's days).
     float build_duration_ticks = 0.0f;
 
     /// BL-436: how a deposit's richness converts into an extraction RATE

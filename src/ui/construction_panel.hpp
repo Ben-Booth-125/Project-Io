@@ -58,16 +58,24 @@ struct construction_read
 construction_read read_construction(const world& w, const recipe_registry& reg,
                                     building_type type, resource_type target,
                                     std::uint16_t recipe, entity_id tile,
-                                    bool state_idle = false);
+                                    bool state_idle = false,
+                                    int days_left = 90);
+// @p days_left (Ben, 2026-10-24; PRODUCTION.md § Construction is measured in days): the
+// site's days of work left. In its last quarter (< 90) a site needs only that share of a
+// quarter's materials, exactly as run_construction's need row; a candidate passes none.
 
 /// The rate alone, for the callers that only rank/warn on it.
 float construction_rate(const world& w, const recipe_registry& reg,
                         building_type type, resource_type target, std::uint16_t recipe,
                         entity_id tile);
 
-/// Quarters of work left at this rate (`ticks_left` stretched by the rate); -1 when
-/// paused, because a paused build has no honest ETA.
-int construction_eta_qtrs(const construction_read& rd, int ticks_left);
+/// DAYS of work left at this rate (`days_left` stretched by the rate); -1 when paused,
+/// because a paused build has no honest ETA. Construction is measured in days (Ben,
+/// 2026-10-24; PRODUCTION.md § Construction is measured in days).
+int construction_eta_days(const construction_read& rd, int days_left);
+
+/// A compact day count — "1 day", "180 days".
+std::string days_label(int days);
 
 /// A compact quarter count — "3 qtrs", "8 qtrs (~2 yr)". The display word is **qtr**,
 /// never tick (NR-002, Ben 2026-08-01).
@@ -87,10 +95,10 @@ std::string construction_blocker_phrase(const construction_read& rd);
 /// has not committed to yet says "Will stall - <clause>" in its hover card.
 std::string construction_stall_reason(const construction_read& rd);
 
-/// The full status line: "Building... ~3 qtrs", "Building... ~9 qtrs (short of
+/// The full status line: "Building... ~180 days", "Building... ~810 days (short of
 /// Steel)", "Paused - no Steel at the market", "Paused - Steel is priced above
-/// the build ceiling".
-std::string construction_status(const construction_read& rd, int ticks_left);
+/// the build ceiling". @p days_left is the site's days of work left.
+std::string construction_status(const construction_read& rd, int days_left);
 
 /// Red paused / amber stretched / green on schedule.
 ImVec4 construction_status_colour(const construction_read& rd);
@@ -156,8 +164,8 @@ inline constexpr float stack = 28.0f; ///< "2/4".
 inline constexpr float state = 12.0f; ///< The state mark.
 inline constexpr float bar   = 38.0f; ///< The profit / progress bar.
 inline constexpr float act   = 44.0f; ///< The Build press.
-inline constexpr float eta   = 32.0f; ///< Quarters left (the queue) - sized so its
-                                      ///< "Qtrs" header is not itself elided.
+inline constexpr float eta   = 32.0f; ///< Days left (the queue) - sized so its
+                                      ///< "Days" header is not itself elided.
 inline constexpr float pad   = 2.0f;  ///< Horizontal cell padding, per side.
 /// HOW MANY TEXT LINES A ROW RESERVES (BL-1371) — two, since Ben's live click of
 /// the one-line grid: *"we are going to have to use two row spaces for each

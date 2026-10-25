@@ -46,7 +46,9 @@ float lp_need(const building_component& b)
         return 0.0f;
     const float wt  = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const float run = std::max(0.0f, b.workforce_assigned) * wt;
-    const float n   = lp_need_per_run * run;
+    // Ben, 2026-10-24: a mid-quarter completion needs points for its share of the
+    // quarter only (PRODUCTION.md § Construction is measured in days).
+    const float n   = lp_need_per_run * run * building_output_share(b);
     return std::isfinite(n) ? n : 0.0f;
 }
 

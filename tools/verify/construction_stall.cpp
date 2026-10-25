@@ -21,7 +21,7 @@
 // A site's first blocking material (lowest resource index) names the cause;
 // "ceiling" outranks "short" (a ceiling block is the BL-1172 mechanism).
 //
-// PROGRESS. (ticks_remaining, construction_progress) after every tick. A site
+// PROGRESS. The days of work left (days_remaining less sub-day progress) after every tick. A site
 // is STALLED at a reading when it has not moved for >= 10 ticks.
 //
 // OVER THE RUN: sites that ever stalled 10+ ticks, how many moved again, how
@@ -97,7 +97,7 @@ struct site_verdict
 
 struct site_rec
 {
-    float last_left   = 0.0f;   ///< ticks_remaining - progress
+    float last_left   = 0.0f;   ///< days of work left (Ben, 2026-10-24: construction is measured in days)
     int   last_move   = 0;      ///< play tick (settle ticks negative) it last moved
     int   born        = 0;
     bool  ever_stalled = false;
@@ -309,7 +309,8 @@ void run_seed(std::uint32_t seed, int ticks)
             {
                 if (b.ticks_remaining <= 0) continue;
                 site_rec s; s.born = now; s.last_move = now;
-                s.last_left = b.ticks_remaining - b.construction_progress;
+                // Construction is measured in days (Ben, 2026-10-24): the work left in days.
+                s.last_left = static_cast<float>(construction_days_left(b)) - b.build_day_milli / 1000.0f;
                 const auto oi = own.find(bid); s.owner = oi == own.end() ? null_entity : oi->second;
                 sites[bid] = s;
                 if (play)
@@ -322,7 +323,8 @@ void run_seed(std::uint32_t seed, int ticks)
             }
             site_rec& s = it->second;
             if (s.completed) continue;
-            const float left = b.ticks_remaining > 0 ? b.ticks_remaining - b.construction_progress : 0.0f;
+            const float left = b.ticks_remaining > 0
+                ? static_cast<float>(construction_days_left(b)) - b.build_day_milli / 1000.0f : 0.0f;
             if (left != s.last_left)
             {
                 if (now - s.last_move >= k_stall_ticks) s.moved_after_stall = true;

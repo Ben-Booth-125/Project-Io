@@ -111,11 +111,15 @@ int main()
         scene s = make_scene(reg, /*steel_supply=*/1000.0f);
         const float bal0 = s.w.nations[s.corp].treasury;
         const economy_report rep = run_economy_step(s.w, reg);
+        // Construction is measured in days (Ben, 2026-10-24): the clearing pays for
+        // the quarter ahead; the site makes that quarter's progress day by day.
+        advance_construction_to(s.w, reg, k_construction_quarter_days);
         const building_component& b = s.w.buildings[s.bld];
-        check(b.ticks_remaining == 2, "A: ample supply advances a whole tick (3 -> 2)",
-              b.ticks_remaining, 2);
-        check(std::fabs(b.construction_progress) < 1e-4f,
-              "A: no fractional remainder at full rate", b.construction_progress, 0.0f);
+        check(b.ticks_remaining == 2 && b.days_remaining == 180,
+              "A: ample supply advances a whole quarter over its 90 days (270 -> 180 days, 3 -> 2 qtrs)",
+              b.days_remaining, 180);
+        check(b.build_day_milli == 0,
+              "A: no fractional remainder at full rate", b.build_day_milli, 0.0f);
         const float drawn = rep.purchases.count({s.corp, s.market})
             ? rep.purchases.at({s.corp, s.market})[ri(resource_type::steel)] : 0.0f;
         check(std::fabs(drawn - per_tick_need) < 1e-3f,
@@ -129,11 +133,12 @@ int main()
     {
         scene s = make_scene(reg, /*steel_supply=*/per_tick_need * 0.6f);
         run_economy_step(s.w, reg);
+        advance_construction_to(s.w, reg, k_construction_quarter_days);
         const building_component& b = s.w.buildings[s.bld];
-        check(b.ticks_remaining == 3, "B: tight supply does NOT complete a tick (stays 3)",
+        check(b.ticks_remaining == 3, "B: tight supply does NOT complete a quarter (stays 3)",
               b.ticks_remaining, 3);
-        check(std::fabs(b.construction_progress - 0.6f) < 1e-3f,
-              "B: progress advances at the material-limited rate (~0.6)", b.construction_progress, 0.6f);
+        check(b.days_remaining == 270 - 54,
+              "B: progress advances at the material-limited rate (0.6 x 90 = 54 days)", b.days_remaining, 216);
     }
 
     // --- Case C: STARVED supply (below 1/max_stretch of need) -> paused. ---
@@ -141,9 +146,10 @@ int main()
         scene s = make_scene(reg, /*steel_supply=*/per_tick_need * 0.05f); // < 1/10
         const float bal0 = s.w.nations[s.corp].treasury;
         run_economy_step(s.w, reg);
+        advance_construction_to(s.w, reg, k_construction_quarter_days);
         const building_component& b = s.w.buildings[s.bld];
-        check(b.ticks_remaining == 3 && std::fabs(b.construction_progress) < 1e-4f,
-              "C: starved build is paused (no progress)", b.construction_progress, 0.0f);
+        check(b.ticks_remaining == 3 && b.days_remaining == 270 && b.build_rate_permille == 0,
+              "C: starved build is paused (no days)", b.days_remaining, 270);
         check(std::fabs(bal0 - s.w.nations[s.corp].treasury) < 1e-4f,
               "C: a paused build spends nothing", 0.0, 0.0);
     }
@@ -167,12 +173,16 @@ int main()
 
         const int ticks = construction_build_ticks(s.w, reg_d, tile, building_type::processing_facility,
                                                    resource_type::iron_ore);
+        // Ben, 2026-10-24: the site's DAYS — the draw follows them, not whole quarters.
+        const int days = construction_build_days(s.w, reg_d, tile, building_type::processing_facility,
+                                                 resource_type::iron_ore);
         // x2.0 landform, less one stack step (the scene's building already stands
         // on the tile, which a real placement would not count) — above the authored 3.
         check(ticks > 3, "D: a mountain site takes longer than the authored 3 ticks", ticks, 4);
         const float capex = construction_capex(s.w, reg_d, tile, building_type::processing_facility,
                                                resource_type::iron_ore);
         s.w.buildings.at(s.bld).ticks_remaining = ticks;
+        s.w.buildings.at(s.bld).days_remaining  = days;
 
         const float bal0 = s.w.nations[s.corp].treasury;
         float steel = 0.0f, capacity = 0.0f;
@@ -187,11 +197,12 @@ int main()
         }
         const float cash = bal0 - s.w.nations[s.corp].treasury;
         check(s.w.buildings.at(s.bld).ticks_remaining == 0, "D: the build completes", 0.0, 0.0);
-        const float want_steel = 24.0f * static_cast<float>(ticks) / 3.0f;
+        const float qtrs = static_cast<float>(days) / 90.0f;
+        const float want_steel = 24.0f * qtrs / 3.0f;
         check(std::fabs(steel - want_steel) < 1e-2f,
-              "D: it drew the authored 24 steel times ticks / 3", steel, want_steel);
-        check(std::fabs(capacity - 0.5f * static_cast<float>(ticks)) < 1e-2f,
-              "D: it drew 0.5 capacity per build tick", capacity, 0.5f * static_cast<float>(ticks));
+              "D: it drew the authored 24 steel times days / 270", steel, want_steel);
+        check(std::fabs(capacity - 0.5f * qtrs) < 1e-2f,
+              "D: it drew 0.5 capacity per quarter of days", capacity, 0.5f * qtrs);
         const float drawn_value = cash + steel * 8.0f + capacity * 4.0f;
         check(std::fabs(capex - drawn_value) < 1e-1f,
               "D: construction_capex == cash + steel + capacity actually drawn", capex, drawn_value);

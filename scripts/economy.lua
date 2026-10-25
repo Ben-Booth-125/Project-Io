@@ -50,8 +50,10 @@ economy = {
     --   maintenance — flat per-tick upkeep charged to the owning corp.
     --   base_wage   — wage per unit workforce per tick (wage = workforce * base_wage).
     --   build_cost  — one-off construction cost (used by the Layer 4 build UI).
-    --   build_duration_ticks — economy ticks the building spends under
-    --                 construction before it produces anything (0 = instant).
+    --   build_duration_days — DAYS the building spends under construction at full
+    --                 supply before it produces anything (0 = instant). Construction
+    --                 is measured in days (Ben, 2026-10-24; PRODUCTION.md): a building
+    --                 finishes between quarters; 180 days = two quarters.
     -- MATERIAL COSTS: re-enabled 2026-07-06 (BL-095-lite). BL-044 originally gated
     -- these against the corp's own pool on the body (construction.cpp), which
     -- deadlocked a fresh start — a corp's steel surplus auto-sells each tick
@@ -97,7 +99,7 @@ economy = {
             maintenance = 2.0,
             base_wage   = 4.0,
             build_cost  = 100.0,
-            build_duration_ticks = 2.0,
+            build_duration_days = 180,
             resource_costs = { steel = 20.0 },
 
             -- BL-436: how a deposit's richness becomes an extraction RATE.
@@ -183,7 +185,7 @@ economy = {
             maintenance = 2.0,
             base_wage   = 12.0,
             build_cost  = 200.0,
-            build_duration_ticks = 3.0,
+            build_duration_days = 270,
             resource_costs = { steel = 25.0 },
 
             -- BL-590 (2026-08-24): keyed by RECIPE — every industrial recipe is
@@ -229,7 +231,7 @@ economy = {
             maintenance = 8.0,
             base_wage   = 6.0,
             build_cost  = 150.0,
-            build_duration_ticks = 2.0,
+            build_duration_days = 180,
             resource_costs = { steel = 20.0 },
         },
         -- BL-433: the one building type that is unambiguously not ancient. Tagged
@@ -243,7 +245,7 @@ economy = {
             maintenance = 20.0,
             base_wage   = 15.0,
             build_cost  = 500.0,
-            build_duration_ticks = 6.0,
+            build_duration_days = 540,
             resource_costs = { steel = 50.0, refined_fuel = 20.0 },
         },
         -- BL-1255 (LOGISTICS.md § 4c; PRODUCTION.md § Infrastructure buildings): the
@@ -257,7 +259,7 @@ economy = {
             maintenance = 6.0,
             base_wage   = 0.0,
             build_cost  = 120.0,
-            build_duration_ticks = 2.0,
+            build_duration_days = 180,
             resource_costs = { steel = 15.0 },
             requires_centre = true, -- a city tile; touching track is checked at the door
         },
@@ -270,7 +272,7 @@ economy = {
             maintenance = 12.0,
             base_wage   = 8.0,
             build_cost  = 250.0,
-            build_duration_ticks = 3.0,
+            build_duration_days = 270,
             resource_costs = { steel = 30.0 },
         },
         -- BL-325 S1: Military Base — the unit muster building. Produces nothing
@@ -284,7 +286,7 @@ economy = {
             maintenance = 15.0,
             base_wage   = 10.0,
             build_cost  = 300.0,
-            build_duration_ticks = 4.0,
+            build_duration_days = 360,
             resource_costs = { steel = 35.0 },
         },
         -- BL-332: Research Institute — the dedicated tech-progress building.
@@ -298,7 +300,7 @@ economy = {
             maintenance = 15.0,
             base_wage   = 10.0,
             build_cost  = 300.0,
-            build_duration_ticks = 4.0,
+            build_duration_days = 360,
             resource_costs = { steel = 35.0 },
         },
         -- BL-615: Schooling — the education building any settlement can host.
@@ -315,7 +317,7 @@ economy = {
             maintenance = 8.0,
             base_wage   = 6.0,
             build_cost  = 150.0,
-            build_duration_ticks = 3.0,
+            build_duration_days = 270,
             resource_costs = { timber = 12.0, stone = 8.0 },
             requires_centre = true,
         },
@@ -330,7 +332,7 @@ economy = {
             maintenance = 18.0,
             base_wage   = 12.0,
             build_cost  = 400.0,
-            build_duration_ticks = 5.0,
+            build_duration_days = 450,
             resource_costs = { stone = 30.0, timber = 12.0 },
             requires_centre  = true,
             min_centre_scale = 4,
@@ -347,7 +349,7 @@ economy = {
             maintenance = 10.0,
             base_wage   = 8.0,
             build_cost  = 200.0,
-            build_duration_ticks = 3.0,
+            build_duration_days = 270,
             resource_costs = { timber = 14.0, stone = 10.0 },
         },
     },
@@ -1709,10 +1711,10 @@ economy = {
     },
 
     -- BL-095: construction is gated on local market supply. Each tick a build
-    -- draws 1/build_duration_ticks of its materials as real market DEMAND (bids
+    -- draws a quarter's share (90 / build_duration_days) of its materials as real market DEMAND (bids
     -- the price up, competes with population and other builds) and progresses at a
     -- rate set by how much of that need the market can supply:
-    --   market supplies the full need   -> full speed (base build_duration_ticks)
+    --   market supplies the full need   -> full speed (base build_duration_days)
     --   market supplies part            -> stretched, proportionally slower
     --   supplies less than 1/max_stretch -> paused until supply recovers
     -- so a starved build takes up to max_stretch × its base duration, then stalls.
@@ -1734,7 +1736,7 @@ economy = {
         max_logistics_reach = 24.0,
 
         -- BL-323 S3 — BUILD TIME DEPENDS ON THE SITE. Three multipliers on the
-        -- base build_duration_ticks, applied once at placement: landform reuses
+        -- base build_duration_days, applied once at placement: landform reuses
         -- logistics.hpp's own cost function (no separate table to author here).
         --   site_time_reach_scale     — extra time (as a fraction of base) at the
         --     furthest placeable reach; 1.0 means a site right at the

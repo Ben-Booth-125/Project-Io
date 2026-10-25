@@ -861,7 +861,8 @@ construction pacing). Placing a building gates only on affordability (the nation
 afford the whole build to commit to it) and does **not** debit up front. Each economy tick a
 building under construction:
 
-- draws `resource_build_cost / build_duration_ticks` of its materials as **real market
+- draws a quarter's share of its materials — `resource_build_cost` over the build's duration in
+  quarters, less in the last quarter when fewer than 90 days of work remain — as **real market
   demand** (competing with population and other builds, bidding the local price up) and pays
   the resolved price for them, plus the same fraction of the flat `build_cost`;
 - progresses at a **rate set by how much of that per-tick material need the local market can
@@ -876,6 +877,28 @@ So a build in a thin market slows or stalls rather than completing instantly, an
 spread across the build. The front door shows the analog rate/ETA/paused status rather than a
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
+
+### Construction is measured in days (Ben, 2026-10-24)
+
+**A build's time is a number of days, so a building can finish between quarters.** Each type's
+duration is authored in days (`build_duration_days`; a two-quarter build is 180 days), times the
+placement's site multiplier (§ Construction site time), rounded to a whole day.
+
+- **Materials and payment stay quarterly.** At each quarter's clearing a site draws the quarter's
+  materials and pays the flat cost for the quarter ahead. That quarter's supply rate — full,
+  stretched or paused — sets how many days of progress the site makes over it: rate × days. A
+  paused quarter adds no days. In its last quarter a site needing fewer than 90 days draws and
+  pays only for the days it needs.
+- **Progress is daily, and a site completes on a day.** Between clearings a site advances day by
+  day, as surveys do. Completion fires that day: the building is operational, and a port or
+  logistics hub joins the network then.
+- **The first quarter is prorated.** A building finishing mid-quarter produces for the rest of
+  that quarter. At the next economy tick its output, operating costs, wages, inputs, upkeep goods
+  and Logistic Point need are scaled by the share of the quarter it stood complete. From then on
+  it runs whole quarters.
+- **Every path counts the same days.** A path that steps whole quarters with no day loop (the
+  settle, a headless run) catches up the quarter's unadvanced days at the clearing, from one
+  cursor, so it completes each site on the same day the live day loop would.
 
 ### Construction site time — a hard site costs more, and the price says so (Ben, 2026-09-23)
 

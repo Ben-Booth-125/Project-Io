@@ -120,8 +120,13 @@ building_opex compute_building_opex(const building_component& b,
     const bool  idle          = b.decommissioned || b.ticks_remaining > 0;
     const float wt_scalar     = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const float material_cost = e.maintenance * idle_floor;
+    // Construction is measured in days (Ben, 2026-10-24; PRODUCTION.md): a building
+    // that completed mid-quarter pays labour maintenance and wages this tick for the
+    // share of the quarter it stood complete; the material floor, which a site pays
+    // too, stays whole. Exactly 1.0f for every other building.
+    const float share         = building_output_share(b);
     const float labour_cost   = idle ? 0.0f
-                                : e.maintenance * wt_scalar - material_cost;
+                                : (e.maintenance * wt_scalar - material_cost) * share;
     const float hab           = std::clamp(mean_hab, 0.1f, 2.0f);
 
     building_opex o;
@@ -134,7 +139,7 @@ building_opex compute_building_opex(const building_component& b,
     o.wages       = idle
                     ? 0.0f
                     : b.workforce_assigned * contention_scalar * e.base_wage
-                          * (1.0f + b.wage_bid) * wt_scalar * hab;
+                          * (1.0f + b.wage_bid) * wt_scalar * hab * share;
     return o;
 }
 

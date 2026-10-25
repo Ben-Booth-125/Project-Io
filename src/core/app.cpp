@@ -511,6 +511,23 @@ int app::run(autostart_mode autostart)
             m_last_survey_day = survey_day;
         }
 
+        // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
+        // § Construction is measured in days): sites advance by the day between
+        // quarters and complete on a day. The world holds the one cursor (days of
+        // this quarter already advanced), so this call only ever moves it forward
+        // to today's day of the quarter not yet stepped — never past the quarter's
+        // end, which the econ step's own catch-up closes. A path with no day loop
+        // gets the same days from that catch-up, so the two agree tick for tick.
+        const auto advance_construction_today = [&]() {
+            const long long into = static_cast<long long>(m_sim_loop.day_tick())
+                                 - static_cast<long long>(m_last_econ_tick)
+                                       * static_cast<long long>(sim_loop::econ_tick_days);
+            if (into > 0)
+                advance_construction_to(m_world, m_registry,
+                                        static_cast<int>(std::min<long long>(into, sim_loop::econ_tick_days)));
+        };
+        advance_construction_today();
+
         // Mirror the day tick onto the world so read-only UI surfaces can age trade
         // routes for the activity fog (BL-089) without threading the tick everywhere.
         m_world.current_day_tick = static_cast<int>(m_sim_loop.day_tick());
@@ -542,6 +559,7 @@ int app::run(autostart_mode autostart)
             }
             step_economy();
             ++m_last_econ_tick;
+            advance_construction_today(); // the new quarter's days already elapsed this frame
             m_agent_seam.on_tick_stepped(static_cast<int>(m_last_econ_tick));
         }
 

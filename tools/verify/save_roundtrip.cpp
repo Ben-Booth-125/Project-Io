@@ -425,6 +425,92 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // P23 (Ben, 2026-10-24; PRODUCTION.md § Construction is measured in days) --
+    // the v57 construction-days section round-trips by value, and a v56 stream
+    // reads with each site's days DERIVED from its ticks (x 90).
+    {
+        world wd = w;
+        std::vector<entity_id> bids;
+        for (const auto& [bid, b] : wd.buildings) bids.push_back(bid);
+        std::sort(bids.begin(), bids.end());
+        bool have = bids.size() >= 2;
+        if (have)
+        {
+            building_component& site = wd.buildings.at(bids[0]);
+            site.ticks_remaining = 2; site.days_remaining = 150; site.build_rate_permille = 600;
+            site.build_paid_days = 40; site.build_day_milli = 321; site.construction_progress = 0.0f;
+            building_component& done = wd.buildings.at(bids[1]);
+            done.ticks_remaining = 0; done.days_remaining = 0; done.completion_day = 12;
+            done.output_share_permille = 500;
+            wd.construction_quarter_day = 37;
+        }
+        const std::string b57 = to_bytes(wd);
+        world back;
+        bool ok = have && from_bytes(b57, back) && back.construction_quarter_day == 37;
+        if (ok)
+        {
+            const building_component& s2 = back.buildings.at(bids[0]);
+            const building_component& d2 = back.buildings.at(bids[1]);
+            ok = s2.ticks_remaining == 2 && s2.days_remaining == 150 && s2.build_rate_permille == 600
+              && s2.build_paid_days == 40 && s2.build_day_milli == 321
+              && d2.completion_day == 12 && d2.output_share_permille == 500
+              && back.state_hash(7) == wd.state_hash(7) && to_bytes(back) == b57;
+        }
+        check(ok, "P23 v57: a site's days, rate, paid days, sub-day progress, a completion day, "
+                  "an output share and the day cursor round-trip by value (hash and bytes equal)");
+
+        // A v56 stream: the same world less the section. Days derived from ticks.
+        world w56 = wd;
+        if (have)
+        {
+            building_component& site = w56.buildings.at(bids[0]);
+            site.days_remaining = 0; site.build_rate_permille = 0; site.build_paid_days = 0;
+            site.build_day_milli = 0; site.construction_progress = 0.25f; // a quarter of a quarter done
+            building_component& done = w56.buildings.at(bids[1]);
+            done.completion_day = 0; done.output_share_permille = 1000;
+            w56.construction_quarter_day = 0;
+        }
+        std::string b56;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_days(w56, o);
+            b56 = o.str();
+        }
+        uint32_t stamped = 0;
+        std::memcpy(&stamped, &b56[4], sizeof stamped);
+        world old;
+        bool ok56 = have && stamped == k_world_save_version_pre_days && from_bytes(b56, old);
+        if (ok56)
+        {
+            const building_component& s3 = old.buildings.at(bids[0]);
+            ok56 = s3.ticks_remaining == 2 && s3.days_remaining == 2 * 90 - 22
+                && old.construction_quarter_day == 0;
+            for (const auto& [bid, b] : old.buildings)
+                ok56 = ok56 && (b.ticks_remaining > 0
+                                    ? (b.days_remaining + 89) / 90 == b.ticks_remaining
+                                    : b.days_remaining == 0);
+        }
+        check(ok56, "P23 a v56 stream reads, each site's days derived from its ticks (2 qtrs less "
+                    "a quarter of one = 158 days), the cursor 0");
+        std::size_t rows = 0; // the buildings the v57 section carries
+        for (const auto& [bid, b] : wd.buildings)
+            rows += canonical_construction_days(b).any() ? 1 : 0;
+        check(have && b57.size() == b56.size() + 8 + 28 * rows && rows >= 2,
+              "P23 v56 is v57 less its section (8 bytes + 28 a row)");
+
+        // Untrusted: a cursor past the quarter is refused whole.
+        std::string bad = b57;
+        if (have && b57.size() >= 8 + 28 * rows)
+        {
+            const int32_t past = 91;
+            std::memcpy(&bad[b57.size() - 8 - 28 * rows], &past, sizeof past);
+        }
+        world sentinel;
+        check(have && !from_bytes(bad, sentinel) && sentinel.buildings.empty(),
+              "P23 a cursor past day 90 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
     // P22 (BL-1407, requirement R2) -- A REAL v54 STREAM LOADS INTO THE
     // NATION-OWNED WORLD. The legacy writer produces a v54 stream whose
     // corporation store holds firms that OWN buildings, money, a reserve, a unit,
