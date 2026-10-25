@@ -2152,6 +2152,145 @@ site_road_stats lay_site_roads(world& w, entity_id body)
             add_target(t);
     }
 
+    // THE NETWORK IS THE ROADS AND THE RAIL (Ben, 2026-10-24; LOGISTICS.md § Logistic
+    // Points). A hub's points travel only along a roaded edge, and the LP seeding lays its
+    // chain of hubs outward from the CAPITAL on the nation's own ground. So a site carrying
+    // a road is not yet served: the road must belong to its nation's network -- the road
+    // component, over the nation's own dry ground, that holds its capital ("home"). A site
+    // off it is joined by an own-ground Track: a Dijkstra over the nation's own dry cells
+    // (the market pass's cell weight, so a route reuses the roads that already shorten it)
+    // to the nearest cell of home. Water is never entered -- a road point does not step
+    // onto it (logistic_points.cpp step_cost) -- and foreign ground never: the join builds
+    // only on the nation's own tiles (NATIONS.md § Own ground). A site with no such route
+    // (an island) is counted `sites_cut_off` and falls through to the nearest-road rule
+    // below, so the building still has its road; the seeding bridges it by sea.
+    // Deterministic: raster cells, a (cost, cell) frontier, nations in a std::map.
+    const std::vector<entity_id> grid = body_tile_grid(w, body); // a copy: caches move below
+    const std::size_t ncell = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    const bool grid_ok = grid.size() >= ncell;
+    const auto cell_index = [&](entity_id t) -> int {
+        const auto [gx, gy] = cell(t);
+        return gx < 0 ? -1 : gy * gw + gx;
+    };
+    // The four cardinal neighbours of @p c in the LP walk's order (N, E, S, W), columns
+    // wrapping; -1 off the grid.
+    const auto neighbours = [&](int c, int out[4]) {
+        const int x = c % gw, y = c / gw;
+        out[0] = y > 0 ? (y - 1) * gw + x : -1;
+        out[1] = y * gw + (x + 1) % gw;
+        out[2] = y + 1 < gh ? (y + 1) * gw + x : -1;
+        out[3] = y * gw + (x + gw - 1) % gw;
+    };
+    const auto own_dry = [&](int c, entity_id nation) -> bool {
+        if (c < 0 || static_cast<std::size_t>(c) >= ncell) return false;
+        const entity_id t = grid[static_cast<std::size_t>(c)];
+        if (t == null_entity || nation_of(w, t) != nation) return false;
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() && !is_water(it->second.substrate);
+    };
+    std::map<entity_id, std::set<int>> home; // nation -> cells of its capital's network
+    // Grow @p nation's home from @p seeds along roaded edges over its own dry ground.
+    const auto grow_home = [&](entity_id nation, std::vector<int> q) {
+        std::set<int>& h = home[nation];
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const int c = q[head];
+            const tile_component& tc = w.tiles.at(grid[static_cast<std::size_t>(c)]);
+            int nb[4];
+            neighbours(c, nb);
+            for (const int v : nb)
+            {
+                if (!own_dry(v, nation) || h.count(v) != 0) continue;
+                const int side = road_side_between(w, grid[static_cast<std::size_t>(c)],
+                                                   grid[static_cast<std::size_t>(v)]);
+                if (side < 0 || road_tier_on_side(tc, side) == 0) continue;
+                h.insert(v);
+                q.push_back(v);
+            }
+        }
+    };
+    // @p nation's home, built on first ask; null when it has no capital on this body.
+    const auto home_of = [&](entity_id nation) -> const std::set<int>* {
+        if (!grid_ok || nation == null_entity) return nullptr;
+        if (const auto it = home.find(nation); it != home.end())
+            return it->second.empty() ? nullptr : &it->second;
+        const auto nit = w.nations.find(nation);
+        const entity_id cap = nit != w.nations.end() ? nit->second.capital_tile : null_entity;
+        const int cc = cap != null_entity ? cell_index(cap) : -1;
+        if (cc < 0 || w.tiles.at(cap).body != body || !own_dry(cc, nation))
+        {
+            home[nation]; // empty: no capital here, the nearest-road rule alone applies
+            return nullptr;
+        }
+        home[nation].insert(cc);
+        grow_home(nation, {cc});
+        return &home[nation];
+    };
+    // The own-ground join from @p from to @p nation's home: true if a route was found and
+    // laid (or the site turned out to be home already).
+    std::vector<std::int64_t> jdist;
+    std::vector<std::int32_t> jparent;
+    const auto join_home = [&](entity_id nation, int from) -> bool {
+        const std::set<int>* h = home_of(nation);
+        if (h == nullptr || !own_dry(from, nation)) return false;
+        if (h->count(from) != 0) return true;
+        jdist.assign(ncell, kNoCost);
+        jparent.assign(ncell, -1);
+        using item = std::pair<std::int64_t, int>;
+        std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+        const auto weight = [&](int c) {
+            return market_cell_weight(w.tiles.at(grid[static_cast<std::size_t>(c)]));
+        };
+        jdist[static_cast<std::size_t>(from)] = 0;
+        pq.push({ 0, from });
+        int reached = -1;
+        while (!pq.empty())
+        {
+            const auto [d, c] = pq.top();
+            pq.pop();
+            if (d != jdist[static_cast<std::size_t>(c)]) continue; // stale
+            if (h->count(c) != 0) { reached = c; break; }
+            int nb[4];
+            neighbours(c, nb);
+            for (const int v : nb)
+            {
+                if (!own_dry(v, nation)) continue;
+                const std::int64_t nd = d + weight(c) + weight(v);
+                std::int64_t& cur = jdist[static_cast<std::size_t>(v)];
+                if (cur == kNoCost || nd < cur)
+                {
+                    cur = nd;
+                    jparent[static_cast<std::size_t>(v)] = c;
+                    pq.push({ nd, v });
+                }
+            }
+        }
+        if (reached < 0) return false;
+        std::vector<int> route; // home -> site
+        for (int c = reached; c >= 0; c = jparent[static_cast<std::size_t>(c)])
+            route.push_back(c);
+        int laid = 0;
+        for (std::size_t k = 0; k + 1 < route.size(); ++k)
+        {
+            const entity_id ta = grid[static_cast<std::size_t>(route[k])];
+            const entity_id tb = grid[static_cast<std::size_t>(route[k + 1])];
+            const int side = road_side_between(w, ta, tb);
+            if (side < 0) continue;
+            if (road_tier_on_side(w.tiles.at(ta), side) == 0 && lay_road_edge(w, ta, side, kTrack))
+                ++laid;
+        }
+        st.crossings_laid += laid;
+        for (const int c : route)
+            add_target(grid[static_cast<std::size_t>(c)]);
+        // The route and every fragment it touched are home now.
+        std::set<int>& hm = home[nation];
+        std::vector<int> fresh;
+        for (const int c : route)
+            if (hm.insert(c).second) fresh.push_back(c);
+        grow_home(nation, std::move(fresh));
+        return true;
+    };
+
     road_snapper           snapper(w, body); // BL-1252: no parallel roads, here too
     std::vector<entity_id> stamped;
     for (const site& s : sites)
@@ -2159,6 +2298,23 @@ site_road_stats lay_site_roads(world& w, entity_id body)
         const auto tit = w.tiles.find(s.tile);
         if (tit == w.tiles.end())
             continue;
+        const bool had_road = tile_has_road(tit->second);
+        const entity_id site_nation = nation_of(w, s.tile);
+        const int site_cell = cell_index(s.tile);
+        if (const std::set<int>* h = home_of(site_nation);
+            h != nullptr && own_dry(site_cell, site_nation) && h->count(site_cell) == 0)
+        {
+            if (!had_road) ++st.sites_roadless;
+            if (join_home(site_nation, site_cell))
+            {
+                ++(had_road ? st.sites_rejoined : st.sites_joined);
+                continue;
+            }
+            ++st.sites_cut_off;
+            if (had_road)
+                continue; // roaded, on ground its capital cannot reach by land
+            --st.sites_roadless; // counted again by the nearest-road rule below
+        }
         if (tile_has_road(tit->second))
             continue; // already served -- by the lattice, or by an earlier site's track
         ++st.sites_roadless;
@@ -2198,11 +2354,43 @@ site_road_stats lay_site_roads(world& w, entity_id body)
     }
     st.walks = static_cast<long long>(w.logistics_flood_fields.size());
     count_road_edges(w, st.edges_after);
-    if (st.sites_joined > 0)
+    if (st.sites_joined > 0 || st.sites_rejoined > 0)
         invalidate_logistics_caches(w); // road_level moved: generate_roads' own contract
     return st;
 }
 
+
+site_road_stats lay_site_roads_every_body(world& w)
+{
+    std::vector<entity_id> bodies;
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        (void)bc;
+        bodies.push_back(bid);
+    }
+    std::sort(bodies.begin(), bodies.end()); // deterministic: bodies is unordered
+    site_road_stats out{};
+    for (const entity_id b : bodies)
+    {
+        const site_road_stats s = lay_site_roads(w, b);
+        out.sites          += s.sites;
+        out.sites_roadless += s.sites_roadless;
+        out.sites_joined   += s.sites_joined;
+        out.sites_failed   += s.sites_failed;
+        out.crossings_laid += s.crossings_laid;
+        out.long_crossing  += s.long_crossing;
+        out.half_crossings_refused += s.half_crossings_refused;
+        out.sites_rejoined += s.sites_rejoined;
+        out.sites_cut_off  += s.sites_cut_off;
+        out.walks           = s.walks;
+        for (int k = 0; k < 3; ++k)
+        {
+            out.edges_before[k] += s.edges_before[k];
+            out.edges_after[k]  += s.edges_after[k];
+        }
+    }
+    return out;
+}
 
 // ---------------------------------------------------------------------------
 // Sea lanes, stamped from the lane record (BL-1098)

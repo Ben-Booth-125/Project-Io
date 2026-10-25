@@ -79,12 +79,14 @@ float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_net
     {
         case lp_network::road:
         {
-            if (water)
-                return -1.0f;
             // Ben, 2026-10-24: THE NETWORK IS THE ROADS AND THE RAIL. A hub's points
             // travel only along a roaded edge; a step off the road is impassable, so
             // no point reaches a tile no road leads to. (Off-network supply is the
             // units' alone, NR-1050: a march draws its nation's pool with no reach.)
+            // A BRIDGE IS A ROAD (Ben, 2026-10-17: a road may span water): a roaded
+            // edge onto a water tile carries points like any other, so a strait the
+            // road crosses is no gap in the network; water no road crosses still is.
+            (void)water;
             const std::uint8_t lvl = road_tier_on_side(from, side);
             return (lvl >= 1 && lvl <= 3) ? lp_road_step[lvl] : -1.0f;
         }

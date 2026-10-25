@@ -262,6 +262,12 @@ int main(int argc, char** argv)
         world& w = start->w;
         state_handover_report handover = hand_over_state_industry(w, start->reg);
         hand_over_rail(w);
+        // finish_campaign_world's site roads, before the seeding (Ben, 2026-10-24: the
+        // network is the roads and the rail; every site joined to its capital's network).
+        const site_road_stats sr = lay_site_roads_every_body(w);
+        std::printf("SR seed=%u sites=%d roadless=%d joined=%d failed=%d rejoined=%d cut_off=%d crossings=%d\n",
+                    seed, sr.sites, sr.sites_roadless, sr.sites_joined, sr.sites_failed,
+                    sr.sites_rejoined, sr.sites_cut_off, sr.crossings_laid);
 
         // Hubs that already stood before the seeding pass: generation's, not this
         // pass's. Everything added below is the pass's own placement.

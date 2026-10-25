@@ -355,6 +355,10 @@ inline shipped_landscape apply_shipped_landscape(
     // after the rail handover (held back with it).
     if (!charter.skip_rail_handover && !charter.skip_state_handover)
     {
+        // finish_campaign_world's site roads, verbatim, BEFORE the seeding (Ben,
+        // 2026-10-24: the network is the roads and the rail, so the seeding covers only
+        // what a road reaches) -- every site joined to its nation's capital network.
+        lay_site_roads_every_body(w);
         out.lp = seed_logistics_sources(w);
         // BL-1402: finish_campaign_world's fold to ground, verbatim, right after it.
         if (!charter.skip_fold)
@@ -388,6 +392,8 @@ inline shipped_landscape apply_shipped_landscape(
             print_state_node_fund(fund_state_nodes_from_firms(w, reg));
         lp_seed_read_at_gate(w, reg, out.lp);
         print_lp_seed_report(out.lp);
+        // ... and its second site-road call, after the seeding (a port it landed).
+        lay_site_roads_every_body(w);
     }
 
     return out;
