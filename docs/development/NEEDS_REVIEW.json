@@ -826,7 +826,7 @@
    "title": "A major nation's capital on a 3-tile landlocked enclave leaves its whole economy off the chain (seed 1)",
    "raised": "2026-10-25",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Port-link lane, seed 1 census on main 3361ccf9",
    "what": "Seed 1's 12 unconnectable consumers all belong to one major nation. Its capital stands on a 3-tile enclave of its own ground, wholly surrounded by a neighbour's land and touching no coast. The nation's other 1837 dry tiles form one coastal landmass about 46 tiles away, where all 12 consumers stand. The chain never crosses a neighbour's land and a port needs a coast joined to the capital, so the port link cannot serve them. Its Logistic Point pool is the capital hub alone (120); 1837 of 1840 dry tiles get nothing. TRACED (enclave_trace, 2026-10-25): the far landmass is not the realm's provinces but a seedless landmass Pass 2b hung on the carve cell of one province near the seat; the 1959 closing-round cession ceded that province's ground to the neighbour, and the cession moves ground only, so the islet stayed with the cedent and then passed as a remote island. The same pattern makes a 1-tile-capital major on seed 0 once history shifts. Ben's conquest cut-off rule (experiment be2b1287, not merged) removes seed 1's case only by changing the whole history, and roughly triples generation time.",
    "why_it_matters": "A major nation the player may pick opens with its economy dark. LOGISTICS.md already counts ground a neighbour cuts off rather than forcing it, so this is lawful, but it reads as a generation defect.",
@@ -842,7 +842,7 @@
     "docs/generation/NATION_GENERATION.md",
     "docs/economy/LOGISTICS.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-25: D. A cession takes the Pass 2b islets hung on the ceded province with it. The conquest cut-off experiment (be2b1287) is dropped."
   }
  ]
 }
