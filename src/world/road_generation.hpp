@@ -696,8 +696,11 @@ void stamp_sea_lanes(world& w, entity_id body,
 // entering water an earlier lane already carries at `kSeaLaneReuseCostQ` -- so lanes
 // share trunks with each other and with the colonial lanes. It runs from the sea
 // tiles on the lower-id port's six hex sides to the first of the higher-id port's it
-// settles (`sea_walk_laned_between`). A pair the walk cannot join (only a lake between
-// them) is counted and lays nothing. Purely additive: no lane is ever unlaid.
+// settles (`sea_walk_laned_between`). LAKES TOO (Ben, 2026-10-25, NR-1061: "ports on a
+// lake lay lanes over the lake to other ports within 50"): a pair the sea does not join
+// but one lake both touch is laned over that lake by the same walk on the lake's own
+// water, as still water. The colonial stamp stays sea-only. A pair no water joins is
+// counted and lays nothing. Purely additive: no lane is ever unlaid.
 //
 // ORDER: ascending port id, pairs (lo, hi). `lay_all_port_lanes` walks every body in
 // ascending id, lo outer and hi inner; `lay_port_lanes` joins ONE port to every other
@@ -715,7 +718,8 @@ struct port_lane_stats
     int       ports       = 0; ///< standing ports read
     int       pairs       = 0; ///< pairs within the limit
     int       laid        = 0; ///< of them, walked and stamped
-    int       unreachable = 0; ///< within the limit by the measure, but no sea the lane walk crosses
+    int       unreachable = 0; ///< within the limit by the measure, but no sea or lake the lane walk crosses
+    int       lake_laid   = 0; ///< of `laid`, lanes laid over a lake (NR-1061)
     long long path_tiles  = 0; ///< tiles over every laid path (a shared tile counts per lane)
     int       tiles_added = 0; ///< tiles that carried no lane before the call
 };

@@ -298,10 +298,10 @@ std::unordered_map<entity_id, float> lp_sea_walk(world& w, entity_id body,
                                                  const std::vector<entity_id>& seeds, float bound);
 
 /// A PORT'S FIELD (Ben, 2026-10-25; LOGISTICS.md § One pool, "Points ride the lanes"):
-/// from @p seeds (a port's tile) onto a laned sea tile beside it, along laned water on all
-/// six hex sides, LANDING only on a standing port's tile beside a lane - every step 1, a
-/// landing ending the walk, bounded at the sea's full reach plus fade. Open water no lane
-/// crosses, a lake, and a shore with no port are never reached. What lp_distance_field
+/// from @p seeds (a port's tile) onto a laned water tile beside it (sea, or a lake: NR-1061),
+/// along laned water on all six hex sides, LANDING only on a standing port's tile beside a
+/// lane - every step 1, a landing ending the walk, bounded at the sea's full reach plus
+/// fade. Open water no lane crosses, and a shore with no port, are never reached. What lp_distance_field
 /// returns for lp_network::sea.
 std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
                                                   const std::vector<entity_id>& seeds);

@@ -2839,13 +2839,16 @@ bool port_lane_standing(const building_component& b)
     return b.type == building_type::port && b.ticks_remaining <= 0 && !b.decommissioned;
 }
 
-/// One body's water as the lane walk reads it, built once per call.
+/// One body's water as the lane walk reads it, built once per call. TWO WATERS: the
+/// sea (ocean and coast) and the lakes, each walked on its own mask, so a lane never
+/// passes from one into the other where a lake happens to touch the shore.
 struct port_lane_body
 {
     bool                      ok = false;
     int                       gw = 0, gh = 0;
     std::vector<std::uint8_t> sea;
-    std::vector<std::uint8_t> laned;
+    std::vector<std::uint8_t> lake;  ///< Ben, 2026-10-25 (NR-1061): ports lay lanes over lakes
+    std::vector<std::uint8_t> laned; ///< any water already carrying a lane
     ocean_current_field       currents;
 };
 
@@ -2865,6 +2868,7 @@ port_lane_body read_port_lane_body(world& w, entity_id body)
         return pb;
     std::vector<terrain_substrate> substrate(static_cast<std::size_t>(n), terrain_substrate::sedimentary);
     pb.sea.assign(static_cast<std::size_t>(n), 0);
+    pb.lake.assign(static_cast<std::size_t>(n), 0);
     pb.laned.assign(static_cast<std::size_t>(n), 0);
     for (int i = 0; i < n; ++i)
     {
@@ -2873,8 +2877,10 @@ port_lane_body read_port_lane_body(world& w, entity_id body)
             continue;
         substrate[static_cast<std::size_t>(i)] = it->second.substrate;
         const bool s = is_sea(it->second.substrate);
+        const bool l = it->second.substrate == terrain_substrate::lake;
         pb.sea[static_cast<std::size_t>(i)]   = s ? 1 : 0;
-        pb.laned[static_cast<std::size_t>(i)] = (s && it->second.lane_level > 0) ? 1 : 0;
+        pb.lake[static_cast<std::size_t>(i)]  = l ? 1 : 0;
+        pb.laned[static_cast<std::size_t>(i)] = ((s || l) && it->second.lane_level > 0) ? 1 : 0;
     }
     if (ocean_current_weight_valid(kPortLaneCurrentWeightQ) && kPortLaneCurrentWeightQ > 0)
         pb.currents = build_ocean_currents(substrate, pb.gw, pb.gh, kPortLaneRotationSense);
@@ -2882,9 +2888,10 @@ port_lane_body read_port_lane_body(world& w, entity_id body)
     return pb;
 }
 
-/// A port's mouths: the SEA tiles on its six hex sides, raster indices ascending --
-/// where a lane from it may start or end.
-std::vector<int> port_lane_mouths(const world& w, const port_lane_body& pb, entity_id tile)
+/// A port's mouths on one water (@p water: the sea mask or the lake mask): the tiles of
+/// it on the port's six hex sides, raster indices ascending -- where a lane may start or end.
+std::vector<int> port_lane_mouths(const world& w, const port_lane_body& pb,
+                                  const std::vector<std::uint8_t>& water, entity_id tile)
 {
     std::vector<int> out;
     const auto tit = w.tiles.find(tile);
@@ -2896,7 +2903,7 @@ std::vector<int> port_lane_mouths(const world& w, const port_lane_body& pb, enti
         if (nb.gy < 0 || nb.gy >= pb.gh)
             continue;
         const int idx = nb.gy * pb.gw + ((nb.gx % pb.gw) + pb.gw) % pb.gw;
-        if (pb.sea[static_cast<std::size_t>(idx)])
+        if (water[static_cast<std::size_t>(idx)])
             out.push_back(idx);
     }
     std::sort(out.begin(), out.end());
@@ -2923,17 +2930,34 @@ std::vector<std::pair<entity_id, entity_id>> standing_ports(const world& w, enti
 /// Lay the lane from port @p lo (its tile) to port @p hi: the lane walk from any of
 /// lo's mouths to the first of hi's it reaches, entering laned water at the reuse
 /// discount, then stamped. Writes the tiles and @p pb.laned; counts into @p st.
+/// THE SEA FIRST, THEN A LAKE (Ben, 2026-10-25, NR-1061: "ports on a lake lay lanes over
+/// the lake to other ports within 50"): a pair the sea joins is laned on the sea, with
+/// the current; a pair the sea does not join but a lake both touch is laned over the
+/// lake, as still water (a lake has no ocean current). Each walk stays on its own water.
 void lay_one_port_lane(world& w, entity_id body, port_lane_body& pb, entity_id lo_tile,
                        entity_id hi_tile, port_lane_stats& st, port_lane_trace* trace,
                        entity_id lo, entity_id hi)
 {
-    const std::vector<int> from = port_lane_mouths(w, pb, lo_tile);
-    const std::vector<int> to   = port_lane_mouths(w, pb, hi_tile);
-    const std::vector<int> path =
-        (from.empty() || to.empty())
-            ? std::vector<int>{}
-            : sea_walk_laned_between(pb.sea, pb.gw, pb.gh, pb.currents.empty() ? nullptr : &pb.currents,
-                                     kPortLaneCurrentWeightQ, &pb.laned, kSeaLaneReuseCostQ, from, to);
+    std::vector<int> path;
+    {
+        const std::vector<int> from = port_lane_mouths(w, pb, pb.sea, lo_tile);
+        const std::vector<int> to   = port_lane_mouths(w, pb, pb.sea, hi_tile);
+        if (!from.empty() && !to.empty())
+            path = sea_walk_laned_between(pb.sea, pb.gw, pb.gh, pb.currents.empty() ? nullptr : &pb.currents,
+                                          kPortLaneCurrentWeightQ, &pb.laned, kSeaLaneReuseCostQ, from, to);
+    }
+    if (path.empty())
+    {
+        const std::vector<int> from = port_lane_mouths(w, pb, pb.lake, lo_tile);
+        const std::vector<int> to   = port_lane_mouths(w, pb, pb.lake, hi_tile);
+        if (!from.empty() && !to.empty())
+        {
+            path = sea_walk_laned_between(pb.lake, pb.gw, pb.gh, nullptr, 0, &pb.laned, kSeaLaneReuseCostQ,
+                                          from, to);
+            if (!path.empty())
+                ++st.lake_laid;
+        }
+    }
     if (path.empty())
     {
         ++st.unreachable;
@@ -2943,8 +2967,8 @@ void lay_one_port_lane(world& w, entity_id body, port_lane_body& pb, entity_id l
     for (const int idx : path)
     {
         const auto it = w.tiles.find(grid[static_cast<std::size_t>(idx)]);
-        if (it == w.tiles.end() || !is_sea(it->second.substrate))
-            continue; // the walk is sea-only; belt and braces
+        if (it == w.tiles.end() || !is_water(it->second.substrate))
+            continue; // the walk is water-only; belt and braces
         if (it->second.lane_level == 0)
             ++st.tiles_added;
         it->second.lane_level = std::max<std::uint8_t>(it->second.lane_level, 1);

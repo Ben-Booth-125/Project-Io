@@ -199,7 +199,9 @@ std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
     // coastal road that port stands on. Every step costs 1; a landing ends the walk. All six
     // hex sides, as a port is placed against sea on any of them and as the any-water walk
     // read them (BL-1396), so a lane's cardinal staircase is ridden at about its hex length.
-    // Open water no lane crosses, a lake, and a shore with no port carry nothing. Bounded at
+    // A lane over a LAKE is ridden as a lane over the sea (Ben, 2026-10-25, NR-1061: ports
+    // on a lake lay lanes over it). Open water no lane crosses, and a shore with no port,
+    // carry nothing. Bounded at
     // the sea's full reach plus its fade.
     std::unordered_map<entity_id, float> dist;
     const auto bit = w.bodies.find(body);

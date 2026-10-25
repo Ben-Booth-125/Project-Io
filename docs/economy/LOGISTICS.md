@@ -582,8 +582,17 @@ one per step — never as a straight line, so a headland between two ports is wa
 is walked with the lane walk above: the sea only, the four cardinal steps, the current at the
 colonial spans' own weight, and **reuse of every lane already on the water**, so lanes between
 neighbouring ports share trunks with each other and with the colonial lanes. A lane starts on the
-sea beside its port (any of the six hex sides) and ends on the sea beside the other. A pair with no
-sea between them that the walk can cross — two ports joined only through a lake — lays nothing.
+sea beside its port (any of the six hex sides) and ends on the sea beside the other.
+
+**Ports lay lanes over lakes too (Ben, 2026-10-25, NR-1061: "ports on a lake lay lanes over the
+lake to other ports within 50, as NR-1061 ruled ports cover lakes").** A pair of ports within fifty
+that the sea does not join, but one lake both touch, is laned **over that lake** by the same walk on
+the lake's own water — the four cardinal steps, reuse of the lanes already on it, and still water,
+since a lake carries no ocean current. A lake lane is the same tile field as a sea lane, saved,
+drawn and ridden alike. Each walk keeps to its own water: a lane never passes from a lake into the
+sea where the two happen to touch. **The distinction from the colonial stamp is deliberate:** the
+"never a lake" rule above is the colonial record's — the history's fleets sailed the ocean — and it
+is unchanged; only a port lays a lane on a lake. A pair no water joins lays nothing.
 
 - **Who is joined: every port, whoever holds it** (a delegated reading, 2026-10-25). The rule says
   "each other port", and a lane is geography — water a convoy can follow, read by every traveller
@@ -761,7 +770,8 @@ into passive and active. What follows replaces the bifold model, the city genera
   scale. Water is where points travel furthest: a port carries the chain to a coast a road could
   never reach, which is what lets an island nation's network be one network. **Points ride the
   lanes (Ben, 2026-10-25: the network is the roads and the rail, and every port lays a lane to every
-  port within fifty — § 4b).** A port's points travel only along **sea lanes**: from the port tile
+  port within fifty — § 4b).** A port's points travel only along **lanes** — on the sea, and on a
+  lake where ports lay one (Ben, 2026-10-25, NR-1061) — from the port tile
   onto a lane beside it, along laned water a tile at a time (all six hex sides, one per step), and
   they **land only on a port tile** where a lane ends beside it — the coastal road that port stands
   on. The fifty and the hundred are counted along the lanes. Open water no lane crosses carries
@@ -772,8 +782,8 @@ into passive and active. What follows replaces the bifold model, the city genera
   hub whose road reach covers its tile, or through a connected port its lanes land on. *Delegated
   reading (2026-10-25) of the two rulings together:* points live on network tiles, and on the
   water the lane is the network tile, so the port's reach is the lane network rather than the any-water
-  walk it replaces. Superseded: the any-water walk that landed on every shore and crossed lakes
-  (BL-1396, Ben 2026-10-21; NR-1061). It survives only as the **measure** of the fifty that decides
+  walk it replaces. Superseded: the any-water walk that landed on every shore (BL-1396, Ben
+  2026-10-21); a port still covers a lake (NR-1061), now by the lanes it lays over it. It survives only as the **measure** of the fifty that decides
   which ports are laned, and of the reach generation's port link reads.
 - **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
   points carry **20 tiles** along the line at full strength and fade to zero at double, **40** — the

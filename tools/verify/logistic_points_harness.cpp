@@ -1478,6 +1478,32 @@ void l10_port_lanes()
         }
         check(painted, "its routed flow lies on every lane tile between the two ports (field_walk_back over the lane)");
     }
+
+    // 7. LAKES (Ben, 2026-10-25, NR-1061): two ports on one lake, 30 lake tiles apart, no
+    //    sea anywhere. They are laned over the lake, and each one's field covers the other.
+    //    A third lake, 60 lake tiles off the second port, is beyond fifty: no lane.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 200);
+        for (int col = 1; col <= 30; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::lake;
+        for (int col = 32; col <= 91; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::lake;
+        add_building(w, tile_at(w, body, 0), building_type::port);
+        add_building(w, tile_at(w, body, 31), building_type::port);
+        add_building(w, tile_at(w, body, 92), building_type::port);
+        const port_lane_stats ls = lay_all_port_lanes(w);
+        std::printf("        (lake: pairs %d, laid %d, over a lake %d, unreachable %d)\n",
+                    ls.pairs, ls.laid, ls.lake_laid, ls.unreachable);
+        check(laned(w, body, 1, 30) && ls.lake_laid == 1 && ls.laid == 1,
+              "two lake ports 30 apart are laned over the lake");
+        check(unlaned(w, body, 32, 91), "a lake port 61 water tiles off is beyond fifty: no lane");
+        const auto f = lp_distance_field(w, body, lp_network::sea, {tile_at(w, body, 0)});
+        const auto it = f.find(tile_at(w, body, 31));
+        check(it != f.end() && approx(it->second, 31.0f) && lp_reach(lp_network::sea, it->second) >= 1.0f,
+              "a lake port's field rides the lake lane and covers the other lake port at full strength");
+        check(f.count(tile_at(w, body, 92)) == 0, "and not the lake port beyond fifty");
+    }
 }
 
 int main()
