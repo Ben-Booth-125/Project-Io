@@ -331,6 +331,18 @@ to the lower nation index, then the lower tile index. The cession moves ground o
 keeps its core, its name and its chest, so a cession never changes the nation count, and the
 receiver's own contiguity is re-checked after each one until no exclave is left.
 
+**A cession takes the Pass 2b islets hung on the ceded province with it (Ben, 2026-10-25).** Pass 2b
+hangs a seedless landmass on the carve cell of one province, so the islet is that province's ground
+wherever it lies. When the province is ceded, every islet of its cell that the cedent still holds
+outside the exclave goes with it, to the same receiver; the cedent's core is never carried. Where an
+exclave is split tile by tile and the province's cell falls to several neighbours, the islet goes to
+the receiver of the part of the cell it hangs from: the exclave tile of that cell nearest the islet
+by Pass 2b's own grid distance, ties to the lower tile index. A carried islet is ground like any
+other, so the receiver's contiguity is re-checked after it: an islet within strait reach of another
+nation is ceded on, and one beyond every strait is the receiver's remote island. Leaving the islet
+with the cedent would let a realm cut down to a few tiles of its seat keep a far landmass as its
+whole economy.
+
 **A cession is a history event.** On a settled world it is a **closing-round step of
 Industrialisation** (§ The nation count is a target), recorded with its cause — the exclave was
 cut off from its realm — and it runs **first**, before the size floor and before reconciliation.

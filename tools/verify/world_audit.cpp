@@ -451,6 +451,94 @@ static int count_cessions(const generation_report& rep)
     return n;
 }
 
+// NR-1077 (Ben, 2026-10-25) — A CAPITAL ON A SPECK. Per nation: the land
+// group (cardinal, column-wrapped, same owner) holding its capital tile, and
+// its largest other group. A nation whose capital group is under
+// `k_speck_tiles` while another of its groups is larger is seated on a speck
+// with its main ground elsewhere. A READING of the finished world.
+static constexpr int k_speck_tiles = 10;
+struct capital_speck_stats
+{
+    int         all    = 0; ///< nations of any rank seated on a speck
+    int         majors = 0; ///< of those, majors (the row fails on these)
+    std::string detail;     ///< " | <name> capital group G of L land" per speck
+};
+
+static capital_speck_stats audit_capital_specks(const world& w, const std::set<entity_id>& majors)
+{
+    capital_speck_stats cs;
+    const entity_id body = w.home_body;
+    const auto      bit  = w.bodies.find(body);
+    if (bit == w.bodies.end()) return cs;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height, total = gw * gh;
+    if (total <= 0) return cs;
+    std::vector<entity_id> owner(static_cast<std::size_t>(total), null_entity);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body || is_water(tc.substrate)) continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx < 0 || idx >= total) continue;
+        const auto nit = w.tile_to_nation.find(tid);
+        if (nit != w.tile_to_nation.end()) owner[static_cast<std::size_t>(idx)] = nit->second;
+    }
+    // Land groups of every nation, labelled once.
+    std::vector<int> comp(static_cast<std::size_t>(total), -1), csize;
+    std::vector<entity_id> cown;
+    for (int s = 0; s < total; ++s)
+    {
+        const entity_id o = owner[static_cast<std::size_t>(s)];
+        if (o == null_entity || comp[static_cast<std::size_t>(s)] >= 0) continue;
+        const int id = static_cast<int>(csize.size());
+        csize.push_back(0);
+        cown.push_back(o);
+        std::vector<int> st{ s };
+        comp[static_cast<std::size_t>(s)] = id;
+        while (!st.empty())
+        {
+            const int t = st.back();
+            st.pop_back();
+            ++csize[static_cast<std::size_t>(id)];
+            const int col = t % gw, row = t / gw;
+            const int nb[4] = { row * gw + (col + 1) % gw, row * gw + (col - 1 + gw) % gw,
+                                row > 0 ? t - gw : -1, row + 1 < gh ? t + gw : -1 };
+            for (const int u : nb)
+                if (u >= 0 && comp[static_cast<std::size_t>(u)] < 0 && owner[static_cast<std::size_t>(u)] == o)
+                {
+                    comp[static_cast<std::size_t>(u)] = id;
+                    st.push_back(u);
+                }
+        }
+    }
+    std::map<entity_id, int> land;
+    for (const entity_id o : owner)
+        if (o != null_entity) ++land[o];
+    for (const auto& [nid, n] : w.nations) // std::map: ascending ids
+    {
+        const auto tit = w.tiles.find(n.capital_tile);
+        if (tit == w.tiles.end() || tit->second.body != body) continue;
+        const int ct = tit->second.grid_y * gw + tit->second.grid_x;
+        if (ct < 0 || ct >= total || owner[static_cast<std::size_t>(ct)] != nid) continue; // capital_off: another row
+        const int cc    = comp[static_cast<std::size_t>(ct)];
+        const int group = csize[static_cast<std::size_t>(cc)];
+        // "Its main ground elsewhere": a group of its own larger than the
+        // capital's. A nation whose every group is a speck (a city state on a
+        // chain of one-tile islets) is seated on its ground, not off it.
+        int largest_other = 0;
+        for (std::size_t c = 0; c < csize.size(); ++c)
+            if (cown[c] == nid && static_cast<int>(c) != cc) largest_other = std::max(largest_other, csize[c]);
+        const int all_land = land[nid];
+        if (group >= k_speck_tiles || largest_other <= group) continue;
+        ++cs.all;
+        const bool major = majors.count(nid) > 0;
+        cs.majors += major ? 1 : 0;
+        char buf[160];
+        std::snprintf(buf, sizeof(buf), " | %s%s capital group %d of %d land", n.name.c_str(), major ? " (MAJOR)" : "",
+                      group, all_land);
+        cs.detail += buf;
+    }
+    return cs;
+}
+
 // THE RANDOM-PLACEMENT PATH (BL-1310 review). A `no_prehistory` world holds
 // no realm and runs no closing rounds (measured: every nation's polity -1),
 // so it is a no-history world on the SETTLEMENT anchors. This carves the same
@@ -606,8 +694,9 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                         hs.closing_cessions_late, hs.closing_secessions_split, hs.closing_reps_off_core,
                         hs.closing_cell_overrides.size(), hs.closing_predicted,
                         rep.handoff_violation.empty() ? "" : " | VIOLATION: ", rep.handoff_violation.c_str());
-            std::printf("        split cessions %d, city states %d (judged at the close)\n", hs.closing_cessions_split,
-                        hs.closing_city_states);
+            std::printf("        split cessions %d, city states %d (judged at the close), islet tiles carried %d (rounds) + %d (tail)\n",
+                        hs.closing_cessions_split, hs.closing_city_states, hs.closing_islet_tiles_carried,
+                        fx.tail_islet_tiles_carried);
             // THE RULE MUST NOT STARVE THE MINORS (Ben, 2026-10-18; sec
             // Territorial fragmentation, measured). At the wizard default
             // (20:4), after the finish (majors are nations home to a
@@ -640,6 +729,20 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                     if (majors.count(kv.first)) major_tiles += sz;
                     else minor_sizes.push_back(sz);
                     if (sz < 80) ++under_floor;
+                }
+                // NR-1077 (Ben, 2026-10-25) — NO MAJOR SEATED ON A SPECK. A
+                // major whose capital's land group is under 10 tiles while a
+                // larger group of its own lies elsewhere is the defect class a
+                // cession that left a Pass 2b islet with its cedent produced
+                // (seed 1: a 3-tile landlocked enclave, the economy on the
+                // islet). Every nation is read; majors fail the row.
+                {
+                    const capital_speck_stats cs = audit_capital_specks(sw, majors);
+                    ++checks;
+                    const bool speck_ok = cs.majors == 0;
+                    fails += speck_ok ? 0 : 1;
+                    std::printf("%s  SPECK seed %u 20:4: majors (%zu) seated on a <%d-tile group with a larger group elsewhere %d | all nations %d%s\n",
+                                speck_ok ? "PASS" : "FAIL", seed, majors.size(), k_speck_tiles, cs.majors, cs.all, cs.detail.c_str());
                 }
                 std::sort(minor_sizes.begin(), minor_sizes.end(), [](int a, int b) { return a > b; });
                 const int    median = minor_sizes.empty() ? 0 : minor_sizes[minor_sizes.size() / 2];

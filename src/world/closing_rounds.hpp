@@ -121,6 +121,10 @@ struct closing_plan
     int provinces_split    = 0; ///< BL-1310 round 4 review: moved provinces spanning two parts (0 by construction)
     int cores_floor_moved  = 0; ///< BL-1310 (Ben 2026-10-18): realms under the floor whose core is a larger piece than the seat's group
     int secessions_split   = 0; ///< secessions where no candidate kept both sides one territory
+    /// NR-1077 (§ Pass 2e, Ben 2026-10-25: "a cession takes the Pass 2b
+    /// islets hung on the ceded province with it"): land tiles of a moved
+    /// province's cell lying outside the exclave, carried to its receiver.
+    int islet_tiles_carried = 0;
     /// Realms whose representative (the lowest region they hold, which the
     /// tail reads as the nation's capital tile) is NOT in the territory of
     /// their capital's group after the rounds -- the two readings of "capital"
