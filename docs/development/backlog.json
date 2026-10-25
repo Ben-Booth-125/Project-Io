@@ -727,6 +727,28 @@
    ],
    "title": "A nation that owns its whole economy finds no build on a thin world, and its treasury falls",
    "design": "SPRINT 57, found at BL-1402's gate. On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. THE WORK: measure first (which candidates fail placement and why - reach, needs_road, own ground at the nation's edge?; whether 'materials not obtainable' reads the nation's own shelves now that every producer is the nation's), and read the treasury trajectory over market_viability's 400 ticks on the 16 seeds; then decide with Ben whether anything is wrong. Never retune to make R1 pass. Pairs with BL-1403 (the tax returns a share of wages, which slows the fall). ADDED 2026-10-24: BL-1402 T8 (AI nations pin trades, build Marketplaces, survey) is PARKED as docs/development/drafts/bl-1402-t8-nation-ai-trade.patch - re-opened it fails market_viability G1t50 (84.0; 84.6 with pins off). Measure it with the treasury trajectory: the same question of how a nation owning every plant trades against its own inputs (NR-1071)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 57,
+   "written": "2026-10-25",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Logistics lens merge, 2026-10-25)",
+   "requires": [],
+   "id": "BL-1410",
+   "short_name": "VERIFY_WORLD_NO_LP_SOURCES",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/core/verify_api.cpp",
+    "scripts/verify/logistics_lens.lua"
+   ],
+   "title": "The --verify world gives the player nation no running Logistic Point source",
+   "design": "Found merging the Logistics lens, 2026-10-25. scripts/verify/logistics_lens.lua fails 4 rows on main 765f585d (BL-1354 makes, T5 generates, T6 staged hub generates, T7 green road) and 2 after the lens merge. In the verify world the player nation holds a Port at (259,83) that makes 0, the key reads generated 0 by 0 sources, and even a staged logistics hub beside it generates 0. The verify run never prints the [lp] seeding line the game prints, so its world may skip seed_logistics_sources or idle every player source (the funding gate, or construction days leaving staged sites unfinished). The live game seeds every nation (100% granted). THE WORK: find which; make the verify world build as the game does; then logistics_lens.lua passes without weakening a row."
   }
  ]
 }
