@@ -338,10 +338,16 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         {
             if (s.network == lp_network::sea) continue;
             const auto f = lp_distance_field(w, w.tiles.at(s.tile).body, s.network, {s.tile});
+            // A BRIDGE IS A ROAD (Ben, 2026-10-17; 2967c7cf): a road field may reach a
+            // water tile only along a road laid onto it; a rail field never does.
             for (const auto& [tile, d] : f)
-                if (is_water(w.tiles.at(tile).substrate)) dry = false;
+            {
+                const tile_component& tc = w.tiles.at(tile);
+                if (!is_water(tc.substrate)) continue;
+                if (s.network != lp_network::road || max_road_tier(tc) == 0) dry = false;
+            }
         }
-        check(dry, "L1", "no road or rail field enters water");
+        check(dry, "L1", "no road or rail field enters water except along a road laid over it (a bridge)");
         // Upkeep: a source supplied at half makes half its points, never zero.
         if (!t.sources.empty() && t.sources.front().nation != null_entity)
         {
