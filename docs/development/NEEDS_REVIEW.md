@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*57 entries — 36 open, 21 resolved.*
+*58 entries — 36 open, 22 resolved.*
 
 ---
 
@@ -572,4 +572,15 @@ Seed 1's 12 unconnectable consumers all belong to one major nation. Its capital 
 > **RESOLVED.** Ben, 2026-10-25: D. A cession takes the Pass 2b islets hung on the ceded province with it. The conquest cut-off experiment (be2b1287) is dropped.
 
 *Files: `src/world/nation_generation.cpp`, `docs/generation/NATION_GENERATION.md`, `docs/economy/LOGISTICS.md`*
+
+### NR-1080 — A capital moved to its nearest province can land on a speck (seed 38)
+*question · raised 2026-10-25 · from Islet-cession lane, world_audit SPECK row*
+
+Seed 38: a major whose seat region has no carve cell has its capital moved to its nearest province, whose cell is an 8-tile islet joined by strait to its 380-tile ground. Legal under the strait rule, but a speck capital.
+
+**Why it matters.** The capital anchors the logistics chain and reads as the nation on the map.
+
+> **RESOLVED.** Ben, 2026-10-25: treat it as work. A capital moved to its nearest province must not land on a speck; seat it on the nation's largest group.
+
+*Files: `src/world/nation_generation.cpp`, `docs/generation/NATION_GENERATION.md`*
 

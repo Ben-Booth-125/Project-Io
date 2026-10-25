@@ -878,6 +878,23 @@
     "docs/economy/LOGISTICS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1080",
+   "title": "A capital moved to its nearest province can land on a speck (seed 38)",
+   "raised": "2026-10-25",
+   "kind": "question",
+   "status": "resolved",
+   "source": "Islet-cession lane, world_audit SPECK row",
+   "what": "Seed 38: a major whose seat region has no carve cell has its capital moved to its nearest province, whose cell is an 8-tile islet joined by strait to its 380-tile ground. Legal under the strait rule, but a speck capital.",
+   "why_it_matters": "The capital anchors the logistics chain and reads as the nation on the map.",
+   "options": [],
+   "recommendation": "",
+   "files": [
+    "src/world/nation_generation.cpp",
+    "docs/generation/NATION_GENERATION.md"
+   ],
+   "resolution": "Ben, 2026-10-25: treat it as work. A capital moved to its nearest province must not land on a speck; seat it on the nation's largest group."
   }
  ]
 }
