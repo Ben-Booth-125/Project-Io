@@ -599,7 +599,7 @@ void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour (caller's red→green ramp sample).
 void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
-/// Draw a railway-line glyph � two parallel rails on a diagonal crossed by
+/// Draw a railway-line glyph — two parallel rails on a diagonal crossed by
 /// sleepers (BL-1255). Distinct from the railway station (the hub node): this
 /// is the LINE, the track a tile carries. Used in the road ladder's Track row.
 ///
@@ -608,5 +608,19 @@ void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param r      Half-extent (radius) of the glyph, screen pixels.
 /// @param colour Stroke colour.
 void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the **capital star** (Ben, 2026-10-25: "render the capital with a star for
+/// most lenses") - a filled FIVE-point star with the family's dark outline, point up,
+/// the cartographer's mark for a seat of government. Drawn on the Planetary canvas at
+/// every nation's capital tile, in that nation's identity colour (presentation.hpp);
+/// the caller rings the player's own. Five points and filled keep it apart from the
+/// retired `hq` (an eight-point star in a ring) and from every building silhouette;
+/// the inner radius is 0.45 r so the points stay sharp at a 5 px radius.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Star centre, screen pixels.
+/// @param r      Half-extent (point radius) of the star, screen pixels.
+/// @param colour Fill colour (the nation's identity colour).
+void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 } // namespace ui::icons

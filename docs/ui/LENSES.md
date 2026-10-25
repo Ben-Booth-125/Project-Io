@@ -46,7 +46,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` — the **Logistics** lens | Planetary: the player nation's roads coloured green → yellow by supplied over requested + a ring on every source + two numbers on every road tile of the nation (supplied over requested) + key. No ground tint. |
+| `throughput` — the **Logistics** lens | Planetary: every link of the player nation's chain — roads, rail legs, sea legs — coloured green → yellow by supplied over requested where traffic crosses it, steel where it is connected but idle, umber where a road is not tied to the capital + a ring on every source + numbers on every link (supplied over requested; one figure on an idle link) + key. No ground tint; the painted routes leave the ground while it is up. |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 | `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
@@ -107,7 +107,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
-| **Logistics** | — | — | roads coloured by supplied over requested + source ring + numbers on road tiles + key |
+| **Logistics** | — | — | every chain link (road, rail, sea) coloured by traffic or reach + source ring + numbers on links + key |
 
 **Per-lens rung notes.** Resource, Population, Industry and Continent
 are **Planetary-only** — their unit of meaning (a tile, a deposit, a
@@ -923,18 +923,58 @@ it along the chains of `LOGISTICS.md` § How a tile's points get to it:
   on its own tile, with nothing supplied.
 - **The colour is the ratio supplied / requested on a log2 scale**: **2 or more is full
   green**, **0.5 or less is full yellow**, interpolated between, so 1 sits at the midpoint.
-  A road no request routes through reads **green** — its supply is at least double a zero
-  request.
+  The ramp is for links that **carry** a routed request; a link no request crosses is not on
+  it at all (Reach is kept apart from traffic, below).
 - The road keeps its **tier** — width and the 1 : 1.5 : 2 weights, and the tier's opacity
   ladder — only its colour is the lens's. Roads that are not the player nation's keep their
   ordinary colour.
 
-**Two numbers on every road tile, stacked** (Ben, 2026-10-24). Wherever the rung gives the text
-room (a drawn radius of **20 px** or more), each **road** tile of the player's nation carries
-**supplied** above **requested**, both LP/tick: the routed flow above — the pair the road's colour
-is the ratio of. **A tile off the roads carries no numbers** (Ben, 2026-10-24: the network is the
-roads and the rail); its hover card still explains it. Below
-20 px the digits do not fit and the road colour carries the read alone.
+**Two numbers on every link that carries traffic, stacked** (Ben, 2026-10-24). Wherever the rung
+gives the text room (a drawn radius of **20 px** or more), each **link** cell of the player's chain
+— a road tile, a rail leg's track, a sea leg's water — that a routed request crosses carries
+**supplied** above **requested**, both LP/tick: the routed flow above — the pair the link's colour
+is the ratio of. A **connected, idle** link carries **one** figure, what could reach it, in the idle
+steel; a road **not tied to the capital** carries none. **A tile off the network carries no
+numbers** (Ben, 2026-10-24: the network is the roads and the rail); its hover card still explains
+it. Below 20 px the digits do not fit and the link colour carries the read alone.
+
+**Every link of the chain** (Ben, 2026-10-25: *"a lens that shows each chain link"*, and *"points on
+lanes and rail"*). A railway station's points run **station to station** and a port's run across
+**water**, so the routed flow names only a rail or sea link's two ends: two groups of the nation a
+line or a crossing joins used to read as cut apart. The lens draws every link of the chain the
+resolver routes on (`LOGISTICS.md` § How a tile's points get to it):
+
+- **Road walks** are the roads themselves, as above.
+- **A rail leg** runs along the **track**, station to station (`rail_leg_path`), and every track
+  tile on it carries the leg's colour and numbers.
+- **A sea leg** runs down the port's own field, from the far end to the port — a port's points
+  ride the **lanes** (`lp_lane_walk`, `LOGISTICS.md` § One pool), so the leg is the run of lane
+  tiles between the two ports, on the sea or a lake alike — and every lane tile on it carries the
+  leg's colour and numbers.
+- A leg's figures are its own: **requested** and **granted** are the routed shares whose path to the
+  capital runs through that link (each request routed as the resolver routes it, its shares laid up
+  its sources' paths), and **supplied** is the carrying source's points × its reach across the leg.
+  Where legs share a tile their shares add; a road tile a leg also crosses (a station's, a
+  landing's) takes the leg's figures unless the road itself carries traffic.
+- Each leg is stroked along its run over a dark casing — a Highway's weight on rail, a lane's on the
+  sea. The bake paints no rail bed under the lens, so every **track** tile is also drawn, in a dark
+  ballast tone at a Road's weight, with the player's legs over it.
+- A rail line between two connected stations that the chain did not join by is still a leg —
+  **connected, idle**.
+
+**Reach is kept apart from traffic** (Ben, 2026-10-25: *"an unused road between them reads 0,0"*).
+Each link cell of the player's chain is in one of three states, and only the first is on the ramp:
+
+- **Carrying** — a routed request crosses it: the ramp, two numbers.
+- **Connected, idle** — on the chain, nothing routed across it. For a road: a connected source of
+  the nation reaches the tile (`lp_route_to`'s `reached` — the same qualifying-source test routing
+  runs). For a leg: it is one of the chain's links. Drawn in a pale **steel** `(204, 214, 230)`, one
+  number (what reaches it), and the hover card says *Connected, idle*.
+- **Not tied to the capital** — a road of the nation no connected source reaches. A dull **umber**
+  `(118, 104, 92)`, darker than the plain canvas's sand, no number; the card says why (*Not tied to
+  the capital* or *No source reaches here*).
+
+The key carries both off-ramp states as swatches under the ramp.
 
 **The hover card** over the player's own ground shows the same pair stacked — *Supplied N
 LP/tick* over *Requested M LP/tick*; on a road *Available N LP/tick* over *Requested M
@@ -973,15 +1013,20 @@ ramp's measurement.
 
 **Rung.** Planetary only — sources, roads and requests are per-tile. Guarded behind
 `overlay_mode::throughput` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
-The drawn road network is this lens's at every rung (RENDERING.md § Roads and sea lanes);
-the painted asphalt in the bake is **not** recoloured per lens, because the bake is keyed on
-tile fields alone and a lens-dependent colour there would re-bake every visible chunk on
-every toggle.
+The drawn road network is this lens's at every rung (RENDERING.md § Roads and sea lanes).
+**While the lens is up the bake paints no route surface at all** (Ben, 2026-10-25: *"currently you
+can see roads twice"*): the painted thread and the drawn stroke follow different geometry, so both
+showing read as two roads. Arming the lens re-bakes only the windows a route reaches, as a
+route-only partial re-bake on the worker pool, and disarming it re-bakes them back — RENDERING.md
+§ Roads and sea lanes, "The Logistics lens takes the routes off the ground", owns the mechanism and
+its measured cost. The capital star shows under this lens (PLANETARY.md § The capital star).
 
 **Colour.**
 
-- **Road:** yellow `(236, 206, 60)` → green `(84, 214, 104)` on `t = (log2(supplied /
-  requested) + 1) / 2`, clamped to [0, 1]; the tier's own alpha.
+- **Link carrying traffic:** yellow `(236, 206, 60)` → green `(84, 214, 104)` on `t =
+  (log2(supplied / requested) + 1) / 2`, clamped to [0, 1]; a road keeps its tier's alpha.
+- **Connected, idle:** steel `(204, 214, 230)`. **Not tied to the capital:** umber `(118, 104, 92)`.
+- **Rail track** (every track tile; the lens draws it): ballast `(92, 86, 80)`.
 - **Source:** a **ring** on the source tile, its thickness carrying that source's share of
   the body's largest, in a hot near-white cyan over a dark backing. A ring rather than a disc
   because every source tile already carries a structure — a filled mark is hidden by it.
@@ -999,7 +1044,8 @@ held across frames only until the tick, the buildings or the network move. Nothi
 persisted and the simulation reads none of it.
 
 **Interaction notes.** Planetary-only, single-select, no selector. Verified by
-`scripts/verify/logistics_lens.lua`.
+`scripts/verify/logistics_lens.lua` and `scripts/verify/logistics_chain.lua` (the chain's links,
+reach apart from traffic, the unpainted ground and the capital star).
 
 ## Placement-suitability surface *(not a strip lens)*
 

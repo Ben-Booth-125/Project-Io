@@ -606,6 +606,14 @@ private:
     std::vector<std::filesystem::path> m_session_dirs; ///< Deleted at exit and on a new world.
     entity_id     m_home = null_entity;     ///< The pinned body (the world's home body).
     bool          m_view_final = false;
+    /// The Logistics lens is up: sources are taken with their routes unpainted
+    /// (ui::ground::strip_painted_routes; ground_request::hide_routes).
+    bool          m_hide_routes = false;
+    /// The coarsest drawn level (0 = the master, 128 px a hex; 2 = 32 px) at which the
+    /// Logistics lens's unpainted ground is re-baked under the view. Coarser than this a
+    /// painted road is under a pixel, so a dirty chunk keeps its pixels until the view
+    /// comes close (feed()'s `deferred`).
+    static constexpr int k_unpaint_max_level = 2;
 
     std::unordered_map<entity_id, std::unique_ptr<body_state>> m_bodies;
     entity_id     m_active = null_entity;   ///< Body the canvas draws (GPU textures are its).

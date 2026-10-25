@@ -1072,6 +1072,11 @@ void rederive_routes(bake_source& s)
     }
 }
 
+void strip_painted_routes(bake_source& s)
+{
+    s.routes_unpainted = true;
+}
+
 double route_clearance(const bake_source& s, double x, double y)
 {
     if (!has_routes(s) || s.route_pieces.empty())
@@ -1091,7 +1096,8 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                   int px0, int py0, int pw, int ph, std::uint32_t* out,
                   const std::uint8_t* tag, const std::uint8_t* cover, const float* ground_lift)
 {
-    if (p.route_strength <= 0.0f || !has_routes(s) || s.route_pieces.empty())
+    if (p.route_strength <= 0.0f || !has_routes(s) || s.route_pieces.empty()
+        || s.routes_unpainted)
         return;
     const double period = g.gw * kSqrt3;
     const auto periodic_cell = [&](double target, int& cells_out) -> double {
@@ -1516,6 +1522,10 @@ std::uint64_t route_hash(const bake_source& s, const geometry& g, int px0, int p
                 | (static_cast<std::uint64_t>(s.road[i]) << 8) | s.lane[i]);
         }
     });
+    // The Logistics lens's unpainted ground (strip_painted_routes) is a different
+    // picture of the same routes, so a window a route reaches hashes apart.
+    if (any && s.routes_unpainted)
+        mix(0x4C0615A11E5ull);
     // No route in reach: nothing to fold, so a window far from every road keeps
     // its hash when roads are laid elsewhere (no needless sweep job).
     return any ? h : 0;
@@ -1567,8 +1577,18 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
     walk_tiles(b, g, px0, py0, pw, ph, 4.0, [&](int c, int r, std::size_t i) {
         const road_plan pa = has_routes(a) ? tile_road_plan(a, i) : road_plan{};
         const road_plan pb = has_routes(b) ? tile_road_plan(b, i) : road_plan{};
-        const bool pieces_moved = !same_pieces(a, b, i);
+        // The lens's unpainted ground flipped: every piece repaints, the same
+        // pieces either side (strip_painted_routes).
+        const bool paint_flipped = a.routes_unpainted != b.routes_unpainted
+                                && has_routes(b) && b.route_count[i] > 0;
+        const bool same = same_pieces(a, b, i);
+        const bool pieces_moved = paint_flipped || !same;
         const bool plan_moved = !same_plan(pa, pb);
+        // A FLIP ALONE moves only the painted surface: the routes are the same, so no
+        // tree is cleared or restored and no town re-lays its blocks - box the pieces'
+        // own reach and nothing else (measured: the trees' boxes were what pushed most
+        // flipped chunks past the 40% whole-chunk line).
+        const bool flip_only = paint_flipped && same && !plan_moved;
         if (!pieces_moved && !plan_moved)
             return;
         const double cx = kSqrt3 * (c + ((r & 1) ? 0.5 : 0.0)), cy = 1.5 * r;
@@ -1645,7 +1665,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                             y0 = std::min(y0, static_cast<double>(pc.y[k])); y1 = std::max(y1, static_cast<double>(pc.y[k]));
                         }
                         box(cx, cy, x0 - reach, y0 - reach - hl, x1 + reach, y1 + reach - hs);
-                        if (!road)
+                        if (!road || flip_only)
                             continue;
                         // The trees it clears, restores or now stands under
                         // (BL-1291): the stand's own trees whose root the
@@ -1666,7 +1686,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
             }
             // A town's blocks keep off the road: every town tile the pieces
             // pass near re-lays its blocks.
-            for (int kk = -1; kk < 6; ++kk)
+            for (int kk = -1; kk < 6 && !flip_only; ++kk)
             {
                 const int t = kk < 0 ? static_cast<int>(i) : nb_index(b, static_cast<int>(i), kk);
                 if (t < 0 || !(settled_at(a, t) || settled_at(b, t)))

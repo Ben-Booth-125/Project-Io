@@ -111,9 +111,19 @@ void hover_structure_ground(const ui_state& ui)
     // "Available"; what was actually granted keeps its own line.
     ImGui::Text(ui.lp_hover_road ? "Available %.0f LP/tick" : "Supplied %.0f LP/tick",
                 static_cast<double>(ui.lp_hover_supplied));
-    ImGui::Text("Requested %.0f LP/tick", static_cast<double>(ui.lp_hover_requested));
-    if (ui.lp_hover_road)
-        ImGui::TextDisabled("granted %.0f", static_cast<double>(ui.lp_hover_granted));
+    // REACH APART FROM TRAFFIC (Ben, 2026-10-25): a link nothing is routed across
+    // says so, rather than reading "Requested 0" as if it were cut off.
+    if (ui.lp_hover_road && ui.lp_hover_chain == 1)
+        ImGui::TextDisabled(ui.lp_hover_link == 2 ? "Rail, connected, idle"
+                            : ui.lp_hover_link == 3 ? "Sea, connected, idle"
+                                                    : "Connected, idle");
+    else
+        ImGui::Text("Requested %.0f LP/tick", static_cast<double>(ui.lp_hover_requested));
+    if (ui.lp_hover_road && ui.lp_hover_chain != 1)
+        ImGui::TextDisabled(ui.lp_hover_link == 2 ? "rail leg, granted %.0f"
+                            : ui.lp_hover_link == 3 ? "sea leg, granted %.0f"
+                                                    : "granted %.0f",
+                            static_cast<double>(ui.lp_hover_granted));
     else if (ui.lp_hover_sources > 0)
         ImGui::TextDisabled("from %d source(s)", ui.lp_hover_sources);
     if (ui.lp_hover_consumers > 0)

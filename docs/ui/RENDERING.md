@@ -523,6 +523,45 @@ takes the light, the grade and the lens wash like the ground does:
 - **The drawn network is the Logistics lens's** (the bullet above): on the plain canvas,
   over baked ground, roads and lanes are painted only, at every rung. A tile whose ground is
   not yet baked (the vector fallback) has no painted road, so it keeps the drawn network.
+- **The Logistics lens takes the routes off the ground** (Ben, 2026-10-25: *"remove the
+  sharper road rendering when the logistics lens is active; currently you can see roads
+  twice"*). The painted route and the lens's drawn stroke follow different geometry — the
+  paint runs between hashed crossing points, bows around ground and clusters and rides the
+  oblique lift; the stroke runs edge-midpoint to edge-midpoint — so under the lens the two
+  read as two roads. While the lens is up the bake paints **no route surface**: no road
+  ladder, no rail bed, no lane wake. Everything else stays: the routes are still derived, so
+  a tree still keeps off a road's line, a town's blocks off its street, a roaded cluster
+  still steps toward its road — only the surface is gone, and the corridor it ran in is the
+  ground's. The canvas then draws the whole network itself — every road and lane as ever,
+  and every **rail** track tile too (the four-cardinal walk, a dark ballast tone at a Road's
+  weight), with the player's chain in the lens's colours (LENSES.md § Logistics lens).
+  **Mechanism:** the canvas sets `ground_request::hide_routes`; `ground_layer` re-takes the
+  active body's source at once with `strip_painted_routes` (one flag on the source), which
+  moves `route_hash` for exactly the windows a route reaches; a chunk no route reaches keeps
+  its hash and is not touched. The flipped chunks re-bake as **route-only partial re-bakes**:
+  a box round each piece's painted reach and nothing more — the routes did not move, so no
+  tree, town block or cluster is re-boxed (§ Chunks, cache and invalidation).
+  **Only what the lens shows close is re-baked.** While the lens is up, a ready chunk the
+  flip dirtied re-bakes only when it is **under the view at a drawn level of 32 px a hex or
+  finer** (`k_unpaint_max_level`); coarser, a painted road is under a pixel and the chunk
+  keeps its pixels until the view comes close, and the far page is not re-baked at all.
+  A chunk never re-baked keeps the painted hash, so disarming the lens re-bakes only what
+  arming it did. **Measured** (`scripts/verify/logistics_chain.lua`, the `ROAD_HIDE` lines,
+  1720 × 1080, the shipped 1960 start): at a close rung (51 px drawn radius) a toggle
+  re-bakes **80** chunks, about **25 s of worker time**; at a mid rung (18 px) **311** chunks,
+  about **54 s**; on the whole grid **none**; the whole home master, before the view rule,
+  was **2,992** chunks and **~540 s**. On the play path that work runs on the pool behind
+  the frame — the main thread pays only the snapshot it already takes on its cadence — and
+  a chunk shows its previous pixels until it lands. `scripts/verify/logistics_unpaint_perf.lua`
+  (the `UNPAINT_PERF` lines, pool path, a Market toggle as the control) measured on a Debug
+  build with the software renderer: at a close rung (77 px) arming re-bakes **42** chunks and
+  the view settles in **~2.2 s**, its frames no slower than the control's (p95 212 ms against
+  242 ms — that build's frames are the renderer's, not 60 fps figures); at a mid rung (28 px)
+  **311** chunks settle in **~5.5 s** (p95 291 ms against 220 ms), and disarming there took
+  **~39 s** behind the frame with one 2 s frame — the cost a Release measure should confirm. **Why not a second, road-free master:** a second master per body would
+  double the ground's resident set against the fixed budget (§ Resident set); and a
+  ground-coloured underlay cannot hide a road it does not lie on — the painted route and
+  the drawn stroke do not share a line, and the paint rides the oblique lift.
 - A built or upgraded road dirties only the window around its tiles (§ Chunks, cache and
   invalidation, the partial re-bake), and the survey mask and the reach fog treat a painted
   road as ground.
@@ -565,8 +604,9 @@ both draw by one rule:
   were most of the road layer's vertices, and the wide rungs must hold the 60 fps
   budget (TECH_FOUNDATIONS.md § Target hardware; Ben, 2026-10-09). The third rung
   and up draw the curve unchanged.
-- Both are **always-on** as ground — painted, under every lens, which washes over them —
-  and dim with the reach fog and stop at the survey mask as roads always have.
+- Both are **always-on** as ground — painted, under every lens but Logistics (which draws
+  them itself, above), and washed over by the lens — and dim with the reach fog and stop at
+  the survey mask as roads always have.
 
 ### Ambient animation
 

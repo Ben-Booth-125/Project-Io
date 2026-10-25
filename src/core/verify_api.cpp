@@ -46,6 +46,8 @@
 #include "world/construction.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/logistics.hpp"
+#include "world/hex_neighbors.hpp"    // the Logistics lens's chain fixture: a coast is six-sided
+#include "world/logistic_points.hpp"  // lp_sea_walk: the chain fixture's far port
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
@@ -61,8 +63,10 @@
 #include "world/supply_system.hpp"  // price_convoy_leg: the sea-lane fixture prices as the dispatch does
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cctype>
+#include <map>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -1557,6 +1561,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("logistics_roads", [this]() {
         sol::table out = m_lua.state().create_table();
         int roads = 0, routed = 0, green = 0, yellow = 0, between = 0, ground = 0, routed_green = 0;
+        // Ben, 2026-10-25: every link of the chain, and reach apart from traffic.
+        int rail = 0, sea = 0, idle = 0, off_chain = 0, carrying = 0;
         double sup = 0.0, req = 0.0;
         const std::size_t n = std::min({ m_ui.lp_on_road.size(), m_ui.lp_supplied.size(),
                                          m_ui.lp_requested.size() });
@@ -1569,6 +1575,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 ++ground;
                 continue;
             }
+            const std::uint8_t chain = i < m_ui.lp_chain.size() ? m_ui.lp_chain[i] : 2;
+            if (chain == 0) ++off_chain;
+            else if (chain == 1) ++idle;
+            else ++carrying;
+            if (m_ui.lp_on_road[i] == 2) ++rail;
+            if (m_ui.lp_on_road[i] == 3) ++sea;
             ++roads;
             const float s = m_ui.lp_supplied[i], r = m_ui.lp_requested[i];
             if (r > 0.0f)
@@ -1595,6 +1607,41 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["ground"]    = ground;  // the nation's other (non-road) tiles
         out["supplied"]  = sup;     // summed over the roads, LP/tick
         out["requested"] = req;
+        // Every link of the chain (Ben, 2026-10-25): `roads` above counts every link
+        // cell, road, rail and sea; these split it.
+        out["rail"]      = rail;      // cells on a rail leg (track)
+        out["sea"]       = sea;       // cells on a sea leg (water)
+        out["carrying"]  = carrying;  // a routed request crosses it
+        out["idle"]      = idle;      // connected, no routed request
+        out["off_chain"] = off_chain; // no connected source reaches it
+        int legs_rail = 0, legs_sea = 0;
+        for (const auto& lg : m_ui.lp_legs)
+            (lg.network == 2 ? legs_sea : legs_rail) += 1;
+        out["legs_rail"] = legs_rail;
+        out["legs_sea"]  = legs_sea;
+        return out;
+    });
+
+    // The capital star (Ben, 2026-10-25): what the Planetary canvas drew last frame -
+    // a count of stars (one per visible wrap copy) and whether the player's was one.
+    v.set_function("capital_stars", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["drawn"]  = m_ui.capital_stars_drawn;
+        out["player"] = m_ui.capital_star_player;
+        // Where the player nation's capital is, so a capture can aim at its star: the
+        // nation's seat is public (the star marks it on the map), a position and no
+        // tile data. has_capital false = the nation names no capital tile.
+        const entity_id pn = player_nation(m_world);
+        out["player_nation"] = static_cast<unsigned>(pn);
+        out["has_capital"]   = false;
+        if (const auto nit = m_world.nations.find(pn); nit != m_world.nations.end())
+            if (const auto tit = m_world.tiles.find(nit->second.capital_tile); tit != m_world.tiles.end())
+            {
+                out["has_capital"] = true;
+                out["body"] = static_cast<unsigned>(tit->second.body);
+                out["x"]    = tit->second.grid_x;
+                out["y"]    = tit->second.grid_y;
+            }
         return out;
     });
 
@@ -6436,6 +6483,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (kind == "research_institute") bc.type = building_type::research_institute;
         else if (kind == "schooling")          bc.type = building_type::schooling;
         else if (kind == "university")         bc.type = building_type::university;
+        else if (kind == "railway_station")    bc.type = building_type::railway_station;
         else
             return null_entity;
         if (bc.type == building_type::extraction_site)
@@ -6501,6 +6549,166 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const bool site  = opts ? opts->get_or("site", false) : false;
             return static_cast<unsigned>(stage_one(tile, kind, detail.value_or(""), rival, site));
         });
+
+    // THE LOGISTICS LENS'S CHAIN FIXTURE (Ben, 2026-10-25: "a lens that shows each chain
+    // link"). Stages, on the player nation's own ground on the active body, a chain
+    // with every kind of link the lens draws: a logistics hub ON the capital (the
+    // root); a RAIL LEG - track laid tile to tile over the nation's land from the
+    // centre nearest the capital to a second centre 6-18 steps on, a railway station
+    // at each end, and a hub beside the first station so it is tied to the capital;
+    // and a SEA LEG - a port on the nation's coast nearest the capital (tied to it by
+    // a hub's road reach) and a second port on the nation's coast the first one's sea
+    // field reaches, 8 or more water steps away. A processing works stands on the far
+    // station's and the far port's tiles, so each leg carries a request. C++ picks the
+    // ground (verify-only staging, bypassing placement and funds, as stage_gallery
+    // does); the script gets back POSITIONS only - where each piece stood - and which
+    // parts staged.
+    v.set_function("logistics_chain_fixture", [this, stage_one]() {
+        sol::state& s = m_lua.state();
+        sol::table out = s.create_table();
+        out["ok"] = false;
+        const entity_id pn = player_nation(m_world);
+        const auto nit = m_world.nations.find(pn);
+        if (nit == m_world.nations.end())
+            return out;
+        const entity_id cap = nit->second.capital_tile;
+        const auto cit = m_world.tiles.find(cap);
+        if (cit == m_world.tiles.end() || cit->second.body != m_ui.active_body)
+            return out;
+        const entity_id body = cit->second.body;
+        const body_component& bc = m_world.bodies.at(body);
+        const int gw = bc.grid_width, gh = bc.grid_height;
+        const std::vector<entity_id> grid = body_tile_grid(m_world, body);
+        const auto at = [&](int x, int y) -> entity_id {
+            if (y < 0 || y >= gh || gw <= 0) return null_entity;
+            const std::size_t i = static_cast<std::size_t>(y) * gw + static_cast<std::size_t>(((x % gw) + gw) % gw);
+            return i < grid.size() ? grid[i] : null_entity;
+        };
+        const auto own_land = [&](entity_id t) {
+            const auto tit = m_world.tiles.find(t);
+            const auto tn  = m_world.tile_to_nation.find(t);
+            return tit != m_world.tiles.end() && !is_water(tit->second.substrate)
+                && tn != m_world.tile_to_nation.end() && tn->second == pn;
+        };
+        const auto card4 = [&](entity_id t) {
+            const tile_component& tc = m_world.tiles.at(t);
+            return std::array<entity_id, 4>{ at(tc.grid_x, tc.grid_y - 1), at(tc.grid_x + 1, tc.grid_y),
+                                             at(tc.grid_x, tc.grid_y + 1), at(tc.grid_x - 1, tc.grid_y) };
+        };
+        const auto coastal = [&](entity_id t) {
+            const tile_component& tc = m_world.tiles.at(t);
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                const entity_id n = at(nb.gx, nb.gy);
+                if (n != null_entity && is_water(m_world.tiles.at(n).substrate))
+                    return true;
+            }
+            return false;
+        };
+        // Steps over the nation's land from the capital (4-neighbour, the rail walk's grid).
+        std::map<entity_id, int> dist{{cap, 0}};
+        std::map<entity_id, entity_id> parent;
+        std::vector<entity_id> q{cap};
+        for (std::size_t h = 0; h < q.size(); ++h)
+            for (const entity_id n : card4(q[h]))
+                if (n != null_entity && !dist.count(n) && own_land(n))
+                {
+                    dist[n] = dist[q[h]] + 1;
+                    parent[n] = q[h];
+                    q.push_back(n);
+                }
+        const auto pos = [&](const char* key, entity_id t) {
+            const tile_component& tc = m_world.tiles.at(t);
+            out[std::string(key) + "_x"] = tc.grid_x;
+            out[std::string(key) + "_y"] = tc.grid_y;
+        };
+        stage_one(cap, "logistics_hub", "", false, false);
+        pos("capital", cap);
+
+        // A run of hubs from the capital out to @p t along the walk above, one every
+        // four steps, so whatever stands at @p t is tied to the capital by road.
+        const auto tie_by_road = [&](entity_id t) {
+            int k = 0;
+            for (entity_id u = t; u != cap; u = parent.at(u))
+                if (++k % 4 == 0)
+                    stage_one(u, "logistics_hub", "", false, false);
+        };
+
+        // THE RAIL LEG: a station ON the capital (an anchor of the chain itself) and
+        // track over the nation's land to a centre 6-18 steps on, with its station.
+        entity_id b = null_entity;
+        {
+            std::vector<std::pair<int, entity_id>> centres;
+            for (const auto& [pc, pt] : m_world.population_centre_tile)
+                if (const auto d = dist.find(pt); d != dist.end() && d->second >= 6 && d->second <= 18)
+                    centres.push_back({d->second, pt});
+            std::sort(centres.begin(), centres.end());
+            if (!centres.empty())
+                b = centres.front().second;
+        }
+        const bool rail = b != null_entity;
+        if (rail)
+        {
+            for (entity_id t = b;; t = parent.at(t))
+            {
+                m_world.rail_track[t] = pn;
+                if (t == cap)
+                    break;
+            }
+            stage_one(cap, "railway_station", "", false, false);
+            stage_one(b, "railway_station", "", false, false);
+            stage_one(b, "processing", "", false, false);
+            pos("station_a", cap);
+            pos("station_b", b);
+        }
+        out["rail"] = rail;
+
+        // THE SEA LEG: the nation's coast nearest the capital (tied by a run of hubs),
+        // then a coast of the nation that port's sea field reaches, well out.
+        entity_id p1 = null_entity;
+        for (const entity_id t : q) // the walk's order: nearest the capital first
+            if (coastal(t) && t != cap)
+            {
+                p1 = t;
+                break;
+            }
+        bool sea = false;
+        if (p1 != null_entity)
+        {
+            const auto field = lp_sea_walk(m_world, body, {p1});
+            entity_id p2 = null_entity;
+            float best = 0.0f;
+            for (const auto& [t, d] : field)
+                if (d >= 8.0f && d <= 45.0f && own_land(t) && coastal(t) && t != p1
+                    && (p2 == null_entity || d > best || (d == best && t < p2)))
+                {
+                    p2 = t;
+                    best = d;
+                }
+            tie_by_road(p1);
+            stage_one(p1, "port", "", false, false);
+            stage_one(p1, "logistics_hub", "", false, false);
+            pos("port_a", p1);
+            if (p2 != null_entity)
+            {
+                const entity_id port_b = stage_one(p2, "port", "", false, false);
+                stage_one(p2, "processing", "", false, false);
+                pos("port_b", p2);
+                // A port's points ride the LANES (lp_lane_walk), and a standing port lays
+                // lanes to every port within 50 when it is built (LOGISTICS.md § 4b) - a
+                // step staging bypasses, so it is taken here, as construction takes it.
+                const port_lane_stats ls = lay_port_lanes(m_world, port_b);
+                out["lanes_laid"] = ls.laid;
+                sea = ls.laid > 0;
+            }
+        }
+        out["sea"] = sea;
+        invalidate_logistics_caches(m_world);
+        m_ground.touch();
+        out["ok"] = true;
+        return out;
+    });
 
     // The whole roster at once, around the player's HQ on the active body: one
     // installation per procedural form (every extraction family, every recipe
@@ -6715,6 +6923,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["chunk_rebakes"]  = static_cast<double>(st.chunk_rebakes);
         t["neigh_bakes"]    = static_cast<double>(st.neigh_bakes);
         t["chunk_patches"]  = static_cast<double>(st.chunk_patches);
+        // The re-bake's cost (the Logistics lens's unpainted ground, 2026-10-25, reads it):
+        // worker ms of every re-bake, and the pixels the windowed and whole ones baked.
+        t["rebake_ms"]      = st.rebake_ms;
+        t["patch_windows"]  = static_cast<double>(st.patch_windows);
+        t["patch_px"]       = static_cast<double>(st.patch_px);
+        t["rebake_px"]      = static_cast<double>(st.rebake_px);
         // BL-1259, the disk cache: loads are not bakes (chunk_bakes excludes them).
         t["chunk_loads"]    = static_cast<double>(st.chunk_loads);
         t["load_failures"]  = static_cast<double>(st.load_failures);
@@ -6780,6 +6994,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             rec["scale"]        = pc.scale;
             rec["population"]   = pc.population;
             rec["habitability"] = pc.habitability;
+            // The capital star (Ben, 2026-10-25): whether this centre stands on a
+            // nation's capital tile, and whether that nation is the player's - public
+            // facts about a city, so a capture can aim at the star.
+            bool capital = false, player_capital = false;
+            const entity_id pn = player_nation(m_world);
+            for (const auto& [nid, nc] : m_world.nations)
+                if (nc.capital_tile == tit->second)
+                {
+                    capital = true;
+                    player_capital = player_capital || nid == pn;
+                }
+            rec["capital"]        = capital;
+            rec["player_capital"] = player_capital;
             out[++idx]          = rec;
         }
         return out;

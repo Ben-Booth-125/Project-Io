@@ -158,6 +158,18 @@ road_plan tile_road_plan(const bake_source& src, std::size_t i);
 /// edits road / lane, the classes or the installations in place calls it again.
 void rederive_routes(bake_source& s);
 
+/// THE LOGISTICS LENS'S GROUND (Ben, 2026-10-25: "remove the sharper road rendering
+/// when the logistics lens is active; currently you can see roads twice"). Mark @p s
+/// so the route pass paints no surface - no road ladder, no rail bed, no sea lane -
+/// while every route is still DERIVED, so nothing else on the ground moves: a tree
+/// still keeps off the road's line, a town's blocks off its street, a roaded cluster
+/// still steps toward it. Under that lens the canvas draws the whole network itself,
+/// in the lens's colours (RENDERING.md § Roads and sea lanes, "The Logistics lens
+/// takes the routes off the ground"). A chunk no route reaches hashes exactly as
+/// before and does not re-bake; one a route reaches re-bakes as a route-only partial
+/// re-bake (route_patch_boxes boxes every piece when the flag differs).
+void strip_painted_routes(bake_source& s);
+
 /// The route pass over a window (absolute bake pixels px0, py0; pw x ph),
 /// honouring @p tag exactly (never paints lock fill or the margin). @p cover:
 /// 100 = water (a lane's wake paints only there), 0 = untouchable, else land
