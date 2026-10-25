@@ -489,7 +489,21 @@ inline constexpr uint32_t world_save_magic =
 /// rules run over them (`fold_legacy_firms`: buildings to their ground nation, money
 /// and reserves to the home treasury, units, track, trades, convoys and routes to the
 /// home nation, the seat to its nation), and they are discarded. v47-v53 likewise.
-inline constexpr uint32_t world_save_version = 56;
+///
+/// Bumped to 57 (Ben, 2026-10-24; PRODUCTION.md § Construction is measured in days):
+/// CONSTRUCTION IS MEASURED IN DAYS. A TRAILING CONSTRUCTION-DAYS SECTION after the
+/// nation books carries the world's one cursor (`construction_quarter_day`, i32) and,
+/// for every building holding any construction-day state, ascending id, (id,
+/// days_remaining, build_rate_permille, build_paid_days, build_day_milli,
+/// completion_day, output_share_permille, on credit, arrears milli-days — the last two
+/// Ben, 2026-10-25: construction starts on the placement day) as i32s. v56 is a STRICT PREFIX of v57 and
+/// is read too (`k_world_save_version_pre_days`): its cursor reads 0 and each site's
+/// days are derived from its ticks_remaining (x 90, less its construction_progress
+/// fraction of a quarter) — `sync_construction_days`.
+inline constexpr uint32_t world_save_version = 57;
+
+/// v56, a strict prefix of v57 (the construction-days section is v57's only addition).
+inline constexpr uint32_t k_world_save_version_pre_days = 56;
 
 /// BL-1407: v55 — the last stream with corporation records; read and folded on load.
 inline constexpr uint32_t k_world_save_version_pre_books = 55;
@@ -596,6 +610,11 @@ struct legacy_corp_record
 void write_world_snapshot_legacy(const world& w,
                                  const std::map<entity_id, legacy_corp_record>& corps,
                                  std::ostream& out, uint32_t version);
+
+/// VERIFICATION ONLY (Ben, 2026-10-24): @p w written as a v56 stream — today's stream
+/// less the construction-days section — so the v56 reader (days derived from ticks)
+/// has a real producer (tools/verify/save_roundtrip). The game never writes it.
+void write_world_snapshot_pre_days(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

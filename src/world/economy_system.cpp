@@ -1107,6 +1107,9 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
 
         building_component probe = b;
         probe.workforce_target   = wt;
+        // Ben, 2026-10-24: `contention` (labour_for) already carries a mid-quarter
+        // completion's output share, so the probe must not apply it a second time.
+        probe.output_share_permille = 1000;
         const building_opex opex = compute_building_opex(probe, e, contention, hab,
                                                          reg.idle_maintenance_floor());
 
@@ -1205,27 +1208,46 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     const std::size_t cap_index =
         static_cast<std::size_t>(resource_type::construction_capacity);
 
+    // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
+    // is measured in days). This pass is the quarter's CLEARING: it draws the
+    // quarter's materials, pays the flat cost for the quarter ahead and sets the
+    // quarter's rate. It advances NO day itself — progress is daily
+    // (`advance_construction_to`), and completion fires on its day there.
     std::vector<entity_id> ids;
-    for (const auto& [bid, b] : w.buildings)
-        if (b.ticks_remaining > 0)
+    // Ben, 2026-10-25: construction STARTS ON THE PLACEMENT DAY — a site's days built
+    // on credit since then are owed (`build_arrears_milli`) and paid here, with the
+    // quarter ahead; a building that completed on credit still pays them.
+    for (auto& [bid, b] : w.buildings)
+        if (b.ticks_remaining > 0 || b.build_arrears_milli > 0)
+        {
+            sync_construction_days(b); // a writer that set ticks only (fixture, v56 save)
+            b.build_rate_permille = 0; // until this clearing sets it
+            b.build_paid_days     = 0;
+            b.build_on_credit     = false; // from here the days are paid ahead
             ids.push_back(bid);
+        }
     std::sort(ids.begin(), ids.end());
 
     // The per-tick need row of one site (BL-709, below) — ONE expression, read by
     // the draw and by BL-1209's pre-pass alike, so the two cannot disagree.
+    // Ben, 2026-10-24: a site in its LAST quarter (fewer than 90 days of work
+    // left) needs only that share of a quarter's row — materials and capacity
+    // alike — so a build draws exactly its days, never a whole final quarter.
+    // Ben, 2026-10-25: plus the days it built on credit since placement (arrears).
     auto need_row_for = [&](const building_component& b, float duration) {
         // BL-590: the material cost specific to THIS named building.
         const auto& material_cost_row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+        const float qf = construction_clearing_fraction(b);
         std::array<float, resource_count> row{};
         for (std::size_t r = 0; r < resource_count; ++r)
-            row[r] = material_cost_row[r] / duration;
+            row[r] = material_cost_row[r] / duration * qf;
         // Flat per TICK, not per unit of material: it is the yard's throughput
         // the site is consuming, and a site consumes it for as long as it is
         // open regardless of what it is made of. Not divided by `duration` for
         // the same reason — a build that takes twice as long occupies the sector
         // for twice as long, and should pay for twice as much of it.
         if (capacity_rate > 0.0f)
-            row[cap_index] += capacity_rate;
+            row[cap_index] += capacity_rate * qf;
         return row;
     };
 
@@ -1387,7 +1409,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         building_component& b          = w.buildings.at(bid);
         const building_economics& econ = reg.economics(b.type);
         const float duration           = econ.build_duration_ticks;
-        if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
+        if (duration <= 0.0f) { b.ticks_remaining = 0; sync_construction_days(b); continue; } // instant safety
         // BL-1296: a state site its treasury could not fund this tick waits —
         // it draws nothing, pays nothing, and registers no want.
         if (b.state_idle)
@@ -1565,50 +1587,32 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             {
                 // BL-1296: a state site's flat cost leaves its treasury — funded
                 // by this tick's gate, so it cannot overdraw it.
-                const float flat = (econ.build_cost / duration) * rate;
+                // Ben, 2026-10-24: the same share of a quarter as the need row.
+                // Ben, 2026-10-25: plus the days owed in arrears.
+                const float flat = (econ.build_cost / duration) * rate
+                                 * construction_clearing_fraction(b);
                 w.nations.at(corp).treasury -= flat;
                 b.construction_paid += flat;
                 w.state_ledger[corp].construction += flat;
             }
         }
 
-        // Advance sub-tick progress; a full-rate tick consumes exactly one whole
-        // ticks_remaining unit.
-        b.construction_progress += rate;
-        while (b.construction_progress >= 1.0f && b.ticks_remaining > 0)
-        {
-            b.construction_progress -= 1.0f;
-            --b.ticks_remaining;
-        }
+        // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
+        // § Construction is measured in days): this clearing paid for the
+        // quarter's work at `rate`, so over the quarter the site makes rate x days
+        // of progress — daily, in `advance_construction_to` — on at most the days
+        // this payment covers (90, or the days left in its last quarter). It
+        // completes there, on its day; nothing completes in this pass.
+        // Ben, 2026-10-25: the payment covered the arrears as far as the rate did;
+        // what the shelf could not cover stays owed to the next clearing.
+        if (b.build_arrears_milli > 0)
+            b.build_arrears_milli = (rate >= 1.0f) ? 0
+                : static_cast<int>(std::lround(static_cast<float>(b.build_arrears_milli) * (1.0f - rate)));
         if (b.ticks_remaining <= 0)
-        {
-            b.construction_progress = 0.0f;
-            // BL-1296 fix round: a STATE site that completes this tick was
-            // funded for its construction, not for running — it runs from the
-            // next gate. Idle for the rest of this tick (no labour, inputs,
-            // output or operating cost), and the ledger says so.
-            if (own.kind == owner_kind::nation)
-            {
-                b.state_idle = true;
-                world::state_tick_ledger& led = w.state_ledger[corp];
-                --led.funded;
-                ++led.idled;
-            }
-
-            // COMPLETION is when a port/hub starts anchoring supply
-            // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
-            // reach field goes stale at this moment too, not only at placement.
-            // Port/hub ONLY (2026-08-12): a mine or farm completing changes no
-            // cached answer, and completions are per-tick events through the
-            // warm start — see invalidate_logistics_caches' narrowing note.
-            if (building_affects_logistics(b.type))
-                invalidate_logistics_caches(w);
-            // BL-263: COMPLETION is also the spontaneous-market-emergence
-            // trigger. No-op if the body already has a market (including an
-            // instant build that already spawned one at placement, construction.cpp).
-            if (body != null_entity)
-                maybe_spawn_market(w, reg, body, b.tile);
-        }
+            continue; // a completed building paying its arrears builds nothing ahead
+        const int q_days = std::min(b.days_remaining, k_construction_quarter_days);
+        b.build_rate_permille = std::clamp(static_cast<int>(std::lround(rate * 1000.0f)), 1, 1000);
+        b.build_paid_days     = q_days;
     }
 
     // BL-1209 — the invariant audit (report-only): after the pass, could any
@@ -1640,6 +1644,177 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                                                     a.first[r], a.real[r], a.rate});
         }
     }
+}
+
+} // namespace
+
+// Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25) — see the declaration.
+// The rate is `site_rate`'s rule read off the shelf as it stands (nothing drawn):
+// the scarcest admitted material sets it, capacity only stretches it (floored at
+// 1/max_stretch), and below 1/max_stretch it pauses. Against the need of the days
+// left in THIS quarter, which is what the credit covers.
+void begin_construction_on_placement(const world& w, const recipe_registry& reg,
+                                     building_component& b)
+{
+    if (b.ticks_remaining <= 0 || b.days_remaining <= 0)
+        return;
+    const int q        = k_construction_quarter_days;
+    const int left_q   = q - std::clamp(w.construction_quarter_day, 0, q);
+    const int days     = std::min(b.days_remaining, left_q);
+    b.build_on_credit     = true;
+    b.build_rate_permille = 0;
+    b.build_paid_days     = 0;
+    const float duration = reg.economics(b.type).build_duration_ticks;
+    if (days <= 0 || duration <= 0.0f)
+        return;
+    const float qf = static_cast<float>(days) / static_cast<float>(q);
+    const float max_stretch = reg.construction().max_stretch;
+    const float pause_below = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+    const float cap_rate    = reg.construction().capacity_per_build_tick;
+    const std::size_t cap   = static_cast<std::size_t>(resource_type::construction_capacity);
+    const entity_id mid = market_for_tile(w, b.tile);
+    const market_component* m = nullptr;
+    if (mid != null_entity)
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            m = &mit->second;
+    const float res_mult = reg.price_band().reservation_mult;
+    auto avail = [&](std::size_t r) {
+        return (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true))
+                   ? std::max(0.0f, m->inventory[r]) : 0.0f;
+    };
+    const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+    float rate = 1.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (r == cap) continue;
+        const float need = row[r] / duration * qf;
+        if (need > 0.0f)
+            rate = std::min(rate, avail(r) / need);
+    }
+    if (cap_rate > 0.0f)
+    {
+        const float need = cap_rate * qf;
+        const float cov  = need > 0.0f ? avail(cap) / need : 1.0f;
+        rate = std::min(rate, std::max(cov, pause_below));
+    }
+    rate = std::clamp(rate, 0.0f, 1.0f);
+    if (rate < pause_below || rate <= 0.0f)
+        return; // paused: it waits for its first clearing, owing nothing
+    b.build_rate_permille = std::clamp(static_cast<int>(std::lround(rate * 1000.0f)), 1, 1000);
+    b.build_paid_days     = days;
+}
+
+// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction is
+// measured in days) — see the declaration in economy_system.hpp. Integer days and
+// milli-days only; days outer, sites inner in ascending id, so a day-by-day caller
+// (the app) and a whole-quarter catch-up (run_economy_step) walk the identical
+// sequence and complete every site on the same day.
+int advance_construction_to(world& w, const recipe_registry& reg, int day_in_quarter)
+{
+    const int q    = k_construction_quarter_days;
+    const int to   = std::clamp(day_in_quarter, 0, q);
+    const int from = std::clamp(w.construction_quarter_day, 0, q);
+    if (to <= from)
+        return 0;
+
+    // The sites with paid work this quarter. None can be added mid-walk (nothing
+    // here places a building), so the list is taken once.
+    std::vector<entity_id> ids;
+    for (auto& [bid, b] : w.buildings)
+        if (b.ticks_remaining > 0)
+        {
+            sync_construction_days(b);
+            if (b.build_rate_permille > 0 && b.build_paid_days > 0)
+                ids.push_back(bid);
+        }
+    std::sort(ids.begin(), ids.end());
+
+    for (int d = from + 1; d <= to; ++d)
+        for (const entity_id bid : ids)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            building_component& b = bit->second;
+            if (b.ticks_remaining <= 0 || b.build_paid_days <= 0 || b.build_rate_permille <= 0)
+                continue;
+            --b.build_paid_days;
+            b.build_day_milli += std::clamp(b.build_rate_permille, 0, 1000);
+            // Ben, 2026-10-25: a day built on credit (placement to first clearing)
+            // is owed, and the next clearing pays it.
+            if (b.build_on_credit)
+                b.build_arrears_milli += std::clamp(b.build_rate_permille, 0, 1000);
+            while (b.build_day_milli >= 1000 && b.days_remaining > 0)
+            {
+                b.build_day_milli -= 1000;
+                --b.days_remaining;
+            }
+            if (b.days_remaining > 0)
+            {
+                b.ticks_remaining = (b.days_remaining + q - 1) / q;
+                continue;
+            }
+
+            // COMPLETION, on day d. The building is operational from today: it
+            // produces for the rest of the quarter (`completion_day` becomes its
+            // output share when the quarter closes).
+            b.ticks_remaining       = 0;
+            b.days_remaining        = 0;
+            b.build_day_milli       = 0;
+            b.build_rate_permille   = 0;
+            b.build_paid_days       = 0;
+            b.build_on_credit       = false; // its arrears, if any, stay owed
+            b.construction_progress = 0.0f;
+            b.completion_day        = d;
+            const building_type   type = b.type;
+            const entity_id       tile = b.tile;
+            const entity_id       body = building_body(w, b);
+            // COMPLETION is when a port/hub starts anchoring supply
+            // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
+            // reach field goes stale on this day too, not only at placement.
+            // Port/hub ONLY (2026-08-12): a mine or farm completing changes no
+            // cached answer — see invalidate_logistics_caches' narrowing note.
+            if (building_affects_logistics(type))
+                invalidate_logistics_caches(w);
+            // BL-263: COMPLETION is also the spontaneous-market-emergence
+            // trigger. No-op if the body already has a market (including an
+            // instant build that already spawned one at placement, construction.cpp).
+            if (body != null_entity)
+                maybe_spawn_market(w, reg, body, tile);
+            // A state site completing used to be idled for the rest of its
+            // funded tick (BL-1296 fix round). Completion no longer happens
+            // inside a funded tick: the economy step catches the quarter up
+            // BEFORE plan_state_funding, so the next gate funds it as a running
+            // building, at its prorated share.
+        }
+
+    w.construction_quarter_day = to;
+    return to - from;
+}
+
+namespace {
+
+/// Close the quarter (Ben, 2026-10-24): catch construction up to its 90th day —
+/// a path with no day loop advances the whole quarter here — then turn each
+/// completion day into the output share THIS tick reads, and reset the cursor
+/// for the quarter ahead. Every building whose share is not pending reads 1000.
+/// Order-free: each building is written against itself only.
+void close_construction_quarter(world& w, const recipe_registry& reg)
+{
+    const int q = k_construction_quarter_days;
+    advance_construction_to(w, reg, q);
+    for (auto& [bid, b] : w.buildings)
+    {
+        if (b.completion_day > 0)
+        {
+            const int stood = q - std::clamp(b.completion_day, 0, q);
+            b.output_share_permille = stood * 1000 / q;
+            b.completion_day        = 0;
+        }
+        else if (b.output_share_permille != 1000)
+            b.output_share_permille = 1000;
+    }
+    w.construction_quarter_day = 0;
 }
 
 } // namespace
@@ -1784,6 +1959,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the tick (`plan_state_funding`). Every pass below skips a `state_idle`
     // building — it builds, staffs, draws, produces and pays nothing — so the
     // state never runs into debt. No state industry anywhere: a no-op.
+    //
+    // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
+    // § Construction is measured in days): FIRST the quarter just past is closed —
+    // any of its days the day loop did not advance (all 90 on a headless path)
+    // are advanced now, sites completing on their own days, and each completion
+    // becomes the output share this tick reads. Before the funding plan, so a
+    // state site that completed last quarter is funded as a running building.
+    close_construction_quarter(w, reg);
     plan_state_funding(w, reg);
 
     run_construction(w, reg, report);
@@ -2012,7 +2195,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const entity_id body = building_body(w, b);
             if (body == null_entity)
                 continue;
-            const float add = b.workforce_assigned * hab_cap_for(body);
+            // Ben, 2026-10-24: a building that stood complete only part of the
+            // quarter claims only that share of a quarter's labour.
+            const float add = b.workforce_assigned * hab_cap_for(body) * building_output_share(b);
             const auto  tn  = w.tile_to_nation.find(b.tile);
             const entity_id claim_nation =
                 (tn != w.tile_to_nation.end()) ? tn->second : null_entity;
@@ -2151,7 +2336,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 // capped by habitability, scaled by the qualified fraction.
                 qual_claims[{tn->second, body}].push_back(
                     { building_id,
-                      b.workforce_assigned * rcp->qualified_workforce * hab_cap_for(body),
+                      b.workforce_assigned * rcp->qualified_workforce * hab_cap_for(body)
+                          * building_output_share(b), // Ben, 2026-10-24: prorated
                       reg.economics(b.type).base_wage * (1.0f + b.wage_bid) });
             }
         }
@@ -2217,6 +2403,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (lit != report.logistic_points.fraction.end())
                 lab *= lit->second;
         }
+        // Construction is measured in days (Ben, 2026-10-24): a building that
+        // completed mid-quarter runs this tick for the share of the quarter it
+        // stood complete — its output and the inputs that output takes.
+        if (const auto bit = w.buildings.find(building_id);
+            bit != w.buildings.end() && bit->second.output_share_permille != 1000)
+            lab *= building_output_share(bit->second);
         return lab;
     };
     phase_stamp(3); // labour (supply, pass 1, pass 1b)
@@ -3887,6 +4079,11 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         // its own market and filled from the GRID below, once every building
         // has bid.
         std::array<float, resource_count> need = basket[ti];
+        // Ben, 2026-10-24: a building complete for part of the quarter draws that
+        // share of its upkeep goods.
+        if (b.output_share_permille != 1000)
+            for (float& q : need)
+                q *= building_output_share(b);
         bool any_need = true;
         std::uint32_t grid_id = 0;
         if (grid_rules)

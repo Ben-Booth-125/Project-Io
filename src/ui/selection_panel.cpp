@@ -1227,8 +1227,9 @@ static std::string draw_building_status_line(const world& w, const recipe_regist
     if (b.ticks_remaining > 0)
     {
         const construction_read rd = read_construction(w, reg, b.type, b.target_resource,
-                                                       b.recipe, b.tile, b.state_idle);
-        line = construction_status(rd, b.ticks_remaining);
+                                                       b.recipe, b.tile, b.state_idle,
+                                                       construction_days_left(b));
+        line = construction_status(rd, construction_days_left(b)); // days (Ben, 2026-10-24)
         ImGui::TextColored(construction_status_colour(rd), "%s", line.c_str());
     }
     else if (open)
@@ -2191,21 +2192,23 @@ stack_reading read_stack(const world& w, const recipe_registry& reg,
     {
         const building_component& b  = w.buildings.at(building);
         const construction_read   rd = read_construction(w, reg, b.type, b.target_resource,
-                                                         b.recipe, b.tile, b.state_idle);
+                                                         b.recipe, b.tile, b.state_idle,
+                                                         construction_days_left(b));
         out.colour   = ImGui::ColorConvertFloat4ToU32(construction_status_colour(rd));
         out.progress = construction_progress_fraction(w, reg, b);
         out.building = true;
         // BL-1342: a stall NAMES the good holding it, in the few words the stack
         // button's third line can carry ("Paused - no Steel"). "Paused" alone was
         // the reading Ben met on a build that had not moved in quarters.
-        out.status = construction_status(rd, b.ticks_remaining);
+        out.status = construction_status(rd, construction_days_left(b));
         const std::string blocker = construction_blocker_phrase(rd);
         if (rd.paused)
             out.text = blocker.empty() ? "Paused" : "Paused - " + blocker;
         else
         {
-            const int eta = construction_eta_qtrs(rd, b.ticks_remaining);
-            out.text = "ETA " + std::to_string(eta) + (eta == 1 ? " qtr" : " qtrs");
+            // Days (Ben, 2026-10-24; PRODUCTION.md § Construction is measured in days).
+            const int eta = construction_eta_days(rd, construction_days_left(b));
+            out.text = "ETA " + days_label(eta);
             if (!blocker.empty())
                 out.text += " - " + blocker;
         }
@@ -2603,7 +2606,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
     // A SITE under construction is ONE ROW OF THE CONSTRUCTION GRID (BL-1365),
     // in the queue's own columns — glyph | what it makes | how far built |
-    // quarters left | cost left | state mark — because a site on this card and a
+    // days left | cost left | state mark — because a site on this card and a
     // row in the queue are the same subject seen from two places, and the words
     // they both used to spend four lines on belong to one hover card. The method
     // phrase and the status sentence (BL-1342's named stall, verbatim) are in the
@@ -2615,8 +2618,9 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
     if (under_construction)
     {
         const construction_read rd = read_construction(w, reg, b.type, b.target_resource,
-                                                       b.recipe, b.tile, b.state_idle);
-        const std::string status = construction_status(rd, b.ticks_remaining);
+                                                       b.recipe, b.tile, b.state_idle,
+                                                       construction_days_left(b));
+        const std::string status = construction_status(rd, construction_days_left(b));
         const float       frac   = construction_progress_fraction(w, reg, b);
         const float       capex  = construction_capex(w, reg, b.tile, b.type, b.target_resource,
                                                       b.recipe);
@@ -2698,7 +2702,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
 
             ImGui::TableSetColumnIndex(3);
             const ImVec2 ep  = ImGui::GetCursorScreenPos();
-            const int    eta = construction_eta_qtrs(rd, b.ticks_remaining);
+            const int    eta = construction_eta_days(rd, construction_days_left(b));
             if (eta < 0)
                 ImGui::TextColored(construction_status_colour(rd), "\xe2\x80\x94");
             else
@@ -2712,7 +2716,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
                 else
                     std::snprintf(buf, sizeof buf,
                                   "About %s left at the rate it is building now.",
-                                  ticks_label(eta).c_str());
+                                  days_label(eta).c_str());
                 cells.push_back(construction_cell(
                     "eta", ep, construction_grid::eta, buf,
                     ImGui::ColorConvertFloat4ToU32(construction_status_colour(rd))));

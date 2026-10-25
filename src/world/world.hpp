@@ -298,6 +298,15 @@ struct world
     /// is what every driver actually advances by one per step.
     int current_econ_tick = 0;
 
+    /// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
+    /// § Construction is measured in days): THE ONE CURSOR — the days of the
+    /// current quarter construction has already advanced, [0, 90]. The app's day
+    /// loop moves it forward day by day (`advance_construction_to`); the economy
+    /// step catches it up to 90, closes the quarter and resets it to 0, so a world
+    /// stepped quarter by quarter advances the same days. AUTHORITATIVE: serialised
+    /// (world_save v57) and folded into state_hash when non-zero.
+    int construction_quarter_day = 0;
+
     /// The system's asteroid belt (a band, not a body). belt.present() is false
     /// when the system has no belt.
     asteroid_belt belt;

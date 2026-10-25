@@ -573,7 +573,14 @@ void recipe_registry::load_from_lua(lua_state& lua)
             e.maintenance = b->get_or("maintenance", 0.0f);
             e.base_wage   = b->get_or("base_wage",   0.0f);
             e.build_cost  = b->get_or("build_cost",  0.0f);
+            // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
+            // § Construction is measured in days): authored as
+            // `build_duration_days`, held here in quarters (days / 90) for every
+            // reader that paces or prices a build by the quarter. An un-migrated
+            // table's `build_duration_ticks` (quarters) still reads.
             e.build_duration_ticks = b->get_or("build_duration_ticks", 0.0f);
+            if (const float days = b->get_or("build_duration_days", 0.0f); days > 0.0f)
+                e.build_duration_ticks = days / static_cast<float>(k_construction_quarter_days);
             // BL-436: richness -> rate conversion. Absent reference = 0 keeps the
             // raw pre-BL-436 behaviour, so an un-migrated economy.lua is unchanged.
             e.richness_reference   = b->get_or("richness_reference", 0.0f);

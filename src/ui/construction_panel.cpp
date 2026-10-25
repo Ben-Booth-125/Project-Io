@@ -54,9 +54,11 @@ namespace ui {
 construction_read read_construction(const world& w, const recipe_registry& reg,
                                     building_type type, resource_type target,
                                     std::uint16_t recipe, entity_id tile,
-                                    bool state_idle)
+                                    bool state_idle, int days_left)
 {
     construction_read out;
+    // Ben, 2026-10-24: a site in its last quarter needs that share of a quarter's row.
+    const float qf = construction_quarter_fraction(days_left);
 
     const building_economics& econ = reg.economics(type);
     const float duration = econ.build_duration_ticks;
@@ -80,9 +82,9 @@ construction_read read_construction(const world& w, const recipe_registry& reg,
     const float capacity_rate   = reg.construction().capacity_per_build_tick;
     std::array<float, resource_count> need{};
     for (std::size_t r = 0; r < resource_count; ++r)
-        need[r] = material_cost_row[r] / duration;
+        need[r] = material_cost_row[r] / duration * qf;
     if (capacity_rate > 0.0f)
-        need[cap_index] += capacity_rate;
+        need[cap_index] += capacity_rate * qf;
 
     const market_component* m = nullptr;
     const entity_id mid = market_for_tile(w, tile);
@@ -175,13 +177,20 @@ std::string ticks_label(int ticks)
     return s;
 }
 
-int construction_eta_qtrs(const construction_read& rd, int ticks_left)
+// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction is
+// measured in days): a building finishes between quarters, so its readout counts days.
+std::string days_label(int days)
+{
+    return std::to_string(days) + (days == 1 ? " day" : " days");
+}
+
+int construction_eta_days(const construction_read& rd, int days_left)
 {
     if (rd.rate <= 0.0f)
         return -1; // a paused build has no honest ETA
     if (rd.rate >= 1.0f)
-        return ticks_left;
-    return static_cast<int>(std::ceil(static_cast<float>(ticks_left) / rd.rate));
+        return days_left;
+    return static_cast<int>(std::ceil(static_cast<float>(days_left) / rd.rate));
 }
 
 std::string construction_blocker_phrase(const construction_read& rd)
@@ -213,18 +222,18 @@ std::string construction_stall_reason(const construction_read& rd)
 
 // The status line — a stall NAMES the good holding it (BL-1342), because "Paused"
 // alone tells a player nothing they can act on.
-std::string construction_status(const construction_read& rd, int ticks_left)
+std::string construction_status(const construction_read& rd, int days_left)
 {
     const std::string good = rd.has_binding ? resource_name(rd.binding) : std::string();
     if (rd.waiting_on_funding || rd.paused)
         return "Paused - " + construction_stall_reason(rd);
-    const int eta = construction_eta_qtrs(rd, ticks_left);
+    const int eta = construction_eta_days(rd, days_left);
     if (rd.rate >= 1.0f)
-        return "Building... ~" + ticks_label(eta);
+        return "Building... ~" + days_label(eta);
     if (rd.has_binding)
-        return "Building... ~" + ticks_label(eta)
+        return "Building... ~" + days_label(eta)
              + (rd.binding_priced_out ? " (" + good + " priced out)" : " (short of " + good + ")");
-    return "Building... ~" + ticks_label(eta) + " (materials scarce)";
+    return "Building... ~" + days_label(eta) + " (materials scarce)";
 }
 
 // Colour for an analog build status: red paused, amber scarce, green on-schedule.
@@ -387,12 +396,12 @@ float construction_progress_fraction(const world& w, const recipe_registry& reg,
     const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
     if (capex > 0.0f)
         return std::clamp(b.construction_paid / capex, 0.0f, 1.0f);
-    // No priceable capex (no market yet): fall back to the ticks ratio, live
-    // denominator and all — an approximate bar beats no bar.
-    const int total = construction_build_ticks(w, reg, b.tile, b.type, b.target_resource);
+    // No priceable capex (no market yet): fall back to the DAYS ratio (Ben,
+    // 2026-10-24), live denominator and all — an approximate bar beats no bar.
+    const int total = construction_build_days(w, reg, b.tile, b.type, b.target_resource);
     if (total <= 0)
         return 0.0f;
-    const float done = static_cast<float>(total - b.ticks_remaining) + b.construction_progress;
+    const float done = static_cast<float>(total - construction_days_left(b));
     return std::clamp(done / static_cast<float>(total), 0.0f, 1.0f);
 }
 
@@ -473,7 +482,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         float             progress  = 0.0f; ///< construction_paid / capex.
         float             cost_left = 0.0f;
         construction_read rd;
-        int               ticks_left = 0;
+        int               days_left = 0; ///< Days of work left (Ben, 2026-10-24).
         // BL-1365: the row reads in glyphs, so it needs what the glyph and the
         // pip key on as well as the words.
         building_type type  = building_type::none;
@@ -490,9 +499,9 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         row.id         = id;
         row.name       = building_group_name(w, reg, b);
         row.progress   = construction_progress_fraction(w, reg, b);
-        row.ticks_left = b.ticks_remaining;
+        row.days_left  = construction_days_left(b);
         row.rd         = read_construction(w, reg, b.type, b.target_resource, b.recipe, b.tile,
-                                           b.state_idle);
+                                           b.state_idle, row.days_left);
         const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
         row.cost_left     = std::max(0.0f, capex - b.construction_paid);
         row.type          = b.type;
@@ -559,7 +568,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
     // naming its column. The cell is now a BAR carrying its own percentage, the
     // authored 25/75 % colour bands moving from the cell background onto the fill.
     ImGui::TableSetupColumn("Done",  ImGuiTableColumnFlags_WidthFixed, construction_grid::bar);
-    ImGui::TableSetupColumn("Qtrs",  ImGuiTableColumnFlags_WidthFixed, construction_grid::eta);
+    ImGui::TableSetupColumn("Days",  ImGuiTableColumnFlags_WidthFixed, construction_grid::eta);
     ImGui::TableSetupColumn("Cost",  ImGuiTableColumnFlags_WidthFixed, construction_grid::cost);
     ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
     ImGui::TableHeadersRow();
@@ -635,13 +644,13 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         // takes longer than its ticks say, and a paused one has no honest ETA — so
         // a paused row prints an em dash and leaves the saying-why to the card.
         const ImVec2 ep  = ImGui::GetCursorScreenPos();
-        const int    eta = construction_eta_qtrs(row.rd, row.ticks_left);
+        const int    eta = construction_eta_days(row.rd, row.days_left);
         if (eta < 0)
             ImGui::TextColored(construction_status_colour(row.rd), "\xe2\x80\x94");
         else
             ImGui::TextColored(construction_status_colour(row.rd), "%d", eta);
         {
-            // The quarters column explains the COUNT, and an em dash is a reading
+            // The days column explains the COUNT, and an em dash is a reading
             // too: a paused build has no honest ETA, which is why the cell is blank
             // rather than optimistic. WHY it is paused is the state mark's.
             char buf[220];
@@ -651,7 +660,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             else
                 std::snprintf(buf, sizeof buf,
                               "About %s left at the rate it is building now.",
-                              ticks_label(eta).c_str());
+                              days_label(eta).c_str());
             cells.push_back(construction_cell("eta", ep, construction_grid::eta, buf,
                                               ImGui::ColorConvertFloat4ToU32(
                                                   construction_status_colour(row.rd))));
@@ -685,7 +694,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             // of that clause (through `construction_stall_reason`), so this
             // explainer and the status line on the site card cannot drift.
             cells.push_back(construction_cell(
-                "state", sp, construction_grid::state, construction_status(row.rd, row.ticks_left),
+                "state", sp, construction_grid::state, construction_status(row.rd, row.days_left),
                 ImGui::ColorConvertFloat4ToU32(construction_status_colour(row.rd))));
         }
 

@@ -50,6 +50,13 @@ uint64_t world::state_hash(int tick) const
     // folded below (sparse, so a nation that never traded or refunded hashes as
     // before).
     fnv1a_u32(h, player_entity);
+    // Construction days (Ben, 2026-10-24): the one cursor, sparse (0 at every
+    // quarter's close, which is where every step-driven hash is taken).
+    if (construction_quarter_day != 0)
+    {
+        fnv1a_u32(h, 0xC0DA7u);
+        fnv1a_i32(h, construction_quarter_day);
+    }
     {
         std::vector<entity_id> ids;
         for (const auto& [nid, nc] : nations)
@@ -126,6 +133,24 @@ uint64_t world::state_hash(int tick) const
             {
                 fnv1a_u32(h, 0x57A7E1u);
                 fnv1a_u32(h, id);
+            }
+            // Construction is measured in days (Ben, 2026-10-24): the site's days
+            // and this quarter's rate, its sub-day progress, a pending completion
+            // day and a prorated output share — sparse, on the supply factor's
+            // argument, so a building holding none of them contributes nothing.
+            // Folded as READ (`canonical_construction_days`), the shape the save writes.
+            if (const construction_day_state cd = canonical_construction_days(b); cd.any())
+            {
+                fnv1a_u32(h, 0xDA75u);
+                fnv1a_u32(h, id);
+                fnv1a_i32(h, cd.days);
+                fnv1a_i32(h, cd.rate);
+                fnv1a_i32(h, cd.paid);
+                fnv1a_i32(h, cd.milli);
+                fnv1a_i32(h, cd.completion_day);
+                fnv1a_i32(h, cd.share);
+                fnv1a_i32(h, cd.credit);  // Ben, 2026-10-25
+                fnv1a_i32(h, cd.arrears);
             }
         }
     }

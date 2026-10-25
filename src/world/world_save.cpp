@@ -494,6 +494,12 @@ bool nation_has_books(const nation_component& nc)
         || !nc.returns.empty();
 }
 
+/// v57 (Ben, 2026-10-24): a building carries construction-day state worth writing.
+bool building_has_construction_days(const building_component& b)
+{
+    return canonical_construction_days(b).any();
+}
+
 void w_corp(std::ostream& o, const legacy_corp_record& c)
 {
     w_str(o, c.name);
@@ -1099,7 +1105,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     w_id_store(out, w.tile_to_nation);
     // BL-1407 (v56): no corporation store. A PRE-v56 stream (the verification
     // writers only) carries the given records, ascending id, or an empty store.
-    if (version < world_save_version)
+    if (version <= k_world_save_version_pre_books)
     {
         w_count(out, corps != nullptr ? corps->size() : 0);
         if (corps != nullptr)
@@ -1336,7 +1342,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // return count, n x f32 in filed order). Nobody taxed: one empty count.
     // BL-1407: a corporation half, so PRE-v56 only (v56 keeps a nation's taxes
     // in its books, below).
-    if (version < world_save_version)
+    if (version <= k_world_save_version_pre_books)
     {
         static const std::map<entity_id, legacy_corp_record> no_corps;
         const std::map<entity_id, legacy_corp_record>& cs = corps != nullptr ? *corps : no_corps;
@@ -1369,7 +1375,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // the comment above says. Unconditional, it appended bytes no reader would eat.
     // BL-1404: v54 and later (the majors' v55 section follows it).
     // BL-1407: a corporation section, so v54 and v55 only.
-    if (version > k_world_save_version_pre_net && version < world_save_version)
+    if (version > k_world_save_version_pre_net && version <= k_world_save_version_pre_books)
     {
         static const std::map<entity_id, legacy_corp_record> no_corps;
         const std::map<entity_id, legacy_corp_record>& cs = corps != nullptr ? *corps : no_corps;
@@ -1412,7 +1418,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // nation with any book state, ascending id, as (id, f32 trade_reserve, f32
     // trade_points, f32 refund_unbooked, f32 refund_opening, u32 n, then n rows
     // of `w_return`, then n x f32 taxes, then n x f64 exact nets, filed order).
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_days)
     {
         std::vector<entity_id> ids;
         for (const auto& [nid, nc] : w.nations)
@@ -1435,6 +1441,48 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_f64(out, q.net);
         }
     }
+
+    // world_save_version 57 (Ben, 2026-10-24; PRODUCTION.md § Construction is
+    // measured in days): THE CONSTRUCTION DAYS, the last section. The world's one
+    // cursor, then every building holding any construction-day state, ascending
+    // id, as (id, days_remaining, build_rate_permille, build_paid_days,
+    // build_day_milli, completion_day, output_share_permille, on credit, arrears
+    // milli-days — Ben, 2026-10-25). A v56 stream ends
+    // before it and is read with its days derived from its ticks.
+    if (version == world_save_version)
+    {
+        w_i32(out, w.construction_quarter_day);
+        std::vector<entity_id> ids;
+        for (const auto& [bid, b] : w.buildings)
+            if (building_has_construction_days(b))
+                ids.push_back(bid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id bid : ids)
+        {
+            // The state AS READ (`canonical_construction_days`) — a writer that set
+            // a site's ticks only has its days derived, a complete building carries
+            // no site state — so the reader's span check always holds and the
+            // loaded world hashes as this one does.
+            const construction_day_state cd = canonical_construction_days(w.buildings.at(bid));
+            w_id(out, bid);
+            w_i32(out, cd.days);
+            w_i32(out, cd.rate);
+            w_i32(out, cd.paid);
+            w_i32(out, cd.milli);
+            w_i32(out, cd.completion_day);
+            w_i32(out, cd.share);
+            w_i32(out, cd.credit);  // Ben, 2026-10-25: built on credit since placement
+            w_i32(out, cd.arrears); // milli-days owed to the next clearing
+        }
+    }
+}
+
+void write_world_snapshot_pre_days(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (Ben, 2026-10-24): the v56 stream shape — no construction-days
+    // section — so the v56 reader has a producer. The game never writes an old version.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_days);
 }
 
 std::size_t world_save_books_section_bytes(const world& w)
@@ -1518,7 +1566,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_road_edges // BL-1340: v52, migrated
             && version != k_world_save_version_pre_net        // BL-1337: v53, nets as f32
             && version != k_world_save_version_pre_major      // BL-1404: v54, majors derived
-            && version != k_world_save_version_pre_books))    // BL-1407: v55, corporations folded
+            && version != k_world_save_version_pre_books      // BL-1407: v55, corporations folded
+            && version != k_world_save_version_pre_days))     // v56: days derived from ticks (Ben, 2026-10-24)
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -1611,7 +1660,7 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false;
     if (!r_id_store(in, s.tile_to_nation))
         return false;
-    if (version < world_save_version && !r_store(in, legacy, r_corp))
+    if (version <= k_world_save_version_pre_books && !r_store(in, legacy, r_corp))
         return false;
 
     if (!r_map(in, s.workforce_supply_overrides, r_id_pair,
@@ -1962,7 +2011,7 @@ bool read_world_snapshot(world& w, std::istream& in)
         // strictly ascending, with exactly its return count of finite,
         // non-negative figures. Refused whole otherwise. BL-1407: pre-v56 only.
         uint32_t ccount = 0;
-        if (version < world_save_version
+        if (version <= k_world_save_version_pre_books
             && (!r_u32(in, ccount) || ccount > legacy.size()))
             return false;
         entity_id cprev = null_entity;
@@ -1992,7 +2041,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // figures, each of which rounds to the f32 slot its record already carried
     // (the writer wrote that slot from this very double). Refused whole
     // otherwise. A v52 (and older) stream ends before it: every net is its slot.
-    if (version > k_world_save_version_pre_net && version < world_save_version) // v54, v55
+    if (version > k_world_save_version_pre_net && version <= k_world_save_version_pre_books) // v54, v55
     {
         uint32_t ccount = 0;
         if (!r_u32(in, ccount) || ccount > legacy.size())
@@ -2062,7 +2111,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // `r_return` reads one, its taxes finite and never negative, its exact net
     // finite, inside float range, and rounding to the row's f32 slot. Refused
     // whole otherwise.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_days)
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -2107,6 +2156,67 @@ bool read_world_snapshot(world& w, std::istream& in)
         }
     }
 
+    // v57 (Ben, 2026-10-24): the construction days. Untrusted: the cursor in
+    // [0, 90]; each row names a building in the stream, strictly ascending, never
+    // null; days non-negative and bounded, a site's days spanning exactly its
+    // ticks_remaining quarters (a complete building holds none); rate in
+    // [0, 1000]; paid days in [0, 90]; sub-day progress in [0, 1000); completion
+    // day in [0, 90]; share in [0, 1000]. Refused whole otherwise. A v56 (and
+    // older) stream ends before it: its cursor is 0 and each site's days are
+    // DERIVED from its ticks (`sync_construction_days`, x 90).
+    if (version == world_save_version)
+    {
+        const int qd = k_construction_quarter_days;
+        int32_t cursor = 0;
+        uint32_t count = 0;
+        if (!r_i32(in, cursor) || cursor < 0 || cursor > qd
+            || !r_u32(in, count) || count > s.buildings.size())
+            return false;
+        s.construction_quarter_day = cursor;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id bid = null_entity;
+            if (!r_id(in, bid) || bid == null_entity || (k > 0 && bid <= prev))
+                return false;
+            prev = bid;
+            const auto bit = s.buildings.find(bid);
+            if (bit == s.buildings.end())
+                return false;
+            building_component& b = bit->second;
+            int32_t days = 0, rate = 0, paid = 0, milli = 0, cday = 0, share = 0, credit = 0, owed = 0;
+            if (!(r_i32(in, days) && r_i32(in, rate) && r_i32(in, paid) && r_i32(in, milli)
+                  && r_i32(in, cday) && r_i32(in, share) && r_i32(in, credit) && r_i32(in, owed)))
+                return false;
+            // Ben, 2026-10-25: on credit only while building; arrears non-negative
+            // and bounded (a year of milli-days is far past any reachable figure).
+            if (credit < 0 || credit > 1 || (credit == 1 && b.ticks_remaining <= 0)
+                || owed < 0 || owed > 4 * qd * 1000)
+                return false;
+            const bool site_ok = (b.ticks_remaining > 0)
+                ? (days > 0 && days <= b.ticks_remaining * qd && (days + qd - 1) / qd == b.ticks_remaining)
+                : (days == 0);
+            if (!site_ok || rate < 0 || rate > 1000 || paid < 0 || paid > qd
+                || milli < 0 || milli >= 1000 || cday < 0 || cday > qd || share < 0 || share > 1000)
+                return false;
+            b.days_remaining        = days;
+            b.build_rate_permille   = rate;
+            b.build_paid_days       = paid;
+            b.build_day_milli       = milli;
+            b.completion_day        = cday;
+            b.output_share_permille = share;
+            b.build_on_credit       = (credit == 1);
+            b.build_arrears_milli   = owed;
+        }
+    }
+    else
+    {
+        // v56 and older: no day state was saved. Keyed writes: order-free.
+        for (auto& [bid, b] : s.buildings)
+            if (b.ticks_remaining > 0)
+                sync_construction_days(b);
+    }
+
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all
     // ids distinct — the only trades the seam can write. Refused whole.
@@ -2130,7 +2240,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // nations — buildings to their ground, money and reserves home, units, track,
     // trades, convoys and routes with them, the seat to its nation — and the
     // records are discarded. Ascending firm id.
-    if (version < world_save_version)
+    if (version <= k_world_save_version_pre_books)
     {
         std::map<entity_id, legacy_firm> firms;
         for (const auto& [cid, cc] : legacy)

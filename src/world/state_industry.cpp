@@ -552,24 +552,29 @@ float state_building_cost_bound(const world& w, const recipe_registry& reg,
         return c;
     };
 
-    if (b.ticks_remaining > 0)
+    if (b.ticks_remaining > 0 || b.build_arrears_milli > 0)
     {
         // A full-rate construction tick (run_construction: flat build cost over
         // the authored duration, and the per-tick need row, capacity included).
+        // Ben, 2026-10-25: a clearing that also pays days built on credit pays
+        // more than a quarter (construction_clearing_fraction); never priced
+        // below one quarter, as before.
         const float duration = e.build_duration_ticks;
+        const float qf = std::max(1.0f, construction_clearing_fraction(b));
         if (duration > 0.0f)
         {
-            bound += e.build_cost / duration;
+            bound += e.build_cost / duration * qf;
             const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
             std::array<float, resource_count> need{};
             for (std::size_t r = 0; r < resource_count; ++r)
-                need[r] = row[r] / duration;
+                need[r] = row[r] / duration * qf;
             const float cap_rate = reg.construction().capacity_per_build_tick;
             if (cap_rate > 0.0f)
-                need[static_cast<std::size_t>(resource_type::construction_capacity)] += cap_rate;
+                need[static_cast<std::size_t>(resource_type::construction_capacity)] += cap_rate * qf;
             bound += shelf_cost(need);
         }
-        return bound;
+        if (b.ticks_remaining > 0)
+            return bound;
     }
     if (b.decommissioned)
         return bound; // idle floor only: no inputs, no upkeep goods

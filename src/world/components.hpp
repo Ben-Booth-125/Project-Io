@@ -1033,13 +1033,17 @@ struct building_component
     /// producing (playtest patch, 2026-07-06 — a build-spree headless check found
     /// the player could place a dozen-plus buildings in a single instant burst
     /// with zero ticks elapsed, since construction had no time cost at all; this
-    /// is the pacing gate). Set from `building_economics::build_duration_ticks`
-    /// at placement; decremented (BL-095: by whole units as sub-tick progress
-    /// accumulates) each economy tick until it reaches 0, at which point the
-    /// building is built and operational.
+    /// is the pacing gate). Since construction is measured in DAYS (Ben,
+    /// 2026-10-24) it is the quarters `days_remaining` spans, ceil(days / 90),
+    /// kept in step by the daily advance (`advance_construction_to`); it reaches 0
+    /// on the day the site completes, at which point the building is built and
+    /// operational. `> 0` stays the one "still building" test every pass reads.
     int  ticks_remaining = 0;
 
-    /// BL-095: sub-tick construction progress accumulator in [0, 1). Each tick the
+    /// LEGACY since construction is measured in days (Ben, 2026-10-24): read once,
+    /// by `construction_days_left`'s derivation for a writer that set only the
+    /// ticks (a fixture, a v56 save), then zeroed; the daily progress lives in
+    /// `build_day_milli`. Historic note: BL-095: sub-tick construction progress accumulator in [0, 1). Each tick the
     /// build advances by a rate in [0, 1] set by how much of its per-tick material
     /// need the local market can supply (full/stretched/paused); when the
     /// accumulator crosses 1.0 one whole `ticks_remaining` unit is consumed. This
@@ -1054,6 +1058,51 @@ struct building_component
     /// cancelled build is refunded exactly what it consumed, never an estimate.
     /// Stays at its final figure once the build completes. world_save_version 37.
     float construction_paid = 0.0f;
+
+    // --- Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
+    // § Construction is measured in days). A building can finish between quarters.
+    // `ticks_remaining` stays the "still building" gate every pass reads, kept equal
+    // to the quarters `days_remaining` spans (ceil(days / 90)); a writer that sets
+    // ticks_remaining directly (a fixture, a v56 save) has its days derived from it
+    // (`sync_construction_days`). All SERIALISED in world_save v57's trailing
+    // construction-days section, and folded into state_hash sparsely.
+
+    /// Days of full-rate work left on this site; 0 once complete.
+    int  days_remaining = 0;
+
+    /// This quarter's supply rate, per-mille (1000 = full): the milli-days of work
+    /// the site makes each day. Set at the quarter's clearing (run_construction);
+    /// 0 = paused (or not yet cleared).
+    int  build_rate_permille = 0;
+
+    /// Days of THIS quarter the clearing's payment covers at that rate — 90, or the
+    /// days left in a site's last quarter. The site advances on at most this many.
+    int  build_paid_days = 0;
+
+    /// Progress toward the next whole day of work, in milli-days, [0, 1000).
+    int  build_day_milli = 0;
+
+    /// The day of the current quarter (1..90) the building completed on; 0 = none.
+    /// Turned into `output_share_permille` when the quarter closes.
+    int  completion_day = 0;
+
+    /// The share of the quarter just closed that this building stood complete,
+    /// per-mille. THIS economy tick's output, operating costs, wages, inputs,
+    /// upkeep goods and Logistic Point need are scaled by it; 1000 = a whole
+    /// quarter (every building but one that completed mid-quarter).
+    int  output_share_permille = 1000;
+
+    /// Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25): a site placed
+    /// between clearings builds from that day on CREDIT, at the rate its shelf
+    /// allows, and the next clearing pays for those days in arrears. True while the
+    /// site's current days are unpaid (placement to its first clearing).
+    bool build_on_credit = false;
+
+    /// The milli-days built on credit and not yet paid for. The next clearing pays
+    /// them with the quarter ahead (as far as the shelf covers both); a part the
+    /// shelf could not cover stays owed to the clearing after. Can outlive the
+    /// site: a short build completing on credit still pays at the next clearing.
+    int  build_arrears_milli = 0;
 
     /// BL-079: consecutive economy ticks this building has been estimated
     /// loss-making. Read only by the scoped background-corp agency (a non-player corp
@@ -1143,6 +1192,122 @@ inline float building_supply_scalar(const building_component& b)
              : ((b.supply_factor_permille <= 0)
                     ? 0.0f
                     : static_cast<float>(b.supply_factor_permille) / 1000.0f);
+}
+
+/// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
+/// is measured in days). The days of a quarter: an economy tick is 90 days
+/// (sim_loop::econ_tick_days).
+inline constexpr int k_construction_quarter_days = 90;
+
+/// The days of work a site has left. 0 once complete (`ticks_remaining <= 0` is the
+/// gate). Where `days_remaining` disagrees with `ticks_remaining` (a writer set the
+/// ticks directly — a fixture, a v56 save), the days are derived from the ticks: a
+/// quarter is 90 days, less the legacy `construction_progress` fraction of one.
+inline int construction_days_left(const building_component& b)
+{
+    if (b.ticks_remaining <= 0)
+        return 0;
+    const int q = k_construction_quarter_days;
+    if (b.days_remaining > 0 && (b.days_remaining + q - 1) / q == b.ticks_remaining)
+        return b.days_remaining;
+    const float part = (b.construction_progress > 0.0f && b.construction_progress < 1.0f)
+                           ? b.construction_progress : 0.0f;
+    const int days = b.ticks_remaining * q - static_cast<int>(part * static_cast<float>(q));
+    return days > 1 ? days : 1;
+}
+
+/// Bring a site's days into agreement with its ticks (above), in place; a complete
+/// building's construction state is cleared. Idempotent.
+inline void sync_construction_days(building_component& b)
+{
+    if (b.ticks_remaining <= 0)
+    {
+        b.days_remaining = 0;
+        b.build_rate_permille = 0;
+        b.build_paid_days = 0;
+        b.build_day_milli = 0;
+        b.build_on_credit = false; // arrears, if any, stay owed
+        return;
+    }
+    const int d = construction_days_left(b);
+    if (d != b.days_remaining)
+    {
+        b.days_remaining  = d;
+        b.build_day_milli = 0;
+    }
+    b.construction_progress = 0.0f; // legacy accumulator: read once, by the derivation
+}
+
+/// The construction-day state AS IT IS READ — the one shape the save writes and
+/// state_hash folds (Ben, 2026-10-24), so a save round trip hashes equal even when a
+/// writer set `ticks_remaining` alone (a founding that stands a site complete, a
+/// fixture): a complete building carries no site state, and a site's days are the
+/// ones its ticks span. Order: days, rate, paid days, sub-day milli, completion day,
+/// output share.
+struct construction_day_state
+{
+    int days = 0, rate = 0, paid = 0, milli = 0, completion_day = 0, share = 1000;
+    int credit = 0, arrears = 0; ///< Ben, 2026-10-25: on credit (0/1), milli-days owed
+    bool any() const
+    {
+        return days != 0 || rate != 0 || paid != 0 || milli != 0 || completion_day != 0
+            || share != 1000 || credit != 0 || arrears != 0;
+    }
+};
+inline construction_day_state canonical_construction_days(const building_component& b)
+{
+    construction_day_state s;
+    s.completion_day = b.completion_day;
+    s.share          = b.output_share_permille;
+    s.arrears        = b.build_arrears_milli > 0 ? b.build_arrears_milli : 0; // owed, built or not
+    if (b.ticks_remaining > 0)
+    {
+        s.days   = construction_days_left(b);
+        s.rate   = b.build_rate_permille;
+        s.paid   = b.build_paid_days;
+        s.milli  = (s.days == b.days_remaining) ? b.build_day_milli : 0;
+        s.credit = b.build_on_credit ? 1 : 0;
+    }
+    return s;
+}
+
+/// The share of a full quarter's work a CLEARING pays for (Ben, 2026-10-25): the
+/// days owed in arrears (built on credit since placement) plus the days ahead
+/// (a quarter, or the days left in a site's last quarter). Exactly 1.0f for a
+/// site with a quarter or more to go and nothing owed.
+inline float construction_clearing_fraction(const building_component& b)
+{
+    const int q     = k_construction_quarter_days;
+    const int ahead = (b.ticks_remaining > 0)
+                          ? std::min(construction_days_left(b), q) : 0;
+    const int owed  = b.build_arrears_milli > 0 ? b.build_arrears_milli : 0;
+    if (owed == 0 && ahead == q)
+        return 1.0f;
+    return (static_cast<float>(owed) / 1000.0f + static_cast<float>(ahead)) / static_cast<float>(q);
+}
+
+/// The share of a full quarter's work a site with @p days_left needs: 1 with a
+/// quarter or more to go, less in its last quarter. Its materials and flat cost
+/// are drawn in this share (run_construction's need row; the UI's mirror).
+inline float construction_quarter_fraction(int days_left)
+{
+    const int q = k_construction_quarter_days;
+    return (days_left >= q || days_left <= 0)
+               ? 1.0f
+               : static_cast<float>(days_left) / static_cast<float>(q);
+}
+
+/// The first-quarter proration (Ben, 2026-10-24): the share of the quarter just
+/// closed this building stood complete, as a multiplier. Exactly 1.0f for every
+/// building that ran the whole quarter, so their arithmetic is bit-for-bit
+/// unchanged.
+inline float building_output_share(const building_component& b)
+{
+    return (b.output_share_permille >= 1000)
+             ? 1.0f
+             : ((b.output_share_permille <= 0)
+                    ? 0.0f
+                    : static_cast<float>(b.output_share_permille) / 1000.0f);
 }
 
 /// Pooled resource quantities held by an entity.

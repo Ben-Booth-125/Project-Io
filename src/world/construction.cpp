@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"
 
+#include "economy_system.hpp"  // begin_construction_on_placement (Ben, 2026-10-25)
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked (BL-1273: the nation's tree; BL-588 before it)
@@ -77,7 +78,10 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
     const float duration = reg.economics(type).build_duration_ticks;
     if (duration <= 0.0f)
         return authored;
-    const float ticks = static_cast<float>(construction_build_ticks(w, reg, tile, type, target));
+    // Ben, 2026-10-24: the site's DAYS in quarters, unrounded — a last quarter
+    // of fewer than 90 days draws only its days (run_construction's need row).
+    const float ticks = static_cast<float>(construction_build_days(w, reg, tile, type, target))
+                      / static_cast<float>(k_construction_quarter_days);
     // BL-709 construction capacity: drawn flat per build tick, not per unit of
     // material (run_construction's need row), so it scales with the ticks alone.
     float capacity_cost = 0.0f;
@@ -89,17 +93,28 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
     return authored * ticks / duration + capacity_cost;
 }
 
-int construction_build_ticks(const world& w, const recipe_registry& reg,
-                             entity_id tile, building_type type, resource_type target)
+int construction_build_days(const world& w, const recipe_registry& reg,
+                            entity_id tile, building_type type, resource_type target)
 {
+    // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
+    // is measured in days): the authored quarters x 90 days, times the site
+    // multiplier, rounded to a whole day. 0 stays instant (some infrastructure
+    // types are undurationed by design); any real duration is floored at 1 day so
+    // the multiplier can never zero out a build that was supposed to take time.
     const float duration = reg.economics(type).build_duration_ticks;
-    // 0 stays instant (some infrastructure types are undurationed by design); any
-    // real duration is floored at 1 tick so the multiplier can never zero out a
-    // build that was supposed to take time.
     if (duration <= 0.0f)
         return 0;
     return std::max(1, static_cast<int>(std::lround(
-        duration * construction_site_multiplier(w, reg, tile, type, target))));
+        duration * static_cast<float>(k_construction_quarter_days)
+        * construction_site_multiplier(w, reg, tile, type, target))));
+}
+
+int construction_build_ticks(const world& w, const recipe_registry& reg,
+                             entity_id tile, building_type type, resource_type target)
+{
+    // The quarters those days span (Ben, 2026-10-24) — `ticks_remaining`'s gate.
+    const int days = construction_build_days(w, reg, tile, type, target);
+    return (days + k_construction_quarter_days - 1) / k_construction_quarter_days;
 }
 
 float construction_initial_workforce(building_type type)
@@ -250,7 +265,10 @@ construction_result construct_for(world& w, const recipe_registry& reg,
     // duration depends on WHERE, not just WHAT (construction_build_ticks above),
     // read before this building is inserted so it does not count itself toward
     // the stack discount.
-    bc.ticks_remaining = construction_build_ticks(w, reg, tile, type, target);
+    // Construction is measured in DAYS (Ben, 2026-10-24): the site's days of work,
+    // and the quarters they span as the gate every pass reads.
+    bc.days_remaining  = construction_build_days(w, reg, tile, type, target);
+    bc.ticks_remaining = (bc.days_remaining + k_construction_quarter_days - 1) / k_construction_quarter_days;
 
     if (type == building_type::extraction_site)
     {
@@ -267,6 +285,10 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // path seeds a route the wrong_air gate above would refuse.
         bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id_at(w, tile); // BL-429
     }
+
+    // Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25): the site builds
+    // from today on credit at the rate its shelf allows; the next clearing pays.
+    begin_construction_on_placement(w, reg, bc);
 
     w.buildings[bld_id]  = bc;
     w.stockpiles[bld_id] = stockpile_component{};

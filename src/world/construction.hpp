@@ -27,8 +27,8 @@ enum class construction_result : uint8_t
 
 /// BL-323 S3 site-time multiplier for building `type`/`target` on `tile`: landform
 /// x reach x stack, each 1.0 in the cheapest case (PRODUCTION.md § Construction site
-/// time). It scales the build's duration, and since the per-tick draw is the authored
-/// cost over the AUTHORED duration, it scales the materials and cash drawn too.
+/// time). It scales the build's duration in days, and since the quarter's draw is the
+/// authored cost over the AUTHORED duration, it scales the materials and cash drawn too.
 /// Const: reads the reach field without building it (an unbuilt field reads 1.0).
 float construction_site_multiplier(const world& w, const recipe_registry& reg,
                                    entity_id tile, building_type type, resource_type target);
@@ -41,9 +41,16 @@ float construction_site_multiplier(const world& w, const recipe_registry& reg,
 /// build door does rather than inventing a state construction never makes.
 float construction_initial_workforce(building_type type);
 
-/// The economy ticks a build of `type`/`target` on `tile` takes at full rate: the
-/// authored duration times the site multiplier, rounded, floored at 1; 0 for an
-/// instant (undurationed) type. What `construct_building` sets `ticks_remaining` to.
+/// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
+/// is measured in days): the days a build of `type`/`target` on `tile` takes at full
+/// rate — the authored duration (quarters x 90 days) times the site multiplier,
+/// rounded to a whole day, floored at 1; 0 for an instant (undurationed) type. What
+/// `construct_building` sets `days_remaining` to.
+int construction_build_days(const world& w, const recipe_registry& reg,
+                            entity_id tile, building_type type, resource_type target);
+
+/// The quarters those days span (ceil(days / 90)): what `construct_building` sets
+/// `ticks_remaining`, the "still building" gate, to.
 int construction_build_ticks(const world& w, const recipe_registry& reg,
                              entity_id tile, building_type type, resource_type target);
 
