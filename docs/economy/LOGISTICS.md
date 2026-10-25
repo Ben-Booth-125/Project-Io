@@ -289,7 +289,8 @@ already roaded but stranded on a fragment the capital's network does not reach i
 way. The join runs after the last stamper and before the Logistic Point seeding, because the
 seeding covers only what a road reaches. A site with no such route to its capital — ground open
 sea, a strait wider than the cap, or a neighbour cuts off — is counted, not forced: it keeps the nearest-road rule
-above, and the seeding's sea bridge or a later road serves it.
+above, and the seeding's port link (§ Logistic Points, *Every overseas building group gets a port
+link*) or a later road serves it.
 
 **Pathfinding is unchanged in shape.** A* still walks 4-cardinal neighbours over the body grid and
 still derives the hex side of each step (`hex_side_for_offset`), the two diagonal sides the
@@ -817,6 +818,21 @@ cross land between its ends is not a strait — and an island already bridged is
 the next one out. One bridge per island serves every consumer on it. Where no water route within
 a port's reach joins the ground to the chain, the consumer is left uncovered and the seeding counts
 it rather than placing a source that would deliver nothing.
+
+**Every overseas building group gets a port link (Ben, 2026-10-25: "Generate port links for
+nations").** A nation's buildings on ground its capital's road network cannot reach — water wider
+than the bridge cap lies between — are joined to it by a **port link**: a port on each coast, joined
+by sea, and **each port roaded into the network on its own coast**. Points travel only along roads
+and rail, so a port no road reaches is a port no hub's points reach, and the link would carry
+nothing. The home port's road joins the capital's network (or, island-hopping, the network of an
+island linked before); the overseas port's road joins the network its buildings stand on. Both are
+laid the way a site's road is — a Track over the nation's own ground, a bridge only within the cap
+— and the shore tile chosen for each port is the one nearest the other coast by sea that such a
+road can reach. A building on the linked ground standing on a road fragment the port's road misses
+is joined to the port's network the same way. Through the link, those buildings draw Logistic
+Points from the capital's chain. The ports are the nation's own buildings on its own ground. The
+bridge cap is unchanged: the link is how a nation crosses water a bridge may not span. Ground with
+no coast, or no own-ground road to one, gets no link and is counted.
 
 How many sources, at what tier, and how the lesser centres are ranked are **in-band calibration**:
 chosen against these three rules, logged, and re-measured by the coverage census rather than fixed

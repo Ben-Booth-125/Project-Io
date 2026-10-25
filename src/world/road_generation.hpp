@@ -458,6 +458,17 @@ site_road_stats lay_site_roads(world& w, entity_id body);
 /// The one call `finish_campaign_world` and its harness mirror make (Ben, 2026-10-24).
 site_road_stats lay_site_roads_every_body(world& w);
 
+/// THE PORT LINK'S ROAD (Ben, 2026-10-25; LOGISTICS.md § The port link). Join @p from to
+/// the road network holding @p anchor -- the anchor and every cell its roaded edges reach
+/// over @p nation's own land and bridges -- by an own-ground Track, the site pass's own
+/// join: the nation's dry cells and bridge runs of at most kMaxCrossingTiles, never
+/// foreign ground or open ocean. True when @p from is on that network afterwards (laid
+/// or already there); false, laying nothing, when no such route exists. Both tiles must
+/// be the nation's dry ground on one body. @p crossings_laid, when given, is added to.
+/// Drops the logistics caches when it lays. Deterministic.
+bool lay_own_ground_join(world& w, entity_id nation, entity_id from, entity_id anchor,
+                         int* crossings_laid = nullptr);
+
 /// Undo every raise @p trace recorded, last first: the road field as `lay_market_roads`
 /// found it. Drops the logistics caches. For instruments reading the pre-pass network
 /// (market_gravity_ladder folds on it; road_generation_harness reads "before").

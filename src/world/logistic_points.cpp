@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"       // body_tile_grid, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
+#include "road_generation.hpp"  // lay_own_ground_join: the port link's road (Ben, 2026-10-25)
 #include "river_generation.hpp" // BL-1340: hex_side_for_offset — a step prices the edge it crosses
 #include "hex_neighbors.hpp"    // BL-1396: the sea walk crosses all six hex sides
 #include "state_industry.hpp"  // state_gate_would_idle (the reading at the gate)
@@ -1594,18 +1595,42 @@ lp_seed_report seed_logistics_sources(world& w)
         return lp_sea_walk(w, body, seeds);
     };
 
-    // Bridge an island to the chain by sea: a HOME port (an existing connected one, or a
-    // new one on the capital's coast where the road chain touches it) whose sea reach
-    // covers the island's coast, then an island port there. A sea step costs the same
-    // both ways (1 a sea step, 1 a landing), so one field
-    // FROM the island's coast reads every home candidate's distance. Least distance,
+    // THE PORT LINK (BL-1356; Ben, 2026-10-21, and 2026-10-25: "Generate port links for
+    // nations"). Ground of a nation's cut off from its capital's road network by water no
+    // bridge spans gets a port on each coast, joined by sea - a HOME port on a shore already
+    // joined to the capital (an existing connected port, or a new one on the capital's own
+    // ground or an island linked before) and an ISLAND port on the cut-off ground's shore -
+    // and EACH PORT IS ROADED INTO THE NETWORK ON ITS OWN COAST, by the site pass's own-ground
+    // join (`lay_own_ground_join`): the network is the roads and the rail (Ben, 2026-10-24),
+    // so a port no road reaches is a port no hub's points reach, and a port no hub covers
+    // joins nothing. A sea step costs the same both ways (1 a sea step, 1 a landing), so one
+    // field FROM the island's coast reads every home candidate's distance. Least distance,
     // then the lower tile id: order-independent. False when the sea is too wide.
     std::set<std::tuple<entity_id, entity_id, entity_id>> bridged;
     // The ground of every island bridged so far, per (nation, body): its shore is as good
     // a home shore as the capital's for the next island out (island-hopping).
     std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> bridged_ground;
+    // Every tile of a linked island -> the island port's tile: the network a road on that
+    // ground joins (a later consumer's, or a home port's for the next island out).
+    std::map<entity_id, entity_id> ground_port;
+    // The road a port link lays: @p from joined to the network holding @p anchor. A laid
+    // crossing moves every road field, so the memo's fields and chains are dropped.
+    const auto link_road = [&](entity_id nation, entity_id from, entity_id anchor) -> bool {
+        int laid = 0;
+        if (!lay_own_ground_join(w, nation, from, anchor, &laid))
+            return false;
+        rep.link_crossings += laid;
+        if (laid > 0)
+        {
+            memo.fields.clear();
+            memo.connected.clear();
+        }
+        return true;
+    };
+    constexpr int k_link_tries = 8; // shore candidates tried, nearest first, per port
     const auto bridge = [&](entity_id nation, entity_id body, entity_id ct,
-                            const std::set<entity_id>& island, entity_id owner) -> bool {
+                            const std::set<entity_id>& island, entity_id target,
+                            entity_id owner) -> bool {
         std::vector<entity_id> shore;
         for (const entity_id t : island)
             if (coastal(t) && placeable(t, nation))
@@ -1634,27 +1659,39 @@ lp_seed_report seed_logistics_sources(world& w)
         }
         // (ii) else a new port on a shore already joined to the capital - the capital's
         //      own ground, or an island bridged before - the shore tile nearest the island
-        //      by sea. The road chain is laid out to it first (a hub carrying it at full
-        //      strength), so the port joins the chain - a connected hub's reach covers its
-        //      tile, and a link counts either way (NR-1058).
+        //      by sea that a road joins to the network there. The road chain is laid out to
+        //      it (a hub carrying it at full strength), so the port joins the chain - a
+        //      connected hub's reach covers its tile, and a link counts either way (NR-1058).
         if (home == null_entity)
         {
             std::set<entity_id> homeland = region_of(nation, body, ct);
             if (const auto bg = bridged_ground.find({nation, body}); bg != bridged_ground.end())
                 homeland.insert(bg->second.begin(), bg->second.end());
+            std::vector<std::pair<float, entity_id>> cands;
             for (const entity_id t : homeland)
             {
                 if (!coastal(t) || !placeable(t, nation))
                     continue;
                 const float d = in_reach(t);
-                if (d >= 0.0f && (home == null_entity || d < home_d || (d == home_d && t < home)))
+                if (d >= 0.0f)
+                    cands.push_back({d, t});
+            }
+            std::sort(cands.begin(), cands.end()); // least distance, then the lower tile id
+            int tries = 0;
+            for (const auto& [d, t] : cands)
+            {
+                if (tries++ >= k_link_tries)
+                    break;
+                const auto gp = ground_port.find(t);
+                if (link_road(nation, t, gp != ground_port.end() ? gp->second : ct))
                 {
                     home   = t;
                     home_d = d;
+                    break;
                 }
             }
             if (home == null_entity)
-                return false; // the sea is wider than a port's reach
+                return false; // the sea is wider than a port's reach, or no road reaches a shore
             if (coverage_of(nation, body, home) < 1.0f)
                 lay_chain(nation, body, ct, home, owner, /*avoid=*/home);
             // The port joins the chain only through a connected source whose reach covers
@@ -1665,27 +1702,48 @@ lp_seed_report seed_logistics_sources(world& w)
             if (hub_tiles.count(home) != 0 || !place_source(nation, home, owner, building_type::port))
                 return false;
         }
-        // the island port: the shore tile nearest the home port by sea
+        // the island port: the shore tile nearest the home port by sea that a road joins to
+        // the network the target stands on
         const auto fh = water_field(body, {home});
-        entity_id land = null_entity;
-        float land_d = 0.0f;
+        std::vector<std::pair<float, entity_id>> lands;
         for (const entity_id t : shore)
         {
             const auto it = fh.find(t);
             if (it == fh.end() || !(lp_reach(lp_network::sea, it->second) > 0.0f) || !placeable(t, nation))
                 continue;
-            if (land == null_entity || it->second < land_d || (it->second == land_d && t < land))
+            lands.push_back({it->second, t});
+        }
+        std::sort(lands.begin(), lands.end());
+        entity_id land = null_entity;
+        int tries = 0;
+        for (const auto& [d, t] : lands)
+        {
+            (void)d;
+            if (tries++ >= k_link_tries)
+                break;
+            if (link_road(nation, t, target))
             {
-                land   = t;
-                land_d = it->second;
+                land = t;
+                break;
             }
         }
         if (land == null_entity)
             return false;
         if (!place_source(nation, land, owner, building_type::port))
             return false;
+        for (const entity_id t : island)
+            ground_port.emplace(t, land);
         ++rep.islands_bridged;
         return true;
+    };
+    // A consumer on linked ground that the chain still misses stands on a road fragment the
+    // island port's road does not reach: join it to the port's network, then lay the chain.
+    const auto rejoin_linked = [&](entity_id nation, entity_id body, entity_id ct, entity_id tile,
+                                   entity_id owner) -> bool {
+        const auto gp = ground_port.find(tile);
+        if (gp == ground_port.end() || !link_road(nation, tile, gp->second))
+            return false;
+        return lay_chain(nation, body, ct, tile, owner);
     };
 
     // 0. THE CAPITAL IS THE PEAK (BL-1367; LOGISTICS.md § Where generation puts the
@@ -1763,12 +1821,13 @@ lp_seed_report seed_logistics_sources(world& w)
                 continue;
             const std::set<entity_id> island = flood_own(nation, body, centre);
             const auto key = std::make_tuple(nation, body, *island.begin());
-            if (bridged.count(key) == 0 && bridge(nation, body, ct, island, owner))
+            if (bridged.count(key) == 0 && bridge(nation, body, ct, island, centre, owner))
             {
                 bridged.insert(key);
                 bridged_ground[{nation, body}].insert(island.begin(), island.end());
             }
-            lay_chain(nation, body, ct, centre, owner);
+            if (!lay_chain(nation, body, ct, centre, owner))
+                rejoin_linked(nation, body, ct, centre, owner);
         }
     }
 
@@ -1818,12 +1877,13 @@ lp_seed_report seed_logistics_sources(world& w)
         {
             const std::set<entity_id> island = flood_own(nation, body, b.tile); // holds b.tile
             const auto key = std::make_tuple(nation, body, *island.begin());
-            if (bridged.count(key) == 0 && bridge(nation, body, ct, island, owner))
+            if (bridged.count(key) == 0 && bridge(nation, body, ct, island, b.tile, owner))
             {
                 bridged.insert(key);
                 bridged_ground[{nation, body}].insert(island.begin(), island.end());
             }
-            covered = lay_chain(nation, body, ct, b.tile, owner);
+            covered = lay_chain(nation, body, ct, b.tile, owner)
+                   || rejoin_linked(nation, body, ct, b.tile, owner);
         }
         if (pass == 0)
             continue; // counted after the retry
@@ -1917,7 +1977,7 @@ lp_seed_report seed_logistics_sources(world& w)
         if (!placed_any)
             break;
     }
-    if (rep.hubs_placed > 0 || rep.ports_placed > 0) // a port moves the sea-leg caches too
+    if (rep.hubs_placed > 0 || rep.ports_placed > 0 || rep.link_crossings > 0) // a port moves the sea-leg caches too
         invalidate_logistics_caches(w);
 
     // 3. The reading.
@@ -1992,13 +2052,13 @@ void print_lp_seed_report(const lp_seed_report& r)
     std::printf("[lp] seeding: %d hubs placed; sources road %d rail %d sea %d (%d more the funding "
                 "gate idles); %d consumers "
                 "(%d full, %d partial, %d uncovered, %d on nobody's ground; %d no hub could connect, %d of them cut off; "
-                "%d ports bridging %d islands); "
+                "%d ports bridging %d islands, %d link crossings); "
                 "need %.1f, pool %.1f, "
                 "granted %.1f (%.1f%%) over %d nations\n",
                 r.hubs_placed, r.sources_by_net[0], r.sources_by_net[1], r.sources_by_net[2],
                 r.gate_idled_sources, r.consumers, r.fully_covered, r.partly_covered, r.uncovered, r.nobodys_ground,
                 r.unconnectable, r.unconnectable_cut_off, r.ports_placed, r.islands_bridged,
-                static_cast<double>(r.need_total), static_cast<double>(r.pool_total),
+                r.link_crossings, static_cast<double>(r.need_total), static_cast<double>(r.pool_total),
                 static_cast<double>(r.granted_total),
                 r.need_total > 0.0f ? 100.0 * r.granted_total / r.need_total : 0.0, r.nations);
     std::fflush(stdout);
