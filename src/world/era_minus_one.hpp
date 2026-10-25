@@ -438,6 +438,7 @@ struct era_minus_one_fixture
     int tail_parts_detached  = 0;
     int tail_provinces_split = 0;
     int tail_cores_floor_moved = 0; ///< BL-1310: tail nations under the floor that kept a larger piece
+    int tail_islet_tiles_carried = 0; ///< NR-1077: islet tiles the tail's cessions carried with their province
 
     /// The 1960 close exactly as generation folded it
     /// (`make_industrialisation_output`), default-constructed when the span did

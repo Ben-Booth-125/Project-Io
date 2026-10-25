@@ -268,7 +268,6 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             exclave_cession ex;
             if (!next_exclave_cession(own, water, gw, gh, core_tile, order, ex, &cells, &unit_anchor)) break;
             const int a  = ex.from;
-            const int ca = cells[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(a)])]; // the cedent's core region
             const std::vector<int> pre_cells = cells; // the cells as the cession was found (the province check)
             const auto at = [&](int t) -> std::size_t { // index of tile t in ex.tiles (sorted)
                 return static_cast<std::size_t>(std::lower_bound(ex.tiles.begin(), ex.tiles.end(), t) - ex.tiles.begin());
@@ -288,16 +287,17 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                     moved_to[r] = ex.part_key[at(anchor_of(static_cast<int>(r)))];
                 }
 
-            // GROUND ONLY: the exclave moves, nothing else. A moved province's
-            // cell ground OUTSIDE the exclave (an islet Pass 2b hung on it)
-            // stays with the cedent, under its core region.
-            for (int t = 0; t < total; ++t)
-            {
-                if (water[static_cast<std::size_t>(t)]) continue;
-                const int r = cells[static_cast<std::size_t>(t)];
-                if (r < 0 || !moving[static_cast<std::size_t>(r)] || in_x(t)) continue;
-                cells[static_cast<std::size_t>(t)] = ca;
-            }
+            // THE ISLETS GO WITH THEIR PROVINCE (NR-1077; § Pass 2e, Ben
+            // 2026-10-25: "a cession takes the Pass 2b islets hung on the
+            // ceded province with it"). A moved province's cell ground OUTSIDE
+            // the exclave -- an islet Pass 2b hung on it -- goes to the
+            // province's receiver: it keeps the province's cell where a realm
+            // receives (the region moves, and the islet with it), and joins
+            // the cell the province's anchor joins where unheld ground does.
+            // Read here, before the parts relabel the exclave. The cedent's
+            // core group is never carried. Ground, as ever: no name, no count.
+            const std::vector<carried_islet> islets =
+                islets_carried_by_cession(own, gw, gh, ex, cells, unit_anchor, core_tile[static_cast<std::size_t>(a)]);
             const int from_seat = a < KP ? seat_of(a) : -1;
 
             // THE PARTS (sec Pass 2e, Ben 2026-10-18: split among the nations
@@ -432,6 +432,14 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 ++plan.cessions;
                 if (part_moved.empty()) ++plan.cessions_islet;
                 if (late) ++plan.cessions_late;
+            }
+            // The islets, after the parts: each takes the cell its province's
+            // anchor now stands in (its own where a realm received it).
+            for (const carried_islet& isl : islets)
+            {
+                const int pc = cells[static_cast<std::size_t>(anchor_of(isl.cell))];
+                for (const int t : isl.tiles) cells[static_cast<std::size_t>(t)] = pc;
+                plan.islet_tiles_carried += static_cast<int>(isl.tiles.size());
             }
             if (split) ++plan.cessions_split;
             // THE CHECK the audit reads: no moved province spans two parts.

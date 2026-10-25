@@ -268,6 +268,31 @@ bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>
 // province only where that anchor stands in the same exclave; otherwise, and
 // without @p unit, every tile is its own unit (the tail's tile-by-tile split).
 
+/// NR-1077 — ONE ISLET a cession carries (§ Pass 2e, Ben 2026-10-25: "a
+/// cession takes the Pass 2b islets hung on the ceded province with it").
+struct carried_islet
+{
+    int cell = -1;          ///< the moved province (unit) whose cell holds it
+    int to   = -1;          ///< the key it goes to: its province's part's receiver
+    std::vector<int> tiles; ///< its land tiles, ascending
+};
+
+/// NR-1077 — the islets @p ex carries. A province MOVES when its anchor
+/// (@p cell_anchor, per unit) stands in the exclave and its cell (@p cell, per
+/// tile) still holds it; every land tile of a moving province's cell the
+/// cedent still holds OUTSIDE the exclave and outside its core group (the
+/// group of @p core_tile) is an islet Pass 2b hung on that cell, grouped per
+/// cell into cardinal components. Each component goes to the receiver of the
+/// exclave tile of its cell nearest it (Chebyshev, column-wrapped; ties to the
+/// lower tile): on a settled world, where a province never splits, the
+/// province's own receiver; tile by tile, the part it hangs from. PURE:
+/// ascending walks, no draw. Ordered by lowest tile.
+std::vector<carried_islet> islets_carried_by_cession(const std::vector<int>& owner, int gw, int gh,
+                                                     const exclave_cession& ex,
+                                                     const std::vector<int>& cell,
+                                                     const std::vector<int>& cell_anchor,
+                                                     int core_tile);
+
 /// BL-1310 — the honest seat where a realm's seat region has no carve cell of
 /// its own (its anchor stands on coastal water, so it never seeded): the
 /// realm's NEAREST PROVINCE, i.e. of @p tiles (the anchors of the realm's own
@@ -340,6 +365,10 @@ struct nation_fold_record
     /// BL-1310 (Ben 2026-10-18): nations under the floor whose core the tail
     /// moved to a larger piece than the seat's group.
     int32_t cores_floor_moved = 0;
+    /// NR-1077 (§ Pass 2e, Ben 2026-10-25): land tiles of a ceded province's
+    /// cell outside the exclave (the Pass 2b islets hung on it) that the
+    /// tail's cessions carried to the province's receiver.
+    int32_t islet_tiles_carried = 0;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

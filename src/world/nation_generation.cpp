@@ -1351,10 +1351,20 @@ std::vector<entity_id> generate_nations(
     // A tail cession, applied: each tile to the key its part went to (the
     // split, § Pass 2e), and ONE logged record per receiving part, naming the
     // seed its ground grew from (the caller records each as an event).
-    const auto apply_cession = [&](const exclave_cession& ex, std::vector<int>& land_owner, auto polity_of_key) {
+    const auto apply_cession = [&](const exclave_cession& ex, std::vector<int>& land_owner,
+                                   const std::vector<int>& cores, auto polity_of_key) {
         std::map<int, std::vector<int>> parts; // receiver -> its tiles, ascending
         for (std::size_t i = 0; i < ex.tiles.size(); ++i)
             parts[i < ex.part_key.size() ? ex.part_key[i] : ex.to].push_back(ex.tiles[i]);
+        // THE ISLETS GO WITH THEIR PROVINCE (NR-1077; § Pass 2e, Ben
+        // 2026-10-25): a moved seed's carve cell ground the cedent still holds
+        // outside the exclave -- an islet Pass 2b hung on it -- goes to the
+        // receiver of the part of that cell it hangs from. Read before the
+        // checks below, which judge the exclave's own parts only.
+        const int from_core = (ex.from >= 0 && static_cast<std::size_t>(ex.from) < cores.size())
+                                  ? cores[static_cast<std::size_t>(ex.from)] : -1;
+        const std::vector<carried_islet> islets =
+            islets_carried_by_cession(land_owner, gw, gh, ex, cell_seed, seeds, from_core);
         // THE CHECKS (world_audit reads them through the fixture): every part
         // touches its receiver's land as it stood BEFORE the cession (so it
         // joins it), and on a settled world no province spans two parts.
@@ -1388,6 +1398,13 @@ std::vector<entity_id> generate_nations(
                 }
             if (parts.size() > 1) ++fold_out->cessions_split;
         }
+        for (const carried_islet& isl : islets)
+        {
+            std::vector<int>& pt = parts[isl.to];
+            pt.insert(pt.end(), isl.tiles.begin(), isl.tiles.end());
+            std::sort(pt.begin(), pt.end());
+            if (fold_out) fold_out->islet_tiles_carried += static_cast<int32_t>(isl.tiles.size());
+        }
         for (const auto& [to, tiles] : parts)
             for (const int t : tiles)
             {
@@ -1413,7 +1430,7 @@ std::vector<entity_id> generate_nations(
         for (int guard = 0; guard < total; ++guard)
         {
             if (!next_exclave_cession(land_owner, water, gw, gh, seed_core, rank, ex, split_unit, split_unit_anchor)) break;
-            apply_cession(ex, land_owner, [&](int key) { return polity_of_seed(key); });
+            apply_cession(ex, land_owner, seed_core, [&](int key) { return polity_of_seed(key); });
             ++tail_cessions;
         }
         if (tail_cessions > 0) rederive_carve_water(owner_map, sub, gw, gh);
@@ -1483,7 +1500,7 @@ std::vector<entity_id> generate_nations(
         for (int guard = 0; guard < total; ++guard)
         {
             if (!next_exclave_cession(land_owner, water, gw, gh, core_tile, rank, ex, split_unit, split_unit_anchor)) break;
-            apply_cession(ex, land_owner,
+            apply_cession(ex, land_owner, core_tile,
                           [&](int key) { return polity_of_seed(survivor[static_cast<std::size_t>(key)]); });
             ++repaired;
         }
@@ -2351,6 +2368,116 @@ std::vector<reach_hit> reach_of(const land_groups& g, int c, const std::vector<i
 }
 
 } // namespace
+
+std::vector<carried_islet> islets_carried_by_cession(const std::vector<int>& owner, int gw, int gh,
+                                                     const exclave_cession& ex,
+                                                     const std::vector<int>& cell,
+                                                     const std::vector<int>& cell_anchor,
+                                                     int core_tile)
+{
+    std::vector<carried_islet> out;
+    const int total = gw * gh;
+    if (total <= 0 || static_cast<int>(owner.size()) < total || static_cast<int>(cell.size()) < total || ex.tiles.empty())
+        return out;
+    const auto in_x = [&](int t) { return std::binary_search(ex.tiles.begin(), ex.tiles.end(), t); };
+    const auto part_of = [&](int t) -> int {
+        const std::size_t i = static_cast<std::size_t>(std::lower_bound(ex.tiles.begin(), ex.tiles.end(), t) - ex.tiles.begin());
+        return i < ex.part_key.size() ? ex.part_key[i] : ex.to;
+    };
+    const int U = static_cast<int>(cell_anchor.size());
+    // The provinces the cession moves: a unit whose anchor stands in the
+    // exclave and whose cell still holds it (the split's own reading).
+    std::vector<char> moving(static_cast<std::size_t>(std::max(U, 0)), 0);
+    bool any = false;
+    for (int u = 0; u < U; ++u)
+    {
+        const int a = cell_anchor[static_cast<std::size_t>(u)];
+        if (a >= 0 && a < total && cell[static_cast<std::size_t>(a)] == u && in_x(a))
+        {
+            moving[static_cast<std::size_t>(u)] = 1;
+            any = true;
+        }
+    }
+    if (!any) return out;
+    // The cedent's core group stays put whatever its cells say.
+    std::vector<char> core(static_cast<std::size_t>(total), 0);
+    if (core_tile >= 0 && core_tile < total && owner[static_cast<std::size_t>(core_tile)] == ex.from)
+    {
+        std::vector<int> st{ core_tile };
+        core[static_cast<std::size_t>(core_tile)] = 1;
+        while (!st.empty())
+        {
+            const int t = st.back();
+            st.pop_back();
+            std::pair<int, int> nbrs[4];
+            int n = 0;
+            cardinal_neighbours(t % gw, t / gw, gw, gh, nbrs, n);
+            for (int i = 0; i < n; ++i)
+            {
+                const int v = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+                if (!core[static_cast<std::size_t>(v)] && owner[static_cast<std::size_t>(v)] == ex.from)
+                {
+                    core[static_cast<std::size_t>(v)] = 1;
+                    st.push_back(v);
+                }
+            }
+        }
+    }
+    // The islets: the moved province's cell ground the cedent still holds
+    // outside the exclave and outside its core, flooded per cell (ascending).
+    const auto hung = [&](int t) {
+        const int u = cell[static_cast<std::size_t>(t)];
+        return u >= 0 && u < U && moving[static_cast<std::size_t>(u)] && owner[static_cast<std::size_t>(t)] == ex.from
+            && !core[static_cast<std::size_t>(t)] && !in_x(t);
+    };
+    std::vector<char> seen(static_cast<std::size_t>(total), 0);
+    for (int s = 0; s < total; ++s)
+    {
+        if (seen[static_cast<std::size_t>(s)] || !hung(s)) continue;
+        carried_islet isl;
+        isl.cell = cell[static_cast<std::size_t>(s)];
+        std::vector<int> st{ s };
+        seen[static_cast<std::size_t>(s)] = 1;
+        while (!st.empty())
+        {
+            const int t = st.back();
+            st.pop_back();
+            isl.tiles.push_back(t);
+            std::pair<int, int> nbrs[4];
+            int n = 0;
+            cardinal_neighbours(t % gw, t / gw, gw, gh, nbrs, n);
+            for (int i = 0; i < n; ++i)
+            {
+                const int v = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+                if (!seen[static_cast<std::size_t>(v)] && hung(v) && cell[static_cast<std::size_t>(v)] == isl.cell)
+                {
+                    seen[static_cast<std::size_t>(v)] = 1;
+                    st.push_back(v);
+                }
+            }
+        }
+        std::sort(isl.tiles.begin(), isl.tiles.end());
+        // THE RECEIVER: the part of the province's cell the islet hangs from
+        // -- the exclave tile of that cell nearest the islet (Chebyshev,
+        // column-wrapped, Pass 2b's own measure), ties to the lower tile. A
+        // province never splits on a settled world, so there it is simply the
+        // province's receiver; tile by tile, it is the part nearest the islet.
+        int best_d = INT32_MAX, best_t = -1;
+        for (const int x : ex.tiles) // ascending: ties keep the lower tile
+        {
+            if (cell[static_cast<std::size_t>(x)] != isl.cell) continue;
+            for (const int t : isl.tiles)
+            {
+                const int d = grid_distance(t % gw, t / gw, x % gw, x / gw, gw);
+                if (d < best_d) { best_d = d; best_t = x; }
+            }
+        }
+        if (best_t < 0) continue; // seatbelt: a moving cell always has its anchor in the exclave
+        isl.to = part_of(best_t);
+        out.push_back(std::move(isl));
+    }
+    return out;
+}
 
 bool next_exclave_cession(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
                           const std::vector<int>& core_tile, const std::vector<int>& order,
